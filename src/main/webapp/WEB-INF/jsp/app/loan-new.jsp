@@ -33,10 +33,8 @@
                 </span>
             </div>
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li>Loan amount must be at most <strong id="eligibilityRatioValue">${ratioPercentLabel}</strong> of your savings balance.</li>
-                <li>Current savings: <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
+                <li>Your current savings: <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
                 <li>Maximum you can apply now: <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
-                <li>Example valid amount: <strong id="eligibilityExampleAmountValue">${exampleAmountLabel}</strong></li>
             </ul>
         </div>
         <div class="erp-section">
@@ -322,9 +320,7 @@
         const applicantSignatureOtpLiveStatus = document.getElementById("applicantSignatureOtpLiveStatus");
         const finalSubmitButton = form.querySelector("button[type='submit'][name='action'][value='SEND_TO_GUARANTORS']") || form.querySelector("button[type='submit']");
         const eligibilitySavingsValue = document.getElementById("eligibilitySavingsValue");
-        const eligibilityRatioValue = document.getElementById("eligibilityRatioValue");
         const eligibilityMaxAllowedValue = document.getElementById("eligibilityMaxAllowedValue");
-        const eligibilityExampleAmountValue = document.getElementById("eligibilityExampleAmountValue");
         const eligibilityExternalStatus = document.getElementById("eligibilityExternalInlineStatus");
         const eligibilityExternalSpinner = document.getElementById("eligibilityExternalSpinner");
         const eligibilityExternalStatusText = document.getElementById("eligibilityExternalStatusText");
@@ -569,14 +565,8 @@
                 if (payload.savingsLabel) {
                     eligibilitySavingsValue.textContent = payload.savingsLabel;
                 }
-                if (payload.ratioPercentLabel) {
-                    eligibilityRatioValue.textContent = payload.ratioPercentLabel;
-                }
                 if (payload.maxAllowedLabel) {
                     eligibilityMaxAllowedValue.textContent = payload.maxAllowedLabel;
-                }
-                if (payload.exampleAmountLabel) {
-                    eligibilityExampleAmountValue.textContent = payload.exampleAmountLabel;
                 }
                 if (eligibilityExternalSpinner) {
                     eligibilityExternalSpinner.classList.add("hidden");

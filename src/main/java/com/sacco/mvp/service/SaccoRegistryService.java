@@ -12,10 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,8 +52,7 @@ public class SaccoRegistryService {
         if (normalizedStationId == null) {
             throw new IllegalStateException("Select a station ID.");
         }
-        return saccoStationRepository.findBySaccoIdAndStationId(normalizeSaccoId(saccoId), normalizedStationId)
-            .filter(SaccoStation::isActive)
+        return saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue(normalizeSaccoId(saccoId), normalizedStationId)
             .map(SaccoStation::getStationId)
             .orElseThrow(() -> new IllegalStateException("Select a valid station ID for the chosen SACCO."));
     }
@@ -70,32 +73,79 @@ public class SaccoRegistryService {
         }
 
         OffsetDateTime now = OffsetDateTime.now();
-        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
-            .orElseGet(() -> RegisteredSacco.builder()
-                .saccoId(normalizedSaccoId)
-                .createdAt(now)
-                .build());
-        sacco.setSaccoName(normalizedSaccoName);
+        upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, now, false);
+        saccoConfigurationService.ensureDefaultLoanProducts(normalizedSaccoId);
+    }
+
+    @Transactional
+    public void updateSacco(String saccoId, String saccoName, String stationIdsText) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        String normalizedSaccoName = normalizeSaccoName(saccoName);
+        LinkedHashSet<String> stationIds = parseStationIds(stationIdsText);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        if (normalizedSaccoName == null) {
+            throw new IllegalStateException("Enter a SACCO name.");
+        }
+        if (stationIds.isEmpty()) {
+            throw new IllegalStateException("Enter at least one station ID.");
+        }
+
+        upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, OffsetDateTime.now(), true);
+    }
+
+    private void upsertSacco(String saccoId,
+                             String saccoName,
+                             LinkedHashSet<String> stationIds,
+                             OffsetDateTime now,
+                             boolean requireExisting) {
+        RegisteredSacco sacco = registeredSaccoRepository.findById(saccoId)
+            .orElseGet(() -> {
+                if (requireExisting) {
+                    throw new IllegalStateException("SACCO not found.");
+                }
+                return RegisteredSacco.builder()
+                    .saccoId(saccoId)
+                    .createdAt(now)
+                    .build();
+            });
+        sacco.setSaccoName(saccoName);
         sacco.setActive(true);
         sacco.setUpdatedAt(now);
         registeredSaccoRepository.save(sacco);
 
+        List<SaccoStation> existingStations = saccoStationRepository.findBySaccoIdOrderByStationIdAsc(saccoId);
+        Map<String, SaccoStation> existingByStationId = existingStations.stream()
+            .collect(Collectors.toMap(SaccoStation::getStationId, station -> station, (left, right) -> left, LinkedHashMap::new));
+        Set<String> requestedStations = stationIds.stream().collect(Collectors.toSet());
+        for (SaccoStation station : existingStations) {
+            boolean shouldStayActive = requestedStations.contains(station.getStationId());
+            if (station.isActive() != shouldStayActive) {
+                station.setActive(shouldStayActive);
+                station.setUpdatedAt(now);
+                saccoStationRepository.save(station);
+            }
+        }
+
         for (String stationId : stationIds) {
-            SaccoStation station = saccoStationRepository.findBySaccoIdAndStationId(normalizedSaccoId, stationId)
-                .orElseGet(() -> SaccoStation.builder()
+            if (existingByStationId.containsKey(stationId)) {
+                continue;
+            }
+            SaccoStation station = SaccoStation.builder()
                     .id(UUID.randomUUID())
-                    .saccoId(normalizedSaccoId)
+                    .saccoId(saccoId)
                     .stationId(stationId)
                     .createdAt(now)
-                    .build());
+                    .build();
             station.setActive(true);
             station.setUpdatedAt(now);
             saccoStationRepository.save(station);
         }
 
-        SaccoSettings settings = saccoSettingsRepository.findById(normalizedSaccoId)
+        SaccoSettings settings = saccoSettingsRepository.findById(saccoId)
             .orElseGet(() -> SaccoSettings.builder()
-                .saccoId(normalizedSaccoId)
+                .saccoId(saccoId)
                 .requiredGuarantors(3)
                 .boardSize(3)
                 .boardQuorum(2)
@@ -103,12 +153,12 @@ public class SaccoRegistryService {
                 .defaultLanguage("en")
                 .createdAt(now)
                 .build());
-        settings.setExternalSaccoName(normalizedSaccoName);
-        settings.setExternalStationId(stationIds.iterator().next());
+        settings.setExternalSaccoName(saccoName);
+        if (settings.getExternalStationId() == null || !requestedStations.contains(settings.getExternalStationId())) {
+            settings.setExternalStationId(stationIds.iterator().next());
+        }
         settings.setUpdatedAt(now);
         saccoSettingsRepository.save(settings);
-
-        saccoConfigurationService.ensureDefaultLoanProducts(normalizedSaccoId);
     }
 
     private LinkedHashSet<String> parseStationIds(String stationIdsText) {
@@ -165,6 +215,10 @@ public class SaccoRegistryService {
 
         public List<String> getStationIds() {
             return stationIds;
+        }
+
+        public String getStationIdsText() {
+            return stationIds == null ? "" : String.join(System.lineSeparator(), stationIds);
         }
     }
 }

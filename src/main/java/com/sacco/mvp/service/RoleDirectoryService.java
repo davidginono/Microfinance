@@ -38,6 +38,17 @@ public class RoleDirectoryService {
         return deduplicateAndSort(refs);
     }
 
+    public boolean hasActiveRoleInSacco(UUID memberId, String saccoId, Position position) {
+        if (memberId == null || saccoId == null || position == null) {
+            return false;
+        }
+        return memberRepository.findById(memberId)
+            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+            .filter(member -> saccoId.equals(member.getSaccoId()))
+            .filter(member -> member.getStaffRolesResolved().contains(position))
+            .isPresent();
+    }
+
     private List<RoleAccountRef> deduplicateAndSort(List<RoleAccountRef> refs) {
         Map<UUID, RoleAccountRef> uniqueRefs = new LinkedHashMap<>();
         refs.forEach(ref -> uniqueRefs.putIfAbsent(ref.getId(), ref));

@@ -28,6 +28,7 @@
                     <th>SACCO ID</th>
                     <th>SACCO Name</th>
                     <th>Stations</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -36,11 +37,18 @@
                         <td class="font-semibold text-slate-800">${sacco.saccoId}</td>
                         <td>${sacco.saccoName}</td>
                         <td>${sacco.stationIds}</td>
+                        <td class="whitespace-nowrap">
+                            <button type="button"
+                                    class="app-btn btn-primary"
+                                    data-sacco-modal-open="edit-${sacco.saccoId}">
+                                Edit
+                            </button>
+                        </td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty registeredSaccos}">
                     <tr>
-                        <td colspan="3" class="text-slate-500">No SACCOs have been registered yet.</td>
+                        <td colspan="4" class="text-slate-500">No SACCOs have been registered yet.</td>
                     </tr>
                 </c:if>
                 </tbody>
@@ -88,6 +96,48 @@
         </div>
     </div>
 </div>
+
+<c:forEach items="${registeredSaccos}" var="sacco">
+    <div class="app-modal-overlay hidden" data-sacco-modal="edit-${sacco.saccoId}">
+        <div class="app-modal-panel app-modal-panel--compact">
+            <div class="app-modal-scroll">
+                <div class="app-modal-header">
+                    <div>
+                        <p class="erp-panel-title">Edit SACCO</p>
+                        <p class="mt-2 text-sm text-slate-500">Update the SACCO name and active station IDs.</p>
+                    </div>
+                    <button type="button" class="app-modal-close" data-sacco-modal-close="edit-${sacco.saccoId}" aria-label="Close modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
+                <form action="/admin/saccos/${sacco.saccoId}" method="post" class="app-modal-body space-y-4">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <label class="block text-sm font-semibold text-slate-700">
+                        SACCO ID
+                        <input type="text" readonly class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="${sacco.saccoId}" />
+                    </label>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        SACCO Name
+                        <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${sacco.saccoName}" />
+                    </label>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        Station IDs
+                        <textarea name="stationIds" rows="5" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800">${sacco.stationIdsText}</textarea>
+                    </label>
+                    <div class="app-modal-section text-sm text-slate-600">
+                        Keep at least one station active for this SACCO. Removed station IDs will be disabled from future selection.
+                    </div>
+                    <div class="app-modal-actions">
+                        <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}">Cancel</button>
+                        <button type="submit" class="app-btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</c:forEach>
 
 <script>
     (function () {

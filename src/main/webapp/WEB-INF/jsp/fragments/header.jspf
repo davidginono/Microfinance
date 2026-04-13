@@ -744,6 +744,7 @@
             border-radius: 0.32rem !important;
         }
     </style>
+<%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="min-h-screen overflow-x-hidden font-sans text-sacco-ink antialiased" style="background: var(--page-bg);">
 <div class="min-h-screen w-full max-w-full overflow-x-hidden" style="background: var(--page-bg);">
@@ -1087,32 +1088,27 @@
             }
         });
 
-        const adminScopeOptionsNode = document.getElementById('adminScopeOptionsData');
-        const adminScopeSaccoSelect = document.getElementById('adminScopeSaccoSelect');
-        const adminScopeStationSelect = document.getElementById('adminScopeStationSelect');
-        if (adminScopeOptionsNode && adminScopeSaccoSelect && adminScopeStationSelect) {
+        window.addEventListener('load', function () {
+            const adminScopeOptionsNode = document.getElementById('adminScopeOptionsData');
+            const adminScopeSaccoSelect = document.getElementById('adminScopeSaccoSelect');
+            const adminScopeStationInput = document.getElementById('adminScopeStationSelect');
+            if (!adminScopeOptionsNode || !adminScopeSaccoSelect || !adminScopeStationInput) {
+                return;
+            }
             const adminScopeOptions = JSON.parse(adminScopeOptionsNode.textContent || '[]');
             const syncStationOptions = function () {
                 const selectedSacco = adminScopeSaccoSelect.value;
                 const scopeOption = adminScopeOptions.find(function (option) { return option.saccoId === selectedSacco; });
-                const currentStation = adminScopeStationSelect.value || '${not empty adminScope ? adminScope.stationId : ""}';
-                adminScopeStationSelect.innerHTML = '';
                 const stations = scopeOption && Array.isArray(scopeOption.stationIds) ? scopeOption.stationIds : [];
-                stations.forEach(function (stationId, index) {
-                    const option = document.createElement('option');
-                    option.value = stationId;
-                    option.textContent = stationId;
-                    if (stationId === currentStation || (currentStation === '' && index === 0)) {
-                        option.selected = true;
-                    }
-                    adminScopeStationSelect.appendChild(option);
-                });
-                if (!adminScopeStationSelect.value && adminScopeStationSelect.options.length > 0) {
-                    adminScopeStationSelect.selectedIndex = 0;
+                const currentStation = adminScopeStationInput.value || '${not empty adminScope ? adminScope.stationId : ""}';
+                if (stations.includes(currentStation)) {
+                    adminScopeStationInput.value = currentStation;
+                    return;
                 }
+                adminScopeStationInput.value = stations.length > 0 ? stations[0] : '';
             };
             adminScopeSaccoSelect.addEventListener('change', syncStationOptions);
             syncStationOptions();
-        }
+        });
     }());
 </script>

@@ -259,7 +259,7 @@ public class MemberRegistrationService {
     }
 
     private void requireRegisteredStation(String saccoId, String stationId) {
-        saccoStationRepository.findBySaccoIdAndStationId(saccoId, stationId)
+        saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue(saccoId, stationId)
             .orElseThrow(() -> new IllegalStateException("Select a valid station ID."));
     }
 

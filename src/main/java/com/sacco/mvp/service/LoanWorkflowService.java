@@ -82,6 +82,12 @@ public class LoanWorkflowService {
         LoanApplication application = existingId == null
             ? LoanApplication.builder().id(UUID.randomUUID()).createdAt(OffsetDateTime.now()).build()
             : loanApplicationRepository.findByIdAndApplicantMemberId(existingId, applicantId)
+                .map(existing -> {
+                    if (existing.getStatus() != LoanStatus.DRAFT) {
+                        throw new IllegalStateException("Only DRAFT applications can be edited.");
+                    }
+                    return existing;
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Loan draft not found"));
 
         application.setSaccoId(saccoId);

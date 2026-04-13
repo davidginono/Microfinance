@@ -1,9 +1,11 @@
 package com.sacco.mvp.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.SavingsAccount;
 import com.sacco.mvp.repository.*;
@@ -11,15 +13,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,14 +38,74 @@ class LoanWorkflowServiceTest {
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
+    @Mock private BoardReviewRepository boardReviewRepository;
+    @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private SavingsAccountRepository savingsAccountRepository;
+    @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Mock private FormSchemaService formSchemaService;
     @Mock private EligibilityService eligibilityService;
     @Mock private OutboxService outboxService;
+    @Mock private LoanAttachmentService loanAttachmentService;
+    @Spy private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock private SaccoConfigurationService saccoConfigurationService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
+
+    @Test
+    void saveDraftRejectsEditingApplicationOutsideDraftStatus() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(2)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        LoanApplication existing = LoanApplication.builder()
+            .id(appId)
+            .saccoId(saccoId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), anyString())).thenReturn(Map.of("purpose", "Working capital"));
+        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("1000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("9000"),
+                new BigDecimal("2999.70")));
+        when(eligibilityService.policySnapshotJson(any(), eq(2))).thenReturn("{}");
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            memberId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("1000"),
+            6,
+            Map.of("purpose", "Working capital"),
+            appId,
+            List.of(UUID.randomUUID(), UUID.randomUUID()),
+            "{\"balance\":1000}",
+            null,
+            null
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Only DRAFT applications can be edited.");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+        verify(loanAttachmentService, never()).store(any(), any(), anyString());
+    }
 
     @Test
     void loanAdvanceSkipsGuarantorStageOnSubmit() {
@@ -52,6 +122,7 @@ class LoanWorkflowServiceTest {
             .tenorMonths(3)
             .status(LoanStatus.DRAFT)
             .requiredGuarantors(0)
+            .financialSnapshot("{}")
             .formData("{}")
             .policySnapshot("{}")
             .createdAt(OffsetDateTime.now())

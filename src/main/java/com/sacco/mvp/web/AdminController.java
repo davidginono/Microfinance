@@ -258,6 +258,16 @@ public class AdminController {
         return "redirect:/admin/saccos";
     }
 
+    @PostMapping("/saccos/{saccoId}")
+    public String updateSacco(@PathVariable String saccoId,
+                              @RequestParam String saccoName,
+                              @RequestParam String stationIds,
+                              RedirectAttributes ra) {
+        saccoRegistryService.updateSacco(saccoId, saccoName, stationIds);
+        ra.addFlashAttribute("message", "SACCO registry updated.");
+        return "redirect:/admin/saccos";
+    }
+
     @PostMapping("/scope")
     public String updateScope(@RequestParam String saccoId,
                               @RequestParam String stationId,

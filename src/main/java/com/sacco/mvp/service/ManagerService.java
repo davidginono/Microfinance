@@ -139,8 +139,7 @@ public class ManagerService {
 
     @Transactional
     public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        LoanApplication app = getManagedApplication(loanId, managerId);
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
         }
@@ -217,8 +216,7 @@ public class ManagerService {
                                  BigDecimal installmentAmount,
                                  String disbursementReference,
                                  String disbursementNotes) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        LoanApplication app = getManagedApplication(loanId, managerId);
 
         if ("FINAL_APPROVE".equals(decision) && app.getStatus() == LoanStatus.BOARD_APPROVED) {
             RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
@@ -263,8 +261,7 @@ public class ManagerService {
 
     @Transactional
     public void markPaid(UUID loanId, UUID managerId, boolean paid) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        LoanApplication app = getManagedApplication(loanId, managerId);
 
         if (paid) {
             if (app.getStatus() != LoanStatus.FINAL_APPROVED) {
@@ -295,8 +292,7 @@ public class ManagerService {
 
     @Transactional
     public void undoDecision(UUID loanId, UUID managerId) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        LoanApplication app = getManagedApplication(loanId, managerId);
         ManagerReview latestReview = managerReviewRepository.findFirstByLoanApplicationIdOrderByCreatedAtDesc(loanId)
             .orElse(null);
 
@@ -311,6 +307,15 @@ public class ManagerService {
         }
 
         throw new IllegalStateException("Manager actions cannot be reversed after the application leaves manager review.");
+    }
+
+    private LoanApplication getManagedApplication(UUID loanId, UUID managerId) {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        if (!roleDirectoryService.hasActiveRoleInSacco(managerId, app.getSaccoId(), Position.MANAGER)) {
+            throw new IllegalArgumentException("Forbidden");
+        }
+        return app;
     }
 
     private void validateDisbursement(LocalDate disbursementDate,

@@ -113,10 +113,7 @@
                                     </c:forEach>
                                 </select>
                             </div>
-                            <div>
-                                <label for="adminScopeStationSelect" class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Station ID</label>
-                                <select id="adminScopeStationSelect" name="stationId" class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-cyan-400 focus:outline-none"></select>
-                            </div>
+                            <input type="hidden" id="adminScopeStationSelect" name="stationId" value="${adminScope.stationId}" />
                             <button type="submit" class="app-btn btn-primary w-full justify-center px-4 py-2 text-[0.76rem]">Apply SACCO Scope</button>
                         </form>
                     </div>

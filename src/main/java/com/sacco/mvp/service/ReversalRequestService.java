@@ -166,6 +166,9 @@ public class ReversalRequestService {
         if (reversalRequest.getStatus() != ReversalRequestStatus.PENDING) {
             throw new IllegalStateException("This reversal request has already been decided.");
         }
+        if (!roleDirectoryService.hasActiveRoleInSacco(managerMemberId, reversalRequest.getSaccoId(), Position.MANAGER)) {
+            throw new IllegalArgumentException("Forbidden");
+        }
 
         LoanApplication app = loanApplicationRepository.findById(reversalRequest.getLoanApplicationId())
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));

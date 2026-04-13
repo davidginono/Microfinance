@@ -8,7 +8,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SaccoStationRepository extends JpaRepository<SaccoStation, UUID> {
+    List<SaccoStation> findBySaccoIdOrderByStationIdAsc(String saccoId);
+
     List<SaccoStation> findBySaccoIdAndActiveTrueOrderByStationIdAsc(String saccoId);
 
     Optional<SaccoStation> findBySaccoIdAndStationId(String saccoId, String stationId);
+
+    Optional<SaccoStation> findBySaccoIdAndStationIdAndActiveTrue(String saccoId, String stationId);
 }

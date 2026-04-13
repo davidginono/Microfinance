@@ -12,3 +12,4 @@ cookies-*.txt
 *-dump.txt
 admin_dashboard_response.html
 login-after.html
+application-local.yml
