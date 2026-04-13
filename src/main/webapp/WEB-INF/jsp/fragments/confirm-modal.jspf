@@ -1,0 +1,130 @@
+<%@ include file="./modal-shell.jspf" %>
+<style>
+    .app-confirm-modal {
+        z-index: 120;
+    }
+</style>
+
+<div id="appConfirmModal" class="app-confirm-modal app-modal-overlay" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+        <div class="app-modal-header">
+            <div>
+                <p id="appConfirmEyebrow" class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Please Confirm</p>
+                <h2 id="appConfirmTitle" class="mt-2 text-2xl font-semibold text-sacco-ink">Confirm Action</h2>
+            </div>
+            <button type="button" id="appConfirmClose" class="app-modal-close" aria-label="Close confirmation">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </div>
+        <div class="app-modal-body">
+            <p id="appConfirmMessage" class="text-base leading-7 text-slate-700"></p>
+        </div>
+        <div class="app-modal-body pt-0">
+        <div class="app-modal-actions">
+            <button type="button" id="appConfirmCancel" class="app-btn btn-neutral">Cancel</button>
+            <button type="button" id="appConfirmProceed" class="app-btn btn-primary">Continue</button>
+        </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        if (window.bindAppConfirmModal) {
+            return;
+        }
+
+        window.bindAppConfirmModal = function () {
+            const modal = document.getElementById("appConfirmModal");
+            if (!modal || modal.dataset.bound === "true") {
+                return;
+            }
+
+            const body = document.body;
+            const title = document.getElementById("appConfirmTitle");
+            const eyebrow = document.getElementById("appConfirmEyebrow");
+            const message = document.getElementById("appConfirmMessage");
+            const proceed = document.getElementById("appConfirmProceed");
+            const cancel = document.getElementById("appConfirmCancel");
+            const close = document.getElementById("appConfirmClose");
+            let pendingForm = null;
+            let pendingSubmitter = null;
+
+            function closeModal() {
+                modal.classList.remove("is-open");
+                modal.setAttribute("aria-hidden", "true");
+                body.classList.remove("overflow-hidden");
+                pendingForm = null;
+                pendingSubmitter = null;
+            }
+
+            function openModal(form, submitter) {
+                pendingForm = form;
+                pendingSubmitter = submitter || null;
+                title.textContent = form.dataset.confirmTitle || "Confirm Action";
+                eyebrow.textContent = form.dataset.confirmEyebrow || "Please Confirm";
+                message.textContent = form.dataset.confirmMessage || "Do you want to continue?";
+                proceed.textContent = form.dataset.confirmProceed || "Continue";
+                modal.classList.add("is-open");
+                modal.setAttribute("aria-hidden", "false");
+                body.classList.add("overflow-hidden");
+                proceed.focus({ preventScroll: true });
+            }
+
+            document.addEventListener("submit", (event) => {
+                const form = event.target;
+                if (!(form instanceof HTMLFormElement) || !form.dataset.confirmMessage) {
+                    return;
+                }
+                if (form.dataset.confirmBypass === "true") {
+                    delete form.dataset.confirmBypass;
+                    return;
+                }
+                event.preventDefault();
+                openModal(form, event.submitter);
+            });
+
+            proceed.addEventListener("click", () => {
+                if (!pendingForm) {
+                    closeModal();
+                    return;
+                }
+                pendingForm.dataset.confirmBypass = "true";
+                const form = pendingForm;
+                const submitter = pendingSubmitter;
+                closeModal();
+                if (submitter && typeof form.requestSubmit === "function") {
+                    form.requestSubmit(submitter);
+                    return;
+                }
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                    return;
+                }
+                form.submit();
+            });
+
+            [cancel, close].forEach((button) => {
+                button.addEventListener("click", closeModal);
+            });
+
+            modal.addEventListener("click", (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape" && modal.classList.contains("is-open")) {
+                    closeModal();
+                }
+            });
+
+            modal.dataset.bound = "true";
+        };
+
+        window.bindAppConfirmModal();
+    })();
+</script>

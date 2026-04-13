@@ -1,0 +1,17 @@
+package com.sacco.mvp.domain;
+
+public enum LoanStatus {
+    DRAFT,
+    SUBMITTED,
+    AWAITING_GUARANTORS,
+    ALL_GUARANTORS_APPROVED,
+    READY_FOR_MANAGER,
+    MANAGER_REJECTED,
+    MANAGER_ACCEPTED,
+    AWAITING_BOARD,
+    BOARD_REJECTED,
+    BOARD_APPROVED,
+    FINAL_REJECTED,
+    FINAL_APPROVED,
+    PAID
+}

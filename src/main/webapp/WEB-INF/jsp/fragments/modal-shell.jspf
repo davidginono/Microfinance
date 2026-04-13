@@ -1,0 +1,126 @@
+<style>
+    .app-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(2px);
+    }
+
+    .app-modal-overlay.is-open {
+        display: flex;
+    }
+
+    .app-modal-panel {
+        width: min(100%, 54rem);
+        max-height: min(88vh, 52rem);
+        overflow: hidden;
+        border: 1px solid #dbe5f1;
+        border-radius: 1.75rem;
+        background: #ffffff;
+        box-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
+    }
+
+    .app-modal-panel--compact {
+        width: min(100%, 40rem);
+    }
+
+    .app-modal-panel--wide {
+        width: min(100%, 68rem);
+    }
+
+    .app-modal-scroll {
+        max-height: min(88vh, 52rem);
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .app-modal-scroll::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+    }
+
+    .app-modal-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid #dbe5f1;
+        background: rgba(255, 255, 255, 0.96);
+        padding: 1.25rem 1.5rem;
+        backdrop-filter: blur(12px);
+    }
+
+    .app-modal-close {
+        display: inline-flex;
+        height: 2.75rem;
+        width: 2.75rem;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d6e1ee;
+        border-radius: 9999px;
+        background: #ffffff;
+        color: #314158;
+        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .app-modal-close:hover,
+    .app-modal-close:focus-visible {
+        background: #f8fbff;
+        border-color: #b8ccdf;
+        color: #122033;
+    }
+
+    .app-modal-body {
+        padding: 1.15rem 1.35rem 1.35rem;
+    }
+
+    .app-modal-section {
+        border: 1px solid #dbe5f1;
+        border-radius: 1.35rem;
+        background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
+        padding: 1.05rem 1.15rem;
+    }
+
+    .app-modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    @media (max-width: 640px) {
+        .app-modal-overlay {
+            padding: 0.75rem;
+        }
+
+        .app-modal-panel {
+            border-radius: 1.35rem;
+        }
+
+        .app-modal-header {
+            padding: 1rem 1rem 0.95rem;
+        }
+
+        .app-modal-body {
+            padding: 1rem;
+        }
+
+        .app-modal-section {
+            padding: 1rem;
+            border-radius: 1.1rem;
+        }
+
+        .app-modal-actions .app-btn {
+            width: 100%;
+        }
+    }
+</style>

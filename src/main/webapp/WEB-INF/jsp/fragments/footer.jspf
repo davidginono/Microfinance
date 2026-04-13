@@ -1,0 +1,105 @@
+    </div>
+</main>
+</div>
+<script>
+    (function () {
+        const sidebar = document.getElementById("appSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        const openBtn = document.getElementById("sidebarToggle");
+
+        if (!sidebar || !overlay || !openBtn) {
+            return;
+        }
+
+        function isSidebarOpen() {
+            return !sidebar.classList.contains("-translate-x-full");
+        }
+
+        function openSidebar() {
+            sidebar.classList.remove("-translate-x-full");
+            overlay.classList.remove("hidden");
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add("-translate-x-full");
+            overlay.classList.add("hidden");
+        }
+
+        openBtn.addEventListener("click", function () {
+            if (isSidebarOpen()) {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
+        });
+        overlay.addEventListener("click", closeSidebar);
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeSidebar();
+            }
+        });
+
+        const adminScopeToggle = document.getElementById("adminScopeToggle");
+        const adminScopePanel = document.getElementById("adminScopePanel");
+        const adminScopeChevron = document.getElementById("adminScopeChevron");
+        const memberArchiveToggle = document.getElementById("memberArchiveToggle");
+        const memberArchivePanel = document.getElementById("memberArchivePanel");
+        const memberArchiveChevron = document.getElementById("memberArchiveChevron");
+        const adminSettingsToggle = document.getElementById("adminSettingsToggle");
+        const adminSettingsPanel = document.getElementById("adminSettingsPanel");
+        const adminSettingsChevron = document.getElementById("adminSettingsChevron");
+
+        if (adminScopeToggle && adminScopePanel) {
+            adminScopeToggle.addEventListener("click", function () {
+                const isExpanded = adminScopeToggle.getAttribute("aria-expanded") === "true";
+                adminScopeToggle.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+                adminScopePanel.classList.toggle("hidden", isExpanded);
+                if (adminScopeChevron) {
+                    adminScopeChevron.classList.toggle("rotate-180", !isExpanded);
+                }
+            });
+        }
+
+        if (memberArchiveToggle && memberArchivePanel) {
+            const archiveStorageKey = "memberArchiveSidebarExpanded";
+            const applyArchiveExpanded = function (expanded) {
+                memberArchiveToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                memberArchivePanel.classList.toggle("hidden", !expanded);
+                if (memberArchiveChevron) {
+                    memberArchiveChevron.classList.toggle("rotate-180", expanded);
+                }
+            };
+            const storedArchiveState = window.localStorage.getItem(archiveStorageKey) === "true";
+            applyArchiveExpanded(storedArchiveState);
+            memberArchiveToggle.addEventListener("click", function () {
+                const isExpanded = memberArchiveToggle.getAttribute("aria-expanded") === "true";
+                const nextExpanded = !isExpanded;
+                applyArchiveExpanded(nextExpanded);
+                window.localStorage.setItem(archiveStorageKey, String(nextExpanded));
+            });
+        }
+
+        if (adminSettingsToggle && adminSettingsPanel) {
+            const settingsStorageKey = "adminSettingsSidebarExpanded";
+            const applySettingsExpanded = function (expanded) {
+                adminSettingsToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                adminSettingsPanel.classList.toggle("hidden", !expanded);
+                if (adminSettingsChevron) {
+                    adminSettingsChevron.classList.toggle("rotate-180", expanded);
+                }
+            };
+            const storedSettingsState = window.localStorage.getItem(settingsStorageKey) === "true";
+            applySettingsExpanded(storedSettingsState);
+            adminSettingsToggle.addEventListener("click", function () {
+                const isExpanded = adminSettingsToggle.getAttribute("aria-expanded") === "true";
+                const nextExpanded = !isExpanded;
+                applySettingsExpanded(nextExpanded);
+                window.localStorage.setItem(settingsStorageKey, String(nextExpanded));
+            });
+        }
+    })();
+</script>
+</div>
+</body>
+</html>

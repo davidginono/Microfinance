@@ -1,0 +1,60 @@
+spring:
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sacco}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:qwerty1!}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+    open-in-view: false
+  mvc:
+    view:
+      prefix: /WEB-INF/jsp/
+      suffix: .jsp
+  web:
+    resources:
+      cache:
+        period: 0
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:davidginono625@gmail.com}
+    password: ${SPRING_MAIL_PASSWORD:xgii umdj qghc egyp}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS:true}
+
+server:
+  port: 8080
+  servlet:
+    jsp:
+      init-parameters:
+        development: true
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.sacco.mvp: INFO
+
+app:
+  outbox:
+    scheduler-enabled: true
+  auth:
+    otp:
+      ttl-minutes: 10
+
+external:
+  foresight:
+    base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}

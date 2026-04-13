@@ -1,0 +1,174 @@
+<style>
+    .loan-view-hero-summary {
+        border: 1px solid var(--panel-border);
+        border-radius: 0.35rem;
+        background: #ffffff;
+        box-shadow: var(--panel-shadow);
+        overflow: hidden;
+    }
+    .loan-view-summary-card {
+        border: 1px solid #d7e1ea;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        box-shadow: none;
+    }
+    .loan-simple-progress {
+        border: 1px solid #d7e1ea;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        padding: 1.2rem 1.3rem;
+    }
+    .loan-simple-progress-list {
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.95rem;
+    }
+    .loan-simple-progress-item {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        color: #1f3755;
+        font-family: inherit;
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+    .loan-simple-progress-dot {
+        width: 0.95rem;
+        height: 0.95rem;
+        border-radius: 9999px;
+        background: #cbd5e1;
+        flex-shrink: 0;
+    }
+    .loan-simple-progress-item.is-active {
+        font-weight: 600;
+        color: #193252;
+    }
+    .loan-simple-progress-item.is-active .loan-simple-progress-dot {
+        background: #1497b8;
+    }
+    .loan-simple-progress-item.is-pending {
+        color: #64748b;
+        font-weight: 400;
+    }
+    .loan-hero-primary-grid {
+        display: grid;
+        gap: 0.9rem 1.35rem;
+        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    }
+    .loan-hero-inline-fact {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+    .loan-hero-inline-label {
+        flex: 0 0 auto;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .loan-hero-inline-value {
+        min-width: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.35;
+        color: #1f3755;
+        word-break: break-word;
+    }
+    .loan-hero-inline-value--id {
+        color: #0f172a;
+        font-weight: 600;
+    }
+    .loan-hero-facts-grid {
+        display: grid;
+        gap: 0.9rem 1.35rem;
+    }
+    .loan-hero-fact {
+        min-width: 0;
+    }
+    .loan-hero-fact-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .loan-hero-fact-value {
+        display: block;
+        margin-top: 0.45rem;
+        min-width: 0;
+        font-size: 1rem;
+        font-weight: 500;
+        line-height: 1.45;
+        color: #1f3755;
+        word-break: break-word;
+    }
+    .loan-view-action-cluster {
+        width: 100%;
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    }
+    .loan-view-action-cluster > * {
+        min-width: 0;
+    }
+    .loan-view-action-cluster form {
+        margin: 0;
+    }
+    .loan-view-action-cluster .app-btn,
+    .loan-view-action-cluster button {
+        width: 100%;
+        min-height: 2.85rem;
+        padding-inline: 1rem;
+        font-size: 0.84rem;
+    }
+    .loan-page-bottom-actions {
+        margin-top: 1rem;
+    }
+    .loan-stat-label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .loan-stat-value {
+        margin-top: 0.8rem;
+        font-family: inherit;
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.25;
+        color: #0f172a;
+    }
+    .loan-stat-meta {
+        margin-top: 0.55rem;
+        font-size: 0.88rem;
+        color: #64748b;
+    }
+    .applicant-info-card {
+        border: 1px solid #d7e1ea;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        padding: 1rem 1.1rem;
+    }
+    .applicant-info-label {
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .applicant-info-value {
+        margin-top: 0.7rem;
+        font-size: 1rem;
+        font-weight: 500;
+        line-height: 1.45;
+        color: #0f172a;
+        font-family: inherit;
+    }
+</style>

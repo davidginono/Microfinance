@@ -1,0 +1,73 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ include file="../fragments/header.jspf" %>
+<%@ include file="../fragments/sidebar.jspf" %>
+<%@ include file="../fragments/alerts.jspf" %>
+<div class="erp-page-header">
+    <p class="erp-breadcrumb">Member Workspace / Applications</p>
+    <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
+    <p class="erp-page-subtitle">Review every loan application, its current workflow stage, and any manager feedback.</p>
+</div>
+<c:set var="hasAwaitingGuarantors" value="false" />
+<c:forEach items="${apps}" var="a">
+    <c:if test="${a.status eq 'AWAITING_GUARANTORS'}">
+        <c:set var="hasAwaitingGuarantors" value="true" />
+    </c:if>
+</c:forEach>
+<c:if test="${hasAwaitingGuarantors}">
+    <div class="erp-section mb-3 border-amber-200 bg-amber-50 text-sm text-amber-800">
+        Waiting for guarantor approval. This page auto-refreshes every 1 hour.
+    </div>
+    <script>
+        setTimeout(function () { window.location.reload(); }, 3600000);
+    </script>
+</c:if>
+<div class="erp-table-wrap overflow-x-auto">
+    <table class="erp-table">
+        <thead>
+            <tr>
+                <th class="px-3 py-2 text-left">Loan Id</th>
+                <th class="px-3 py-2 text-left">
+                    <spring:message code="loan.type" />
+                </th>
+                <th class="px-3 py-2 text-left">
+                    <spring:message code="loan.amount" />
+                </th>
+                <th class="px-3 py-2 text-left">
+                    <spring:message code="loan.status" />
+                </th>
+                <th class="px-3 py-2 text-left">Reason</th>
+                <th class="px-3 py-2 text-left">Date</th>
+                <th class="px-3 py-2 text-left"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <c:forEach items="${apps}" var="app">
+                <tr>
+                    <td class="px-3 py-2">${fn:substring(app.id, 0, 8)}</td>
+                    <td class="px-3 py-2">
+                        <spring:message code="loan.type.${app.loanType}" />
+                    </td>
+                    <td class="px-3 py-2">${app.amount}</td>
+                    <td class="px-3 py-2">
+                        <spring:message code="loan.status.${app.status}" text="${app.status}" />
+                    </td>
+                    <td class="px-3 py-2">
+                        <c:choose>
+                            <c:when test="${not empty managerReasons[app.id]}">${managerReasons[app.id]}</c:when>
+                            <c:otherwise>-</c:otherwise>
+                        </c:choose>
+                    </td>
+                    <td class="px-3 py-2">${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</td>
+                    <td class="px-3 py-2"><a href="/app/loan-applications/${app.id}"
+                            class="app-btn btn-primary">
+                            <spring:message code="common.view" />
+                        </a></td>
+                </tr>
+            </c:forEach>
+        </tbody>
+    </table>
+</div>
+
+<%@ include file="../fragments/footer.jspf" %>

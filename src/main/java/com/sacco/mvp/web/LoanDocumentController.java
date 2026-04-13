@@ -1,0 +1,140 @@
+package com.sacco.mvp.web;
+
+import com.sacco.mvp.domain.GuarantorRequest;
+import com.sacco.mvp.domain.GuarantorRequestStatus;
+import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.BoardReview;
+import com.sacco.mvp.repository.BoardReviewRepository;
+import com.sacco.mvp.repository.GuarantorRequestRepository;
+import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.LoanAttachmentService;
+import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanReportService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Controller;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@Controller
+@RequiredArgsConstructor
+public class LoanDocumentController {
+    private final LoanApplicationRepository loanApplicationRepository;
+    private final MemberRepository memberRepository;
+    private final GuarantorRequestRepository guarantorRequestRepository;
+    private final BoardReviewRepository boardReviewRepository;
+    private final LoanPresentationService loanPresentationService;
+    private final LoanAttachmentService loanAttachmentService;
+    private final LoanReportService loanReportService;
+
+    @GetMapping("/documents/loan-applications/{loanId}/print")
+    @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
+    public ResponseEntity<byte[]> downloadPrintable(@PathVariable UUID loanId) {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            throw new IllegalStateException("Load SACCO financial details before printing");
+        }
+        long approvedGuarantors = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
+            .count();
+        if (app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0 && approvedGuarantors < app.getRequiredGuarantors()) {
+            throw new IllegalStateException("Printing is available after all guarantors approve");
+        }
+        if (app.getStatus() == LoanStatus.DRAFT || app.getStatus() == LoanStatus.AWAITING_GUARANTORS) {
+            throw new IllegalStateException("Printing is available once the application is on review by manager");
+        }
+
+        Member applicant = memberRepository.findById(app.getApplicantMemberId())
+            .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
+        List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(loanId);
+        List<BoardReview> boardReviews = boardReviewRepository.findByLoanApplicationId(loanId);
+        Map<UUID, String> guarantorNames = new LinkedHashMap<>();
+        for (Member member : memberRepository.findAllById(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
+            guarantorNames.put(member.getId(), member.getFullName());
+        }
+        Map<UUID, Member> boardMembers = new LinkedHashMap<>();
+        for (Member member : memberRepository.findAllById(boardReviews.stream().map(BoardReview::getBoardMemberId).toList())) {
+            boardMembers.put(member.getId(), member);
+        }
+
+        String html = loanPresentationService.buildPrintableHtml(
+            app,
+            applicant,
+            loanPresentationService.parseFormFields(app.getFormData()),
+            loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()),
+            guarantorRequests,
+            guarantorNames,
+            boardReviews,
+            boardMembers,
+            loanPresentationService.latestManagerReason(loanId)
+        );
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.TEXT_HTML)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + ".html")
+            .body(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}")
+    @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable UUID loanId, @PathVariable String attachmentId) throws IOException {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+        LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(loanId, attachmentId, app.getAttachmentsJson());
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            mediaType = MediaType.parseMediaType(resource.getContentType());
+        } catch (Exception ignored) {
+        }
+
+        return ResponseEntity.ok()
+            .contentType(mediaType)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getOriginalName() + "\"")
+            .body(Files.readAllBytes(resource.getPath()));
+    }
+
+    @GetMapping("/documents/reports/member-loans.pdf")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
+        byte[] pdf = loanReportService.buildMemberPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/manager-loans.pdf")
+    @PreAuthorize("hasRole('MANAGER') and @userClaims.has(principal, 'REVIEW_MANAGER_QUEUE')")
+    public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                            @RequestParam(required = false) Integer year,
+                                                            @RequestParam(defaultValue = "false") boolean returnedOnly) {
+        LoanReportService.ManagerLoanReport report = loanReportService.managerReport(
+            principal.getSaccoId(), year, returnedOnly);
+        byte[] pdf = loanReportService.buildManagerPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=manager-disbursed-loans-" + report.year() + "-report.pdf")
+            .body(pdf);
+    }
+
+}

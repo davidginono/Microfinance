@@ -1,0 +1,60 @@
+<style>
+    @keyframes otp-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .otp-button-spinner {
+        position: relative;
+        display: none;
+        height: 1rem;
+        width: 1rem;
+        border-radius: 9999px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        opacity: 0.8;
+        animation: otp-spin 0.72s linear infinite;
+    }
+
+    .otp-button-spinner:not(.hidden) {
+        display: inline-flex;
+    }
+
+    .otp-button-spinner::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border-radius: inherit;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        opacity: 0.45;
+        animation: otp-spin 1.05s linear infinite reverse;
+    }
+
+    .otp-request-button.is-loading,
+    .otp-request-button.is-sent,
+    .otp-request-button:disabled {
+        border-color: #cbd5e1 !important;
+        background: #e2e8f0 !important;
+        color: #64748b !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
+    }
+
+    .otp-request-button.is-sent {
+        background: #e7f7ef !important;
+        border-color: #b7e4c7 !important;
+        color: #166534 !important;
+    }
+
+    .action-button-disabled,
+    .action-button-disabled:disabled {
+        border-color: #cbd5e1 !important;
+        background: #e2e8f0 !important;
+        color: #64748b !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
+        opacity: 1 !important;
+    }
+</style>
