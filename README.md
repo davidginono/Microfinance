@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SACCO Loan Workflow MVP (Spring Boot + JSP)
 
 Server-rendered SACCO loan workflow MVP using:
@@ -53,3 +54,7 @@ Includes tests for:
 - Loan advance guarantor skip logic
 - Board quorum (2 of 3)
 - Ownership/assignment authorization checks
+=======
+# SACCOS_LMS
+Loan Management System for SACCOS
+>>>>>>> 0f2163f16b4afdc56931cf281bfe3bcb3e198c76
