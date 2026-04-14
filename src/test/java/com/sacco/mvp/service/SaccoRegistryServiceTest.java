@@ -7,10 +7,17 @@ import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockMultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -25,17 +32,22 @@ import static org.mockito.Mockito.when;
 
 class SaccoRegistryServiceTest {
 
+    @TempDir
+    Path tempDir;
+
     @Test
     void updateSaccoOnlyPersistsChangedAndNewStations() {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
         SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
 
         SaccoRegistryService service = new SaccoRegistryService(
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            null
+            null,
+            saccoLogoStorageService
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -86,6 +98,73 @@ class SaccoRegistryServiceTest {
         verify(saccoStationRepository).save(argThat(matchesStation("STN002", false)));
         verify(saccoStationRepository).save(argThat(matchesStation("STN003", true)));
         verify(saccoStationRepository, never()).save(argThat(matchesStation("STN001", true)));
+    }
+
+    @Test
+    void updateSaccoStoresReplacementLogoWhenProvided() throws IOException {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            null,
+            saccoLogoStorageService
+        );
+
+        OffsetDateTime now = OffsetDateTime.now();
+        RegisteredSacco existingSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-1")
+            .externalStationId("STN001")
+            .externalSaccoName("Example Sacco")
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .defaultLanguage("en")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(existingSacco));
+        when(saccoStationRepository.findBySaccoIdOrderByStationIdAsc("SACCO-1"))
+            .thenReturn(List.of(SaccoStation.builder()
+                .id(UUID.randomUUID())
+                .saccoId("SACCO-1")
+                .stationId("STN001")
+                .active(true)
+                .createdAt(now)
+                .updatedAt(now)
+                .build()));
+        when(saccoSettingsRepository.findById("SACCO-1")).thenReturn(Optional.of(settings));
+
+        MockMultipartFile logoFile = new MockMultipartFile(
+            "logoFile",
+            "logo.png",
+            "image/png",
+            pngBytes(120, 120)
+        );
+
+        service.updateSacco("SACCO-1", "Example Sacco", "STN001", logoFile);
+
+        org.junit.jupiter.api.Assertions.assertTrue(saccoLogoStorageService.hasLogo("SACCO-1"));
+    }
+
+    private byte[] pngBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", output);
+        return output.toByteArray();
     }
 
     private ArgumentMatcher<SaccoStation> matchesStation(String stationId, boolean active) {

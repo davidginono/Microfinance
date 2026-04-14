@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AdminIncident;
 import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
-import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.Position;

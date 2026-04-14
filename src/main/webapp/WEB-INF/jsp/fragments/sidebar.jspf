@@ -211,6 +211,6 @@
         </div>
     </div>
 </aside>
-<main class="shell-main box-border overflow-x-hidden pb-8 pt-5" style="min-height: calc(100vh - var(--shell-nav-height));">
-    <div class="shell-content-frame mx-auto min-w-0 overflow-x-hidden space-y-4">
+<main class="shell-main box-border pb-8 pt-5" style="min-height: calc(100vh - var(--shell-nav-height));">
+    <div class="shell-content-frame mx-auto min-w-0 space-y-4">
 

@@ -9,7 +9,13 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "outbox_events")
+@Table(
+    name = "outbox_events",
+    indexes = {
+        @Index(name = "idx_outbox_events_created_at", columnList = "created_at"),
+        @Index(name = "idx_outbox_events_status_created_at", columnList = "status, created_at")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

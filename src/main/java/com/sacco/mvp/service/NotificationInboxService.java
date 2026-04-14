@@ -33,6 +33,10 @@ public class NotificationInboxService {
         ).stream().filter(NotificationViewService.NotificationView::isUnread).count();
     }
 
+    public long unreadIncidentCount(UUID memberId) {
+        return unreadIncidentViews(memberId).size();
+    }
+
     public List<NotificationViewService.NotificationView> unreadViews(UUID memberId, Collection<Position> positions) {
         if (memberId == null || positions == null || positions.isEmpty()) {
             return Collections.emptyList();
@@ -41,6 +45,17 @@ public class NotificationInboxService {
             notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId),
             positions
         );
+    }
+
+    public List<NotificationViewService.NotificationView> unreadIncidentViews(UUID memberId) {
+        if (memberId == null) {
+            return Collections.emptyList();
+        }
+        return notificationViewService.toViews(
+            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId)
+        ).stream()
+            .filter(view -> view.getIncidentId() != null)
+            .toList();
     }
 
     public List<NotificationViewService.NotificationView> allViews(UUID memberId, Collection<Position> positions) {

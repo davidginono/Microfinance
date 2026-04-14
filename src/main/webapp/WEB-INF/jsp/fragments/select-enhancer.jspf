@@ -88,28 +88,35 @@
         color: #2F348D;
     }
     .neo-select-menu {
-        position: absolute;
-        top: calc(100% - 2px);
+        position: fixed;
         left: 0;
-        right: 0;
-        z-index: 80;
+        top: 0;
+        z-index: 115;
+        width: min(var(--neo-select-menu-width, 100%), calc(100vw - 1rem));
         max-height: 17rem;
         overflow-y: auto;
         overflow-x: hidden;
         border: 1px solid #2F348D;
-        border-top: none;
-        border-radius: 0 0 6px 6px;
+        border-radius: 6px;
         background: #ffffff;
         padding: 0;
         box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
         opacity: 0;
         pointer-events: none;
+        visibility: hidden;
         transform: translateY(5px);
         transition: opacity 0.2s ease, transform 0.2s ease;
     }
-    .neo-select--open .neo-select-menu {
+    .neo-select-menu.is-open {
         opacity: 1;
         pointer-events: auto;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    .neo-select-menu.is-open-upward {
+        transform: translateY(-5px);
+    }
+    .neo-select-menu.is-open.is-open-upward {
         transform: translateY(0);
     }
     .neo-select-menu::-webkit-scrollbar {
@@ -205,6 +212,7 @@
             }
             state.wrapper.classList.remove('neo-select--open');
             state.button.setAttribute('aria-expanded', 'false');
+            state.menu.classList.remove('is-open', 'is-open-upward');
         }
 
         function closeAllEnhancedSelects(exceptState) {
@@ -275,6 +283,9 @@
                 emptyState.className = 'neo-select-empty';
                 emptyState.textContent = 'No options available';
                 state.menu.appendChild(emptyState);
+                if (state.wrapper.classList.contains('neo-select--open')) {
+                    positionMenu(state);
+                }
                 return;
             }
 
@@ -328,6 +339,53 @@
                 });
                 state.menu.appendChild(item);
             });
+
+            if (state.wrapper.classList.contains('neo-select--open')) {
+                positionMenu(state);
+            }
+        }
+
+        function positionMenu(state) {
+            if (!state || !state.wrapper.isConnected || !state.button.isConnected) {
+                return;
+            }
+
+            const viewportPadding = 8;
+            const rect = state.button.getBoundingClientRect();
+            const maxWidth = Math.max(220, window.innerWidth - (viewportPadding * 2));
+            const menuWidth = Math.min(Math.max(rect.width, 220), maxWidth);
+            const left = Math.min(
+                Math.max(rect.left, viewportPadding),
+                Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
+            );
+            const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+            const availableAbove = rect.top - viewportPadding;
+            const desiredHeight = Math.min(state.menu.scrollHeight || 0, 272);
+            const openUpward = availableBelow < Math.min(desiredHeight, 180) && availableAbove > availableBelow;
+            const maxHeight = Math.max(120, openUpward ? availableAbove : availableBelow);
+            const menuHeight = Math.min(desiredHeight || 272, maxHeight);
+            const top = openUpward
+                ? Math.max(viewportPadding, rect.top - menuHeight + 1)
+                : Math.min(window.innerHeight - menuHeight - viewportPadding, rect.bottom - 1);
+
+            state.menu.style.left = left + 'px';
+            state.menu.style.top = top + 'px';
+            state.menu.style.setProperty('--neo-select-menu-width', menuWidth + 'px');
+            state.menu.style.maxHeight = menuHeight + 'px';
+            state.menu.classList.toggle('is-open-upward', openUpward);
+        }
+
+        function positionAllOpenMenus() {
+            document.querySelectorAll('.neo-select.neo-select--open').forEach(function (wrapper) {
+                const nativeSelect = wrapper.querySelector('select[data-neo-enhanced="true"]');
+                if (!nativeSelect) {
+                    return;
+                }
+                const state = enhancedStates.get(nativeSelect);
+                if (state) {
+                    positionMenu(state);
+                }
+            });
         }
 
         function openEnhancedSelect(state) {
@@ -337,7 +395,10 @@
             closeAllEnhancedSelects(state);
             state.wrapper.classList.add('neo-select--open');
             state.button.setAttribute('aria-expanded', 'true');
+            state.menu.classList.add('is-open');
+            positionMenu(state);
             window.requestAnimationFrame(function () {
+                positionMenu(state);
                 focusOption(state, 'selected');
             });
         }
@@ -380,9 +441,10 @@
             const menu = document.createElement('div');
             menu.className = 'neo-select-menu';
             menu.setAttribute('role', 'listbox');
+            menu.setAttribute('data-neo-select-menu', 'true');
 
             wrapper.appendChild(button);
-            wrapper.appendChild(menu);
+            document.body.appendChild(menu);
 
             const state = {
                 select: select,
@@ -462,7 +524,7 @@
             globalHandlersBound = true;
 
             document.addEventListener('click', function (event) {
-                if (!event.target.closest('.neo-select')) {
+                if (!event.target.closest('.neo-select') && !event.target.closest('[data-neo-select-menu="true"]')) {
                     closeAllEnhancedSelects();
                 }
             });
@@ -472,6 +534,9 @@
                     closeAllEnhancedSelects();
                 }
             });
+
+            window.addEventListener('resize', positionAllOpenMenus);
+            window.addEventListener('scroll', positionAllOpenMenus, true);
         }
 
         function observeNewSelects() {

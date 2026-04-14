@@ -5,7 +5,6 @@ import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.Position;
-import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
@@ -13,16 +12,26 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Controller
@@ -220,25 +229,66 @@ public class AdminController {
 
     @GetMapping("/outbox")
     @PreAuthorize("hasRole('ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
-    public String outbox(Model model) {
-        model.addAttribute("events", adminService.outboxEvents());
-        model.addAttribute("outboxStatuses", OutboxStatus.values());
+    public String outbox(@RequestParam(required = false) OutboxStatus status,
+                         @RequestParam(required = false) String dateFrom,
+                         @RequestParam(required = false) String dateTo,
+                         @RequestParam(required = false) String loanId,
+                         @RequestParam(defaultValue = "0") int page,
+                         @RequestParam(defaultValue = "50") int size,
+                         Model model) {
+        Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
+        if (!dateErrors.isEmpty()) {
+            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            applyDateErrors(model, dateErrors);
+            return "admin/outbox";
+        }
+        try {
+            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage = adminService.outboxEvents(page, size, status, dateFrom, dateTo, loanId);
+            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, eventsPage);
+        } catch (IllegalArgumentException | DataAccessException ex) {
+            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that outbox filter. Adjust the values and try again."));
+        }
         return "admin/outbox";
     }
 
     @PostMapping("/outbox/{id}/retry")
     @PreAuthorize("hasRole('ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
     public String retryOutbox(@PathVariable UUID id,
+                              @RequestParam(required = false) OutboxStatus status,
+                              @RequestParam(required = false) String dateFrom,
+                              @RequestParam(required = false) String dateTo,
+                              @RequestParam(required = false) String loanId,
+                              @RequestParam(defaultValue = "0") int page,
+                              @RequestParam(defaultValue = "50") int size,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               RedirectAttributes ra) {
         adminService.retryOutbox(principal.getMemberId(), id);
         ra.addFlashAttribute("message", "Outbox event moved back to NEW for retry.");
-        return "redirect:/admin/outbox";
+        return "redirect:/admin/outbox?page=" + normalizePage(page)
+            + buildOutboxPaginationQuery(status, dateFrom, dateTo, loanId, normalizePageSize(size));
     }
 
     @GetMapping("/events")
-    public String events(Model model) {
-        model.addAttribute("entries", adminService.eventEntries());
+    public String events(@RequestParam(required = false) String dateFrom,
+                         @RequestParam(required = false) String dateTo,
+                         @RequestParam(required = false) String actorId,
+                         @RequestParam(defaultValue = "0") int page,
+                         @RequestParam(defaultValue = "50") int size,
+                         Model model) {
+        Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
+        if (!dateErrors.isEmpty()) {
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            applyDateErrors(model, dateErrors);
+            return "admin/events";
+        }
+        try {
+            Page<com.sacco.mvp.domain.AuditLog> entriesPage = adminService.eventEntries(page, size, dateFrom, dateTo, actorId);
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, entriesPage);
+        } catch (IllegalArgumentException | DataAccessException ex) {
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that event log filter. Adjust the values and try again."));
+        }
         return "admin/events";
     }
 
@@ -252,9 +302,15 @@ public class AdminController {
     public String registerSacco(@RequestParam String saccoId,
                                 @RequestParam String saccoName,
                                 @RequestParam String stationIds,
+                                @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                                 RedirectAttributes ra) {
-        saccoRegistryService.registerSacco(saccoId, saccoName, stationIds);
-        ra.addFlashAttribute("message", "SACCO details saved.");
+        try {
+            saccoRegistryService.registerSacco(saccoId, saccoName, stationIds, logoFile);
+            ra.addFlashAttribute("message", "SACCO details saved.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/admin/saccos";
+        }
         return "redirect:/admin/saccos";
     }
 
@@ -262,9 +318,15 @@ public class AdminController {
     public String updateSacco(@PathVariable String saccoId,
                               @RequestParam String saccoName,
                               @RequestParam String stationIds,
+                              @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                               RedirectAttributes ra) {
-        saccoRegistryService.updateSacco(saccoId, saccoName, stationIds);
-        ra.addFlashAttribute("message", "SACCO registry updated.");
+        try {
+            saccoRegistryService.updateSacco(saccoId, saccoName, stationIds, logoFile);
+            ra.addFlashAttribute("message", "SACCO registry updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/admin/saccos";
+        }
         return "redirect:/admin/saccos";
     }
 
@@ -281,5 +343,125 @@ public class AdminController {
     public String handleError(RuntimeException ex, RedirectAttributes ra) {
         ra.addFlashAttribute("error", ex.getMessage());
         return "redirect:/admin/dashboard";
+    }
+
+    private String normalizeDateParam(String raw) {
+        return raw == null ? "" : raw.trim();
+    }
+
+    private String normalizeTextParam(String raw) {
+        return raw == null ? "" : raw.trim();
+    }
+
+    private int normalizePageSize(int size) {
+        if (size <= 0) {
+            return 50;
+        }
+        return Math.min(size, 100);
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private void populateOutboxFilterModel(Model model,
+                                           OutboxStatus status,
+                                           String dateFrom,
+                                           String dateTo,
+                                           String loanId,
+                                           Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
+        model.addAttribute("events", eventsPage.getContent());
+        model.addAttribute("eventsPage", eventsPage);
+        model.addAttribute("outboxStatuses", OutboxStatus.values());
+        model.addAttribute("selectedOutboxStatus", status == null ? "" : status.name());
+        model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
+        model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
+        model.addAttribute("selectedLoanId", normalizeTextParam(loanId));
+        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(status, dateFrom, dateTo, loanId, eventsPage.getSize()));
+        model.addAttribute("selectedPageSize", eventsPage.getSize());
+    }
+
+    private void populateEventsFilterModel(Model model,
+                                           String dateFrom,
+                                           String dateTo,
+                                           String actorId,
+                                           Page<com.sacco.mvp.domain.AuditLog> entriesPage) {
+        model.addAttribute("entries", entriesPage.getContent());
+        model.addAttribute("entriesPage", entriesPage);
+        model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
+        model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
+        model.addAttribute("selectedActorId", normalizeTextParam(actorId));
+        model.addAttribute("eventsPaginationQuery", buildEventsPaginationQuery(dateFrom, dateTo, actorId, entriesPage.getSize()));
+        model.addAttribute("selectedPageSize", entriesPage.getSize());
+    }
+
+    private String resolveFilterErrorMessage(RuntimeException ex, String fallback) {
+        if (ex instanceof DataAccessException) {
+            return fallback;
+        }
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return fallback;
+        }
+        return message;
+    }
+
+    private Map<String, String> validateDateRangeInputs(String dateFrom, String dateTo) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        LocalDate from = parseFilterDate(dateFrom, "dateFromError", "Enter a valid Filter From date.", errors);
+        LocalDate to = parseFilterDate(dateTo, "dateToError", "Enter a valid Filter To date.", errors);
+        if (from != null && to != null && from.isAfter(to)) {
+            errors.put("dateToError", "Filter To cannot be earlier than Filter From.");
+        }
+        return errors;
+    }
+
+    private LocalDate parseFilterDate(String raw, String key, String message, Map<String, String> errors) {
+        String normalized = normalizeDateParam(raw);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            errors.put(key, message);
+            return null;
+        }
+    }
+
+    private void applyDateErrors(Model model, Map<String, String> dateErrors) {
+        model.addAttribute("dateFromError", dateErrors.get("dateFromError"));
+        model.addAttribute("dateToError", dateErrors.get("dateToError"));
+    }
+
+    private String buildOutboxPaginationQuery(OutboxStatus status, String dateFrom, String dateTo, String loanId, int size) {
+        StringBuilder query = new StringBuilder("&size=").append(size);
+        if (status != null) {
+            query.append("&status=").append(UriUtils.encode(status.name(), StandardCharsets.UTF_8));
+        }
+        if (dateFrom != null && !dateFrom.isBlank()) {
+            query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
+        }
+        if (dateTo != null && !dateTo.isBlank()) {
+            query.append("&dateTo=").append(UriUtils.encode(dateTo.trim(), StandardCharsets.UTF_8));
+        }
+        if (loanId != null && !loanId.isBlank()) {
+            query.append("&loanId=").append(UriUtils.encode(loanId.trim(), StandardCharsets.UTF_8));
+        }
+        return query.toString();
+    }
+
+    private String buildEventsPaginationQuery(String dateFrom, String dateTo, String actorId, int size) {
+        StringBuilder query = new StringBuilder("&size=").append(size);
+        if (dateFrom != null && !dateFrom.isBlank()) {
+            query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
+        }
+        if (dateTo != null && !dateTo.isBlank()) {
+            query.append("&dateTo=").append(UriUtils.encode(dateTo.trim(), StandardCharsets.UTF_8));
+        }
+        if (actorId != null && !actorId.isBlank()) {
+            query.append("&actorId=").append(UriUtils.encode(actorId.trim(), StandardCharsets.UTF_8));
+        }
+        return query.toString();
     }
 }

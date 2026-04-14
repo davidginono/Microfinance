@@ -9,6 +9,7 @@ import com.sacco.mvp.repository.SaccoStationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -28,6 +29,7 @@ public class SaccoRegistryService {
     private final SaccoStationRepository saccoStationRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoConfigurationService saccoConfigurationService;
+    private final SaccoLogoStorageService saccoLogoStorageService;
 
     public List<RegisteredSaccoView> listRegisteredSaccos() {
         return registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
@@ -36,7 +38,9 @@ public class SaccoRegistryService {
                 sacco.getSaccoName(),
                 saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId()).stream()
                     .map(SaccoStation::getStationId)
-                    .toList()
+                    .toList(),
+                saccoLogoStorageService.hasLogo(sacco.getSaccoId()),
+                saccoLogoStorageService.publicLogoUrl(sacco.getSaccoId(), sacco.getUpdatedAt())
             ))
             .toList();
     }
@@ -59,6 +63,11 @@ public class SaccoRegistryService {
 
     @Transactional
     public void registerSacco(String saccoId, String saccoName, String stationIdsText) {
+        registerSacco(saccoId, saccoName, stationIdsText, null);
+    }
+
+    @Transactional
+    public void registerSacco(String saccoId, String saccoName, String stationIdsText, MultipartFile logoFile) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
         String normalizedSaccoName = normalizeSaccoName(saccoName);
         LinkedHashSet<String> stationIds = parseStationIds(stationIdsText);
@@ -74,11 +83,17 @@ public class SaccoRegistryService {
 
         OffsetDateTime now = OffsetDateTime.now();
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, now, false);
+        saccoLogoStorageService.store(normalizedSaccoId, logoFile);
         saccoConfigurationService.ensureDefaultLoanProducts(normalizedSaccoId);
     }
 
     @Transactional
     public void updateSacco(String saccoId, String saccoName, String stationIdsText) {
+        updateSacco(saccoId, saccoName, stationIdsText, null);
+    }
+
+    @Transactional
+    public void updateSacco(String saccoId, String saccoName, String stationIdsText, MultipartFile logoFile) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
         String normalizedSaccoName = normalizeSaccoName(saccoName);
         LinkedHashSet<String> stationIds = parseStationIds(stationIdsText);
@@ -93,6 +108,7 @@ public class SaccoRegistryService {
         }
 
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, OffsetDateTime.now(), true);
+        saccoLogoStorageService.store(normalizedSaccoId, logoFile);
     }
 
     private void upsertSacco(String saccoId,
@@ -203,7 +219,9 @@ public class SaccoRegistryService {
     public record RegisteredSaccoView(
         String saccoId,
         String saccoName,
-        List<String> stationIds
+        List<String> stationIds,
+        boolean hasLogo,
+        String logoUrl
     ) {
         public String getSaccoId() {
             return saccoId;
@@ -215,6 +233,14 @@ public class SaccoRegistryService {
 
         public List<String> getStationIds() {
             return stationIds;
+        }
+
+        public boolean isHasLogo() {
+            return hasLogo;
+        }
+
+        public String getLogoUrl() {
+            return logoUrl;
         }
 
         public String getStationIdsText() {

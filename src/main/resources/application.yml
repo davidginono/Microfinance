@@ -53,6 +53,11 @@ logging:
 app:
   outbox:
     scheduler-enabled: true
+  retention:
+    cleanup-enabled: true
+    cleanup-cron: "0 30 2 * * *"
+    audit-log-days: 70
+    outbox-days: 70
   auth:
     otp:
       ttl-minutes: 10

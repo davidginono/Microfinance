@@ -4,11 +4,9 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <div class="erp-page-header-sticky">
-        <p class="erp-breadcrumb">Admin Tools / Dashboard</p>
-        <h1 class="erp-page-title">Admin Dashboard</h1>
-        <p class="erp-page-subtitle">Supervise user activity, incidents, outbox delivery, and attachment storage from one administration workspace.</p>
-    </div>
+    <p class="erp-breadcrumb">Admin Tools / Dashboard</p>
+    <h1 class="erp-page-title">Admin Dashboard</h1>
+    <p class="erp-page-subtitle">Supervise user activity, incidents, outbox delivery, and attachment storage from one administration workspace.</p>
 </div>
 
 <section class="erp-stat-grid">

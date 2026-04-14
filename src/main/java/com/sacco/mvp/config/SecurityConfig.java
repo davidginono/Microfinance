@@ -29,7 +29,7 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/css/**").permitAll()
+                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/css/**", "/error", "/error/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
@@ -94,6 +94,7 @@ public class SecurityConfig {
                 })
                 .permitAll())
             .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
+            .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
             .csrf(Customizer.withDefaults());
 
         return http.build();

@@ -8,6 +8,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.NotificationViewService;
+import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.web.view.CurrentUserView;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +26,7 @@ public class CurrentUserModelAdvice {
     private final AdminScopeService adminScopeService;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
+    private final SaccoLogoStorageService saccoLogoStorageService;
     private final ObjectMapper objectMapper;
 
     @ModelAttribute("currentMember")
@@ -46,6 +48,9 @@ public class CurrentUserModelAdvice {
         if (principal == null) {
             return 0;
         }
+        if (principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+            return notificationInboxService.unreadIncidentCount(principal.getMemberId());
+        }
         return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
     }
 
@@ -54,6 +59,9 @@ public class CurrentUserModelAdvice {
         @AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {
             return Collections.emptyList();
+        }
+        if (principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+            return notificationInboxService.unreadIncidentViews(principal.getMemberId());
         }
         return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
     }
@@ -64,12 +72,28 @@ public class CurrentUserModelAdvice {
             return "/login";
         }
         return switch (principal.getPosition()) {
-            case ADMIN -> "/admin/messages";
+            case ADMIN -> "/admin/incidents";
             case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
             case BOARD -> "/board/queue";
             case CHAIRPERSON -> "/chairperson/manager-decisions";
             case MEMBER -> "/app/notifications";
         };
+    }
+
+    @ModelAttribute("notificationPanelSubtitle")
+    public String notificationPanelSubtitle(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+            return "Latest incidents requiring admin attention";
+        }
+        return "Latest updates from the loan workflow";
+    }
+
+    @ModelAttribute("notificationPanelEmptyState")
+    public String notificationPanelEmptyState(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+            return "No admin incidents yet.";
+        }
+        return "No notifications yet.";
     }
 
     @ModelAttribute("notificationOpenBaseUrl")
@@ -112,14 +136,19 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoId")
     public String activeSaccoId(@AuthenticationPrincipal AppUserPrincipal principal) {
-        ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
-        return brand == null ? null : brand.id();
+        return null;
     }
 
     @ModelAttribute("activeSaccoLogoText")
     public String activeSaccoLogoText(@AuthenticationPrincipal AppUserPrincipal principal) {
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
         return brand == null ? "LM" : brand.logoText();
+    }
+
+    @ModelAttribute("activeSaccoLogoUrl")
+    public String activeSaccoLogoUrl(@AuthenticationPrincipal AppUserPrincipal principal) {
+        ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
+        return brand == null ? null : brand.logoUrl();
     }
 
     private ActiveSaccoBrand resolveActiveSaccoBrand(AppUserPrincipal principal) {
@@ -129,25 +158,37 @@ public class CurrentUserModelAdvice {
 
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
         if (scope != null && scope.getSaccoId() != null) {
-            return buildBrand(scope.getSaccoId(), scope.getSaccoName());
+            RegisteredSacco registeredSacco = registeredSaccoRepository.findById(scope.getSaccoId())
+                .filter(RegisteredSacco::isActive)
+                .orElse(null);
+            String saccoName = registeredSacco != null && registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank()
+                ? registeredSacco.getSaccoName()
+                : scope.getSaccoName();
+            return buildBrand(scope.getSaccoId(), saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
         }
 
         String saccoId = principal.getSaccoId();
-        String saccoName = registeredSaccoRepository.findById(saccoId)
+        RegisteredSacco registeredSacco = registeredSaccoRepository.findById(saccoId)
             .filter(RegisteredSacco::isActive)
-            .map(RegisteredSacco::getSaccoName)
+            .orElse(null);
+        String saccoName = (registeredSacco != null ? java.util.Optional.ofNullable(registeredSacco.getSaccoName()) : java.util.Optional.<String>empty())
             .filter(name -> name != null && !name.isBlank())
             .or(() -> saccoSettingsRepository.findById(saccoId)
                 .map(SaccoSettings::getExternalSaccoName)
                 .filter(name -> name != null && !name.isBlank()))
             .orElse(saccoId);
-        return buildBrand(saccoId, saccoName);
+        return buildBrand(saccoId, saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
     }
 
-    private ActiveSaccoBrand buildBrand(String saccoId, String saccoName) {
+    private ActiveSaccoBrand buildBrand(String saccoId, String saccoName, java.time.OffsetDateTime updatedAt) {
         String safeId = saccoId == null || saccoId.isBlank() ? "SACCO" : saccoId.trim();
         String safeName = saccoName == null || saccoName.isBlank() ? safeId : saccoName.trim();
-        return new ActiveSaccoBrand(safeId, safeName, logoTextForSacco(safeName));
+        return new ActiveSaccoBrand(
+            safeId,
+            safeName,
+            logoTextForSacco(safeName),
+            saccoLogoStorageService.publicLogoUrl(safeId, updatedAt)
+        );
     }
 
     private String logoTextForSacco(String name) {
@@ -174,5 +215,5 @@ public class CurrentUserModelAdvice {
         return String.join("", letters);
     }
 
-    private record ActiveSaccoBrand(String id, String name, String logoText) {}
+    private record ActiveSaccoBrand(String id, String name, String logoText, String logoUrl) {}
 }

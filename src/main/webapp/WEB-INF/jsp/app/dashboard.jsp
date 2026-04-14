@@ -224,13 +224,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 %>
 
 <section class="space-y-4">
-    <div class="-mx-4 mb-4 border-b border-slate-200 bg-[var(--page-bg)] px-4 py-2 lg:-mx-8 lg:px-8">
-        <p class="text-xl font-bold tracking-wide text-slate-500">DASHBOARD</p>
-    </div>
-
     <div class="erp-page-header">
         <p class="erp-breadcrumb">Member Workspace / Dashboard</p>
-        <h1 class="erp-page-title">Welcome,
+        <h1 class="erp-page-title" data-sticky-title-source="true">Dashboard</h1>
+        <p class="erp-page-heading">Welcome,
             <c:choose>
                 <c:when test="${not empty currentMember and not empty currentMember.fullName}">
                     ${currentMember.fullName}
@@ -239,7 +236,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <sec:authentication property="principal.username" />
                 </c:otherwise>
             </c:choose>
-        </h1>
+        </p>
         <p class="erp-page-subtitle">
             Track applications in progress, follow guarantor approvals, and monitor every active loan repayment timeline from one SACCO workspace.
         </p>

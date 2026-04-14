@@ -3,6 +3,8 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,7 +12,9 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -25,6 +29,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminService {
     private static final long DASHBOARD_RECENT_WINDOW_DAYS = 30L;
+    private static final int DEFAULT_LOG_PAGE_SIZE = 50;
+    private static final int MAX_LOG_PAGE_SIZE = 100;
     private final MemberRepository memberRepository;
     private final SavingsAccountRepository savingsAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -41,7 +47,6 @@ public class AdminService {
     private final AdminAlertService adminAlertService;
     private final NotificationViewService notificationViewService;
     private final UserClaimService userClaimService;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final RoleDirectoryService roleDirectoryService;
     private final SaccoConfigurationService saccoConfigurationService;
 
@@ -332,8 +337,17 @@ public class AdminService {
             Map.of("subject", subject, "message", message, "adminCount", admins.size()));
     }
 
-    public List<OutboxEvent> outboxEvents() {
-        return outboxEventRepository.findTop100ByOrderByCreatedAtDesc();
+    public Page<OutboxEvent> outboxEvents(int page, int size, OutboxStatus status, String dateFrom, String dateTo, String loanId) {
+        PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizePageSize(size));
+        String normalizedLoanId = normalizeOptional(loanId);
+        DateRange dateRange = resolveDateRange(dateFrom, dateTo);
+        return outboxEventRepository.searchMonitorView(
+            status == null ? null : status.name(),
+            dateRange.start(),
+            dateRange.endExclusive(),
+            normalizedLoanId,
+            pageRequest
+        );
     }
 
     @Transactional
@@ -352,12 +366,19 @@ public class AdminService {
             Map.of("status", event.getStatus(), "eventType", event.getEventType()));
     }
 
-    public List<AuditLog> auditEntries() {
-        return auditLogRepository.findTop100ByOrderByCreatedAtDesc();
+    public Page<AuditLog> auditEntries(int page, int size, String dateFrom, String dateTo, String actorId) {
+        DateRange dateRange = resolveDateRange(dateFrom, dateTo);
+        String normalizedActorId = normalizeOptional(actorId);
+        return auditLogRepository.searchEventLogView(
+            dateRange.start(),
+            dateRange.endExclusive(),
+            normalizedActorId,
+            PageRequest.of(normalizePage(page), normalizePageSize(size))
+        );
     }
 
-    public List<AuditLog> eventEntries() {
-        return auditLogRepository.findTop100ByOrderByCreatedAtDesc();
+    public Page<AuditLog> eventEntries(int page, int size, String dateFrom, String dateTo, String actorId) {
+        return auditEntries(page, size, dateFrom, dateTo, actorId);
     }
 
     public ReportData reports(String saccoId, String statusFilter, String loanTypeFilter, String dateFrom, String dateTo) {
@@ -466,6 +487,43 @@ public class AdminService {
             throw new IllegalStateException(message);
         }
         return normalized;
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private int normalizePageSize(int size) {
+        if (size <= 0) {
+            return DEFAULT_LOG_PAGE_SIZE;
+        }
+        return Math.min(size, MAX_LOG_PAGE_SIZE);
+    }
+
+    private DateRange resolveDateRange(String dateFrom, String dateTo) {
+        LocalDate from = parseDate(dateFrom, "Invalid start date.");
+        LocalDate to = parseDate(dateTo, "Invalid end date.");
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("Start date cannot be after end date.");
+        }
+        ZoneId zoneId = ZoneId.systemDefault();
+        OffsetDateTime start = from == null ? null : from.atStartOfDay(zoneId).toOffsetDateTime();
+        OffsetDateTime endExclusive = to == null ? null : to.plusDays(1).atStartOfDay(zoneId).toOffsetDateTime();
+        return new DateRange(start, endExclusive);
+    }
+
+    private LocalDate parseDate(String raw, String message) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private record DateRange(OffsetDateTime start, OffsetDateTime endExclusive) {
     }
 
     private String normalizeOptional(String value) {

@@ -4,6 +4,7 @@ package com.sacco.mvp.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import lombok.*;
@@ -16,7 +17,12 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Entity
-@Table(name = "audit_log")
+@Table(
+    name = "audit_log",
+    indexes = {
+        @Index(name = "idx_audit_log_created_at", columnList = "created_at")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

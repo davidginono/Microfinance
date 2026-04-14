@@ -1,6 +1,5 @@
 package com.sacco.mvp.security;
 
-import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;

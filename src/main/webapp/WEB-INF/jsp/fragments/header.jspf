@@ -39,11 +39,11 @@
     <style>
         html {
             font-size: 16px;
-            overflow-x: hidden;
+            overflow-x: clip;
         }
         body {
             background: #eef2f5;
-            overflow-x: hidden;
+            overflow-x: clip;
             margin: 0;
         }
         :root {
@@ -260,20 +260,46 @@
                 font-size: 0.72rem;
             }
         }
-        .erp-page-header {
-            margin-bottom: 0.9rem;
-        }
+        .erp-page-header,
         .erp-page-header-sticky {
-            position: sticky;
-            top: var(--shell-nav-height);
-            z-index: 25;
-            padding: 0 0 0.85rem;
-            background: linear-gradient(180deg, rgba(238, 242, 245, 0.98) 0%, rgba(238, 242, 245, 0.96) 82%, rgba(238, 242, 245, 0.9) 100%);
-            border-bottom: 1px solid rgba(207, 216, 223, 0.9);
-            backdrop-filter: blur(10px);
+            margin-bottom: 0.9rem;
         }
         .erp-page-header p {
             margin: 0;
+        }
+        .shell-page-title-rail {
+            position: fixed;
+            top: var(--shell-nav-height);
+            left: 0;
+            width: 100%;
+            z-index: 38;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-6px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        .shell-page-title-rail.is-active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .shell-page-title-rail__inner {
+            width: var(--shell-content-max);
+            max-width: calc(100vw - 2rem);
+            margin-left: var(--shell-page-title-left, auto);
+            margin-right: auto;
+            padding: 0.58rem 0 0.48rem;
+            border-bottom: 1px solid rgba(207, 216, 223, 0.96);
+            background: linear-gradient(180deg, rgba(238, 242, 245, 0.985) 0%, rgba(238, 242, 245, 0.965) 100%);
+            backdrop-filter: blur(10px);
+        }
+        .shell-page-title-rail__text {
+            margin: 0;
+            color: var(--text-main);
+            font-family: Sora, ui-sans-serif, system-ui;
+            font-size: 1.1rem;
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: 0.01em;
         }
         .erp-page-kicker {
             color: #64748b;
@@ -289,6 +315,14 @@
             font-size: 1.55rem;
             font-weight: 700;
             line-height: 1.2;
+        }
+        .erp-page-heading {
+            margin-top: 0.35rem;
+            color: var(--text-main);
+            font-family: Sora, ui-sans-serif, system-ui;
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1.18;
         }
         .erp-page-subtitle {
             margin-top: 0.35rem;
@@ -551,8 +585,14 @@
             .erp-page-subtitle {
                 font-size: 0.86rem;
             }
-            .erp-page-header-sticky {
-                padding-bottom: 0.75rem;
+            .shell-page-title-rail__inner {
+                padding: 0.52rem 0 0.42rem;
+            }
+            .shell-page-title-rail__text {
+                font-size: 1rem;
+            }
+            .erp-page-heading {
+                font-size: 1.7rem;
             }
             .erp-table th,
             .erp-table td {
@@ -706,10 +746,12 @@
             max-width: 100%;
             padding-left: 1rem;
             padding-right: 1rem;
+            overflow-x: clip;
         }
         .shell-content-frame {
             width: 100%;
             max-width: var(--shell-content-max);
+            overflow-x: visible;
         }
         @media (min-width: 1024px) {
             .shell-sidebar {
@@ -746,8 +788,8 @@
     </style>
 <%@ include file="select-enhancer.jspf" %>
 </head>
-<body class="min-h-screen overflow-x-hidden font-sans text-sacco-ink antialiased" style="background: var(--page-bg);">
-<div class="min-h-screen w-full max-w-full overflow-x-hidden" style="background: var(--page-bg);">
+<body class="min-h-screen font-sans text-sacco-ink antialiased" style="background: var(--page-bg); overflow-x: clip;">
+<div class="min-h-screen w-full max-w-full" style="background: var(--page-bg); overflow-x: clip;">
 <nav id="shellTopNav" class="fixed inset-x-0 top-0 z-50 border-b shadow-sm" style="min-height: var(--shell-nav-height); border-color: #10a8b6; background: linear-gradient(180deg, #19c6d8 0%, #11b2c3 100%);">
     <div class="flex items-center justify-between gap-2 px-2.5 py-2 sm:gap-3 sm:px-3 lg:px-4">
         <div class="flex min-w-0 items-center gap-2 sm:gap-2.5">
@@ -759,9 +801,20 @@
                 </svg>
             </button>
             <a href="${currentMember.position eq 'ADMIN' ? '/admin/dashboard' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/manager-decisions' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'BOARD' ? '/board/queue' : '/app/dashboard')))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
-                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/35 bg-white/95 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-800 shadow-sm sm:h-9 sm:w-9 sm:text-[0.68rem]">
-                    ${activeSaccoLogoText}
-                </span>
+                <c:choose>
+                    <c:when test="${not empty activeSaccoLogoUrl}">
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
+                            <img src="${activeSaccoLogoUrl}"
+                                 alt="${not empty activeSaccoName ? activeSaccoName : 'SACCO'} logo"
+                                 class="h-full w-full object-contain p-1" />
+                        </span>
+                    </c:when>
+                    <c:otherwise>
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/35 bg-white/95 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-800 shadow-sm sm:h-9 sm:w-9 sm:text-[0.68rem]">
+                            ${activeSaccoLogoText}
+                        </span>
+                    </c:otherwise>
+                </c:choose>
                 <div class="min-w-0 leading-tight">
                     <p class="truncate font-display text-[0.92rem] font-semibold tracking-tight text-white sm:text-base">
                         <c:choose>
@@ -815,7 +868,7 @@
                     <div class="erp-dropdown-header">
                         <div>
                             <p class="erp-dropdown-title">Notifications</p>
-                            <p class="erp-dropdown-subtitle">Latest updates from the loan workflow</p>
+                            <p class="erp-dropdown-subtitle">${notificationPanelSubtitle}</p>
                         </div>
                         <a href="${notificationTargetUrl}" class="erp-dropdown-link">View all</a>
                     </div>
@@ -823,7 +876,11 @@
                         <c:choose>
                             <c:when test="${not empty headerNotifications}">
                                 <c:forEach items="${headerNotifications}" var="notification">
-                                    <a href="${notificationTargetUrl}?highlight=${notification.id}#notification-${notification.id}" class="block rounded-md border px-3 py-3 transition hover:border-slate-300 hover:bg-slate-50 ${notification.unread ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}">
+                                    <c:url var="headerNotificationHref" value="${notificationTargetUrl}?highlight=${notification.id}#notification-${notification.id}" />
+                                    <c:if test="${not empty currentMember and currentMember.position eq 'ADMIN' and notification.incidentId ne null}">
+                                        <c:url var="headerNotificationHref" value="/admin/incidents/${notification.incidentId}" />
+                                    </c:if>
+                                    <a href="${headerNotificationHref}" class="block rounded-md border px-3 py-3 transition hover:border-slate-300 hover:bg-slate-50 ${notification.unread ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}">
                                         <div class="flex items-start justify-between gap-3">
                                             <div>
                                                 <p class="text-sm font-semibold text-slate-800">${notification.subject}</p>
@@ -836,7 +893,7 @@
                                 </c:forEach>
                             </c:when>
                             <c:otherwise>
-                                <div class="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">No notifications yet.</div>
+                                <div class="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">${notificationPanelEmptyState}</div>
                             </c:otherwise>
                         </c:choose>
                     </div>
@@ -934,21 +991,67 @@
         </div>
     </div>
 </nav>
+<div id="shellPageTitleRail" class="shell-page-title-rail" aria-hidden="true">
+    <div class="shell-page-title-rail__inner">
+        <p id="shellPageTitleRailText" class="shell-page-title-rail__text"></p>
+    </div>
+</div>
 <div id="appToastContainer" class="pointer-events-none fixed right-4 top-[calc(var(--shell-nav-height)+0.75rem)] z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-[calc(var(--shell-nav-height)+1rem)]"></div>
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/45 lg:hidden"></div>
-<div class="relative min-h-screen overflow-x-hidden" style="padding-top: var(--shell-nav-height);">
+<div class="relative min-h-screen" style="padding-top: var(--shell-nav-height); overflow-x: clip;">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>
     (function () {
         const shellTopNav = document.getElementById('shellTopNav');
         const toastContainer = document.getElementById('appToastContainer');
+        const pageTitleRail = document.getElementById('shellPageTitleRail');
+        const pageTitleRailText = document.getElementById('shellPageTitleRailText');
+        let titleRailTicking = false;
         const syncShellNavHeight = function () {
             if (!shellTopNav) {
                 return;
             }
             const measuredHeight = Math.max(Math.ceil(shellTopNav.getBoundingClientRect().height), 58);
             document.documentElement.style.setProperty('--shell-nav-height', measuredHeight + 'px');
+        };
+        const resolveStickyTitleSource = function () {
+            return document.querySelector('[data-sticky-title-source]') || document.querySelector('.erp-page-title');
+        };
+        const updatePageTitleRail = function () {
+            if (!pageTitleRail || !pageTitleRailText) {
+                return;
+            }
+            const source = resolveStickyTitleSource();
+            const contentFrame = document.querySelector('.shell-content-frame');
+            if (!source || !contentFrame) {
+                pageTitleRail.classList.remove('is-active');
+                pageTitleRailText.textContent = '';
+                return;
+            }
+            const navHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--shell-nav-height')) || 58;
+            const titleText = (source.getAttribute('data-sticky-title') || source.textContent || '').trim();
+            const sourceRect = source.getBoundingClientRect();
+            const frameRect = contentFrame.getBoundingClientRect();
+            const shouldShow = sourceRect.top <= navHeight;
+            if (!titleText || !shouldShow) {
+                pageTitleRail.classList.remove('is-active');
+                pageTitleRailText.textContent = '';
+                return;
+            }
+            document.documentElement.style.setProperty('--shell-page-title-left', Math.round(frameRect.left) + 'px');
+            pageTitleRailText.textContent = titleText;
+            pageTitleRail.classList.add('is-active');
+        };
+        const schedulePageTitleRailUpdate = function () {
+            if (titleRailTicking) {
+                return;
+            }
+            titleRailTicking = true;
+            window.requestAnimationFrame(function () {
+                titleRailTicking = false;
+                updatePageTitleRail();
+            });
         };
 
         window.showToast = function (type, message, options) {
@@ -1027,6 +1130,7 @@
 
         window.addEventListener('load', function () {
             syncShellNavHeight();
+            schedulePageTitleRailUpdate();
             document.querySelectorAll('[data-toast-message]').forEach(function (element) {
                 const message = element.getAttribute('data-toast-message');
                 if (!message) {
@@ -1046,8 +1150,15 @@
             }
         });
 
-        window.addEventListener('resize', syncShellNavHeight);
-        window.requestAnimationFrame(syncShellNavHeight);
+        window.addEventListener('resize', function () {
+            syncShellNavHeight();
+            schedulePageTitleRailUpdate();
+        });
+        window.addEventListener('scroll', schedulePageTitleRailUpdate, { passive: true });
+        window.requestAnimationFrame(function () {
+            syncShellNavHeight();
+            schedulePageTitleRailUpdate();
+        });
 
         const notificationToggle = document.getElementById('notificationToggle');
         const notificationPanel = document.getElementById('notificationPanel');
