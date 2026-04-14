@@ -289,14 +289,15 @@
             margin-right: auto;
             padding: 0.58rem 0 0.48rem;
             border-bottom: 1px solid rgba(207, 216, 223, 0.96);
-            background: linear-gradient(180deg, rgba(238, 242, 245, 0.985) 0%, rgba(238, 242, 245, 0.965) 100%);
-            backdrop-filter: blur(10px);
+            background: linear-gradient(180deg, rgba(238, 242, 245, 0.82) 0%, rgba(238, 242, 245, 0.68) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
         .shell-page-title-rail__text {
             margin: 0;
             color: var(--text-main);
             font-family: Sora, ui-sans-serif, system-ui;
-            font-size: 1.1rem;
+            font-size: 1.32rem;
             font-weight: 700;
             line-height: 1.15;
             letter-spacing: 0.01em;
@@ -589,7 +590,7 @@
                 padding: 0.52rem 0 0.42rem;
             }
             .shell-page-title-rail__text {
-                font-size: 1rem;
+                font-size: 1.14rem;
             }
             .erp-page-heading {
                 font-size: 1.7rem;
