@@ -56,13 +56,10 @@
                         <th>Amount</th>
                         <th>Decision</th>
                         <th>Date</th>
-                        <th>Action</th>
                     </tr>
                     </thead>
                     <tbody>
                     <c:forEach items="${guarantorArchives}" var="req">
-                        <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
-                        <c:set var="canRequestRemoval" value="${req.status eq 'APPROVED' and guaranteeRemovalAllowed[req.id] and empty pendingRemoval}" />
                         <tr>
                             <td>${fn:substring(req.loanApplicationId, 0, 8)}</td>
                             <td>${guaranteeNames[req.loanApplicationId]}</td>
@@ -75,38 +72,15 @@
                             <td>${req.status}</td>
                             <td>
                                 <c:choose>
-                                    <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
-                                    <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
-                                </c:choose>
-                            </td>
-                            <td>
-                                <c:choose>
-                                    <c:when test="${canRequestRemoval}">
-                                        <form action="/app/guarantee-requests/${req.id}/undo"
-                                              method="post"
-                                              data-confirm-title="Request Guarantor Removal"
-                                              data-confirm-message="Send a removal request to the applicant for this approved guarantee?"
-                                              data-confirm-proceed="Send Request">
-                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                            <button type="submit" class="app-btn btn-neutral">Request Removal</button>
-                                        </form>
-                                    </c:when>
-                                    <c:when test="${req.status eq 'APPROVED' and not empty pendingRemoval}">
-                                        <button type="button" class="app-btn btn-neutral action-button-disabled" disabled>Removal Request Sent</button>
-                                    </c:when>
-                                    <c:when test="${req.status eq 'APPROVED'}">
-                                        <button type="button" class="app-btn btn-neutral action-button-disabled" disabled>Removal Window Closed</button>
-                                    </c:when>
-                                    <c:otherwise>
-                                        <span class="text-slate-400">-</span>
-                                    </c:otherwise>
-                                </c:choose>
+                                <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
+                                <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                            </c:choose>
                             </td>
                         </tr>
                     </c:forEach>
                     <c:if test="${empty guarantorArchives}">
                         <tr>
-                            <td colspan="7">No archived guarantor decisions match this filter.</td>
+                            <td colspan="6">No archived guarantor decisions match this filter.</td>
                         </tr>
                     </c:if>
                     </tbody>

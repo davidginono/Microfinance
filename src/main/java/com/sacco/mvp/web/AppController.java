@@ -752,7 +752,7 @@ public class AppController {
         List<GuarantorRequest> requests = activeGuarantorRequests(
             loanWorkflowService.myGuarantorRequests(principal.getMemberId()));
         model.addAttribute("requests", requests);
-        addGuaranteeContext(requests, model);
+        addGuaranteeActionContext(requests, model);
         model.addAttribute("guarantorSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         return "app/guarantee-requests";
     }
@@ -1353,13 +1353,16 @@ public class AppController {
 
     private List<GuarantorRequest> activeGuarantorRequests(List<GuarantorRequest> requests) {
         return requests.stream()
-            .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING)
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING
+                || (request.getStatus() == GuarantorRequestStatus.APPROVED && isWithinReversalWindow(request.getDecidedAt())))
             .toList();
     }
 
     private List<GuarantorRequest> archivedGuarantorRequests(List<GuarantorRequest> requests) {
         return requests.stream()
-            .filter(request -> request.getStatus() != GuarantorRequestStatus.PENDING)
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.REJECTED
+                || request.getStatus() == GuarantorRequestStatus.EXPIRED
+                || (request.getStatus() == GuarantorRequestStatus.APPROVED && !isWithinReversalWindow(request.getDecidedAt())))
             .toList();
     }
 

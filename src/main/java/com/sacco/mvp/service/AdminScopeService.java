@@ -44,8 +44,10 @@ public class AdminScopeService {
                 : selectedSacco.stationIds().getFirst();
         }
 
-        session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
-        session.setAttribute(SESSION_STATION_ID, selectedStationId);
+        if (hasExplicitScopeSelection()) {
+            session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
+            session.setAttribute(SESSION_STATION_ID, selectedStationId);
+        }
 
         return new AdminScopeView(
             selectedSacco.saccoId(),
@@ -70,6 +72,24 @@ public class AdminScopeService {
         HttpSession session = requestFactory.getObject().getSession(true);
         session.setAttribute(SESSION_SACCO_ID, saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId());
         session.setAttribute(SESSION_STATION_ID, resolvedStationId);
+    }
+
+    public boolean hasExplicitScopeSelection() {
+        HttpSession session = requestFactory.getObject().getSession(false);
+        if (session == null) {
+            return false;
+        }
+        return attributeAsString(session.getAttribute(SESSION_SACCO_ID)) != null
+            && attributeAsString(session.getAttribute(SESSION_STATION_ID)) != null;
+    }
+
+    public void clearScope() {
+        HttpSession session = requestFactory.getObject().getSession(false);
+        if (session == null) {
+            return;
+        }
+        session.removeAttribute(SESSION_SACCO_ID);
+        session.removeAttribute(SESSION_STATION_ID);
     }
 
     private String attributeAsString(Object value) {

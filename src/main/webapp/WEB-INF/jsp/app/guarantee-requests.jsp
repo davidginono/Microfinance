@@ -31,6 +31,8 @@
     <thead><tr><th>Loan Reference</th><th>Guarantee Name</th><th>Loan Type</th><th>Loan Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
+        <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
+        <c:set var="canRequestRemoval" value="${req.status eq 'APPROVED' and guaranteeRemovalAllowed[req.id] and empty pendingRemoval}" />
         <tr>
             <td>${fn:substring(req.loanApplicationId, 0, 8)}</td>
             <td>${guaranteeNames[req.loanApplicationId]}</td>
@@ -63,11 +65,25 @@
                     </div>
                 </c:if>
                 <c:if test="${req.status ne 'PENDING'}">
-                    <button type="button"
-                            class="app-btn btn-neutral"
-                            data-guarantee-modal-open="undo-${req.id}">
-                        Request Removal
-                    </button>
+                    <c:choose>
+                        <c:when test="${canRequestRemoval}">
+                            <button type="button"
+                                    class="app-btn btn-neutral"
+                                    data-guarantee-modal-open="undo-${req.id}">
+                                Request Removal
+                            </button>
+                        </c:when>
+                        <c:when test="${req.status eq 'APPROVED' and not empty pendingRemoval}">
+                            <button type="button"
+                                    class="app-btn btn-neutral action-button-disabled"
+                                    disabled>
+                                Removal Request Sent
+                            </button>
+                        </c:when>
+                        <c:otherwise>
+                            <span class="text-slate-400">-</span>
+                        </c:otherwise>
+                    </c:choose>
                 </c:if>
             </td>
         </tr>

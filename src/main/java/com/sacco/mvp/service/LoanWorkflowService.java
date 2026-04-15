@@ -75,6 +75,7 @@ public class LoanWorkflowService {
         validateRepaymentPeriod(product, tenorMonths);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
+        validateGuarantorSelection(saccoId, applicantId, product.getGuarantorsRequired(), guarantorIds);
 
         EligibilityService.EligibilityResult eligibility = eligibilityService.check(saccoId, applicantId, loanType, amount);
         String snapshot = eligibilityService.policySnapshotJson(eligibility, product.getGuarantorsRequired());
@@ -523,13 +524,23 @@ public class LoanWorkflowService {
     }
 
     private List<UUID> normalizeGuarantorSelection(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
-        if (guarantorIds == null || guarantorIds.size() != app.getRequiredGuarantors()) {
-            throw new IllegalArgumentException("Select exactly " + app.getRequiredGuarantors() + " guarantors");
+        return validateGuarantorSelection(app.getSaccoId(), applicantId, app.getRequiredGuarantors(), guarantorIds);
+    }
+
+    private List<UUID> validateGuarantorSelection(String saccoId,
+                                                  UUID applicantId,
+                                                  Integer requiredGuarantors,
+                                                  List<UUID> guarantorIds) {
+        if (requiredGuarantors == null || requiredGuarantors <= 0) {
+            return Collections.emptyList();
+        }
+        if (guarantorIds == null || guarantorIds.size() != requiredGuarantors) {
+            throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " guarantors");
         }
 
         List<UUID> uniqueGuarantors = new ArrayList<>(new LinkedHashSet<>(guarantorIds));
-        if (uniqueGuarantors.size() != app.getRequiredGuarantors()) {
-            throw new IllegalArgumentException("Select exactly " + app.getRequiredGuarantors() + " different guarantors");
+        if (uniqueGuarantors.size() != requiredGuarantors) {
+            throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " different guarantors");
         }
 
         for (UUID guarantorId : uniqueGuarantors) {
@@ -538,7 +549,7 @@ public class LoanWorkflowService {
             }
             Member guarantor = memberRepository.findById(guarantorId)
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
-            if (!guarantor.getSaccoId().equals(app.getSaccoId()) || guarantor.getStatus() != MemberStatus.ACTIVE) {
+            if (!guarantor.getSaccoId().equals(saccoId) || guarantor.getStatus() != MemberStatus.ACTIVE) {
                 throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
             }
         }

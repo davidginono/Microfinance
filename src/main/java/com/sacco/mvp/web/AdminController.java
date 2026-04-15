@@ -47,6 +47,15 @@ public class AdminController {
     private final DatabaseUtilizationService databaseUtilizationService;
     private final NotificationInboxService notificationInboxService;
 
+    @GetMapping("/scope/select")
+    public String selectScope(@AuthenticationPrincipal AppUserPrincipal principal,
+                              @RequestParam(required = false) String next,
+                              Model model) {
+        model.addAttribute("scopeSelection", adminScopeService.currentScope(principal));
+        model.addAttribute("nextAdminPath", normalizeAdminNextPath(next));
+        return "admin/scope-select";
+    }
+
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         model.addAttribute("dashboard", adminService.dashboard(adminScopeService.currentSaccoId(principal), principal.getMemberId()));
@@ -369,10 +378,11 @@ public class AdminController {
     @PostMapping("/scope")
     public String updateScope(@RequestParam String saccoId,
                               @RequestParam String stationId,
+                              @RequestParam(required = false) String next,
                               RedirectAttributes ra) {
         adminScopeService.updateScope(saccoId, stationId);
         ra.addFlashAttribute("message", "You are now working under the selected SACCO and station.");
-        return "redirect:/admin/dashboard";
+        return "redirect:" + normalizeAdminNextPath(next);
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
@@ -509,6 +519,23 @@ public class AdminController {
             query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
+    }
+
+    private String normalizeAdminNextPath(String next) {
+        if (next == null || next.isBlank()) {
+            return "/admin/dashboard";
+        }
+        try {
+            URI uri = URI.create(next);
+            String path = uri.getPath();
+            if (path == null || !path.startsWith("/admin") || path.startsWith("/admin/scope")) {
+                return "/admin/dashboard";
+            }
+            String query = uri.getRawQuery();
+            return query == null || query.isBlank() ? path : path + "?" + query;
+        } catch (IllegalArgumentException ex) {
+            return "/admin/dashboard";
+        }
     }
 
     private String resolveAdminReturnPath(HttpServletRequest request) {

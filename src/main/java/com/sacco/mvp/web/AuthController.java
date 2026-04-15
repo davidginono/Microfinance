@@ -9,6 +9,7 @@ import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.MemberRegistrationService;
+import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.UserClaimService;
 import com.sacco.mvp.web.form.MemberRegistrationForm;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -43,6 +44,7 @@ public class AuthController {
     private final MemberRepository memberRepository;
     private final UserClaimService userClaimService;
     private final SaccoRegistryService saccoRegistryService;
+    private final AdminScopeService adminScopeService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/")
@@ -51,7 +53,9 @@ public class AuthController {
             return "redirect:/login";
         }
         return switch (principal.getPosition()) {
-            case ADMIN -> "redirect:/admin/dashboard";
+            case ADMIN -> adminScopeService.hasExplicitScopeSelection()
+                ? "redirect:/admin/dashboard"
+                : "redirect:/admin/scope/select";
             case CHAIRPERSON -> "redirect:/chairperson/manager-decisions";
             case MANAGER -> "redirect:/manager/loan-applications?status=READY_FOR_MANAGER";
             case BOARD -> "redirect:/board/queue";
@@ -307,7 +311,7 @@ public class AuthController {
 
     private String defaultLanding(Member member) {
         return switch (Position.primaryRole(member.getStaffRolesResolved(), member.isMemberAccess())) {
-            case ADMIN -> "/admin/dashboard";
+            case ADMIN -> "/admin/scope/select";
             case CHAIRPERSON -> "/chairperson/manager-decisions";
             case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
             case BOARD -> "/board/queue";

@@ -47,17 +47,14 @@ public class LoanPresentationService {
         try {
             Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<>() {});
             Map<String, Object> display = new LinkedHashMap<>();
+            addFinancialRow(display, "Entered Loan Amount (TZS)", raw.get("requestedAmount"));
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
-            addFinancialRow(display, "Principal (TZS) (Entered Loan Amount + Fees)", raw.get("loanToBePaid"));
+            addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
+            addFinancialRow(display, "Principal (TZS)", raw.get("loanToBePaid"));
             Object loanPlusInterest = raw.get("loanPlusInterest");
-            Object interestAmount = raw.get("interestAmount");
             if (loanPlusInterest != null && String.valueOf(loanPlusInterest).matches("-?\\d+(\\.\\d+)?")) {
-                String combined = formatMoney(new BigDecimal(String.valueOf(loanPlusInterest)));
-                if (interestAmount != null && String.valueOf(interestAmount).matches("-?\\d+(\\.\\d+)?")) {
-                    combined += " (Interest: " + formatMoney(new BigDecimal(String.valueOf(interestAmount))) + ")";
-                }
-                display.put("Principal + Interest (TZS)", combined);
+                display.put("Principal + Interest (TZS)", formatMoney(new BigDecimal(String.valueOf(loanPlusInterest))));
             }
             addFinancialRow(display, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
             return display;
@@ -185,6 +182,7 @@ public class LoanPresentationService {
     }
 
     public String buildPrintableHtml(LoanApplication app,
+                                     String saccoName,
                                      Member applicant,
                                      Map<String, Object> formFields,
                                      Map<String, Object> financialFields,
@@ -199,7 +197,8 @@ public class LoanPresentationService {
         html.append("<style>");
         html.append("body{font-family:Arial,sans-serif;margin:24px;color:#172033;}h1,h2{margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #d8dee8;padding:8px;text-align:left;vertical-align:top;}th{background:#f4f6f8;} .meta{margin:4px 0;} .note{margin-top:12px;padding:10px;background:#f7f4ee;border:1px solid #e7d6ca;} .signature-box{margin-top:18px;padding:16px;border:1px solid #d8dee8;background:#f8fafc;} .signature-text{margin-top:8px;font-family:'Brush Script MT','Segoe Script','Lucida Handwriting',cursive;font-size:54px;line-height:1.05;color:#0f172a;} .muted{color:#5b6b82;font-size:12px;}");
         html.append("</style></head><body>");
-        html.append("<h1>IAA SACCOS Loan Application</h1>");
+        String printableSaccoName = saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim();
+        html.append("<h1>").append(esc(printableSaccoName)).append(" Loan Application</h1>");
         html.append("<p class=\"meta\"><strong>Loan Id:</strong> ").append(shortId(app.getId())).append("</p>");
         html.append("<p class=\"meta\"><strong>Applicant:</strong> ").append(esc(applicant.getFullName())).append(" (")
             .append(esc(applicant.getMemberNo())).append(")</p>");

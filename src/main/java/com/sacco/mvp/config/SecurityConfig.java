@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserDetailsService;
+import com.sacco.mvp.service.AdminScopeService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +26,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, MemberRepository memberRepository) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   MemberRepository memberRepository,
+                                                   AdminScopeService adminScopeService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
@@ -75,7 +78,8 @@ public class SecurityConfig {
                         .anyMatch(a -> "ROLE_BOARD".equals(a.getAuthority()));
 
                     if (isAdmin) {
-                        response.sendRedirect("/admin/dashboard");
+                        adminScopeService.clearScope();
+                        response.sendRedirect("/admin/scope/select");
                         return;
                     }
                     if (isChairperson) {

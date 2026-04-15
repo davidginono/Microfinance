@@ -10,6 +10,8 @@ import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.RegisteredSaccoRepository;
+import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -41,6 +43,8 @@ public class LoanDocumentController {
     private final MemberRepository memberRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
+    private final RegisteredSaccoRepository registeredSaccoRepository;
+    private final SaccoSettingsRepository saccoSettingsRepository;
     private final LoanPresentationService loanPresentationService;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanReportService loanReportService;
@@ -78,6 +82,7 @@ public class LoanDocumentController {
 
         String html = loanPresentationService.buildPrintableHtml(
             app,
+            resolvePrintableSaccoName(app.getSaccoId()),
             applicant,
             loanPresentationService.parseFormFields(app.getFormData()),
             loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()),
@@ -92,6 +97,20 @@ public class LoanDocumentController {
             .contentType(MediaType.TEXT_HTML)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + ".html")
             .body(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String resolvePrintableSaccoName(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return "SACCO";
+        }
+        return registeredSaccoRepository.findById(saccoId)
+            .filter(registeredSacco -> registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank())
+            .map(registeredSacco -> registeredSacco.getSaccoName().trim())
+            .or(() -> saccoSettingsRepository.findById(saccoId)
+                .map(settings -> settings.getExternalSaccoName())
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim))
+            .orElse(saccoId);
     }
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}")

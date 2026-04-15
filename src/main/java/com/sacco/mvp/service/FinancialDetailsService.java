@@ -58,6 +58,7 @@ public class FinancialDetailsService {
             BigDecimal.valueOf(safeTenor), 2, RoundingMode.HALF_UP);
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("requestedAmount", safeAmount);
         snapshot.put("applicationFee", APPLICATION_FEE);
         snapshot.put("insuranceFee", insuranceFee);
         snapshot.put("loanBalance", loanBalance);
