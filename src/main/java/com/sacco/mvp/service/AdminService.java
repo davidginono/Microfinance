@@ -21,8 +21,8 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +31,8 @@ public class AdminService {
     private static final long DASHBOARD_RECENT_WINDOW_DAYS = 30L;
     private static final int DEFAULT_LOG_PAGE_SIZE = 50;
     private static final int MAX_LOG_PAGE_SIZE = 100;
+    private static final int DEFAULT_USER_PAGE_SIZE = 25;
+    private static final int MAX_USER_PAGE_SIZE = 100;
     private final MemberRepository memberRepository;
     private final SavingsAccountRepository savingsAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -110,6 +112,23 @@ public class AdminService {
                 .build()));
         users.sort(Comparator.comparing(UserAccessView::getFullName, String.CASE_INSENSITIVE_ORDER));
         return users;
+    }
+
+    public Page<UserAccessView> usersPage(String saccoId, String query, int page, int size) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? DEFAULT_USER_PAGE_SIZE : Math.min(size, MAX_USER_PAGE_SIZE);
+        return memberRepository.findUserAccessPage(saccoId, normalizedQuery, PageRequest.of(safePage, safeSize))
+            .map(member -> UserAccessView.builder()
+                .accountId(member.getId())
+                .loginId(member.getMemberNo())
+                .fullName(member.getFullName())
+                .email(member.getEmail())
+                .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
+                .staffRoles(member.getStaffRolesResolved())
+                .status(member.getStatus())
+                .membershipLabel(resolveMembershipLabel(member))
+                .build());
     }
 
     @Transactional
@@ -200,6 +219,10 @@ public class AdminService {
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings not found"));
     }
 
+    public int activeBoardMemberCount(String saccoId) {
+        return roleDirectoryService.activeByRole(saccoId, Position.BOARD).size();
+    }
+
     @Transactional
     public void updateLoanProduct(String saccoId, UUID adminId, UUID productId, Integer guarantorsRequired,
                                   BigDecimal ratio, BigDecimal insuranceRate, BigDecimal interestRate,
@@ -226,24 +249,45 @@ public class AdminService {
     public void updateBoardReviewRequirement(String saccoId, UUID adminId, Integer boardQuorum) {
         SaccoSettings settings = settings(saccoId);
         int requiredReviewers = boardQuorum == null ? 0 : boardQuorum;
-        int boardSize = settings.getBoardSize() == null ? 0 : settings.getBoardSize();
+        int activeBoardMembers = activeBoardMemberCount(saccoId);
 
         if (requiredReviewers <= 0) {
             throw new IllegalArgumentException("Required board reviewers must be at least 1.");
         }
-        if (boardSize > 0 && requiredReviewers > boardSize) {
-            throw new IllegalArgumentException("Required board reviewers cannot be more than the board size.");
+        if (activeBoardMembers <= 0) {
+            throw new IllegalArgumentException("No active board members are configured for this SACCO yet.");
+        }
+        if (requiredReviewers > activeBoardMembers) {
+            throw new IllegalArgumentException("Required board reviewers cannot be more than the active board members in this SACCO.");
         }
 
         Map<String, Object> before = snapshotSettings(settings);
         settings.setBoardQuorum(requiredReviewers);
         settings.setUpdatedAt(OffsetDateTime.now());
         saccoSettingsRepository.save(settings);
-        auditService.log("SACCO_SETTINGS", UUID.fromString(settings.getSaccoId()), "ADMIN_UPDATE_BOARD_REVIEW_REQUIREMENT", adminId, before, snapshotSettings(settings));
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_BOARD_REVIEW_REQUIREMENT", adminId, before, snapshotSettings(settings));
     }
 
     public List<NotificationViewService.NotificationView> adminMessages(UUID adminId) {
-        return notificationViewService.toViews(notificationRepository.findByRecipientMemberIdOrderByCreatedAtDesc(adminId));
+        return notificationViewService.toViews(notificationRepository.findByRecipientMemberIdOrderByCreatedAtDesc(adminId)).stream()
+            .filter(view -> "SUPPORT_MESSAGE".equals(view.getType()) && view.getIncidentId() != null)
+            .toList();
+    }
+
+    public Map<UUID, AdminIncident> adminMessageIncidentMap(List<NotificationViewService.NotificationView> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> incidentIds = messages.stream()
+            .map(NotificationViewService.NotificationView::getIncidentId)
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+        if (incidentIds.isEmpty()) {
+            return Map.of();
+        }
+        return adminIncidentRepository.findAllById(incidentIds).stream()
+            .collect(Collectors.toMap(AdminIncident::getId, incident -> incident, (left, right) -> left, LinkedHashMap::new));
     }
 
     public List<Member> activeMembers(String saccoId) {

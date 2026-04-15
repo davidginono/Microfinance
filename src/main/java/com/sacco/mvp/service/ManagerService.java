@@ -176,9 +176,12 @@ public class ManagerService {
 
         SaccoSettings settings = saccoSettingsRepository.findById(app.getSaccoId())
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings missing"));
+        int requiredBoardReviewers = settings.getBoardQuorum() == null || settings.getBoardQuorum() <= 0
+            ? Math.max(settings.getBoardSize() == null ? 0 : settings.getBoardSize(), 1)
+            : settings.getBoardQuorum();
 
         List<RoleDirectoryService.RoleAccountRef> boardMembers = roleDirectoryService.activeByRole(app.getSaccoId(), Position.BOARD);
-        if (boardMembers.size() < settings.getBoardSize()) {
+        if (boardMembers.size() < requiredBoardReviewers) {
             throw new IllegalStateException("Not enough board members");
         }
 
@@ -188,7 +191,7 @@ public class ManagerService {
             boardReviewRepository.deleteByLoanApplicationId(loanId);
         }
 
-        boardMembers.stream().limit(settings.getBoardSize()).forEach(board -> {
+        boardMembers.stream().limit(requiredBoardReviewers).forEach(board -> {
             boardReviewRepository.save(BoardReview.builder()
                 .id(UUID.randomUUID())
                 .loanApplicationId(loanId)

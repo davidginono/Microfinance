@@ -149,17 +149,36 @@
         .auth-panel-divider {
             border-bottom: 1px solid #dbe4ee;
         }
+        .auth-tab-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            border-radius: 8px;
+            border: 1px solid #dbe4ee;
+            background: #f8fafc;
+            padding: 0.22rem;
+        }
         .auth-tab {
-            background: #f3f4f6;
-            color: #5b6b7d;
-            border-color: #d8e1eb;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: #90a0b4;
+            min-width: 7rem;
+            padding: 0.72rem 1.15rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+            line-height: 1;
+            transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
         }
         .auth-tab[data-active="true"] {
-            background: #e8f7fb;
-            color: #0f2747;
-            border-color: #8fd7e3;
-            border-bottom-color: #ffffff;
+            background: #ffffff;
+            color: #16324f;
             box-shadow: none;
+            transform: none;
+        }
+        .auth-tab:not([data-active="true"]):hover {
+            color: #5c6d82;
+            background: rgba(255, 255, 255, 0.65);
         }
         .auth-alt-divider {
             color: #7c8ea6;
@@ -268,9 +287,9 @@
                     </c:if>
 
                     <div class="auth-panel-divider mb-5">
-                        <div class="inline-flex translate-y-px text-sm font-semibold">
-                            <button type="button" class="auth-tab rounded-t-[9px] border border-slate-200 px-5 py-3 text-slate-600 transition" data-login-tab-toggle="member" data-active="true">Members</button>
-                            <button type="button" class="auth-tab rounded-t-[9px] border border-slate-200 border-l-0 px-5 py-3 text-slate-600 transition" data-login-tab-toggle="staff" data-active="false">Staff</button>
+                        <div class="auth-tab-switch text-sm font-semibold">
+                            <button type="button" class="auth-tab" data-login-tab-toggle="member" data-active="true">Members</button>
+                            <button type="button" class="auth-tab" data-login-tab-toggle="staff" data-active="false">Staff</button>
                         </div>
                     </div>
 

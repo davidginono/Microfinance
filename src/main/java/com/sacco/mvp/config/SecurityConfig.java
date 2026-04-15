@@ -55,11 +55,11 @@ public class SecurityConfig {
                                     return "Invalid staff number or password.";
                                 }
                                 if (!member.isMemberAccess()) {
-                                    return "This account is staff-only. Sign in through Staff instead.";
+                                    return "You are not registered as a member. Sign in through Staff instead.";
                                 }
                                 return "Invalid member number or password.";
                             })
-                            .orElse(message);
+                            .orElse("No member account was found for that member number. Please register yourself first.");
                     }
                     request.getSession(true).setAttribute("loginErrorMessage", message);
                     response.sendRedirect("/login?error");

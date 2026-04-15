@@ -96,6 +96,8 @@
         max-height: 17rem;
         overflow-y: auto;
         overflow-x: hidden;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
         border: 1px solid #2F348D;
         border-radius: 6px;
         background: #ffffff;
@@ -120,11 +122,9 @@
         transform: translateY(0);
     }
     .neo-select-menu::-webkit-scrollbar {
-        width: 8px;
-    }
-    .neo-select-menu::-webkit-scrollbar-thumb {
-        border-radius: 999px;
-        background: rgba(100, 116, 139, 0.25);
+        width: 0;
+        height: 0;
+        display: none;
     }
     .neo-select-empty {
         padding: 0.9rem 1rem;

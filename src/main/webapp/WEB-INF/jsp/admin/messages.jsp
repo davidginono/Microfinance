@@ -5,28 +5,49 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / Messages</p>
-    <h1 class="erp-page-title">Admin Messages</h1>
-    <p class="erp-page-subtitle">Review incoming support traffic, reply to members, and broadcast important operational notices.</p>
+    <p class="erp-breadcrumb">Admin Tools / Incidents</p>
+    <h1 class="erp-page-title">Incidents</h1>
+    <p class="erp-page-subtitle">Review member support incidents, reply to members, and jump into the admin cases that need your attention.</p>
 </div>
 
-<div class="mb-3 flex items-center justify-end">
-    <form action="/admin/messages/mark-all-read" method="post" class="m-0">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <button type="submit" class="app-btn btn-primary">Mark all read</button>
+<section class="erp-form-wrap">
+    <form action="/admin/messages" method="get" class="grid gap-3 md:grid-cols-3">
+        <div>
+            <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
+            <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+                <option value="">All statuses</option>
+                <c:forEach items="${incidentStatuses}" var="item">
+                    <option value="${item}" ${selectedStatus eq item.name() ? 'selected' : ''}>${item}</option>
+                </c:forEach>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-sm font-semibold text-slate-700">Severity</label>
+            <select name="severity" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+                <option value="">All severities</option>
+                <c:forEach items="${incidentSeverities}" var="item">
+                    <option value="${item}" ${selectedSeverity eq item.name() ? 'selected' : ''}>${item}</option>
+                </c:forEach>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="app-btn btn-primary">Apply Filters</button>
+            <a href="/admin/messages" class="app-btn btn-neutral">Clear</a>
+        </div>
     </form>
-</div>
+</section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title">Inbox</p></div>
+    <div class="erp-panel-header"><p class="erp-panel-title">Incident Inbox</p></div>
     <div class="erp-panel-body">
     <div class="erp-table-wrap overflow-x-auto">
         <table class="erp-table">
             <thead>
-            <tr><th>Subject</th><th>Message</th><th>Source</th><th>Type</th><th>Incident</th><th>Date</th></tr>
+            <tr><th>Subject</th><th>Message</th><th>Source</th><th>Type</th><th>Severity</th><th>Status</th><th>Incident</th><th>Date</th></tr>
             </thead>
             <tbody>
             <c:forEach items="${messages}" var="item">
+                <c:set var="incidentMeta" value="${messageIncidents[item.incidentId]}" />
                 <tr id="notification-${item.id}" class="${highlightNotificationId eq item.id ? 'bg-amber-50' : (item.unread ? 'bg-sacco-blue/5' : 'bg-white')}">
                     <td class="px-3 py-2 font-semibold text-slate-900">
                         <a href="/admin/messages/${item.id}/open" class="hover:text-sacco-blue">
@@ -48,6 +69,8 @@
                     </td>
                     <td class="px-3 py-2">${item.source}</td>
                     <td class="px-3 py-2">${item.type}</td>
+                    <td class="px-3 py-2">${incidentMeta != null ? incidentMeta.severity : '-'}</td>
+                    <td class="px-3 py-2">${incidentMeta != null ? incidentMeta.status : '-'}</td>
                     <td class="px-3 py-2">
                         <c:if test="${not empty item.incidentId}">
                             <a href="/admin/incidents/${item.incidentId}" class="app-btn btn-neutral">Open Incident</a>
@@ -58,7 +81,7 @@
                 </tr>
             </c:forEach>
             <c:if test="${empty messages}">
-                <tr><td colspan="6" class="px-3 py-3 text-slate-500">No admin messages yet.</td></tr>
+                <tr><td colspan="8" class="px-3 py-3 text-slate-500">No member support notifications match the current filters.</td></tr>
             </c:if>
             </tbody>
         </table>

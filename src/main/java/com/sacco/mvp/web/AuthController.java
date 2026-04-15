@@ -159,14 +159,14 @@ public class AuthController {
         if (matchedAccount != null && !matchedAccount.isMemberAccess()) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
-                "message", "This account is staff-only. Sign in through Staff instead."
+                "message", "You are not registered as a member. Sign in through Staff instead."
             ));
         }
         Member member = matchedAccount != null && matchedAccount.isMemberAccess() ? matchedAccount : null;
         if (member == null) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
-                "message", "No active member account matches that email address."
+                "message", "No member account was found for that email address. Please register yourself first."
             ));
         }
 
@@ -197,9 +197,9 @@ public class AuthController {
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.LOGIN, otpCode);
             Member member = memberRepository.findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalStateException("No active member account matches that email address."));
+                .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
             if (!member.isMemberAccess()) {
-                throw new IllegalStateException("This account is staff-only. Sign in through Staff instead.");
+                throw new IllegalStateException("You are not registered as a member. Sign in through Staff instead.");
             }
             signInMember(member, request);
             return ResponseEntity.ok(Map.of(

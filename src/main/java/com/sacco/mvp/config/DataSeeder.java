@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +43,7 @@ public class DataSeeder {
     private final ObjectMapper objectMapper;
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.seed", name = "demo-data-enabled", havingValue = "true")
     CommandLineRunner seedApplicationData() {
         return args -> {
             OffsetDateTime now = OffsetDateTime.now();

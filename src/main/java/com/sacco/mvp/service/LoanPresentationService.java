@@ -49,7 +49,7 @@ public class LoanPresentationService {
             Map<String, Object> display = new LinkedHashMap<>();
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
-            addFinancialRow(display, "Principal (TZS) (Loan Amount + Application Costs)", raw.get("loanToBePaid"));
+            addFinancialRow(display, "Principal (TZS) (Entered Loan Amount + Fees)", raw.get("loanToBePaid"));
             Object loanPlusInterest = raw.get("loanPlusInterest");
             Object interestAmount = raw.get("interestAmount");
             if (loanPlusInterest != null && String.valueOf(loanPlusInterest).matches("-?\\d+(\\.\\d+)?")) {

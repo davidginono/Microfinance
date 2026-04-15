@@ -14,6 +14,61 @@
     .otp-checkmark-pop {
         animation: otp-pop 180ms ease-out;
     }
+
+    .loan-action-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .loan-action-card {
+        border: 1px solid #dbe4ee;
+        border-radius: 0.95rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        padding: 1rem 1.1rem;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .loan-action-card__label {
+        margin: 0 0 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+
+    .loan-action-card__body {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.9rem;
+    }
+
+    .loan-action-card__text {
+        flex: 1 1 15rem;
+        min-width: 0;
+    }
+
+    .loan-action-card__title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #172033;
+    }
+
+    .loan-action-card__hint {
+        margin: 0.35rem 0 0;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        color: #5b708f;
+    }
+
+    @media (min-width: 768px) {
+        .loan-action-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
 </style>
 
 <div class="erp-page-header">
@@ -267,32 +322,50 @@
         </div>
     </div>
 
-    <div class="flex flex-wrap gap-6">
-        <div>
-            <button class="app-btn btn-neutral px-5 py-3 text-sm" type="submit">
-                <spring:message code="common.savedraft" />
-            </button>
-            <p class="mt-2 text-sm text-slate-500">Lets the applicant come back later and continue editing before submission.</p>
+    <div class="loan-action-grid">
+        <div class="loan-action-card">
+            <p class="loan-action-card__label">Draft Workspace</p>
+            <div class="loan-action-card__body">
+                <div class="loan-action-card__text">
+                    <p class="loan-action-card__title">Save Draft</p>
+                    <p class="loan-action-card__hint">Lets the applicant come back later and continue editing before submission.</p>
+                </div>
+                <button class="app-btn btn-neutral px-5 py-3 text-sm" type="submit">
+                    <spring:message code="common.savedraft" />
+                </button>
+            </div>
         </div>
         <c:if test="${not empty formValues['applicationId']}">
-            <div class="pt-0.5">
+            <div class="loan-action-card">
+                <p class="loan-action-card__label">Workflow Action</p>
                 <c:choose>
                     <c:when test="${requiredGuarantors gt 0}">
-                        <button class="app-btn btn-approve px-5 py-3 text-sm"
-                                type="submit"
-                                name="action"
-                                value="SEND_TO_GUARANTORS">
-                            Send to Guarantors
-                        </button>
-                        <p class="mt-2 text-sm text-slate-500">The Submit button will appear after all required guarantors have approved.</p>
+                        <div class="loan-action-card__body">
+                            <div class="loan-action-card__text">
+                                <p class="loan-action-card__title">Send to Guarantors</p>
+                                <p class="loan-action-card__hint">This changes the current loan into the guarantor review stage and sends it out for approval.</p>
+                            </div>
+                            <button class="app-btn btn-approve px-5 py-3 text-sm"
+                                    type="submit"
+                                    name="action"
+                                    value="SEND_TO_GUARANTORS">
+                                Send to Guarantors
+                            </button>
+                        </div>
                     </c:when>
                     <c:otherwise>
-                        <button class="app-btn btn-approve px-5 py-3 text-sm"
-                                type="submit"
-                                name="action"
-                                value="SEND_TO_GUARANTORS">
-                            <spring:message code="common.submit" />
-                        </button>
+                        <div class="loan-action-card__body">
+                            <div class="loan-action-card__text">
+                                <p class="loan-action-card__title">Submit Application</p>
+                                <p class="loan-action-card__hint">This sends the application forward immediately for the next review stage.</p>
+                            </div>
+                            <button class="app-btn btn-approve px-5 py-3 text-sm"
+                                    type="submit"
+                                    name="action"
+                                    value="SEND_TO_GUARANTORS">
+                                <spring:message code="common.submit" />
+                            </button>
+                        </div>
                     </c:otherwise>
                 </c:choose>
             </div>
@@ -707,10 +780,10 @@
             });
         }
 
-        form.addEventListener("submit", function () {
-            const clickedButton = document.activeElement;
-            const submitButton = clickedButton && clickedButton.form === form && clickedButton.type === "submit"
-                ? clickedButton
+        form.addEventListener("submit", function (event) {
+            const submitter = event.submitter || document.activeElement;
+            const submitButton = submitter && submitter.form === form && submitter.type === "submit"
+                ? submitter
                 : form.querySelector("button[type='submit']");
             if (!submitButton || submitButton.disabled) {
                 return;

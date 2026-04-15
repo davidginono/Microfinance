@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriUtils;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -59,11 +61,31 @@ public class AdminController {
 
     @GetMapping("/messages")
     public String messages(@AuthenticationPrincipal AppUserPrincipal principal,
+                           @RequestParam(required = false) IncidentStatus status,
+                           @RequestParam(required = false) IncidentSeverity severity,
                            @RequestParam(required = false) UUID highlight,
                            Model model) {
-        model.addAttribute("messages", adminService.adminMessages(principal.getMemberId()));
+        java.util.List<com.sacco.mvp.service.NotificationViewService.NotificationView> allMessages =
+            adminService.adminMessages(principal.getMemberId());
+        Map<UUID, com.sacco.mvp.domain.AdminIncident> messageIncidents = adminService.adminMessageIncidentMap(allMessages);
+        java.util.List<com.sacco.mvp.service.NotificationViewService.NotificationView> filteredMessages = allMessages.stream()
+            .filter(item -> {
+                com.sacco.mvp.domain.AdminIncident incident = item.getIncidentId() == null ? null : messageIncidents.get(item.getIncidentId());
+                if (incident == null) {
+                    return false;
+                }
+                return (status == null || incident.getStatus() == status)
+                    && (severity == null || incident.getSeverity() == severity);
+            })
+            .toList();
+        model.addAttribute("messages", filteredMessages);
+        model.addAttribute("messageIncidents", messageIncidents);
         model.addAttribute("members", adminService.activeMembers(adminScopeService.currentSaccoId(principal)));
         model.addAttribute("highlightNotificationId", highlight);
+        model.addAttribute("incidentStatuses", IncidentStatus.values());
+        model.addAttribute("incidentSeverities", IncidentSeverity.values());
+        model.addAttribute("selectedStatus", status == null ? "" : status.name());
+        model.addAttribute("selectedSeverity", severity == null ? "" : severity.name());
         return "admin/messages";
     }
 
@@ -89,7 +111,7 @@ public class AdminController {
         } else {
             ra.addFlashAttribute("message", "There were no unread admin messages.");
         }
-        return "redirect:/admin/messages";
+        return "redirect:/admin/incidents";
     }
 
     @GetMapping("/incidents")
@@ -149,9 +171,22 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public String users(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        java.util.List<AdminService.UserAccessView> users = adminService.users(adminScopeService.currentSaccoId(principal));
-        model.addAttribute("users", users);
+    public String users(@AuthenticationPrincipal AppUserPrincipal principal,
+                        @RequestParam(required = false) String query,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "25") int size,
+                        Model model) {
+        Page<AdminService.UserAccessView> usersPage = adminService.usersPage(
+            adminScopeService.currentSaccoId(principal),
+            query,
+            page,
+            size
+        );
+        model.addAttribute("users", usersPage.getContent());
+        model.addAttribute("usersPage", usersPage);
+        model.addAttribute("selectedUserQuery", query == null ? "" : query.trim());
+        model.addAttribute("selectedPageSize", usersPage.getSize());
+        model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, usersPage.getSize()));
         model.addAttribute("staffPositions", Position.staffAssignableRoles());
         model.addAttribute("statuses", MemberStatus.values());
         return "admin/users";
@@ -188,6 +223,7 @@ public class AdminController {
         String saccoId = adminScopeService.currentSaccoId(principal);
         model.addAttribute("products", adminService.loanProducts(saccoId));
         model.addAttribute("settings", adminService.settings(saccoId));
+        model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("settingsSection", "board".equalsIgnoreCase(section) ? "board" : "loan");
         return "admin/settings-controls";
     }
@@ -340,9 +376,11 @@ public class AdminController {
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public String handleError(RuntimeException ex, RedirectAttributes ra) {
+    public String handleError(RuntimeException ex,
+                              HttpServletRequest request,
+                              RedirectAttributes ra) {
         ra.addFlashAttribute("error", ex.getMessage());
-        return "redirect:/admin/dashboard";
+        return "redirect:" + resolveAdminReturnPath(request);
     }
 
     private String normalizeDateParam(String raw) {
@@ -463,5 +501,31 @@ public class AdminController {
             query.append("&actorId=").append(UriUtils.encode(actorId.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
+    }
+
+    private String buildUsersPaginationQuery(String queryText, int size) {
+        StringBuilder query = new StringBuilder("&size=").append(size);
+        if (queryText != null && !queryText.isBlank()) {
+            query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
+        }
+        return query.toString();
+    }
+
+    private String resolveAdminReturnPath(HttpServletRequest request) {
+        String referer = request.getHeader("Referer");
+        if (referer == null || referer.isBlank()) {
+            return "/admin/dashboard";
+        }
+        try {
+            URI uri = URI.create(referer);
+            String path = uri.getPath();
+            if (path == null || !path.startsWith("/admin")) {
+                return "/admin/dashboard";
+            }
+            String query = uri.getRawQuery();
+            return query == null || query.isBlank() ? path : path + "?" + query;
+        } catch (IllegalArgumentException ignored) {
+            return "/admin/dashboard";
+        }
     }
 }

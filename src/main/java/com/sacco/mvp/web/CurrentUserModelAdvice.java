@@ -83,7 +83,7 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("notificationPanelSubtitle")
     public String notificationPanelSubtitle(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
-            return "Latest incidents requiring admin attention";
+            return "Latest member support incidents requiring admin attention";
         }
         return "Latest updates from the loan workflow";
     }
@@ -91,7 +91,7 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("notificationPanelEmptyState")
     public String notificationPanelEmptyState(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
-            return "No admin incidents yet.";
+            return "No member support incidents yet.";
         }
         return "No notifications yet.";
     }

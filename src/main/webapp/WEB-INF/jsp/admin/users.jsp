@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -15,6 +16,50 @@
     <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user">Add User</button>
 </div>
 
+<div class="erp-panel overflow-hidden">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="max-w-2xl">
+                <p class="erp-widget-title">Filter And View Options</p>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Search by user name, email address, or user ID, then page through the matching records instead of loading the full user table at once.</p>
+            </div>
+            <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
+                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
+                <c:set var="userTotal" value="${usersPage.totalElements}" />
+                <c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
+                <c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
+                <c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
+                <p class="mt-2 text-base font-medium text-slate-700">Showing <span class="font-semibold text-sacco-ink">${userSliceStart}-${userSliceEnd}</span> of <span class="font-semibold text-sacco-ink">${userTotal}</span> users</p>
+            </div>
+        </div>
+    </div>
+
+    <form method="get" action="/admin/users" class="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_14rem_auto] lg:items-end">
+        <label class="block">
+            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search User</span>
+            <input type="text"
+                   name="query"
+                   value="${selectedUserQuery}"
+                   class="mt-2 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
+                   placeholder="Search by name, email, or user ID" />
+        </label>
+
+        <label class="block">
+            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Rows Per Page</span>
+            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800">
+                <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
+                <option value="50" ${selectedPageSize == 50 ? 'selected' : ''}>50 rows</option>
+                <option value="100" ${selectedPageSize == 100 ? 'selected' : ''}>100 rows</option>
+            </select>
+        </label>
+
+        <div class="flex flex-wrap gap-3">
+            <button type="submit" class="app-btn btn-primary">Apply Filters</button>
+            <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
+        </div>
+    </form>
+</div>
+
 <div class="erp-table-wrap overflow-x-auto">
     <table class="erp-table min-w-[980px]">
         <thead>
@@ -28,31 +73,82 @@
         </tr>
         </thead>
         <tbody>
-        <c:forEach items="${users}" var="user">
-            <tr>
-                <td class="px-3 py-2 align-top">
-                    <div class="font-semibold text-slate-900">${user.fullName}</div>
-                    <div class="text-xs text-slate-500">${user.loginId}</div>
-                </td>
-                <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
-                <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
-                <td class="px-3 py-2 align-top whitespace-nowrap">
-                    <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
-                        ${user.membershipLabel}
-                    </span>
-                </td>
-                <td class="px-3 py-2 align-top whitespace-nowrap">${user.status}</td>
-                <td class="px-3 py-2 align-top whitespace-nowrap">
-                    <button type="button"
-                            class="app-btn btn-primary"
-                            data-user-modal-open="user-${user.accountId}">
-                        Edit
-                    </button>
-                </td>
-            </tr>
-        </c:forEach>
+        <c:choose>
+            <c:when test="${empty users}">
+                <tr>
+                    <td colspan="6" class="px-4 py-5 text-sm text-slate-500">
+                        <c:choose>
+                            <c:when test="${not empty selectedUserQuery}">
+                                No users matched <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
+                            </c:when>
+                            <c:otherwise>
+                                No users are available in the current slice.
+                            </c:otherwise>
+                        </c:choose>
+                    </td>
+                </tr>
+            </c:when>
+            <c:otherwise>
+                <c:forEach items="${users}" var="user">
+                    <tr>
+                        <td class="px-3 py-2 align-top">
+                            <div class="font-semibold text-slate-900">${user.fullName}</div>
+                            <div class="text-xs text-slate-500">${user.loginId}</div>
+                        </td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">
+                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
+                                ${user.membershipLabel}
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.status}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">
+                            <button type="button"
+                                    class="app-btn btn-primary"
+                                    data-user-modal-open="user-${user.accountId}">
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                </c:forEach>
+            </c:otherwise>
+        </c:choose>
         </tbody>
     </table>
+</div>
+
+<div class="erp-toolbar">
+    <div class="text-sm text-slate-500">
+        The table is server-paged so large user lists stay fast and manageable. Increase rows per page only when you need a wider view.
+    </div>
+    <c:if test="${usersPage.totalPages > 1}">
+        <div class="flex flex-wrap items-center justify-end gap-2">
+            <c:set var="userPrevPage" value="${usersPage.number - 1}" />
+            <c:set var="userNextPage" value="${usersPage.number + 1}" />
+            <c:choose>
+                <c:when test="${usersPage.first}">
+                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Previous</span>
+                </c:when>
+                <c:otherwise>
+                    <a href="/admin/users?page=${userPrevPage}${usersPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                </c:otherwise>
+            </c:choose>
+
+            <span class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+                Page ${usersPage.number + 1} of ${usersPage.totalPages}
+            </span>
+
+            <c:choose>
+                <c:when test="${usersPage.last}">
+                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Next</span>
+                </c:when>
+                <c:otherwise>
+                    <a href="/admin/users?page=${userNextPage}${usersPaginationQuery}" class="app-btn btn-neutral">Next</a>
+                </c:otherwise>
+            </c:choose>
+        </div>
+    </c:if>
 </div>
 
 <div class="app-modal-overlay hidden"

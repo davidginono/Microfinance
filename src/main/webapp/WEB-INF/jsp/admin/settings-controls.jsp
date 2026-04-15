@@ -28,13 +28,16 @@
                 <input name="boardQuorum"
                        type="number"
                        min="1"
-                       max="${settings.boardSize}"
+                       max="${activeBoardMemberCount}"
                        class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                        value="${settings.boardQuorum}" />
+                <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
+                    Set how many active board members must review each loan before the board stage can complete.
+                </span>
             </label>
 
             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                Board Size: <strong>${settings.boardSize}</strong>
+                Active Board Members: <strong>${activeBoardMemberCount}</strong>
             </div>
 
             <div class="app-modal-actions !justify-start md:justify-end">

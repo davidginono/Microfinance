@@ -4,9 +4,16 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / Incidents</p>
-    <h1 class="erp-page-title">Incidents</h1>
-    <p class="erp-page-subtitle">Track support issues and system alerts by severity and status, then route your admin attention to the right case.</p>
+    <p class="erp-breadcrumb">Admin Tools / Notifications</p>
+    <h1 class="erp-page-title">Notifications</h1>
+    <p class="erp-page-subtitle">Review routed incident cases and filter them by severity and status to focus your admin attention.</p>
+</div>
+
+<div class="mb-3 flex items-center justify-end">
+    <form action="/admin/messages/mark-all-read" method="post" class="m-0">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <button type="submit" class="app-btn btn-primary">Mark all read</button>
+    </form>
 </div>
 
 <section class="erp-form-wrap">

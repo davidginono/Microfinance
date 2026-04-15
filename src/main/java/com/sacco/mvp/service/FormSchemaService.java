@@ -41,6 +41,9 @@ public class FormSchemaService {
             while (iterator.hasNext()) {
                 Map.Entry<String, JsonNode> entry = iterator.next();
                 String name = entry.getKey();
+                if (shouldExcludeField(name)) {
+                    continue;
+                }
                 JsonNode field = entry.getValue();
                 String type = field.path("type").asText("text");
                 if ("textarea".equalsIgnoreCase(field.path("format").asText())) {
@@ -95,6 +98,9 @@ public class FormSchemaService {
                 if (v == null || v.isBlank()) {
                     return;
                 }
+                if (shouldExcludeField(k)) {
+                    return;
+                }
                 String raw = v.trim();
                 JsonNode property = properties.path(k);
                 String type = property.path("type").asText("string");
@@ -125,6 +131,10 @@ public class FormSchemaService {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to serialize form data", e);
         }
+    }
+
+    private boolean shouldExcludeField(String fieldName) {
+        return fieldName != null && "additionalnotes".equals(fieldName.trim().toLowerCase(Locale.ROOT));
     }
 }
 

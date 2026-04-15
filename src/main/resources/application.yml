@@ -51,6 +51,8 @@ logging:
     com.sacco.mvp: INFO
 
 app:
+  seed:
+    demo-data-enabled: ${APP_SEED_DEMO_DATA_ENABLED:false}
   outbox:
     scheduler-enabled: true
   retention:

@@ -54,7 +54,7 @@ public class NotificationInboxService {
         return notificationViewService.toViews(
             notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId)
         ).stream()
-            .filter(view -> view.getIncidentId() != null)
+            .filter(view -> "SUPPORT_MESSAGE".equals(view.getType()) && view.getIncidentId() != null)
             .toList();
     }
 
