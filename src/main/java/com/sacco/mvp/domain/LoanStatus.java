@@ -13,5 +13,6 @@ public enum LoanStatus {
     BOARD_APPROVED,
     FINAL_REJECTED,
     FINAL_APPROVED,
+    DEFAULTED,
     PAID
 }

@@ -1,5 +1,6 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -19,23 +20,20 @@ public class AdminScopeService {
     private final SaccoRegistryService saccoRegistryService;
 
     public AdminScopeView currentScope(AppUserPrincipal principal) {
-        if (principal == null || !principal.hasRole(com.sacco.mvp.domain.Position.ADMIN)) {
+        if (!isAdminWorkspaceUser(principal)) {
             return null;
         }
-        List<SaccoRegistryService.RegisteredSaccoView> options = saccoRegistryService.listRegisteredSaccos();
+        List<SaccoRegistryService.RegisteredSaccoView> options = availableOptions(principal);
         if (options.isEmpty()) {
             return null;
         }
 
         HttpSession session = requestFactory.getObject().getSession(true);
-        String selectedSaccoId = attributeAsString(session.getAttribute(SESSION_SACCO_ID));
+        String selectedSaccoId = principal.getSaccoId();
         SaccoRegistryService.RegisteredSaccoView selectedSacco = options.stream()
             .filter(option -> option.saccoId().equals(selectedSaccoId))
             .findFirst()
-            .orElseGet(() -> options.stream()
-                .filter(option -> option.saccoId().equals(principal.getSaccoId()))
-                .findFirst()
-                .orElse(options.getFirst()));
+            .orElse(options.getFirst());
 
         String selectedStationId = attributeAsString(session.getAttribute(SESSION_STATION_ID));
         if (selectedStationId == null || !selectedSacco.stationIds().contains(selectedStationId)) {
@@ -44,10 +42,8 @@ public class AdminScopeService {
                 : selectedSacco.stationIds().getFirst();
         }
 
-        if (hasExplicitScopeSelection()) {
-            session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
-            session.setAttribute(SESSION_STATION_ID, selectedStationId);
-        }
+        session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
+        session.setAttribute(SESSION_STATION_ID, selectedStationId);
 
         return new AdminScopeView(
             selectedSacco.saccoId(),
@@ -67,10 +63,14 @@ public class AdminScopeService {
         return scope == null ? principal.getStationId() : scope.getStationId();
     }
 
-    public void updateScope(String saccoId, String stationId) {
-        String resolvedStationId = saccoRegistryService.requireStationForSacco(saccoId, stationId);
+    public void updateScope(AppUserPrincipal principal, String saccoId, String stationId) {
+        if (!isAdminWorkspaceUser(principal)) {
+            throw new IllegalStateException("Admin workspace access is not available for this account.");
+        }
+        String resolvedSaccoId = principal.getSaccoId();
+        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
         HttpSession session = requestFactory.getObject().getSession(true);
-        session.setAttribute(SESSION_SACCO_ID, saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId());
+        session.setAttribute(SESSION_SACCO_ID, resolvedSaccoId);
         session.setAttribute(SESSION_STATION_ID, resolvedStationId);
     }
 
@@ -94,6 +94,19 @@ public class AdminScopeService {
 
     private String attributeAsString(Object value) {
         return value instanceof String stringValue && !stringValue.isBlank() ? stringValue : null;
+    }
+
+    private boolean isAdminWorkspaceUser(AppUserPrincipal principal) {
+        return principal != null
+            && principal.hasRole(Position.MINOR_ADMIN)
+            && !principal.hasRole(Position.ADMIN);
+    }
+
+    private List<SaccoRegistryService.RegisteredSaccoView> availableOptions(AppUserPrincipal principal) {
+        List<SaccoRegistryService.RegisteredSaccoView> options = saccoRegistryService.listRegisteredSaccos();
+        return options.stream()
+            .filter(option -> option.saccoId().equals(principal.getSaccoId()))
+            .toList();
     }
 
     @lombok.Getter

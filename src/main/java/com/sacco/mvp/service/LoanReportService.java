@@ -34,7 +34,11 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LoanReportService {
-    private static final List<LoanStatus> DISBURSED_STATUSES = List.of(LoanStatus.FINAL_APPROVED, LoanStatus.PAID);
+    private static final List<LoanStatus> DISBURSED_STATUSES = List.of(
+        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DEFAULTED,
+        LoanStatus.PAID
+    );
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final LoanApplicationRepository loanApplicationRepository;
@@ -136,7 +140,9 @@ public class LoanReportService {
 
     private LoanSummary summarize(Collection<LoanApplication> loans) {
         long paidCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
-        long ongoingCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED).count();
+        long ongoingCount = loans.stream()
+            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED || loan.getStatus() == LoanStatus.DEFAULTED)
+            .count();
         BigDecimal disbursedAmount = loans.stream().map(LoanApplication::getAmount).filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal paidAmount = loans.stream()
@@ -175,9 +181,11 @@ public class LoanReportService {
         line.append(formatMoney(loan.getAmount())).append(" | ");
         line.append("Disbursed ").append(formatDate(loan.getDisbursementDate())).append(" | ");
         line.append("Due ").append(formatDate(loan.getFinalDueDate())).append(" | ");
-        line.append(loan.getStatus() == LoanStatus.PAID
-            ? "PAID on " + formatTimestamp(loan.getPaidAt())
-            : "ONGOING");
+        line.append(switch (loan.getStatus()) {
+            case PAID -> "PAID on " + formatTimestamp(loan.getPaidAt());
+            case DEFAULTED -> "DEFAULTED";
+            default -> "ONGOING";
+        });
         return line.toString();
     }
 

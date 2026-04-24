@@ -29,6 +29,9 @@ public class LoanProductSetting {
     @Column(name = "loan_type", nullable = false)
     private LoanType loanType;
 
+    @Column(name = "product_name", length = 120)
+    private String productName;
+
     @Column(name = "guarantors_required", nullable = false)
     private Integer guarantorsRequired;
 
@@ -56,5 +59,12 @@ public class LoanProductSetting {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    public String getDisplayName() {
+        if (productName != null && !productName.isBlank()) {
+            return productName;
+        }
+        return loanType == null ? "" : loanType.getDisplayLabel();
+    }
 }
 

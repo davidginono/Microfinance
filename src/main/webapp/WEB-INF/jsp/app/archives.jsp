@@ -21,7 +21,7 @@
                     </div>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(guarantorArchives)} shown</span>
                 </div>
-                <form action="/app/archives" method="get" class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
+                <form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
                     <input type="hidden" name="section" value="guarantors" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Loan ID Search</span>
@@ -98,7 +98,7 @@
                     </div>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(archives)} shown</span>
                 </div>
-                <form action="/app/archives" method="get" class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
+                <form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
                     <input type="hidden" name="section" value="loans" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Loan ID Search</span>
@@ -113,6 +113,7 @@
                         <select name="loanArchiveFilter" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none">
                             <option value="ALL" ${loanArchiveFilter eq 'ALL' ? 'selected' : ''}>All archived loans</option>
                             <option value="DISBURSED" ${loanArchiveFilter eq 'DISBURSED' ? 'selected' : ''}>Disbursed only</option>
+                            <option value="DEFAULTED" ${loanArchiveFilter eq 'DEFAULTED' ? 'selected' : ''}>Defaulted only</option>
                             <option value="PAID" ${loanArchiveFilter eq 'PAID' ? 'selected' : ''}>Paid only</option>
                             <option value="REJECTED" ${loanArchiveFilter eq 'REJECTED' ? 'selected' : ''}>Rejected only</option>
                         </select>
@@ -127,7 +128,8 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th>Loan Id</th>
+                        <th>Loan Application ID</th>
+                        <th>Loan ID</th>
                         <th>Loan Type</th>
                         <th>Amount</th>
                         <th>Status</th>
@@ -139,13 +141,15 @@
                     <tbody>
                     <c:forEach items="${archives}" var="app">
                         <tr>
-                            <td>${fn:substring(app.id, 0, 8)}</td>
+                            <td>${app.applicationNumber}</td>
+                            <td><c:out value="${empty app.loanId ? '-' : app.loanId}" /></td>
                             <td><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></td>
                             <td>${app.amount}</td>
                             <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
                             <td>
                                 <c:choose>
                                     <c:when test="${app.status eq 'FINAL_APPROVED'}">Disbursed loan moved to archive</c:when>
+                                    <c:when test="${app.status eq 'DEFAULTED'}">Loan passed the final due date and remains unpaid</c:when>
                                     <c:when test="${app.status eq 'PAID'}">Manager confirmed repayment completed</c:when>
                                     <c:when test="${not empty managerReasons[app.id]}">${managerReasons[app.id]}</c:when>
                                     <c:otherwise><spring:message code="loan.status.${app.status}" text="${app.status}" /></c:otherwise>

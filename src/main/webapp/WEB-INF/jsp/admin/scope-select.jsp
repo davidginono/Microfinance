@@ -6,7 +6,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / SACCO Workspace</p>
     <h1 class="erp-page-title">Choose A SACCO</h1>
-    <p class="erp-page-subtitle">Select the SACCO workspace you want to manage before opening the admin dashboard.</p>
+    <p class="erp-page-subtitle">Choose the SACCO workspace to manage.</p>
 </div>
 
 <section class="erp-panel overflow-hidden">
@@ -14,7 +14,7 @@
         <p class="erp-widget-title">Admin Scope</p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink">Start In The Right SACCO Workspace</h2>
     </div>
-    <form action="/admin/scope" method="post" class="erp-panel-body grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+    <form id="adminScopeLandingForm" action="/admin/scope" method="post" class="erp-panel-body">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <input type="hidden" name="next" value="${nextAdminPath}" />
         <c:if test="${not empty scopeSelection}">
@@ -30,18 +30,16 @@
                 </select>
             </label>
         </c:if>
-        <div class="flex items-end md:justify-end">
-            <button type="submit" class="app-btn btn-primary min-w-[12rem]">Open Dashboard</button>
-        </div>
     </form>
 </section>
 
 <script>
     (() => {
+        const form = document.getElementById("adminScopeLandingForm");
         const options = ${adminScopeOptionsJson};
         const saccoSelect = document.getElementById("adminScopeLandingSelect");
         const stationInput = document.getElementById("adminScopeStationLanding");
-        if (!saccoSelect || !stationInput || !Array.isArray(options)) {
+        if (!form || !saccoSelect || !stationInput || !Array.isArray(options)) {
             return;
         }
 
@@ -52,7 +50,10 @@
             stationInput.value = stations.length ? stations[0] : "";
         };
 
-        saccoSelect.addEventListener("change", syncStation);
+        saccoSelect.addEventListener("change", function () {
+            syncStation();
+            form.requestSubmit();
+        });
         syncStation();
     })();
 </script>

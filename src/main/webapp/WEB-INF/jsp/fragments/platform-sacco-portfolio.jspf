@@ -1,0 +1,82 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+
+<c:choose>
+    <c:when test="${empty portfolioSummaries}">
+        <section class="erp-panel">
+            <div class="erp-panel-body">
+                <p class="text-sm text-slate-500">No SACCOs have been registered yet.</p>
+            </div>
+        </section>
+    </c:when>
+    <c:otherwise>
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <c:forEach items="${portfolioSummaries}" var="summary">
+                <article class="erp-panel overflow-hidden border-t-4 ${summary.toneCardClass}">
+                    <div class="erp-panel-body space-y-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <c:choose>
+                                    <c:when test="${summary.hasLogo}">
+                                        <img src="${summary.logoUrl}"
+                                             alt="${summary.saccoName} logo"
+                                             class="h-11 w-11 rounded-md border border-slate-200 bg-white object-contain p-1 shadow-sm" />
+                                    </c:when>
+                                    <c:otherwise>
+                                        <span class="inline-flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                            ${summary.logoFallbackText}
+                                        </span>
+                                    </c:otherwise>
+                                </c:choose>
+                                <div class="min-w-0">
+                                    <p class="truncate text-lg font-semibold text-slate-900">${summary.saccoName}</p>
+                                    <p class="truncate text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">${summary.saccoId}</p>
+                                </div>
+                            </div>
+                            <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${summary.toneBadgeClass}">
+                                <span class="h-2.5 w-2.5 rounded-full ${summary.toneDotClass}"></span>
+                                ${summary.healthStatus}
+                            </span>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Members</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.totalMembers}</dd>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Loans</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.totalDisbursedPrincipalLabel}</dd>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Repayment</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.repaymentPercentLabel}</dd>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Default</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.defaultPercentLabel}</dd>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Liquidity</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.liquidityRatioLabel}</dd>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                                <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Loans</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">${summary.activeLoanCount}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <p class="font-semibold text-slate-800">Stations</p>
+                            <p class="mt-1">${summary.stationListLabel}</p>
+                            <p class="mt-2 text-xs text-slate-500">${summary.healthNote}</p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <a href="/admin/saccos/${summary.saccoId}?section=overview" class="app-btn btn-primary">View Details</a>
+                        </div>
+                    </div>
+                </article>
+            </c:forEach>
+        </section>
+    </c:otherwise>
+</c:choose>

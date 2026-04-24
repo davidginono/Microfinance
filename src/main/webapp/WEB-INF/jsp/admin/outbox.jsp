@@ -7,14 +7,14 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Outbox Monitor</p>
     <h1 class="erp-page-title">Outbox Monitor</h1>
-    <p class="erp-page-subtitle">Monitor event publication, identify failures, and retry the items that need operational recovery.</p>
+    <p class="erp-page-subtitle">Monitor event delivery and retries.</p>
 </div>
 <div class="erp-panel mb-4 overflow-hidden">
     <div class="erp-panel-header">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="erp-panel-title">Filter And View Options</p>
-                <p class="mt-1 text-sm text-slate-500">Focus on the period and status you need before paging through outbox activity.</p>
+                <p class="mt-1 text-sm text-slate-500">Filter the period, then page the results.</p>
             </div>
             <div class="inline-flex flex-wrap items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
                 <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
@@ -31,7 +31,7 @@
             </div>
         </div>
     </div>
-    <form action="/admin/outbox" method="get" class="erp-panel-body grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] xl:items-end">
+    <form action="/admin/outbox" method="get" class="admin-filter-form erp-panel-body grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] xl:items-end">
         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Filter From
             <input type="date" name="dateFrom" value="${selectedDateFrom}" class="mt-1 w-full rounded border px-3 py-2.5 text-sm text-slate-800 ${not empty dateFromError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-white'}" />
@@ -45,15 +45,6 @@
             <c:if test="${not empty dateToError}">
                 <span class="mt-1 block text-[0.78rem] font-normal normal-case tracking-normal text-rose-600">${dateToError}</span>
             </c:if>
-        </label>
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Status
-            <select name="status" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800">
-                <option value="" ${empty selectedOutboxStatus ? 'selected' : ''}>All statuses</option>
-                <c:forEach items="${outboxStatuses}" var="outboxStatus">
-                    <option value="${outboxStatus}" ${selectedOutboxStatus eq outboxStatus.name() ? 'selected' : ''}>${outboxStatus}</option>
-                </c:forEach>
-            </select>
         </label>
         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Loan ID
@@ -89,7 +80,6 @@
                     <c:if test="${event.status eq 'FAILED'}">
                         <form action="/admin/outbox/${event.id}/retry" method="post">
                             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <input type="hidden" name="status" value="${selectedOutboxStatus}" />
                             <input type="hidden" name="dateFrom" value="${selectedDateFrom}" />
                             <input type="hidden" name="dateTo" value="${selectedDateTo}" />
                             <input type="hidden" name="loanId" value="${selectedLoanId}" />

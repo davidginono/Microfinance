@@ -1,5 +1,6 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
@@ -48,7 +49,10 @@ public class CurrentUserModelAdvice {
         if (principal == null) {
             return 0;
         }
-        if (principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+        if (isPlatformAdminIdentity(principal)) {
+            return 0;
+        }
+        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return notificationInboxService.unreadIncidentCount(principal.getMemberId());
         }
         return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
@@ -60,7 +64,10 @@ public class CurrentUserModelAdvice {
         if (principal == null) {
             return Collections.emptyList();
         }
-        if (principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+        if (isPlatformAdminIdentity(principal)) {
+            return Collections.emptyList();
+        }
+        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return notificationInboxService.unreadIncidentViews(principal.getMemberId());
         }
         return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
@@ -71,10 +78,16 @@ public class CurrentUserModelAdvice {
         if (principal == null) {
             return "/login";
         }
+        if (isPlatformAdminIdentity(principal)) {
+            return "/admin/dashboard";
+        }
+        if (principal.hasRole(Position.MINOR_ADMIN)) {
+            return "/admin/incidents";
+        }
         return switch (principal.getPosition()) {
-            case ADMIN -> "/admin/incidents";
-            case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
-            case BOARD -> "/board/queue";
+            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
+            case MANAGER -> "/manager/notifications";
+            case BOARD -> "/board/notifications";
             case CHAIRPERSON -> "/chairperson/manager-decisions";
             case MEMBER -> "/app/notifications";
         };
@@ -82,7 +95,10 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("notificationPanelSubtitle")
     public String notificationPanelSubtitle(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+        if (isPlatformAdminIdentity(principal)) {
+            return "Platform activity is available from the dashboard and event log.";
+        }
+        if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return "Latest member support incidents requiring admin attention";
         }
         return "Latest updates from the loan workflow";
@@ -90,7 +106,10 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("notificationPanelEmptyState")
     public String notificationPanelEmptyState(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal != null && principal.getPosition() == com.sacco.mvp.domain.Position.ADMIN) {
+        if (isPlatformAdminIdentity(principal)) {
+            return "No platform notifications.";
+        }
+        if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return "No member support incidents yet.";
         }
         return "No notifications yet.";
@@ -101,10 +120,16 @@ public class CurrentUserModelAdvice {
         if (principal == null) {
             return "/login";
         }
+        if (isPlatformAdminIdentity(principal)) {
+            return "/admin/dashboard";
+        }
+        if (principal.hasRole(Position.MINOR_ADMIN)) {
+            return "/admin/messages/";
+        }
         return switch (principal.getPosition()) {
-            case ADMIN -> "/admin/messages/";
-            case MANAGER -> "/manager/loan-applications/";
-            case BOARD -> "/board/loan-applications/";
+            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
+            case MANAGER -> "/manager/notifications/";
+            case BOARD -> "/board/notifications/";
             case CHAIRPERSON -> "/chairperson/manager-decisions";
             case MEMBER -> "/app/notifications/";
         };
@@ -113,6 +138,21 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("adminScope")
     public AdminScopeService.AdminScopeView adminScope(@AuthenticationPrincipal AppUserPrincipal principal) {
         return adminScopeService.currentScope(principal);
+    }
+
+    @ModelAttribute("isPlatformAdminIdentity")
+    public boolean isPlatformAdminIdentityModel(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return isPlatformAdminIdentity(principal);
+    }
+
+    /**
+     * Separation of Duties — true when the signed-in user is a pure Super Admin
+     * (ADMIN without MINOR_ADMIN). SACCO-scoped write controls should be hidden
+     * from this user in JSPs because the backend will reject their POSTs.
+     */
+    @ModelAttribute("isSuperAdminObserver")
+    public boolean isSuperAdminObserver(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return isPlatformAdminIdentity(principal);
     }
 
     @ModelAttribute("adminScopeOptionsJson")
@@ -153,6 +193,9 @@ public class CurrentUserModelAdvice {
 
     private ActiveSaccoBrand resolveActiveSaccoBrand(AppUserPrincipal principal) {
         if (principal == null) {
+            return null;
+        }
+        if (isPlatformAdminIdentity(principal)) {
             return null;
         }
 
@@ -213,6 +256,10 @@ public class CurrentUserModelAdvice {
             return letters.getFirst() + "S";
         }
         return String.join("", letters);
+    }
+
+    private boolean isPlatformAdminIdentity(AppUserPrincipal principal) {
+        return principal != null && principal.hasRole(Position.ADMIN);
     }
 
     private record ActiveSaccoBrand(String id, String name, String logoText, String logoUrl) {}

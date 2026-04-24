@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
     List<LoanApplication> findByApplicantMemberIdOrderByCreatedAtDesc(UUID applicantMemberId);
@@ -17,7 +18,14 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     List<LoanApplication> findByStatusAndFinalDueDateIsNotNull(LoanStatus status);
     List<LoanApplication> findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(UUID applicantMemberId, LoanStatus status);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
+    List<LoanApplication> findByTopUpSourceLoanIdIn(Collection<UUID> topUpSourceLoanIds);
 
     Optional<LoanApplication> findByIdAndApplicantMemberId(UUID id, UUID applicantMemberId);
+
+    boolean existsBySaccoIdAndLoanId(String saccoId, String loanId);
+
+    Optional<LoanApplication> findBySaccoIdAndApplicationNumber(String saccoId, Long applicationNumber);
+
+    List<LoanApplication> findByStatusInAndLoanIdIsNotNull(Collection<LoanStatus> statuses);
 }
 

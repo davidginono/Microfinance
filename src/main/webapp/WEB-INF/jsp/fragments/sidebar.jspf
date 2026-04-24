@@ -6,7 +6,7 @@
 <aside id="appSidebar" class="shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0" style="top: var(--shell-nav-height); border-color: #d7dde3;">
     <div class="shell-sidebar-panel flex h-full flex-col overflow-hidden border-r border-slate-200/60 bg-transparent">
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
-            <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN')">
+            <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
                 <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Main Menu</p>
                 </div>
@@ -50,11 +50,11 @@
                                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                             </svg>
                         </button>
-                        <div id="memberArchivePanel" class="ml-4 hidden space-y-1 border-l border-slate-200 pl-3">
-                            <a href="/app/archives?section=loans" class="block px-2 py-1.5 text-sm font-semibold transition ${requestUri eq '/app/archives' and param.section ne 'guarantors' ? 'text-cyan-800' : 'text-slate-500 hover:text-slate-800'}">
+                        <div id="memberArchivePanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                            <a href="/app/archives?section=loans" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/archives' and param.section ne 'guarantors' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 Disbursed & Loan Archive
                             </a>
-                            <a href="/app/archives?section=guarantors" class="block px-2 py-1.5 text-sm font-semibold transition ${requestUri eq '/app/archives' and param.section eq 'guarantors' ? 'text-cyan-800' : 'text-slate-500 hover:text-slate-800'}">
+                            <a href="/app/archives?section=guarantors" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/archives' and param.section eq 'guarantors' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 Guarantee Archive
                             </a>
                         </div>
@@ -76,105 +76,148 @@
                 </a>
             </sec:authorize>
 
-            <sec:authorize access="hasRole('ADMIN')">
+            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
                 <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Admin Tools</p>
                 </div>
-                <c:if test="${not empty adminScope}">
-                    <button type="button"
-                            id="adminScopeToggle"
-                            class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                            aria-expanded="false"
-                            aria-controls="adminScopePanel">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border border-slate-200 bg-white text-slate-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
-                        </span>
-                        <span class="min-w-0 flex-1">Select SACCO</span>
-                        <svg id="adminScopeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                    <div id="adminScopePanel" class="hidden rounded-md border border-cyan-100 bg-cyan-50/70 px-3 py-3 shadow-sm">
-                        <div class="rounded-md border border-cyan-100 bg-white/75 px-3 py-2">
-                            <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-700">SACCO Workspace</p>
-                            <p class="mt-1 text-sm font-semibold text-slate-800">${adminScope.saccoId}</p>
-                            <div class="mt-2 flex items-center justify-between gap-2">
-                                <span class="text-xs font-medium text-slate-500">Current station</span>
-                                <span class="rounded-md bg-cyan-100 px-2 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm">${adminScope.stationId}</span>
+                <c:choose>
+                    <c:when test="${pageContext.request.isUserInRole('ROLE_ADMIN')}">
+                        <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
+                        <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
+                        <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
+                            Dashboard
+                        </a>
+                        <a href="/admin/saccos" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${platformSaccosActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${platformSaccosActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/><path d="M10 6a3 3 0 100 6 3 3 0 000-6z"/></svg></span>
+                            SACCOs
+                        </a>
+                        <div class="shell-sidebar-group space-y-1">
+                            <button type="button"
+                                    id="adminSaccoToggle"
+                                    class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${saccoRegistryActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
+                                    aria-expanded="false"
+                                    aria-controls="adminSaccoPanel">
+                                <span class="inline-flex h-7 w-7 items-center justify-center border ${saccoRegistryActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 011-1h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3z"/><path d="M6 6h8v1.5H6zm0 3.5h8V11H6zm0 3.5h5V14.5H6z"/></svg></span>
+                                <span class="min-w-0 flex-1">SACCO Registry</span>
+                                <svg id="adminSaccoChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${saccoRegistryActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                            <div id="adminSaccoPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                                <a href="/admin/saccos/registry" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/saccos/registry' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                    Registry
+                                </a>
+                                <a href="/admin/saccos/minor-admins" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/admin/saccos/minor-admins') ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                    Minor Admin Registration
+                                </a>
                             </div>
                         </div>
-                        <form action="/admin/scope" method="post" class="mt-3 space-y-2.5">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <div>
-                                <label for="adminScopeSaccoSelect" class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">SACCO ID</label>
-                                <select id="adminScopeSaccoSelect" name="saccoId" class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-cyan-400 focus:outline-none">
-                                    <c:forEach items="${adminScope.options}" var="option">
-                                        <option value="${option.saccoId}" ${adminScope.saccoId eq option.saccoId ? 'selected' : ''}>${option.saccoId} - ${option.saccoName}</option>
-                                    </c:forEach>
-                                </select>
+                        <a href="/admin/outbox" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
+                            Outbox Monitor
+                        </a>
+                        <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
+                            Event Log
+                        </a>
+                    </c:when>
+                    <c:otherwise>
+                        <c:if test="${not empty adminScope}">
+                            <button type="button"
+                                    id="adminScopeToggle"
+                                    class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                    aria-expanded="false"
+                                    aria-controls="adminScopePanel">
+                                <span class="inline-flex h-7 w-7 items-center justify-center border border-slate-200 bg-white text-slate-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
+                                </span>
+                                <span class="min-w-0 flex-1">SACCO Workspace</span>
+                                <svg id="adminScopeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                            <div id="adminScopePanel" class="hidden rounded-md border border-cyan-100 bg-cyan-50/70 px-3 py-3 shadow-sm">
+                                <div class="rounded-md border border-cyan-100 bg-white/75 px-3 py-2">
+                                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-700">SACCO Workspace</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-800">${adminScope.saccoId}</p>
+                                    <div class="mt-2 flex items-center justify-between gap-2">
+                                        <span class="text-xs font-medium text-slate-500">Current station</span>
+                                        <span class="rounded-md bg-cyan-100 px-2 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm">${adminScope.stationId}</span>
+                                    </div>
+                                </div>
+                                <form action="/admin/scope" method="post" class="mt-3 space-y-2.5">
+                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                    <input type="hidden" id="adminScopeSaccoSelect" name="saccoId" value="${adminScope.saccoId}" />
+                                    <div>
+                                        <label for="adminScopeStationSelect" class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Station ID</label>
+                                        <select id="adminScopeStationSelect" name="stationId" class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-cyan-400 focus:outline-none">
+                                            <option value="${adminScope.stationId}" selected>${adminScope.stationId}</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="app-btn btn-primary w-full justify-center px-4 py-2 text-[0.76rem]">Apply Station</button>
+                                </form>
                             </div>
-                            <input type="hidden" id="adminScopeStationSelect" name="stationId" value="${adminScope.stationId}" />
-                            <button type="submit" class="app-btn btn-primary w-full justify-center px-4 py-2 text-[0.76rem]">Apply SACCO Scope</button>
-                        </form>
-                    </div>
-                </c:if>
-                <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
-                    Admin Dashboard
-                </a>
-                <a href="/admin/messages" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 012 0v1.07A7.002 7.002 0 0117 10a7 7 0 11-14 0 7.002 7.002 0 016-6.93V2zm1 4a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z"/></svg></span>
-                    Incidents
-                </a>
-                <a href="/admin/users" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 8a7 7 0 1114 0H3z"/></svg></span>
-                    Users & Roles
-                </a>
-                <a href="/admin/saccos" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/saccos' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/saccos' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/><path d="M10 6a3 3 0 100 6 3 3 0 000-6z"/></svg></span>
-                    SACCO Registry
-                </a>
-                <c:set var="adminSettingsActive" value="${requestUri eq '/admin/settings-controls' or requestUri eq '/admin/loan-products'}" />
-                <div class="shell-sidebar-group space-y-1">
-                    <button type="button"
-                            id="adminSettingsToggle"
-                            class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${adminSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
-                            aria-expanded="false"
-                            aria-controls="adminSettingsPanel">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border ${adminSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg></span>
-                        <span class="min-w-0 flex-1">Settings & Controls</span>
-                        <svg id="adminSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${adminSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                    <div id="adminSettingsPanel" class="ml-4 hidden space-y-1 border-l border-slate-200 pl-3">
-                        <a href="/admin/settings-controls?section=loan" class="block px-2 py-1.5 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' ? 'text-cyan-800' : 'text-slate-500 hover:text-slate-800'}">
-                            Loan Application Settings
+                        </c:if>
+                        <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
+                            Admin Dashboard
                         </a>
-                        <a href="/admin/settings-controls?section=board" class="block px-2 py-1.5 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'board' ? 'text-cyan-800' : 'text-slate-500 hover:text-slate-800'}">
-                            Board Settings
+                        <a href="/admin/messages" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 012 0v1.07A7.002 7.002 0 0117 10a7 7 0 11-14 0 7.002 7.002 0 016-6.93V2zm1 4a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z"/></svg></span>
+                            Incidents
                         </a>
-                    </div>
-                </div>
-                <a href="/admin/outbox" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
-                    Outbox Monitor
-                </a>
-                <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                    <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
-                    Event Log
-                </a>
+                        <a href="/admin/users" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 8a7 7 0 1114 0H3z"/></svg></span>
+                            Users & Roles
+                        </a>
+                        <a href="/admin/saccos" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${(requestUri eq '/admin/saccos' or requestUri eq '/admin/saccos/registry') ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${(requestUri eq '/admin/saccos' or requestUri eq '/admin/saccos/registry') ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/><path d="M10 6a3 3 0 100 6 3 3 0 000-6z"/></svg></span>
+                            Station Registry
+                        </a>
+                        <c:set var="adminSettingsActive" value="${requestUri eq '/admin/settings-controls' or requestUri eq '/admin/loan-products'}" />
+                        <div class="shell-sidebar-group space-y-1">
+                            <button type="button"
+                                    id="adminSettingsToggle"
+                                    class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${adminSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
+                                    aria-expanded="false"
+                                    aria-controls="adminSettingsPanel">
+                                <span class="inline-flex h-7 w-7 items-center justify-center border ${adminSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg></span>
+                                <span class="min-w-0 flex-1">Settings & Controls</span>
+                                <svg id="adminSettingsChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${adminSettingsActive ? 'text-cyan-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                            <div id="adminSettingsPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                                <a href="/admin/settings-controls?section=loan" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                    Loan Application Settings
+                                </a>
+                                <a href="/admin/settings-controls?section=board" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'board' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                    Board Settings
+                                </a>
+                            </div>
+                        </div>
+                        <a href="/admin/outbox" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
+                            Outbox Monitor
+                        </a>
+                        <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
+                            Event Log
+                        </a>
+                    </c:otherwise>
+                </c:choose>
             </sec:authorize>
 
-            <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showBoardPanel" value="${pageContext.request.isUserInRole('ROLE_BOARD') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showBoardPanel" value="${pageContext.request.isUserInRole('ROLE_BOARD') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <c:if test="${showManagerPanel or showBoardPanel or showChairpersonPanel}">
                 <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Review Panels</p>
                 </div>
             </c:if>
-            <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
+            <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
                 <a href="/manager/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/manager/dashboard' ? 'border-blue-200 bg-blue-50 text-sacco-blue shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-blue'}">
                     <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/manager/dashboard' ? 'border-blue-200 bg-blue-100 text-sacco-blue' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l2.39 4.84L18 7.64l-4 3.9.94 5.46L10 14.77 5.06 17l.94-5.46-4-3.9 5.61-.8L10 2z"/></svg></span>
                     <spring:message code="menu.managerDashboard" text="Manager Dashboard" />
@@ -188,7 +231,7 @@
                     <spring:message code="menu.managerReports" text="Loan Reports" />
                 </a>
             </sec:authorize>
-            <sec:authorize access="hasRole('BOARD') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_BOARD_QUEUE')">
+            <sec:authorize access="hasRole('BOARD') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_BOARD_QUEUE')">
                 <a href="/board/queue" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications') ? 'border-green-200 bg-green-50 text-sacco-green shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-green'}">
                     <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications') ? 'border-green-200 bg-green-100 text-sacco-green' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v3H2V4zm0 5h16v7a2 2 0 01-2 2H4a2 2 0 01-2-2V9zm3 2v2h4v-2H5z"/></svg></span>
                     Board Queue
@@ -198,7 +241,7 @@
                     Board Archive
                 </a>
             </sec:authorize>
-            <sec:authorize access="hasRole('CHAIRPERSON') and !hasRole('ADMIN') and principal.claims.contains('VIEW_CHAIRPERSON_PANEL')">
+            <sec:authorize access="hasRole('CHAIRPERSON') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('VIEW_CHAIRPERSON_PANEL')">
                 <a href="/chairperson/manager-decisions" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${fn:startsWith(requestUri, '/chairperson/') ? 'border-amber-200 bg-amber-50 text-sacco-brown shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-brown'}">
                     <span class="inline-flex h-7 w-7 items-center justify-center border ${fn:startsWith(requestUri, '/chairperson/') ? 'border-amber-200 bg-amber-100 text-sacco-brown' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l7 3v5c0 4.25-2.92 8.1-7 9-4.08-.9-7-4.75-7-9V5l7-3z"/></svg></span>
                     Chairperson Panel
@@ -206,11 +249,16 @@
             </sec:authorize>
         </nav>
 
-        <div class="border-t px-4 py-3 text-xs font-medium text-slate-600" style="border-color: rgba(214, 226, 238, 0.88); background: rgba(255,255,255,0.78);">
-            <spring:message code="app.title" /> &middot; 2026
+        <div class="border-t px-4 py-3 text-xs font-medium text-slate-600" style="border-color: rgba(214, 226, 238, 0.88);">
+            <div><spring:message code="app.title" /> &middot; 2026</div>
+            <div class="shell-powered-by">
+                <span class="shell-powered-by-label">Powered by</span>
+                <img class="shell-powered-by-logo"
+                     src="/images/computer-resources-logo.png"
+                     alt="Computer Resources Tanzania Limited" />
+            </div>
         </div>
     </div>
 </aside>
 <main class="shell-main box-border pb-8 pt-5" style="min-height: calc(100vh - var(--shell-nav-height));">
     <div class="shell-content-frame mx-auto min-w-0 space-y-4">
-

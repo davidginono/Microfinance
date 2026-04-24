@@ -5,8 +5,10 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserDetailsService;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.StaffMfaService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -14,10 +16,12 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -25,15 +29,19 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
 public class SecurityConfig {
+    @Value("${app.auth.local-dev-minor-admin-password-login-enabled:false}")
+    private boolean localDevMinorAdminPasswordLoginEnabled;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    MemberRepository memberRepository,
-                                                   AdminScopeService adminScopeService) throws Exception {
+                                                   AdminScopeService adminScopeService,
+                                                   StaffMfaService staffMfaService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/css/**", "/error", "/error/**").permitAll()
-                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/auth/claim/**", "/css/**", "/error", "/error/**").permitAll()
+                .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MINOR_ADMIN")
                 .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/board/**").hasRole("BOARD")
@@ -45,6 +53,7 @@ public class SecurityConfig {
                     String username = request.getParameter("username");
                     String loginType = request.getParameter("loginType");
                     String message = "Invalid member number or password.";
+                    String redirectTarget = "/login?error";
                     if (username != null && !username.isBlank()) {
                         message = memberRepository.findByMemberNo(username.trim())
                             .map(member -> {
@@ -64,12 +73,17 @@ public class SecurityConfig {
                             })
                             .orElse("No member account was found for that member number. Please register yourself first.");
                     }
+                    if ("staff-password".equals(loginType)) {
+                        redirectTarget = "/login?error&tab=staff";
+                    }
                     request.getSession(true).setAttribute("loginErrorMessage", message);
-                    response.sendRedirect("/login?error");
+                    response.sendRedirect(redirectTarget);
                 })
                 .successHandler((request, response, authentication) -> {
-                    boolean isAdmin = authentication.getAuthorities().stream()
+                    boolean isSuperAdmin = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+                    boolean isMinorAdmin = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_MINOR_ADMIN".equals(a.getAuthority()));
                     boolean isChairperson = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_CHAIRPERSON".equals(a.getAuthority()));
                     boolean isManager = authentication.getAuthorities().stream()
@@ -77,9 +91,48 @@ public class SecurityConfig {
                     boolean isBoard = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_BOARD".equals(a.getAuthority()));
 
-                    if (isAdmin) {
+                    // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
+                    // present an email OTP before the authenticated SecurityContext is
+                    // persisted. Password alone cannot grant admin access.
+                    boolean requireStaffMfa = isSuperAdmin
+                        || (isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled);
+                    if (requireStaffMfa) {
+                        if (authentication.getPrincipal() instanceof AppUserPrincipal principal) {
+                            String landing = isSuperAdmin ? "/admin/dashboard" : "/admin/dashboard";
+                            try {
+                                staffMfaService.startChallenge(principal, landing, request);
+                            } catch (IllegalStateException ex) {
+                                SecurityContextHolder.clearContext();
+                                jakarta.servlet.http.HttpSession failed = request.getSession(false);
+                                if (failed != null) {
+                                    failed.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+                                }
+                                request.getSession(true).setAttribute("loginErrorMessage", ex.getMessage());
+                                response.sendRedirect("/login?error");
+                                return;
+                            }
+                            // Strip the authenticated context so the user must clear MFA
+                            // before any admin route becomes reachable.
+                            SecurityContextHolder.clearContext();
+                            jakarta.servlet.http.HttpSession existing = request.getSession(false);
+                            if (existing != null) {
+                                existing.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+                            }
+                            if (isSuperAdmin) {
+                                adminScopeService.clearScope();
+                            }
+                            response.sendRedirect("/login/staff/mfa");
+                            return;
+                        }
+                    }
+
+                    if (isSuperAdmin) {
                         adminScopeService.clearScope();
-                        response.sendRedirect("/admin/scope/select");
+                        response.sendRedirect("/admin/dashboard");
+                        return;
+                    }
+                    if (isMinorAdmin) {
+                        response.sendRedirect("/admin/dashboard");
                         return;
                     }
                     if (isChairperson) {

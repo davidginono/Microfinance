@@ -1,10 +1,14 @@
 package com.sacco.mvp.config;
 
+import com.sacco.mvp.domain.EmailOtpPurpose;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -25,6 +29,11 @@ public class EmailOtpSchemaInitializer implements CommandLineRunner {
                 return;
             }
 
+            String allowedPurposes = Arrays.stream(EmailOtpPurpose.values())
+                .map(Enum::name)
+                .map(value -> "'" + value + "'")
+                .collect(Collectors.joining(",\n                    "));
+
             jdbcTemplate.update("""
                 UPDATE email_otp_tokens
                 SET purpose = 'STAFF_LOGIN'
@@ -40,16 +49,11 @@ public class EmailOtpSchemaInitializer implements CommandLineRunner {
                 ALTER TABLE email_otp_tokens
                 ADD CONSTRAINT email_otp_tokens_purpose_check
                 CHECK (purpose IN (
-                    'LOGIN',
-                    'STAFF_LOGIN',
-                    'REGISTRATION',
-                    'APPLICANT_SIGNATURE',
-                    'GUARANTOR_SIGNATURE',
-                    'BOARD_SIGNATURE'
+                    %s
                 ))
-                """);
+                """.formatted(allowedPurposes));
 
-            log.info("Ensured email_otp_tokens purpose constraint supports signature and staff OTP flows.");
+            log.info("Ensured email_otp_tokens purpose constraint matches current OTP purposes.");
         } catch (Exception ex) {
             log.warn("Unable to refresh email_otp_tokens purpose constraint automatically: {}", ex.getMessage());
         }

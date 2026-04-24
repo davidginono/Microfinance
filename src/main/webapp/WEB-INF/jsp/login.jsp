@@ -7,29 +7,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><spring:message code="app.title" /></title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ["Manrope", "ui-sans-serif", "system-ui"],
-                        display: ["Sora", "ui-sans-serif", "system-ui"]
-                    },
-                    colors: {
-                        sacco: {
-                            brown: "#8A4B24",
-                            blue: "#2F348D",
-                            green: "#3F9C4B"
-                        }
-                    }
-                }
-            }
-        };
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
+    <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <style>
         @keyframes otp-pop {
             0% { transform: translateY(4px) scale(0.82); opacity: 0; }
@@ -55,134 +34,54 @@
         }
         .auth-shell {
             background:
-                radial-gradient(circle at top left, rgba(156, 163, 175, 0.12), transparent 38%),
-                radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.10), transparent 28%),
-                #eef2f5;
+                radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
+                linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
         }
         .auth-frame {
-            border-radius: 8px;
-            border: 1px solid #e4eaf1;
+            border-radius: 1rem;
+            border: 1px solid #d7e3ee;
             background: #ffffff;
-            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
-        }
-        .auth-decor {
-            background: linear-gradient(180deg, #dff1fb 0%, #cfe8f8 100%);
-        }
-        .auth-decor::before,
-        .auth-decor::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-        .auth-decor::before {
-            background:
-                linear-gradient(145deg,
-                    rgba(255,255,255,0.34) 0%,
-                    rgba(255,255,255,0.34) 20%,
-                    transparent 20%,
-                    transparent 44%,
-                    rgba(255,255,255,0.16) 44%,
-                    rgba(255,255,255,0.16) 58%,
-                    transparent 58%,
-                    transparent 100%);
-        }
-        .auth-decor::after {
-            background:
-                linear-gradient(25deg,
-                    rgba(92, 180, 235, 0.22) 0%,
-                    rgba(92, 180, 235, 0.22) 18%,
-                    transparent 18%,
-                    transparent 40%,
-                    rgba(92, 180, 235, 0.13) 40%,
-                    rgba(92, 180, 235, 0.13) 60%,
-                    transparent 60%,
-                    transparent 100%);
-        }
-        .auth-decor-glow {
-            position: absolute;
-            left: -28%;
-            bottom: -10%;
-            width: 120%;
-            height: 44%;
-            background: radial-gradient(circle at center, rgba(113, 196, 245, 0.42) 0%, rgba(113, 196, 245, 0.18) 42%, rgba(113, 196, 245, 0) 78%);
-            pointer-events: none;
-        }
-        .auth-title-panel {
-            position: relative;
-            overflow: hidden;
-            border: 0;
-            border-radius: 0;
-            background: linear-gradient(180deg, #eef8ff 0%, #deeffb 100%);
-        }
-        .auth-title-panel::before,
-        .auth-title-panel::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-        .auth-title-panel::before {
-            background:
-                linear-gradient(145deg,
-                    rgba(255,255,255,0.34) 0%,
-                    rgba(255,255,255,0.34) 22%,
-                    transparent 22%,
-                    transparent 46%,
-                    rgba(255,255,255,0.14) 46%,
-                    rgba(255,255,255,0.14) 62%,
-                    transparent 62%,
-                    transparent 100%);
-        }
-        .auth-title-panel::after {
-            background:
-                linear-gradient(25deg,
-                    rgba(92, 180, 235, 0.20) 0%,
-                    rgba(92, 180, 235, 0.20) 18%,
-                    transparent 18%,
-                    transparent 42%,
-                    rgba(92, 180, 235, 0.12) 42%,
-                    rgba(92, 180, 235, 0.12) 62%,
-                    transparent 62%,
-                    transparent 100%);
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
         }
         .auth-panel-divider {
-            border-bottom: 1px solid #dbe4ee;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .auth-title-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .auth-heading {
+            font-family: "Sora", ui-sans-serif, system-ui;
+            font-size: 2.2rem;
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+            color: #0f172a;
+        }
+        .auth-subheading {
+            color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.6;
         }
         .auth-tab-switch {
             display: inline-flex;
-            align-items: center;
-            gap: 0.15rem;
-            border-radius: 8px;
-            border: 1px solid #dbe4ee;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
             background: #f8fafc;
-            padding: 0.22rem;
+            padding: 0.25rem;
         }
         .auth-tab {
-            border: 0;
-            border-radius: 6px;
-            background: transparent;
-            color: #90a0b4;
-            min-width: 7rem;
-            padding: 0.72rem 1.15rem;
-            font-size: 0.92rem;
-            font-weight: 700;
-            line-height: 1;
-            transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+            border-radius: 0.375rem;
+            color: #334155;
+            transition: color 180ms ease, box-shadow 180ms ease;
         }
         .auth-tab[data-active="true"] {
             background: #ffffff;
-            color: #16324f;
-            box-shadow: none;
-            transform: none;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
         }
-        .auth-tab:not([data-active="true"]):hover {
-            color: #5c6d82;
-            background: rgba(255, 255, 255, 0.65);
-        }
-        .auth-alt-divider {
-            color: #7c8ea6;
-            letter-spacing: 0.2em;
+        .auth-tab:hover {
+            color: #0f172a;
         }
         .auth-footer-links .text-slate-300,
         .auth-footer-links .text-slate-500 {
@@ -193,42 +92,43 @@
             color: #64748b;
         }
         .auth-input {
-            border-radius: 4px;
+            border-radius: 0.375rem;
             border: 1px solid #d7e1ef;
-            background: #edf4ff;
+            background: #f8fbff;
             color: #0f172a;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
             transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
         }
         .auth-input:focus {
             outline: none;
-            border-color: #16b7c8;
-            box-shadow: 0 0 0 4px rgba(22, 183, 200, 0.12);
+            border-color: #c7d4e4;
+            box-shadow: 0 0 0 1px #c7d4e4;
             background: #ffffff;
         }
         .auth-card {
-            border-radius: 10px;
+            border-radius: 0.75rem;
             border: 1px solid #e1e8f0;
-            background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-            box-shadow: 0 5px 16px rgba(15, 23, 42, 0.035);
+            background: #ffffff;
+            box-shadow: 0 8px 26px rgba(15, 23, 42, 0.035);
         }
         .auth-primary-btn {
-            border-radius: 4px;
-            border: 1px solid #10a8b6;
-            background: linear-gradient(180deg, #1bc4d3 0%, #11b2c3 100%);
+            border-radius: 0.85rem;
+            border: 1px solid #14b8c4;
+            background: #14b8c4;
             color: #ffffff;
-            box-shadow: 0 8px 18px rgba(17, 178, 195, 0.14);
-            transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+            box-shadow: none;
+            transition: background-color 160ms ease, transform 160ms ease;
         }
         .auth-primary-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 12px 22px rgba(17, 178, 195, 0.18);
-            filter: saturate(1.03);
+            background: #0ea5b7;
         }
         .auth-secondary-btn {
-            border-radius: 4px;
+            border-radius: 0.85rem;
             border: 1px solid #d7e1ef;
             background: #ffffff;
             color: #12304d;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
             transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
         }
         .auth-secondary-btn:hover {
@@ -251,27 +151,89 @@
         .auth-footer-link:hover {
             color: #0f172a;
         }
+        .auth-mode-card {
+            border: 0;
+            background: transparent;
+            padding: 0;
+        }
+        .auth-mode-title {
+            color: #7b8aa0;
+            font-size: 0.98rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            text-align: center;
+        }
+        .auth-or-divider {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            color: #94a3b8;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+        .auth-or-divider::before,
+        .auth-or-divider::after {
+            content: "";
+            flex: 1 1 auto;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .auth-section-label {
+            color: #334155;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .auth-signup-link {
+            color: #2563eb;
+            font-weight: 700;
+            transition: color 160ms ease;
+        }
+        .auth-signup-link:hover {
+            color: #1d4ed8;
+        }
+        .auth-login-meta .text-slate-300,
+        .auth-login-meta .text-slate-500 {
+            display: none;
+        }
+        @media (max-width: 640px) {
+            .auth-heading {
+                font-size: 1.85rem;
+            }
+            .auth-frame {
+                border-radius: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
+<c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
 <div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
-<div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-    <div class="auth-frame relative w-full max-w-[920px] overflow-hidden">
-        <div class="absolute inset-x-0 top-0 h-4 bg-gradient-to-r from-[#1bc4d3] via-[#15b8c9] to-[#11b2c3]"></div>
-        <div class="grid min-h-[31rem] lg:grid-cols-[0.29fr_0.71fr]">
-            <div class="auth-decor relative hidden overflow-hidden border-r border-slate-200/80 lg:block">
-                <div class="auth-decor-glow"></div>
+<div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
+    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
+        <div class="mb-6 sm:mb-7">
+            <div class="auth-title-stack min-w-0">
+                <h1 class="auth-heading">Log in to Loan Management System</h1>
             </div>
-
-            <div class="relative flex items-center bg-white px-6 py-0 sm:px-8 lg:px-10 lg:py-0">
-                <div class="mx-auto w-full max-w-[580px]">
-                    <div class="auth-title-panel -mx-6 mb-5 px-6 py-4 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10 lg:py-5">
-                        <div class="relative z-[1]">
-                            <h1 class="text-[1.9rem] font-semibold tracking-[-0.03em] text-[#1f436d] sm:text-[2.75rem]">Loan Management System</h1>
-                            <h2 class="mt-4 text-[1.75rem] font-semibold tracking-[-0.03em] text-[#1f436d] sm:text-[2.45rem]">Sign In</h2>
-                        </div>
-                    </div>
-                    <div class="pb-7 pt-1 sm:pb-7 lg:pb-8">
+        </div>
+        <div class="mb-5">
+            <div class="mb-5 inline-flex rounded-md border border-slate-200 bg-slate-50 p-1 text-sm font-semibold">
+                <button type="button"
+                        class="auth-tab rounded px-4 py-2"
+                        data-login-tab-toggle="member"
+                        data-active="${activeLoginTab eq 'member'}">
+                    Members
+                </button>
+                <button type="button"
+                        class="auth-tab rounded px-4 py-2"
+                        data-login-tab-toggle="staff"
+                        data-active="${activeLoginTab eq 'staff'}">
+                    Staff
+                </button>
+            </div>
+        </div>
+        <div class="pb-1">
 
                     <c:if test="${param.error != null}">
                         <div hidden data-toast-message="${fn:escapeXml(not empty errorMessage ? errorMessage : 'Invalid member number or password.')}" data-toast-type="error"></div>
@@ -282,52 +244,51 @@
                     <c:if test="${param.logout != null}">
                         <div hidden data-toast-message="Logged out successfully." data-toast-type="success"></div>
                     </c:if>
+                    <c:if test="${param.claimed != null and empty loginMessage}">
+                        <div hidden data-toast-message="Your account is now active. Sign in as staff to continue." data-toast-type="success"></div>
+                    </c:if>
+                    <c:if test="${not empty loginMessage}">
+                        <div hidden data-toast-message="${fn:escapeXml(loginMessage)}" data-toast-type="success"></div>
+                    </c:if>
                     <c:if test="${not empty message}">
                         <div hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></div>
                     </c:if>
 
-                    <div class="auth-panel-divider mb-5">
-                        <div class="auth-tab-switch text-sm font-semibold">
-                            <button type="button" class="auth-tab" data-login-tab-toggle="member" data-active="true">Members</button>
-                            <button type="button" class="auth-tab" data-login-tab-toggle="staff" data-active="false">Staff</button>
-                        </div>
-                    </div>
-
-                    <div data-login-tab="member" class="space-y-5">
-                        <div class="auth-card p-5 sm:p-6">
-                            <p class="text-[1.1rem] font-semibold text-[#233e61]">Member Number &amp; Password</p>
-                            <p class="mt-2 text-[0.95rem] leading-7 text-slate-500">Use this for seeded local-development accounts or any existing member account that still has a password.</p>
-                            <form action="/login" method="post" class="mt-5 space-y-4">
+                    <div data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5">
+                        <div class="auth-mode-card space-y-4">
+                            <div>
+                                <p class="auth-mode-title">Member Number &amp; Password</p>
+                            </div>
+                            <form action="/login" method="post" class="space-y-4">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <div>
-                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Member Number</label>
+                                    <label class="mb-2 block auth-section-label">Member Number</label>
                                     <input name="username" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
-                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Password</label>
+                                    <label class="mb-2 block auth-section-label">Password</label>
                                     <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
-                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Sign In With Password</button>
+                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in</button>
                             </form>
                         </div>
 
-                        <div class="auth-alt-divider flex items-center gap-4 text-[0.7rem] font-semibold uppercase">
-                            <span class="h-px flex-1 bg-slate-200"></span>
-                            <span>OR Sign In With One-Time Pin Code</span>
-                            <span class="h-px flex-1 bg-slate-200"></span>
-                        </div>
+                        <div class="auth-or-divider">or</div>
 
                         <div id="memberLoginError" data-auto-scroll-message="true" class="hidden rounded-2xl border border-sacco-brown/20 bg-[#f7efe9] px-4 py-3 text-sm font-medium text-sacco-brown"></div>
                         <div id="memberLoginSuccess" data-auto-scroll-message="true" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
-                        <form id="memberLoginForm" class="space-y-5">
+                        <form id="memberLoginForm" class="auth-mode-card space-y-4">
                             <input type="hidden" id="memberLoginCsrfName" value="${_csrf.parameterName}" />
                             <input type="hidden" id="memberLoginCsrfToken" value="${_csrf.token}" />
                             <div>
-                                <label class="mb-2 block text-sm font-semibold text-slate-700">Email Address</label>
+                                <p class="auth-mode-title">One-Time Pin Code</p>
+                            </div>
+                            <div>
+                                <label class="mb-2 block auth-section-label">Email</label>
                                 <input id="memberLoginEmail" name="email" type="email" autocomplete="email" class="auth-input w-full px-4 py-3.5 text-slate-900" required />
                             </div>
                             <div id="memberOtpBlock" class="hidden">
-                                <label class="mb-2 block text-sm font-semibold text-slate-700">OTP Code</label>
+                                <label class="mb-2 block auth-section-label">OTP Code</label>
                                 <input id="memberLoginOtpCode" name="otpCode" inputmode="numeric" maxlength="6" class="auth-input w-full px-4 py-3.5 tracking-[0.3em] text-slate-900" />
                                 <div id="memberOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
                                     <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
@@ -337,52 +298,54 @@
                                     <span data-otp-text>Checking code...</span>
                                 </div>
                             </div>
-                            <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="space-y-3">
                                 <button id="memberRequestOtpButton" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button">
                                     <span class="otp-button-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
                                     <span class="otp-button-label">Send Sign-In Code</span>
                                 </button>
-                                <button id="memberVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Sign In</button>
+                                <button id="memberVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Log in</button>
                             </div>
                         </form>
                     </div>
 
-                    <div data-login-tab="staff" class="hidden space-y-5">
-                        <div class="auth-card p-5 sm:p-6">
-                            <p class="text-[1.1rem] font-semibold text-[#233e61]">Staff Number &amp; Password</p>
-                            <p class="mt-2 text-[0.95rem] leading-7 text-slate-500">Use this for seeded local-development staff accounts or any staff account that still has a password.</p>
-                            <form action="/login" method="post" class="mt-5 space-y-4">
+                    <div data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5">
+                        <div class="auth-mode-card space-y-4">
+                            <div>
+                                <p class="auth-mode-title">Member Number &amp; Password</p>
+                                <p class="mt-1 text-xs text-slate-500">Admins and minor admins can sign in here using their staff member number and password.</p>
+                            </div>
+                            <form action="/login" method="post" class="space-y-4">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="staff-password" />
                                 <div>
-                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Staff Number</label>
+                                    <label class="mb-2 block auth-section-label">Staff Member Number</label>
                                     <input name="username" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
-                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Password</label>
+                                    <label class="mb-2 block auth-section-label">Password</label>
                                     <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
-                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Sign In With Password</button>
+                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in as Staff</button>
                             </form>
                         </div>
 
-                        <div class="auth-alt-divider flex items-center gap-4 text-[0.7rem] font-semibold uppercase">
-                            <span class="h-px flex-1 bg-slate-200"></span>
-                            <span>OR Sign In With One-Time Pin Code</span>
-                            <span class="h-px flex-1 bg-slate-200"></span>
-                        </div>
+                        <div class="auth-or-divider">or</div>
 
                         <div id="staffLoginError" data-auto-scroll-message="true" class="hidden rounded-2xl border border-sacco-brown/20 bg-[#f7efe9] px-4 py-3 text-sm font-medium text-sacco-brown"></div>
                         <div id="staffLoginSuccess" data-auto-scroll-message="true" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
-                        <form id="staffLoginForm" class="space-y-5">
+                        <form id="staffLoginForm" class="auth-mode-card space-y-4">
                             <input type="hidden" id="staffLoginCsrfName" value="${_csrf.parameterName}" />
                             <input type="hidden" id="staffLoginCsrfToken" value="${_csrf.token}" />
                             <div>
-                                <label class="mb-2 block text-sm font-semibold text-slate-700">Email Address</label>
+                                <p class="auth-mode-title">Email Sign-In Code</p>
+                                <p class="mt-1 text-xs text-slate-500">Staff sign in with a one-time code sent to their registered email.</p>
+                            </div>
+                            <div>
+                                <label class="mb-2 block auth-section-label">Email</label>
                                 <input id="staffLoginEmail" type="email" name="email" class="auth-input w-full px-4 py-3.5 text-slate-900" required />
                             </div>
                             <div id="staffOtpBlock" class="hidden">
-                                <label class="mb-2 block text-sm font-semibold text-slate-700">OTP Code</label>
+                                <label class="mb-2 block auth-section-label">OTP Code</label>
                                 <input id="staffLoginOtpCode" name="otpCode" inputmode="numeric" maxlength="6" class="auth-input w-full px-4 py-3.5 tracking-[0.3em] text-slate-900" />
                                 <div id="staffOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
                                     <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
@@ -392,33 +355,21 @@
                                     <span data-otp-text>Checking code...</span>
                                 </div>
                             </div>
-                            <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="space-y-3">
                                 <button id="staffRequestOtpButton" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button">
                                     <span class="otp-button-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
                                     <span class="otp-button-label">Send Sign-In Code</span>
                                 </button>
-                                <button id="staffVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Sign In</button>
+                                <button id="staffVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Log in</button>
                             </div>
                         </form>
                     </div>
 
-                    <div class="mt-6 space-y-5 border-t border-slate-200 pt-6">
-                        <a href="/register/member" class="auth-secondary-btn inline-flex w-full items-center justify-center px-4 py-3.5 text-sm font-semibold">
-                            <spring:message code="login.registerMember" />
-                        </a>
-                        <div class="auth-footer-links flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-slate-200 pt-4 text-sm">
-                            <a href="mailto:support@loan-management.local" class="auth-footer-link">Contact Us</a>
-                            <span class="text-slate-300">•</span>
-                            <button type="button" class="auth-footer-link bg-transparent p-0">Privacy Policy</button>
-                            <span class="text-slate-300">•</span>
-                            <button type="button" class="auth-footer-link bg-transparent p-0">Terms &amp; Conditions</button>
-                            <span class="text-slate-300">•</span>
-                            <span class="text-slate-500">©2026</span>
-                        </div>
+                    <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
+                        <span>Don't have an account? </span>
+                        <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
                     </div>
                     </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

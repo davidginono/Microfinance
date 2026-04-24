@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -33,22 +34,27 @@ public class LoanWorkflowService {
     private final BoardReviewRepository boardReviewRepository;
     private final ManagerReviewRepository managerReviewRepository;
     private final MemberRepository memberRepository;
-    private final SavingsAccountRepository savingsAccountRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final FormSchemaService formSchemaService;
     private final EligibilityService eligibilityService;
     private final OutboxService outboxService;
     private final LoanAttachmentService loanAttachmentService;
+    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final ObjectMapper objectMapper;
     private final SaccoConfigurationService saccoConfigurationService;
+    private final ApplicationNumberService applicationNumberService;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
         if (!products.isEmpty()) {
-            return products;
+            return products.stream()
+                .sorted(java.util.Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+                .toList();
         }
         saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .sorted(java.util.Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+            .toList();
     }
 
     public List<LoanApplication> myApplications(UUID memberId) {
@@ -66,11 +72,36 @@ public class LoanWorkflowService {
             .findFirst();
     }
 
+    public boolean canRequestTopUp(LoanApplication app) {
+        if (app == null) {
+            return false;
+        }
+        return !isTopUpBlockedFor(app)
+            && app.getFinalDueDate() != null
+            && !app.getFinalDueDate().isBefore(LocalDate.now());
+    }
+
+    public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId) {
+        if (topUpSourceLoanId == null) {
+            return null;
+        }
+        LoanApplication sourceLoan = loanApplicationRepository.findByIdAndApplicantMemberId(topUpSourceLoanId, applicantId)
+            .orElseThrow(() -> new IllegalArgumentException("Selected top-up source loan was not found."));
+        if (!Objects.equals(sourceLoan.getSaccoId(), saccoId)) {
+            throw new IllegalArgumentException("Selected top-up source loan was not found.");
+        }
+        if (isTopUpBlockedFor(sourceLoan)) {
+            throw new IllegalStateException("Disbursed loans cannot be topped up.");
+        }
+        return sourceLoan;
+    }
+
     @Transactional
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                      List<UUID> guarantorIds, String financialSnapshotJson, UUID topUpSourceLoanId,
                                      List<MultipartFile> attachments) {
+        LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
         LoanProductSetting product = formSchemaService.getSchema(saccoId, loanType);
         validateRepaymentPeriod(product, tenorMonths);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
@@ -81,7 +112,11 @@ public class LoanWorkflowService {
         String snapshot = eligibilityService.policySnapshotJson(eligibility, product.getGuarantorsRequired());
 
         LoanApplication application = existingId == null
-            ? LoanApplication.builder().id(UUID.randomUUID()).createdAt(OffsetDateTime.now()).build()
+            ? LoanApplication.builder()
+                .id(UUID.randomUUID())
+                .applicationNumber(applicationNumberService.nextFor(saccoId))
+                .createdAt(OffsetDateTime.now())
+                .build()
             : loanApplicationRepository.findByIdAndApplicantMemberId(existingId, applicantId)
                 .map(existing -> {
                     if (existing.getStatus() != LoanStatus.DRAFT) {
@@ -93,7 +128,7 @@ public class LoanWorkflowService {
 
         application.setSaccoId(saccoId);
         application.setApplicantMemberId(applicantId);
-        application.setTopUpSourceLoanId(topUpSourceLoanId);
+        application.setTopUpSourceLoanId(topUpSourceLoan == null ? null : topUpSourceLoan.getId());
         application.setLoanType(loanType);
         application.setAmount(amount);
         application.setTenorMonths(tenorMonths);
@@ -112,6 +147,11 @@ public class LoanWorkflowService {
         LoanApplication saved = loanApplicationRepository.save(application);
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
         return loanApplicationRepository.save(saved);
+    }
+
+    private boolean isTopUpBlockedFor(LoanApplication app) {
+        LoanStatus status = app.getStatus();
+        return status == LoanStatus.FINAL_APPROVED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     @Transactional
@@ -211,6 +251,15 @@ public class LoanWorkflowService {
         loanApplicationRepository.save(app);
     }
 
+    @Transactional
+    public int syncLoanPayments(UUID appId, UUID memberId, int monthsBack) {
+        LoanApplication app = getMine(appId, memberId);
+        if (app.getLoanId() == null || app.getLoanId().isBlank()) {
+            throw new IllegalStateException("This loan has not been disbursed yet.");
+        }
+        return loanPaymentTransactionSyncService.syncRecent(app, monthsBack);
+    }
+
     public Page<Member> searchGuarantors(String saccoId, UUID applicantId, String q, int page, int size) {
         String query = q == null ? "" : q.trim();
         if (query.isBlank()) {
@@ -259,8 +308,6 @@ public class LoanWorkflowService {
             throw new IllegalStateException("Guarantors must be selected before submitting the application");
         }
 
-        BigDecimal requestedSplit = app.getAmount().divide(BigDecimal.valueOf(app.getRequiredGuarantors()), 2,
-            java.math.RoundingMode.UP);
         List<GuarantorRequest> existingRequests = guarantorRequestRepository.findByLoanApplicationId(appId);
         Map<UUID, GuarantorRequest> existingByGuarantor = new LinkedHashMap<>();
         for (GuarantorRequest existingRequest : existingRequests) {
@@ -289,7 +336,7 @@ public class LoanWorkflowService {
             }
 
             request.setStatus(GuarantorRequestStatus.PENDING);
-            request.setRequestedAmount(requestedSplit);
+            request.setRequestedAmount(null);
             request.setCommittedAmount(null);
             request.setDecisionReason(null);
             request.setGuarantorSignatureText(null);
@@ -318,9 +365,7 @@ public class LoanWorkflowService {
 
     @Transactional
     public void approveGuarantorRequest(UUID requestId, UUID guarantorId) {
-        GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)
-            .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
-        approveGuarantorRequest(requestId, guarantorId, request.getRequestedAmount(), null, null);
+        approveGuarantorRequestInternal(requestId, guarantorId, null, null);
     }
 
     @Transactional
@@ -328,37 +373,22 @@ public class LoanWorkflowService {
                                         UUID guarantorId,
                                         String signatureText,
                                         OffsetDateTime verifiedAt) {
-        GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)
-            .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
-        approveGuarantorRequest(requestId, guarantorId, request.getRequestedAmount(), signatureText, verifiedAt);
+        approveGuarantorRequestInternal(requestId, guarantorId, signatureText, verifiedAt);
     }
 
-    @Transactional
-    public void approveGuarantorRequest(UUID requestId, UUID guarantorId, BigDecimal committedAmount) {
-        approveGuarantorRequest(requestId, guarantorId, committedAmount, null, null);
-    }
-
-    @Transactional
-    public void approveGuarantorRequest(UUID requestId,
-                                        UUID guarantorId,
-                                        BigDecimal committedAmount,
-                                        String signatureText,
-                                        OffsetDateTime verifiedAt) {
+    private void approveGuarantorRequestInternal(UUID requestId,
+                                                 UUID guarantorId,
+                                                 String signatureText,
+                                                 OffsetDateTime verifiedAt) {
         GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)
             .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
         if (request.getStatus() != GuarantorRequestStatus.PENDING) {
             throw new IllegalStateException("Request already decided");
         }
 
-        BigDecimal available = savingsAccountRepository.findByMemberId(guarantorId)
-            .orElseThrow(() -> new IllegalArgumentException("Savings account missing"))
-            .getAvailableBalance();
-        if (committedAmount.compareTo(available) > 0) {
-            throw new IllegalStateException("Committed amount exceeds guarantor balance");
-        }
-
         request.setStatus(GuarantorRequestStatus.APPROVED);
-        request.setCommittedAmount(committedAmount);
+        request.setRequestedAmount(null);
+        request.setCommittedAmount(null);
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
         request.setGuarantorSignatureVerifiedAt(verifiedAt);
         request.setDecidedAt(OffsetDateTime.now());
@@ -559,8 +589,6 @@ public class LoanWorkflowService {
 
     private void refreshGuarantorRequestsForSubmission(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
         List<UUID> uniqueGuarantors = normalizeGuarantorSelection(app, applicantId, guarantorIds);
-        BigDecimal requestedSplit = app.getAmount().divide(BigDecimal.valueOf(app.getRequiredGuarantors()), 2,
-            java.math.RoundingMode.UP);
 
         guarantorRequestRepository.deleteByLoanApplicationId(app.getId());
         guarantorRequestRepository.flush();
@@ -575,7 +603,7 @@ public class LoanWorkflowService {
                     .build());
 
             request.setStatus(GuarantorRequestStatus.PENDING);
-            request.setRequestedAmount(requestedSplit);
+            request.setRequestedAmount(null);
             request.setCommittedAmount(null);
             request.setDecisionReason(null);
             request.setGuarantorSignatureText(null);
@@ -610,4 +638,3 @@ public class LoanWorkflowService {
         }
     }
 }
-

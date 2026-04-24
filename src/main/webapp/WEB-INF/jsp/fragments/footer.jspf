@@ -46,6 +46,9 @@
         const memberArchiveToggle = document.getElementById("memberArchiveToggle");
         const memberArchivePanel = document.getElementById("memberArchivePanel");
         const memberArchiveChevron = document.getElementById("memberArchiveChevron");
+        const adminSaccoToggle = document.getElementById("adminSaccoToggle");
+        const adminSaccoPanel = document.getElementById("adminSaccoPanel");
+        const adminSaccoChevron = document.getElementById("adminSaccoChevron");
         const adminSettingsToggle = document.getElementById("adminSettingsToggle");
         const adminSettingsPanel = document.getElementById("adminSettingsPanel");
         const adminSettingsChevron = document.getElementById("adminSettingsChevron");
@@ -77,6 +80,25 @@
                 const nextExpanded = !isExpanded;
                 applyArchiveExpanded(nextExpanded);
                 window.localStorage.setItem(archiveStorageKey, String(nextExpanded));
+            });
+        }
+
+        if (adminSaccoToggle && adminSaccoPanel) {
+            const saccoStorageKey = "adminSaccoSidebarExpanded";
+            const applySaccoExpanded = function (expanded) {
+                adminSaccoToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                adminSaccoPanel.classList.toggle("hidden", !expanded);
+                if (adminSaccoChevron) {
+                    adminSaccoChevron.classList.toggle("rotate-180", expanded);
+                }
+            };
+            const storedSaccoState = window.localStorage.getItem(saccoStorageKey);
+            applySaccoExpanded(storedSaccoState === "true");
+            adminSaccoToggle.addEventListener("click", function () {
+                const isExpanded = adminSaccoToggle.getAttribute("aria-expanded") === "true";
+                const nextExpanded = !isExpanded;
+                applySaccoExpanded(nextExpanded);
+                window.localStorage.setItem(saccoStorageKey, String(nextExpanded));
             });
         }
 

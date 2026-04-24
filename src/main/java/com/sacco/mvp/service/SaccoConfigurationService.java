@@ -38,20 +38,73 @@ public class SaccoConfigurationService {
                                     int guarantorsRequired,
                                     int maxRepaymentMonths,
                                     OffsetDateTime now) {
-        loanProductSettingRepository.save(LoanProductSetting.builder()
+        loanProductSettingRepository.save(newLoanProduct(
+            saccoId,
+            loanType,
+            null,
+            guarantorsRequired,
+            DEFAULT_RATIO,
+            DEFAULT_INSURANCE_RATE,
+            DEFAULT_INTEREST_RATE,
+            maxRepaymentMonths,
+            true,
+            now
+        ));
+    }
+
+    @Transactional
+    public LoanProductSetting createLoanProduct(String saccoId,
+                                                LoanType loanType,
+                                                String productName,
+                                                Integer guarantorsRequired,
+                                                BigDecimal maxLoanSavingsRatio,
+                                                BigDecimal insuranceRate,
+                                                BigDecimal interestRate,
+                                                Integer maxRepaymentMonths,
+                                                boolean active) {
+        if (loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
+            throw new IllegalStateException("That loan product already exists for this SACCO.");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        return loanProductSettingRepository.save(newLoanProduct(
+            saccoId,
+            loanType,
+            productName,
+            guarantorsRequired,
+            maxLoanSavingsRatio == null ? DEFAULT_RATIO : maxLoanSavingsRatio,
+            insuranceRate == null ? DEFAULT_INSURANCE_RATE : insuranceRate,
+            interestRate == null ? DEFAULT_INTEREST_RATE : interestRate,
+            maxRepaymentMonths,
+            active,
+            now
+        ));
+    }
+
+    private LoanProductSetting newLoanProduct(String saccoId,
+                                              LoanType loanType,
+                                              String productName,
+                                              Integer guarantorsRequired,
+                                              BigDecimal maxLoanSavingsRatio,
+                                              BigDecimal insuranceRate,
+                                              BigDecimal interestRate,
+                                              Integer maxRepaymentMonths,
+                                              boolean active,
+                                              OffsetDateTime now) {
+        return LoanProductSetting.builder()
             .id(UUID.randomUUID())
             .saccoId(saccoId)
             .loanType(loanType)
+            .productName(productName)
             .guarantorsRequired(guarantorsRequired)
-            .maxLoanSavingsRatio(DEFAULT_RATIO)
-            .insuranceRate(DEFAULT_INSURANCE_RATE)
-            .interestRate(DEFAULT_INTEREST_RATE)
+            .maxLoanSavingsRatio(maxLoanSavingsRatio)
+            .insuranceRate(insuranceRate)
+            .interestRate(interestRate)
             .maxRepaymentMonths(maxRepaymentMonths)
             .formSchema(defaultLoanFormSchema())
-            .active(true)
+            .active(active)
             .createdAt(now)
             .updatedAt(now)
-            .build());
+            .build();
     }
 
     private String defaultLoanFormSchema() {

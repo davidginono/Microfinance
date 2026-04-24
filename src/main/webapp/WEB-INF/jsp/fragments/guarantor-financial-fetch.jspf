@@ -1,0 +1,158 @@
+<%@ include file="modal-shell.jspf" %>
+<div id="guarantorFinancialModal" class="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="guarantorFinancialModalTitle" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact">
+        <div class="app-modal-scroll">
+            <div class="app-modal-header">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Guarantor</p>
+                    <h2 id="guarantorFinancialModalTitle" class="mt-0.5 text-lg font-semibold text-slate-900" data-gf-modal-name>Financial Status</h2>
+                </div>
+                <button type="button" class="app-modal-close" data-gf-modal-close aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 111.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 01-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="app-modal-body">
+                <div class="app-modal-section space-y-3" data-gf-modal-ready>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Savings</span>
+                        <span class="text-base font-semibold text-slate-900" data-gf-modal-savings>-</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Shares</span>
+                        <span class="text-base font-semibold text-slate-900" data-gf-modal-shares>-</span>
+                    </div>
+                    <p class="m-0 text-sm text-slate-500" data-gf-modal-note></p>
+                </div>
+                <div class="app-modal-section hidden items-center justify-center py-8 text-sm text-slate-500" data-gf-modal-loading>
+                    Loading financial status...
+                </div>
+                <div class="app-modal-section hidden border-rose-200 bg-rose-50 text-sm text-rose-700" data-gf-modal-error>
+                    Unable to load status.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var triggers = document.querySelectorAll('.guarantor-financial-trigger');
+    if (!triggers.length) {
+        return;
+    }
+    var modal = document.getElementById('guarantorFinancialModal');
+    if (!modal) {
+        return;
+    }
+    var nameEl = modal.querySelector('[data-gf-modal-name]');
+    var readyEl = modal.querySelector('[data-gf-modal-ready]');
+    var loadingEl = modal.querySelector('[data-gf-modal-loading]');
+    var errorEl = modal.querySelector('[data-gf-modal-error]');
+    var savingsEl = modal.querySelector('[data-gf-modal-savings]');
+    var sharesEl = modal.querySelector('[data-gf-modal-shares]');
+    var noteEl = modal.querySelector('[data-gf-modal-note]');
+
+    function show(el) { if (el) el.classList.remove('hidden'); }
+    function hide(el) { if (el) el.classList.add('hidden'); }
+
+    function openModal() {
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function setState(state) {
+        if (state === 'loading') {
+            show(loadingEl); hide(readyEl); hide(errorEl);
+        } else if (state === 'ready') {
+            hide(loadingEl); show(readyEl); hide(errorEl);
+        } else if (state === 'error') {
+            hide(loadingEl); hide(readyEl); show(errorEl);
+        }
+    }
+
+    function setButtonBusy(btn, busy) {
+        var spinner = btn.querySelector('[data-financial-spinner]');
+        var label = btn.querySelector('[data-financial-label]');
+        if (spinner) spinner.classList.toggle('hidden', !busy);
+        if (label) label.textContent = busy ? 'Loading...' : 'View Status';
+        btn.disabled = busy;
+    }
+
+    function guarantorNameFor(btn) {
+        var row = btn.closest('tr');
+        if (!row) return 'Guarantor';
+        var firstCell = row.querySelector('td');
+        if (!firstCell) return 'Guarantor';
+        return (firstCell.textContent || '').trim() || 'Guarantor';
+    }
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.closest('[data-gf-modal-close]')) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
+
+    triggers.forEach(function (btn) {
+        // Legacy inline result panel is no longer used — keep it hidden.
+        var legacy = btn.parentElement ? btn.parentElement.querySelector('.guarantor-financial-result') : null;
+        if (legacy) legacy.remove();
+        var label = btn.querySelector('[data-financial-label]');
+        if (label && /^\s*Load Status\s*$/i.test(label.textContent)) {
+            label.textContent = 'View Status';
+        }
+
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-url');
+            if (!url) return;
+            if (nameEl) nameEl.textContent = guarantorNameFor(btn);
+            setState('loading');
+            openModal();
+            setButtonBusy(btn, true);
+
+            fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function (response) {
+                    return response.json().then(function (payload) {
+                        return { ok: response.ok, payload: payload };
+                    });
+                })
+                .then(function (result) {
+                    if (result.ok) {
+                        var data = result.payload || {};
+                        if (savingsEl) savingsEl.textContent = data.savingsLabel || '-';
+                        if (sharesEl) sharesEl.textContent = data.sharesLabel || '-';
+                        if (noteEl) noteEl.textContent = data.statusMessage || '';
+                        setState('ready');
+                    } else {
+                        if (errorEl) errorEl.textContent = (result.payload && result.payload.message) || 'Unable to load status.';
+                        setState('error');
+                    }
+                })
+                .catch(function () {
+                    if (errorEl) errorEl.textContent = 'Network error while loading status.';
+                    setState('error');
+                })
+                .finally(function () {
+                    setButtonBusy(btn, false);
+                });
+        });
+    });
+})();
+</script>

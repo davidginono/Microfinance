@@ -53,9 +53,8 @@ public class AuthController {
             return "redirect:/login";
         }
         return switch (principal.getPosition()) {
-            case ADMIN -> adminScopeService.hasExplicitScopeSelection()
-                ? "redirect:/admin/dashboard"
-                : "redirect:/admin/scope/select";
+            case ADMIN -> "redirect:/admin/dashboard";
+            case MINOR_ADMIN -> "redirect:/admin/dashboard";
             case CHAIRPERSON -> "redirect:/chairperson/manager-decisions";
             case MANAGER -> "redirect:/manager/loan-applications?status=READY_FOR_MANAGER";
             case BOARD -> "redirect:/board/queue";
@@ -311,7 +310,8 @@ public class AuthController {
 
     private String defaultLanding(Member member) {
         return switch (Position.primaryRole(member.getStaffRolesResolved(), member.isMemberAccess())) {
-            case ADMIN -> "/admin/scope/select";
+            case ADMIN -> "/admin/dashboard";
+            case MINOR_ADMIN -> "/admin/dashboard";
             case CHAIRPERSON -> "/chairperson/manager-decisions";
             case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
             case BOARD -> "/board/queue";

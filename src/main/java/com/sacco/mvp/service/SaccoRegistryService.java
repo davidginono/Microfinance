@@ -111,6 +111,23 @@ public class SaccoRegistryService {
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
     }
 
+    @Transactional
+    public void updateStationsOnly(String saccoId, String stationIdsText) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        LinkedHashSet<String> stationIds = parseStationIds(stationIdsText);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        if (stationIds.isEmpty()) {
+            throw new IllegalStateException("Enter at least one station ID.");
+        }
+
+        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
+            .filter(RegisteredSacco::isActive)
+            .orElseThrow(() -> new IllegalStateException("SACCO not found."));
+        upsertSacco(normalizedSaccoId, sacco.getSaccoName(), stationIds, OffsetDateTime.now(), true);
+    }
+
     private void upsertSacco(String saccoId,
                              String saccoName,
                              LinkedHashSet<String> stationIds,

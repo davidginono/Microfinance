@@ -6,7 +6,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Notifications</p>
     <h1 class="erp-page-title">Notifications</h1>
-    <p class="erp-page-subtitle">Review routed incident cases and filter them by severity and status to focus your admin attention.</p>
+    <p class="erp-page-subtitle">Review routed incident notifications.</p>
 </div>
 
 <div class="mb-3 flex items-center justify-end">
@@ -17,7 +17,7 @@
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/incidents" method="get" class="grid gap-3 md:grid-cols-3">
+    <form action="/admin/incidents" method="get" class="admin-filter-form grid gap-3 md:grid-cols-3">
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">

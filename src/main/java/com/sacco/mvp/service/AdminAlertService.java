@@ -35,7 +35,10 @@ public class AdminAlertService {
     }
 
     public void alertSaccoAdmins(String saccoId, String source, String subject, String message, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByRole(saccoId, Position.ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+            saccoId,
+            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+        );
         notifyAdmins(admins, "SYSTEM_ALERT", source, subject, message, IncidentSeverity.HIGH, saccoId, null, details);
     }
 
@@ -75,7 +78,10 @@ public class AdminAlertService {
 
     public AdminIncident openSupportIncident(String saccoId, UUID memberId, String source, String subject, String message,
                                              IncidentSeverity severity, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByRole(saccoId, Position.ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+            saccoId,
+            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+        );
         notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
         return adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId).stream()
             .filter(item -> subject.equals(item.getSubject()) && message.equals(item.getMessage()))

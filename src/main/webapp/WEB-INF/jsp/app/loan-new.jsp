@@ -69,7 +69,7 @@
 
     <c:if test="${not empty topUpSourceLoan}">
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            This application is being created as a loan top-up from reference ${fn:substring(topUpSourceLoan.id, 0, 8)}.
+            This application is being created as a loan top-up from application <strong>${topUpSourceLoan.applicationNumber}</strong><c:if test="${not empty topUpSourceLoan.loanId}"> (loan ${topUpSourceLoan.loanId})</c:if>.
         </div>
     </c:if>
 
@@ -363,6 +363,30 @@
             window.showToast?.(type === "success" ? "success" : "error", text);
         }
 
+        async function readJsonErrorMessage(response, fallbackMessage) {
+            const contentType = response.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+                try {
+                    const payload = await response.json();
+                    return payload && payload.message ? payload.message : fallbackMessage;
+                } catch (error) {
+                    return fallbackMessage;
+                }
+            }
+            try {
+                const text = await response.text();
+                if (text) {
+                    const match = text.match(/<title>(.*?)<\/title>/i);
+                    if (match && match[1]) {
+                        return match[1];
+                    }
+                }
+            } catch (error) {
+                // Ignore response parsing issues and use the fallback message.
+            }
+            return fallbackMessage;
+        }
+
         function resetFinancialPreview() {
             if (!financialSnapshotInput.value) {
                 return;
@@ -640,7 +664,8 @@
                 const response = await fetch("/app/loan-applications/financial-preview", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                        "Accept": "application/json"
                     },
                     body: new URLSearchParams({
                         "${_csrf.parameterName}": csrfInput.value,
@@ -652,7 +677,7 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error("Unable to load official SACCO details.");
+                    throw new Error(await readJsonErrorMessage(response, "Unable to load official SACCO details."));
                 }
 
                 const payload = await response.json();

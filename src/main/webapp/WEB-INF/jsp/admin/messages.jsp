@@ -7,11 +7,11 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Incidents</p>
     <h1 class="erp-page-title">Incidents</h1>
-    <p class="erp-page-subtitle">Review member support incidents, reply to members, and jump into the admin cases that need your attention.</p>
+    <p class="erp-page-subtitle">Review member incidents and reply where needed.</p>
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/messages" method="get" class="grid gap-3 md:grid-cols-3">
+    <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-3">
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">

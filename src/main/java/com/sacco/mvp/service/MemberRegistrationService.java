@@ -143,7 +143,7 @@ public class MemberRegistrationService {
             log.info("Member registration blocked because member number already exists locally: {}", memberNo);
             throw new IllegalStateException("That member number is already registered in the MVP system.");
         }
-        if (memberRepository.findByEmailIgnoreCase(email).isPresent()) {
+        if (memberRepository.existsByEmailIgnoreCase(email)) {
             log.info("Member registration blocked because email already exists locally: {}", email);
             throw new IllegalStateException("That email address is already registered in the MVP system.");
         }

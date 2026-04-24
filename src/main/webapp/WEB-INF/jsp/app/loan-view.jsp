@@ -38,6 +38,11 @@
         background: #f0fdf4;
         color: #15803d;
     }
+    .loan-repayment-chip.is-defaulted {
+        border-color: #fecaca;
+        background: #fff1f2;
+        color: #b91c1c;
+    }
     .loan-repayment-grid {
         display: grid;
         gap: 0.85rem;
@@ -119,9 +124,15 @@
         <div class="min-w-0">
             <div class="loan-hero-primary-grid">
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label">Loan ID</div>
+                    <div class="loan-hero-inline-label">Loan Application ID</div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
+                <c:if test="${not empty disbursedLoanId}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label">Loan ID</div>
+                        <div class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</div>
+                    </div>
+                </c:if>
                 <div class="loan-hero-inline-fact">
                     <div class="loan-hero-inline-label">Status</div>
                     <div class="loan-hero-inline-value">
@@ -136,12 +147,6 @@
                     <div class="loan-hero-inline-label">Loan Type</div>
                     <div class="loan-hero-inline-value"><spring:message code="loan.type.${app.loanType}"/></div>
                 </div>
-                <c:if test="${not empty topUpSourceLoan}">
-                    <div class="loan-hero-fact">
-                        <div class="loan-hero-fact-label">Top-Up Source</div>
-                        <div class="loan-hero-fact-value">${fn:substring(topUpSourceLoan.id, 0, 8)}</div>
-                    </div>
-                </c:if>
             </div>
         </div>
     </div>
@@ -156,51 +161,25 @@
             <div class="loan-stat-label">Tenor</div>
             <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
         </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Current Savings</div>
-            <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
-            <div class="loan-stat-meta">
-                <c:choose>
-                    <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                    <c:otherwise>Status unavailable</c:otherwise>
-                </c:choose>
+            <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-stat-label">Current Savings</div>
+                <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
             </div>
-        </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Current Shares</div>
-            <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
-            <div class="loan-stat-meta">
-                <c:choose>
-                    <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                    <c:otherwise>Status unavailable</c:otherwise>
-                </c:choose>
+            <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-stat-label">Current Shares</div>
+                <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
             </div>
-        </div>
         </div>
 
         <div class="mt-6 loan-simple-progress">
             <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
             <div class="loan-simple-progress-list">
-                <div class="loan-simple-progress-item<c:if test='${loanProgressStep lt 1}'> is-pending</c:if><c:if test='${loanProgressStep ge 1}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>1. Draft</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${loanProgressStep lt 2}'> is-pending</c:if><c:if test='${loanProgressStep ge 2}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>2. Submitted</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${loanProgressStep lt 3}'> is-pending</c:if><c:if test='${loanProgressStep ge 3}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>3. Manager Review</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${loanProgressStep lt 4}'> is-pending</c:if><c:if test='${loanProgressStep ge 4}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>4. Approved</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${loanProgressStep lt 5}'> is-pending</c:if><c:if test='${loanProgressStep ge 5}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>5. Disbursed</span>
-                </div>
+                <c:forEach items="${loanProgressItems}" var="item">
+                    <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
+                        <span class="loan-simple-progress-dot"></span>
+                        <span>${item.label}</span>
+                    </div>
+                </c:forEach>
             </div>
         </div>
 
@@ -290,59 +269,6 @@
     </div>
 </c:if>
 
-<c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">
-    <div class="erp-section mt-4">
-            <div class="space-y-4">
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
-                    <p>
-                        <strong>Applicant Declaration:</strong>
-                        I,
-                        <strong>
-                            <c:choose>
-                                <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
-                                <c:otherwise>the applicant</c:otherwise>
-                            </c:choose>
-                        </strong>,
-                        confirm that the information and documents provided in this application are true and complete,
-                        that this loan request is mine, and that if approved I will repay it according to the agreed terms,
-                        loan schedule, and the IAA SACCOS LTD by-laws.
-                    </p>
-                </div>
-            <form action="/app/loan-applications/${app.id}/submit" method="post" class="space-y-3">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                            <p class="mt-2 text-sm text-slate-600">Request a one-time code before submitting this application for manager review.</p>
-                        </div>
-                        <button type="button" class="app-btn btn-primary otp-request-button signature-otp-request inline-flex items-center justify-center gap-2">
-                            <span class="otp-button-spinner hidden"></span>
-                            <span class="otp-button-label">Send OTP Code</span>
-                        </button>
-                    </div>
-                    <div data-auto-scroll-message="true" class="signature-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
-                    <div class="mt-3">
-                        <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
-                        <input type="text" name="applicantSignatureOtpCode"
-                               inputmode="numeric" maxlength="6" autocomplete="one-time-code"
-                               class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                               placeholder="123456" />
-                        <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                            <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                            <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                            </svg>
-                            <span data-otp-text>Checking code...</span>
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" class="app-btn btn-approve">Submit</button>
-            </form>
-        </div>
-    </div>
-</c:if>
-
 <c:if test="${app.status eq 'READY_FOR_MANAGER' and not empty pendingManagerStageWithdrawal}">
     <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         Your application removal request is already waiting for the manager's decision.
@@ -376,7 +302,7 @@
     </table>
 </div>
 
-<c:if test="${app.status eq 'FINAL_APPROVED' or app.status eq 'PAID'}">
+<c:if test="${app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-section">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -384,14 +310,22 @@
                 <p class="mt-1 text-sm text-slate-500">
                     <c:choose>
                         <c:when test="${app.status eq 'PAID'}">This loan was disbursed and fully cleared. The schedule below shows the agreed repayment trail.</c:when>
+                        <c:when test="${app.status eq 'DEFAULTED'}">This loan reached the final due date with an outstanding balance. Use the repayment details below to track what is still unpaid.</c:when>
                         <c:otherwise>This disbursed loan now follows the repayment timetable below.</c:otherwise>
                     </c:choose>
                 </p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="loan-repayment-chip<c:if test="${app.status eq 'PAID'}"> is-paid</c:if>">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <c:if test="${not empty app.loanId}">
+                    <form action="/app/loan-applications/${app.id}/sync-payments" method="post" class="inline-flex">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                        <button type="submit" class="app-btn btn-neutral">Refresh Payments</button>
+                    </form>
+                </c:if>
+                <span class="loan-repayment-chip<c:if test="${app.status eq 'PAID'}"> is-paid</c:if><c:if test="${app.status eq 'DEFAULTED'}"> is-defaulted</c:if>">
                     <c:choose>
-                        <c:when test="${app.status eq 'PAID'}">Fully Paid</c:when>
+                        <c:when test="${app.status eq 'PAID'}">&#10003; Fully Paid</c:when>
+                        <c:when test="${app.status eq 'DEFAULTED'}">Defaulted / Not Paid</c:when>
                         <c:otherwise>Active Schedule</c:otherwise>
                     </c:choose>
                 </span>
@@ -460,14 +394,27 @@
                 </c:if>
                 <c:if test="${app.status ne 'PAID' and not empty repaymentDaysLeft}">
                     <div class="loan-repayment-note">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Time Left</div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <c:choose>
+                                <c:when test="${app.status eq 'DEFAULTED'}">Overdue</c:when>
+                                <c:otherwise>Time Left</c:otherwise>
+                            </c:choose>
+                        </div>
                         <div class="loan-repayment-note-value">
-                            ${repaymentDaysLeft} day<c:if test="${repaymentDaysLeft ne 1}">s</c:if> remaining
-                            <c:if test="${not empty repaymentMonthsLeft or not empty repaymentWeeksLeft}">
-                                <span class="text-slate-400">|</span>
-                                ${repaymentMonthsLeft} month<c:if test="${repaymentMonthsLeft ne 1}">s</c:if>,
-                                ${repaymentWeeksLeft} week<c:if test="${repaymentWeeksLeft ne 1}">s</c:if>
-                            </c:if>
+                            <c:choose>
+                                <c:when test="${app.status eq 'DEFAULTED'}">
+                                    <c:set var="overdueDays" value="${0 - repaymentDaysLeft}" />
+                                    ${overdueDays} day<c:if test="${overdueDays ne 1}">s</c:if> overdue
+                                </c:when>
+                                <c:otherwise>
+                                    ${repaymentDaysLeft} day<c:if test="${repaymentDaysLeft ne 1}">s</c:if> remaining
+                                    <c:if test="${not empty repaymentMonthsLeft or not empty repaymentWeeksLeft}">
+                                        <span class="text-slate-400">|</span>
+                                        ${repaymentMonthsLeft} month<c:if test="${repaymentMonthsLeft ne 1}">s</c:if>,
+                                        ${repaymentWeeksLeft} week<c:if test="${repaymentWeeksLeft ne 1}">s</c:if>
+                                    </c:if>
+                                </c:otherwise>
+                            </c:choose>
                         </div>
                     </div>
                 </c:if>
@@ -497,7 +444,11 @@
                             <tr>
                                 <th class="px-3 py-2 text-left">Installment</th>
                                 <th class="px-3 py-2 text-left">Due Date</th>
-                                <th class="px-3 py-2 text-left">Amount</th>
+                                <th class="px-3 py-2 text-left">Scheduled Amount</th>
+                                <th class="px-3 py-2 text-left">Principal Paid</th>
+                                <th class="px-3 py-2 text-left">Interest Paid</th>
+                                <th class="px-3 py-2 text-left">Total Paid</th>
+                                <th class="px-3 py-2 text-left">Payment Date</th>
                                 <th class="px-3 py-2 text-left">Status</th>
                             </tr>
                         </thead>
@@ -507,6 +458,10 @@
                                     <td class="px-3 py-2 font-medium text-slate-700">${row.installment}</td>
                                     <td class="px-3 py-2">${row.dueDate}</td>
                                     <td class="px-3 py-2 font-medium text-slate-900">${row.amount}</td>
+                                    <td class="px-3 py-2">${row.principalPaid}</td>
+                                    <td class="px-3 py-2">${row.interestPaid}</td>
+                                    <td class="px-3 py-2 font-medium text-slate-900">${row.totalPaid}</td>
+                                    <td class="px-3 py-2">${row.paymentDate}</td>
                                     <td class="px-3 py-2"><span class="loan-repayment-status">${row.status}</span></td>
                                 </tr>
                             </c:forEach>
@@ -562,7 +517,6 @@
             <tr>
                 <th class="px-3 py-2 text-left">Guarantor</th>
                 <th class="px-3 py-2 text-left">Status</th>
-                <th class="px-3 py-2 text-left">Committed</th>
                 <th class="px-3 py-2 text-left">Date</th>
                 <th class="px-3 py-2 text-left">Removal Request</th>
             </tr>
@@ -578,7 +532,6 @@
                         </c:choose>
                     </td>
                     <td class="px-3 py-2">${req.status}</td>
-                    <td class="px-3 py-2">${req.committedAmount}</td>
                     <td class="px-3 py-2">
                         <c:choose>
                             <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16),
@@ -628,13 +581,12 @@
                                 <td class="px-3 py-2">SELECTED IN DRAFT</td>
                                 <td class="px-3 py-2">-</td>
                                 <td class="px-3 py-2">-</td>
-                                <td class="px-3 py-2">-</td>
                             </tr>
                         </c:forEach>
                     </c:when>
                     <c:otherwise>
                         <tr>
-                            <td colspan="5" class="px-3 py-3 text-slate-500">No guarantors selected yet.</td>
+                            <td colspan="4" class="px-3 py-3 text-slate-500">No guarantors selected yet.</td>
                         </tr>
                     </c:otherwise>
                 </c:choose>
@@ -648,7 +600,7 @@
 <c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showPrintAction or showEditAction or showTopUpAction or showMemberReversalAction or showDeleteAction}" />
+<c:set var="showLoanActionCard" value="${showPrintAction or showEditAction or showTopUpAction or (showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED') or showDeleteAction}" />
 <c:if test="${showLoanActionCard}">
     <div class="erp-form-wrap loan-page-bottom-actions">
         <div class="loan-view-action-cluster">
@@ -667,7 +619,7 @@
                     Request Loan Top-Up
                 </a>
             </c:if>
-            <c:if test="${showMemberReversalAction}">
+            <c:if test="${showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED'}">
                 <c:choose>
                     <c:when test="${app.status eq 'READY_FOR_MANAGER'}">
                         <c:choose>
@@ -716,6 +668,86 @@
                     <button type="submit" class="app-btn btn-reject">Remove Application</button>
                 </form>
             </c:if>
+        </div>
+    </div>
+</c:if>
+
+<c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">
+    <div class="erp-form-wrap mt-4 space-y-4">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Final Step</p>
+            <h2 class="mt-2 text-lg font-semibold text-sacco-ink">Submit to Manager or Loan Officer</h2>
+            <p class="mt-1 text-sm text-slate-600">All guarantors have accepted this loan. Confirm your declaration and OTP, then submit the application for review.</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
+            <p>
+                <strong>Applicant Declaration:</strong>
+                I,
+                <strong>
+                    <c:choose>
+                        <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
+                        <c:otherwise>the applicant</c:otherwise>
+                    </c:choose>
+                </strong>,
+                confirm that the information and documents provided in this application are true and complete,
+                that this loan request is mine, and that if approved I will repay it according to the agreed terms,
+                loan schedule, and the IAA SACCOS LTD by-laws.
+            </p>
+        </div>
+        <form id="loan-submit-manager-form" action="/app/loan-applications/${app.id}/submit" method="post" class="space-y-3">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
+                        <p class="mt-2 text-sm text-slate-600">Request a one-time code before submitting this application for manager review.</p>
+                    </div>
+                    <button type="button" class="app-btn btn-primary otp-request-button signature-otp-request inline-flex items-center justify-center gap-2">
+                        <span class="otp-button-spinner hidden"></span>
+                        <span class="otp-button-label">Send OTP Code</span>
+                    </button>
+                </div>
+                <div data-auto-scroll-message="true" class="signature-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                <div class="mt-3">
+                    <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                    <input type="text" name="applicantSignatureOtpCode"
+                           inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                           class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                           placeholder="123456" />
+                    <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                        <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                        <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span data-otp-text>Checking code...</span>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <c:if test="${showMemberReversalAction}">
+            <form id="loan-cancel-submission-form"
+                  action="/app/loan-applications/${app.id}/cancel"
+                  method="post"
+                  data-confirm-title="Cancel Submission"
+                  data-confirm-message="Move this application back to draft so you can keep editing it?"
+                  data-confirm-proceed="Move to Draft">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            </form>
+        </c:if>
+        <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
+            <c:if test="${showMemberReversalAction}">
+                <button type="submit"
+                        form="loan-cancel-submission-form"
+                        class="app-btn btn-neutral w-full ${memberReversalWindowOpen ? '' : 'action-button-disabled'}"
+                        ${memberReversalWindowOpen ? '' : 'disabled'}>
+                    Cancel Submission
+                </button>
+            </c:if>
+            <button type="submit"
+                    form="loan-submit-manager-form"
+                    class="app-btn btn-approve w-full ${showMemberReversalAction ? '' : 'sm:col-span-2'}">
+                Submit to Manager or Loan Officer
+            </button>
         </div>
     </div>
 </c:if>

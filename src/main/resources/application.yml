@@ -51,10 +51,15 @@ logging:
     com.sacco.mvp: INFO
 
 app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
   seed:
     demo-data-enabled: ${APP_SEED_DEMO_DATA_ENABLED:false}
   outbox:
     scheduler-enabled: true
+  loan-payments:
+    sync-enabled: true
+    sync-cron: "0 0 10 1 * *"
+    sync-zone: "Africa/Nairobi"
   retention:
     cleanup-enabled: true
     cleanup-cron: "0 30 2 * * *"
@@ -63,7 +68,11 @@ app:
   auth:
     otp:
       ttl-minutes: 10
+    invitation:
+      ttl-hours: ${APP_AUTH_INVITATION_TTL_HOURS:72}
 
 external:
   foresight:
     base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}
+  memberportal:
+    base-url: ${EXTERNAL_MEMBERPORTAL_BASE_URL:https://api.foresightfin.app}

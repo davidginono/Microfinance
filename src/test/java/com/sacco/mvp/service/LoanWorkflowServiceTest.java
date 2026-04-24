@@ -49,6 +49,7 @@ class LoanWorkflowServiceTest {
     @Mock private LoanAttachmentService loanAttachmentService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private SaccoConfigurationService saccoConfigurationService;
+    @Mock private ApplicationNumberService applicationNumberService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
@@ -105,6 +106,44 @@ class LoanWorkflowServiceTest {
 
         verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
         verify(loanAttachmentService, never()).store(any(), any(), anyString());
+    }
+
+    @Test
+    void saveDraftRejectsTopUpWhenSourceLoanIsAlreadyDisbursed() {
+        UUID memberId = UUID.randomUUID();
+        UUID sourceLoanId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanApplication sourceLoan = LoanApplication.builder()
+            .id(sourceLoanId)
+            .saccoId(saccoId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.FINAL_APPROVED)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(sourceLoanId, memberId)).thenReturn(Optional.of(sourceLoan));
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            memberId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("1000"),
+            6,
+            Map.of("purpose", "Working capital"),
+            null,
+            List.of(),
+            "{\"balance\":1000}",
+            sourceLoanId,
+            null
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Disbursed loans cannot be topped up.");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+        verify(loanAttachmentService, never()).store(any(), any(), anyString());
+        verifyNoInteractions(formSchemaService, eligibilityService, applicationNumberService);
     }
 
     @Test

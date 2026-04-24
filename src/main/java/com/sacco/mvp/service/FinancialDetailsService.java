@@ -44,26 +44,29 @@ public class FinancialDetailsService {
         BigDecimal insuranceFee = safeAmount.multiply(insuranceRate)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal loanBalance = outstandingLoanBalance(memberId, topUpSourceLoanId);
-        BigDecimal loanToBePaid = safeAmount
-            .add(APPLICATION_FEE)
-            .add(insuranceFee)
+        BigDecimal principalAmount = safeAmount
             .add(loanBalance)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalDeductions = APPLICATION_FEE.add(insuranceFee)
             .setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal interestAmount = safeAmount.multiply(interestRate)
             .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal loanPlusInterest = loanToBePaid.add(interestAmount)
+        BigDecimal principalPlusInterest = principalAmount.add(interestAmount)
             .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal monthlyRepaymentAmount = loanPlusInterest.divide(
+        BigDecimal monthlyRepaymentAmount = principalPlusInterest.divide(
             BigDecimal.valueOf(safeTenor), 2, RoundingMode.HALF_UP);
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("requestedAmount", safeAmount);
         snapshot.put("applicationFee", APPLICATION_FEE);
         snapshot.put("insuranceFee", insuranceFee);
+        snapshot.put("totalDeductions", totalDeductions);
         snapshot.put("loanBalance", loanBalance);
-        snapshot.put("loanToBePaid", loanToBePaid);
-        snapshot.put("loanPlusInterest", loanPlusInterest);
+        snapshot.put("principalAmount", principalAmount);
+        snapshot.put("loanToBePaid", principalAmount);
+        snapshot.put("principalPlusInterest", principalPlusInterest);
+        snapshot.put("loanPlusInterest", principalPlusInterest);
         snapshot.put("interestAmount", interestAmount);
         snapshot.put("monthlyRepaymentAmount", monthlyRepaymentAmount);
         snapshot.put("applicationFeeRate", APPLICATION_FEE);
@@ -82,21 +85,13 @@ public class FinancialDetailsService {
     }
 
     private BigDecimal outstandingLoanBalance(UUID memberId, UUID topUpSourceLoanId) {
-        LoanApplication sourceLoan = null;
-        if (topUpSourceLoanId != null) {
-            sourceLoan = loanApplicationRepository.findById(topUpSourceLoanId)
-                .filter(loan -> memberId.equals(loan.getApplicantMemberId()))
-                .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED)
-                .orElse(null);
+        if (topUpSourceLoanId == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        if (sourceLoan == null) {
-            LocalDate today = LocalDate.now();
-            sourceLoan = loanApplicationRepository.findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(memberId, LoanStatus.FINAL_APPROVED)
-                .stream()
-                .filter(loan -> loan.getFinalDueDate() == null || !loan.getFinalDueDate().isBefore(today))
-                .findFirst()
-                .orElse(null);
-        }
+        LoanApplication sourceLoan = loanApplicationRepository.findById(topUpSourceLoanId)
+            .filter(loan -> memberId.equals(loan.getApplicantMemberId()))
+            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED || loan.getStatus() == LoanStatus.DEFAULTED)
+            .orElse(null);
         if (sourceLoan == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
@@ -110,7 +105,9 @@ public class FinancialDetailsService {
         if (product.getMaxRepaymentMonths() != null
             && product.getMaxRepaymentMonths() > 0
             && tenorMonths > product.getMaxRepaymentMonths()) {
-            throw new IllegalArgumentException("Repayment period cannot exceed " + product.getMaxRepaymentMonths() + " month(s) for this loan product");
+            throw new IllegalArgumentException(
+                "Total months to repay cannot exceed " + product.getMaxRepaymentMonths() + " month(s) configured for this loan product."
+            );
         }
     }
 

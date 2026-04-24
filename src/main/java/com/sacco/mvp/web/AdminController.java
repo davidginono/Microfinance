@@ -10,7 +10,9 @@ import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
 import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.SaccoRegistryService;
+import com.sacco.mvp.web.form.MinorAdminRegistrationForm;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,18 +41,23 @@ import java.util.UUID;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/admin")
-@PreAuthorize("hasRole('ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+@PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
 public class AdminController {
     private final AdminService adminService;
     private final AdminScopeService adminScopeService;
     private final SaccoRegistryService saccoRegistryService;
+    private final PlatformAdminService platformAdminService;
     private final DatabaseUtilizationService databaseUtilizationService;
     private final NotificationInboxService notificationInboxService;
 
     @GetMapping("/scope/select")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String selectScope(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam(required = false) String next,
                               Model model) {
+        if (principal != null && principal.hasRole(Position.MINOR_ADMIN) && !principal.hasRole(Position.ADMIN)) {
+            return "redirect:" + normalizeAdminNextPath(next);
+        }
         model.addAttribute("scopeSelection", adminScopeService.currentScope(principal));
         model.addAttribute("nextAdminPath", normalizeAdminNextPath(next));
         return "admin/scope-select";
@@ -58,17 +65,23 @@ public class AdminController {
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+        if (principal != null && principal.hasRole(Position.ADMIN)) {
+            model.addAttribute("platformDashboard", platformAdminService.dashboard());
+            return "admin/platform-dashboard";
+        }
         model.addAttribute("dashboard", adminService.dashboard(adminScopeService.currentSaccoId(principal), principal.getMemberId()));
         return "admin/dashboard";
     }
 
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     @ResponseBody
-    public DatabaseUtilizationService.DatabaseUtilizationPayload databaseUtilization() {
+    public DatabaseUtilizationService.DatabaseUtilizationPayload databaseUtilization(@AuthenticationPrincipal AppUserPrincipal principal) {
         return databaseUtilizationService.snapshot();
     }
 
     @GetMapping("/messages")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String messages(@AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) IncidentStatus status,
                            @RequestParam(required = false) IncidentSeverity severity,
@@ -99,6 +112,7 @@ public class AdminController {
     }
 
     @GetMapping("/messages/{id}/open")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String openMessage(@PathVariable UUID id,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               RedirectAttributes ra) {
@@ -112,6 +126,7 @@ public class AdminController {
     }
 
     @PostMapping("/messages/mark-all-read")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String markAllMessagesRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                       RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -124,6 +139,7 @@ public class AdminController {
     }
 
     @GetMapping("/incidents")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String incidents(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam(required = false) IncidentStatus status,
                             @RequestParam(required = false) IncidentSeverity severity,
@@ -137,6 +153,7 @@ public class AdminController {
     }
 
     @GetMapping("/incidents/{id}")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String incidentDetail(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  Model model) {
@@ -147,6 +164,7 @@ public class AdminController {
     }
 
     @PostMapping("/incidents/{id}")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateIncident(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam IncidentSeverity severity,
@@ -159,6 +177,7 @@ public class AdminController {
     }
 
     @PostMapping("/messages/reply")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String reply(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam UUID memberId,
                         @RequestParam String subject,
@@ -170,6 +189,7 @@ public class AdminController {
     }
 
     @PostMapping("/messages/broadcast")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String broadcast(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam String subject,
                             @RequestParam String message,
@@ -180,6 +200,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String users(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam(required = false) String query,
                         @RequestParam(defaultValue = "0") int page,
@@ -196,12 +217,15 @@ public class AdminController {
         model.addAttribute("selectedUserQuery", query == null ? "" : query.trim());
         model.addAttribute("selectedPageSize", usersPage.getSize());
         model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, usersPage.getSize()));
-        model.addAttribute("staffPositions", Position.staffAssignableRoles());
+        model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
+            ? Position.staffAssignableRoles()
+            : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
         model.addAttribute("statuses", MemberStatus.values());
         return "admin/users";
     }
 
     @PostMapping("/users")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String createUser(@AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam String memberNo,
                              @RequestParam String fullName,
@@ -209,28 +233,47 @@ public class AdminController {
                              @RequestParam(required = false) String phone,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
-        adminService.createUser(adminScopeService.currentSaccoId(principal), principal.getMemberId(), memberNo, fullName, email, phone, positions);
+        adminService.createUser(
+            adminScopeService.currentSaccoId(principal),
+            principal.getMemberId(),
+            principal.getGrantedPositions(),
+            memberNo,
+            fullName,
+            email,
+            phone,
+            positions
+        );
         ra.addFlashAttribute("message", "User created.");
         return "redirect:/admin/users";
     }
 
     @PostMapping("/users/{id}")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateUser(@PathVariable UUID id,
                              @AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              @RequestParam MemberStatus status,
                              RedirectAttributes ra) {
-        adminService.updateUser(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id, positions, status);
+        adminService.updateUser(
+            adminScopeService.currentSaccoId(principal),
+            principal.getMemberId(),
+            principal.getGrantedPositions(),
+            id,
+            positions,
+            status
+        );
         ra.addFlashAttribute("message", "User updated.");
         return "redirect:/admin/users";
     }
 
     @GetMapping({"/loan-products", "/settings-controls"})
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String loanProducts(@AuthenticationPrincipal AppUserPrincipal principal,
                                @RequestParam(required = false, defaultValue = "loan") String section,
                                Model model) {
         String saccoId = adminScopeService.currentSaccoId(principal);
         model.addAttribute("products", adminService.loanProducts(saccoId));
+        model.addAttribute("customizedProductExists", adminService.customizedLoanProductExists(saccoId));
         model.addAttribute("settings", adminService.settings(saccoId));
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("settingsSection", "board".equalsIgnoreCase(section) ? "board" : "loan");
@@ -238,28 +281,54 @@ public class AdminController {
     }
 
     @PostMapping({"/loan-products/{id}", "/settings-controls/{id}"})
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateLoanProduct(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam Integer guarantorsRequired,
+                                    @RequestParam(required = false) String productName,
                                     @RequestParam BigDecimal maxLoanSavingsPercent,
                                     @RequestParam BigDecimal insurancePercent,
                                     @RequestParam BigDecimal interestPercent,
                                     @RequestParam Integer maxRepaymentMonths,
                                     @RequestParam(defaultValue = "false") boolean active,
                                     RedirectAttributes ra) {
-        BigDecimal maxLoanSavingsRatio = maxLoanSavingsPercent
-            .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
-        BigDecimal insuranceRate = insurancePercent
-            .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
-        BigDecimal interestRate = interestPercent
-            .divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+        BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
+        BigDecimal insuranceRate = percentToRatio(insurancePercent);
+        BigDecimal interestRate = percentToRatio(interestPercent);
         adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
-            guarantorsRequired, maxLoanSavingsRatio, insuranceRate, interestRate, maxRepaymentMonths, active);
+            guarantorsRequired, productName, maxLoanSavingsRatio, insuranceRate, interestRate, maxRepaymentMonths, active);
         ra.addFlashAttribute("message", "Loan product updated.");
         return "redirect:/admin/settings-controls?section=loan";
     }
 
+    @PostMapping({"/loan-products/customized-product", "/settings-controls/customized-product"})
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String createCustomizedLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
+                                              @RequestParam(required = false) String productName,
+                                              @RequestParam Integer guarantorsRequired,
+                                              @RequestParam BigDecimal maxLoanSavingsPercent,
+                                              @RequestParam BigDecimal insurancePercent,
+                                              @RequestParam BigDecimal interestPercent,
+                                              @RequestParam Integer maxRepaymentMonths,
+                                              @RequestParam(defaultValue = "false") boolean active,
+                                              RedirectAttributes ra) {
+        adminService.createCustomizedLoanProduct(
+            adminScopeService.currentSaccoId(principal),
+            principal.getMemberId(),
+            productName,
+            guarantorsRequired,
+            percentToRatio(maxLoanSavingsPercent),
+            percentToRatio(insurancePercent),
+            percentToRatio(interestPercent),
+            maxRepaymentMonths,
+            active
+        );
+        ra.addFlashAttribute("message", "Customized loan product added.");
+        return "redirect:/admin/settings-controls?section=loan";
+    }
+
     @PostMapping("/settings-controls/review-rules")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateReviewRules(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam Integer boardQuorum,
                                     RedirectAttributes ra) {
@@ -273,9 +342,8 @@ public class AdminController {
     }
 
     @GetMapping("/outbox")
-    @PreAuthorize("hasRole('ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
-    public String outbox(@RequestParam(required = false) OutboxStatus status,
-                         @RequestParam(required = false) String dateFrom,
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
+    public String outbox(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
                          @RequestParam(required = false) String loanId,
                          @RequestParam(defaultValue = "0") int page,
@@ -283,24 +351,23 @@ public class AdminController {
                          Model model) {
         Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
         if (!dateErrors.isEmpty()) {
-            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             applyDateErrors(model, dateErrors);
             return "admin/outbox";
         }
         try {
-            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage = adminService.outboxEvents(page, size, status, dateFrom, dateTo, loanId);
-            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, eventsPage);
+            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage = adminService.outboxEvents(page, size, null, dateFrom, dateTo, loanId);
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, eventsPage);
         } catch (IllegalArgumentException | DataAccessException ex) {
-            populateOutboxFilterModel(model, status, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that outbox filter. Adjust the values and try again."));
         }
         return "admin/outbox";
     }
 
     @PostMapping("/outbox/{id}/retry")
-    @PreAuthorize("hasRole('ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
     public String retryOutbox(@PathVariable UUID id,
-                              @RequestParam(required = false) OutboxStatus status,
                               @RequestParam(required = false) String dateFrom,
                               @RequestParam(required = false) String dateTo,
                               @RequestParam(required = false) String loanId,
@@ -311,7 +378,7 @@ public class AdminController {
         adminService.retryOutbox(principal.getMemberId(), id);
         ra.addFlashAttribute("message", "Outbox event moved back to NEW for retry.");
         return "redirect:/admin/outbox?page=" + normalizePage(page)
-            + buildOutboxPaginationQuery(status, dateFrom, dateTo, loanId, normalizePageSize(size));
+            + buildOutboxPaginationQuery(dateFrom, dateTo, loanId, normalizePageSize(size));
     }
 
     @GetMapping("/events")
@@ -338,50 +405,222 @@ public class AdminController {
     }
 
     @GetMapping("/saccos")
-    public String saccos(Model model) {
+    public String saccos(@AuthenticationPrincipal AppUserPrincipal principal,
+                         Model model) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        if (superAdmin) {
+            model.addAttribute("platformDashboard", platformAdminService.dashboard());
+            return "admin/platform-saccos";
+        }
+
+        java.util.List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos();
+        if (principal != null) {
+            String scopedSaccoId = adminScopeService.currentSaccoId(principal);
+            registeredSaccos = registeredSaccos.stream()
+                .filter(sacco -> sacco.saccoId().equals(scopedSaccoId))
+                .toList();
+        }
+        model.addAttribute("superAdmin", superAdmin);
+        model.addAttribute("registeredSaccos", registeredSaccos);
+        return "admin/sacco-registry";
+    }
+
+    @GetMapping("/saccos/registry")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String saccoRegistry(Model model) {
         model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
-        return "admin/saccos";
+        model.addAttribute("superAdmin", true);
+        return "admin/sacco-registry";
+    }
+
+    @GetMapping("/saccos/{saccoId}")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String saccoDetail(@PathVariable String saccoId,
+                              @RequestParam(required = false) String section,
+                              @AuthenticationPrincipal AppUserPrincipal principal,
+                              Model model) {
+        model.addAttribute("selectedSection", platformAdminService.normalizeSection(section));
+        model.addAttribute("saccoDetail", platformAdminService.saccoDetail(saccoId));
+        return "admin/sacco-detail";
+    }
+
+    @GetMapping("/saccos/minor-admins")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String minorAdmins(Model model) {
+        model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
+        model.addAttribute("minorAdmins", adminService.minorAdmins());
+        model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
+        model.addAttribute("superAdmin", true);
+        return "admin/minor-admins";
     }
 
     @PostMapping("/saccos")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String registerSacco(@RequestParam String saccoId,
                                 @RequestParam String saccoName,
                                 @RequestParam String stationIds,
                                 @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
+                                @AuthenticationPrincipal AppUserPrincipal principal,
                                 RedirectAttributes ra) {
         try {
             saccoRegistryService.registerSacco(saccoId, saccoName, stationIds, logoFile);
             ra.addFlashAttribute("message", "SACCO details saved.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return "redirect:/admin/saccos";
+            return "redirect:/admin/saccos/registry";
         }
-        return "redirect:/admin/saccos";
+        return "redirect:/admin/saccos/registry";
+    }
+
+    @PostMapping("/saccos/minor-admins")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String registerMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                     @ModelAttribute MinorAdminRegistrationForm registrationForm,
+                                     RedirectAttributes ra) {
+        try {
+            adminService.registerMinorAdmin(
+                principal.getMemberId(),
+                registrationForm.getSaccoId(),
+                registrationForm.getStationId(),
+                registrationForm.getMemberNo(),
+                registrationForm.getFullName(),
+                registrationForm.getEmail(),
+                registrationForm.getPhone()
+            );
+            ra.addFlashAttribute("message", "Minor Admin invited. A password setup link has been emailed to them.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
+    @PostMapping("/saccos/minor-admins/{accountId}")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @PathVariable UUID accountId,
+                                   @RequestParam String saccoId,
+                                   @RequestParam String stationId,
+                                   @RequestParam String memberNo,
+                                   @RequestParam String fullName,
+                                   @RequestParam String email,
+                                   @RequestParam(required = false) String phone,
+                                   RedirectAttributes ra) {
+        try {
+            adminService.updateMinorAdmin(
+                principal.getMemberId(),
+                accountId,
+                saccoId,
+                stationId,
+                memberNo,
+                fullName,
+                email,
+                phone
+            );
+            ra.addFlashAttribute("message", "Minor Admin details updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
+    @PostMapping("/saccos/minor-admins/{accountId}/resend-invite")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String resendMinorAdminInvite(@AuthenticationPrincipal AppUserPrincipal principal,
+                                         @PathVariable UUID accountId,
+                                         RedirectAttributes ra) {
+        try {
+            adminService.resendMinorAdminInvitation(principal.getMemberId(), accountId);
+            ra.addFlashAttribute("message", "A new activation link has been emailed.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
+    @PostMapping("/saccos/minor-admins/{accountId}/revoke-invite")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String revokeMinorAdminInvite(@AuthenticationPrincipal AppUserPrincipal principal,
+                                         @PathVariable UUID accountId,
+                                         RedirectAttributes ra) {
+        try {
+            adminService.revokeMinorAdminInvitation(principal.getMemberId(), accountId);
+            ra.addFlashAttribute("message", "Invitation revoked. Account marked inactive.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
+    @PostMapping("/saccos/minor-admins/{accountId}/deactivate")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deactivateMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                       @PathVariable UUID accountId,
+                                       RedirectAttributes ra) {
+        try {
+            adminService.deactivateMinorAdmin(principal.getMemberId(), accountId);
+            ra.addFlashAttribute("message", "Minor Admin deactivated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
+    @PostMapping("/saccos/minor-admins/{accountId}/reinvite")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String reinviteMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                     @PathVariable UUID accountId,
+                                     RedirectAttributes ra) {
+        try {
+            adminService.reinviteMinorAdmin(principal.getMemberId(), accountId);
+            ra.addFlashAttribute("message", "A fresh activation link has been emailed.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
     }
 
     @PostMapping("/saccos/{saccoId}")
+    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateSacco(@PathVariable String saccoId,
+                              @AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String saccoName,
                               @RequestParam String stationIds,
                               @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                               RedirectAttributes ra) {
         try {
-            saccoRegistryService.updateSacco(saccoId, saccoName, stationIds, logoFile);
-            ra.addFlashAttribute("message", "SACCO registry updated.");
+            if (principal != null && principal.hasRole(Position.ADMIN)) {
+                saccoRegistryService.updateSacco(saccoId, saccoName, stationIds, logoFile);
+                ra.addFlashAttribute("message", "SACCO registry updated.");
+            } else {
+                String scopedSaccoId = adminScopeService.currentSaccoId(principal);
+                if (!scopedSaccoId.equalsIgnoreCase(saccoId)) {
+                    throw new IllegalStateException("Minor admins can only manage stations for their own SACCO.");
+                }
+                saccoRegistryService.updateStationsOnly(scopedSaccoId, stationIds);
+                ra.addFlashAttribute("message", "Station registry updated.");
+            }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return "redirect:/admin/saccos";
+            return principal != null && principal.hasRole(Position.ADMIN)
+                ? "redirect:/admin/saccos/registry"
+                : "redirect:/admin/saccos";
         }
-        return "redirect:/admin/saccos";
+        return principal != null && principal.hasRole(Position.ADMIN)
+            ? "redirect:/admin/saccos/registry"
+            : "redirect:/admin/saccos";
     }
 
     @PostMapping("/scope")
-    public String updateScope(@RequestParam String saccoId,
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String updateScope(@AuthenticationPrincipal AppUserPrincipal principal,
+                              @RequestParam String saccoId,
                               @RequestParam String stationId,
                               @RequestParam(required = false) String next,
                               RedirectAttributes ra) {
-        adminScopeService.updateScope(saccoId, stationId);
-        ra.addFlashAttribute("message", "You are now working under the selected SACCO and station.");
+        adminScopeService.updateScope(principal, saccoId, stationId);
+        ra.addFlashAttribute("message", principal != null && principal.hasRole(Position.ADMIN)
+            ? "You are now working under the selected SACCO and station."
+            : "You are now working under the selected station.");
         return "redirect:" + normalizeAdminNextPath(next);
     }
 
@@ -413,19 +652,16 @@ public class AdminController {
     }
 
     private void populateOutboxFilterModel(Model model,
-                                           OutboxStatus status,
                                            String dateFrom,
                                            String dateTo,
                                            String loanId,
                                            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
         model.addAttribute("events", eventsPage.getContent());
         model.addAttribute("eventsPage", eventsPage);
-        model.addAttribute("outboxStatuses", OutboxStatus.values());
-        model.addAttribute("selectedOutboxStatus", status == null ? "" : status.name());
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
         model.addAttribute("selectedLoanId", normalizeTextParam(loanId));
-        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(status, dateFrom, dateTo, loanId, eventsPage.getSize()));
+        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(dateFrom, dateTo, loanId, eventsPage.getSize()));
         model.addAttribute("selectedPageSize", eventsPage.getSize());
     }
 
@@ -482,11 +718,8 @@ public class AdminController {
         model.addAttribute("dateToError", dateErrors.get("dateToError"));
     }
 
-    private String buildOutboxPaginationQuery(OutboxStatus status, String dateFrom, String dateTo, String loanId, int size) {
+    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanId, int size) {
         StringBuilder query = new StringBuilder("&size=").append(size);
-        if (status != null) {
-            query.append("&status=").append(UriUtils.encode(status.name(), StandardCharsets.UTF_8));
-        }
         if (dateFrom != null && !dateFrom.isBlank()) {
             query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
         }
@@ -519,6 +752,10 @@ public class AdminController {
             query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
+    }
+
+    private BigDecimal percentToRatio(BigDecimal percent) {
+        return percent.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
     }
 
     private String normalizeAdminNextPath(String next) {

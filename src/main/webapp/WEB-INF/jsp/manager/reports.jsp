@@ -4,6 +4,11 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<style>
+    .manager-report-checkbox {
+        min-height: 2.75rem;
+    }
+</style>
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Manager Panel / Loan Reports</p>
@@ -11,7 +16,7 @@
     <p class="erp-page-subtitle">Filter disbursed loans by year, review which ones have been returned, and export the report to PDF.</p>
 </div>
 
-<form method="get" action="/manager/reports" class="erp-form-wrap mb-4 grid gap-4 md:grid-cols-3">
+<form method="get" action="/manager/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 md:grid-cols-3">
     <div>
         <label class="mb-1 block text-sm font-medium text-slate-700">Year</label>
         <select name="year" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
@@ -21,7 +26,7 @@
         </select>
     </div>
     <div class="flex items-end">
-        <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <label class="manager-report-checkbox inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
             <input type="checkbox" name="returnedOnly" value="true" ${returnedOnlyChecked} />
             Returned loans only
         </label>
@@ -36,7 +41,8 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Id</th>
+            <th>Loan Application ID</th>
+            <th>Loan ID</th>
             <th>Applicant</th>
             <th>Loan Type</th>
             <th>Amount</th>
@@ -51,6 +57,7 @@
         <c:forEach items="${reportRows}" var="row">
             <tr>
                 <td>${row.shortId}</td>
+                <td><c:out value="${empty row.loanId ? '-' : row.loanId}" /></td>
                 <td>${row.applicantName}</td>
                 <td>${row.loanTypeLabel}</td>
                 <td>${row.amount}</td>
@@ -62,7 +69,7 @@
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">
-            <tr><td colspan="9">No disbursed loans matched the selected year.</td></tr>
+            <tr><td colspan="10">No disbursed loans matched the selected year.</td></tr>
         </c:if>
         </tbody>
     </table>

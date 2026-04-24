@@ -7,17 +7,14 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Event Log</p>
     <h1 class="erp-page-title">Event Log</h1>
-    <p class="erp-page-subtitle">Review the recorded actions taken across the system for visibility, troubleshooting, and operational follow-up.</p>
-</div>
-<div class="mb-3">
-    <a href="/admin/dashboard" class="app-btn btn-neutral">Back To Dashboard</a>
+    <p class="erp-page-subtitle">Review recorded system activity.</p>
 </div>
 <div class="erp-panel mb-4 overflow-hidden">
     <div class="erp-panel-header">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="erp-panel-title">Filter And View Options</p>
-                <p class="mt-1 text-sm text-slate-500">Trim the audit trail to the period you want, then page through the matching system activity.</p>
+                <p class="mt-1 text-sm text-slate-500">Filter the period, then page the audit trail.</p>
             </div>
             <div class="inline-flex flex-wrap items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
                 <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
@@ -34,7 +31,7 @@
             </div>
         </div>
     </div>
-    <form action="/admin/events" method="get" class="erp-panel-body grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] xl:items-end">
+    <form action="/admin/events" method="get" class="admin-filter-form erp-panel-body grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] xl:items-end">
         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Filter From
             <input type="date" name="dateFrom" value="${selectedDateFrom}" class="mt-1 w-full rounded border px-3 py-2.5 text-sm text-slate-800 ${not empty dateFromError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-white'}" />

@@ -30,9 +30,15 @@
         <div class="min-w-0">
             <div class="loan-hero-primary-grid">
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label">Loan ID</div>
+                    <div class="loan-hero-inline-label">Loan Application ID</div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
+                <c:if test="${not empty disbursedLoanId}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label">Loan ID</div>
+                        <div class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</div>
+                    </div>
+                </c:if>
                 <div class="loan-hero-inline-fact">
                     <div class="loan-hero-inline-label">Status</div>
                     <div class="loan-hero-inline-value">
@@ -68,48 +74,22 @@
             <div class="loan-view-summary-card px-4 py-4">
                 <div class="loan-stat-label">Current Savings</div>
                 <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
-                <div class="loan-stat-meta">
-                    <c:choose>
-                        <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                        <c:otherwise>Status unavailable</c:otherwise>
-                    </c:choose>
-                </div>
             </div>
             <div class="loan-view-summary-card px-4 py-4">
                 <div class="loan-stat-label">Current Shares</div>
                 <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
-                <div class="loan-stat-meta">
-                    <c:choose>
-                        <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                        <c:otherwise>Status unavailable</c:otherwise>
-                    </c:choose>
-                </div>
             </div>
         </div>
 
         <div class="mt-6 loan-simple-progress">
             <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
             <div class="loan-simple-progress-list">
-                <div class="loan-simple-progress-item<c:if test='${boardProgressStep lt 1}'> is-pending</c:if><c:if test='${boardProgressStep ge 1}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>1. Draft</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${boardProgressStep lt 2}'> is-pending</c:if><c:if test='${boardProgressStep ge 2}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>2. Submitted</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${boardProgressStep lt 3}'> is-pending</c:if><c:if test='${boardProgressStep ge 3}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>3. Manager Review</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${boardProgressStep lt 4}'> is-pending</c:if><c:if test='${boardProgressStep ge 4}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>4. Board Review</span>
-                </div>
-                <div class="loan-simple-progress-item<c:if test='${boardProgressStep lt 5}'> is-pending</c:if><c:if test='${boardProgressStep ge 5}'> is-active</c:if>">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>5. Outcome</span>
-                </div>
+                <c:forEach items="${loanProgressItems}" var="item">
+                    <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
+                        <span class="loan-simple-progress-dot"></span>
+                        <span>${item.label}</span>
+                    </div>
+                </c:forEach>
             </div>
         </div>
 
@@ -270,8 +250,8 @@
         <tr>
             <th class="px-3 py-2 text-left">Guarantor</th>
             <th class="px-3 py-2 text-left">Status</th>
-            <th class="px-3 py-2 text-left">Committed</th>
             <th class="px-3 py-2 text-left">Date</th>
+            <th class="px-3 py-2 text-left">Financial Status</th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -284,12 +264,30 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">${req.status}</td>
-                <td class="px-3 py-2">${req.committedAmount}</td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16), 'T', ' ')}</c:when>
                         <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
                     </c:choose>
+                </td>
+                <td class="px-3 py-2">
+                    <button type="button"
+                            class="app-btn btn-neutral guarantor-financial-trigger"
+                            data-url="/board/loan-applications/${app.id}/guarantors/${req.guarantorMemberId}/financial-status">
+                        <span class="guarantor-financial-spinner hidden" data-financial-spinner></span>
+                        <span data-financial-label>Load Status</span>
+                    </button>
+                    <div class="guarantor-financial-result hidden">
+                        <div class="guarantor-financial-result-row">
+                            <span class="guarantor-financial-result-label">Savings</span>
+                            <span class="guarantor-financial-result-value" data-financial-savings>-</span>
+                        </div>
+                        <div class="guarantor-financial-result-row">
+                            <span class="guarantor-financial-result-label">Shares</span>
+                            <span class="guarantor-financial-result-value" data-financial-shares>-</span>
+                        </div>
+                        <div class="guarantor-financial-result-note" data-financial-note></div>
+                    </div>
                 </td>
             </tr>
         </c:forEach>
@@ -347,11 +345,11 @@
                     </div>
                 </div>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
                 <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit" ${hasBoardSavedSignature ? '' : 'disabled'}>Approve Review</button>
                 <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit" formnovalidate>Reject Review</button>
             </div>
-            <div class="border-t border-slate-200 pt-4">
+            <div class="border-t border-slate-200 pt-4 loan-final-action-row">
                 <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary w-full justify-center">Print Loan Application</a>
             </div>
         </form>
@@ -573,4 +571,5 @@
     })();
 </script>
 
+<%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

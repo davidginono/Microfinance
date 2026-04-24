@@ -99,12 +99,12 @@ public class NotificationInboxService {
         String loanId = stringValue(details.get("loanId"));
         String incidentId = stringValue(details.get("incidentId"));
 
-        if (position == Position.ADMIN && !incidentId.isBlank()) {
+        if (position != null && position.isAdminRole() && !incidentId.isBlank()) {
             return "/admin/incidents/" + incidentId;
         }
         if (!loanId.isBlank()) {
             return switch (position) {
-                case ADMIN -> defaultTarget;
+                case ADMIN, MINOR_ADMIN -> defaultTarget;
                 case MANAGER -> "/manager/loan-applications/" + loanId;
                 case BOARD -> "/board/loan-applications/" + loanId;
                 case CHAIRPERSON -> "/chairperson/manager-decisions";

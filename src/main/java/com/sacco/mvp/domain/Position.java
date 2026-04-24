@@ -8,6 +8,7 @@ import java.util.Set;
 
 public enum Position {
     MEMBER,
+    MINOR_ADMIN,
     MANAGER,
     BOARD,
     CHAIRPERSON,
@@ -17,8 +18,24 @@ public enum Position {
         return this != MEMBER;
     }
 
+    public boolean isAdminRole() {
+        return this == ADMIN || this == MINOR_ADMIN;
+    }
+
+    public boolean isSuperAdminRole() {
+        return this == ADMIN;
+    }
+
     public static List<Position> staffAssignableRoles() {
-        return List.of(ADMIN, CHAIRPERSON, MANAGER, BOARD);
+        return List.of(ADMIN, MINOR_ADMIN, CHAIRPERSON, MANAGER, BOARD);
+    }
+
+    public static boolean containsAdminRole(Collection<Position> roles) {
+        return roles != null && roles.stream().anyMatch(Position::isAdminRole);
+    }
+
+    public static boolean containsSuperAdminRole(Collection<Position> roles) {
+        return roles != null && roles.stream().anyMatch(Position::isSuperAdminRole);
     }
 
     public static LinkedHashSet<Position> normalizeStaffRoles(Collection<Position> roles) {
@@ -44,10 +61,11 @@ public enum Position {
     private int priority() {
         return switch (this) {
             case ADMIN -> 0;
-            case CHAIRPERSON -> 1;
-            case MANAGER -> 2;
-            case BOARD -> 3;
-            case MEMBER -> 4;
+            case MINOR_ADMIN -> 1;
+            case CHAIRPERSON -> 2;
+            case MANAGER -> 3;
+            case BOARD -> 4;
+            case MEMBER -> 5;
         };
     }
 }

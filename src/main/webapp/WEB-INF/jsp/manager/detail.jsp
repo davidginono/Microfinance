@@ -16,9 +16,15 @@
         <div class="min-w-0">
             <div class="loan-hero-primary-grid">
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label">Loan ID</div>
+                    <div class="loan-hero-inline-label">Loan Application ID</div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
+                <c:if test="${not empty disbursedLoanId}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label">Loan ID</div>
+                        <div class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</div>
+                    </div>
+                </c:if>
                 <div class="loan-hero-inline-fact">
                     <div class="loan-hero-inline-label">Status</div>
                     <div class="loan-hero-inline-value">
@@ -51,52 +57,25 @@
             <div class="loan-stat-label">Tenor</div>
             <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
         </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Current Savings</div>
-            <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
-            <div class="loan-stat-meta">
-                <c:choose>
-                    <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                    <c:otherwise>Status unavailable</c:otherwise>
-                </c:choose>
+            <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-stat-label">Current Savings</div>
+                <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
             </div>
-        </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Current Shares</div>
-            <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
-            <div class="loan-stat-meta">
-                <c:choose>
-                    <c:when test="${applicantExternalAccountStatus.available}">Live balance</c:when>
-                    <c:otherwise>Status unavailable</c:otherwise>
-                </c:choose>
+            <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-stat-label">Current Shares</div>
+                <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
             </div>
-        </div>
     </div>
 
     <div class="mt-6 loan-simple-progress">
         <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
-        <p class="mt-1 text-sm text-slate-500">Track how far this application has moved through review and disbursement.</p>
         <div class="loan-simple-progress-list">
-            <div class="loan-simple-progress-item<c:if test='${progressStep lt 1}'> is-pending</c:if><c:if test='${progressStep ge 1}'> is-active</c:if>">
-                <span class="loan-simple-progress-dot"></span>
-                <span>1. Draft</span>
-            </div>
-            <div class="loan-simple-progress-item<c:if test='${progressStep lt 2}'> is-pending</c:if><c:if test='${progressStep ge 2}'> is-active</c:if>">
-                <span class="loan-simple-progress-dot"></span>
-                <span>2. Submitted</span>
-            </div>
-            <div class="loan-simple-progress-item<c:if test='${progressStep lt 3}'> is-pending</c:if><c:if test='${progressStep ge 3}'> is-active</c:if>">
-                <span class="loan-simple-progress-dot"></span>
-                <span>3. Manager Review</span>
-            </div>
-            <div class="loan-simple-progress-item<c:if test='${progressStep lt 4}'> is-pending</c:if><c:if test='${progressStep ge 4}'> is-active</c:if>">
-                <span class="loan-simple-progress-dot"></span>
-                <span>4. Approved</span>
-            </div>
-            <div class="loan-simple-progress-item<c:if test='${progressStep lt 5}'> is-pending</c:if><c:if test='${progressStep ge 5}'> is-active</c:if>">
-                <span class="loan-simple-progress-dot"></span>
-                <span>5. Disbursed</span>
-            </div>
+            <c:forEach items="${loanProgressItems}" var="item">
+                <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
+                    <span class="loan-simple-progress-dot"></span>
+                    <span>${item.label}</span>
+                </div>
+            </c:forEach>
         </div>
     </div>
 </div>
@@ -218,11 +197,6 @@
                         <tr>
                             <td class="px-3 py-2">
                                 <div class="font-medium text-slate-900">${loan.shortId}</div>
-                                <c:if test="${loan.isTopUpSource eq 'true'}">
-                                    <div class="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                                        Top-Up Source
-                                    </div>
-                                </c:if>
                             </td>
                             <td class="px-3 py-2 text-slate-700">${loan.loanTypeLabel}</td>
                             <td class="px-3 py-2 font-medium text-slate-900">${loan.amount}</td>
@@ -308,9 +282,8 @@
         <tr>
             <th class="px-3 py-2 text-left">Guarantor</th>
             <th class="px-3 py-2 text-left">Status</th>
-            <th class="px-3 py-2 text-left">Requested</th>
-            <th class="px-3 py-2 text-left">Committed</th>
             <th class="px-3 py-2 text-left">Date</th>
+            <th class="px-3 py-2 text-left">Financial Status</th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -323,16 +296,36 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">${g.status}</td>
-                <td class="px-3 py-2">${g.requestedAmount}</td>
-                <td class="px-3 py-2">${g.committedAmount}</td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty g.decidedAt}">${fn:replace(fn:substring(g.decidedAt, 0, 16), 'T', ' ')}</c:when>
                         <c:otherwise>${fn:replace(fn:substring(g.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
                     </c:choose>
                 </td>
+                <td class="px-3 py-2">
+                    <button type="button"
+                            class="app-btn btn-neutral guarantor-financial-trigger"
+                            data-url="/manager/loan-applications/${app.id}/guarantors/${g.guarantorMemberId}/financial-status">
+                        <span class="guarantor-financial-spinner hidden" data-financial-spinner></span>
+                        <span data-financial-label>Load Status</span>
+                    </button>
+                    <div class="guarantor-financial-result hidden">
+                        <div class="guarantor-financial-result-row">
+                            <span class="guarantor-financial-result-label">Savings</span>
+                            <span class="guarantor-financial-result-value" data-financial-savings>-</span>
+                        </div>
+                        <div class="guarantor-financial-result-row">
+                            <span class="guarantor-financial-result-label">Shares</span>
+                            <span class="guarantor-financial-result-value" data-financial-shares>-</span>
+                        </div>
+                        <div class="guarantor-financial-result-note" data-financial-note></div>
+                    </div>
+                </td>
             </tr>
         </c:forEach>
+        <c:if test="${empty guarantorRequests}">
+            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No guarantors selected yet.</td></tr>
+        </c:if>
         </tbody>
     </table>
 </div>
@@ -354,13 +347,23 @@
             </c:forEach>
         </div>
         <c:if test="${not empty repaymentRows}">
-            <div class="mt-5 erp-table-wrap overflow-x-auto">
+            <c:if test="${not empty app.loanId}">
+                <form action="/manager/loan-applications/${app.id}/sync-payments" method="post" class="mt-4 flex items-center justify-end">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <button type="submit" class="app-btn btn-neutral">Refresh Payments</button>
+                </form>
+            </c:if>
+            <div class="mt-3 erp-table-wrap overflow-x-auto">
                 <table class="erp-table">
                     <thead>
                     <tr>
                         <th class="px-3 py-2 text-left">Installment</th>
                         <th class="px-3 py-2 text-left">Due Date</th>
-                        <th class="px-3 py-2 text-left">Amount</th>
+                        <th class="px-3 py-2 text-left">Scheduled Amount</th>
+                        <th class="px-3 py-2 text-left">Principal Paid</th>
+                        <th class="px-3 py-2 text-left">Interest Paid</th>
+                        <th class="px-3 py-2 text-left">Total Paid</th>
+                        <th class="px-3 py-2 text-left">Payment Date</th>
                         <th class="px-3 py-2 text-left">Status</th>
                     </tr>
                     </thead>
@@ -370,6 +373,10 @@
                             <td class="px-3 py-2">${row.installment}</td>
                             <td class="px-3 py-2">${row.dueDate}</td>
                             <td class="px-3 py-2">${row.amount}</td>
+                            <td class="px-3 py-2">${row.principalPaid}</td>
+                            <td class="px-3 py-2">${row.interestPaid}</td>
+                            <td class="px-3 py-2">${row.totalPaid}</td>
+                            <td class="px-3 py-2">${row.paymentDate}</td>
                             <td class="px-3 py-2">${row.status}</td>
                         </tr>
                     </c:forEach>
@@ -419,7 +426,12 @@
 </c:if>
 
 <c:if test="${app.status eq 'BOARD_APPROVED'}">
-    <form action="/manager/loan-applications/${app.id}/finalize" method="post" class="erp-form-wrap space-y-3">
+    <form action="/manager/loan-applications/${app.id}/finalize"
+          method="post"
+          class="erp-form-wrap space-y-3"
+          data-confirm-title="Disburse Loan"
+          data-confirm-message="Disburse this loan now? There will be no reversal of this action."
+          data-confirm-proceed="Disburse Loan">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <input type="hidden" name="decision" value="FINAL_APPROVE" />
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -439,6 +451,15 @@
                 <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
             </div>
             <div>
+                <label class="mb-1 block text-sm font-medium text-slate-700">Loan ID <span class="text-rose-600">*</span></label>
+                <input type="text" name="loanId" value="${app.loanId}"
+                       pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
+                       title="Enter the SACCO loan-book number (4-20 digits)"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       placeholder="SACCO loan-book number (digits only)" />
+                <p class="mt-1 text-xs text-slate-500">Entered at disbursement. 4-20 digits, unique within this SACCO.</p>
+            </div>
+            <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Reference</label>
                 <input type="text" name="disbursementReference" value="${app.disbursementReference}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="Receipt, voucher, or transfer reference" />
             </div>
@@ -453,7 +474,7 @@
             <label class="mb-1 block text-sm font-medium text-slate-700">Manager Notes</label>
             <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="Optional disbursement or repayment instructions">${app.disbursementNotes}</textarea>
         </div>
-        <button type="submit" class="app-btn btn-approve">Finalize</button>
+        <button type="submit" class="app-btn btn-approve">Disburse Loan</button>
     </form>
 </c:if>
 
@@ -486,25 +507,10 @@
 <div class="erp-form-wrap loan-page-bottom-actions">
     <div class="loan-view-action-cluster">
         <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Print Loan Application</a>
-        <c:if test="${app.status eq 'FINAL_APPROVED'}">
-            <form action="/manager/loan-applications/${app.id}/mark-paid" method="post">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <button type="submit" class="app-btn btn-approve">Mark Loan as Paid</button>
-            </form>
-        </c:if>
-        <c:if test="${app.status eq 'PAID'}">
-            <form action="/manager/loan-applications/${app.id}/mark-active" method="post">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <button type="submit"
-                        class="app-btn btn-neutral ${paidReversalWindowOpen ? '' : 'action-button-disabled'}"
-                        ${paidReversalWindowOpen ? '' : 'disabled'}>
-                    Move Back to Disbursed
-                </button>
-            </form>
-        </c:if>
     </div>
 </div>
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
+<%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
 
 <%@ include file="../fragments/footer.jspf" %>

@@ -32,6 +32,7 @@
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
+        <c:set var="removalExpiryLabel" value="${guaranteeRemovalExpiryLabels[req.id]}" />
         <c:set var="canRequestRemoval" value="${req.status eq 'APPROVED' and guaranteeRemovalAllowed[req.id] and empty pendingRemoval}" />
         <tr>
             <td>${fn:substring(req.loanApplicationId, 0, 8)}</td>
@@ -67,11 +68,16 @@
                 <c:if test="${req.status ne 'PENDING'}">
                     <c:choose>
                         <c:when test="${canRequestRemoval}">
-                            <button type="button"
-                                    class="app-btn btn-neutral"
-                                    data-guarantee-modal-open="undo-${req.id}">
-                                Request Removal
-                            </button>
+                            <div class="min-w-[240px] space-y-2">
+                                <button type="button"
+                                        class="app-btn btn-neutral"
+                                        data-guarantee-modal-open="undo-${req.id}">
+                                    Request Removal
+                                </button>
+                                <c:if test="${not empty removalExpiryLabel}">
+                                    <p class="text-xs text-slate-500">Active until ${removalExpiryLabel}</p>
+                                </c:if>
+                            </div>
                         </c:when>
                         <c:when test="${req.status eq 'APPROVED' and not empty pendingRemoval}">
                             <button type="button"

@@ -23,7 +23,8 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Id</th>
+            <th>Loan Application ID</th>
+            <th>Loan ID</th>
             <th>Loan Type</th>
             <th>Amount</th>
             <th>Disbursed</th>
@@ -36,6 +37,7 @@
         <c:forEach items="${reportRows}" var="loan">
             <tr>
                 <td>${loan.shortId}</td>
+                <td><c:out value="${empty loan.loanId ? '-' : loan.loanId}" /></td>
                 <td>${loan.loanTypeLabel}</td>
                 <td>${loan.amount}</td>
                 <td>${loan.disbursed}</td>

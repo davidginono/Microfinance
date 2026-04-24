@@ -6,7 +6,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-public class SaccoLoanApplication {
+public class
+
+
+SaccoLoanApplication {
     public static void main(String[] args) {
         SpringApplication.run(SaccoLoanApplication.class, args);
     }

@@ -6,11 +6,11 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Reports</p>
     <h1 class="erp-page-title">Admin Reports</h1>
-    <p class="erp-page-subtitle">Review filtered workflow volume, rejection counts, and product mix from the administrative reporting view.</p>
+    <p class="erp-page-subtitle">Review workflow and product totals.</p>
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/reports/filter" method="get" class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+    <form action="/admin/reports/filter" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">

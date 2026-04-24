@@ -1,6 +1,7 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.*;
+import com.sacco.mvp.integration.memberportal.LoanPaymentLookupException;
 import com.sacco.mvp.repository.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EligibilityService;
@@ -35,6 +36,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/app")
 public class AppController {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
+    private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
     private static final String DISMISSED_ACTIVE_LOAN_CHARTS_KEY = "dismissedActiveLoanCharts";
     private final LoanWorkflowService loanWorkflowService;
     private final FormSchemaService formSchemaService;
@@ -61,13 +64,14 @@ public class AppController {
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final UserSettingsRepository userSettingsRepository;
+    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final ForesightDirectoryService foresightDirectoryService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<GuarantorRequest> pendingGuarantees = activeGuarantorRequests(
-            loanWorkflowService.myGuarantorRequests(principal.getMemberId()));
+            visibleGuarantorRequests(loanWorkflowService.myGuarantorRequests(principal.getMemberId())));
         List<LoanApplication> allApplications = loanWorkflowService.myApplications(principal.getMemberId());
         List<LoanApplication> currentApplications = currentApplications(allApplications);
         List<LoanApplication> archivedApplications = archivedApplications(allApplications);
@@ -89,6 +93,7 @@ public class AppController {
             .count();
         Set<UUID> dismissedActiveLoanChartIds = dismissedActiveLoanChartIds(principal.getMemberId());
         List<Map<String, Object>> activeLoanChartRows = buildActiveLoanChartRows(activeLoans, dismissedActiveLoanChartIds);
+        Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
 
         model.addAttribute("myApplications", currentApplications);
         model.addAttribute("managerReasons", loanPresentationService.latestManagerReasons(allApplications));
@@ -103,6 +108,7 @@ public class AppController {
         model.addAttribute("statusChartRows", buildStatusChartRows(statusCounts));
         model.addAttribute("activeLoanChartRows", activeLoanChartRows);
         model.addAttribute("archivedApplicationCount", archivedApplications.size());
+        model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.resolve(member));
         addGuaranteeContext(pendingGuarantees, model);
         return "app/dashboard";
     }
@@ -114,8 +120,8 @@ public class AppController {
                                                  RedirectAttributes ra) {
         LoanApplication app = loanApplicationRepository.findByIdAndApplicantMemberId(loanId, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan not found"));
-        if (app.getStatus() != LoanStatus.FINAL_APPROVED) {
-            ra.addFlashAttribute("error", "Only active disbursed loans can be removed from the repayment timeline.");
+        if (app.getStatus() != LoanStatus.FINAL_APPROVED && app.getStatus() != LoanStatus.DEFAULTED) {
+            ra.addFlashAttribute("error", "Only active or defaulted disbursed loans can be removed from the repayment timeline.");
             return "redirect:/app/dashboard";
         }
         if (!hasRepaymentTimeframeEnded(app)) {
@@ -160,7 +166,7 @@ public class AppController {
         List<LoanApplication> allApplications = loanWorkflowService.myApplications(principal.getMemberId());
         List<LoanApplication> allArchives = archivedApplications(allApplications);
         List<GuarantorRequest> allGuarantorArchives = archivedGuarantorRequests(
-            loanWorkflowService.myGuarantorRequests(principal.getMemberId()));
+            visibleGuarantorRequests(loanWorkflowService.myGuarantorRequests(principal.getMemberId())));
         List<LoanApplication> archives = filterLoanArchives(allArchives, loanArchiveQuery, loanArchiveFilter);
         List<GuarantorRequest> guarantorArchives = filterGuarantorArchives(
             allGuarantorArchives, guarantorArchiveQuery, guarantorArchiveFilter);
@@ -195,18 +201,15 @@ public class AppController {
         model.addAttribute("reportRows", report.loans().stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
-                row.put("shortId", loan.getId().toString().substring(0, 8));
-                row.put("loanTypeLabel", switch (loan.getLoanType()) {
-                    case LOAN_ADVANCE -> "Loan Advance (Mkopo wa Chapchap)";
-                    case EDUCATION_LOAN -> "Education Loan (Mkopo wa Elimu)";
-                    case EMERGENCY_LOAN -> "Emergency Loan (Mkopo wa Dharura)";
-                    case DEVELOPMENT_LOAN -> "Development Loan (Mkopo wa Biashara)";
-                });
+                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
+                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
+                row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("amount", loan.getAmount() == null ? "-" : loan.getAmount().toPlainString());
                 row.put("disbursed", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("statusLabel", switch (loan.getStatus()) {
                     case FINAL_APPROVED -> "DISBURSED LOAN";
+                    case DEFAULTED -> "DEFAULTED";
                     case PAID -> "PAID";
                     default -> loan.getStatus().name();
                 });
@@ -224,6 +227,8 @@ public class AppController {
             .sorted(Comparator.comparing(LoanApplication::getFinalDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
             .filter(app -> !hasRepaymentTimeframeEnded(app) || !dismissedChartIds.contains(app.getId()))
             .map(app -> {
+                LoanPresentationService.LoanPaymentSummaryView paymentSummary =
+                    loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
                 Map<String, Object> row = new LinkedHashMap<>();
                 long daysLeft = app.getFinalDueDate() == null ? 0 : Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, app.getFinalDueDate()));
                 long totalDays = 0L;
@@ -240,6 +245,7 @@ public class AppController {
                 row.put("fullId", app.getId());
                 row.put("loanId", app.getId().toString().substring(0, 8));
                 row.put("amountLabel", loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("startDate", resolveRepaymentTimerStartDate(app));
                 row.put("daysLeft", daysLeft);
                 row.put("elapsedDays", elapsedDays);
                 row.put("totalDays", totalDays);
@@ -247,9 +253,29 @@ public class AppController {
                 row.put("finalDueDate", app.getFinalDueDate());
                 row.put("countdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
                 row.put("canDismiss", hasRepaymentTimeframeEnded(app));
+                row.put("repaymentStateLabel", repaymentStateLabel(app, paymentSummary, today));
+                row.put("repaymentStateClasses", repaymentStateClasses(app, paymentSummary, today));
+                row.put("paymentSummaryAvailable", paymentSummary.available());
+                row.put("loanDescription", paymentSummary.loanDescription());
+                row.put("lastPaymentDate", paymentSummary.lastPaymentDateLabel());
+                row.put("totalOutstanding", paymentSummary.totalOutstandingLabel());
+                row.put("outstandingPrincipal", paymentSummary.outstandingPrincipalLabel());
+                row.put("outstandingInterest", paymentSummary.outstandingInterestLabel());
+                row.put("totalPrincipalPaid", paymentSummary.totalPrincipalPaidLabel());
+                row.put("totalInterestPaid", paymentSummary.totalInterestPaidLabel());
                 return row;
             })
             .toList();
+    }
+
+    private LocalDate resolveRepaymentTimerStartDate(LoanApplication app) {
+        if (app == null) {
+            return null;
+        }
+        if (app.getDisbursementDate() != null) {
+            return app.getDisbursementDate();
+        }
+        return app.getFirstRepaymentDate();
     }
 
     private List<Map<String, Object>> buildStatusChartRows(Map<LoanStatus, Long> statusCounts) {
@@ -302,6 +328,12 @@ public class AppController {
         }
         Map<String, String> formValues = new LinkedHashMap<>();
         if (topUpLoanId != null) {
+            try {
+                loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                ra.addFlashAttribute("error", ex.getMessage());
+                return "redirect:/app/loan-applications";
+            }
             formValues.put("topUpLoanId", topUpLoanId.toString());
         }
         return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), null, model);
@@ -452,8 +484,7 @@ public class AppController {
         model.addAttribute("topUpSourceLoan",
             app.getTopUpSourceLoanId() == null ? null
                 : loanApplicationRepository.findByIdAndApplicantMemberId(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
-        model.addAttribute("canRequestTopUp",
-            app.getStatus() == LoanStatus.FINAL_APPROVED && (app.getFinalDueDate() == null || !app.getFinalDueDate().isBefore(java.time.LocalDate.now())));
+        model.addAttribute("canRequestTopUp", loanWorkflowService.canRequestTopUp(app));
         model.addAttribute("formFields", loanPresentationService.parseFormFields(app.getFormData()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
@@ -478,8 +509,11 @@ public class AppController {
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "");
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseAttachments(app.getAttachmentsJson()));
-        model.addAttribute("repaymentSummary", loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson()));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(app.getRepaymentScheduleJson()));
+        model.addAttribute("repaymentSummary",
+            loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
+        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
+            app.getRepaymentScheduleJson(),
+            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("repaymentDaysLeft",
             app.getFinalDueDate() == null ? null : java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), app.getFinalDueDate()));
@@ -497,34 +531,17 @@ public class AppController {
                 && guarantorRequests.stream().filter(req -> req.getStatus() == GuarantorRequestStatus.APPROVED).count() >= app.getRequiredGuarantors());
         model.addAttribute("statusTimeline", List.of(
             LoanStatus.DRAFT, LoanStatus.AWAITING_GUARANTORS, LoanStatus.ALL_GUARANTORS_APPROVED, LoanStatus.READY_FOR_MANAGER,
-            LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.BOARD_APPROVED, LoanStatus.FINAL_APPROVED, LoanStatus.PAID
+            LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.BOARD_APPROVED,
+            LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
     }
 
     private void addMemberLoanViewDisplayAttributes(Model model, LoanApplication app) {
-        int progressStep = memberLoanProgressStep(app.getStatus());
-        int progressPercent = memberLoanProgressPercent(app.getStatus());
-
-        model.addAttribute("loanIdShort", app.getId() == null ? "" : app.getId().toString().substring(0, 8));
-        model.addAttribute("loanProgressStep", progressStep);
-        model.addAttribute("loanProgressPercent", progressPercent);
+        model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
+        model.addAttribute("disbursedLoanId", app.getLoanId());
         model.addAttribute("loanStatusBadgeClass", memberLoanStatusBadgeClass(app.getStatus()));
-        model.addAttribute("loanStep1CardClass", progressStep >= 1 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-white");
-        model.addAttribute("loanStep1DotClass", progressStep >= 1 ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500");
-        model.addAttribute("loanStep1TextClass", progressStep >= 1 ? "text-slate-900" : "text-slate-500");
-        model.addAttribute("loanStep2CardClass", progressStep >= 2 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-white");
-        model.addAttribute("loanStep2DotClass", progressStep >= 2 ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500");
-        model.addAttribute("loanStep2TextClass", progressStep >= 2 ? "text-slate-900" : "text-slate-500");
-        model.addAttribute("loanStep3CardClass", progressStep >= 3 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-white");
-        model.addAttribute("loanStep3DotClass", progressStep >= 3 ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500");
-        model.addAttribute("loanStep3TextClass", progressStep >= 3 ? "text-slate-900" : "text-slate-500");
-        model.addAttribute("loanStep4CardClass", progressStep >= 4 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-white");
-        model.addAttribute("loanStep4DotClass", progressStep >= 4 ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500");
-        model.addAttribute("loanStep4TextClass", progressStep >= 4 ? "text-slate-900" : "text-slate-500");
-        model.addAttribute("loanStep5CardClass", progressStep >= 5 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-white");
-        model.addAttribute("loanStep5DotClass", progressStep >= 5 ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500");
-        model.addAttribute("loanStep5TextClass", progressStep >= 5 ? "text-slate-900" : "text-slate-500");
+        model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
     }
 
     private int memberLoanProgressStep(LoanStatus status) {
@@ -536,7 +553,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
             case AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED -> 4;
-            case FINAL_REJECTED, FINAL_APPROVED, PAID -> 5;
+            case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
     }
 
@@ -549,7 +566,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 35;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
             case AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED -> 80;
-            case FINAL_REJECTED, FINAL_APPROVED, PAID -> 100;
+            case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
         };
     }
 
@@ -561,7 +578,7 @@ public class AppController {
             case DRAFT -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, BOARD_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, BOARD_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
             case AWAITING_BOARD -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case FINAL_REJECTED -> "bg-rose-50 text-rose-700";
@@ -646,6 +663,26 @@ public class AppController {
         return "redirect:/app/loan-applications/" + id;
     }
 
+    @PostMapping("/loan-applications/{id}/sync-payments")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    public String syncLoanPayments(@PathVariable UUID id,
+                                   @AuthenticationPrincipal AppUserPrincipal principal,
+                                   @RequestParam(name = "monthsBack", defaultValue = "12") int monthsBack,
+                                   RedirectAttributes ra) {
+        try {
+            int inserted = loanWorkflowService.syncLoanPayments(id, principal.getMemberId(), monthsBack);
+            ra.addFlashAttribute("message",
+                inserted == 0
+                    ? "Repayment data refreshed; nothing new was found."
+                    : "Repayment data refreshed; " + inserted + " new payment record(s) were added.");
+        } catch (LoanPaymentLookupException ex) {
+            ra.addFlashAttribute("error", "Repayment data could not be fetched: " + ex.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + id;
+    }
+
     @PostMapping("/loan-applications/{id}/delete")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
     public String deleteApplication(@PathVariable UUID id,
@@ -686,27 +723,34 @@ public class AppController {
 
     @PostMapping("/loan-applications/financial-preview")
     @ResponseBody
-    public Map<String, Object> financialPreview(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                @RequestParam LoanType loanType,
-                                                @RequestParam BigDecimal amount,
-                                                @RequestParam Integer tenorMonths,
-                                                @RequestParam(required = false) UUID topUpLoanId) {
-        Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
-            principal.getSaccoId(), principal.getMemberId(), loanType, amount, tenorMonths, topUpLoanId);
-        EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-            principal.getSaccoId(), principal.getMemberId(), loanType, amount);
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("snapshotJson", financialDetailsService.toJson(snapshot));
-        response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
-        response.put("message", "Loan details loaded");
-        Map<String, Object> eligibilityMap = new LinkedHashMap<>();
-        eligibilityMap.put("eligible", eligibility.eligible());
-        eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
-        eligibilityMap.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
-        eligibilityMap.put("ratioPercentLabel",
-            eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
-        response.put("eligibility", eligibilityMap);
-        return response;
+    public ResponseEntity<Map<String, Object>> financialPreview(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                @RequestParam LoanType loanType,
+                                                                @RequestParam BigDecimal amount,
+                                                                @RequestParam Integer tenorMonths,
+                                                                @RequestParam(required = false) UUID topUpLoanId) {
+        try {
+            loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
+            Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
+                principal.getSaccoId(), principal.getMemberId(), loanType, amount, tenorMonths, topUpLoanId);
+            EligibilityService.EligibilityResult eligibility = eligibilityService.check(
+                principal.getSaccoId(), principal.getMemberId(), loanType, amount);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("snapshotJson", financialDetailsService.toJson(snapshot));
+            response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
+            response.put("message", "Loan details loaded");
+            Map<String, Object> eligibilityMap = new LinkedHashMap<>();
+            eligibilityMap.put("eligible", eligibility.eligible());
+            eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
+            eligibilityMap.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+            eligibilityMap.put("ratioPercentLabel",
+                eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
+            response.put("eligibility", eligibilityMap);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "message", ex.getMessage()
+            ));
+        }
     }
 
     @GetMapping("/loan-applications/external-eligibility-summary")
@@ -750,7 +794,7 @@ public class AppController {
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
     public String myGuarantorRequests(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<GuarantorRequest> requests = activeGuarantorRequests(
-            loanWorkflowService.myGuarantorRequests(principal.getMemberId()));
+            visibleGuarantorRequests(loanWorkflowService.myGuarantorRequests(principal.getMemberId())));
         model.addAttribute("requests", requests);
         addGuaranteeActionContext(requests, model);
         model.addAttribute("guarantorSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
@@ -1220,30 +1264,26 @@ public class AppController {
 
     private void addGuaranteeActionContext(List<GuarantorRequest> requests, Model model) {
         addGuaranteeContext(requests, model);
-        Map<UUID, LoanApplication> applicationById = new HashMap<>();
-        Set<UUID> applicationIds = requests.stream()
-            .map(GuarantorRequest::getLoanApplicationId)
-            .collect(Collectors.toSet());
-        if (!applicationIds.isEmpty()) {
-            for (LoanApplication application : loanApplicationRepository.findAllById(applicationIds)) {
-                applicationById.put(application.getId(), application);
-            }
-        }
+        Map<UUID, LoanApplication> applicationById = loanApplicationsById(requests);
         Map<UUID, ReversalRequest> pendingRemovalRequests = new HashMap<>();
         Map<UUID, Boolean> removalAllowed = new HashMap<>();
+        Map<UUID, String> removalExpiryLabels = new HashMap<>();
         for (GuarantorRequest request : requests) {
             ReversalRequest pendingUndo = reversalRequestService.pendingGuarantorUndo(request.getId());
             if (pendingUndo != null) {
                 pendingRemovalRequests.put(request.getId(), pendingUndo);
             }
             LoanApplication application = applicationById.get(request.getLoanApplicationId());
-            boolean stageOpen = application != null
-                && (application.getStatus() == LoanStatus.AWAITING_GUARANTORS
-                    || application.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED);
-            removalAllowed.put(request.getId(), stageOpen && isWithinReversalWindow(request.getDecidedAt()));
+            boolean stageOpen = isGuarantorRemovalStageOpen(application);
+            boolean canRequestRemoval = stageOpen && isWithinReversalWindow(request.getDecidedAt());
+            removalAllowed.put(request.getId(), canRequestRemoval);
+            if (canRequestRemoval && request.getDecidedAt() != null) {
+                removalExpiryLabels.put(request.getId(), formatReversalWindowExpiry(request.getDecidedAt()));
+            }
         }
         model.addAttribute("guaranteePendingRemovalRequests", pendingRemovalRequests);
         model.addAttribute("guaranteeRemovalAllowed", removalAllowed);
+        model.addAttribute("guaranteeRemovalExpiryLabels", removalExpiryLabels);
     }
 
     private LoanApplication resolveTopUpSourceLoan(UUID memberId, String topUpLoanId) {
@@ -1277,10 +1317,11 @@ public class AppController {
         String normalizedFilter = safeArchiveFilter(loanArchiveFilter);
         return archives.stream()
             .filter(app -> normalizedQuery.isBlank()
-                || app.getId().toString().toLowerCase(Locale.ROOT).contains(normalizedQuery)
-                || app.getId().toString().substring(0, 8).toLowerCase(Locale.ROOT).contains(normalizedQuery))
+                || (app.getLoanId() != null
+                    && app.getLoanId().toLowerCase(Locale.ROOT).contains(normalizedQuery)))
             .filter(app -> switch (normalizedFilter) {
                 case "DISBURSED" -> app.getStatus() == LoanStatus.FINAL_APPROVED;
+                case "DEFAULTED" -> app.getStatus() == LoanStatus.DEFAULTED;
                 case "PAID" -> app.getStatus() == LoanStatus.PAID;
                 case "REJECTED" -> isRejectedStatus(app.getStatus());
                 default -> true;
@@ -1312,8 +1353,40 @@ public class AppController {
 
     private List<LoanApplication> activeRepaymentLoans(List<LoanApplication> apps) {
         return apps.stream()
-            .filter(app -> app.getStatus() == LoanStatus.FINAL_APPROVED)
+            .filter(app -> app.getStatus() == LoanStatus.FINAL_APPROVED || app.getStatus() == LoanStatus.DEFAULTED)
             .toList();
+    }
+
+    private String repaymentStateLabel(LoanApplication app,
+                                       LoanPresentationService.LoanPaymentSummaryView paymentSummary,
+                                       LocalDate today) {
+        if (app.getStatus() == LoanStatus.PAID) {
+            return "Paid";
+        }
+        if (app.getStatus() == LoanStatus.DEFAULTED) {
+            return "Defaulted";
+        }
+        if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
+            if (paymentSummary.available()
+                && paymentSummary.totalOutstanding() != null
+                && paymentSummary.totalOutstanding().compareTo(BigDecimal.ZERO) > 0) {
+                return "Defaulted";
+            }
+            return "Overdue";
+        }
+        return "Active";
+    }
+
+    private String repaymentStateClasses(LoanApplication app,
+                                         LoanPresentationService.LoanPaymentSummaryView paymentSummary,
+                                         LocalDate today) {
+        String state = repaymentStateLabel(app, paymentSummary, today);
+        return switch (state) {
+            case "Paid" -> "border-emerald-200 bg-emerald-50 text-emerald-700";
+            case "Defaulted" -> "border-rose-200 bg-rose-50 text-rose-700";
+            case "Overdue" -> "border-amber-200 bg-amber-50 text-amber-700";
+            default -> "border-slate-200 bg-slate-50 text-slate-700";
+        };
     }
 
     private Set<UUID> dismissedActiveLoanChartIds(UUID memberId) {
@@ -1352,23 +1425,72 @@ public class AppController {
     }
 
     private List<GuarantorRequest> activeGuarantorRequests(List<GuarantorRequest> requests) {
+        Map<UUID, LoanApplication> applicationById = loanApplicationsById(requests);
         return requests.stream()
             .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING
-                || (request.getStatus() == GuarantorRequestStatus.APPROVED && isWithinReversalWindow(request.getDecidedAt())))
+                || (request.getStatus() == GuarantorRequestStatus.APPROVED
+                    && isGuarantorRemovalStageOpen(applicationById.get(request.getLoanApplicationId()))
+                    && isWithinReversalWindow(request.getDecidedAt())))
+            .toList();
+    }
+
+    private List<GuarantorRequest> visibleGuarantorRequests(List<GuarantorRequest> requests) {
+        Set<UUID> loanIds = requests.stream()
+            .map(GuarantorRequest::getLoanApplicationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (loanIds.isEmpty()) {
+            return requests;
+        }
+        Set<UUID> supersededLoanIds = loanApplicationRepository.findByTopUpSourceLoanIdIn(loanIds).stream()
+            .filter(app -> app.getStatus() != LoanStatus.DRAFT)
+            .map(LoanApplication::getTopUpSourceLoanId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (supersededLoanIds.isEmpty()) {
+            return requests;
+        }
+        return requests.stream()
+            .filter(request -> !supersededLoanIds.contains(request.getLoanApplicationId()))
             .toList();
     }
 
     private List<GuarantorRequest> archivedGuarantorRequests(List<GuarantorRequest> requests) {
+        Map<UUID, LoanApplication> applicationById = loanApplicationsById(requests);
         return requests.stream()
             .filter(request -> request.getStatus() == GuarantorRequestStatus.REJECTED
                 || request.getStatus() == GuarantorRequestStatus.EXPIRED
-                || (request.getStatus() == GuarantorRequestStatus.APPROVED && !isWithinReversalWindow(request.getDecidedAt())))
+                || (request.getStatus() == GuarantorRequestStatus.APPROVED
+                    && (!isGuarantorRemovalStageOpen(applicationById.get(request.getLoanApplicationId()))
+                        || !isWithinReversalWindow(request.getDecidedAt()))))
             .toList();
+    }
+
+    private Map<UUID, LoanApplication> loanApplicationsById(List<GuarantorRequest> requests) {
+        Set<UUID> applicationIds = requests.stream()
+            .map(GuarantorRequest::getLoanApplicationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (applicationIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, LoanApplication> applicationById = new HashMap<>();
+        for (LoanApplication application : loanApplicationRepository.findAllById(applicationIds)) {
+            applicationById.put(application.getId(), application);
+        }
+        return applicationById;
+    }
+
+    private boolean isGuarantorRemovalStageOpen(LoanApplication application) {
+        return application != null
+            && (application.getStatus() == LoanStatus.AWAITING_GUARANTORS
+                || application.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED);
     }
 
     private boolean isPendingApplication(LoanApplication app) {
         return !isRejectedStatus(app.getStatus())
             && app.getStatus() != LoanStatus.FINAL_APPROVED
+            && app.getStatus() != LoanStatus.DEFAULTED
             && app.getStatus() != LoanStatus.PAID;
     }
 
@@ -1382,11 +1504,16 @@ public class AppController {
     private boolean isArchived(LoanApplication app) {
         return isRejectedStatus(app.getStatus())
             || app.getStatus() == LoanStatus.FINAL_APPROVED
+            || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID;
     }
 
     private boolean isWithinReversalWindow(OffsetDateTime referenceAt) {
         return referenceAt != null && referenceAt.plusHours(REVERSAL_WINDOW_HOURS).isAfter(OffsetDateTime.now());
+    }
+
+    private String formatReversalWindowExpiry(OffsetDateTime referenceAt) {
+        return referenceAt.plusHours(REVERSAL_WINDOW_HOURS).format(REVERSAL_WINDOW_FORMATTER);
     }
 
     private boolean hasRepaymentTimeframeEnded(LoanApplication app) {
@@ -1453,7 +1580,8 @@ public class AppController {
             || status == LoanStatus.ALL_GUARANTORS_APPROVED
             || status == LoanStatus.READY_FOR_MANAGER
             || status == LoanStatus.AWAITING_BOARD
-            || status == LoanStatus.FINAL_APPROVED;
+            || status == LoanStatus.FINAL_APPROVED
+            || status == LoanStatus.DEFAULTED;
     }
 
     private String dashboardStatusLabel(LoanStatus status) {
@@ -1474,6 +1602,9 @@ public class AppController {
         }
         if (status == LoanStatus.FINAL_APPROVED) {
             return "Disbursed Loan";
+        }
+        if (status == LoanStatus.DEFAULTED) {
+            return "Defaulted / Not Paid";
         }
         if (status == LoanStatus.PAID) {
             return "Paid";
@@ -1499,6 +1630,9 @@ public class AppController {
         }
         if (status == LoanStatus.FINAL_APPROVED) {
             return "#22C55E";
+        }
+        if (status == LoanStatus.DEFAULTED) {
+            return "#DC2626";
         }
         if (status == LoanStatus.PAID) {
             return "#0F766E";

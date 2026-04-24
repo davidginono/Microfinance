@@ -9,7 +9,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Settings & Controls</p>
     <h1 class="erp-page-title">Settings & Controls</h1>
-    <p class="erp-page-subtitle">Manage product settings, percentages, guarantor rules, and repayment controls without affecting workflow logic.</p>
+    <p class="erp-page-subtitle">Manage loan, guarantor, and board controls.</p>
 </div>
 
 <c:if test="${settingsSection eq 'board'}">
@@ -48,21 +48,23 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
+    <c:if test="${not customizedProductExists}">
+        <div class="mb-4 flex flex-wrap justify-end gap-3">
+            <button type="button"
+                    class="app-btn btn-primary"
+                    data-product-modal-open="create-product">
+                Add loan product
+            </button>
+        </div>
+    </c:if>
+
     <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
         <c:forEach items="${products}" var="product">
-            <c:choose>
-                <c:when test="${product.loanType eq 'LOAN_ADVANCE'}"><c:set var="loanTypeLabel" value="Loan Advance" /></c:when>
-                <c:when test="${product.loanType eq 'EDUCATION_LOAN'}"><c:set var="loanTypeLabel" value="Education Loan" /></c:when>
-                <c:when test="${product.loanType eq 'EMERGENCY_LOAN'}"><c:set var="loanTypeLabel" value="Emergency Loan" /></c:when>
-                <c:when test="${product.loanType eq 'DEVELOPMENT_LOAN'}"><c:set var="loanTypeLabel" value="Development Loan" /></c:when>
-                <c:otherwise><c:set var="loanTypeLabel" value="${fn:replace(product.loanType, '_', ' ')}" /></c:otherwise>
-            </c:choose>
-
             <section class="erp-panel overflow-hidden">
                 <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="erp-widget-title">Loan Product</p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink">${loanTypeLabel}</h2>
+                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
                         <p class="mt-1 text-sm text-slate-500">Configuration overview for this product.</p>
                     </div>
                     <div class="flex items-center gap-2 sm:pt-1">
@@ -123,15 +125,77 @@
     </div>
 </c:if>
 
-<c:forEach items="${products}" var="product">
-    <c:choose>
-        <c:when test="${product.loanType eq 'LOAN_ADVANCE'}"><c:set var="loanTypeLabel" value="Loan Advance" /></c:when>
-        <c:when test="${product.loanType eq 'EDUCATION_LOAN'}"><c:set var="loanTypeLabel" value="Education Loan" /></c:when>
-        <c:when test="${product.loanType eq 'EMERGENCY_LOAN'}"><c:set var="loanTypeLabel" value="Emergency Loan" /></c:when>
-        <c:when test="${product.loanType eq 'DEVELOPMENT_LOAN'}"><c:set var="loanTypeLabel" value="Development Loan" /></c:when>
-        <c:otherwise><c:set var="loanTypeLabel" value="${fn:replace(product.loanType, '_', ' ')}" /></c:otherwise>
-    </c:choose>
+<c:if test="${settingsSection eq 'loan' and not customizedProductExists}">
+    <div class="app-modal-overlay hidden"
+         data-product-modal="create-product">
+        <div class="app-modal-panel app-modal-panel--compact">
+            <div class="app-modal-scroll">
+                <div class="app-modal-header">
+                    <div>
+                        <p class="erp-widget-title">Add Loan Product</p>
+                        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Customized Loan Product</h2>
+                        <p class="mt-1 text-sm text-slate-500">Name the product, then set its limits and rates for this SACCO.</p>
+                    </div>
+                    <button type="button" class="app-modal-close" data-product-modal-close="create-product" aria-label="Close modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
 
+                <form action="/admin/settings-controls/customized-product" method="post" class="app-modal-body grid gap-4 md:grid-cols-2">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+                        Loan Product Name
+                        <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. School Fees Booster" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Guarantors
+                        <input name="guarantorsRequired" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Savings Percentage
+                        <input name="maxLoanSavingsPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="33.33" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Insurance %
+                        <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.50" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Interest %
+                        <input name="interestPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="10.00" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Max Repayment Period
+                        <input name="maxRepaymentMonths" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="12" />
+                    </label>
+
+                    <label class="flex items-center gap-2 self-end rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input name="active" type="checkbox" value="true" checked />
+                        <span>Active Immediately</span>
+                    </label>
+
+                    <div class="app-modal-actions md:col-span-2">
+                        <button type="button"
+                                class="app-btn btn-neutral"
+                                data-product-modal-close="create-product">
+                            Cancel
+                        </button>
+                        <button type="submit" class="app-btn btn-primary">Add loan product</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</c:if>
+
+<c:forEach items="${products}" var="product">
     <div class="app-modal-overlay hidden"
          data-product-modal="product-${product.id}">
         <div class="app-modal-panel">
@@ -139,7 +203,7 @@
             <div class="app-modal-header">
                 <div>
                     <p class="erp-widget-title">Edit Product</p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink">${loanTypeLabel}</h2>
+                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
                 </div>
                 <button type="button" class="app-modal-close" data-product-modal-close="product-${product.id}" aria-label="Close modal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -150,6 +214,13 @@
 
             <form action="/admin/settings-controls/${product.id}" method="post" class="app-modal-body grid gap-4 md:grid-cols-2">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+
+                <c:if test="${product.loanType eq 'CUSTOMIZED_LOAN'}">
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+                        Loan Product Name
+                        <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${fn:escapeXml(product.displayName)}" />
+                    </label>
+                </c:if>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Guarantors

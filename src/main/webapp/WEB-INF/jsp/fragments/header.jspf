@@ -8,34 +8,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><spring:message code="app.title" /></title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ["Manrope", "ui-sans-serif", "system-ui"],
-                        display: ["Sora", "ui-sans-serif", "system-ui"]
-                    },
-                    colors: {
-                        sacco: {
-                            brown: "#8A4B24",
-                            blue: "#2F348D",
-                            green: "#3F9C4B",
-                            cream: "#F7F4EE",
-                            ink: "#172033"
-                        }
-                    },
-                    boxShadow: {
-                        frame: "0 18px 45px -22px rgba(23, 32, 51, 0.32)"
-                    }
-                }
-            }
-        };
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
+    <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <style>
         html {
             font-size: 16px;
@@ -177,13 +151,16 @@
             overflow: hidden;
         }
         .erp-dropdown-header {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
             align-items: flex-start;
-            justify-content: space-between;
             gap: 0.75rem;
             padding: 0.8rem 0.95rem 0.7rem;
             border-bottom: 1px solid #e5e7eb;
             background: #f8fafc;
+        }
+        .erp-dropdown-heading {
+            min-width: 0;
         }
         .erp-dropdown-title {
             color: #1f2937;
@@ -198,20 +175,48 @@
             line-height: 1.35;
         }
         .erp-dropdown-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            white-space: nowrap;
+            flex-shrink: 0;
             color: #334155;
             font-size: 0.76rem;
             font-weight: 700;
+            line-height: 1.2;
+        }
+        .erp-notification-body {
+            max-height: 22rem;
+            overflow-y: auto;
+            padding: 0.75rem;
+        }
+        .erp-notification-empty {
+            border-radius: 0.4rem;
+            border: 1px dashed #dbe3ec;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            font-size: 0.92rem;
+            line-height: 1.45;
+            color: #64748b;
+            background: #ffffff;
+        }
+        .erp-notification-panel {
+            width: min(21rem, calc(100vw - 1rem));
+            max-width: calc(100vw - 1rem);
         }
         .erp-icon-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 2.15rem;
-            height: 2.15rem;
+            width: 2.55rem;
+            height: 2.55rem;
+            padding: 0;
             border: 1px solid rgba(255,255,255,0.55);
             border-radius: 0.28rem;
             background: rgba(255,255,255,0.96);
             color: #475569;
+            font-size: 1rem;
+            line-height: 1;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
             transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
         }
@@ -219,38 +224,104 @@
             background: #f8fafc;
             box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
         }
+        .shell-powered-by {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.2rem;
+            margin-top: 0.45rem;
+            color: #18bfd0;
+        }
+        .shell-powered-by-label {
+            color: #64748b;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .shell-powered-by-logo {
+            width: 10.8rem;
+            height: auto;
+            max-width: 100%;
+            flex-shrink: 0;
+            display: block;
+        }
+        .shell-powered-by-logo text {
+            fill: #18bfd0;
+        }
         .erp-icon-btn svg {
             width: 1.2rem;
             height: 1.2rem;
+            flex-shrink: 0;
         }
         @media (max-width: 768px) {
             .erp-icon-btn {
-                width: 2rem;
-                height: 2rem;
+                width: 2.35rem;
+                height: 2.35rem;
+            }
+            .erp-icon-btn svg {
+                width: 1.08rem;
+                height: 1.08rem;
+            }
+            .erp-notification-panel {
+                position: fixed;
+                top: calc(var(--shell-nav-height) + 0.5rem);
+                left: 50%;
+                right: auto;
+                width: min(22rem, calc(100vw - 1rem));
+                max-width: calc(100vw - 1rem);
+            }
+            .notification-panel.erp-notification-panel {
+                transform: translate(-50%, -8px);
+            }
+            .notification-panel.erp-notification-panel.is-open {
+                transform: translate(-50%, 0);
+            }
+            .erp-notification-panel .erp-dropdown-header {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0.7rem;
+                padding: 0.9rem 1rem 0.85rem;
+            }
+            .erp-notification-panel .erp-dropdown-link {
+                justify-content: center;
+                width: fit-content;
+                min-width: 5.25rem;
+                padding: 0.42rem 0.7rem;
+                border: 1px solid #cbd5e1;
+                border-radius: 0.32rem;
+                background: #ffffff;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            }
+            .erp-notification-panel .erp-dropdown-subtitle {
+                max-width: 26ch;
+            }
+            .erp-notification-body {
+                max-height: min(20rem, calc(100vh - var(--shell-nav-height) - 5.5rem));
+                padding: 0.85rem;
+            }
+            .erp-notification-empty {
+                padding: 2rem 1rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .erp-icon-btn {
+                width: 2.2rem;
+                height: 2.2rem;
             }
             .erp-icon-btn svg {
                 width: 1rem;
                 height: 1rem;
             }
         }
-        @media (max-width: 480px) {
-            .erp-icon-btn {
-                width: 1.9rem;
-                height: 1.9rem;
-            }
-            .erp-icon-btn svg {
-                width: 0.95rem;
-                height: 0.95rem;
-            }
-        }
         @media (max-width: 374px) {
             .erp-icon-btn {
-                width: 1.78rem;
-                height: 1.78rem;
+                width: 2rem;
+                height: 2rem;
             }
             .erp-icon-btn svg {
-                width: 0.88rem;
-                height: 0.88rem;
+                width: 0.92rem;
+                height: 0.92rem;
             }
             .erp-mobile-compact {
                 gap: 0.35rem !important;
@@ -258,6 +329,10 @@
             .erp-mobile-compact .app-btn {
                 padding: 0.45rem 0.6rem;
                 font-size: 0.72rem;
+            }
+            .erp-notification-panel {
+                width: calc(100vw - 0.75rem);
+                max-width: calc(100vw - 0.75rem);
             }
         }
         .erp-page-header,
@@ -351,6 +426,31 @@
         }
         .erp-panel-body {
             padding: 1rem;
+        }
+        .admin-filter-form input,
+        .admin-filter-form select,
+        .admin-filter-form .neo-select-button,
+        .admin-filter-form .app-btn,
+        .erp-filter-form input,
+        .erp-filter-form select,
+        .erp-filter-form .neo-select-button,
+        .erp-filter-form .app-btn,
+        .erp-filter-form button {
+            min-height: 2.75rem;
+        }
+        .admin-filter-form input,
+        .admin-filter-form select,
+        .admin-filter-form .neo-select-button,
+        .erp-filter-form input,
+        .erp-filter-form select,
+        .erp-filter-form .neo-select-button {
+            padding-top: 0.7rem;
+            padding-bottom: 0.7rem;
+        }
+        .admin-filter-form .app-btn,
+        .erp-filter-form .app-btn,
+        .erp-filter-form button {
+            min-width: 6.5rem;
         }
         .erp-widget-title {
             color: var(--text-muted);
@@ -722,11 +822,14 @@
             color: #516680 !important;
         }
         #memberArchivePanel > a,
+        #adminSaccoPanel > a,
         #adminSettingsPanel > a {
             border-radius: 0.25rem;
         }
         #memberArchivePanel > a:hover,
         #memberArchivePanel > a:focus-visible,
+        #adminSaccoPanel > a:hover,
+        #adminSaccoPanel > a:focus-visible,
         #adminSettingsPanel > a:hover,
         #adminSettingsPanel > a:focus-visible {
             background: rgba(255, 255, 255, 0.72);
@@ -791,7 +894,7 @@
 </head>
 <body class="min-h-screen font-sans text-sacco-ink antialiased" style="background: var(--page-bg); overflow-x: clip;">
 <div class="min-h-screen w-full max-w-full" style="background: var(--page-bg); overflow-x: clip;">
-<nav id="shellTopNav" class="fixed inset-x-0 top-0 z-50 border-b shadow-sm" style="min-height: var(--shell-nav-height); border-color: #10a8b6; background: linear-gradient(180deg, #19c6d8 0%, #11b2c3 100%);">
+<nav id="shellTopNav" class="fixed inset-x-0 top-0 z-50 border-b shadow-sm" style="min-height: var(--shell-nav-height); border-color: #8fbfdf; background: linear-gradient(145deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.24) 23%, rgba(255,255,255,0) 23%), linear-gradient(180deg, #abd5ef 0%, #8fc5e7 100%);">
     <div class="flex items-center justify-between gap-2 px-2.5 py-2 sm:gap-3 sm:px-3 lg:px-4">
         <div class="flex min-w-0 items-center gap-2 sm:gap-2.5">
             <button id="sidebarToggle" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" style="border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.96);" aria-label="Open menu">
@@ -801,7 +904,7 @@
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="${currentMember.position eq 'ADMIN' ? '/admin/dashboard' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/manager-decisions' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'BOARD' ? '/board/queue' : '/app/dashboard')))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/manager-decisions' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'BOARD' ? '/board/queue' : '/app/dashboard')))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
                 <c:choose>
                     <c:when test="${not empty activeSaccoLogoUrl}">
                         <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
@@ -834,8 +937,8 @@
         </div>
 
         <div class="erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
-            <sec:authorize access="hasRole('ADMIN')">
-                <c:if test="${not empty adminScope}">
+            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
                     <div class="hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
@@ -865,20 +968,20 @@
                         </c:choose>
                     </span>
                 </c:if>
-                <div id="notificationPanel" class="notification-panel erp-dropdown absolute right-0 top-[calc(100%+0.55rem)] z-50 w-[18rem] max-w-[calc(100vw-1rem)] sm:w-[21rem] max-[374px]:right-[-0.2rem] max-[374px]:w-[16rem]">
+                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50">
                     <div class="erp-dropdown-header">
-                        <div>
+                        <div class="erp-dropdown-heading">
                             <p class="erp-dropdown-title">Notifications</p>
                             <p class="erp-dropdown-subtitle">${notificationPanelSubtitle}</p>
                         </div>
                         <a href="${notificationTargetUrl}" class="erp-dropdown-link">View all</a>
                     </div>
-                    <div class="max-h-[22rem] space-y-2 overflow-y-auto p-3">
+                    <div class="erp-notification-body space-y-2">
                         <c:choose>
                             <c:when test="${not empty headerNotifications}">
                                 <c:forEach items="${headerNotifications}" var="notification">
-                                    <c:url var="headerNotificationHref" value="${notificationTargetUrl}?highlight=${notification.id}#notification-${notification.id}" />
-                                    <c:if test="${not empty currentMember and currentMember.position eq 'ADMIN' and notification.incidentId ne null}">
+                                    <c:url var="headerNotificationHref" value="${notificationTargetUrl}${fn:contains(notificationTargetUrl, '?') ? '&amp;' : '?'}highlight=${notification.id}#notification-${notification.id}" />
+                                    <c:if test="${not empty currentMember and (currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') and notification.incidentId ne null}">
                                         <c:url var="headerNotificationHref" value="/admin/incidents/${notification.incidentId}" />
                                     </c:if>
                                     <a href="${headerNotificationHref}" class="block rounded-md border px-3 py-3 transition hover:border-slate-300 hover:bg-slate-50 ${notification.unread ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}">
@@ -894,7 +997,7 @@
                                 </c:forEach>
                             </c:when>
                             <c:otherwise>
-                                <div class="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">${notificationPanelEmptyState}</div>
+                                <div class="erp-notification-empty">${notificationPanelEmptyState}</div>
                             </c:otherwise>
                         </c:choose>
                     </div>
@@ -928,7 +1031,7 @@
                 </button>
                 <div id="profilePanel" class="profile-panel erp-dropdown absolute right-0 top-[calc(100%+0.55rem)] z-50 w-[16.5rem] max-w-[calc(100vw-1rem)] sm:w-[19rem] max-[374px]:right-[-0.2rem] max-[374px]:w-[15rem]">
                     <div class="erp-dropdown-header">
-                        <div>
+                        <div class="erp-dropdown-heading">
                             <p class="erp-dropdown-title">Profile</p>
                             <p class="erp-dropdown-subtitle">Your account details</p>
                         </div>
@@ -954,7 +1057,7 @@
                             <c:if test="${not empty currentMember and not empty currentMember.email}">
                                 <p class="mt-1 truncate text-xs text-slate-500">${currentMember.email}</p>
                             </c:if>
-                            <c:if test="${not empty adminScope}">
+                            <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
                                 <p class="mt-1 text-[11px] font-medium text-slate-500">${adminScope.saccoId} / ${adminScope.stationId}</p>
                             </c:if>
                         </div>
@@ -1203,8 +1306,8 @@
         window.addEventListener('load', function () {
             const adminScopeOptionsNode = document.getElementById('adminScopeOptionsData');
             const adminScopeSaccoSelect = document.getElementById('adminScopeSaccoSelect');
-            const adminScopeStationInput = document.getElementById('adminScopeStationSelect');
-            if (!adminScopeOptionsNode || !adminScopeSaccoSelect || !adminScopeStationInput) {
+            const adminScopeStationSelect = document.getElementById('adminScopeStationSelect');
+            if (!adminScopeOptionsNode || !adminScopeSaccoSelect || !adminScopeStationSelect) {
                 return;
             }
             const adminScopeOptions = JSON.parse(adminScopeOptionsNode.textContent || '[]');
@@ -1212,12 +1315,23 @@
                 const selectedSacco = adminScopeSaccoSelect.value;
                 const scopeOption = adminScopeOptions.find(function (option) { return option.saccoId === selectedSacco; });
                 const stations = scopeOption && Array.isArray(scopeOption.stationIds) ? scopeOption.stationIds : [];
-                const currentStation = adminScopeStationInput.value || '${not empty adminScope ? adminScope.stationId : ""}';
-                if (stations.includes(currentStation)) {
-                    adminScopeStationInput.value = currentStation;
-                    return;
+                const currentStation = adminScopeStationSelect.value || '${not empty adminScope ? adminScope.stationId : ""}';
+                adminScopeStationSelect.innerHTML = '';
+                stations.forEach(function (stationId) {
+                    const option = document.createElement('option');
+                    option.value = stationId;
+                    option.textContent = stationId;
+                    if (stationId === currentStation) {
+                        option.selected = true;
+                    }
+                    adminScopeStationSelect.appendChild(option);
+                });
+                if (!stations.includes(currentStation) && stations.length > 0) {
+                    adminScopeStationSelect.value = stations[0];
                 }
-                adminScopeStationInput.value = stations.length > 0 ? stations[0] : '';
+                if (typeof window.refreshEnhancedSelects === 'function') {
+                    window.refreshEnhancedSelects(adminScopeStationSelect.parentElement);
+                }
             };
             adminScopeSaccoSelect.addEventListener('change', syncStationOptions);
             syncStationOptions();

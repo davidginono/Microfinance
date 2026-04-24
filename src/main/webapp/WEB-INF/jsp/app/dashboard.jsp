@@ -305,6 +305,34 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </div>
 
+    <section class="erp-panel">
+        <div class="erp-panel-header">
+            <p class="erp-panel-title">Financial Status</p>
+        </div>
+        <div class="erp-panel-body">
+            <div>
+                <div>
+                    <p class="erp-widget-title">Member Balances</p>
+                    <h2 class="erp-widget-heading">Savings And Shares Overview</h2>
+                </div>
+            </div>
+
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Savings</p>
+                    <p class="mt-2 text-2xl font-bold text-sacco-ink">${dashboardExternalAccountStatus.savingsLabel}</p>
+                    <p class="mt-2 text-sm text-slate-500">Current savings balance available to this member.</p>
+                </div>
+
+                <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Shares</p>
+                    <p class="mt-2 text-2xl font-bold text-sacco-ink">${dashboardExternalAccountStatus.sharesLabel}</p>
+                    <p class="mt-2 text-sm text-slate-500">Current shares balance recorded for this member.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
         <section class="erp-panel">
             <div class="erp-panel-header">
@@ -365,40 +393,92 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <c:when test="${not empty activeLoanChartRows}">
                         <div class="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-1 3xl:grid-cols-2">
                             <c:forEach items="${activeLoanChartRows}" var="loanRow">
-                                <div class="rounded border border-slate-200 bg-white p-4">
+                                <div class="rounded border border-slate-200 bg-white p-4"
+                                     data-repayment-timer="card"
+                                     data-start-date="${loanRow.startDate}"
+                                     data-final-due-date="${loanRow.finalDueDate}"
+                                     data-total-days="${loanRow.totalDays}">
                                     <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_160px] sm:items-center">
                                         <div class="min-w-0">
-                                            <p class="erp-widget-title">Repayment Timer</p>
-                                            <h3 class="mt-1 text-lg font-bold text-sacco-ink">Loan ID ${loanRow.loanId}</h3>
+                                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                                <div>
+                                                    <p class="erp-widget-title">Repayment Timer</p>
+                                                    <h3 class="mt-1 text-lg font-bold text-sacco-ink">Loan ID ${loanRow.loanId}</h3>
+                                                </div>
+                                                <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">
+                                                    <c:if test="${loanRow.repaymentStateLabel eq 'Paid'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
+                                                </span>
+                                            </div>
                                             <p class="mt-1 text-sm text-slate-500">Loan Amount: ${loanRow.amountLabel}</p>
                                             <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-slate-600">
                                                 <div>
                                                     <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Elapsed</p>
-                                                    <p class="mt-1 font-semibold text-sacco-ink">${loanRow.elapsedDays} day(s)</p>
+                                                    <p class="mt-1 font-semibold text-sacco-ink" data-repayment-timer="elapsed-days">${loanRow.elapsedDays} day(s)</p>
                                                 </div>
                                                 <div>
                                                     <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Remaining</p>
-                                                    <p class="mt-1 font-semibold text-sacco-ink">${loanRow.daysLeft} day(s)</p>
+                                                    <p class="mt-1 font-semibold text-sacco-ink" data-repayment-timer="days-left">${loanRow.daysLeft} day(s)</p>
                                                 </div>
                                                 <div class="col-span-2">
                                                     <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Final Due Date</p>
                                                     <p class="mt-1 font-semibold text-sacco-ink">${loanRow.finalDueDate}</p>
                                                 </div>
                                             </div>
+                                            <div class="mt-4 rounded-md border border-slate-200 bg-slate-50">
+                                                <div class="border-b border-slate-200 px-3 py-2">
+                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Loan Payment Summary</p>
+                                                </div>
+                                                <c:choose>
+                                                    <c:when test="${loanRow.paymentSummaryAvailable}">
+                                                        <div class="grid gap-3 px-3 py-3 sm:grid-cols-2">
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Product</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.loanDescription}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Last Payment</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.lastPaymentDate}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.totalOutstanding}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Principal Paid</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.totalPrincipalPaid}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding Principal</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.outstandingPrincipal}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding Interest</p>
+                                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.outstandingInterest}</p>
+                                                            </div>
+                                                        </div>
+                                                    </c:when>
+                                                    <c:otherwise>
+                                                        <div class="px-3 py-3 text-sm text-slate-500">
+                                                            Payment summary details will appear after the latest synced repayment record is fetched from memberportal.
+                                                        </div>
+                                                    </c:otherwise>
+                                                </c:choose>
+                                            </div>
                                         </div>
 
                                         <div class="mx-auto flex w-full max-w-[170px] flex-col items-center gap-3">
                                             <div class="relative flex h-28 w-28 items-center justify-center rounded-full sm:h-32 sm:w-32"
+                                                 data-repayment-timer="ring"
                                                  style="background: conic-gradient(#E2E8F0 0% ${loanRow.remainingPercent}%, #2F348D ${loanRow.remainingPercent}% 100%);">
                                                 <div class="flex h-18 w-18 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm sm:h-20 sm:w-20">
                                                     <p class="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-400">Remaining</p>
-                                                    <p class="mt-1 font-display text-xl text-sacco-ink sm:text-2xl">${loanRow.remainingPercent}%</p>
-                                                    <p class="mt-1 text-[10px] text-slate-500">${loanRow.countdown}</p>
+                                                    <p class="mt-1 font-display text-xl text-sacco-ink sm:text-2xl" data-repayment-timer="remaining-percent">${loanRow.remainingPercent}%</p>
+                                                    <p class="mt-1 text-[10px] text-slate-500" data-repayment-timer="countdown">${loanRow.countdown}</p>
                                                 </div>
                                             </div>
                                             <div class="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-center">
                                                 <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Repayment Progress</p>
-                                                <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.remainingPercent}% remaining</p>
+                                                <p class="mt-1 text-sm font-semibold text-sacco-ink" data-repayment-timer="progress-text">${loanRow.remainingPercent}% remaining</p>
                                             </div>
                                             <c:if test="${loanRow.canDismiss}">
                                                 <form method="post" action="${pageContext.request.contextPath}/app/dashboard/active-loans/${loanRow.fullId}/seen" class="w-full">
@@ -447,7 +527,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <table class="erp-table">
                         <thead>
                         <tr>
-                            <th>Loan Id</th>
+                            <th>Loan Application ID</th>
                             <th>Loan Type</th>
                             <th>Amount</th>
                             <th>Status</th>
@@ -456,7 +536,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <tbody>
                         <c:forEach items="${myApplications}" var="app" end="4">
                             <tr>
-                                <td>${fn:substring(app.id, 0, 8)}</td>
+                                <td>${app.applicationNumber}</td>
                                 <td><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></td>
                                 <td>${app.amount}</td>
                                 <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
@@ -483,7 +563,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <thead>
                         <tr>
                             <th>Loan Id</th>
-                            <th>Requested</th>
+                            <th>Loan Amount</th>
                             <th>Status</th>
                         </tr>
                         </thead>
@@ -491,7 +571,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <c:forEach items="${pendingGuarantees}" var="request" end="4">
                             <tr>
                                 <td>${fn:substring(request.loanApplicationId, 0, 8)}</td>
-                                <td>${request.requestedAmount}</td>
+                                <td>${guaranteeLoanAmounts[request.loanApplicationId]}</td>
                                 <td>${request.status}</td>
                             </tr>
                         </c:forEach>
@@ -510,6 +590,124 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
 <script>
     (function () {
+        function parseLocalDate(value) {
+            if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                return null;
+            }
+            var parts = value.split('-');
+            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        }
+
+        function formatDayLabel(days) {
+            return days + ' day(s)';
+        }
+
+        function formatPercent(value) {
+            if (!isFinite(value)) {
+                return '0%';
+            }
+            var rounded = Math.max(0, Math.min(100, value));
+            if (rounded === 0 || rounded === 100) {
+                return Math.round(rounded) + '%';
+            }
+            return rounded.toFixed(1) + '%';
+        }
+
+        function formatCountdown(diffMs) {
+            var minuteMs = 60 * 1000;
+            var hourMs = 60 * minuteMs;
+            var dayMs = 24 * hourMs;
+
+            if (diffMs <= 0) {
+                var overdueMs = Math.abs(diffMs);
+                var overdueDays = Math.floor(overdueMs / dayMs);
+                if (overdueDays >= 1) {
+                    return overdueDays === 1 ? 'Overdue by 1 day' : 'Overdue by ' + overdueDays + ' days';
+                }
+                var overdueHours = Math.max(1, Math.floor(overdueMs / hourMs));
+                return overdueHours === 1 ? 'Overdue by 1 hour' : 'Overdue by ' + overdueHours + ' hours';
+            }
+
+            var days = Math.floor(diffMs / dayMs);
+            var hours = Math.floor((diffMs % dayMs) / hourMs);
+            var minutes = Math.floor((diffMs % hourMs) / minuteMs);
+
+            if (days > 1) {
+                return days + 'd ' + hours + 'h left';
+            }
+            if (days === 1) {
+                return '1d ' + hours + 'h left';
+            }
+            if (hours > 0) {
+                return hours + 'h ' + minutes + 'm left';
+            }
+            return Math.max(1, minutes) + 'm left';
+        }
+
+        function updateRepaymentTimerCard(card) {
+            if (!card) {
+                return;
+            }
+
+            var startDate = parseLocalDate(card.getAttribute('data-start-date'));
+            var finalDueDate = parseLocalDate(card.getAttribute('data-final-due-date'));
+            if (!startDate || !finalDueDate) {
+                return;
+            }
+
+            var now = new Date();
+            var startAt = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+            var dueAt = new Date(finalDueDate.getFullYear(), finalDueDate.getMonth(), finalDueDate.getDate(), 23, 59, 59, 999);
+            var totalMs = Math.max(dueAt.getTime() - startAt.getTime(), 1);
+            var elapsedMs = Math.max(0, Math.min(totalMs, now.getTime() - startAt.getTime()));
+            var remainingMs = Math.max(0, dueAt.getTime() - now.getTime());
+            var dayMs = 24 * 60 * 60 * 1000;
+
+            var elapsedDays = Math.max(0, Math.floor(elapsedMs / dayMs));
+            var daysLeft = Math.max(0, Math.ceil(remainingMs / dayMs));
+            var remainingPercent = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
+
+            var elapsedEl = card.querySelector('[data-repayment-timer="elapsed-days"]');
+            var daysLeftEl = card.querySelector('[data-repayment-timer="days-left"]');
+            var percentEl = card.querySelector('[data-repayment-timer="remaining-percent"]');
+            var countdownEl = card.querySelector('[data-repayment-timer="countdown"]');
+            var progressEl = card.querySelector('[data-repayment-timer="progress-text"]');
+            var ringEl = card.querySelector('[data-repayment-timer="ring"]');
+
+            if (elapsedEl) {
+                elapsedEl.textContent = formatDayLabel(elapsedDays);
+            }
+            if (daysLeftEl) {
+                daysLeftEl.textContent = formatDayLabel(daysLeft);
+            }
+            if (percentEl) {
+                percentEl.textContent = formatPercent(remainingPercent);
+            }
+            if (countdownEl) {
+                countdownEl.textContent = formatCountdown(dueAt.getTime() - now.getTime());
+            }
+            if (progressEl) {
+                progressEl.textContent = formatPercent(remainingPercent) + ' remaining';
+            }
+            if (ringEl) {
+                ringEl.style.background = 'conic-gradient(#E2E8F0 0% ' + remainingPercent + '%, #2F348D ' + remainingPercent + '% 100%)';
+            }
+        }
+
+        function startRepaymentTimers() {
+            var timerCards = document.querySelectorAll('[data-repayment-timer="card"]');
+            if (!timerCards.length) {
+                return;
+            }
+
+            function refresh() {
+                Array.prototype.forEach.call(timerCards, updateRepaymentTimerCard);
+            }
+
+            refresh();
+            window.setInterval(refresh, 60000);
+        }
+
         function bindTooltip(wrapId, selector, tooltipId, titleId, valueRenderer) {
             var wrap = document.getElementById(wrapId);
             var tooltip = document.getElementById(tooltipId);
@@ -547,6 +745,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     (point.getAttribute('data-value') || '0') + ' application(s)';
             }
         );
+
+        startRepaymentTimers();
 
     }());
 </script>

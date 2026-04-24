@@ -8,11 +8,11 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Users & Roles</p>
     <h1 class="erp-page-title">Users & Roles</h1>
-    <p class="erp-page-subtitle">Manage member, staff, and staff-and-member access cleanly while keeping role access aligned with each account type.</p>
+    <p class="erp-page-subtitle">Manage access and roles for the current SACCO.</p>
 </div>
 
 <div class="erp-toolbar">
-    <div class="text-sm text-slate-500">Use Add User for staff accounts. Members should still come through the registration flow first.</div>
+    <div class="text-sm text-slate-500">Add User is for staff accounts only.</div>
     <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user">Add User</button>
 </div>
 
@@ -21,7 +21,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
                 <p class="erp-widget-title">Filter And View Options</p>
-                <p class="mt-2 text-sm leading-6 text-slate-500">Search by user name, email address, or user ID, then page through the matching records instead of loading the full user table at once.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Search users and page the results.</p>
             </div>
             <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                 <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_14rem_auto] lg:items-end">
+    <form method="get" action="/admin/users" class="admin-filter-form grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_14rem_auto] lg:items-end">
         <label class="block">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search User</span>
             <input type="text"
@@ -120,7 +120,7 @@
 
 <div class="erp-toolbar">
     <div class="text-sm text-slate-500">
-        The table is server-paged so large user lists stay fast and manageable. Increase rows per page only when you need a wider view.
+        The table is server-paged to keep large user lists manageable.
     </div>
     <c:if test="${usersPage.totalPages > 1}">
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -206,10 +206,6 @@
                     </div>
                 </div>
 
-            <div class="app-modal-section text-sm text-slate-600 md:col-span-2">
-                New users added here are <strong>staff</strong> by default. Admin accounts must remain <strong>ADMIN</strong> only. Other staff accounts can hold one or more non-admin staff roles.
-            </div>
-
             <div class="app-modal-actions md:col-span-2">
                 <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
                 <button type="submit" class="app-btn btn-primary">Create User</button>
@@ -265,20 +261,6 @@
                     </select>
                 </label>
 
-                <div class="app-modal-section text-sm text-slate-600">
-                    <c:choose>
-                        <c:when test="${user.staffRoles.contains('ADMIN') || user.roleSummary eq 'ADMIN'}">
-                            This is an <strong>Admin</strong> account. It must remain <strong>ADMIN</strong> only and cannot be combined with any other staff role.
-                        </c:when>
-                        <c:when test="${user.membershipLabel ne 'Staff'}">
-                            This account remains a registered member. Leave all staff roles unticked to keep it as <strong>Member</strong> only, or tick one or more staff roles to make it <strong>Staff And Member</strong>.
-                        </c:when>
-                        <c:otherwise>
-                            This is a staff account. Select every staff role this user should be allowed to use while keeping the account as <strong>Staff</strong> only.
-                        </c:otherwise>
-                    </c:choose>
-                </div>
-
                 <div class="app-modal-actions">
                     <button type="button"
                             class="app-btn btn-neutral"
@@ -309,19 +291,19 @@
             if (!checkboxes.length) {
                 return;
             }
-            const adminCheckbox = checkboxes.find((checkbox) => checkbox.value === 'ADMIN');
-            if (!adminCheckbox) {
+            const adminClassCheckboxes = checkboxes.filter((checkbox) => checkbox.value === 'ADMIN' || checkbox.value === 'MINOR_ADMIN');
+            if (!adminClassCheckboxes.length) {
                 return;
             }
-            const adminChecked = adminCheckbox.checked;
+            const checkedAdminClass = adminClassCheckboxes.find((checkbox) => checkbox.checked);
             checkboxes.forEach((checkbox) => {
-                if (checkbox === adminCheckbox) {
-                    return;
+                const isAdminClass = checkbox.value === 'ADMIN' || checkbox.value === 'MINOR_ADMIN';
+                if (checkedAdminClass && checkbox !== checkedAdminClass) {
+                    if (isAdminClass || !isAdminClass) {
+                        checkbox.checked = false;
+                    }
                 }
-                if (adminChecked) {
-                    checkbox.checked = false;
-                }
-                checkbox.disabled = adminChecked;
+                checkbox.disabled = Boolean(checkedAdminClass && checkbox !== checkedAdminClass);
             });
         }
 

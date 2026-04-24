@@ -3,17 +3,19 @@ name: iaa-saccos-ui-governance
 description: UI and navigation governance for IAA_SACCOS. Use when generating or editing JSP, HTML, controller-backed page flows, shared fragments, dashboards, workspaces, forms, review screens, or navigation patterns in this repository. Enforce single-source navigation in the sidebar, reduce UI memory load by avoiding explanatory text, and apply Shneiderman and Nielsen usability rules while staying within the existing ERP-style system.
 ---
 
-# IAA SACCOS UI Governance
+# SACCOS LMS UI Governance
 
 ## Navigation
 
 - Keep navigations in one place: the sidebar.
 - Do not repeat the same workspace navigation links inside page content areas.
+- Do not add route-launch buttons such as `Open SACCOs`, `Back To Dashboard`, `Open Event Log`, or `Open Registry` inside page bodies when those destinations already exist in the sidebar.
 - Do not add duplicate "Back to Queue", "Go to Dashboard", "Open Archive", or similar links inside cards or action sections when the sidebar already provides that route.
 - Use modern sidebar behavior by default:
   - parent menu groups with subitems should collapse by default and expand only after explicit user action
   - use clear chevrons, `aria-expanded`, and persistent open/closed state when helpful
   - when a submenu item is selected, render that destination as its own focused view instead of stacking sibling destinations on one page
+- When a portfolio dashboard and a registry both exist, keep them as separate sidebar destinations instead of combining cards and registry tables on one page.
 - Use content-area actions only for record-specific tasks:
   - submit
   - approve
@@ -30,6 +32,7 @@ description: UI and navigation governance for IAA_SACCOS. Use when generating or
 - Remove repeated status explanations, process explanations, and instructional text when the interface already makes the action clear.
 - Do not add mini dashboard stat cards or summary-number strips to non-dashboard pages.
 - Keep counts, totals, and KPI summaries on dedicated dashboard routes only unless the user explicitly asks for inline analytics on that page.
+- Keep dashboard routes card-focused by default. Do not place operational registry tables on dashboards unless the user explicitly asks for a combined view.
 - Keep headings concise and direct.
 - Use one clear prompt for risky actions instead of surrounding the action with multiple warnings.
 - Favor recognition over recall:
@@ -41,6 +44,7 @@ description: UI and navigation governance for IAA_SACCOS. Use when generating or
 - Strive for consistency in labels, buttons, spacing, card structure, and status treatments.
 - Enable frequent users to use shortcuts:
   - keep common actions predictable
+  - avoid putting alternate navigations of any of the sidebar menu items in the main content.
   - avoid moving primary actions between pages
 - Offer informative feedback:
   - use concise success, error, and pending states
@@ -56,8 +60,9 @@ description: UI and navigation governance for IAA_SACCOS. Use when generating or
   - let the user feel in charge through clear choices and confirmations
   - avoid surprising state changes
 - Reduce short-term memory load:
-  - keep related facts on the same card
-  - avoid duplicate navigation and duplicate explanation blocks
+    - Do not put unnecessary subtitle explanations, and elaborations.
+    - keep related facts on the same card
+    - avoid duplicate navigation and duplicate explanation blocks
 
 ## Nielsen Heuristics
 
@@ -87,6 +92,13 @@ description: UI and navigation governance for IAA_SACCOS. Use when generating or
 - Keep page content focused on the current record or task, not on cross-workspace navigation.
 - On list, report, form, review, archive, and detail pages, avoid dashboard-style metric summaries above the main content.
 - When editing a page with repeated navigation links in the body, remove them and rely on the sidebar unless the link is record-specific.
+- When a route named `SACCOs` exists, treat it as the portfolio/workspace view. Put registry tables under a separate `SACCO Registry` sidebar item and separate page.
+- Use one shared modal style across the product:
+  - calm white modal surface
+  - modest system-aligned corners, not pill-shaped
+  - thin neutral border and soft shadow
+  - simple close icon in the top-right
+  - action buttons grouped at the bottom-right
 - When adding helper text, keep it to one short sentence only if the action would otherwise be ambiguous.
 - Prefer concise confirmation dialogs over long inline explanations.
 - Preserve responsiveness and avoid horizontal overflow on mobile, tablet, laptop, and wide screens.

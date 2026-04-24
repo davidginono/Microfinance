@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.BoardDecision;
+import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryDto;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,12 +24,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 
 @Service
 @RequiredArgsConstructor
@@ -47,20 +52,129 @@ public class LoanPresentationService {
         try {
             Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<>() {});
             Map<String, Object> display = new LinkedHashMap<>();
-            addFinancialRow(display, "Entered Loan Amount (TZS)", raw.get("requestedAmount"));
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
+            putMoney(display, "Principal (TZS)", resolvePrincipalAmount(raw));
             addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
-            addFinancialRow(display, "Principal (TZS)", raw.get("loanToBePaid"));
-            Object loanPlusInterest = raw.get("loanPlusInterest");
-            if (loanPlusInterest != null && String.valueOf(loanPlusInterest).matches("-?\\d+(\\.\\d+)?")) {
-                display.put("Principal + Interest (TZS)", formatMoney(new BigDecimal(String.valueOf(loanPlusInterest))));
+            BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw);
+            if (principalPlusInterest != null) {
+                display.put("Principal + Interest (TZS)", formatMoney(principalPlusInterest));
             }
             addFinancialRow(display, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
             return display;
         } catch (Exception e) {
             return Collections.emptyMap();
         }
+    }
+
+    private BigDecimal resolvePrincipalAmount(Map<String, Object> raw) {
+        BigDecimal principalAmount = readBigDecimal(raw.get("principalAmount"));
+        if (principalAmount != null) {
+            return principalAmount;
+        }
+        BigDecimal totalBeforeInterest = readBigDecimal(raw.get("loanToBePaid"));
+        if (totalBeforeInterest == null) {
+            return null;
+        }
+        BigDecimal applicationFee = readBigDecimal(raw.get("applicationFee"));
+        BigDecimal insuranceFee = readBigDecimal(raw.get("insuranceFee"));
+        return totalBeforeInterest
+            .subtract(applicationFee == null ? BigDecimal.ZERO : applicationFee)
+            .subtract(insuranceFee == null ? BigDecimal.ZERO : insuranceFee)
+            .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal resolvePrincipalPlusInterest(Map<String, Object> raw) {
+        BigDecimal principalPlusInterest = readBigDecimal(raw.get("principalPlusInterest"));
+        if (principalPlusInterest != null) {
+            return principalPlusInterest;
+        }
+        BigDecimal principalAmount = resolvePrincipalAmount(raw);
+        BigDecimal interestAmount = readBigDecimal(raw.get("interestAmount"));
+        if (principalAmount == null || interestAmount == null) {
+            return null;
+        }
+        return principalAmount.add(interestAmount).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value);
+        if (!text.matches("-?\\d+(\\.\\d+)?")) {
+            return null;
+        }
+        return new BigDecimal(text);
+    }
+
+    public List<Map<String, Object>> buildProgressItems(LoanApplication app) {
+        if (app == null || app.getStatus() == null) {
+            return List.of(progressItem("Draft", true, true));
+        }
+
+        List<String> labels = new ArrayList<>();
+        boolean hasGuarantorStage = app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0;
+
+        labels.add("Draft");
+        if (hasGuarantorStage) {
+            labels.add("Awaiting Guarantors");
+            labels.add("All Guarantors Approved");
+        }
+        labels.add("On Review By Manager");
+
+        int currentIndex;
+        switch (app.getStatus()) {
+            case DRAFT -> currentIndex = labels.size() - 1;
+            case SUBMITTED, AWAITING_GUARANTORS -> currentIndex = hasGuarantorStage ? 1 : labels.size() - 1;
+            case ALL_GUARANTORS_APPROVED -> currentIndex = hasGuarantorStage ? 2 : labels.size() - 1;
+            case READY_FOR_MANAGER -> currentIndex = labels.size() - 1;
+            case MANAGER_REJECTED -> {
+                labels.add("Manager Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            default -> {
+                labels.add("On Review By Board");
+                switch (app.getStatus()) {
+                    case MANAGER_ACCEPTED, AWAITING_BOARD -> currentIndex = labels.size() - 1;
+                    case BOARD_REJECTED -> {
+                        labels.add("Board Rejected");
+                        currentIndex = labels.size() - 1;
+                    }
+                    default -> {
+                        labels.add("Board Approved");
+                        switch (app.getStatus()) {
+                            case BOARD_APPROVED -> currentIndex = labels.size() - 1;
+                            case FINAL_REJECTED -> {
+                                labels.add("Final Rejected");
+                                currentIndex = labels.size() - 1;
+                            }
+                            case FINAL_APPROVED -> {
+                                labels.add("Disbursed Loan");
+                                currentIndex = labels.size() - 1;
+                            }
+                            case DEFAULTED -> {
+                                labels.add("Disbursed Loan");
+                                labels.add("Defaulted");
+                                currentIndex = labels.size() - 1;
+                            }
+                            case PAID -> {
+                                labels.add("Disbursed Loan");
+                                labels.add("Paid");
+                                currentIndex = labels.size() - 1;
+                            }
+                            default -> currentIndex = labels.size() - 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int i = 0; i < labels.size(); i++) {
+            items.add(progressItem(labels.get(i), i <= currentIndex, i == currentIndex));
+        }
+        return items;
     }
 
     public List<Map<String, Object>> parseAttachments(String json) {
@@ -75,6 +189,10 @@ public class LoanPresentationService {
     }
 
     public Map<String, Object> parseRepaymentSummary(String json) {
+        return parseRepaymentSummary(json, null);
+    }
+
+    public Map<String, Object> parseRepaymentSummary(String json, java.time.OffsetDateTime paidAt) {
         if (json == null || json.isBlank()) {
             return Collections.emptyMap();
         }
@@ -90,13 +208,48 @@ public class LoanPresentationService {
             putValue(display, "Disbursement Reference", raw.get("disbursementReference"));
             putValue(display, "Manager Notes", raw.get("disbursementNotes"));
             putValue(display, "Paid At", raw.get("paidAt"));
+            if (paidAt != null) {
+                display.put("Paid At", formatTimestamp(paidAt));
+            }
             return display;
         } catch (Exception ex) {
             return Collections.emptyMap();
         }
     }
 
+    public LoanPaymentSummaryView parseLoanPaymentSummaryView(String json) {
+        if (json == null || json.isBlank()) {
+            return LoanPaymentSummaryView.empty();
+        }
+        try {
+            LoanPaymentSummaryDto summary = objectMapper.readValue(json, LoanPaymentSummaryDto.class);
+            return new LoanPaymentSummaryView(
+                true,
+                blankToDash(summary.loanDescription()),
+                summary.lastPaymentDate(),
+                blankToDash(summary.lastPaymentDate()),
+                summary.totalOutstanding(),
+                formatNullableMoney(summary.totalOutstanding()),
+                formatNullableMoney(summary.outstandingPrincipal()),
+                formatNullableMoney(summary.outstandingInterest()),
+                formatNullableMoney(summary.totalPrincipalPaid()),
+                formatNullableMoney(summary.totalInterestPaid())
+            );
+        } catch (Exception ex) {
+            return LoanPaymentSummaryView.empty();
+        }
+    }
+
     public List<Map<String, Object>> parseRepaymentRows(String json) {
+        return parseRepaymentRows(json, Collections.emptyList());
+    }
+
+    /**
+     * Builds the view rows for the installment schedule, enriched with any
+     * payment transactions whose {@code receiptDate} falls in the same
+     * calendar month as the installment's {@code dueDate}.
+     */
+    public List<Map<String, Object>> parseRepaymentRows(String json, List<LoanPaymentTransaction> transactions) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -106,6 +259,8 @@ public class LoanPresentationService {
             if (!(scheduleObject instanceof List<?> schedule)) {
                 return Collections.emptyList();
             }
+            Map<YearMonth, PaidBucket> paidByMonth = bucketTransactionsByMonth(transactions);
+
             List<Map<String, Object>> rows = new java.util.ArrayList<>();
             for (Object entry : schedule) {
                 if (!(entry instanceof Map<?, ?> item)) {
@@ -114,14 +269,109 @@ public class LoanPresentationService {
                 Map<String, Object> row = new LinkedHashMap<>();
                 Object installmentNumber = item.get("installmentNumber");
                 row.put("installment", installmentNumber == null ? "-" : "Installment " + installmentNumber);
-                row.put("dueDate", item.get("dueDate"));
+                Object dueDateValue = item.get("dueDate");
+                row.put("dueDate", dueDateValue);
                 row.put("amount", formatMoneyValue(item.get("amount")));
-                row.put("status", humanizeValue(item.get("status")));
+
+                PaidBucket bucket = lookupBucket(paidByMonth, dueDateValue);
+                row.put("principalPaid", bucket == null ? "-" : formatMoney(bucket.principal));
+                row.put("interestPaid", bucket == null ? "-" : formatMoney(bucket.interest));
+                row.put("totalPaid", bucket == null ? "-" : formatMoney(bucket.total));
+                row.put("paymentDate", bucket == null || bucket.lastDate == null ? "-" : bucket.lastDate.toString());
+
+                String scheduledStatus = String.valueOf(item.get("status"));
+                row.put("status", humanizeValue(deriveStatus(scheduledStatus, item.get("amount"), bucket)));
                 rows.add(row);
             }
             return rows;
         } catch (Exception ex) {
             return Collections.emptyList();
+        }
+    }
+
+    private Map<YearMonth, PaidBucket> bucketTransactionsByMonth(List<LoanPaymentTransaction> transactions) {
+        if (transactions == null || transactions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<YearMonth, PaidBucket> map = new LinkedHashMap<>();
+        for (LoanPaymentTransaction txn : transactions) {
+            if (txn == null || txn.getReceiptDate() == null) {
+                continue;
+            }
+            YearMonth key = YearMonth.from(txn.getReceiptDate());
+            PaidBucket bucket = map.computeIfAbsent(key, k -> new PaidBucket());
+            bucket.add(txn);
+        }
+        return map;
+    }
+
+    private PaidBucket lookupBucket(Map<YearMonth, PaidBucket> paidByMonth, Object dueDateValue) {
+        if (paidByMonth.isEmpty() || dueDateValue == null) {
+            return null;
+        }
+        String raw = String.valueOf(dueDateValue);
+        if (raw.length() < 7) {
+            return null;
+        }
+        try {
+            YearMonth key = YearMonth.parse(raw.substring(0, 7));
+            return paidByMonth.get(key);
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
+    }
+
+    private String deriveStatus(String scheduledStatus, Object scheduledAmount, PaidBucket bucket) {
+        if (bucket == null || bucket.total.signum() <= 0) {
+            return scheduledStatus;
+        }
+        BigDecimal scheduled = toBigDecimal(scheduledAmount);
+        if (scheduled != null && bucket.total.compareTo(scheduled) >= 0) {
+            return "PAID";
+        }
+        return "PARTIAL";
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal bd) {
+            return bd;
+        }
+        if (value instanceof Number n) {
+            return new BigDecimal(n.toString());
+        }
+        String str = String.valueOf(value).trim();
+        if (str.isEmpty()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(str);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static final class PaidBucket {
+        BigDecimal principal = BigDecimal.ZERO;
+        BigDecimal interest = BigDecimal.ZERO;
+        BigDecimal total = BigDecimal.ZERO;
+        LocalDate lastDate;
+
+        void add(LoanPaymentTransaction txn) {
+            if (txn.getPrincipalPaid() != null) {
+                principal = principal.add(txn.getPrincipalPaid());
+            }
+            if (txn.getInterestPaid() != null) {
+                interest = interest.add(txn.getInterestPaid());
+            }
+            if (txn.getTotalPaid() != null) {
+                total = total.add(txn.getTotalPaid());
+            }
+            if (lastDate == null || txn.getReceiptDate().isAfter(lastDate)) {
+                lastDate = txn.getReceiptDate();
+            }
         }
     }
 
@@ -199,7 +449,12 @@ public class LoanPresentationService {
         html.append("</style></head><body>");
         String printableSaccoName = saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim();
         html.append("<h1>").append(esc(printableSaccoName)).append(" Loan Application</h1>");
-        html.append("<p class=\"meta\"><strong>Loan Id:</strong> ").append(shortId(app.getId())).append("</p>");
+        html.append("<p class=\"meta\"><strong>Loan Application ID:</strong> ")
+            .append(app.getApplicationNumber() == null ? "-" : app.getApplicationNumber().toString())
+            .append("</p>");
+        if (app.getLoanId() != null && !app.getLoanId().isBlank()) {
+            html.append("<p class=\"meta\"><strong>Loan ID:</strong> ").append(esc(app.getLoanId())).append("</p>");
+        }
         html.append("<p class=\"meta\"><strong>Applicant:</strong> ").append(esc(applicant.getFullName())).append(" (")
             .append(esc(applicant.getMemberNo())).append(")</p>");
         html.append("<p class=\"meta\"><strong>Loan Type:</strong> ").append(esc(String.valueOf(app.getLoanType()))).append("</p>");
@@ -251,25 +506,28 @@ public class LoanPresentationService {
         html.append("</div>");
     }
 
+    private Map<String, Object> progressItem(String label, boolean active, boolean current) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("label", label);
+        item.put("active", active);
+        item.put("current", current);
+        return item;
+    }
+
     private void appendGuarantorSummary(StringBuilder html,
                                         List<GuarantorRequest> guarantorRequests,
                                         Map<UUID, String> guarantorNames) {
         html.append("<h2>Guarantor Summary</h2>");
-        html.append("<table><thead><tr><th>Guarantor</th><th>Status</th><th>Committed Amount</th><th>Signature</th><th>Verified At</th></tr></thead><tbody>");
+        html.append("<table><thead><tr><th>Guarantor</th><th>Status</th><th>Signature</th><th>Verified At</th></tr></thead><tbody>");
         if (guarantorRequests == null || guarantorRequests.isEmpty()) {
-            html.append("<tr><td colspan=\"5\">No guarantor details available.</td></tr>");
+            html.append("<tr><td colspan=\"4\">No guarantor details available.</td></tr>");
         } else {
             for (GuarantorRequest request : guarantorRequests) {
                 String name = guarantorNames == null ? null : guarantorNames.get(request.getGuarantorMemberId());
-                String amount = request.getCommittedAmount() == null
-                    ? (request.getRequestedAmount() == null ? "-" : formatMoney(request.getRequestedAmount()))
-                    : formatMoney(request.getCommittedAmount());
                 html.append("<tr><td>")
                     .append(esc(name == null || name.isBlank() ? "Guarantor" : name))
                     .append("</td><td>")
                     .append(esc(humanizeValue(request.getStatus())))
-                    .append("</td><td>")
-                    .append(esc(amount))
                     .append("</td><td>");
                 if (request.getStatus() == com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
                     && request.getGuarantorSignatureText() != null
@@ -398,6 +656,10 @@ public class LoanPresentationService {
         return timestamp == null ? "-" : timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
+    private String formatNullableMoney(BigDecimal amount) {
+        return amount == null ? "-" : formatMoney(amount);
+    }
+
     private String formatMoneyValue(Object value) {
         if (value == null || String.valueOf(value).isBlank()) {
             return "";
@@ -465,6 +727,31 @@ public class LoanPresentationService {
 
     private String esc(String value) {
         return HtmlUtils.htmlEscape(value == null ? "" : value);
+    }
+
+    private String blankToDash(Object value) {
+        if (value == null) {
+            return "-";
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? "-" : text;
+    }
+
+    public record LoanPaymentSummaryView(
+        boolean available,
+        String loanDescription,
+        LocalDate lastPaymentDate,
+        String lastPaymentDateLabel,
+        BigDecimal totalOutstanding,
+        String totalOutstandingLabel,
+        String outstandingPrincipalLabel,
+        String outstandingInterestLabel,
+        String totalPrincipalPaidLabel,
+        String totalInterestPaidLabel
+    ) {
+        public static LoanPaymentSummaryView empty() {
+            return new LoanPaymentSummaryView(false, "-", null, "-", null, "-", "-", "-", "-", "-");
+        }
     }
 
 }

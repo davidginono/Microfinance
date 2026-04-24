@@ -96,7 +96,18 @@ Default local URL:
 - Shared shell styling lives primarily in:
   - `src/main/webapp/WEB-INF/jsp/fragments/header.jspf`
   - `src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf`
+- Treat the sidebar as the only global navigation for admin, member, manager, board, and chairperson pages.
+- Do not add duplicate navigation actions inside page bodies for destinations that already exist in the sidebar.
+- Keep dashboard routes focused on summary cards and high-level KPIs. Do not place registry tables, cross-workspace listings, or alternate route launchers on dashboards unless explicitly requested.
+- Keep portfolio views and registry views separate when both exist:
+  - `SACCOs` should remain a focused portfolio/workspace view
+  - `SACCO Registry` should be its own sidebar destination and view
 - Keep visual changes consistent with the current ERP-style admin/member layout.
+- Use one shared modal language across the app. Default to the shared modal shell with calm white surfaces, modest system-aligned corner radii, thin grey borders, light shadows, right-aligned footer actions, and a simple top-right close icon.
+- Reduce short-term memory overload:
+  - keep page-header explanations brief
+  - keep card-header helper text brief or omit it when the title already explains the section
+  - avoid stacking multiple instructional sentences when one short line is enough
 - Preserve responsiveness across:
   - small mobile screens
   - tablets
@@ -107,7 +118,7 @@ Default local URL:
 ## Editing Rules
 
 - Prefer minimal, targeted changes.
-- ALways consider RESPONSIVENESS FOR MOBILE DEVICES
+- Always consider RESPONSIVENESS FOR MOBILE DEVICES.
 - Reuse existing services and controller flows instead of duplicating logic.
 - Avoid changing database structure unless explicitly required.
 - Avoid changing seeded business rules unless explicitly requested.

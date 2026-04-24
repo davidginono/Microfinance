@@ -93,7 +93,7 @@ public class UserClaimService {
                 case MANAGER -> claims.add(UserClaim.REVIEW_MANAGER_QUEUE);
                 case BOARD -> claims.add(UserClaim.REVIEW_BOARD_QUEUE);
                 case CHAIRPERSON -> claims.add(UserClaim.VIEW_CHAIRPERSON_PANEL);
-                case ADMIN -> {
+                case ADMIN, MINOR_ADMIN -> {
                     claims.add(UserClaim.ACCESS_ADMIN_SETTINGS);
                     claims.add(UserClaim.ACCESS_OUTBOX_MONITOR);
                 }

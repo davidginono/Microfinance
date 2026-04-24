@@ -21,6 +21,12 @@ public class LoanApplication {
     @Id
     private UUID id;
 
+    @Column(name = "application_number", nullable = false, updatable = false)
+    private Long applicationNumber;
+
+    @Column(name = "loan_id", length = 20)
+    private String loanId;
+
     @Column(name = "sacco_id", nullable = false)
     private String saccoId;
 
@@ -105,6 +111,13 @@ public class LoanApplication {
     @Column(name = "repayment_schedule_json", columnDefinition = "jsonb")
     private String repaymentScheduleJson;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "loan_payment_summary_json", columnDefinition = "jsonb")
+    private String loanPaymentSummaryJson;
+
+    @Column(name = "loan_payment_summary_fetched_at")
+    private OffsetDateTime loanPaymentSummaryFetchedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -118,4 +131,3 @@ public class LoanApplication {
     @Column(nullable = false)
     private Integer version;
 }
-

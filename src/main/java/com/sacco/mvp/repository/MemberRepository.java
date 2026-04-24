@@ -15,10 +15,15 @@ import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
     Optional<Member> findByMemberNo(String memberNo);
+    boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
 
     Optional<Member> findByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
 
     Optional<Member> findByPhone(String phone);
+    boolean existsByPhone(String phone);
+    boolean existsByPhoneAndIdNot(String phone, UUID id);
 
     Optional<Member> findTopBySaccoIdAndPositionOrderByRankDesc(String saccoId, Position position);
 
@@ -31,6 +36,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findBySaccoIdOrderByFullNameAsc(String saccoId);
 
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
+
+    boolean existsBySaccoIdAndPosition(String saccoId, Position position);
+
+    boolean existsBySaccoIdAndPositionAndIdNot(String saccoId, Position position, UUID id);
 
     @Query("""
         select m
@@ -47,4 +56,3 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                     @Param("query") String query,
                                     Pageable pageable);
 }
-

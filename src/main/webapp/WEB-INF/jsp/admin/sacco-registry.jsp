@@ -5,19 +5,20 @@
 <%@ include file="../fragments/modal-shell.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / SACCO Registry</p>
-    <h1 class="erp-page-title">SACCO Registry</h1>
-    <p class="erp-page-subtitle">Register SACCOs and their stations so registration and admin work stay tied to real SACCO IDs.</p>
+    <p class="erp-breadcrumb">Admin Tools / ${superAdmin ? 'SACCO Registry' : 'Station Registry'}</p>
+    <h1 class="erp-page-title">${superAdmin ? 'SACCO Registry' : 'Station Registry'}</h1>
+    <p class="erp-page-subtitle">${superAdmin ? 'Manage registered SACCO workspaces.' : 'Manage station IDs for your SACCO workspace.'}</p>
 </div>
 
 <div class="erp-panel">
     <div class="erp-panel-header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="erp-panel-title">Registered SACCOs</p>
-                <p class="mt-1 text-sm text-slate-500">Manage SACCO IDs, names, and station lists from one place.</p>
+                <p class="erp-panel-title">${superAdmin ? 'SACCO Registry' : 'Current SACCO Stations'}</p>
             </div>
-            <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco">Add SACCO</button>
+            <c:if test="${superAdmin}">
+                <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco">Add SACCO</button>
+            </c:if>
         </div>
     </div>
     <div class="erp-panel-body">
@@ -29,6 +30,9 @@
                     <th>SACCO ID</th>
                     <th>SACCO Name</th>
                     <th>Stations</th>
+                    <c:if test="${superAdmin}">
+                        <th>Details</th>
+                    </c:if>
                     <th>Action</th>
                 </tr>
                 </thead>
@@ -52,6 +56,11 @@
                         <td class="font-semibold text-slate-800">${sacco.saccoId}</td>
                         <td>${sacco.saccoName}</td>
                         <td>${sacco.stationIds}</td>
+                        <c:if test="${superAdmin}">
+                            <td class="whitespace-nowrap">
+                                <a href="/admin/saccos/${sacco.saccoId}?section=overview" class="app-btn btn-neutral">View Details</a>
+                            </td>
+                        </c:if>
                         <td class="whitespace-nowrap">
                             <button type="button"
                                     class="app-btn btn-primary"
@@ -63,7 +72,7 @@
                 </c:forEach>
                 <c:if test="${empty registeredSaccos}">
                     <tr>
-                        <td colspan="5" class="text-slate-500">No SACCOs have been registered yet.</td>
+                        <td colspan="${superAdmin ? 6 : 5}" class="text-slate-500">No SACCOs have been registered yet.</td>
                     </tr>
                 </c:if>
                 </tbody>
@@ -72,6 +81,7 @@
     </div>
 </div>
 
+<c:if test="${superAdmin}">
 <div class="app-modal-overlay hidden" data-sacco-modal="create-sacco">
     <div class="app-modal-panel app-modal-panel--compact">
         <div class="app-modal-scroll">
@@ -142,6 +152,7 @@
         </div>
     </div>
 </div>
+</c:if>
 
 <c:forEach items="${registeredSaccos}" var="sacco">
     <div class="app-modal-overlay hidden" data-sacco-modal="edit-${sacco.saccoId}">
@@ -164,14 +175,26 @@
                         SACCO ID
                         <input type="text" readonly class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="${sacco.saccoId}" />
                     </label>
-                    <label class="block text-sm font-semibold text-slate-700">
-                        SACCO Name
-                        <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${sacco.saccoName}" />
-                    </label>
+                    <c:choose>
+                        <c:when test="${superAdmin}">
+                            <label class="block text-sm font-semibold text-slate-700">
+                                SACCO Name
+                                <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${sacco.saccoName}" />
+                            </label>
+                        </c:when>
+                        <c:otherwise>
+                            <input type="hidden" name="saccoName" value="${sacco.saccoName}" />
+                            <label class="block text-sm font-semibold text-slate-700">
+                                SACCO Name
+                                <input type="text" readonly class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="${sacco.saccoName}" />
+                            </label>
+                        </c:otherwise>
+                    </c:choose>
                     <label class="block text-sm font-semibold text-slate-700">
                         Station IDs
                         <textarea name="stationIds" rows="5" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800">${sacco.stationIdsText}</textarea>
                     </label>
+                    <c:if test="${superAdmin}">
                     <div class="rounded border border-slate-200 bg-slate-50 p-4">
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO Logo</p>
                         <div class="mt-3 flex items-start gap-4">
@@ -214,12 +237,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="app-modal-section text-sm text-slate-600">
-                        Keep at least one station active for this SACCO. Removed station IDs will be disabled from future selection.
-                    </div>
+                    </c:if>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}">Cancel</button>
-                        <button type="submit" class="app-btn btn-primary">Save Changes</button>
+                        <button type="submit" class="app-btn btn-primary">${superAdmin ? 'Save Changes' : 'Save Stations'}</button>
                     </div>
                 </form>
             </div>

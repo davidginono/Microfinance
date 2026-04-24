@@ -25,7 +25,7 @@ public class AdminScopeInterceptor implements HandlerInterceptor {
             return true;
         }
         Object principal = authentication.getPrincipal();
-        if (!(principal instanceof AppUserPrincipal userPrincipal) || !userPrincipal.hasRole(Position.ADMIN)) {
+        if (!(principal instanceof AppUserPrincipal userPrincipal) || userPrincipal.hasRole(Position.ADMIN)) {
             return true;
         }
         if (adminScopeService.hasExplicitScopeSelection()) {

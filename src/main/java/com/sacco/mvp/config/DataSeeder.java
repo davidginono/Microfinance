@@ -7,6 +7,7 @@ import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,10 +21,13 @@ import java.util.*;
 @Configuration(proxyBeanMethods = false)
 @RequiredArgsConstructor
 public class DataSeeder {
-    private static final String SACCO_ID = "SACCO-ARUSHA-001";
-    private static final String EXTERNAL_STATION_ID = "STN789";
-    private static final String EXTERNAL_SACCO_NAME = "IAA SACCOS LTD";
-    private static final String DEFAULT_PASSWORD = "Password@123";
+    private static final String IAA_SACCO_ID = "SACCO-ARUSHA-001";
+    private static final String IAA_SACCO_NAME = "IAA SACCOS LTD";
+    private static final String IAA_PRIMARY_STATION_ID = "STN789";
+    private static final String IAA_SECONDARY_STATION_ID = "AR704";
+    private static final String DEVELOPMENT_SHARED_EMAIL = "ginonodavid625@gmail.com";
+    private static final String MINOR_ADMIN_MEMBER_NO_PREFIX = "MINDEV";
+
     private static final BigDecimal DEFAULT_RATIO = new BigDecimal("0.3333");
     private static final BigDecimal DEFAULT_INSURANCE_RATE = new BigDecimal("0.0150");
     private static final BigDecimal DEFAULT_INTEREST_RATE = new BigDecimal("0.1000");
@@ -42,94 +46,157 @@ public class DataSeeder {
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
 
+    @Value("${app.auth.local-dev-minor-admin-password:}")
+    private String localDevMinorAdminPassword;
+
     @Bean
     @ConditionalOnProperty(prefix = "app.seed", name = "demo-data-enabled", havingValue = "true")
     CommandLineRunner seedApplicationData() {
         return args -> {
             OffsetDateTime now = OffsetDateTime.now();
-            seedSacco(now);
+            seedIaaSacco(now);
             seedLoanProducts(now);
 
-            seedStaffUser(
-                "9ec44d7a-3a70-4f22-bfa0-9f1bd0b5a301", "ADM001", "Amina Admin", "0757000001",
-                "adm001@sacco.local", Position.ADMIN, now.minusDays(60));
-            seedStaffUser(
-                "22f4818f-d378-4d3e-99e0-6a5fa9d73f11", "MGR001", "Mary Manager", "0757000002",
-                "mgr001@sacco.local", Position.MANAGER, now.minusDays(58));
-            seedStaffUser(
-                "5d25ee8d-1cc2-4f24-9f38-f74083e7cf21", "BRD001", "Ben Board One", "0757000003",
-                "brd001@sacco.local", Position.BOARD, now.minusDays(56));
-            seedStaffUser(
-                "1bf74fe9-2850-4627-a2aa-147e24f0c2a6", "BRD002", "Bea Board Two", "0757000004",
-                "brd002@sacco.local", Position.BOARD, now.minusDays(55));
-            seedStaffUser(
-                "66b82e0c-e983-4fc2-aad5-13157516bb77", "BRD003", "Bob Board Three", "0757000005",
-                "brd003@sacco.local", Position.BOARD, now.minusDays(54));
-            seedStaffUser(
-                "de54fdfb-b44b-4e09-973c-fbc008ea55b8", "CHR001", "Cathy Chairperson", "0757000006",
-                "chr001@sacco.local", Position.CHAIRPERSON, now.minusDays(53));
+            seedAccount(row(
+                    "9ec44d7a-3a70-4f22-bfa0-9f1bd0b5a301", "2026-01-18T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Amina Admin", "ADM001",
+                    "$2a$10$olMY7sGh3063PaHhSoyxXOGFSi3GEJqfN30Vp.melpQZAL/HYF/ry",
+                    "0757000001", Position.ADMIN, "2026-03-23T14:51:02.637961+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "22f4818f-d378-4d3e-99e0-6a5fa9d73f11", "2026-01-20T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Mary Manager", "MGR001",
+                    "$2a$10$EqrpMnyom9NWaS.ysJGawe5teNMpRjwJUND7RDfNCtDKgPoE2suJG",
+                    "0757000002", Position.MANAGER, "2026-03-23T14:51:03.09653+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "5d25ee8d-1cc2-4f24-9f38-f74083e7cf21", "2026-01-22T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Ben Board One", "BRD001",
+                    "$2a$10$.F8koOE8R5uBkAeTm80Hpe65/kt60kPCXTz/GgbrUw.dvTwrD7boe",
+                    "0757000003", Position.BOARD, "2026-03-23T14:51:03.649947+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, "Board B One"),
+                null, null, null);
+            seedAccount(row(
+                    "1bf74fe9-2850-4627-a2aa-147e24f0c2a6", "2026-01-23T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Bea Board Two", "BRD002",
+                    "$2a$10$3Z79EO5sqSeRfIquwDWZoeVjcYntMBPDYDkioJcv9GT.yUrW8ovVS",
+                    "0757000004", Position.BOARD, "2026-03-23T14:51:04.234834+03:00", 2,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, "Ben B Two"),
+                null, null, null);
+            seedAccount(row(
+                    "66b82e0c-e983-4fc2-aad5-13157516bb77", "2026-01-24T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Bob Board Three", "BRD003",
+                    "$2a$10$USMdLhlzevWGnq6y4gADaOdhqAIQ0wZWJB5OiS5VCrgNhYca9NPmC",
+                    "0757000005", Position.BOARD, "2026-03-23T14:51:04.593618+03:00", 3,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_SECONDARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "de54fdfb-b44b-4e09-973c-fbc008ea55b8", "2026-01-25T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Cathy Chairperson", "CHR001",
+                    "$2a$10$01qD/ddGNR94Uu7WL27w7u.eIJUGnnSpC3kgUR2rcXAk48xFaf7Fa",
+                    "0757000006", Position.CHAIRPERSON, "2026-03-23T14:51:05.003517+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "65a7f80e-641f-4b12-a232-d80d2103201a", "2026-03-23T13:03:33.355981+03:00",
+                    "ginonodavid625@gmail.com", "JAMES KUMJA", "1111",
+                    "$2a$10$m4gNiPA1bMrGPAcZNfb/wO8Q/c8K1MBAkWSAHnDlfNZnIlsMFpJ4i",
+                    "0673054847", Position.BOARD, null, 4,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, null, false, null, null),
+                null, null, null);
 
-            Member alice = seedMember(
-                "6c7ff573-a3c8-4cd1-91f9-b0a19aef9101", "MEM001", "Alice Member", "0757000101",
-                "mem001@sacco.local", Position.MEMBER, 1, now.minusDays(50), new BigDecimal("450000.00"),
-                new BigDecimal("180000.00"), new BigDecimal("250000.00"));
-            Member alex = seedMember(
-                "92d4ae9d-d6ca-42d0-ac4a-1ce1cf527969", "MEM002", "Alex Member", "0757000102",
-                "ginonodavid625@gmail.com", Position.MEMBER, 2, now.minusDays(49), new BigDecimal("380000.00"),
-                new BigDecimal("150000.00"), new BigDecimal("210000.00"));
-            Member asha = seedMember(
-                "4f0d8da6-0931-45ad-b005-8e8cde536594", "MEM003", "Asha Member", "0757000103",
-                "mem003@sacco.local", Position.MEMBER, 3, now.minusDays(48), new BigDecimal("320000.00"),
-                new BigDecimal("120000.00"), new BigDecimal("160000.00"));
-            Member amos = seedMember(
-                "7ee64686-e9b9-41e6-85bf-f119495b94b6", "MEM004", "Amos Member", "0757000104",
-                "mem004@sacco.local", Position.MEMBER, 4, now.minusDays(47), new BigDecimal("300000.00"),
-                new BigDecimal("110000.00"), new BigDecimal("140000.00"));
-            Member amina = seedMember(
-                "95d06d4c-9fa2-46d4-a574-8ad4f66f5af7", "MEM005", "Amina Member", "0757000105",
-                "mem005@sacco.local", Position.MEMBER, 5, now.minusDays(46), new BigDecimal("295000.00"),
-                new BigDecimal("108000.00"), new BigDecimal("138000.00"));
-            Member abdi = seedMember(
-                "52fa43e5-3ff0-40f2-bbf6-290f9f8b153e", "MEM006", "Abdi Member", "0757000106",
-                "mem006@sacco.local", Position.MEMBER, 6, now.minusDays(45), new BigDecimal("280000.00"),
-                new BigDecimal("100000.00"), new BigDecimal("130000.00"));
-            Member agnes = seedMember(
-                "9713ec57-271c-4f54-82ba-8c009ba36e4d", "MEM007", "Agnes Member", "0757000107",
-                "mem007@sacco.local", Position.MEMBER, 7, now.minusDays(44), new BigDecimal("270000.00"),
-                new BigDecimal("98000.00"), new BigDecimal("125000.00"));
+            Member alice = seedAccount(row(
+                    "6c7ff573-a3c8-4cd1-91f9-b0a19aef9101", "2026-01-28T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Alice Member", "MEM001",
+                    "$2a$10$EISvjLP9Y57pGYtgg2Jm/uxmCJ5PKabU1M/aamifC/puQBoUlWzRS",
+                    "0757000101", Position.MEMBER, "2026-04-15T13:53:13.752713+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:13.625321+03:00", "Alice Member"),
+                new BigDecimal("450000.00"), new BigDecimal("180000.00"), new BigDecimal("250000.00"));
+            Member alex = seedAccount(row(
+                    "92d4ae9d-d6ca-42d0-ac4a-1ce1cf527969", "2026-01-29T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Alex Member", "MEM002",
+                    "$2a$10$h4q3Wy22rhButWYokfCh9eC06G7Cn9zRn6YsG0PeZUYHchTvL3sLS",
+                    "0757000102", Position.MEMBER, "2026-04-15T13:53:13.903739+03:00", 2,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:13.773177+03:00", "Alex Member"),
+                new BigDecimal("380000.00"), new BigDecimal("150000.00"), new BigDecimal("210000.00"));
+            Member asha = seedAccount(row(
+                    "4f0d8da6-0931-45ad-b005-8e8cde536594", "2026-01-30T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Asha Member", "MEM003",
+                    "$2a$10$SuUxpRjfbrwUnDNVh6evXu6QrezYm.zDmGg7hVpuFgLBdhuTQJMu2",
+                    "0757000103", Position.MEMBER, "2026-04-15T13:53:14.05379+03:00", 3,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:13.916088+03:00", "Asha Member"),
+                new BigDecimal("320000.00"), new BigDecimal("120000.00"), new BigDecimal("160000.00"));
+            Member amos = seedAccount(row(
+                    "7ee64686-e9b9-41e6-85bf-f119495b94b6", "2026-01-31T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Amos Member", "MEM004",
+                    "$2a$10$9HYnvNRpVsk3OyeqtUOk4eYbMQoi5hxuWuJPlOn/DhKOeBpGL3DIi",
+                    "0757000104", Position.MEMBER, "2026-04-15T13:53:14.191118+03:00", 4,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:14.067001+03:00", "Amos Member"),
+                new BigDecimal("300000.00"), new BigDecimal("110000.00"), new BigDecimal("140000.00"));
+            Member amina = seedAccount(row(
+                    "95d06d4c-9fa2-46d4-a574-8ad4f66f5af7", "2026-02-01T23:20:43.514392+03:00",
+                    "gpt872793@gmail.com", "Amina Member", "MEM005",
+                    "$2a$10$SoKvs8gwlhdJLs4ojGfEuO/.ipuUfVkYZc.OMFK5LMebwzW0Xgbt2",
+                    "0757000105", Position.MEMBER, "2026-04-15T13:53:14.302741+03:00", 5,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:14.202497+03:00", "Amina Member"),
+                new BigDecimal("295000.00"), new BigDecimal("108000.00"), new BigDecimal("138000.00"));
+            Member abdi = seedAccount(row(
+                    "52fa43e5-3ff0-40f2-bbf6-290f9f8b153e", "2026-02-02T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Abdi Member", "MEM006",
+                    "$2a$10$He01Lc23rx7.3eWaf4f4POO5OsCaq14GefT2Q8bafJt8heHqlRDMa",
+                    "0757000106", Position.MEMBER, "2026-04-15T13:53:14.427274+03:00", 6,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, "2026-04-15T13:53:14.313712+03:00", "Abdi Member"),
+                new BigDecimal("280000.00"), new BigDecimal("100000.00"), new BigDecimal("130000.00"));
+            seedAccount(row(
+                    "9713ec57-271c-4f54-82ba-8c009ba36e4d", "2026-02-03T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Agnes Member", "MEM007",
+                    "$2a$10$T9rOngjJsRFqhHn1FSs9hOtbjhpUR1Po2SSSxkAotp751DJ6nA6bW",
+                    "0757000107", Position.MANAGER, "2026-04-15T13:53:14.56361+03:00", 8,
+                    "TAHA SACCOS", MemberStatus.ACTIVE, IAA_SECONDARY_STATION_ID, true, "2026-04-15T13:53:14.442379+03:00", "Agnes Member"),
+                new BigDecimal("270000.00"), new BigDecimal("98000.00"), new BigDecimal("125000.00"));
+            seedAccount(row(
+                    "b48d0a9e-2992-4251-ac61-4711239f3499", "2026-03-20T10:08:29.077462+03:00",
+                    "ginonodavid625@gmail.com", "JOSEPH HAMAD URASSA", "1145",
+                    "$2a$10$OYT3oVQZcOFGdbUpEwcyQOGmrAdQpC8sSFl1ilRFvvO8RHWalBUj2",
+                    "+255657822049", Position.MEMBER, "2026-03-20T10:08:29.077462+03:00", 1,
+                    "TAHA SACCOS", MemberStatus.ACTIVE, IAA_SECONDARY_STATION_ID, null, null, "Joseph U Urasa"),
+                new BigDecimal("265000.00"), new BigDecimal("90000.00"), new BigDecimal("118000.00"));
+            Member david = seedAccount(row(
+                    "26d14862-f350-4424-8416-2572882a9557", "2026-03-26T09:53:23.771062+03:00",
+                    "ginonodavid625@gmail.com", "David Ginono", "MEM008",
+                    "OTP_ONLY_LOGIN",
+                    null, Position.MEMBER, "2026-03-26T09:53:23.771062+03:00", 8,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, true, null, null),
+                new BigDecimal("240000.00"), new BigDecimal("86000.00"), new BigDecimal("112000.00"));
 
-            seedSampleLoans(now, alice, alex, asha, amos, amina, abdi, agnes);
+            seedSampleLoans(now, alice, alex, asha, amos, amina, abdi, david);
+            seedLocalDevelopmentMinorAdminAccess();
         };
     }
 
-    private void seedSacco(OffsetDateTime now) {
-        registeredSaccoRepository.findById(SACCO_ID)
+    private void seedIaaSacco(OffsetDateTime now) {
+        registeredSaccoRepository.findById(IAA_SACCO_ID)
             .orElseGet(() -> registeredSaccoRepository.save(RegisteredSacco.builder()
-                .saccoId(SACCO_ID)
-                .saccoName(EXTERNAL_SACCO_NAME)
+                .saccoId(IAA_SACCO_ID)
+                .saccoName(IAA_SACCO_NAME)
                 .active(true)
                 .createdAt(now.minusDays(90))
                 .updatedAt(now)
                 .build()));
 
-        saccoStationRepository.findBySaccoIdAndStationId(SACCO_ID, EXTERNAL_STATION_ID)
-            .orElseGet(() -> saccoStationRepository.save(SaccoStation.builder()
-                .id(UUID.randomUUID())
-                .saccoId(SACCO_ID)
-                .stationId(EXTERNAL_STATION_ID)
-                .active(true)
-                .createdAt(now.minusDays(90))
-                .updatedAt(now)
-                .build()));
+        seedStation(IAA_PRIMARY_STATION_ID, now);
+        seedStation(IAA_SECONDARY_STATION_ID, now);
 
-        SaccoSettings sacco = saccoSettingsRepository.findById(SACCO_ID)
+        SaccoSettings sacco = saccoSettingsRepository.findById(IAA_SACCO_ID)
             .orElseGet(() -> SaccoSettings.builder()
-                .saccoId(SACCO_ID)
+                .saccoId(IAA_SACCO_ID)
                 .createdAt(now.minusDays(90))
                 .build());
 
-        sacco.setExternalStationId(EXTERNAL_STATION_ID);
-        sacco.setExternalSaccoName(EXTERNAL_SACCO_NAME);
+        sacco.setExternalStationId(IAA_PRIMARY_STATION_ID);
+        sacco.setExternalSaccoName(IAA_SACCO_NAME);
         sacco.setRequiredGuarantors(3);
         sacco.setBoardSize(3);
         sacco.setBoardQuorum(2);
@@ -140,6 +207,21 @@ public class DataSeeder {
         }
         sacco.setUpdatedAt(now);
         saccoSettingsRepository.save(sacco);
+    }
+
+    private void seedStation(String stationId, OffsetDateTime now) {
+        if (stationId == null || stationId.isBlank()) {
+            return;
+        }
+        saccoStationRepository.findBySaccoIdAndStationId(IAA_SACCO_ID, stationId)
+            .orElseGet(() -> saccoStationRepository.save(SaccoStation.builder()
+                .id(UUID.randomUUID())
+                .saccoId(IAA_SACCO_ID)
+                .stationId(stationId)
+                .active(true)
+                .createdAt(now.minusDays(90))
+                .updatedAt(now)
+                .build()));
     }
 
     private void seedLoanProducts(OffsetDateTime now) {
@@ -157,11 +239,11 @@ public class DataSeeder {
                                  int maxRepaymentMonths,
                                  OffsetDateTime now) {
         LoanProductSetting product = loanProductSettingRepository.findAll().stream()
-            .filter(existing -> existing.getSaccoId().equals(SACCO_ID) && existing.getLoanType() == loanType)
+            .filter(existing -> Objects.equals(existing.getSaccoId(), IAA_SACCO_ID) && existing.getLoanType() == loanType)
             .findFirst()
             .orElseGet(() -> LoanProductSetting.builder()
                 .id(UUID.randomUUID())
-                .saccoId(SACCO_ID)
+                .saccoId(IAA_SACCO_ID)
                 .loanType(loanType)
                 .createdAt(now.minusDays(80))
                 .build());
@@ -180,80 +262,77 @@ public class DataSeeder {
         loanProductSettingRepository.save(product);
     }
 
-    private Member seedMember(String id,
-                              String memberNo,
-                              String fullName,
-                              String phone,
-                              String email,
-                              Position position,
-                              int rank,
-                              OffsetDateTime createdAt,
-                              BigDecimal availableBalance,
-                              BigDecimal sharesBalance,
-                              BigDecimal depositsBalance) {
-        Member member = memberRepository.findByMemberNo(memberNo)
+    private Member seedAccount(SeedMemberRow row,
+                               BigDecimal availableBalance,
+                               BigDecimal sharesBalance,
+                               BigDecimal depositsBalance) {
+        Member member = memberRepository.findByMemberNo(row.memberNo())
             .orElseGet(() -> Member.builder()
-                .id(UUID.fromString(id))
-                .createdAt(createdAt)
+                .id(UUID.fromString(row.id()))
+                .createdAt(row.createdAt())
                 .build());
 
-        member.setSaccoId(SACCO_ID);
-        member.setMemberNo(memberNo);
-        member.setStationId(EXTERNAL_STATION_ID);
-        member.setFullName(fullName);
-        member.setPhone(phone);
-        preserveExistingEmail(member, email);
-        member.setSignatureText(fullName);
-        member.setSignatureRegisteredAt(OffsetDateTime.now());
-        member.setMemberAccount(position == Position.MEMBER);
-        member.setStatus(MemberStatus.ACTIVE);
-        member.setPosition(position);
-        member.setRank(rank);
-        member.setPasswordHash(passwordEncoder.encode(DEFAULT_PASSWORD));
+        member.setSaccoId(IAA_SACCO_ID);
+        member.setMemberNo(row.memberNo());
+        member.setStationId(row.stationId());
+        member.setFullName(row.fullName());
+        member.setPhone(row.phone());
+        member.setEmail(resolveSeedEmail(row));
+        member.setSignatureText(row.signatureText());
+        member.setSignatureRegisteredAt(row.signatureRegisteredAt());
+        member.setMemberAccount(row.memberAccount());
+        member.setStatus(row.status());
+        member.setPosition(row.position());
+        member.setRank(row.rank());
+        member.setPasswordHash(row.passwordHash());
+        member.setProfileLastSyncedAt(row.profileLastSyncedAt());
         if (member.getCreatedAt() == null) {
-            member.setCreatedAt(createdAt);
+            member.setCreatedAt(row.createdAt());
         }
-        member.setProfileLastSyncedAt(OffsetDateTime.now());
-        Member saved = memberRepository.save(member);
+        member.setStaffRoles(resolveStaffRoles(row.position()));
 
-        seedSavingsAccount(saved.getId(), availableBalance, sharesBalance, depositsBalance);
-        seedUserSettings(saved.getId());
+        Member saved = memberRepository.save(member);
+        if (saved.isMemberAccess()) {
+            seedSavingsAccount(saved.getId(), availableBalance, sharesBalance, depositsBalance);
+            seedUserSettings(saved.getId());
+        }
         return saved;
     }
 
-    private Member seedStaffUser(String id,
-                                 String memberNo,
-                                 String fullName,
-                                 String phone,
-                                 String email,
-                                 Position position,
-                                 OffsetDateTime createdAt) {
-        Member member = memberRepository.findByMemberNo(memberNo)
-            .orElseGet(() -> Member.builder()
-                .id(UUID.fromString(id))
-                .createdAt(createdAt)
-                .build());
-
-        member.setSaccoId(SACCO_ID);
-        member.setMemberNo(memberNo);
-        member.setFullName(fullName);
-        member.setPhone(phone);
-        preserveExistingEmail(member, email);
-        member.setMemberAccount(false);
-        member.setStatus(MemberStatus.ACTIVE);
-        member.setPosition(position);
-        member.setStaffRoles(new LinkedHashSet<>(List.of(position)));
-        member.setPasswordHash(passwordEncoder.encode(DEFAULT_PASSWORD));
-        if (member.getCreatedAt() == null) {
-            member.setCreatedAt(createdAt);
+    private void seedLocalDevelopmentMinorAdminAccess() {
+        String password = blankToNull(localDevMinorAdminPassword);
+        if (password == null) {
+            return;
         }
-        return memberRepository.save(member);
+
+        List<Member> minorAdmins = memberRepository.findAll().stream()
+            .filter(member -> member.getPosition() == Position.MINOR_ADMIN)
+            .sorted(Comparator.comparing(Member::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .toList();
+
+        int sequence = 1;
+        for (Member member : minorAdmins) {
+            if (member.getMemberNo() == null || member.getMemberNo().isBlank()) {
+                member.setMemberNo(MINOR_ADMIN_MEMBER_NO_PREFIX + String.format("%03d", sequence));
+            }
+            member.setPasswordHash(passwordEncoder.encode(password));
+            memberRepository.save(member);
+            sequence++;
+        }
     }
 
-    private void preserveExistingEmail(Member member, String seededEmail) {
-        if (member.getEmail() == null || member.getEmail().isBlank()) {
-            member.setEmail(seededEmail);
+    private String resolveSeedEmail(SeedMemberRow row) {
+        if (row.position() == Position.MINOR_ADMIN && row.email() != null && !row.email().isBlank()) {
+            return row.email();
         }
+        return DEVELOPMENT_SHARED_EMAIL;
+    }
+
+    private LinkedHashSet<Position> resolveStaffRoles(Position position) {
+        if (position == null || !position.isStaffRole()) {
+            return new LinkedHashSet<>();
+        }
+        return new LinkedHashSet<>(List.of(position));
     }
 
     private void seedSavingsAccount(UUID memberId,
@@ -267,12 +346,16 @@ public class DataSeeder {
                 .memberId(memberId)
                 .build());
 
-        account.setAvailableBalance(availableBalance);
-        account.setSharesBalance(sharesBalance);
-        account.setDepositsBalance(depositsBalance);
+        account.setAvailableBalance(zeroIfNull(availableBalance));
+        account.setSharesBalance(zeroIfNull(sharesBalance));
+        account.setDepositsBalance(zeroIfNull(depositsBalance));
         account.setUpdatedAt(now);
         account.setSummaryLastSyncedAt(now);
         savingsAccountRepository.save(account);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : value;
     }
 
     private void seedUserSettings(UUID memberId) {
@@ -296,7 +379,7 @@ public class DataSeeder {
                                  Member amos,
                                  Member amina,
                                  Member abdi,
-                                 Member agnes) {
+                                 Member david) {
         seedAcceptedLoan(
             "e94127fd-b8fd-48ec-a0d6-c53ed2ddb4db",
             alice,
@@ -331,7 +414,8 @@ public class DataSeeder {
             LoanType.EDUCATION_LOAN,
             new BigDecimal("45000.00"),
             6,
-            now.minusDays(4));
+            now.minusDays(4),
+            List.of(amos, amina, abdi));
 
         seedAwaitingGuarantorsLoan(
             "321f3127-a5a9-4cc2-a9ce-14d77a9460f4",
@@ -344,7 +428,7 @@ public class DataSeeder {
 
         seedAllGuarantorsApprovedLoan(
             "62f735b0-4ef2-4d19-a52c-0adad8d53398",
-            agnes,
+            david,
             LoanType.EDUCATION_LOAN,
             8,
             new BigDecimal("50000.00"),
@@ -421,7 +505,8 @@ public class DataSeeder {
             "purpose", "Business growth",
             "nationalId", "ID-" + member.getMemberNo(),
             "employerName", "Self employed",
-            "hasExistingLoan", false
+            "hasExistingLoan", false,
+            "decisionReason", reason
         )));
         loanApplicationRepository.save(app);
     }
@@ -431,18 +516,14 @@ public class DataSeeder {
                                          LoanType loanType,
                                          BigDecimal amount,
                                          int tenorMonths,
-                                         OffsetDateTime createdAt) {
+                                         OffsetDateTime createdAt,
+                                         List<Member> guarantors) {
         if (loanApplicationRepository.existsById(UUID.fromString(loanId))) {
             return;
         }
-        List<UUID> guarantors = List.of(
-            UUID.fromString("7ee64686-e9b9-41e6-85bf-f119495b94b6"),
-            UUID.fromString("95d06d4c-9fa2-46d4-a574-8ad4f66f5af7"),
-            UUID.fromString("52fa43e5-3ff0-40f2-bbf6-290f9f8b153e")
-        );
         LoanApplication app = baseLoan(loanId, member, loanType, amount, tenorMonths, createdAt, LoanStatus.READY_FOR_MANAGER);
         app.setSubmittedAt(createdAt.plusHours(3));
-        app.setSelectedGuarantors(toJson(guarantors));
+        app.setSelectedGuarantors(toJson(guarantors.stream().map(Member::getId).toList()));
         loanApplicationRepository.save(app);
     }
 
@@ -462,14 +543,13 @@ public class DataSeeder {
         app.setSelectedGuarantors(toJson(guarantors.stream().map(Member::getId).toList()));
         loanApplicationRepository.save(app);
 
-        BigDecimal split = amount.divide(BigDecimal.valueOf(guarantors.size()), 2, RoundingMode.HALF_UP);
         for (Member guarantor : guarantors) {
             guarantorRequestRepository.save(GuarantorRequest.builder()
                 .id(UUID.randomUUID())
                 .loanApplicationId(applicationId)
                 .guarantorMemberId(guarantor.getId())
                 .status(GuarantorRequestStatus.PENDING)
-                .requestedAmount(split)
+                .requestedAmount(null)
                 .createdAt(createdAt.plusHours(1))
                 .build());
         }
@@ -491,15 +571,14 @@ public class DataSeeder {
         app.setSelectedGuarantors(toJson(guarantors.stream().map(Member::getId).toList()));
         loanApplicationRepository.save(app);
 
-        BigDecimal split = amount.divide(BigDecimal.valueOf(guarantors.size()), 2, RoundingMode.HALF_UP);
         for (Member guarantor : guarantors) {
             guarantorRequestRepository.save(GuarantorRequest.builder()
                 .id(UUID.randomUUID())
                 .loanApplicationId(applicationId)
                 .guarantorMemberId(guarantor.getId())
                 .status(GuarantorRequestStatus.APPROVED)
-                .requestedAmount(split)
-                .committedAmount(split)
+                .requestedAmount(null)
+                .committedAmount(null)
                 .createdAt(createdAt.plusHours(1))
                 .decidedAt(createdAt.plusHours(8))
                 .build());
@@ -516,7 +595,7 @@ public class DataSeeder {
         int requiredGuarantors = loanType == LoanType.LOAN_ADVANCE ? 0 : 3;
         return LoanApplication.builder()
             .id(UUID.fromString(loanId))
-            .saccoId(SACCO_ID)
+            .saccoId(IAA_SACCO_ID)
             .applicantMemberId(member.getId())
             .loanType(loanType)
             .amount(amount)
@@ -564,16 +643,20 @@ public class DataSeeder {
         BigDecimal insuranceFee = safeAmount.multiply(DEFAULT_INSURANCE_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal interestRate = effectiveInterestRate(loanType, tenorMonths);
         BigDecimal interestAmount = safeAmount.multiply(interestRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal loanToBePaid = safeAmount.add(APPLICATION_FEE).add(insuranceFee).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal loanPlusInterest = loanToBePaid.add(interestAmount).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal monthlyRepayment = loanPlusInterest.divide(BigDecimal.valueOf(tenorMonths), 2, RoundingMode.HALF_UP);
+        BigDecimal totalDeductions = APPLICATION_FEE.add(insuranceFee).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal principalAmount = safeAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal principalPlusInterest = principalAmount.add(interestAmount).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal monthlyRepayment = principalPlusInterest.divide(BigDecimal.valueOf(tenorMonths), 2, RoundingMode.HALF_UP);
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("applicationFee", APPLICATION_FEE);
         snapshot.put("insuranceFee", insuranceFee);
+        snapshot.put("totalDeductions", totalDeductions);
         snapshot.put("loanBalance", BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-        snapshot.put("loanToBePaid", loanToBePaid);
-        snapshot.put("loanPlusInterest", loanPlusInterest);
+        snapshot.put("principalAmount", principalAmount);
+        snapshot.put("loanToBePaid", principalAmount);
+        snapshot.put("principalPlusInterest", principalPlusInterest);
+        snapshot.put("loanPlusInterest", principalPlusInterest);
         snapshot.put("interestAmount", interestAmount);
         snapshot.put("monthlyRepaymentAmount", monthlyRepayment);
         snapshot.put("applicationFeeRate", APPLICATION_FEE);
@@ -584,10 +667,8 @@ public class DataSeeder {
     }
 
     private BigDecimal monthlyRepayment(BigDecimal amount, int tenorMonths, BigDecimal interestRate) {
-        BigDecimal insuranceFee = amount.multiply(DEFAULT_INSURANCE_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal loanToBePaid = amount.add(APPLICATION_FEE).add(insuranceFee).setScale(2, RoundingMode.HALF_UP);
         BigDecimal interestAmount = amount.multiply(interestRate).setScale(2, RoundingMode.HALF_UP);
-        return loanToBePaid.add(interestAmount)
+        return amount.add(interestAmount)
             .divide(BigDecimal.valueOf(tenorMonths), 2, RoundingMode.HALF_UP);
     }
 
@@ -604,5 +685,72 @@ public class DataSeeder {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Failed to prepare seed data JSON", ex);
         }
+    }
+
+    private SeedMemberRow row(String id,
+                              String createdAt,
+                              String email,
+                              String fullName,
+                              String memberNo,
+                              String passwordHash,
+                              String phone,
+                              Position position,
+                              String profileLastSyncedAt,
+                              Integer rank,
+                              String ignoredSaccoId,
+                              MemberStatus status,
+                              String stationId,
+                              Boolean memberAccount,
+                              String signatureRegisteredAt,
+                              String signatureText) {
+        return new SeedMemberRow(
+            id,
+            OffsetDateTime.parse(createdAt),
+            email,
+            fullName,
+            memberNo,
+            passwordHash,
+            blankToNull(phone),
+            position,
+            parseNullable(profileLastSyncedAt),
+            rank,
+            IAA_SACCO_ID,
+            status,
+            blankToNull(stationId),
+            memberAccount,
+            parseNullable(signatureRegisteredAt),
+            blankToNull(signatureText)
+        );
+    }
+
+    private OffsetDateTime parseNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return OffsetDateTime.parse(value);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private record SeedMemberRow(
+        String id,
+        OffsetDateTime createdAt,
+        String email,
+        String fullName,
+        String memberNo,
+        String passwordHash,
+        String phone,
+        Position position,
+        OffsetDateTime profileLastSyncedAt,
+        Integer rank,
+        String saccoId,
+        MemberStatus status,
+        String stationId,
+        Boolean memberAccount,
+        OffsetDateTime signatureRegisteredAt,
+        String signatureText
+    ) {
     }
 }

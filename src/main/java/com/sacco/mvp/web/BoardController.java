@@ -16,6 +16,7 @@ import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.NotificationInboxService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +47,7 @@ public class BoardController {
     private final LoanPresentationService loanPresentationService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
+    private final NotificationInboxService notificationInboxService;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -112,9 +114,9 @@ public class BoardController {
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
-        model.addAttribute("loanIdShort", app.getId().toString().substring(0, 8));
-        model.addAttribute("boardProgressStep", boardLoanProgressStep(app));
-        model.addAttribute("boardProgressPercent", boardLoanProgressPercent(app));
+        model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
+        model.addAttribute("disbursedLoanId", app.getLoanId());
+        model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
         model.addAttribute("boardStatusBadgeClass", boardLoanStatusBadgeClass(app));
         model.addAttribute("boardSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         model.addAttribute("boardAssessors", boardReviews.stream()
@@ -136,8 +138,31 @@ public class BoardController {
         return "board/detail";
     }
 
+    @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
+    @ResponseBody
+    @PreAuthorize("hasAnyRole('BOARD','ADMIN') and @authz.isBoardAssignee(#loanId, principal)")
+    public ResponseEntity<Map<String, Object>> guarantorFinancialStatus(@PathVariable UUID loanId,
+                                                                        @PathVariable UUID guarantorId,
+                                                                        @AuthenticationPrincipal AppUserPrincipal principal) {
+        boardService.getMyReview(loanId, principal.getMemberId());
+        boolean guarantorAssigned = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
+            .anyMatch(request -> guarantorId.equals(request.getGuarantorMemberId()));
+        if (!guarantorAssigned) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Guarantor request was not found for this loan."));
+        }
+        Member guarantor = memberRepository.findById(guarantorId)
+            .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
+        ExternalAccountStatusService.ExternalAccountStatusView status = externalAccountStatusService.resolve(guarantor);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("available", status.isAvailable());
+        payload.put("savingsLabel", status.getSavingsLabel());
+        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("statusMessage", status.getStatusMessage());
+        return ResponseEntity.ok(payload);
+    }
+
     @PostMapping("/loan-applications/{id}/request-signature-otp")
-    @PreAuthorize("hasAnyRole('BOARD','ADMIN') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestBoardSignatureOtp(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -172,7 +197,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
-    @PreAuthorize("hasAnyRole('BOARD','ADMIN') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam BoardDecision decision,
@@ -204,7 +229,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/undo")
-    @PreAuthorize("hasAnyRole('BOARD','ADMIN') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
     public String undo(@PathVariable UUID id,
                        @AuthenticationPrincipal AppUserPrincipal principal,
                        RedirectAttributes ra) {
@@ -215,6 +240,45 @@ public class BoardController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/board/loan-applications/" + id;
+    }
+
+    @GetMapping("/notifications")
+    @PreAuthorize("hasRole('BOARD') or hasRole('ADMIN')")
+    public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
+                                @RequestParam(required = false) UUID highlight,
+                                Model model) {
+        model.addAttribute("notifications", notificationInboxService.allViews(
+            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("highlightNotificationId", highlight);
+        return "board/notifications";
+    }
+
+    @GetMapping("/notifications/{id}/open")
+    @PreAuthorize("hasRole('BOARD') or hasRole('ADMIN')")
+    public String openNotification(@PathVariable UUID id,
+                                   @AuthenticationPrincipal AppUserPrincipal principal,
+                                   RedirectAttributes ra) {
+        try {
+            return "redirect:" + notificationInboxService.openForMember(
+                id, principal.getMemberId(), principal.getGrantedPositions(),
+                principal.getPosition(), "/board/notifications");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/board/notifications";
+        }
+    }
+
+    @PostMapping("/notifications/mark-all-read")
+    @PreAuthorize("hasRole('BOARD')")
+    public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
+                                           RedirectAttributes ra) {
+        int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
+        if (updated > 0) {
+            ra.addFlashAttribute("message", "All notifications have been marked as read.");
+        } else {
+            ra.addFlashAttribute("message", "There were no unread notifications.");
+        }
+        return "redirect:/board/notifications";
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
@@ -318,31 +382,12 @@ public class BoardController {
         return memberId == null ? "-" : "#" + memberId.toString().substring(0, 8);
     }
 
-    private int boardLoanProgressStep(LoanApplication app) {
-        return switch (app.getStatus()) {
-            case DRAFT -> 1;
-            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED, READY_FOR_MANAGER, MANAGER_REJECTED -> 2;
-            case MANAGER_ACCEPTED, AWAITING_BOARD, BOARD_REJECTED -> 3;
-            case BOARD_APPROVED, FINAL_APPROVED, FINAL_REJECTED -> 4;
-            case PAID -> 5;
-        };
-    }
-
-    private int boardLoanProgressPercent(LoanApplication app) {
-        return switch (app.getStatus()) {
-            case DRAFT -> 10;
-            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED, READY_FOR_MANAGER, MANAGER_REJECTED -> 30;
-            case MANAGER_ACCEPTED, AWAITING_BOARD, BOARD_REJECTED -> 60;
-            case BOARD_APPROVED, FINAL_APPROVED, FINAL_REJECTED -> 84;
-            case PAID -> 100;
-        };
-    }
-
     private String boardLoanStatusBadgeClass(LoanApplication app) {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, AWAITING_BOARD -> "bg-blue-50 text-blue-700";
             case BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         };

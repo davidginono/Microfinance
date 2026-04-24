@@ -8,22 +8,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><spring:message code="register.member.title" /></title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&family=Great+Vibes&display=swap" rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ["Manrope", "ui-sans-serif", "system-ui"],
-                        display: ["Sora", "ui-sans-serif", "system-ui"]
-                    }
-                }
-            }
-        };
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
+    <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <style>
         @keyframes otp-pop {
             0% { transform: translateY(4px) scale(0.82); opacity: 0; }
@@ -47,60 +33,51 @@
         .app-toast-exit {
             animation: toast-out 180ms ease-in forwards;
         }
-        .auth-decor {
-            background: linear-gradient(180deg, #dff1fb 0%, #cfe8f8 100%);
-        }
-        .auth-decor::before,
-        .auth-decor::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-        .auth-decor::before {
+        .auth-shell {
             background:
-                linear-gradient(145deg,
-                    rgba(255,255,255,0.34) 0%,
-                    rgba(255,255,255,0.34) 20%,
-                    transparent 20%,
-                    transparent 44%,
-                    rgba(255,255,255,0.16) 44%,
-                    rgba(255,255,255,0.16) 58%,
-                    transparent 58%,
-                    transparent 100%);
+                radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
+                linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
         }
-        .auth-decor::after {
-            background:
-                linear-gradient(25deg,
-                    rgba(92, 180, 235, 0.22) 0%,
-                    rgba(92, 180, 235, 0.22) 18%,
-                    transparent 18%,
-                    transparent 40%,
-                    rgba(92, 180, 235, 0.13) 40%,
-                    rgba(92, 180, 235, 0.13) 60%,
-                    transparent 60%,
-                    transparent 100%);
+        .auth-frame {
+            border-radius: 1rem;
+            border: 1px solid #d7e3ee;
+            background: #ffffff;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
         }
-        .auth-decor-glow {
-            position: absolute;
-            left: -28%;
-            bottom: -10%;
-            width: 120%;
-            height: 44%;
-            background: radial-gradient(circle at center, rgba(113, 196, 245, 0.42) 0%, rgba(113, 196, 245, 0.18) 42%, rgba(113, 196, 245, 0) 78%);
-            pointer-events: none;
+        .auth-title-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .auth-heading {
+            font-family: "Sora", ui-sans-serif, system-ui;
+            font-size: 2.2rem;
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+            color: #0f172a;
+        }
+        .auth-subheading {
+            color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .auth-form-card {
+            border: 0;
+            background: transparent;
+            padding: 0;
         }
         .registration-field {
             width: 100%;
             min-height: 3.2rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            background: #ffffff;
+            border: 1px solid #d7e1ef;
+            border-radius: 0.375rem;
+            background: #f8fbff;
             padding: 0.82rem 1rem 0.82rem 1.05rem;
             color: #172033;
             font-size: 0.96rem;
             font-weight: 500;
             line-height: 1.3;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
             transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
         .registration-field::placeholder {
@@ -112,13 +89,36 @@
         }
         .registration-field:focus {
             outline: none;
-            border-color: #2F348D;
-            box-shadow: 0 0 0 2px rgba(47, 52, 141, 0.1);
+            border-color: #c7d4e4;
+            box-shadow: 0 0 0 1px #c7d4e4;
+            background: #ffffff;
+        }
+        .registration-select {
+            width: 100%;
+            min-height: 3.2rem;
+            border: 1px solid #d7e1ef;
+            border-radius: 0.375rem;
+            background: #ffffff;
+            padding: 0.82rem 3rem 0.82rem 1.05rem;
+            color: #172033;
+            font-size: 0.96rem;
+            font-weight: 500;
+            line-height: 1.3;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .registration-select:hover {
+            border-color: #b7c5d6;
+        }
+        .registration-select:focus {
+            outline: none;
+            border-color: #c7d4e4;
+            box-shadow: 0 0 0 1px #c7d4e4;
+            background: #ffffff;
         }
         .registration-action {
             min-height: 3rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 10px;
+            border: 1px solid #d7e1ef;
+            border-radius: 0.85rem;
             background: #ffffff;
             padding: 0.78rem 1.35rem;
             font-size: 0.94rem;
@@ -131,13 +131,12 @@
         .registration-action:hover {
             background: #f8fafc;
             border-color: #94a3b8;
-            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
             transform: translateY(-1px);
         }
         .registration-action:focus-visible {
             outline: none;
-            border-color: #2F348D;
-            box-shadow: 0 0 0 2px rgba(47, 52, 141, 0.1);
+            border-color: #16b7c8;
+            box-shadow: 0 0 0 4px rgba(22, 183, 200, 0.12);
         }
         .registration-action:active {
             transform: translateY(0);
@@ -151,49 +150,71 @@
             box-shadow: none;
             transform: none;
         }
+        .registration-primary {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: #ffffff;
+        }
+        .registration-primary:hover {
+            border-color: #1f9ec8;
+            background: #1f9ec8;
+        }
+        .registration-section-label {
+            color: #334155;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .registration-note {
+            color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        @media (max-width: 640px) {
+            .auth-heading {
+                font-size: 1.85rem;
+            }
+            .auth-frame {
+                border-radius: 1rem;
+            }
+        }
     </style>
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
-<body class="min-h-screen bg-[#eef2f5] font-sans text-slate-900 antialiased">
+<body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-10">
-    <div class="relative w-full max-w-6xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-        <div class="h-12 w-full border-b border-[#10a8b6]" style="background:linear-gradient(180deg,#19c6d8 0%,#11b2c3 100%);"></div>
-        <div class="grid lg:grid-cols-[0.95fr_1.15fr]">
-            <div class="auth-decor relative hidden overflow-hidden border-r border-slate-200 lg:block">
-                <div class="auth-decor-glow"></div>
+    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
+        <div class="mb-6 sm:mb-7">
+            <div class="auth-title-stack min-w-0">
+                <h1 class="auth-heading"><spring:message code="register.member.title" /></h1>
+                <p class="auth-subheading mt-3"><spring:message code="register.member.subtitle" /></p>
             </div>
-
-            <div class="bg-white p-7 sm:p-10">
-                <div class="mb-6">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Loan Management System</p>
-                    <h3 class="mt-2 font-display text-3xl font-semibold tracking-tight text-slate-900"><spring:message code="register.member.title" /></h3>
-                    <p class="mt-2 text-sm text-slate-500"><spring:message code="register.member.subtitle" /></p>
-                </div>
+        </div>
 
                 <c:if test="${not empty errors}">
                     <div hidden data-toast-message="${fn:escapeXml(errors)}" data-toast-type="error"></div>
                 </c:if>
-                <div id="registrationVerifyError" class="hidden"></div>
-                <div id="registrationVerifySuccess" class="hidden"></div>
-                <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post" class="space-y-4">
+                <div id="registrationVerifyError" class="hidden" data-auto-scroll-message="true" aria-live="assertive"></div>
+                <div id="registrationVerifySuccess" class="hidden" data-auto-scroll-message="true" aria-live="polite"></div>
+                <form:form id="memberRegistrationForm" modelAttribute="registrationForm" action="/register/member" method="post" class="space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <form:errors path="*" cssClass="mb-4 block border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700" element="div" />
 
-                    <div class="grid gap-4 md:grid-cols-2">
+                    <div class="auth-form-card space-y-4">
+                    <div class="grid gap-4">
                         <div>
                             <spring:bind path="registrationForm.memberNo">
-                                <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}"><spring:message code="register.member.memberNo" /></label>
+                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.memberNo" /></label>
                             </spring:bind>
                             <form:input path="memberNo" cssClass="registration-field" />
                             <form:errors path="memberNo" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
                         <div>
                             <spring:bind path="registrationForm.saccoId">
-                                <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}"><spring:message code="register.member.saccoId" /></label>
+                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.saccoId" /></label>
                             </spring:bind>
-                            <form:select path="saccoId" cssClass="w-full border border-slate-300 bg-white px-3.5 py-3 text-slate-900 focus:border-[#2F348D] focus:outline-none focus:ring-2 focus:ring-[#2F348D]/10">
+                            <form:select path="saccoId" cssClass="registration-select">
                                 <option value="" data-placeholder="true">Select SACCO Name</option>
                                 <c:forEach items="${registrationSaccos}" var="sacco">
                                     <form:option value="${sacco.saccoId}">${sacco.saccoId} - ${sacco.saccoName}</form:option>
@@ -203,17 +224,17 @@
                         </div>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2">
+                    <div class="grid gap-4">
                         <div>
                             <spring:bind path="registrationForm.fullName">
-                                <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}"><spring:message code="register.member.fullName" /></label>
+                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.fullName" /></label>
                             </spring:bind>
                             <form:input path="fullName" cssClass="registration-field" />
                             <form:errors path="fullName" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
                         <div>
                             <spring:bind path="registrationForm.email">
-                                <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}"><spring:message code="register.member.email" /></label>
+                                <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.email" /></label>
                             </spring:bind>
                             <form:input path="email"
                                         type="email"
@@ -228,32 +249,33 @@
 
                     <div>
                         <spring:bind path="registrationForm.stationId">
-                            <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}"><spring:message code="register.member.stationId" /></label>
+                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
                         </spring:bind>
-                        <form:select path="stationId" id="registrationStationSelect" cssClass="w-full border border-slate-300 bg-white px-3.5 py-3 text-slate-900 focus:border-[#2F348D] focus:outline-none focus:ring-2 focus:ring-[#2F348D]/10">
+                        <form:select path="stationId" id="registrationStationSelect" cssClass="registration-select">
                             <option value="" data-placeholder="true">Select station ID</option>
                         </form:select>
                         <form:errors path="stationId" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
+                    </div>
 
-                    <div>
+                    <div class="auth-form-card">
                         <spring:bind path="registrationForm.signatureText">
-                            <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}">Signature</label>
+                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Signature</label>
                         </spring:bind>
                         <form:input path="signatureText"
                                     id="registrationSignatureInput"
                                     cssClass="registration-field"
                                     placeholder="Example: James M Juma" />
-                        <p class="mt-1 text-xs text-slate-500">Type your signature in a simple name style like <strong>James M Juma</strong>.</p>
+                        <p class="registration-note mt-2 text-sm">Type your signature in a simple name style like <strong>James M Juma</strong>.</p>
                         <form:errors path="signatureText" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
 
-                    <div id="registrationOtpBlock" class="${not empty registrationForm.otpCode ? '' : 'hidden'}">
+                    <div id="registrationOtpBlock" class="auth-form-card ${not empty registrationForm.otpCode ? '' : 'hidden'}">
                         <spring:bind path="registrationForm.otpCode">
-                            <label class="mb-1.5 block text-sm font-semibold ${status.error ? 'text-rose-600' : 'text-slate-700'}">OTP Code</label>
+                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">OTP Code</label>
                         </spring:bind>
                         <form:input path="otpCode" inputmode="numeric" maxlength="6" cssClass="registration-field tracking-[0.3em]" />
-                        <p class="mt-1 text-xs text-slate-500">Enter the 6-digit code sent to your email to finish registration.</p>
+                        <p class="registration-note mt-2 text-sm">Enter the 6-digit code sent to your email to finish registration.</p>
                         <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                             <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#2F348D]"></span>
                             <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -264,21 +286,19 @@
                         <form:errors path="otpCode" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
 
-                    <div class="flex flex-col gap-3 pt-2 sm:flex-row">
-                        <button id="memberRegisterRequestOtp" class="otp-request-button registration-action inline-flex items-center justify-center gap-2" type="button">
+                    <div class="space-y-3 pt-2">
+                        <button id="memberRegisterRequestOtp" class="otp-request-button registration-action inline-flex w-full items-center justify-center gap-2" type="button">
                             <span class="otp-button-spinner hidden"></span>
                             <span class="otp-button-label">Send OTP Code</span>
                         </button>
-                        <button id="memberRegisterSubmit" class="registration-action inline-flex items-center justify-center" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
+                        <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex w-full items-center justify-center" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
                             <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
                         </button>
-                        <a href="/login" class="registration-action inline-flex items-center justify-center text-slate-700">
+                        <a href="/login" class="registration-action inline-flex w-full items-center justify-center text-slate-700">
                             <spring:message code="register.member.back" />
                         </a>
                     </div>
                 </form:form>
-            </div>
-        </div>
     </div>
 </div>
 <script id="registrationSaccosData" type="application/json">${registrationSaccosJson}</script>
@@ -334,7 +354,7 @@
                 return;
             }
             window.requestAnimationFrame(() => {
-                const top = Math.max(window.scrollY + element.getBoundingClientRect().top - 18, 0);
+                const top = Math.max(window.scrollY + element.getBoundingClientRect().top - 24, 0);
                 window.scrollTo({ top, behavior: 'smooth' });
                 element.setAttribute('tabindex', '-1');
                 try {
@@ -352,7 +372,7 @@
                     window.showToast(element.getAttribute('data-toast-type') || 'info', message);
                 }
             });
-            const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find((element) =>
+            const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message], #memberRegistrationForm > .border-rose-200')).find((element) =>
                 !element.classList.contains('hidden') && element.textContent && element.textContent.trim()
             );
             if (initialAlert) {
@@ -396,6 +416,7 @@
             successBox.classList.add("hidden");
             errorBox.textContent = message;
             errorBox.className = "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700";
+            scrollToFeedback(errorBox);
         };
 
         const setSuccess = (message) => {
@@ -545,6 +566,7 @@
 
                 if (!verifyResponse.ok || payload.valid !== true) {
                     setError(payload.message || "Unable to verify the member details right now.");
+                    setOtpButtonState("idle");
                     return;
                 }
                 otpBlock.classList.remove("hidden");

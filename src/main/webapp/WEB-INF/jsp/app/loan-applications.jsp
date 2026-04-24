@@ -27,7 +27,7 @@
     <table class="erp-table">
         <thead>
             <tr>
-                <th class="px-3 py-2 text-left">Loan Id</th>
+                <th class="px-3 py-2 text-left">Loan Application ID</th>
                 <th class="px-3 py-2 text-left">
                     <spring:message code="loan.type" />
                 </th>
@@ -45,7 +45,7 @@
         <tbody>
             <c:forEach items="${apps}" var="app">
                 <tr>
-                    <td class="px-3 py-2">${fn:substring(app.id, 0, 8)}</td>
+                    <td class="px-3 py-2">${app.applicationNumber}</td>
                     <td class="px-3 py-2">
                         <spring:message code="loan.type.${app.loanType}" />
                     </td>

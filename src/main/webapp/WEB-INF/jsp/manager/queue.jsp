@@ -36,19 +36,15 @@
        class="erp-filter-tab ${status eq 'FINAL_APPROVED' ? 'is-active' : ''}">
         Disbursed Loans
     </a>
-    <a href="/manager/loan-applications?status=PAID"
-       class="erp-filter-tab ${status eq 'PAID' ? 'is-active' : ''}">
-        Paid Loans
-    </a>
 </div>
 </div>
 <div class="erp-table-wrap overflow-x-auto">
 <table class="erp-table">
-    <thead><tr><th>Reference</th><th>Applicant</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Loan Application ID</th><th>Applicant</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>
     <c:forEach items="${apps}" var="app">
         <tr>
-            <td class="px-3 py-2">${fn:substring(app.id, 0, 8)}</td>
+            <td class="px-3 py-2">${app.applicationNumber}</td>
             <td class="px-3 py-2">
                 <c:choose>
                     <c:when test="${not empty applicantNames[app.applicantMemberId]}">${applicantNames[app.applicantMemberId]}</c:when>
@@ -66,16 +62,6 @@
             <td class="px-3 py-2">
                 <div class="flex flex-wrap gap-2">
                     <a href="/manager/loan-applications/${app.id}" class="app-btn btn-primary">Open</a>
-                    <c:if test="${app.status eq 'FINAL_APPROVED'}">
-                        <form action="/manager/loan-applications/${app.id}/mark-paid"
-                              method="post"
-                              data-confirm-title="Mark Loan as Paid"
-                              data-confirm-message="Mark this disbursed loan as fully paid?"
-                              data-confirm-proceed="Mark Paid">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <button type="submit" class="app-btn btn-approve">Mark Paid</button>
-                        </form>
-                    </c:if>
                 </div>
             </td>
         </tr>

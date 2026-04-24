@@ -46,7 +46,7 @@ public class NotificationViewService {
         if (positions == null || positions.isEmpty()) {
             return false;
         }
-        if (positions.contains(Position.ADMIN)) {
+        if (Position.containsAdminRole(positions)) {
             return true;
         }
         if (positions.stream().anyMatch(MEMBER_SIDE_POSITIONS::contains)) {
@@ -136,6 +136,7 @@ public class NotificationViewService {
             case "BOARD_APPROVED" -> "Board Approved";
             case "BOARD_REJECTED" -> "Board Rejected";
             case "FINAL_APPROVED" -> "Loan Approved";
+            case "DEFAULTED" -> "Loan Defaulted";
             case "PAID" -> "Loan Marked As Paid";
             case "FINAL_REJECTED" -> "Loan Rejected";
             case "LOAN_READY_FOR_MANAGER" -> "On Review By Manager";
@@ -168,7 +169,13 @@ public class NotificationViewService {
                     ? "Your loan application has been fully approved."
                     : "Your loan was approved. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
             }
-            case "PAID" -> "Your manager marked this disbursed loan as fully paid.";
+            case "PAID" -> {
+                String source = stringValue(details.get("source"));
+                yield "SYNC".equalsIgnoreCase(source)
+                    ? "Your loan was automatically marked as fully paid after repayment sync."
+                    : "Your manager marked this disbursed loan as fully paid.";
+            }
+            case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
             case "FINAL_REJECTED" -> "Your loan application has been finally rejected.";
             case "LOAN_READY_FOR_MANAGER" -> "Your application is now on review by manager.";
             case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to send it for manager review.";

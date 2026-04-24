@@ -33,6 +33,7 @@ public class AdminService {
     private static final int MAX_LOG_PAGE_SIZE = 100;
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
+    private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
     private final MemberRepository memberRepository;
     private final SavingsAccountRepository savingsAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -51,6 +52,8 @@ public class AdminService {
     private final UserClaimService userClaimService;
     private final RoleDirectoryService roleDirectoryService;
     private final SaccoConfigurationService saccoConfigurationService;
+    private final SaccoRegistryService saccoRegistryService;
+    private final MinorAdminInvitationService minorAdminInvitationService;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
         OffsetDateTime recentWindowStart = OffsetDateTime.now().minusDays(DASHBOARD_RECENT_WINDOW_DAYS);
@@ -134,61 +137,228 @@ public class AdminService {
     @Transactional
     public Member createUser(String saccoId,
                              UUID adminId,
+                             Set<Position> actorRoles,
                              String memberNo,
                              String fullName,
                              String email,
                              String phone,
                              List<Position> positions) {
-        LinkedHashSet<Position> staffRoles = validateStaffRoles(positions);
-        Position primaryRole = Position.primaryRole(staffRoles, false);
+        LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
+        return createStaffAccount(
+            saccoId,
+            null,
+            adminId,
+            memberNo,
+            fullName,
+            email,
+            phone,
+            staffRoles,
+            "ADMIN_CREATE_STAFF_USER"
+        );
+    }
+
+    @Transactional
+    public void resendMinorAdminInvitation(UUID adminId, UUID accountId) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
+        if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("That account is not a Minor Admin.");
+        }
+        if (member.getStatus() != MemberStatus.INVITED) {
+            throw new IllegalStateException("Only accounts awaiting activation can be resent.");
+        }
+        minorAdminInvitationService.issueInvitation(member, adminId);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_RESEND_MINOR_ADMIN_INVITE", adminId, null, snapshotMember(member));
+    }
+
+    @Transactional
+    public void deactivateMinorAdmin(UUID adminId, UUID accountId) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
+        if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("That account is not a Minor Admin.");
+        }
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new IllegalStateException("Only active accounts can be deactivated.");
+        }
+        Map<String, Object> before = snapshotMember(member);
+        member.setStatus(MemberStatus.INACTIVE);
+        memberRepository.save(member);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_DEACTIVATE_MINOR_ADMIN", adminId, before, snapshotMember(member));
+    }
+
+    @Transactional
+    public void reinviteMinorAdmin(UUID adminId, UUID accountId) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
+        if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("That account is not a Minor Admin.");
+        }
+        if (member.getStatus() == MemberStatus.ACTIVE) {
+            throw new IllegalStateException("That account is already active.");
+        }
+        Map<String, Object> before = snapshotMember(member);
+        member.setStatus(MemberStatus.INVITED);
+        member.setPasswordHash(INVITED_ACCOUNT_PASSWORD_PLACEHOLDER);
+        memberRepository.save(member);
+        minorAdminInvitationService.issueInvitation(member, adminId);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_REINVITE_MINOR_ADMIN", adminId, before, snapshotMember(member));
+    }
+
+    @Transactional
+    public void revokeMinorAdminInvitation(UUID adminId, UUID accountId) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
+        if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("That account is not a Minor Admin.");
+        }
+        if (member.getStatus() != MemberStatus.INVITED) {
+            throw new IllegalStateException("Only pending invitations can be revoked.");
+        }
+        minorAdminInvitationService.revokeInvitation(member.getId(), adminId);
+        member.setStatus(MemberStatus.INACTIVE);
+        memberRepository.save(member);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_REVOKE_MINOR_ADMIN_INVITE", adminId, null, snapshotMember(member));
+    }
+
+    @Transactional
+    public Member registerMinorAdmin(UUID adminId,
+                                     String saccoId,
+                                     String stationId,
+                                     String memberNo,
+                                     String fullName,
+                                     String email,
+                                     String phone) {
+        String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
+        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
+        return createStaffAccount(
+            resolvedSaccoId,
+            resolvedStationId,
+            adminId,
+            memberNo,
+            fullName,
+            email,
+            phone,
+            new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)),
+            "ADMIN_CREATE_MINOR_ADMIN"
+        );
+    }
+
+    @Transactional
+    public void updateMinorAdmin(UUID adminId,
+                                 UUID accountId,
+                                 String saccoId,
+                                 String stationId,
+                                 String memberNo,
+                                 String fullName,
+                                 String email,
+                                 String phone) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
+        if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("That account is not a Minor Admin.");
+        }
+
+        String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
+        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
+        ensureMinorAdminSlotAvailable(resolvedSaccoId, accountId);
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeOptional(phone);
 
-        if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {
+        if (memberRepository.existsByMemberNoIgnoreCaseAndIdNot(normalizedMemberNo, accountId)) {
             throw new IllegalStateException("That user ID is already in use.");
         }
-        if (memberRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
+        if (memberRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, accountId)) {
             throw new IllegalStateException("That email address is already in use.");
         }
-        if (normalizedPhone != null && memberRepository.findByPhone(normalizedPhone).isPresent()) {
+        if (normalizedPhone != null && memberRepository.existsByPhoneAndIdNot(normalizedPhone, accountId)) {
             throw new IllegalStateException("That phone number is already in use.");
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
-        Member user = Member.builder()
-            .id(UUID.randomUUID())
-            .saccoId(saccoId)
-            .memberNo(normalizedMemberNo)
-            .fullName(normalizedFullName)
-            .email(normalizedEmail)
-            .phone(normalizedPhone)
-            .memberAccount(false)
-            .status(MemberStatus.ACTIVE)
-            .position(primaryRole)
-            .staffRoles(staffRoles)
-            .passwordHash("OTP_ONLY_LOGIN")
-            .createdAt(now)
-            .build();
+        Map<String, Object> before = snapshotMember(member);
+        boolean saccoChanged = !resolvedSaccoId.equals(member.getSaccoId());
+        member.setSaccoId(resolvedSaccoId);
+        member.setStationId(resolvedStationId);
+        member.setMemberNo(normalizedMemberNo);
+        member.setFullName(normalizedFullName);
+        member.setEmail(normalizedEmail);
+        member.setPhone(normalizedPhone);
+        member.setPosition(Position.MINOR_ADMIN);
+        member.setStaffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)));
+        if (saccoChanged || member.getRank() == null) {
+            member.setRank(nextRank(resolvedSaccoId, Position.MINOR_ADMIN));
+        }
+        memberRepository.save(member);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_UPDATE_MINOR_ADMIN", adminId, before, snapshotMember(member));
+    }
 
-        Member saved = memberRepository.save(user);
-        auditService.log("STAFF_USER", saved.getId(), "ADMIN_CREATE_STAFF_USER", adminId, null, snapshotMember(saved));
-        return saved;
+    public List<MinorAdminAccessView> minorAdmins() {
+        Comparator<String> textComparator = Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER);
+        OffsetDateTime now = OffsetDateTime.now();
+        return memberRepository.findAll().stream()
+            .filter(member -> member.getStaffRolesResolved().contains(Position.MINOR_ADMIN))
+            .sorted(Comparator.comparing(Member::getSaccoId, textComparator)
+                .thenComparing(Member::getStationId, textComparator)
+                .thenComparing(Member::getFullName, textComparator))
+            .map(member -> {
+                MinorAdminInvitationState state = resolveInvitationState(member, now);
+                return new MinorAdminAccessView(
+                    member.getId(),
+                    member.getMemberNo(),
+                    member.getFullName(),
+                    member.getEmail(),
+                    member.getPhone(),
+                    member.getSaccoId(),
+                    member.getStationId(),
+                    member.getStatus(),
+                    state.label(),
+                    state.expiresAt()
+                );
+            })
+            .toList();
+    }
+
+    private MinorAdminInvitationState resolveInvitationState(Member member, OffsetDateTime now) {
+        if (member.getStatus() == MemberStatus.ACTIVE) {
+            return new MinorAdminInvitationState("ACTIVE", null);
+        }
+        if (member.getStatus() != MemberStatus.INVITED) {
+            return new MinorAdminInvitationState(member.getStatus().name(), null);
+        }
+        return minorAdminInvitationService.findActiveInvitation(member.getId())
+            .map(invite -> {
+                if (invite.getExpiresAt() != null && invite.getExpiresAt().isBefore(now)) {
+                    return new MinorAdminInvitationState("EXPIRED", invite.getExpiresAt());
+                }
+                return new MinorAdminInvitationState("INVITED", invite.getExpiresAt());
+            })
+            .orElse(new MinorAdminInvitationState("INVITED", null));
+    }
+
+    private record MinorAdminInvitationState(String label, OffsetDateTime expiresAt) {
     }
 
     @Transactional
-    public void updateUser(String saccoId, UUID adminId, UUID accountId, List<Position> positions, MemberStatus status) {
+    public void updateUser(String saccoId, UUID adminId, Set<Position> actorRoles, UUID accountId, List<Position> positions, MemberStatus status) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         if (!saccoId.equals(member.getSaccoId())) {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
-        LinkedHashSet<Position> staffRoles = validateStaffRoles(positions);
+        boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
+        if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
+            throw new IllegalStateException("Only super admins can update Super Admin accounts.");
+        }
+        LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
+        if (staffRoles.contains(Position.MINOR_ADMIN)) {
+            ensureMinorAdminSlotAvailable(saccoId, accountId);
+        }
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
-        if (accountId.equals(adminId) && (!staffRoles.contains(Position.ADMIN) || status != MemberStatus.ACTIVE)) {
-            throw new IllegalStateException("You cannot remove your own admin access");
+        if (accountId.equals(adminId) && (!Position.containsAdminRole(staffRoles) || status != MemberStatus.ACTIVE)) {
+            throw new IllegalStateException("You cannot remove your own admin workspace access.");
         }
 
         Map<String, Object> before = snapshotMember(member);
@@ -211,7 +381,13 @@ public class AdminService {
 
     public List<LoanProductSetting> loanProducts(String saccoId) {
         saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
-        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId);
+        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+            .sorted(Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+            .toList();
+    }
+
+    public boolean customizedLoanProductExists(String saccoId) {
+        return loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, LoanType.CUSTOMIZED_LOAN);
     }
 
     public SaccoSettings settings(String saccoId) {
@@ -225,7 +401,7 @@ public class AdminService {
 
     @Transactional
     public void updateLoanProduct(String saccoId, UUID adminId, UUID productId, Integer guarantorsRequired,
-                                  BigDecimal ratio, BigDecimal insuranceRate, BigDecimal interestRate,
+                                  String productName, BigDecimal ratio, BigDecimal insuranceRate, BigDecimal interestRate,
                                   Integer maxRepaymentMonths, boolean active) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
@@ -234,6 +410,7 @@ public class AdminService {
         }
 
         Map<String, Object> before = snapshotProduct(product);
+        product.setProductName(normalizeProductName(product.getLoanType(), productName));
         product.setGuarantorsRequired(guarantorsRequired);
         product.setMaxLoanSavingsRatio(ratio);
         product.setInsuranceRate(insuranceRate);
@@ -243,6 +420,30 @@ public class AdminService {
         product.setUpdatedAt(OffsetDateTime.now());
         loanProductSettingRepository.save(product);
         auditService.log("LOAN_PRODUCT", productId, "ADMIN_UPDATE_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
+    }
+
+    @Transactional
+    public void createCustomizedLoanProduct(String saccoId,
+                                            UUID adminId,
+                                            String productName,
+                                            Integer guarantorsRequired,
+                                            BigDecimal ratio,
+                                            BigDecimal insuranceRate,
+                                            BigDecimal interestRate,
+                                            Integer maxRepaymentMonths,
+                                            boolean active) {
+        LoanProductSetting product = saccoConfigurationService.createLoanProduct(
+            saccoId,
+            LoanType.CUSTOMIZED_LOAN,
+            normalizeProductName(LoanType.CUSTOMIZED_LOAN, productName),
+            guarantorsRequired,
+            ratio,
+            insuranceRate,
+            interestRate,
+            maxRepaymentMonths,
+            active
+        );
+        auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_CUSTOMIZED_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
     }
 
     @Transactional
@@ -364,7 +565,10 @@ public class AdminService {
     public void submitSupport(String saccoId, UUID memberId, String subject, String message) {
         Member sender = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByRole(saccoId, Position.ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+            saccoId,
+            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+        );
         if (admins.isEmpty()) {
             throw new IllegalStateException("No active admin is configured for this SACCO");
         }
@@ -482,6 +686,7 @@ public class AdminService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("memberNo", member.getMemberNo());
         data.put("fullName", member.getFullName());
+        data.put("stationId", member.getStationId());
         data.put("position", member.getPosition());
         data.put("staffRoles", member.getStaffRolesResolved());
         data.put("memberAccount", member.isMemberAccess());
@@ -489,7 +694,7 @@ public class AdminService {
         return data;
     }
 
-    private LinkedHashSet<Position> validateStaffRoles(List<Position> positions) {
+    private LinkedHashSet<Position> validateStaffRoles(Set<Position> actorRoles, List<Position> positions) {
         LinkedHashSet<Position> staffRoles = Position.normalizeStaffRoles(positions);
         if (staffRoles.isEmpty()) {
             throw new IllegalStateException("Select at least one staff role for the user.");
@@ -497,8 +702,16 @@ public class AdminService {
         if ((positions != null) && positions.stream().anyMatch(position -> position == Position.MEMBER)) {
             throw new IllegalStateException("Use member registration for member-only accounts. Admin-created users must use a staff role.");
         }
-        if (staffRoles.contains(Position.ADMIN) && staffRoles.size() > 1) {
-            throw new IllegalStateException("Admin accounts cannot be combined with any other staff role.");
+        boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
+        if (staffRoles.contains(Position.ADMIN) && !actorIsSuperAdmin) {
+            throw new IllegalStateException("Only super admins can assign Super Admin access.");
+        }
+        long adminRoleCount = staffRoles.stream().filter(Position::isAdminRole).count();
+        if (adminRoleCount > 1) {
+            throw new IllegalStateException("Choose either Super Admin or Minor Admin, not both.");
+        }
+        if (Position.containsAdminRole(staffRoles) && staffRoles.size() > 1) {
+            throw new IllegalStateException("Admin-class accounts cannot be combined with any other staff role.");
         }
         return staffRoles;
     }
@@ -523,6 +736,74 @@ public class AdminService {
         return memberRepository.findTopBySaccoIdAndPositionOrderByRankDesc(saccoId, position)
             .map(Member::getRank)
             .orElse(0) + 1;
+    }
+
+    private void ensureMinorAdminSlotAvailable(String saccoId, UUID existingAccountId) {
+        boolean occupied = existingAccountId == null
+            ? memberRepository.existsBySaccoIdAndPosition(saccoId, Position.MINOR_ADMIN)
+            : memberRepository.existsBySaccoIdAndPositionAndIdNot(saccoId, Position.MINOR_ADMIN, existingAccountId);
+        if (occupied) {
+            throw new IllegalStateException("Each SACCO can only have one Minor Admin account. Update the existing one instead.");
+        }
+    }
+
+    private Member createStaffAccount(String saccoId,
+                                      String stationId,
+                                      UUID adminId,
+                                      String memberNo,
+                                      String fullName,
+                                      String email,
+                                      String phone,
+                                      LinkedHashSet<Position> staffRoles,
+                                      String auditAction) {
+        Position primaryRole = Position.primaryRole(staffRoles, false);
+        if (staffRoles.contains(Position.MINOR_ADMIN)) {
+            ensureMinorAdminSlotAvailable(saccoId, null);
+        }
+        String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
+        String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
+        String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
+        String normalizedPhone = normalizeOptional(phone);
+        String normalizedStationId = normalizeOptional(stationId);
+
+        if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {
+            throw new IllegalStateException("That user ID is already in use.");
+        }
+        if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new IllegalStateException("That email address is already in use.");
+        }
+        if (normalizedPhone != null && memberRepository.existsByPhone(normalizedPhone)) {
+            throw new IllegalStateException("That phone number is already in use.");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        // All staff accounts are provisioned passwordless: they receive an activation
+        // email (see MinorAdminInvitationService.issueInvitation) and sign in using
+        // email OTP thereafter. They remain INVITED until they click the activation
+        // link and confirm the one-time code.
+        boolean requiresClaim = !staffRoles.isEmpty();
+        Member user = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .memberNo(normalizedMemberNo)
+            .stationId(normalizedStationId)
+            .fullName(normalizedFullName)
+            .email(normalizedEmail)
+            .phone(normalizedPhone)
+            .memberAccount(false)
+            .status(requiresClaim ? MemberStatus.INVITED : MemberStatus.ACTIVE)
+            .position(primaryRole)
+            .staffRoles(staffRoles)
+            .passwordHash(INVITED_ACCOUNT_PASSWORD_PLACEHOLDER)
+            .createdAt(now)
+            .build();
+
+        Member saved = memberRepository.save(user);
+        auditService.log("STAFF_USER", saved.getId(), auditAction, adminId, null, snapshotMember(saved));
+        if (requiresClaim) {
+            minorAdminInvitationService.issueInvitation(saved, adminId);
+        }
+        return saved;
     }
 
     private String requireValue(String value, String message) {
@@ -578,6 +859,20 @@ public class AdminService {
         return normalized.isBlank() ? null : normalized;
     }
 
+    private String normalizeProductName(LoanType loanType, String productName) {
+        String normalized = normalizeOptional(productName);
+        if (loanType != LoanType.CUSTOMIZED_LOAN) {
+            return null;
+        }
+        if (normalized == null) {
+            throw new IllegalStateException("Enter the loan product name.");
+        }
+        if (normalized.length() > 120) {
+            throw new IllegalStateException("Loan product name must be 120 characters or fewer.");
+        }
+        return normalized;
+    }
+
     private void ensureUserSettings(UUID memberId, OffsetDateTime now) {
         if (userSettingsRepository.existsById(memberId)) {
             return;
@@ -605,6 +900,21 @@ public class AdminService {
         private String membershipLabel;
     }
 
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class MinorAdminAccessView {
+        private UUID accountId;
+        private String loginId;
+        private String fullName;
+        private String email;
+        private String phone;
+        private String saccoId;
+        private String stationId;
+        private MemberStatus status;
+        private String invitationState;
+        private OffsetDateTime invitationExpiresAt;
+    }
+
     private void ensureSavingsAccount(UUID memberId, OffsetDateTime now) {
         if (savingsAccountRepository.findByMemberId(memberId).isPresent()) {
             return;
@@ -623,6 +933,7 @@ public class AdminService {
     private Map<String, Object> snapshotProduct(LoanProductSetting product) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("loanType", product.getLoanType());
+        data.put("productName", product.getProductName());
         data.put("guarantorsRequired", product.getGuarantorsRequired());
         data.put("ratio", product.getMaxLoanSavingsRatio());
         data.put("insuranceRate", product.getInsuranceRate());

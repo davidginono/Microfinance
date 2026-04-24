@@ -50,7 +50,7 @@
                     <select id="productsLoanType" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
                             <option value="${p.loanType}" data-max-months="${p.maxRepaymentMonths}">
-                                <spring:message code="loan.type.${p.loanType}" />
+                                <c:out value="${p.displayName}" />
                             </option>
                         </c:forEach>
                     </select>
@@ -126,7 +126,7 @@
     <div class="erp-section mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="text-sm text-slate-700">
             One loan application is already on review:
-            <strong>${fn:substring(applicationLockApp.id, 0, 8)}</strong>
+            <strong>${applicationLockApp.applicationNumber}</strong>
             (<strong>${applicationLockStatusLabel}</strong>).
             Start another one after this loan is disbursed.
         </div>
@@ -148,7 +148,7 @@
         <tbody>
         <c:forEach items="${products}" var="p">
             <tr>
-                <td><spring:message code="loan.type.${p.loanType}" /></td>
+                <td><c:out value="${p.displayName}" /></td>
                 <td>${p.guarantorsRequired}</td>
                 <td>
                     <c:choose>

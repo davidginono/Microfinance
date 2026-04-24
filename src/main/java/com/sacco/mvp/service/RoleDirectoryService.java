@@ -29,6 +29,17 @@ public class RoleDirectoryService {
         return deduplicateAndSort(refs);
     }
 
+    public List<RoleAccountRef> activeByAnyRole(String saccoId, java.util.Collection<Position> positions) {
+        if (positions == null || positions.isEmpty()) {
+            return List.of();
+        }
+        List<RoleAccountRef> refs = new ArrayList<>();
+        memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
+            .filter(member -> member.getStaffRolesResolved().stream().anyMatch(positions::contains))
+            .forEach(member -> refs.add(fromMember(member)));
+        return deduplicateAndSort(refs);
+    }
+
     public List<RoleAccountRef> activeGlobalByRole(Position position) {
         List<RoleAccountRef> refs = new ArrayList<>();
         memberRepository.findAll().stream()
