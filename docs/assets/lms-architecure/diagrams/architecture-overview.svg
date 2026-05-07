@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">LMS architecture overview</title>
+  <desc id="desc">Overview of channels, security, workflow services, persistence, and integration layers.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#eef5fb"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1">
+      <stop offset="0%" stop-color="#135d66"/>
+      <stop offset="100%" stop-color="#2d7a87"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 30px 'Segoe UI', Arial, sans-serif; fill: #12343b; }
+      .subtitle { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #4c6470; }
+      .layer { fill: #ffffff; stroke: #c6d6e3; stroke-width: 2; rx: 26; }
+      .layerTitle { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #173b45; }
+      .node { fill: #fdfefe; stroke: #7ea8b7; stroke-width: 2; rx: 18; }
+      .nodeAccent { fill: #eff7f8; stroke: #2d7a87; stroke-width: 2; rx: 18; }
+      .nodeTitle { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #173b45; }
+      .nodeText { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #4d6570; }
+      .arrow { stroke: #6f93a2; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+      .badge { fill: url(#accent); rx: 999; }
+      .badgeText { font: 700 12px 'Segoe UI', Arial, sans-serif; fill: #ffffff; letter-spacing: 1px; }
+    </style>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#6f93a2"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="620" fill="url(#bg)"/>
+  <text x="70" y="70" class="title">LMS System Design</text>
+  <text x="70" y="100" class="subtitle">Session-based loan workflow platform with SACCO-scoped workspaces, approval queues, notifications, and audit records.</text>
+
+  <rect x="60" y="130" width="1080" height="104" class="layer"/>
+  <rect x="60" y="256" width="1080" height="120" class="layer"/>
+  <rect x="60" y="398" width="1080" height="160" class="layer"/>
+
+  <text x="88" y="162" class="layerTitle">Experience Layer</text>
+  <text x="88" y="288" class="layerTitle">Security and Workflow Layer</text>
+  <text x="88" y="430" class="layerTitle">Persistence and Integration Layer</text>
+
+  <rect x="90" y="176" width="230" height="42" class="nodeAccent"/>
+  <text x="118" y="202" class="nodeTitle">Member Workspace</text>
+  <text x="118" y="220" class="nodeText">Registration, loan application, guarantor actions</text>
+
+  <rect x="350" y="176" width="230" height="42" class="nodeAccent"/>
+  <text x="378" y="202" class="nodeTitle">Staff Workspaces</text>
+  <text x="378" y="220" class="nodeText">Admin, manager, board, chairperson dashboards</text>
+
+  <rect x="610" y="176" width="230" height="42" class="nodeAccent"/>
+  <text x="638" y="202" class="nodeTitle">Shared Views</text>
+  <text x="638" y="220" class="nodeText">Notifications, reports, printable loan records</text>
+
+  <rect x="870" y="176" width="230" height="42" class="nodeAccent"/>
+  <text x="898" y="202" class="nodeTitle">Email Touchpoints</text>
+  <text x="898" y="220" class="nodeText">OTP delivery, alerts, workflow notices</text>
+
+  <rect x="90" y="304" width="220" height="50" class="node"/>
+  <text x="116" y="333" class="nodeTitle">Authentication and Session Gate</text>
+  <text x="116" y="350" class="nodeText">Password login, OTP login, CSRF, MFA step-up</text>
+
+  <rect x="340" y="304" width="220" height="50" class="node"/>
+  <text x="366" y="333" class="nodeTitle">Role and Claim Enforcement</text>
+  <text x="366" y="350" class="nodeText">Workspace rules, ownership checks, assignee checks</text>
+
+  <rect x="590" y="304" width="220" height="50" class="node"/>
+  <text x="616" y="333" class="nodeTitle">Loan Workflow Services</text>
+  <text x="616" y="350" class="nodeText">Drafting, guarantors, manager review, board review</text>
+
+  <rect x="840" y="304" width="220" height="50" class="node"/>
+  <text x="866" y="333" class="nodeTitle">Admin and Oversight Services</text>
+  <text x="866" y="350" class="nodeText">Tenant settings, users, incidents, outbox monitoring</text>
+
+  <rect x="90" y="448" width="220" height="74" class="node"/>
+  <text x="116" y="478" class="nodeTitle">Core Transaction Tables</text>
+  <text x="116" y="498" class="nodeText">Members, loans, guarantor requests, reviews, payments</text>
+  <text x="116" y="516" class="nodeText">Shared database with SACCO-level scoping</text>
+
+  <rect x="340" y="448" width="220" height="74" class="node"/>
+  <text x="366" y="478" class="nodeTitle">Security and Identity Records</text>
+  <text x="366" y="498" class="nodeText">OTP tokens, user settings, staff role assignments</text>
+  <text x="366" y="516" class="nodeText">Signature and verification timestamps</text>
+
+  <rect x="590" y="448" width="220" height="74" class="node"/>
+  <text x="616" y="478" class="nodeTitle">Operational Oversight Records</text>
+  <text x="616" y="498" class="nodeText">Notifications, outbox events, incidents, audit log</text>
+  <text x="616" y="516" class="nodeText">Review evidence and support visibility</text>
+
+  <rect x="840" y="448" width="220" height="74" class="node"/>
+  <text x="866" y="478" class="nodeTitle">External and Platform Inputs</text>
+  <text x="866" y="498" class="nodeText">Member verification, savings snapshots, SACCO registry</text>
+  <text x="866" y="516" class="nodeText">Workspace setup and synchronization feeds</text>
+
+  <path d="M205 234 L205 292" class="arrow"/>
+  <path d="M465 234 L465 292" class="arrow"/>
+  <path d="M725 234 L725 292" class="arrow"/>
+  <path d="M985 234 L985 292" class="arrow"/>
+
+  <path d="M200 356 L200 438" class="arrow"/>
+  <path d="M450 356 L450 438" class="arrow"/>
+  <path d="M700 356 L700 438" class="arrow"/>
+  <path d="M950 356 L950 438" class="arrow"/>
+
+  <rect x="992" y="58" width="148" height="26" class="badge"/>
+  <text x="1017" y="75" class="badgeText">PRESENTATION VIEW</text>
+</svg>

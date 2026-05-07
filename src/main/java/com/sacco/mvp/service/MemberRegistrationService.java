@@ -47,7 +47,8 @@ public class MemberRegistrationService {
         log.info("Member registration requested: memberNo={}, email={}, saccoId={}",
             form.getMemberNo(), form.getEmail(), form.getSaccoId());
         VerifiedExternalMember verified = verifyExternalMember(form);
-        ensureLocalUniqueness(verified.memberNo(), verified.email());
+        String normalizedPhone = normalizePhone(form.getPhone());
+        ensureLocalUniqueness(verified.memberNo(), verified.email(), normalizedPhone);
         SaccoSettings sacco = resolveLocalSacco(verified);
         OffsetDateTime now = OffsetDateTime.now();
         Member member = Member.builder()
@@ -56,7 +57,7 @@ public class MemberRegistrationService {
             .memberNo(verified.memberNo())
             .stationId(verified.stationId())
             .fullName(verified.fullName())
-            .phone(null)
+            .phone(normalizedPhone)
             .email(verified.email())
             .signatureText(normalizeSignatureText(form.getSignatureText()))
             .signatureRegisteredAt(now)
@@ -138,7 +139,8 @@ public class MemberRegistrationService {
         );
     }
 
-    public void ensureLocalUniqueness(String memberNo, String email) {
+    public void ensureLocalUniqueness(String memberNo, String email, String phone) {
+        String normalizedPhone = normalizePhone(phone);
         if (memberRepository.findByMemberNo(memberNo).isPresent()) {
             log.info("Member registration blocked because member number already exists locally: {}", memberNo);
             throw new IllegalStateException("That member number is already registered in the MVP system.");
@@ -146,6 +148,10 @@ public class MemberRegistrationService {
         if (memberRepository.existsByEmailIgnoreCase(email)) {
             log.info("Member registration blocked because email already exists locally: {}", email);
             throw new IllegalStateException("That email address is already registered in the MVP system.");
+        }
+        if (memberRepository.existsByPhone(normalizedPhone)) {
+            log.info("Member registration blocked because phone already exists locally: {}", normalizedPhone);
+            throw new IllegalStateException("That phone number is already registered in the MVP system.");
         }
     }
 
@@ -209,6 +215,7 @@ public class MemberRegistrationService {
                 .boardSize(3)
                 .boardQuorum(2)
                 .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+                .applicationFee(new BigDecimal("15000.00"))
                 .defaultLanguage("en")
                 .createdAt(now)
                 .updatedAt(now)
@@ -225,6 +232,19 @@ public class MemberRegistrationService {
 
     private String normalizeEmail(String value) {
         return normalizeSpaces(value).toLowerCase();
+    }
+
+    private String normalizePhone(String value) {
+        String normalized = normalizeSpaces(value);
+        if (normalized.isBlank()) {
+            throw new IllegalStateException("Enter your phone number.");
+        }
+        boolean hasPlus = normalized.startsWith("+");
+        String digitsOnly = normalized.replaceAll("[^0-9]", "");
+        if (digitsOnly.length() < 7) {
+            throw new IllegalStateException("Enter a valid phone number.");
+        }
+        return hasPlus ? "+" + digitsOnly : digitsOnly;
     }
 
     private String normalizeSaccoId(String value) {
@@ -272,4 +292,3 @@ public class MemberRegistrationService {
     ) {
     }
 }
-

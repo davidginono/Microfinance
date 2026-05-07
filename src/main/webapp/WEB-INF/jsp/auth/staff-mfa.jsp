@@ -66,7 +66,7 @@
             </form>
         </div>
 
-        <p class="mt-5 text-xs text-slate-500">Only privileged staff accounts use this second verification step.</p>
+        <p class="mt-5 text-xs text-slate-500">Only minor admin accounts use this second verification step when the local development bypass is off.</p>
     </div>
 </main>
 

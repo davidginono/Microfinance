@@ -55,8 +55,10 @@ public class AuthController {
         return switch (principal.getPosition()) {
             case ADMIN -> "redirect:/admin/dashboard";
             case MINOR_ADMIN -> "redirect:/admin/dashboard";
-            case CHAIRPERSON -> "redirect:/chairperson/manager-decisions";
+            case LOAN_OFFICER -> "redirect:/loan-officer/queue";
             case MANAGER -> "redirect:/manager/loan-applications?status=READY_FOR_MANAGER";
+            case ACCOUNTANT -> "redirect:/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
+            case DISBURSEMENT_OFFICER -> "redirect:/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
             case BOARD -> "redirect:/board/queue";
             case MEMBER -> "redirect:/app/dashboard";
         };
@@ -97,7 +99,11 @@ public class AuthController {
 
         try {
             MemberRegistrationService.VerifiedExternalMember verified = memberRegistrationService.verifyExternalMember(form);
-            memberRegistrationService.ensureLocalUniqueness(verified.memberNo(), verified.email());
+            memberRegistrationService.ensureLocalUniqueness(
+                verified.memberNo(),
+                verified.email(),
+                form.getPhone()
+            );
             emailOtpService.issueOtp(
                 verified.email(),
                 EmailOtpPurpose.REGISTRATION,
@@ -312,8 +318,10 @@ public class AuthController {
         return switch (Position.primaryRole(member.getStaffRolesResolved(), member.isMemberAccess())) {
             case ADMIN -> "/admin/dashboard";
             case MINOR_ADMIN -> "/admin/dashboard";
-            case CHAIRPERSON -> "/chairperson/manager-decisions";
+            case LOAN_OFFICER -> "/loan-officer/queue";
             case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
+            case ACCOUNTANT -> "/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
+            case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
             case BOARD -> "/board/queue";
             case MEMBER -> "/app/dashboard";
         };

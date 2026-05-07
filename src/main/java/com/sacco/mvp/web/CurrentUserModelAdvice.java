@@ -87,8 +87,10 @@ public class CurrentUserModelAdvice {
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
             case MANAGER -> "/manager/notifications";
+            case ACCOUNTANT -> "/accountant/notifications";
+            case DISBURSEMENT_OFFICER -> "/disbursement/notifications";
             case BOARD -> "/board/notifications";
-            case CHAIRPERSON -> "/chairperson/manager-decisions";
+            case LOAN_OFFICER -> "/loan-officer/notifications";
             case MEMBER -> "/app/notifications";
         };
     }
@@ -129,8 +131,10 @@ public class CurrentUserModelAdvice {
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
             case MANAGER -> "/manager/notifications/";
+            case ACCOUNTANT -> "/accountant/notifications/";
+            case DISBURSEMENT_OFFICER -> "/disbursement/notifications/";
             case BOARD -> "/board/notifications/";
-            case CHAIRPERSON -> "/chairperson/manager-decisions";
+            case LOAN_OFFICER -> "/loan-officer/notifications/";
             case MEMBER -> "/app/notifications/";
         };
     }

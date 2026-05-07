@@ -8,8 +8,11 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Manager Panel / Review Detail</p>
-    <h1 class="erp-page-title">Manager Review</h1>
+    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
+    <c:if test="${not empty reviewPanelSubtitle}">
+        <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
+    </c:if>
 </div>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
@@ -48,45 +51,48 @@
     </div>
 
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Loan Amount</div>
-            <div class="loan-stat-value">${app.amount}</div>
-        </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Tenor</div>
-            <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
-        </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Savings</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
-            </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Shares</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
-            </div>
-    </div>
-
-    <div class="mt-6 loan-simple-progress">
-        <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
-        <div class="loan-simple-progress-list">
-            <c:forEach items="${loanProgressItems}" var="item">
-                <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
-                    <span class="loan-simple-progress-dot"></span>
-                    <span>${item.label}</span>
+        <div class="space-y-3"
+             data-live-account-status-url="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Loan Amount</div>
+                    <div class="loan-stat-value">${app.amount}</div>
                 </div>
-            </c:forEach>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Tenor</div>
+                    <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
+                </div>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Current Savings</div>
+                    <div class="loan-stat-value" data-live-account-status-savings>Loading...</div>
+                </div>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Current Shares</div>
+                    <div class="loan-stat-value" data-live-account-status-shares>Loading...</div>
+                </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                 data-live-account-status-box>
+                Loading live balances...
+            </div>
+        </div>
+
+        <div class="mt-6 loan-simple-progress">
+            <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
+            <div class="loan-simple-progress-list">
+                <c:forEach items="${loanProgressItems}" var="item">
+                    <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
+                        <span class="loan-simple-progress-dot"></span>
+                        <span>${item.label}</span>
+                    </div>
+                </c:forEach>
+            </div>
         </div>
     </div>
 </div>
 </div>
 
 <div class="mt-4 space-y-4">
-    <c:if test="${not applicantExternalAccountStatus.available}">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            ${applicantExternalAccountStatus.statusMessage}
-        </div>
-    </c:if>
     <c:if test="${not empty managerReason}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
             <strong>Current Rejection Reason:</strong> ${managerReason}
@@ -187,6 +193,7 @@
                         <th class="px-3 py-2 text-left">Loan</th>
                         <th class="px-3 py-2 text-left">Type</th>
                         <th class="px-3 py-2 text-left">Amount</th>
+                        <th class="px-3 py-2 text-left">Outstanding Balance</th>
                         <th class="px-3 py-2 text-left">Installment</th>
                         <th class="px-3 py-2 text-left">Disbursed</th>
                         <th class="px-3 py-2 text-left">Final Due</th>
@@ -200,6 +207,7 @@
                             </td>
                             <td class="px-3 py-2 text-slate-700">${loan.loanTypeLabel}</td>
                             <td class="px-3 py-2 font-medium text-slate-900">${loan.amount}</td>
+                            <td class="px-3 py-2 font-medium text-slate-900" data-active-loan-outstanding="${loan.id}">${loan.outstandingBalance}</td>
                             <td class="px-3 py-2">
                                 <div class="font-medium text-slate-900">${loan.installmentAmount}</div>
                                 <div class="mt-1 text-xs uppercase tracking-wide text-slate-500">${loan.repaymentFrequency}</div>
@@ -248,8 +256,42 @@
     </table>
 </div>
 
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+    <div class="erp-table-wrap overflow-x-auto">
+        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+            <tr>
+                <th class="px-3 py-2 text-left">File</th>
+                <th class="px-3 py-2 text-left">Size</th>
+                <th class="px-3 py-2 text-left">Uploaded</th>
+                <th class="px-3 py-2 text-left"></th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            <c:forEach items="${disbursementProofAttachments}" var="file">
+                <tr>
+                    <td class="px-3 py-2">${file.originalName}</td>
+                    <td class="px-3 py-2">${file.sizeLabel}</td>
+                    <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                    <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}?inline=true" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
+                        </div>
+                    </td>
+                </tr>
+            </c:forEach>
+            <c:if test="${empty disbursementProofAttachments}">
+                <tr><td colspan="4" class="px-3 py-3 text-slate-500">No disbursement proof uploaded yet.</td></tr>
+            </c:if>
+            </tbody>
+        </table>
+    </div>
+</c:if>
+
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Attachments</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
@@ -305,7 +347,7 @@
                 <td class="px-3 py-2">
                     <button type="button"
                             class="app-btn btn-neutral guarantor-financial-trigger"
-                            data-url="/manager/loan-applications/${app.id}/guarantors/${g.guarantorMemberId}/financial-status">
+                            data-url="${reviewBasePath}/loan-applications/${app.id}/guarantors/${g.guarantorMemberId}/financial-status">
                         <span class="guarantor-financial-spinner hidden" data-financial-spinner></span>
                         <span data-financial-label>Load Status</span>
                     </button>
@@ -347,8 +389,8 @@
             </c:forEach>
         </div>
         <c:if test="${not empty repaymentRows}">
-            <c:if test="${not empty app.loanId}">
-                <form action="/manager/loan-applications/${app.id}/sync-payments" method="post" class="mt-4 flex items-center justify-end">
+            <c:if test="${allowPaymentSync and not empty app.loanId}">
+                <form action="${reviewBasePath}/loan-applications/${app.id}/sync-payments" method="post" class="mt-4 flex items-center justify-end">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <button type="submit" class="app-btn btn-neutral">Refresh Payments</button>
                 </form>
@@ -360,11 +402,11 @@
                         <th class="px-3 py-2 text-left">Installment</th>
                         <th class="px-3 py-2 text-left">Due Date</th>
                         <th class="px-3 py-2 text-left">Scheduled Amount</th>
+                        <th class="px-3 py-2 text-left">Outstanding Balance</th>
                         <th class="px-3 py-2 text-left">Principal Paid</th>
                         <th class="px-3 py-2 text-left">Interest Paid</th>
                         <th class="px-3 py-2 text-left">Total Paid</th>
                         <th class="px-3 py-2 text-left">Payment Date</th>
-                        <th class="px-3 py-2 text-left">Status</th>
                     </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -372,12 +414,17 @@
                         <tr>
                             <td class="px-3 py-2">${row.installment}</td>
                             <td class="px-3 py-2">${row.dueDate}</td>
-                            <td class="px-3 py-2">${row.amount}</td>
+                            <td class="px-3 py-2">
+                                <div>${row.amount}</div>
+                                <c:if test="${not empty row.scheduledBreakdown}">
+                                    <div class="mt-1 text-xs text-slate-500">${row.scheduledBreakdown}</div>
+                                </c:if>
+                            </td>
+                            <td class="px-3 py-2">${row.outstandingBalance}</td>
                             <td class="px-3 py-2">${row.principalPaid}</td>
                             <td class="px-3 py-2">${row.interestPaid}</td>
                             <td class="px-3 py-2">${row.totalPaid}</td>
                             <td class="px-3 py-2">${row.paymentDate}</td>
-                            <td class="px-3 py-2">${row.status}</td>
                         </tr>
                     </c:forEach>
                     </tbody>
@@ -387,25 +434,25 @@
     </div>
 </c:if>
 
-<c:if test="${app.status eq 'READY_FOR_MANAGER'}">
-    <form action="/manager/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3">
+<c:if test="${showReviewDecisionForm}">
+    <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <label class="block text-sm font-medium text-slate-700">Reasons</label>
-        <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="Write the reason for approval note or rejection"></textarea>
+        <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
+        <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
         <div class="flex flex-wrap gap-2">
-            <button type="submit" name="decision" value="ACCEPT" class="app-btn btn-primary">Approve Loan</button>
-            <button type="submit" name="decision" value="REJECT" class="app-btn btn-reject">Reject Loan</button>
+            <button type="submit" name="decision" value="ACCEPT" class="app-btn btn-primary">${approveActionLabel}</button>
+            <button type="submit" name="decision" value="REJECT" class="app-btn btn-reject">${rejectActionLabel}</button>
         </div>
     </form>
 </c:if>
 
-<c:if test="${not empty pendingManagerStageWithdrawal}">
+<c:if test="${showManagerReversalRequests and not empty pendingManagerStageWithdrawal}">
     <div class="erp-form-wrap space-y-3">
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             The applicant wants this loan application removed while it is still under manager review. Review the request before anything changes.
         </div>
         <div class="flex flex-wrap gap-2">
-            <form action="/manager/loan-applications/${app.id}/reversal-requests/${pendingManagerStageWithdrawal.id}/approve"
+            <form action="${reviewBasePath}/loan-applications/${app.id}/reversal-requests/${pendingManagerStageWithdrawal.id}/approve"
                   method="post"
                   data-confirm-title="Approve Removal"
                   data-confirm-message="Approve this request and remove the application from manager review?"
@@ -413,7 +460,7 @@
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn btn-primary">Approve Removal</button>
             </form>
-            <form action="/manager/loan-applications/${app.id}/reversal-requests/${pendingManagerStageWithdrawal.id}/reject"
+            <form action="${reviewBasePath}/loan-applications/${app.id}/reversal-requests/${pendingManagerStageWithdrawal.id}/reject"
                   method="post"
                   data-confirm-title="Decline Removal"
                   data-confirm-message="Keep this application in the manager queue and decline the removal request?"
@@ -425,9 +472,10 @@
     </div>
 </c:if>
 
-<c:if test="${app.status eq 'BOARD_APPROVED'}">
-    <form action="/manager/loan-applications/${app.id}/finalize"
+<c:if test="${showDisbursementForm}">
+    <form action="${reviewBasePath}/loan-applications/${app.id}/finalize"
           method="post"
+          enctype="multipart/form-data"
           class="erp-form-wrap space-y-3"
           data-confirm-title="Disburse Loan"
           data-confirm-message="Disburse this loan now? There will be no reversal of this action."
@@ -439,7 +487,12 @@
                 <label class="block text-sm font-medium text-slate-700">Loan Disbursement</label>
                 <p class="mt-1 text-sm text-slate-500">Enter the release date and repayment terms before final approval.</p>
             </div>
-            <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">Board quorum reached</span>
+            <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                <c:choose>
+                    <c:when test="${app.status eq 'BOARD_APPROVED'}">Committee approval threshold reached</c:when>
+                    <c:otherwise>Ready for disbursement</c:otherwise>
+                </c:choose>
+            </span>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
             <div>
@@ -471,25 +524,24 @@
             </div>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700">Manager Notes</label>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Proof <span class="text-rose-600">*</span></label>
+            <input type="file"
+                   name="disbursementProofFile"
+                   accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                   required />
+            <p class="mt-1 text-xs text-slate-500">Attach the receipt, voucher, or signed proof the applicant can later view.</p>
+        </div>
+        <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
             <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="Optional disbursement or repayment instructions">${app.disbursementNotes}</textarea>
         </div>
-        <button type="submit" class="app-btn btn-approve">Disburse Loan</button>
+        <button type="submit" class="app-btn btn-approve">${disbursementActionLabel}</button>
     </form>
 </c:if>
 
-<c:if test="${app.status eq 'BOARD_REJECTED'}">
-    <form action="/manager/loan-applications/${app.id}/finalize" method="post" class="erp-form-wrap space-y-3">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <input type="hidden" name="decision" value="FINAL_REJECT" />
-        <label class="block text-sm font-medium text-slate-700">Finalize Decision</label>
-        <p class="text-sm text-slate-500">Board quorum rejected this application. Finalize to close the workflow.</p>
-        <button type="submit" class="app-btn btn-reject">Finalize Rejection</button>
-    </form>
-</c:if>
-
-<c:if test="${app.status eq 'MANAGER_REJECTED'}">
-    <form action="/manager/loan-applications/${app.id}/undo-decision"
+<c:if test="${showUndoForm}">
+    <form action="${reviewBasePath}/loan-applications/${app.id}/undo-decision"
           method="post"
           class="erp-form-wrap"
           data-confirm-title="Reverse Manager Action"
@@ -512,5 +564,34 @@
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
+<%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<script>
+    (() => {
+        const url = "${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/active-loans/outstanding-balances";
+        const cells = document.querySelectorAll("[data-active-loan-outstanding]");
+        if (!cells.length) {
+            return;
+        }
+        fetch(url, {
+            headers: {
+                "Accept": "application/json"
+            },
+            credentials: "same-origin"
+        })
+            .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+            .then(({ ok, payload }) => {
+                if (!ok || !payload || !Array.isArray(payload.rows)) {
+                    return;
+                }
+                payload.rows.forEach((row) => {
+                    const cell = document.querySelector('[data-active-loan-outstanding="' + row.id + '"]');
+                    if (cell && row.outstandingBalance) {
+                        cell.textContent = row.outstandingBalance;
+                    }
+                });
+            })
+            .catch(() => {});
+    })();
+</script>
 
 <%@ include file="../fragments/footer.jspf" %>

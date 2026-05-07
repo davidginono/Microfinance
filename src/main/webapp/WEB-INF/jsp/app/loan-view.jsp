@@ -86,18 +86,6 @@
         font-size: 0.94rem;
         color: #64748b;
     }
-    .loan-repayment-status {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 9999px;
-        background: #f8fafc;
-        padding: 0.3rem 0.7rem;
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #475569;
-    }
 </style>
 
 <div class="erp-page-header">
@@ -147,28 +135,41 @@
                     <div class="loan-hero-inline-label">Loan Type</div>
                     <div class="loan-hero-inline-value"><spring:message code="loan.type.${app.loanType}"/></div>
                 </div>
+                <c:if test="${not empty formFields['Loan Purpose']}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label">Loan Purpose</div>
+                        <div class="loan-hero-inline-value">${formFields['Loan Purpose']}</div>
+                    </div>
+                </c:if>
             </div>
         </div>
     </div>
 
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Loan Amount</div>
-            <div class="loan-stat-value">${app.amount}</div>
-        </div>
-        <div class="loan-view-summary-card px-4 py-4">
-            <div class="loan-stat-label">Tenor</div>
-            <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
-        </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Savings</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
+        <div class="space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Loan Amount</div>
+                    <div class="loan-stat-value">${app.amount}</div>
+                </div>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Tenor</div>
+                    <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
+                </div>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Current Savings</div>
+                    <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
+                </div>
+                <div class="loan-view-summary-card px-4 py-4">
+                    <div class="loan-stat-label">Current Shares</div>
+                    <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
+                </div>
             </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Shares</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
-            </div>
+            <c:if test="${not applicantExternalAccountStatus.available}">
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    ${applicantExternalAccountStatus.statusMessage}
+                </div>
+            </c:if>
         </div>
 
         <div class="mt-6 loan-simple-progress">
@@ -190,11 +191,6 @@
     <c:if test="${not empty managerReason}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
             <strong>Manager Reason:</strong> ${managerReason}
-        </div>
-    </c:if>
-    <c:if test="${not applicantExternalAccountStatus.available}">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            ${applicantExternalAccountStatus.statusMessage}
         </div>
     </c:if>
 </div>
@@ -445,11 +441,11 @@
                                 <th class="px-3 py-2 text-left">Installment</th>
                                 <th class="px-3 py-2 text-left">Due Date</th>
                                 <th class="px-3 py-2 text-left">Scheduled Amount</th>
+                                <th class="px-3 py-2 text-left">Outstanding Balance</th>
                                 <th class="px-3 py-2 text-left">Principal Paid</th>
                                 <th class="px-3 py-2 text-left">Interest Paid</th>
                                 <th class="px-3 py-2 text-left">Total Paid</th>
                                 <th class="px-3 py-2 text-left">Payment Date</th>
-                                <th class="px-3 py-2 text-left">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -458,11 +454,11 @@
                                     <td class="px-3 py-2 font-medium text-slate-700">${row.installment}</td>
                                     <td class="px-3 py-2">${row.dueDate}</td>
                                     <td class="px-3 py-2 font-medium text-slate-900">${row.amount}</td>
+                                    <td class="px-3 py-2">${row.outstandingBalance}</td>
                                     <td class="px-3 py-2">${row.principalPaid}</td>
                                     <td class="px-3 py-2">${row.interestPaid}</td>
                                     <td class="px-3 py-2 font-medium text-slate-900">${row.totalPaid}</td>
                                     <td class="px-3 py-2">${row.paymentDate}</td>
-                                    <td class="px-3 py-2"><span class="loan-repayment-status">${row.status}</span></td>
                                 </tr>
                             </c:forEach>
                         </tbody>
@@ -478,8 +474,44 @@
     </div>
 </c:if>
 
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+    <div class="erp-table-wrap overflow-x-auto">
+        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-3 py-2 text-left">File</th>
+                    <th class="px-3 py-2 text-left">Size</th>
+                    <th class="px-3 py-2 text-left">Uploaded</th>
+                    <th class="px-3 py-2 text-left"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                <c:forEach items="${disbursementProofAttachments}" var="file">
+                    <tr>
+                        <td class="px-3 py-2">${file.originalName}</td>
+                        <td class="px-3 py-2">${file.sizeLabel}</td>
+                        <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                        <td class="px-3 py-2">
+                            <div class="flex flex-wrap gap-2">
+                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}?inline=true" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
+                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
+                            </div>
+                        </td>
+                    </tr>
+                </c:forEach>
+                <c:if test="${empty disbursementProofAttachments}">
+                    <tr>
+                        <td colspan="4" class="px-3 py-3 text-slate-500">No disbursement proof has been uploaded for this loan yet.</td>
+                    </tr>
+                </c:if>
+            </tbody>
+        </table>
+    </div>
+</c:if>
+
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Attachments</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
             <tr>

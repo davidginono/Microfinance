@@ -14,9 +14,12 @@ import java.util.Locale;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     private final AdminScopeInterceptor adminScopeInterceptor;
+    private final MemberLocaleInterceptor memberLocaleInterceptor;
 
-    public WebConfig(AdminScopeInterceptor adminScopeInterceptor) {
+    public WebConfig(AdminScopeInterceptor adminScopeInterceptor,
+                     MemberLocaleInterceptor memberLocaleInterceptor) {
         this.adminScopeInterceptor = adminScopeInterceptor;
+        this.memberLocaleInterceptor = memberLocaleInterceptor;
     }
 
     @Bean
@@ -36,6 +39,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(memberLocaleInterceptor)
+            .addPathPatterns("/app/**");
         registry.addInterceptor(adminScopeInterceptor)
             .addPathPatterns("/admin/**")
             .excludePathPatterns("/admin/scope", "/admin/scope/select");

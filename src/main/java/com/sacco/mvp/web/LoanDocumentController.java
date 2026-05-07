@@ -80,7 +80,7 @@ public class LoanDocumentController {
             boardMembers.put(member.getId(), member);
         }
 
-        String html = loanPresentationService.buildPrintableHtml(
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
             app,
             resolvePrintableSaccoName(app.getSaccoId()),
             applicant,
@@ -94,9 +94,9 @@ public class LoanDocumentController {
         );
 
         return ResponseEntity.ok()
-            .contentType(MediaType.TEXT_HTML)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + ".html")
-            .body(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + ".pdf")
+            .body(pdf);
     }
 
     private String resolvePrintableSaccoName(String saccoId) {
@@ -115,7 +115,9 @@ public class LoanDocumentController {
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
-    public ResponseEntity<byte[]> downloadAttachment(@PathVariable UUID loanId, @PathVariable String attachmentId) throws IOException {
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable UUID loanId,
+                                                     @PathVariable String attachmentId,
+                                                     @RequestParam(name = "inline", defaultValue = "false") boolean inline) throws IOException {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(loanId, attachmentId, app.getAttachmentsJson());
@@ -127,7 +129,7 @@ public class LoanDocumentController {
 
         return ResponseEntity.ok()
             .contentType(mediaType)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getOriginalName() + "\"")
+            .header(HttpHeaders.CONTENT_DISPOSITION, (inline ? "inline" : "attachment") + "; filename=\"" + resource.getOriginalName() + "\"")
             .body(Files.readAllBytes(resource.getPath()));
     }
 
@@ -142,17 +144,72 @@ public class LoanDocumentController {
             .body(pdf);
     }
 
+    @GetMapping("/documents/reports/member-loans.csv")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    public ResponseEntity<byte[]> downloadMemberLoanReportCsv(@AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
+        byte[] csv = loanReportService.buildMemberCsv(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.csv")
+            .body(csv);
+    }
+
+    @GetMapping("/documents/reports/member-loans.xlsx")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
+        byte[] workbook = loanReportService.buildMemberExcel(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.xlsx")
+            .body(workbook);
+    }
+
     @GetMapping("/documents/reports/manager-loans.pdf")
     @PreAuthorize("hasRole('MANAGER') and @userClaims.has(principal, 'REVIEW_MANAGER_QUEUE')")
     public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                            @RequestParam(required = false) Integer year,
-                                                            @RequestParam(defaultValue = "false") boolean returnedOnly) {
-        LoanReportService.ManagerLoanReport report = loanReportService.managerReport(
-            principal.getSaccoId(), year, returnedOnly);
-        byte[] pdf = loanReportService.buildManagerPdf(report);
+                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                            @RequestParam(required = false) String decisionFilter) {
+        LoanReportService.ManagerWorkflowReport report = loanReportService.managerWorkflowReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
+        byte[] pdf = loanReportService.buildManagerWorkflowPdf(report);
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=manager-disbursed-loans-" + report.year() + "-report.pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=manager-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/accountant-loans.pdf")
+    @PreAuthorize("hasRole('ACCOUNTANT') and @userClaims.has(principal, 'REVIEW_ACCOUNTANT_QUEUE')")
+    public ResponseEntity<byte[]> downloadAccountantLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                               @RequestParam(required = false) String decisionFilter) {
+        LoanReportService.AccountantLoanReport report = loanReportService.accountantReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
+        byte[] pdf = loanReportService.buildAccountantPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=accountant-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/disbursement-loans.pdf")
+    @PreAuthorize("hasRole('DISBURSEMENT_OFFICER') and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    public ResponseEntity<byte[]> downloadDisbursementLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        LoanReportService.DisbursementLoanReport report = loanReportService.disbursementReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate);
+        byte[] pdf = loanReportService.buildDisbursementPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=disbursement-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
             .body(pdf);
     }
 

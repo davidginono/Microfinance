@@ -15,7 +15,6 @@ import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.ReversalRequestService;
-import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.service.dto.FormModel;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -108,9 +107,17 @@ public class AppController {
         model.addAttribute("statusChartRows", buildStatusChartRows(statusCounts));
         model.addAttribute("activeLoanChartRows", activeLoanChartRows);
         model.addAttribute("archivedApplicationCount", archivedApplications.size());
-        model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.resolve(member));
+        model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         addGuaranteeContext(pendingGuarantees, model);
         return "app/dashboard";
+    }
+
+    @GetMapping("/dashboard/external-account-status")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> dashboardExternalAccountStatus(@AuthenticationPrincipal AppUserPrincipal principal) {
+        Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
+        return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(member)));
     }
 
     @PostMapping("/dashboard/active-loans/{loanId}/seen")
@@ -135,11 +142,15 @@ public class AppController {
     @GetMapping("/loan-products")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
     public String products(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("products", loanWorkflowService.listProducts(principal.getSaccoId()));
+        List<LoanProductSetting> products = loanWorkflowService.listProducts(principal.getSaccoId());
+        model.addAttribute("products", products);
         loanWorkflowService.findApplicationInProgress(principal.getMemberId()).ifPresent(app -> {
             model.addAttribute("applicationLockApp", app);
             model.addAttribute("applicationLockStatusLabel", dashboardStatusLabel(app.getStatus()));
         });
+        loanWorkflowService.findActiveDisbursedLoan(principal.getMemberId()).ifPresent(app ->
+            model.addAttribute("activeDisbursedLoanApp", app)
+        );
         return "app/loan-products";
     }
 
@@ -198,22 +209,23 @@ public class AppController {
         model.addAttribute("reportPaidCount", report.summary().paidCount());
         model.addAttribute("reportPaidAmountLabel", report.summary().getPaidAmountLabel());
         model.addAttribute("reportOngoingCount", report.summary().ongoingCount());
-        model.addAttribute("reportRows", report.loans().stream()
-            .map(loan -> {
+        model.addAttribute("reportDetails", report.details().stream()
+            .map(detail -> {
                 Map<String, String> row = new LinkedHashMap<>();
-                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
-                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
-                row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
-                row.put("amount", loan.getAmount() == null ? "-" : loan.getAmount().toPlainString());
-                row.put("disbursed", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
-                row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
-                row.put("statusLabel", switch (loan.getStatus()) {
-                    case FINAL_APPROVED -> "DISBURSED LOAN";
-                    case DEFAULTED -> "DEFAULTED";
-                    case PAID -> "PAID";
-                    default -> loan.getStatus().name();
-                });
-                row.put("paidAt", loan.getPaidAt() == null ? "-" : loan.getPaidAt().toString().replace('T', ' ').substring(0, 16));
+                row.put("loanApplicationIdLabel", detail.loanApplicationIdLabel());
+                row.put("loanIdLabel", detail.loanIdLabel());
+                row.put("memberDetailsLabel", detail.memberDetailsLabel());
+                row.put("approvedProductLabel", detail.approvedProductLabel());
+                row.put("approvedAmountLabel", detail.approvedAmountLabel());
+                row.put("tenureLabel", detail.tenureLabel());
+                row.put("deductionSummaryLabel", detail.deductionSummaryLabel());
+                row.put("guarantorDetailsLabel", detail.guarantorDetailsLabel());
+                row.put("approvalDecisionSummaryLabel", detail.approvalDecisionSummaryLabel());
+                row.put("disbursementDateLabel", detail.disbursementDateLabel());
+                row.put("finalDueDateLabel", detail.finalDueDateLabel());
+                row.put("statusLabel", detail.statusLabel());
+                row.put("preparedByLabel", detail.preparedByLabel());
+                row.put("preparedDateLabel", detail.preparedDateLabel());
                 return row;
             })
             .toList());
@@ -325,6 +337,13 @@ public class AppController {
                     + "). Continue it until it is disbursed before applying again."
             );
             return "redirect:/app/loan-applications/" + app.getId();
+        }
+        LoanProductSetting product = formSchemaService.getSchema(principal.getSaccoId(), loanType);
+        try {
+            loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/app/loan-products";
         }
         Map<String, String> formValues = new LinkedHashMap<>();
         if (topUpLoanId != null) {
@@ -508,12 +527,14 @@ public class AppController {
         model.addAttribute("managerReason",
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "");
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
-        model.addAttribute("attachments", loanPresentationService.parseAttachments(app.getAttachmentsJson()));
+        model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
+        model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
             app.getRepaymentScheduleJson(),
-            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId())));
+            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
+            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("repaymentDaysLeft",
             app.getFinalDueDate() == null ? null : java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), app.getFinalDueDate()));
@@ -552,7 +573,9 @@ public class AppController {
             case DRAFT -> 1;
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
-            case AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED -> 4;
+            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
+                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
             case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
     }
@@ -565,7 +588,9 @@ public class AppController {
             case DRAFT -> 10;
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 35;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
-            case AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED -> 80;
+            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
+                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
             case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
         };
     }
@@ -578,9 +603,10 @@ public class AppController {
             case DRAFT -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, BOARD_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
-            case AWAITING_BOARD -> "bg-blue-50 text-blue-700";
-            case MANAGER_ACCEPTED, BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
+            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
+                FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case FINAL_REJECTED -> "bg-rose-50 text-rose-700";
         };
     }
@@ -610,6 +636,14 @@ public class AppController {
                     emailOtpService.consumeOtpById(applicantSignatureOtpTokenId);
                 }
                 ra.addFlashAttribute("message", "Application submitted and sent for manager review.");
+                return "redirect:/app/loan-applications/" + id;
+            }
+            if (app.getStatus() == LoanStatus.AWAITING_BOARD) {
+                ra.addFlashAttribute("message", "Application submitted and sent for committee review.");
+                return "redirect:/app/loan-applications/" + id;
+            }
+            if (app.getStatus() == LoanStatus.MANAGER_ACCEPTED) {
+                ra.addFlashAttribute("message", "Application completed the configured review path and is now ready for disbursement.");
                 return "redirect:/app/loan-applications/" + id;
             }
             ra.addFlashAttribute("message", "Application status updated successfully.");
@@ -703,12 +737,18 @@ public class AppController {
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
                                                       @RequestParam(defaultValue = "") String q) {
         String query = q == null ? "" : q.trim().toUpperCase(Locale.ROOT);
-        boolean sixDigits = query.matches("\\d{6}");
-        boolean fullMemberNo = query.matches("[A-Z0-9]{6,20}") && query.chars().anyMatch(Character::isDigit);
-        if (!sixDigits && !fullMemberNo) {
+        boolean fourDigitsOrMore = query.matches("\\d{4,20}");
+        boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
+        if (!fourDigitsOrMore && !fullMemberNo) {
             return Collections.emptyList();
         }
-        return loanWorkflowService.searchGuarantors(principal.getSaccoId(), principal.getMemberId(), query, 0, 6)
+        return loanWorkflowService.searchGuarantors(
+                principal.getSaccoId(),
+                principal.getStationId(),
+                principal.getMemberId(),
+                query,
+                0,
+                6)
             .getContent()
             .stream()
             .map(member -> {
@@ -730,6 +770,8 @@ public class AppController {
                                                                 @RequestParam(required = false) UUID topUpLoanId) {
         try {
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
+            LoanProductSetting product = formSchemaService.getSchema(principal.getSaccoId(), loanType);
+            loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product);
             Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
                 principal.getSaccoId(), principal.getMemberId(), loanType, amount, tenorMonths, topUpLoanId);
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
@@ -762,30 +804,19 @@ public class AppController {
         if (member.getStationId() == null || member.getStationId().isBlank()) {
             throw new IllegalStateException("Station ID is not configured for this member.");
         }
-        SaccoSettings sacco = saccoSettingsRepository.findById(principal.getSaccoId())
-            .orElseThrow(() -> new IllegalArgumentException("SACCO settings missing"));
-
-        ForesightAccountSummary summary = foresightDirectoryService.fetchAccountSummary(principal.getUsername(), member.getStationId());
-        BigDecimal savings = summary == null || summary.savingsBalance() == null
-            ? BigDecimal.ZERO
-            : summary.savingsBalance();
-
-        BigDecimal ratio = loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(principal.getSaccoId(), loanType)
-            .map(LoanProductSetting::getMaxLoanSavingsRatio)
-            .filter(Objects::nonNull)
-            .orElseGet(sacco::getMaxLoanSavingsRatio);
-        if (ratio == null) {
-            ratio = BigDecimal.ZERO;
-        }
-
-        BigDecimal maxAllowed = savings.multiply(ratio).setScale(2, RoundingMode.DOWN);
+        EligibilityService.EligibilityResult eligibility = eligibilityService.check(
+            principal.getSaccoId(),
+            principal.getMemberId(),
+            loanType,
+            BigDecimal.ZERO
+        );
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("savingsLabel", formatTzs(savings));
-        response.put("ratioPercentLabel", ratio.multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
-        response.put("maxAllowedLabel", formatTzs(maxAllowed));
-        response.put("exampleAmountLabel", formatTzs(exampleAmount(maxAllowed)));
-        response.put("memberNumber", principal.getUsername());
+        response.put("savingsLabel", formatTzs(eligibility.savings()));
+        response.put("ratioPercentLabel", eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
+        response.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+        response.put("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
+        response.put("memberNumber", member.getMemberNo());
         response.put("stationId", member.getStationId());
         return response;
     }
@@ -994,6 +1025,48 @@ public class AppController {
         return "app/support";
     }
 
+    @GetMapping("/settings")
+    @PreAuthorize("hasRole('MEMBER')")
+    public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+        UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
+            .orElseGet(() -> UserSettings.builder()
+                .memberId(principal.getMemberId())
+                .language("en")
+                .notificationPrefs("{}")
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
+                .build());
+        model.addAttribute("memberSettingsLanguage", normalizeMemberLanguage(settings.getLanguage()));
+        return "app/settings";
+    }
+
+    @PostMapping("/settings/language")
+    @PreAuthorize("hasRole('MEMBER')")
+    public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
+                                 @RequestParam String language,
+                                 RedirectAttributes ra) {
+        OffsetDateTime now = OffsetDateTime.now();
+        UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
+            .orElseGet(() -> UserSettings.builder()
+                .memberId(principal.getMemberId())
+                .language("en")
+                .notificationPrefs("{}")
+                .createdAt(now)
+                .updatedAt(now)
+                .build());
+        settings.setLanguage(normalizeMemberLanguage(language));
+        if (settings.getNotificationPrefs() == null || settings.getNotificationPrefs().isBlank()) {
+            settings.setNotificationPrefs("{}");
+        }
+        if (settings.getCreatedAt() == null) {
+            settings.setCreatedAt(now);
+        }
+        settings.setUpdatedAt(now);
+        userSettingsRepository.save(settings);
+        ra.addFlashAttribute("message", "Language preference updated.");
+        return "redirect:/app/settings";
+    }
+
     @PostMapping("/notifications/mark-all-read")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
@@ -1037,7 +1110,11 @@ public class AppController {
             principal.getSaccoId(), principal.getMemberId(), loanType, BigDecimal.ZERO);
 
         model.addAttribute("formModel", form);
+        model.addAttribute("product", schema);
         model.addAttribute("loanType", loanType);
+        model.addAttribute("loanProductName", schema.getDisplayName());
+        model.addAttribute("loanProductCode", schema.getDisplayCode());
+        model.addAttribute("loanProductDescription", schema.getDisplayDescription());
         model.addAttribute("requiredGuarantors", requiredGuarantors);
         model.addAttribute("formValues", formValues == null ? Collections.emptyMap() : formValues);
         model.addAttribute("selectedGuarantorLookup", toLookupMap(guarantorIds));
@@ -1048,6 +1125,17 @@ public class AppController {
             eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
         model.addAttribute("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
         model.addAttribute("exampleAmountRaw", exampleAmount(eligibility.maxAllowed()).toPlainString());
+        model.addAttribute("minimumAmountLabel",
+            schema.getMinimumAmount() == null ? "-" : formatTzs(schema.getMinimumAmount()));
+        model.addAttribute("maximumAmountLabel",
+            schema.getMaximumAmount() == null ? "Not set" : formatTzs(schema.getMaximumAmount()));
+        String annualInterestPercentLabel = loanType == LoanType.LOAN_ADVANCE
+            ? "0% at 1 month, 12% after"
+            : (schema.getInterestRate() == null
+                ? BigDecimal.ZERO
+                : schema.getInterestRate().multiply(BigDecimal.valueOf(100))).stripTrailingZeros().toPlainString() + "%";
+        model.addAttribute("annualInterestPercentLabel", annualInterestPercentLabel);
+        model.addAttribute("allowApplicationWithActiveLoan", schema.isApplicationWithActiveLoanAllowed());
         model.addAttribute("financialSnapshotDisplay",
             loanPresentationService.parseFinancialFields(formValues == null ? null : formValues.get("financialSnapshotJson")));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
@@ -1424,6 +1512,16 @@ public class AppController {
         userSettingsRepository.save(settings);
     }
 
+    private String normalizeMemberLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            return "en";
+        }
+        return switch (language.trim().toLowerCase(Locale.ROOT)) {
+            case "sw", "swahili" -> "sw";
+            default -> "en";
+        };
+    }
+
     private List<GuarantorRequest> activeGuarantorRequests(List<GuarantorRequest> requests) {
         Map<UUID, LoanApplication> applicationById = loanApplicationsById(requests);
         return requests.stream()
@@ -1572,6 +1670,16 @@ public class AppController {
         return status == LoanStatus.MANAGER_REJECTED
             || status == LoanStatus.BOARD_REJECTED
             || status == LoanStatus.FINAL_REJECTED;
+    }
+
+    private Map<String, Object> externalAccountStatusPayload(ExternalAccountStatusService.ExternalAccountStatusView status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("available", status.isAvailable());
+        payload.put("pending", status.isPending());
+        payload.put("savingsLabel", status.getSavingsLabel());
+        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("statusMessage", status.getStatusMessage());
+        return payload;
     }
 
     private boolean isStatusChartIncluded(LoanStatus status) {

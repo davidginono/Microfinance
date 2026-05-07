@@ -1,6 +1,6 @@
 ---
-name: iaa-saccos-ui-governance
-description: UI and navigation governance for IAA_SACCOS. Use when generating or editing JSP, HTML, controller-backed page flows, shared fragments, dashboards, workspaces, forms, review screens, or navigation patterns in this repository. Enforce single-source navigation in the sidebar, reduce UI memory load by avoiding explanatory text, and apply Shneiderman and Nielsen usability rules while staying within the existing ERP-style system.
+name: saccos-lms-ui-governance
+description: UI and navigation governance for SACCOS_LMS. Use when generating or editing JSP, HTML, controller-backed page flows, shared fragments, dashboards, workspaces, forms, review screens, or navigation patterns in this repository. Enforce single-source navigation in the sidebar, reduce UI memory load by avoiding explanatory text, and apply Shneiderman and Nielsen usability rules while staying within the existing ERP-style system.
 ---
 
 # SACCOS LMS UI Governance
@@ -122,3 +122,4 @@ description: UI and navigation governance for IAA_SACCOS. Use when generating or
 - Prefer uncontrolled inputs; controlled inputs must be cheap per keystroke
 - Add `<link rel="preconnect">` for CDN/asset domains
 - Critical fonts: `<link rel="preload" as="font">` with `font-display: swap`
+

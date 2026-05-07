@@ -42,8 +42,10 @@ public class SecurityConfig {
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                 .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/auth/claim/**", "/css/**", "/error", "/error/**").permitAll()
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MINOR_ADMIN")
-                .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
+                .requestMatchers("/loan-officer/**").hasRole("LOAN_OFFICER")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
+                .requestMatchers("/accountant/**").hasRole("ACCOUNTANT")
+                .requestMatchers("/disbursement/**").hasRole("DISBURSEMENT_OFFICER")
                 .requestMatchers("/board/**").hasRole("BOARD")
                 .requestMatchers("/app/**").hasRole("MEMBER")
                 .anyRequest().authenticated())
@@ -84,18 +86,23 @@ public class SecurityConfig {
                         .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
                     boolean isMinorAdmin = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_MINOR_ADMIN".equals(a.getAuthority()));
-                    boolean isChairperson = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_CHAIRPERSON".equals(a.getAuthority()));
                     boolean isManager = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_MANAGER".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));
+                    boolean isLoanOfficer = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_LOAN_OFFICER".equals(a.getAuthority()));
+                    boolean isAccountant = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_ACCOUNTANT".equals(a.getAuthority()));
+                    boolean isDisbursementOfficer = authentication.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_DISBURSEMENT_OFFICER".equals(a.getAuthority()));
                     boolean isBoard = authentication.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_BOARD".equals(a.getAuthority()));
 
                     // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
                     // present an email OTP before the authenticated SecurityContext is
                     // persisted. Password alone cannot grant admin access.
-                    boolean requireStaffMfa = isSuperAdmin
-                        || (isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled);
+                    // Super admins now bypass this challenge; only MINOR_ADMIN can still
+                    // be routed through staff MFA when the local dev bypass is off.
+                    boolean requireStaffMfa = isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled;
                     if (requireStaffMfa) {
                         if (authentication.getPrincipal() instanceof AppUserPrincipal principal) {
                             String landing = isSuperAdmin ? "/admin/dashboard" : "/admin/dashboard";
@@ -135,12 +142,20 @@ public class SecurityConfig {
                         response.sendRedirect("/admin/dashboard");
                         return;
                     }
-                    if (isChairperson) {
-                        response.sendRedirect("/chairperson/manager-decisions");
+                    if (isLoanOfficer) {
+                        response.sendRedirect("/loan-officer/queue");
                         return;
                     }
                     if (isManager) {
                         response.sendRedirect("/manager/dashboard");
+                        return;
+                    }
+                    if (isAccountant) {
+                        response.sendRedirect("/accountant/loan-applications?filter=AWAITING_ACCOUNTANT");
+                        return;
+                    }
+                    if (isDisbursementOfficer) {
+                        response.sendRedirect("/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT");
                         return;
                     }
                     if (isBoard) {

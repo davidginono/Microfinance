@@ -1,0 +1,112 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<%@ include file="../fragments/header.jspf" %>
+<%@ include file="../fragments/sidebar.jspf" %>
+<%@ include file="../fragments/alerts.jspf" %>
+
+<style>
+    .disbursement-queue-search-form {
+        width: 100%;
+        display: grid;
+        gap: 0.85rem;
+        padding: 0.9rem 1rem;
+        border: 1px solid #d7dde3;
+        border-radius: 0.4rem;
+        background: #f8fafc;
+    }
+    .disbursement-queue-search-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.55rem;
+    }
+    @media (min-width: 768px) {
+        .disbursement-queue-search-form {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+        }
+        .disbursement-queue-search-actions {
+            justify-content: flex-end;
+        }
+    }
+</style>
+
+<div class="erp-page-header">
+    <p class="erp-breadcrumb">Disbursement Panel / Queue</p>
+    <h1 class="erp-page-title">Disbursement Queue</h1>
+    <p class="erp-page-subtitle">Release approved loans that are ready for final disbursement.</p>
+</div>
+<div class="erp-toolbar">
+    <div class="space-y-3">
+        <div>
+            <p class="erp-widget-title">Current Filter</p>
+            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+        </div>
+        <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form">
+            <input type="hidden" name="filter" value="${currentFilterKey}" />
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                ${queueSearchLabel}
+                <input type="search"
+                       name="searchId"
+                       value="${fn:escapeXml(queueSearchValue)}"
+                       placeholder="${queueSearchPlaceholder}"
+                       inputmode="numeric"
+                       class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+            </label>
+            <div class="disbursement-queue-search-actions">
+                <c:if test="${not empty queueSearchValue}">
+                    <a href="/disbursement/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                </c:if>
+                <button type="submit" class="app-btn btn-primary">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="erp-table-wrap overflow-x-auto">
+    <table class="erp-table">
+        <thead>
+        <tr>
+            <th>Loan Application ID</th>
+            <th>Applicant</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody>
+        <c:forEach items="${apps}" var="app">
+            <tr>
+                <td class="px-3 py-2">${app.applicationNumber}</td>
+                <td class="px-3 py-2">
+                    <c:choose>
+                        <c:when test="${not empty applicantNames[app.applicantMemberId]}">${applicantNames[app.applicantMemberId]}</c:when>
+                        <c:otherwise>#${fn:substring(app.applicantMemberId, 0, 8)}</c:otherwise>
+                    </c:choose>
+                </td>
+                <td class="px-3 py-2">${app.amount}</td>
+                <td class="px-3 py-2"><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
+                <td class="px-3 py-2">
+                    <c:choose>
+                        <c:when test="${not empty app.disbursementDate}">${app.disbursementDate}</c:when>
+                        <c:otherwise>${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
+                    </c:choose>
+                </td>
+                <td class="px-3 py-2">
+                    <a href="/disbursement/loan-applications/${app.id}" class="app-btn btn-primary">Open</a>
+                </td>
+            </tr>
+        </c:forEach>
+        <c:if test="${empty apps}">
+            <tr>
+                <td colspan="6" class="px-3 py-8 text-center text-slate-500">
+                    No loan applications found for the ${fn:toLowerCase(currentFilterLabel)} filter.
+                </td>
+            </tr>
+        </c:if>
+        </tbody>
+    </table>
+</div>
+
+<%@ include file="../fragments/footer.jspf" %>

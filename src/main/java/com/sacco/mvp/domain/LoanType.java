@@ -26,4 +26,24 @@ public enum LoanType {
             case CUSTOMIZED_LOAN -> 5;
         };
     }
+
+    public String defaultProductCode() {
+        return switch (this) {
+            case LOAN_ADVANCE -> "ADV_LOAN";
+            case EDUCATION_LOAN -> "EDU_LOAN";
+            case EMERGENCY_LOAN -> "EMERGENCY_LOAN";
+            case DEVELOPMENT_LOAN -> "DEV_LOAN";
+            case CUSTOMIZED_LOAN -> "CUSTOM_LOAN";
+        };
+    }
+
+    public String defaultDescription() {
+        return switch (this) {
+            case LOAN_ADVANCE -> "Short-cycle advance for urgent member needs.";
+            case EDUCATION_LOAN -> "Supports school fees and related education expenses.";
+            case EMERGENCY_LOAN -> "Supports time-sensitive personal and family emergencies.";
+            case DEVELOPMENT_LOAN -> "Supports business growth and long-term development plans.";
+            case CUSTOMIZED_LOAN -> "A SACCO-defined loan product with custom rules.";
+        };
+    }
 }

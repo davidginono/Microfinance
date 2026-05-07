@@ -23,7 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationViewService {
     private static final EnumSet<Position> MEMBER_SIDE_POSITIONS = EnumSet.of(
-        Position.MEMBER, Position.MANAGER, Position.BOARD, Position.CHAIRPERSON
+        Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER, Position.BOARD, Position.LOAN_OFFICER
     );
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final ObjectMapper objectMapper;
@@ -133,13 +133,19 @@ public class NotificationViewService {
             case "SYSTEM_ALERT" -> "System Alert";
             case "REPAYMENT_REMINDER" -> "Repayment Reminder";
             case "MANAGER_REJECTED" -> "Manager Rejected";
+            case "LOAN_OFFICER_REVIEW_ASSIGNED" -> "Loan Officer Review Assigned";
+            case "LOAN_OFFICER_REJECTED" -> "Loan Officer Rejected";
             case "BOARD_APPROVED" -> "Board Approved";
             case "BOARD_REJECTED" -> "Board Rejected";
+            case "ACCOUNTANT_REJECTED" -> "Accountant Rejected";
             case "FINAL_APPROVED" -> "Loan Approved";
             case "DEFAULTED" -> "Loan Defaulted";
             case "PAID" -> "Loan Marked As Paid";
             case "FINAL_REJECTED" -> "Loan Rejected";
             case "LOAN_READY_FOR_MANAGER" -> "On Review By Manager";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "On Review By Accountant";
+            case "LOAN_READY_FOR_BOARD" -> "On Review By Board";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "Ready for Disbursement";
             case "LOAN_GUARANTORS_APPROVED" -> "All Guarantors Approved";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "Guarantor Request";
             case "BOARD_REVIEW_ASSIGNED" -> "Board Review Assigned";
@@ -160,8 +166,10 @@ public class NotificationViewService {
                 String reasons = stringValue(details.get("reasons"));
                 yield reasons.isBlank() ? "Your application was rejected by the manager." : "Manager reason: " + reasons;
             }
+            case "LOAN_OFFICER_REJECTED" -> "Your application was rejected at loan officer review.";
             case "BOARD_APPROVED" -> "Your application has passed board review.";
             case "BOARD_REJECTED" -> "Your application was rejected at board review.";
+            case "ACCOUNTANT_REJECTED" -> "Your application was rejected during accountant review.";
             case "FINAL_APPROVED" -> {
                 String finalDueDate = stringValue(details.get("finalDueDate"));
                 String firstRepaymentDate = stringValue(details.get("firstRepaymentDate"));
@@ -178,9 +186,13 @@ public class NotificationViewService {
             case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
             case "FINAL_REJECTED" -> "Your loan application has been finally rejected.";
             case "LOAN_READY_FOR_MANAGER" -> "Your application is now on review by manager.";
-            case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to send it for manager review.";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "Your application is now on review by accountant.";
+            case "LOAN_READY_FOR_BOARD" -> "Your application is now on review by committee.";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "Your application completed the configured review path and is now ready for disbursement.";
+            case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
             case "BOARD_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for board review.";
+            case "LOAN_OFFICER_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for loan officer review.";
             case "GUARANTOR_UNDO_REQUESTED" -> "A guarantor asked to be removed from your loan application.";
             case "GUARANTOR_UNDO_APPROVED" -> "The applicant approved your request to be removed from this loan.";
             case "GUARANTOR_UNDO_REJECTED" -> "The applicant kept you on the loan as an active guarantor.";

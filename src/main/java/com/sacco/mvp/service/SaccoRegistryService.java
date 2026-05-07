@@ -128,6 +128,31 @@ public class SaccoRegistryService {
         upsertSacco(normalizedSaccoId, sacco.getSaccoName(), stationIds, OffsetDateTime.now(), true);
     }
 
+    @Transactional
+    public void addStation(String saccoId, String stationId) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        String normalizedStationId = normalizeStationId(stationId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        if (normalizedStationId == null) {
+            throw new IllegalStateException("Enter a station ID.");
+        }
+
+        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
+            .filter(RegisteredSacco::isActive)
+            .orElseThrow(() -> new IllegalStateException("SACCO not found."));
+
+        LinkedHashSet<String> stationIds = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(normalizedSaccoId).stream()
+            .map(SaccoStation::getStationId)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!stationIds.add(normalizedStationId)) {
+            throw new IllegalStateException("That station ID is already saved.");
+        }
+
+        upsertSacco(normalizedSaccoId, sacco.getSaccoName(), stationIds, OffsetDateTime.now(), true);
+    }
+
     private void upsertSacco(String saccoId,
                              String saccoName,
                              LinkedHashSet<String> stationIds,
@@ -183,6 +208,7 @@ public class SaccoRegistryService {
                 .boardSize(3)
                 .boardQuorum(2)
                 .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+                .applicationFee(new BigDecimal("15000.00"))
                 .defaultLanguage("en")
                 .createdAt(now)
                 .build());

@@ -248,6 +248,19 @@
                     </div>
 
                     <div>
+                        <spring:bind path="registrationForm.phone">
+                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.phone" /></label>
+                        </spring:bind>
+                        <form:input path="phone"
+                                    type="tel"
+                                    autocomplete="tel"
+                                    inputmode="tel"
+                                    cssClass="registration-field"
+                                    placeholder="+255712345678" />
+                        <form:errors path="phone" cssClass="mt-1 block text-xs text-rose-600" />
+                    </div>
+
+                    <div>
                         <spring:bind path="registrationForm.stationId">
                             <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.stationId" /></label>
                         </spring:bind>

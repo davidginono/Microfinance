@@ -25,33 +25,35 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / New Application</p>
-    <h1 class="erp-page-title"><spring:message code="newloan.title" />: <spring:message code="loan.type.${loanType}" /></h1>
-    <p class="erp-page-subtitle">Complete the application, load the loan details, and save a clean draft before sending it to guarantors.</p>
+    <p class="erp-breadcrumb"><spring:message code="newloan.breadcrumb" /></p>
+    <h1 class="erp-page-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
+    <p class="erp-page-subtitle"><c:out value="${loanProductDescription}" /></p>
 </div>
 <div class="mb-4 erp-section-muted">
-    <h5 class="erp-panel-title">Eligibility Guide</h5>
+    <h5 class="erp-panel-title"><spring:message code="newloan.eligibilityGuide.title" /></h5>
     <div class="mt-3 grid gap-3 md:grid-cols-2">
         <div class="erp-section">
             <div class="flex flex-wrap items-center gap-2">
-                <p class="font-semibold text-slate-800">Application Rules</p>
+                <p class="font-semibold text-slate-800"><spring:message code="newloan.applicationRules.title" /></p>
                 <span id="eligibilityExternalInlineStatus" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
                     <span id="eligibilityExternalSpinner" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                    <span id="eligibilityExternalStatusText">Loading financial statuses</span>
+                    <span id="eligibilityExternalStatusText"><spring:message code="newloan.applicationRules.loading" /></span>
                 </span>
             </div>
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li>Your current savings: <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
-                <li>Maximum you can apply now: <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+                <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
+                <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+                <li><spring:message code="newloan.applicationRules.amountRange" /> <strong>${minimumAmountLabel}</strong> to <strong>${maximumAmountLabel}</strong></li>
             </ul>
         </div>
         <div class="erp-section">
-            <p class="font-semibold text-slate-800">Before You Submit</p>
+            <p class="font-semibold text-slate-800"><spring:message code="newloan.beforeSubmit.title" /></p>
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li>Enter all required loan details clearly.</li>
-                <li>Use the <strong>Load Loan Details</strong> button to fetch deductions and repayment estimates.</li>
-                <li>Attach any supporting files before final submission.</li>
-                <li>Choose exactly <strong>${requiredGuarantors}</strong> guarantor(s) for this product.</li>
+                <li><spring:message code="newloan.beforeSubmit.item1" /></li>
+                <li><spring:message code="newloan.beforeSubmit.item2" /></li>
+                <li><spring:message code="newloan.beforeSubmit.item3" /></li>
+                <li><spring:message code="newloan.beforeSubmit.item4" arguments="${requiredGuarantors}" /></li>
+                <li><spring:message code="newloan.beforeSubmit.item5" arguments="${product.minimumRepaymentMonths},${product.maxRepaymentMonths}" /></li>
             </ul>
         </div>
     </div>
@@ -80,17 +82,32 @@
             <input id="loanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                    value="${formValues['amount']}"
                    placeholder="100,000.00"
+                   data-min-amount="${product.minimumAmount}"
+                   data-max-amount="${product.maximumAmount}"
                    class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                    required />
+            <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedRange" /> ${minimumAmountLabel} to ${maximumAmountLabel}</p>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700">Total Months to Repay</label>
+            <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>
             <input id="tenorInput" type="number" name="tenorMonths"
+                   min="${product.minimumRepaymentMonths}"
+                   max="${product.maxRepaymentMonths}"
                    value="${formValues['tenorMonths']}"
                    placeholder="12"
                    class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                    required />
+            <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedTenureRange" /> ${product.minimumRepaymentMonths} to ${product.maxRepaymentMonths} month(s)</p>
         </div>
+    </div>
+
+    <div class="erp-section-muted">
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.purpose.label" /></label>
+        <textarea name="purpose"
+                  rows="4"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                  placeholder="<spring:message code='newloan.purpose.placeholder' />">${formValues['purpose']}</textarea>
+        <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.purpose.helper" /></p>
     </div>
 
     <c:forEach items="${formModel.fields}" var="field">
@@ -131,27 +148,27 @@
 
     <div class="erp-section-muted">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h5 class="erp-panel-title">Loan Details</h5>
-                <p class="text-sm text-slate-500">Load the loan details after completing the form fields to preview principal, interest, deductions, and repayment values.</p>
-            </div>
+                <div>
+                    <h5 class="erp-panel-title"><spring:message code="newloan.loanDetails.title" /></h5>
+                    <p class="text-sm text-slate-500"><spring:message code="newloan.loanDetails.helper" arguments="${annualInterestPercentLabel}" /></p>
+                </div>
             <button id="loadFinancialDetailsButton" type="button" class="app-btn btn-primary">
-                Load Loan Details
+                <spring:message code="newloan.loanDetails.button" />
             </button>
         </div>
         <div id="financialFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
         <div id="financialLoading" class="mt-3 hidden erp-section text-sm text-slate-600">
             <div class="flex items-center gap-3">
                 <span class="inline-flex h-3 w-3 animate-pulse rounded-full bg-sacco-blue"></span>
-                Loading loan details...
+                <spring:message code="newloan.loanDetails.loading" />
             </div>
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotDisplay}'>hidden </c:if>mt-4 erp-table-wrap overflow-x-auto">
             <table class="erp-table">
                 <thead>
                 <tr>
-                    <th>Section</th>
-                    <th>Value</th>
+                    <th><spring:message code="newloan.table.section" /></th>
+                    <th><spring:message code="newloan.table.value" /></th>
                 </tr>
                 </thead>
                 <tbody id="financialPreviewBody">
@@ -170,21 +187,21 @@
         <div class="erp-section-muted">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h5 class="erp-panel-title">Select ${requiredGuarantors} Guarantors</h5>
-                    <p class="text-sm text-slate-500">Search by 6 digits or the full member number only when you click Search. Names are not allowed.</p>
+                    <h5 class="erp-panel-title"><spring:message code="newloan.guarantors.title" arguments="${requiredGuarantors}" /></h5>
+                    <p class="text-sm text-slate-500"><spring:message code="newloan.guarantors.help" /></p>
                 </div>
                 <span id="guarantorSelectedCount" class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">
-                    0 selected / ${requiredGuarantors}
+                    <spring:message code="newloan.guarantors.counter" arguments="${requiredGuarantors}" />
                 </span>
             </div>
 
             <div class="relative flex gap-2">
-                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="Enter 6 digits or full member number"
+                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
                        class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none" />
-                <button id="guarantorSearchButton" type="button" class="app-btn btn-primary shrink-0">Search</button>
+                <button id="guarantorSearchButton" type="button" class="app-btn btn-primary shrink-0"><spring:message code="common.search" /></button>
                 <div id="guarantorDropdown" class="absolute left-0 right-0 z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
             </div>
-            <p id="guarantorHint" class="mt-2 text-sm text-slate-500">No member details are shown until you search using a valid member number.</p>
+            <p id="guarantorHint" class="mt-2 text-sm text-slate-500"><spring:message code="newloan.guarantors.hint" /></p>
 
             <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
                 <c:forEach items="${selectedGuarantorItems}" var="item">
@@ -204,70 +221,66 @@
 
     <div class="erp-section-muted">
         <div class="mb-2">
-            <h5 class="erp-panel-title">Attachments</h5>
-            <p class="text-sm text-slate-500">Upload supporting documents such as IDs, scanned forms, or other loan evidence.</p>
+            <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
+            <p class="text-sm text-slate-500"><spring:message code="newloan.attachments.helper" /></p>
         </div>
         <input type="file" name="attachments" multiple class="w-full rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-700" />
-        <p class="mt-2 text-sm text-slate-500">You can add multiple files. If the page returns with a validation error, re-select the files before submitting again.</p>
+        <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.attachments.note" /></p>
     </div>
 
     <div class="erp-section-muted">
-        <h5 class="erp-panel-title">Applicant Declaration</h5>
+        <h5 class="erp-panel-title"><spring:message code="newloan.declaration.title" /></h5>
         <div class="mt-3 space-y-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
-            <p>
-                I,
+            <p><spring:message code="newloan.declaration.text" />
                 <strong>
                     <c:choose>
                         <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
-                        <c:otherwise>the applicant</c:otherwise>
+                        <c:otherwise><spring:message code="newloan.declaration.applicantFallback" /></c:otherwise>
                     </c:choose>
-                </strong>,
-                guarantee that I shall make the loan repayments as decided by the loan approval committee and in case of default,
-                I accept to pay loan penalty as specified by the IAA SACCOS LTD by laws. I also accept to adhere to all terms and
-                conditions as stipulated on the attached loan contract.
+                </strong><spring:message code="newloan.declaration.textTail" />
             </p>
             <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <c:choose>
                     <c:when test="${empty formValues['applicationId']}">
                         <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                            <p class="mt-2 text-sm text-slate-600">Save this application as a draft first. After that, we will show the OTP step at the correct submission stage.</p>
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="newloan.otp.title" /></div>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="newloan.otp.draftFirst" /></p>
                         </div>
                     </c:when>
                     <c:when test="${requiredGuarantors gt 0}">
                         <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                            <p class="mt-2 text-sm text-slate-600">You will request the applicant OTP only after all guarantors have approved this application.</p>
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="newloan.otp.title" /></div>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="newloan.otp.afterGuarantors" /></p>
                         </div>
                     </c:when>
                     <c:otherwise>
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                                <p class="mt-2 text-sm text-slate-600">Request a one-time code before sending this application. The code confirms that you are the applicant.</p>
+                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="newloan.otp.title" /></div>
+                                <p class="mt-2 text-sm text-slate-600"><spring:message code="newloan.otp.requestBeforeSending" /></p>
                                 <c:if test="${empty savedSignatureText}">
-                                    <p class="mt-2 text-sm text-rose-600">Add your signature on your member account before requesting OTP.</p>
+                                    <p class="mt-2 text-sm text-rose-600"><spring:message code="newloan.otp.addSignature" /></p>
                                 </c:if>
                             </div>
                             <button id="requestApplicantSignatureOtpButton" type="button" class="app-btn btn-primary otp-request-button inline-flex items-center justify-center gap-2">
                                 <span class="otp-button-spinner hidden"></span>
-                                <span class="otp-button-label">Send OTP Code</span>
+                                <span class="otp-button-label"><spring:message code="newloan.otp.sendCode" /></span>
                             </button>
                         </div>
                         <div id="applicantSignatureOtpFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
                         <div class="mt-3">
-                            <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                            <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.otp.codeLabel" /></label>
                             <input type="text" name="applicantSignatureOtpCode" id="applicantSignatureOtpCode"
                                    inputmode="numeric" maxlength="6" autocomplete="one-time-code"
                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                    placeholder="123456" />
-                            <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email, then send the application.</p>
+                            <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.otp.codeHelp" /></p>
                             <div id="applicantSignatureOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
                                 </svg>
-                                <span data-otp-text>Checking code...</span>
+                                <span data-otp-text><spring:message code="newloan.otp.checkingCode" /></span>
                             </div>
                         </div>
                     </c:otherwise>
@@ -288,7 +301,7 @@
                     <button class="app-btn btn-approve px-5 py-3 text-sm"
                             type="submit"
                             data-form-action="SEND_TO_GUARANTORS">
-                        Send to Guarantors
+                        <spring:message code="newloan.actions.sendToGuarantors" />
                     </button>
                 </c:when>
                 <c:otherwise>
@@ -328,6 +341,23 @@
         const eligibilityExternalStatus = document.getElementById("eligibilityExternalInlineStatus");
         const eligibilityExternalSpinner = document.getElementById("eligibilityExternalSpinner");
         const eligibilityExternalStatusText = document.getElementById("eligibilityExternalStatusText");
+        const msgCheckingCode = "<spring:message code='newloan.js.checkingCode' />";
+        const msgVerifyingCode = "<spring:message code='newloan.js.verifyingCode' />";
+        const msgVerified = "<spring:message code='newloan.js.verified' />";
+        const msgInvalidOtp = "<spring:message code='newloan.js.invalidOtp' />";
+        const msgLoadingStatuses = "<spring:message code='newloan.js.loadingStatuses' />";
+        const msgUnableLoadSavings = "<spring:message code='newloan.js.unableLoadSavings' />";
+        const msgStatusesLoaded = "<spring:message code='newloan.js.statusesLoaded' />";
+        const msgUnableLoadOfficialDetails = "<spring:message code='newloan.js.unableLoadOfficialDetails' />";
+        const msgSendOtp = "<spring:message code='newloan.js.sendOtp' />";
+        const msgSending = "<spring:message code='newloan.js.sending' />";
+        const msgOtpSent = "<spring:message code='newloan.js.otpSent' />";
+        const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
+        const msgLoanAmountChanged = "<spring:message code='newloan.js.loanAmountChanged' />";
+        const msgLoadFinancialDetails = "<spring:message code='newloan.loanDetails.loading' />";
+        const msgUnableSendOtp = "<spring:message code='newloan.js.unableSendOtp' />";
+        const msgOtpEmailSent = "<spring:message code='newloan.js.otpEmailSent' />";
+        const msgInvalidOtpCode = "<spring:message code='newloan.js.invalidOtp' />";
 
         function normalizeMoneyInput(value) {
             const cleaned = (value || "").replace(/,/g, "").replace(/[^\d.]/g, "");
@@ -393,7 +423,7 @@
             }
             financialSnapshotInput.value = "";
             financialCard.classList.add("hidden");
-            showFinancialFeedback("error", "Loan amount or tenor changed. Load SACCO details again before submitting.");
+            showFinancialFeedback("error", msgLoanAmountChanged);
         }
 
         function showSignatureOtpFeedback(type, text) {
@@ -464,7 +494,7 @@
                 statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
                 spinner.classList.remove("hidden");
                 tick.classList.add("hidden");
-                text.textContent = "Checking code...";
+                text.textContent = msgCheckingCode;
             }
 
             function renderPending() {
@@ -472,7 +502,7 @@
                 statusBox.classList.add("flex", "border-slate-200", "bg-white", "text-slate-600");
                 spinner.classList.remove("hidden");
                 tick.classList.add("hidden");
-                text.textContent = "Verifying code...";
+                text.textContent = msgVerifyingCode;
             }
 
             function renderVerified() {
@@ -483,7 +513,7 @@
                 tick.classList.remove("otp-checkmark-pop");
                 void tick.offsetWidth;
                 tick.classList.add("otp-checkmark-pop");
-                text.textContent = "Verified";
+                text.textContent = msgVerified;
             }
 
             function renderInvalid(message) {
@@ -491,7 +521,7 @@
                 statusBox.classList.add("flex", "border-rose-200", "bg-rose-50", "text-rose-700");
                 spinner.classList.add("hidden");
                 tick.classList.add("hidden");
-                text.textContent = message || "The OTP code is invalid.";
+                text.textContent = message || msgInvalidOtp;
             }
 
             function render() {
@@ -544,7 +574,7 @@
                         }
                         verifiedCode = "";
                         setProceedEnabled(false);
-                        renderInvalid(error && error.message ? error.message : "The OTP code is invalid.");
+                        renderInvalid(error && error.message ? error.message : msgInvalidOtp);
                     });
             }
 
@@ -575,7 +605,7 @@
                 eligibilityExternalSpinner.classList.remove("hidden");
             }
             if (eligibilityExternalStatusText) {
-                eligibilityExternalStatusText.textContent = "Loading financial statuses";
+                eligibilityExternalStatusText.textContent = msgLoadingStatuses;
             }
             eligibilityExternalStatus.classList.remove("text-emerald-600", "text-rose-600");
             eligibilityExternalStatus.classList.add("text-slate-500");
@@ -587,7 +617,7 @@
                     }
                 });
                 if (!response.ok) {
-                    throw new Error("Unable to load live savings data right now.");
+                    throw new Error(msgUnableLoadSavings);
                 }
                 const payload = await response.json();
                 if (payload.savingsLabel) {
@@ -600,7 +630,7 @@
                     eligibilityExternalSpinner.classList.add("hidden");
                 }
                 if (eligibilityExternalStatusText) {
-                    eligibilityExternalStatusText.textContent = "Financial statuses loaded";
+                    eligibilityExternalStatusText.textContent = msgStatusesLoaded;
                 }
                 eligibilityExternalStatus.classList.remove("text-rose-600");
                 eligibilityExternalStatus.classList.remove("text-slate-500");
@@ -610,7 +640,7 @@
                     eligibilityExternalSpinner.classList.add("hidden");
                 }
                 if (eligibilityExternalStatusText) {
-                    eligibilityExternalStatusText.textContent = error.message || "Unable to load live savings data right now.";
+                    eligibilityExternalStatusText.textContent = error.message || msgUnableLoadSavings;
                 }
                 eligibilityExternalStatus.classList.remove("text-emerald-600");
                 eligibilityExternalStatus.classList.remove("text-slate-500");
@@ -646,7 +676,7 @@
                 });
                 const payload = await response.json();
                 if (!response.ok || payload.valid === false) {
-                    throw new Error(payload.message || "The OTP code is invalid.");
+                    throw new Error(payload.message || msgInvalidOtpCode);
                 }
                 return payload;
             }
@@ -677,7 +707,7 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(await readJsonErrorMessage(response, "Unable to load official SACCO details."));
+                    throw new Error(await readJsonErrorMessage(response, msgUnableLoadOfficialDetails));
                 }
 
                 const payload = await response.json();
@@ -706,7 +736,7 @@
         if (signatureOtpButton) {
             signatureOtpButton.addEventListener("click", async function () {
                 applicantOtpUi.reset();
-                setOtpButtonState(signatureOtpButton, "loading", "Send OTP Code", "Sending...", "OTP Sent");
+                setOtpButtonState(signatureOtpButton, "loading", msgSendOtp, msgSending, msgOtpSent);
                 try {
                     const response = await fetch("/app/loan-applications/request-signature-otp", {
                         method: "POST",
@@ -721,17 +751,17 @@
                     });
                     const payload = await response.json();
                     if (!response.ok || payload.valid === false) {
-                        throw new Error(payload.message || "Unable to send the OTP code right now.");
+                        throw new Error(payload.message || msgUnableSendOtp);
                     }
-                    showSignatureOtpFeedback("success", payload.message || "We sent an OTP code to your email.");
-                    setOtpButtonState(signatureOtpButton, "sent", "Send OTP Code", "Sending...", "OTP Sent");
+                    showSignatureOtpFeedback("success", payload.message || msgOtpEmailSent);
+                    setOtpButtonState(signatureOtpButton, "sent", msgSendOtp, msgSending, msgOtpSent);
                     applicantOtpUi.markRequested();
                     if (applicantSignatureOtpInput) {
                         applicantSignatureOtpInput.focus();
                     }
                 } catch (error) {
-                    showSignatureOtpFeedback("error", error.message || "Unable to send the OTP code right now.");
-                    setOtpButtonState(signatureOtpButton, "idle", "Send OTP Code", "Sending...", "OTP Sent");
+                    showSignatureOtpFeedback("error", error.message || msgUnableSendOtp);
+                    setOtpButtonState(signatureOtpButton, "idle", msgSendOtp, msgSending, msgOtpSent);
                 }
             });
         }
@@ -766,9 +796,17 @@
             const selectedContainer = document.getElementById("selectedGuarantors");
             const hiddenInputs = document.getElementById("selectedGuarantorInputs");
             const selected = new Map();
+            const msgSelectedSuffix = "<spring:message code='newloan.js.selectedSuffix' />";
+            const msgNoMatches = "<spring:message code='newloan.js.noMatches' />";
+            const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' />";
+            const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
+            const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
+            const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
+            const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
+            const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
 
             function updateCounter() {
-                counter.textContent = selected.size + " selected / " + required;
+                counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
             }
 
             function renderHiddenInputs() {
@@ -818,7 +856,7 @@
                 if (!items.length) {
                     const empty = document.createElement("div");
                     empty.className = "px-4 py-3 text-sm text-slate-500";
-                    empty.textContent = "No matching members found.";
+                    empty.textContent = msgNoMatches;
                     dropdown.appendChild(empty);
                 } else {
                     items.forEach(function (item) {
@@ -828,14 +866,14 @@
                         row.textContent = item.memberNo + " - " + item.fullName;
                         row.addEventListener("click", function () {
                             if (selected.size >= required) {
-                                hint.textContent = "You can only select " + required + " guarantors.";
+                                hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
                                 hideDropdown();
                                 return;
                             }
                             selected.set(item.id, item);
                             renderSelected();
                             searchInput.value = "";
-                            hint.textContent = "Guarantor selected.";
+                            hint.textContent = msgGuarantorSelected;
                             hideDropdown();
                         });
                         dropdown.appendChild(row);
@@ -846,10 +884,10 @@
 
             async function runSearch() {
                 const term = searchInput.value.trim().toUpperCase();
-                const validSixDigits = /^\d{6}$/.test(term);
-                const validFullMemberNo = /^[A-Z0-9]{6,20}$/.test(term) && /\d/.test(term);
-                if (!validSixDigits && !validFullMemberNo) {
-                    hint.textContent = "Enter exactly 6 digits or the full member number to search.";
+                const validFourDigitsOrMore = /^\d{4,20}$/.test(term);
+                const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(term) && /\d/.test(term);
+                if (!validFourDigitsOrMore && !validFullMemberNo) {
+                    hint.textContent = msgEnterMemberNumber;
                     hideDropdown();
                     return;
                 }
@@ -860,13 +898,13 @@
                 });
                 const data = response.ok ? await response.json() : [];
                 const filtered = data.filter(function (item) { return !selected.has(item.id); });
-                hint.textContent = filtered.length + " matching member(s) found.";
+                hint.textContent = filtered.length + " " + msgMatchingMembers;
                 showResults(filtered);
             }
 
             searchButton.addEventListener("click", function () {
                 runSearch().catch(function () {
-                    hint.textContent = "Unable to search guarantors right now.";
+                    hint.textContent = msgUnableSearchGuarantors;
                     hideDropdown();
                 });
             });
@@ -876,8 +914,9 @@
                 draftButton.addEventListener("click", function (event) {
                     if (selected.size !== required) {
                         event.preventDefault();
-                        hint.textContent = "Select exactly " + required + " guarantors before saving the draft.";
-                        window.showToast?.("error", "Select exactly " + required + " guarantors before saving the draft.");
+                        const warning = msgSelectGuarantorsDraft.replace("{0}", required);
+                        hint.textContent = warning;
+                        window.showToast?.("error", warning);
                     }
                 });
             }

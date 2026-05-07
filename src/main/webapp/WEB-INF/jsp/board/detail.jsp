@@ -21,8 +21,11 @@
 <c:set var="hasBoardSavedSignature" value="${not empty boardSavedSignatureText}" />
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Board Panel / Review Detail</p>
-    <h1 class="erp-page-title">Board Review Detail</h1>
+    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
+    <c:if test="${not empty reviewPanelSubtitle}">
+        <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
+    </c:if>
 </div>
 
 <div class="loan-view-hero-summary">
@@ -62,7 +65,7 @@
     </div>
 
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-4 sm:grid-cols-2">
             <div class="loan-view-summary-card px-4 py-4">
                 <div class="loan-stat-label">Loan Amount</div>
                 <div class="loan-stat-value">${app.amount}</div>
@@ -70,14 +73,6 @@
             <div class="loan-view-summary-card px-4 py-4">
                 <div class="loan-stat-label">Tenor</div>
                 <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
-            </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Savings</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
-            </div>
-            <div class="loan-view-summary-card px-4 py-4">
-                <div class="loan-stat-label">Current Shares</div>
-                <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
             </div>
         </div>
 
@@ -97,11 +92,6 @@
 </div>
 
 <div class="mt-4 space-y-4">
-    <c:if test="${not applicantExternalAccountStatus.available}">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            ${applicantExternalAccountStatus.statusMessage}
-        </div>
-    </c:if>
     <c:if test="${not empty managerReason}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
             <strong>Manager Reason:</strong> ${managerReason}
@@ -110,7 +100,7 @@
     <div class="loan-view-summary-card px-5 py-5">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Applicant Details</p>
-            <p class="mt-1 text-sm text-slate-600">Key applicant information for board review before making a decision.</p>
+            <p class="mt-1 text-sm text-slate-600">Key applicant information for ${reviewRoleLabelLower} review before making a decision.</p>
         </div>
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="applicant-info-card">
@@ -137,8 +127,8 @@
 
 <div class="loan-view-summary-card px-5 py-5">
     <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Committee Assessors</p>
-        <p class="mt-2 text-base text-slate-600">All board members assigned to this application and the decisions recorded so far.</p>
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewAssessorTitle}</p>
+        <p class="mt-2 text-base text-slate-600">${reviewAssessorDescription}</p>
     </div>
     <div class="mt-5 erp-table-wrap overflow-x-auto">
         <table class="erp-table">
@@ -216,8 +206,42 @@
     </table>
 </div>
 
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+    <div class="erp-table-wrap overflow-x-auto">
+        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+            <tr>
+                <th class="px-3 py-2 text-left">File</th>
+                <th class="px-3 py-2 text-left">Size</th>
+                <th class="px-3 py-2 text-left">Uploaded</th>
+                <th class="px-3 py-2 text-left"></th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            <c:forEach items="${disbursementProofAttachments}" var="file">
+                <tr>
+                    <td class="px-3 py-2">${file.originalName}</td>
+                    <td class="px-3 py-2">${file.sizeLabel}</td>
+                    <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                    <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}?inline=true" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
+                        </div>
+                    </td>
+                </tr>
+            </c:forEach>
+            <c:if test="${empty disbursementProofAttachments}">
+                <tr><td colspan="4" class="px-3 py-3 text-slate-500">No disbursement proof uploaded yet.</td></tr>
+            </c:if>
+            </tbody>
+        </table>
+    </div>
+</c:if>
+
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Attachments</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
@@ -273,7 +297,7 @@
                 <td class="px-3 py-2">
                     <button type="button"
                             class="app-btn btn-neutral guarantor-financial-trigger"
-                            data-url="/board/loan-applications/${app.id}/guarantors/${req.guarantorMemberId}/financial-status">
+                            data-url="${reviewBasePath}/loan-applications/${app.id}/guarantors/${req.guarantorMemberId}/financial-status">
                         <span class="guarantor-financial-spinner hidden" data-financial-spinner></span>
                         <span data-financial-label>Load Status</span>
                     </button>
@@ -299,52 +323,70 @@
 </div>
 
 <c:choose>
-    <c:when test="${myReview.decision eq 'PENDING' and app.status eq 'AWAITING_BOARD'}">
-        <form action="/board/loan-applications/${app.id}/decision" method="post" class="loan-view-summary-card mt-4 space-y-4 px-5 py-5" data-board-decision-form="true">
+    <c:when test="${myReview.decision eq 'PENDING' and app.status eq reviewAwaitingStatus}">
+        <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="loan-view-summary-card mt-4 space-y-4 px-5 py-5" data-board-decision-form="true">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Board Decision</p>
-                <p class="mt-1 text-sm text-slate-600">Add your comment, then approve or reject this review.</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewDecisionLabel}</p>
+                <p class="mt-1 text-sm text-slate-600">Comments are optional for approval and required for rejection.</p>
             </div>
             <div>
                 <label class="mb-2 block text-sm font-medium text-slate-700">Comment</label>
                 <textarea class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" name="comment"></textarea>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                        <p class="mt-2 text-sm text-slate-600">Request a one-time code to confirm this board approval.</p>
+            <c:choose>
+                <c:when test="${reviewApprovalOtpEnabled}">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
+                                <p class="mt-2 text-sm text-slate-600">Request a one-time code to confirm this ${reviewRoleLabelLower} approval.</p>
+                            </div>
+                            <button type="button"
+                                    class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
+                                    data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-signature-otp">
+                                <span class="otp-button-spinner hidden"></span>
+                                <span class="otp-button-label">Send OTP Code</span>
+                            </button>
+                        </div>
+                        <div class="board-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                        <div class="mt-3">
+                            <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                            <input type="text"
+                                   name="boardSignatureOtpCode"
+                                   inputmode="numeric"
+                                   maxlength="6"
+                                   autocomplete="one-time-code"
+                                   class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                   placeholder="123456"
+                                   ${reviewApprovalOtpEnabled and hasBoardSavedSignature ? 'required' : ''} />
+                            <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before confirming approval.</p>
+                            <div class="board-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                                <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                                <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                                </svg>
+                                <span data-otp-text>Checking code...</span>
+                            </div>
+                        </div>
                     </div>
-                    <button type="button"
-                            class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
-                            data-request-url="/board/loan-applications/${app.id}/request-signature-otp"
-                            ${hasBoardSavedSignature ? '' : 'disabled'}>
-                        <span class="otp-button-spinner hidden"></span>
-                        <span class="otp-button-label">Send OTP Code</span>
-                    </button>
-                </div>
-                <div class="board-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
-                <div class="mt-3">
-                    <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
-                    <input type="text"
-                           name="boardSignatureOtpCode"
-                           inputmode="numeric"
-                           maxlength="6"
-                           autocomplete="one-time-code"
-                           class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                           placeholder="123456"
-                           ${hasBoardSavedSignature ? 'required' : ''} />
-                    <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before confirming approval.</p>
-                    <div class="board-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                        <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                        <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                        </svg>
-                        <span data-otp-text>Checking code...</span>
+                </c:when>
+                <c:otherwise>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
+                                <p class="mt-2 text-sm text-slate-600">OTP confirmation is disabled for this ${reviewRoleLabelLower} approval.</p>
+                            </div>
+                            <button type="button"
+                                    class="app-btn btn-primary inline-flex items-center justify-center gap-2"
+                                    disabled>
+                                <span class="otp-button-label">Send OTP Code</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </c:otherwise>
+            </c:choose>
             <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
                 <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit" ${hasBoardSavedSignature ? '' : 'disabled'}>Approve Review</button>
                 <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit" formnovalidate>Reject Review</button>
@@ -394,7 +436,7 @@
             if (label) {
                 label.textContent = loading ? loadingLabel : (sent ? sentLabel : idleLabel);
             }
-            button.disabled = loading || sent || ${hasBoardSavedSignature ? 'false' : 'true'};
+            button.disabled = loading || sent;
             button.classList.toggle("is-loading", loading);
             button.classList.toggle("is-sent", sent);
         }
@@ -510,7 +552,7 @@
                 const requestUrl = button.getAttribute("data-request-url");
 
                 if (!requestUrl) {
-                    showOtpFeedback(feedback, "error", "Board OTP request is not configured.");
+                    showOtpFeedback(feedback, "error", "${reviewRoleLabel} OTP request is not configured.");
                     return;
                 }
 
@@ -529,7 +571,7 @@
                     if (!response.ok || payload.valid === false) {
                         throw new Error(payload.message || "Unable to send the OTP code right now.");
                     }
-                    showOtpFeedback(feedback, "success", payload.message || "We sent a board approval code to your email.");
+                    showOtpFeedback(feedback, "success", payload.message || "We sent an approval code to your email.");
                     setOtpButtonState(button, "sent", "Send OTP Code", "Sending...", "OTP Sent");
                     otpUi.markRequested();
                     if (input) {
@@ -545,6 +587,7 @@
         document.querySelectorAll("form[data-board-decision-form='true']").forEach((form) => {
             const approveButton = form.querySelector(".board-approve-submit");
             const rejectButton = form.querySelector(".board-reject-submit");
+            const commentField = form.querySelector("textarea[name='comment']");
 
             function clearRejectConfirmation() {
                 delete form.dataset.confirmEyebrow;
@@ -553,16 +596,32 @@
                 delete form.dataset.confirmProceed;
             }
 
-            approveButton?.addEventListener("click", clearRejectConfirmation);
+            commentField?.addEventListener("input", () => {
+                commentField.setCustomValidity("");
+            });
+
+            approveButton?.addEventListener("click", () => {
+                commentField?.setCustomValidity("");
+                clearRejectConfirmation();
+            });
 
             rejectButton?.addEventListener("click", () => {
                 form.dataset.confirmEyebrow = "Confirm Rejection";
-                form.dataset.confirmTitle = "Reject Board Review";
-                form.dataset.confirmMessage = "Reject this loan review? This board decision will be recorded immediately.";
+                form.dataset.confirmTitle = "Reject ${reviewRoleLabel} Review";
+                form.dataset.confirmMessage = "Reject this loan review? This ${reviewRoleLabelLower} decision will be recorded immediately.";
                 form.dataset.confirmProceed = "Reject Review";
             });
 
             form.addEventListener("submit", (event) => {
+                commentField?.setCustomValidity("");
+                const submittedDecision = event.submitter ? event.submitter.value : "";
+                if (submittedDecision === "REJECTED" && commentField && !commentField.value.trim()) {
+                    event.preventDefault();
+                    commentField.setCustomValidity("Add a comment before rejecting this review.");
+                    commentField.reportValidity();
+                    commentField.focus();
+                    return;
+                }
                 if (event.submitter && event.submitter.classList.contains("board-approve-submit")) {
                     clearRejectConfirmation();
                 }

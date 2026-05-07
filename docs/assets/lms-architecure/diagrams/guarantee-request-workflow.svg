@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Guarantee request workflow</title>
+  <desc id="desc">Guarantee request lifecycle from loan submission to guarantor decisions and application recalculation.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7fbff; }
+      .title { font: 700 27px 'Segoe UI', Arial, sans-serif; fill: #163942; }
+      .box { fill: #ffffff; stroke: #7ea8b7; stroke-width: 2; rx: 18; }
+      .accent { fill: #eff7f8; stroke: #2d7a87; stroke-width: 2; rx: 18; }
+      .warn { fill: #fff8ef; stroke: #d4b36a; stroke-width: 2; rx: 18; }
+      .boxTitle { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #163942; }
+      .text { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #4c6570; }
+      .arrow { stroke: #6f93a2; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+    </style>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#6f93a2"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="360" class="bg"/>
+  <text x="70" y="62" class="title">Workflow 4: Guarantee Request</text>
+  <rect x="70" y="128" width="170" height="82" class="accent"/>
+  <text x="96" y="160" class="boxTitle">Loan Requests Guarantees</text>
+  <text x="96" y="180" class="text">Guarantor work items are created</text>
+
+  <rect x="290" y="128" width="170" height="82" class="box"/>
+  <text x="316" y="160" class="boxTitle">Guarantor Opens Queue</text>
+  <text x="316" y="180" class="text">Assigned request becomes visible</text>
+
+  <rect x="510" y="128" width="170" height="82" class="warn"/>
+  <text x="536" y="160" class="boxTitle">Confirm with Signature OTP</text>
+  <text x="536" y="180" class="text">Approval uses guarantor verification</text>
+
+  <rect x="730" y="128" width="170" height="82" class="box"/>
+  <text x="756" y="160" class="boxTitle">Approve or Reject</text>
+  <text x="756" y="180" class="text">Decision and reason are recorded</text>
+
+  <rect x="950" y="128" width="170" height="82" class="accent"/>
+  <text x="976" y="160" class="boxTitle">Recalculate Loan Readiness</text>
+  <text x="976" y="180" class="text">Application status is refreshed</text>
+
+  <path d="M240 169 L290 169" class="arrow"/>
+  <path d="M460 169 L510 169" class="arrow"/>
+  <path d="M680 169 L730 169" class="arrow"/>
+  <path d="M900 169 L950 169" class="arrow"/>
+</svg>

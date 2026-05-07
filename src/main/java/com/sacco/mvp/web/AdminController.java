@@ -3,8 +3,11 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
+import com.sacco.mvp.domain.InterestMethod;
+import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
@@ -69,7 +72,11 @@ public class AdminController {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-dashboard";
         }
-        model.addAttribute("dashboard", adminService.dashboard(adminScopeService.currentSaccoId(principal), principal.getMemberId()));
+        model.addAttribute("dashboard", adminService.dashboard(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            principal.getMemberId()
+        ));
         return "admin/dashboard";
     }
 
@@ -87,9 +94,10 @@ public class AdminController {
                            @RequestParam(required = false) IncidentSeverity severity,
                            @RequestParam(required = false) UUID highlight,
                            Model model) {
+        String stationId = adminScopeService.currentStationId(principal);
         java.util.List<com.sacco.mvp.service.NotificationViewService.NotificationView> allMessages =
             adminService.adminMessages(principal.getMemberId());
-        Map<UUID, com.sacco.mvp.domain.AdminIncident> messageIncidents = adminService.adminMessageIncidentMap(allMessages);
+        Map<UUID, com.sacco.mvp.domain.AdminIncident> messageIncidents = adminService.adminMessageIncidentMap(allMessages, stationId);
         java.util.List<com.sacco.mvp.service.NotificationViewService.NotificationView> filteredMessages = allMessages.stream()
             .filter(item -> {
                 com.sacco.mvp.domain.AdminIncident incident = item.getIncidentId() == null ? null : messageIncidents.get(item.getIncidentId());
@@ -102,7 +110,7 @@ public class AdminController {
             .toList();
         model.addAttribute("messages", filteredMessages);
         model.addAttribute("messageIncidents", messageIncidents);
-        model.addAttribute("members", adminService.activeMembers(adminScopeService.currentSaccoId(principal)));
+        model.addAttribute("members", adminService.activeMembers(adminScopeService.currentSaccoId(principal), stationId));
         model.addAttribute("highlightNotificationId", highlight);
         model.addAttribute("incidentStatuses", IncidentStatus.values());
         model.addAttribute("incidentSeverities", IncidentSeverity.values());
@@ -144,7 +152,12 @@ public class AdminController {
                             @RequestParam(required = false) IncidentStatus status,
                             @RequestParam(required = false) IncidentSeverity severity,
                             Model model) {
-        model.addAttribute("incidents", adminService.incidents(adminScopeService.currentSaccoId(principal), status, severity));
+        model.addAttribute("incidents", adminService.incidents(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            status,
+            severity
+        ));
         model.addAttribute("incidentStatuses", IncidentStatus.values());
         model.addAttribute("incidentSeverities", IncidentSeverity.values());
         model.addAttribute("selectedStatus", status == null ? "" : status.name());
@@ -157,7 +170,11 @@ public class AdminController {
     public String incidentDetail(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  Model model) {
-        model.addAttribute("incident", adminService.incident(adminScopeService.currentSaccoId(principal), id));
+        model.addAttribute("incident", adminService.incident(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            id
+        ));
         model.addAttribute("incidentStatuses", IncidentStatus.values());
         model.addAttribute("incidentSeverities", IncidentSeverity.values());
         return "admin/incident-detail";
@@ -171,7 +188,15 @@ public class AdminController {
                                  @RequestParam IncidentStatus status,
                                  @RequestParam(required = false) String resolutionNote,
                                  RedirectAttributes ra) {
-        adminService.updateIncident(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id, severity, status, resolutionNote);
+        adminService.updateIncident(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            principal.getMemberId(),
+            id,
+            severity,
+            status,
+            resolutionNote
+        );
         ra.addFlashAttribute("message", "Incident updated.");
         return "redirect:/admin/incidents/" + id;
     }
@@ -183,7 +208,14 @@ public class AdminController {
                         @RequestParam String subject,
                         @RequestParam String message,
                         RedirectAttributes ra) {
-        adminService.replyToMember(adminScopeService.currentSaccoId(principal), principal.getMemberId(), memberId, subject, message);
+        adminService.replyToMember(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            principal.getMemberId(),
+            memberId,
+            subject,
+            message
+        );
         ra.addFlashAttribute("message", "Reply sent to member notifications.");
         return "redirect:/admin/messages";
     }
@@ -194,7 +226,13 @@ public class AdminController {
                             @RequestParam String subject,
                             @RequestParam String message,
                             RedirectAttributes ra) {
-        adminService.broadcast(adminScopeService.currentSaccoId(principal), principal.getMemberId(), subject, message);
+        adminService.broadcast(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            principal.getMemberId(),
+            subject,
+            message
+        );
         ra.addFlashAttribute("message", "Broadcast sent to active SACCO members.");
         return "redirect:/admin/messages";
     }
@@ -208,6 +246,7 @@ public class AdminController {
                         Model model) {
         Page<AdminService.UserAccessView> usersPage = adminService.usersPage(
             adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
             query,
             page,
             size
@@ -235,6 +274,7 @@ public class AdminController {
                              RedirectAttributes ra) {
         adminService.createUser(
             adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
             principal.getMemberId(),
             principal.getGrantedPositions(),
             memberNo,
@@ -256,6 +296,7 @@ public class AdminController {
                              RedirectAttributes ra) {
         adminService.updateUser(
             adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
             principal.getMemberId(),
             principal.getGrantedPositions(),
             id,
@@ -270,13 +311,24 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String loanProducts(@AuthenticationPrincipal AppUserPrincipal principal,
                                @RequestParam(required = false, defaultValue = "loan") String section,
+                               @RequestParam(required = false) String modal,
                                Model model) {
         String saccoId = adminScopeService.currentSaccoId(principal);
         model.addAttribute("products", adminService.loanProducts(saccoId));
+        model.addAttribute("productVersionsByProductId", adminService.loanProductVersions(saccoId));
+        model.addAttribute("loanProductsVersions", adminService.loanProductsVersionHistory(saccoId));
         model.addAttribute("customizedProductExists", adminService.customizedLoanProductExists(saccoId));
         model.addAttribute("settings", adminService.settings(saccoId));
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
+        model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
+        model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
+        model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
+        model.addAttribute("approvalFlowStageLabels", adminService.settings(saccoId).resolvedApprovalFlow().stream()
+            .map(ApprovalWorkflowStage::getDisplayLabel)
+            .toList());
         model.addAttribute("settingsSection", "board".equalsIgnoreCase(section) ? "board" : "loan");
+        model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
+        model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
         return "admin/settings-controls";
     }
 
@@ -284,60 +336,321 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateLoanProduct(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
-                                    @RequestParam Integer guarantorsRequired,
+                                    @RequestParam(required = false) String productCode,
                                     @RequestParam(required = false) String productName,
+                                    @RequestParam(required = false) String productDescription,
+                                    @RequestParam Integer displayOrder,
+                                    @RequestParam BigDecimal minimumAmount,
+                                    @RequestParam(required = false) BigDecimal maximumAmount,
+                                    @RequestParam Integer guarantorsRequired,
                                     @RequestParam BigDecimal maxLoanSavingsPercent,
                                     @RequestParam BigDecimal insurancePercent,
-                                    @RequestParam BigDecimal interestPercent,
+                                    @RequestParam BigDecimal annualInterestPercent,
+                                    @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
+                                    @RequestParam Integer minRepaymentMonths,
                                     @RequestParam Integer maxRepaymentMonths,
-                                    @RequestParam(defaultValue = "false") boolean active,
+                                    @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
+                                    @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
+                                    @RequestParam(defaultValue = "false") boolean managerReviewRequired,
+                                    @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
+                                    @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                    @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
+                                    @RequestParam(required = false) Integer committeePriority,
+                                    @RequestParam(required = false) Integer committeeMinimumVotes,
+                                    @RequestParam(required = false) Integer committeeApprovalThreshold,
+                                    @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
+                                    @RequestParam(required = false) Integer accountantPriority,
+                                    @RequestParam(defaultValue = "1") Integer managerPriority,
+                                    @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+                                    @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
+                                    @RequestParam(required = false) String modalKey,
                                     RedirectAttributes ra) {
-        BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
-        BigDecimal insuranceRate = percentToRatio(insurancePercent);
-        BigDecimal interestRate = percentToRatio(interestPercent);
-        adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
-            guarantorsRequired, productName, maxLoanSavingsRatio, insuranceRate, interestRate, maxRepaymentMonths, active);
-        ra.addFlashAttribute("message", "Loan product updated.");
-        return "redirect:/admin/settings-controls?section=loan";
+        String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "product-" + id : normalizeLoanSettingsModalKey(modalKey);
+        try {
+            BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
+            BigDecimal insuranceRate = percentToRatio(insurancePercent);
+            BigDecimal annualRate = percentToRatio(annualInterestPercent);
+            ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
+                loanOfficerReviewRequired,
+                workflowStartStage,
+                managerPriority,
+                loanOfficerPriority
+            );
+            adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
+                productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
+                maxLoanSavingsRatio, insuranceRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
+                allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
+                resolvedWorkflowStartStage, committeeReviewRequired, committeePriority, committeeMinimumVotes,
+                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, productStatus);
+            ra.addFlashAttribute("message", "Loan product updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            attachLoanSettingsValidationFeedback(ra, ex.getMessage());
+        }
+        return loanSettingsRedirect(resolvedModalKey);
     }
 
     @PostMapping({"/loan-products/customized-product", "/settings-controls/customized-product"})
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String createCustomizedLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
+                                              @RequestParam(required = false) String productCode,
                                               @RequestParam(required = false) String productName,
+                                              @RequestParam(required = false) String productDescription,
+                                              @RequestParam Integer displayOrder,
+                                              @RequestParam BigDecimal minimumAmount,
+                                              @RequestParam(required = false) BigDecimal maximumAmount,
                                               @RequestParam Integer guarantorsRequired,
                                               @RequestParam BigDecimal maxLoanSavingsPercent,
                                               @RequestParam BigDecimal insurancePercent,
-                                              @RequestParam BigDecimal interestPercent,
+                                              @RequestParam BigDecimal annualInterestPercent,
+                                              @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
+                                              @RequestParam Integer minRepaymentMonths,
                                               @RequestParam Integer maxRepaymentMonths,
-                                              @RequestParam(defaultValue = "false") boolean active,
+                                              @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
+                                              @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
+                                              @RequestParam(defaultValue = "false") boolean managerReviewRequired,
+                                              @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
+                                              @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                              @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
+                                              @RequestParam(required = false) Integer committeePriority,
+                                              @RequestParam(required = false) Integer committeeMinimumVotes,
+                                              @RequestParam(required = false) Integer committeeApprovalThreshold,
+                                              @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
+                                              @RequestParam(required = false) Integer accountantPriority,
+                                              @RequestParam(defaultValue = "1") Integer managerPriority,
+                                              @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+                                              @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
+                                              @RequestParam(required = false) String modalKey,
                                               RedirectAttributes ra) {
-        adminService.createCustomizedLoanProduct(
+        String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
+        try {
+            ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
+                loanOfficerReviewRequired,
+                workflowStartStage,
+                managerPriority,
+                loanOfficerPriority
+            );
+            adminService.createCustomizedLoanProduct(
+                adminScopeService.currentSaccoId(principal),
+                principal.getMemberId(),
+                productCode,
+                productName,
+                productDescription,
+                displayOrder,
+                minimumAmount,
+                maximumAmount,
+                guarantorsRequired,
+                percentToRatio(maxLoanSavingsPercent),
+                percentToRatio(insurancePercent),
+                percentToRatio(annualInterestPercent),
+                interestMethod,
+                minRepaymentMonths,
+                maxRepaymentMonths,
+                allowApplicationWithActiveLoan,
+                freshFinancialDataRequired,
+                managerReviewRequired,
+                loanOfficerReviewRequired,
+                resolvedWorkflowStartStage,
+                committeeReviewRequired,
+                committeePriority,
+                committeeMinimumVotes,
+                committeeApprovalThreshold,
+                accountantReviewRequired,
+                accountantPriority,
+                productStatus
+            );
+            ra.addFlashAttribute("message", "Customized loan product added.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            attachLoanSettingsValidationFeedback(ra, ex.getMessage());
+        }
+        return loanSettingsRedirect(resolvedModalKey);
+    }
+
+    @PostMapping("/settings-controls/loan-rules")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateLoanRules(@AuthenticationPrincipal AppUserPrincipal principal,
+                                  @RequestParam BigDecimal applicationFee,
+                                  @RequestParam(required = false) String modalKey,
+                                  RedirectAttributes ra) {
+        String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "application-fee" : normalizeLoanSettingsModalKey(modalKey);
+        try {
+            adminService.updateLoanApplicationFee(
+                adminScopeService.currentSaccoId(principal),
+                principal.getMemberId(),
+                applicationFee
+            );
+            ra.addFlashAttribute("message", "Loan settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            attachLoanSettingsValidationFeedback(ra, ex.getMessage());
+        }
+        return loanSettingsRedirect(resolvedModalKey);
+    }
+
+    private ApprovalWorkflowStage resolveLoanOfficerWorkflowStartStage(boolean loanOfficerReviewRequired,
+                                                                       ApprovalWorkflowStage workflowStartStage,
+                                                                       Integer managerPriority,
+                                                                       Integer loanOfficerPriority) {
+        int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
+        int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
+        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 2) {
+            throw new IllegalStateException("Manager priority must be 1 or 2.");
+        }
+        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 2) {
+            throw new IllegalStateException("Loan Officer priority must be 1 or 2.");
+        }
+        if (!loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.MANAGER;
+        }
+        if (resolvedManagerPriority == resolvedLoanOfficerPriority) {
+            throw new IllegalStateException("Manager and Loan Officer cannot share the same priority slot.");
+        }
+        if (workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER && resolvedLoanOfficerPriority == 1) {
+            return ApprovalWorkflowStage.LOAN_OFFICER;
+        }
+        return resolvedManagerPriority == 1 ? ApprovalWorkflowStage.MANAGER : ApprovalWorkflowStage.LOAN_OFFICER;
+    }
+
+    private String loanSettingsRedirect(String modalKey) {
+        String normalizedModalKey = normalizeLoanSettingsModalKey(modalKey);
+        if (normalizedModalKey == null) {
+            return "redirect:/admin/settings-controls?section=loan";
+        }
+        return "redirect:/admin/settings-controls?section=loan&modal="
+            + UriUtils.encode(normalizedModalKey, StandardCharsets.UTF_8);
+    }
+
+    private String normalizeLoanSettingsModalKey(String modalKey) {
+        if (modalKey == null) {
+            return null;
+        }
+        String normalized = modalKey.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private void attachLoanSettingsValidationFeedback(RedirectAttributes ra, String message) {
+        Map<String, String> fieldErrors = resolveLoanSettingsFieldErrors(message);
+        if (fieldErrors.isEmpty()) {
+            ra.addFlashAttribute("error", message);
+            return;
+        }
+        ra.addFlashAttribute("error", "Please correct the highlighted fields below.");
+        ra.addFlashAttribute("loanSettingsFieldErrors", fieldErrors);
+    }
+
+    private Map<String, String> resolveLoanSettingsFieldErrors(String message) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        if (message == null || message.isBlank()) {
+            return fieldErrors;
+        }
+        switch (message) {
+            case "Enter the loan product name." ->
+                fieldErrors.put("productName", "Enter a loan product name.");
+            case "Loan product name must be 120 characters or fewer." ->
+                fieldErrors.put("productName", "Loan product name must be 120 characters or fewer.");
+            case "That loan product code already exists in this SACCO." ->
+                fieldErrors.put("productName", "Use a more distinct loan product name. This one creates a duplicate product code.");
+            case "Loan product description must be 500 characters or fewer." ->
+                fieldErrors.put("productDescription", "Keep the description within 500 characters.");
+            case "Display order must be at least 1." ->
+                fieldErrors.put("displayOrder", "Display order must be 1 or higher.");
+            case "Minimum amount cannot be negative." ->
+                fieldErrors.put("minimumAmount", "Minimum amount cannot be negative.");
+            case "Maximum amount must be greater than zero.",
+                 "Maximum amount cannot be lower than the minimum amount." ->
+                fieldErrors.put("maximumAmount", message);
+            case "Savings ratio must be greater than zero." ->
+                fieldErrors.put("maxLoanSavingsPercent", "Savings percentage must be greater than zero.");
+            case "Guarantors required cannot be negative." ->
+                fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
+            case "Insurance rate cannot be negative." ->
+                fieldErrors.put("insurancePercent", "Insurance percentage cannot be negative.");
+            case "Application fee cannot be negative." ->
+                fieldErrors.put("applicationFee", "Application fee cannot be negative.");
+            case "Annual interest rate cannot be negative." ->
+                fieldErrors.put("annualInterestPercent", "Annual interest percentage cannot be negative.");
+            case "Workflow start stage must be Manager or Loan Officer." -> {
+                fieldErrors.put("workflowStartStage", "Choose whether Manager or Loan Officer starts the review.");
+                fieldErrors.put("managerPriority", "Manager and Loan Officer priorities must match the selected start stage.");
+                fieldErrors.put("loanOfficerPriority", "Manager and Loan Officer priorities must match the selected start stage.");
+            }
+            case "Loan Officer must be enabled before it can be selected as the start stage.",
+                 "No active loan officers are configured for this SACCO yet." ->
+                fieldErrors.put("loanOfficerReviewRequired", "Assign at least one active Loan Officer before using this stage.");
+            case "Manager priority must be 1 or 2." ->
+                fieldErrors.put("managerPriority", "Manager priority must be 1 or 2.");
+            case "Loan Officer priority must be 1 or 2." ->
+                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be 1 or 2.");
+            case "Manager and Loan Officer cannot share the same priority slot." -> {
+                fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer. One must be 1 and the other 2.");
+                fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer. One must be 1 and the other 2.");
+            }
+            case "Stage priority must be 3 or 4." -> {
+                fieldErrors.put("committeePriority", "Committee priority must be 3 or 4.");
+                fieldErrors.put("accountantPriority", "Accountant priority must be 3 or 4.");
+            }
+            case "Committee and Accountant cannot share the same priority slot." -> {
+                fieldErrors.put("committeePriority", "Committee and Accountant cannot share the same priority slot.");
+                fieldErrors.put("accountantPriority", "Committee and Accountant cannot share the same priority slot.");
+            }
+            case "Minimum repayment period must be at least 1 month." ->
+                fieldErrors.put("minRepaymentMonths", "Minimum repayment period must be at least 1 month.");
+            case "Maximum repayment period must be at least 1 month.",
+                 "Maximum repayment period cannot be lower than the minimum repayment period." ->
+                fieldErrors.put("maxRepaymentMonths", message);
+            case "Committee minimum votes must be at least 1 when committee review is required.",
+                 "Committee minimum votes cannot exceed the number of active board members." ->
+                fieldErrors.put("committeeMinimumVotes", message);
+            case "Committee approval threshold must be at least 1 when committee review is required.",
+                 "Committee approval threshold cannot exceed the number of active board members." ->
+                fieldErrors.put("committeeApprovalThreshold", message);
+            case "Committee approval threshold cannot be greater than committee minimum votes." -> {
+                fieldErrors.put("committeeMinimumVotes", "Committee approvals needed cannot be greater than committee reviewers assigned.");
+                fieldErrors.put("committeeApprovalThreshold", "Committee approvals needed cannot be greater than committee reviewers assigned.");
+            }
+            case "No active board members are configured for this SACCO yet." ->
+                fieldErrors.put("committeeReviewRequired", "Assign at least one active committee reviewer before using this stage.");
+            default -> {
+            }
+        }
+        return fieldErrors;
+    }
+
+    @PostMapping("/settings-controls/{id}/versions/{versionId}/rollback")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String rollbackLoanProductVersion(@PathVariable UUID id,
+                                             @PathVariable UUID versionId,
+                                             @AuthenticationPrincipal AppUserPrincipal principal,
+                                             RedirectAttributes ra) {
+        adminService.rollbackLoanProductVersion(
             adminScopeService.currentSaccoId(principal),
             principal.getMemberId(),
-            productName,
-            guarantorsRequired,
-            percentToRatio(maxLoanSavingsPercent),
-            percentToRatio(insurancePercent),
-            percentToRatio(interestPercent),
-            maxRepaymentMonths,
-            active
+            id,
+            versionId
         );
-        ra.addFlashAttribute("message", "Customized loan product added.");
+        ra.addFlashAttribute("message", "Loan product rolled back to the selected saved version.");
         return "redirect:/admin/settings-controls?section=loan";
+    }
+
+    @GetMapping("/reports")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String reports() {
+        return "admin/reports";
     }
 
     @PostMapping("/settings-controls/review-rules")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateReviewRules(@AuthenticationPrincipal AppUserPrincipal principal,
+                                    @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
+                                    @RequestParam(defaultValue = "false") boolean boardReviewRequired,
                                     @RequestParam Integer boardQuorum,
                                     RedirectAttributes ra) {
         adminService.updateBoardReviewRequirement(
             adminScopeService.currentSaccoId(principal),
             principal.getMemberId(),
+            loanOfficerReviewRequired,
+            boardReviewRequired,
             boardQuorum
         );
-        ra.addFlashAttribute("message", "Board review requirement updated.");
+        ra.addFlashAttribute("message", "Approval flow updated.");
         return "redirect:/admin/settings-controls?section=board";
     }
 
@@ -599,6 +912,32 @@ public class AdminController {
                 saccoRegistryService.updateStationsOnly(scopedSaccoId, stationIds);
                 ra.addFlashAttribute("message", "Station registry updated.");
             }
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return principal != null && principal.hasRole(Position.ADMIN)
+                ? "redirect:/admin/saccos/registry"
+                : "redirect:/admin/saccos";
+        }
+        return principal != null && principal.hasRole(Position.ADMIN)
+            ? "redirect:/admin/saccos/registry"
+            : "redirect:/admin/saccos";
+    }
+
+    @PostMapping("/saccos/{saccoId}/stations")
+    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String addStation(@PathVariable String saccoId,
+                             @AuthenticationPrincipal AppUserPrincipal principal,
+                             @RequestParam String stationId,
+                             RedirectAttributes ra) {
+        try {
+            if (principal != null && !principal.hasRole(Position.ADMIN)) {
+                String scopedSaccoId = adminScopeService.currentSaccoId(principal);
+                if (!scopedSaccoId.equalsIgnoreCase(saccoId)) {
+                    throw new IllegalStateException("Minor admins can only manage stations for their own SACCO.");
+                }
+            }
+            saccoRegistryService.addStation(saccoId, stationId);
+            ra.addFlashAttribute("message", "Station added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return principal != null && principal.hasRole(Position.ADMIN)

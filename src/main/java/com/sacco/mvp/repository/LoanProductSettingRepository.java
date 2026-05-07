@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface LoanProductSettingRepository extends JpaRepository<LoanProductSetting, UUID> {
     Optional<LoanProductSetting> findBySaccoIdAndLoanTypeAndActiveTrue(String saccoId, LoanType loanType);
 
+    Optional<LoanProductSetting> findBySaccoIdAndLoanType(String saccoId, LoanType loanType);
+
     List<LoanProductSetting> findBySaccoIdAndActiveTrue(String saccoId);
 
     List<LoanProductSetting> findBySaccoIdOrderByLoanTypeAsc(String saccoId);
@@ -18,5 +20,9 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
     boolean existsBySaccoId(String saccoId);
 
     boolean existsBySaccoIdAndLoanType(String saccoId, LoanType loanType);
+
+    boolean existsBySaccoIdAndProductCodeIgnoreCase(String saccoId, String productCode);
+
+    boolean existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot(String saccoId, String productCode, UUID id);
 }
 

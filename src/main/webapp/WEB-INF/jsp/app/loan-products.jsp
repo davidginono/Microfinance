@@ -8,19 +8,19 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / Apply for a Loan</p>
+    <p class="erp-breadcrumb"><spring:message code="products.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="products.title" /></h1>
-    <p class="erp-page-subtitle">Choose the right SACCO loan product, then continue with the correct application flow.</p>
+    <p class="erp-page-subtitle"><spring:message code="products.subtitle" /></p>
 </div>
 
 <section class="erp-form-wrap mb-4 space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h5 class="erp-panel-title">Calculate Loan Eligibility Before Applying</h5>
+            <h5 class="erp-panel-title"><spring:message code="products.calculateEligibility.title" /></h5>
         
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            <button id="productsCalculatorButton" type="button" class="app-btn btn-primary">Calculate Loan</button>
+            <button id="productsCalculatorButton" type="button" class="app-btn btn-primary"><spring:message code="products.calculateEligibility.button" /></button>
         </div>
     </div>
   
@@ -32,11 +32,11 @@
         <div class="app-modal-scroll">
         <div class="app-modal-header">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500">Loan Eligibility</p>
-                <h2 class="mt-2 text-3xl font-semibold text-sacco-ink">Calculate Loan Eligibility</h2>
-                <p class="mt-2 text-sm text-slate-500">Estimate eligibility and repayment values before opening the loan form.</p>
+                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="products.calculator.eyebrow" /></p>
+                <h2 class="mt-2 text-3xl font-semibold text-sacco-ink"><spring:message code="products.calculator.title" /></h2>
+                <p class="mt-2 text-sm text-slate-500"><spring:message code="products.calculator.subtitle" /></p>
             </div>
-            <button id="productsCalculatorCloseButton" type="button" class="app-modal-close" aria-label="Close modal">
+            <button id="productsCalculatorCloseButton" type="button" class="app-modal-close" aria-label="<spring:message code='products.calculator.closeAria' />">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                 </svg>
@@ -46,7 +46,7 @@
         <div class="app-modal-body space-y-5">
             <div class="grid gap-3 md:grid-cols-2">
                 <div class="md:col-span-2">
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Choose Loan Product</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
                     <select id="productsLoanType" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
                             <option value="${p.loanType}" data-max-months="${p.maxRepaymentMonths}">
@@ -56,14 +56,14 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Loan Amount (TSh)</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.amount.label" /> (TSh)</label>
                     <input id="productsLoanAmount" type="hidden" />
                     <input id="productsLoanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                            class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="100,000.00" />
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Total Months to Repay</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.tenor.label" /></label>
                     <input id="productsTenorMonths" type="number" min="1"
                            class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="12" />
@@ -72,42 +72,42 @@
 
             <div class="grid gap-3 md:grid-cols-2">
                 <div class="app-modal-section">
-                    <p class="font-semibold text-slate-800">Before You Apply</p>
+                    <p class="font-semibold text-slate-800"><spring:message code="products.beforeYouApply.title" /></p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                        <li>Pick a product, amount, and repayment period first.</li>
-                        <li>The calculator checks your savings-based eligibility before you apply.</li>
-                        <li>Repayment values shown here help you compare products before opening the form.</li>
+                        <li><spring:message code="products.beforeYouApply.item1" /></li>
+                        <li><spring:message code="products.beforeYouApply.item2" /></li>
+                        <li><spring:message code="products.beforeYouApply.item3" /></li>
                     </ul>
                 </div>
                 <div id="productsEligibilityCard" class="app-modal-section">
-                    <p class="font-semibold text-slate-800">Eligibility Result</p>
+                    <p class="font-semibold text-slate-800"><spring:message code="products.eligibilityResult.title" /></p>
                     <div class="mt-2 space-y-1 text-sm text-slate-600">
-                        <p id="productsEligibilityMessage">Load the calculator to check whether the selected amount qualifies.</p>
-                        <p><strong>Savings:</strong> <span id="productsSavingsLabel">-</span></p>
-                        <p><strong>Eligibility Ratio:</strong> <span id="productsRatioLabel">-</span></p>
-                        <p><strong>Maximum Allowed:</strong> <span id="productsMaxAllowedLabel">-</span></p>
+                        <p id="productsEligibilityMessage"><spring:message code="products.eligibilityResult.message" /></p>
+                        <p><strong><spring:message code="products.eligibilityResult.savings" />:</strong> <span id="productsSavingsLabel">-</span></p>
+                        <p><strong><spring:message code="products.eligibilityResult.ratio" />:</strong> <span id="productsRatioLabel">-</span></p>
+                        <p><strong><spring:message code="products.eligibilityResult.maximum" />:</strong> <span id="productsMaxAllowedLabel">-</span></p>
                     </div>
                 </div>
             </div>
 
             <div class="app-modal-section flex flex-wrap items-center justify-between gap-3">
-                <div class="text-sm text-slate-500">Load the calculator once you have entered the amount and repayment period.</div>
-                <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary">Calculate Loan</button>
+                <div class="text-sm text-slate-500"><spring:message code="products.loadHint" /></div>
+                <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary"><spring:message code="products.calculateEligibility.button" /></button>
             </div>
 
             <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
             <div id="productsFinancialLoading" class="hidden app-modal-section text-sm text-slate-600">
                 <div class="flex items-center gap-3">
                     <span class="inline-flex h-3 w-3 animate-pulse rounded-full bg-sacco-blue"></span>
-                    Loading loan calculator results...
+                    <spring:message code="products.loadingCalculator" />
                 </div>
             </div>
             <div id="productsFinancialCard" class="hidden erp-table-wrap overflow-x-auto">
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th>Section</th>
-                        <th>Value</th>
+                        <th><spring:message code="products.table.section" /></th>
+                        <th><spring:message code="products.table.value" /></th>
                     </tr>
                     </thead>
                     <tbody id="productsFinancialBody"></tbody>
@@ -119,18 +119,26 @@
 </div>
 
 <div class="mb-3 px-1">
-    <p class="text-base font-medium text-slate-700">Choose a loan to apply.</p>
+    <p class="text-base font-medium text-slate-700"><spring:message code="products.chooseLoan" /></p>
 </div>
 
 <c:if test="${not empty applicationLockApp}">
     <div class="erp-section mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="text-sm text-slate-700">
-            One loan application is already on review:
+            <spring:message code="products.applicationLock.intro" />
             <strong>${applicationLockApp.applicationNumber}</strong>
             (<strong>${applicationLockStatusLabel}</strong>).
-            Start another one after this loan is disbursed.
+            <spring:message code="products.applicationLock.followup" />
         </div>
-        <a href="/app/loan-applications/${applicationLockApp.id}" class="app-btn btn-neutral">View Current Application</a>
+        <a href="/app/loan-applications/${applicationLockApp.id}" class="app-btn btn-neutral"><spring:message code="products.applicationLock.viewCurrent" /></a>
+    </div>
+</c:if>
+
+<c:if test="${empty applicationLockApp and not empty activeDisbursedLoanApp}">
+        <div class="erp-section mb-4 text-sm text-slate-700">
+        <spring:message code="products.activeLoan.intro" />
+        <strong>${activeDisbursedLoanApp.applicationNumber}</strong>.
+        <spring:message code="products.activeLoan.followup" />
     </div>
 </c:if>
 
@@ -139,29 +147,55 @@
         <thead>
             <tr>
                 <th><spring:message code="loan.type" /></th>
-                <th>Guarantors</th>
-                <th>Interest</th>
-                <th>Max Repayment Period</th>
-                <th>Action</th>
+                <th><spring:message code="products.table.amountRules" /></th>
+                <th><spring:message code="products.table.guarantors" /></th>
+                <th><spring:message code="products.table.annualInterest" /></th>
+                <th><spring:message code="products.table.tenure" /></th>
+                <th><spring:message code="products.table.action" /></th>
             </tr>
         </thead>
         <tbody>
         <c:forEach items="${products}" var="p">
             <tr>
-                <td><c:out value="${p.displayName}" /></td>
+                <td>
+                    <div class="font-semibold text-slate-900"><c:out value="${p.displayName}" /></div>
+                    <div class="mt-1 text-sm text-slate-500"><c:out value="${p.displayDescription}" /></div>
+                </td>
+                <td>
+                    <div class="text-sm text-slate-700">
+                        <spring:message code="products.amount.min" />:
+                        <strong><fmt:formatNumber value="${p.minimumAmount}" minFractionDigits="2" maxFractionDigits="2" /></strong>
+                    </div>
+                    <div class="mt-1 text-sm text-slate-700">
+                        <spring:message code="products.amount.max" />:
+                        <strong>
+                            <c:choose>
+                                <c:when test="${p.maximumAmount ne null}">
+                                    <fmt:formatNumber value="${p.maximumAmount}" minFractionDigits="2" maxFractionDigits="2" />
+                                </c:when>
+                                <c:otherwise><spring:message code="products.amount.notSet" /></c:otherwise>
+                            </c:choose>
+                        </strong>
+                    </div>
+                </td>
                 <td>${p.guarantorsRequired}</td>
                 <td>
                     <c:choose>
-                        <c:when test="${p.loanType eq 'LOAN_ADVANCE'}">0% at 1 month, 12% after</c:when>
+                        <c:when test="${p.loanType eq 'LOAN_ADVANCE'}"><spring:message code="products.interest.loanAdvance" /></c:when>
                         <c:otherwise><fmt:formatNumber value="${p.interestRate * 100}" minFractionDigits="0" maxFractionDigits="2" />%</c:otherwise>
                     </c:choose>
                 </td>
-                <td>${p.maxRepaymentMonths} month(s)</td>
+                <td>${p.minimumRepaymentMonths} - ${p.maxRepaymentMonths} month(s)</td>
                 <td>
                     <c:choose>
                         <c:when test="${not empty applicationLockApp}">
                             <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
-                                Application On Review
+                                <spring:message code="products.action.applicationOnReview" />
+                            </button>
+                        </c:when>
+                        <c:when test="${not empty activeDisbursedLoanApp and not p.applicationWithActiveLoanAllowed}">
+                            <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
+                                <spring:message code="products.action.activeLoanNotAllowed" />
                             </button>
                         </c:when>
                         <c:otherwise>
@@ -198,6 +232,13 @@
         const csrfToken = "${_csrf.token}";
         const csrfParam = "${_csrf.parameterName}";
         const bodyElement = document.body;
+        const msgLoadPrompt = "<spring:message code='products.js.loadPrompt' />";
+        const msgEnterAmountTenor = "<spring:message code='products.js.enterAmountTenor' />";
+        const msgUnableLoadCalculator = "<spring:message code='products.js.unableLoadCalculator' />";
+        const msgWithinEligibility = "<spring:message code='products.js.withinEligibility' />";
+        const msgAboveEligibility = "<spring:message code='products.js.aboveEligibility' />";
+        const msgLoaded = "<spring:message code='products.js.loaded' />";
+        const msgFailedLoad = "<spring:message code='products.js.failedLoad' />";
 
         if (modal) {
             modal.style.position = "fixed";
@@ -261,7 +302,7 @@
         function clearPreview() {
             card.classList.add("hidden");
             body.innerHTML = "";
-            eligibilityMessage.textContent = "Load the calculator to check whether the selected amount qualifies.";
+            eligibilityMessage.textContent = msgLoadPrompt;
             savingsLabel.textContent = "-";
             ratioLabel.textContent = "-";
             maxAllowedLabel.textContent = "-";
@@ -295,7 +336,7 @@
             const amount = amountInput.value.trim();
             const tenorMonths = tenorInput.value.trim();
             if (!amount || !tenorMonths) {
-                showFeedback("error", "Enter both loan amount and repayment months before loading the calculator.");
+                showFeedback("error", msgEnterAmountTenor);
                 return;
             }
 
@@ -318,7 +359,7 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error("Unable to load the loan calculator right now.");
+                    throw new Error(msgUnableLoadCalculator);
                 }
 
                 const payload = await response.json();
@@ -337,12 +378,12 @@
                 ratioLabel.textContent = eligibility.ratioPercentLabel || "-";
                 maxAllowedLabel.textContent = eligibility.maxAllowedLabel || "-";
                 eligibilityMessage.textContent = eligibility.eligible
-                    ? "This amount is within your current eligibility."
-                    : "This amount is above your current eligibility. Reduce the amount before applying.";
+                    ? msgWithinEligibility
+                    : msgAboveEligibility;
 
-                showFeedback("success", payload.message || "Loan details loaded.");
+                showFeedback("success", payload.message || msgLoaded);
             } catch (error) {
-                showFeedback("error", error.message || "Failed to load the loan calculator.");
+                showFeedback("error", error.message || msgFailedLoad);
             } finally {
                 loading.classList.add("hidden");
                 loadButton.disabled = false;

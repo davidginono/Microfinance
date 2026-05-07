@@ -106,8 +106,10 @@ public class NotificationInboxService {
             return switch (position) {
                 case ADMIN, MINOR_ADMIN -> defaultTarget;
                 case MANAGER -> "/manager/loan-applications/" + loanId;
+                case ACCOUNTANT -> "/accountant/loan-applications/" + loanId;
+                case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications/" + loanId;
                 case BOARD -> "/board/loan-applications/" + loanId;
-                case CHAIRPERSON -> "/chairperson/manager-decisions";
+                case LOAN_OFFICER -> "/loan-officer/loan-applications/" + loanId;
                 case MEMBER -> "/app/loan-applications/" + loanId;
             };
         }

@@ -8,7 +8,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Users & Roles</p>
     <h1 class="erp-page-title">Users & Roles</h1>
-    <p class="erp-page-subtitle">Manage access and roles for the current SACCO.</p>
+    <p class="erp-page-subtitle">Manage access and roles for the current workspace station.</p>
 </div>
 
 <div class="erp-toolbar">
@@ -21,7 +21,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
                 <p class="erp-widget-title">Filter And View Options</p>
-                <p class="mt-2 text-sm leading-6 text-slate-500">Search users and page the results.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Search users by member number or email and page the results.</p>
             </div>
             <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                 <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
@@ -41,7 +41,7 @@
                    name="query"
                    value="${selectedUserQuery}"
                    class="mt-2 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
-                   placeholder="Search by name, email, or user ID" />
+                   placeholder="Search by member number or email" />
         </label>
 
         <label class="block">
@@ -79,7 +79,7 @@
                     <td colspan="6" class="px-4 py-5 text-sm text-slate-500">
                         <c:choose>
                             <c:when test="${not empty selectedUserQuery}">
-                                No users matched <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
+                                No users matched member number or email <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
                             </c:when>
                             <c:otherwise>
                                 No users are available in the current slice.

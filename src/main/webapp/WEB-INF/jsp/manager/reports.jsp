@@ -1,39 +1,41 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
-<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<style>
-    .manager-report-checkbox {
-        min-height: 2.75rem;
-    }
-</style>
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Manager Panel / Loan Reports</p>
-    <h1 class="erp-page-title">Disbursed Loan Reports</h1>
-    <p class="erp-page-subtitle">Filter disbursed loans by year, review which ones have been returned, and export the report to PDF.</p>
+    <h1 class="erp-page-title">Manager Review Reports</h1>
+    <p class="erp-page-subtitle">Filter the loans you reviewed by date range and decision, then compare your decision with the loan's current workflow status.</p>
 </div>
 
-<form method="get" action="/manager/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 md:grid-cols-3">
+<form method="get" action="/manager/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 lg:grid-cols-4">
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Year</label>
-        <select name="year" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-            <c:forEach items="${reportYears}" var="reportYear">
-                <option value="${reportYear}" ${yearValue == reportYear.toString() ? 'selected' : ''}>${reportYear}</option>
-            </c:forEach>
+        <label class="mb-1 block text-sm font-medium text-slate-700">From Date</label>
+        <input type="date"
+               name="fromDate"
+               value="${fromDateValue}"
+               class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">To Date</label>
+        <input type="date"
+               name="toDate"
+               value="${toDateValue}"
+               class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Decision</label>
+        <select name="decisionFilter" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+            <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}>All decisions</option>
+            <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}>Approved</option>
+            <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}>Rejected</option>
         </select>
     </div>
-    <div class="flex items-end">
-        <label class="manager-report-checkbox inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
-            <input type="checkbox" name="returnedOnly" value="true" ${returnedOnlyChecked} />
-            Returned loans only
-        </label>
-    </div>
     <div class="flex items-end gap-2">
-        <button type="submit" class="app-btn btn-primary">Apply Filter</button>
-        <a href="/documents/reports/manager-loans.pdf?year=${yearValue}&returnedOnly=${returnedOnlyValue}" class="app-btn btn-neutral">Download PDF</a>
+        <button type="submit" class="app-btn btn-primary">Generate Report</button>
+        <a href="/documents/reports/manager-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}&decisionFilter=${decisionFilterValue}" class="app-btn btn-neutral">Download PDF</a>
     </div>
 </form>
 
@@ -46,10 +48,9 @@
             <th>Applicant</th>
             <th>Loan Type</th>
             <th>Amount</th>
-            <th>Disbursed</th>
-            <th>Final Due Date</th>
-            <th>Status</th>
-            <th>Paid At</th>
+            <th>Manager Decision</th>
+            <th>Reviewed At</th>
+            <th>Current Status</th>
             <th></th>
         </tr>
         </thead>
@@ -61,15 +62,18 @@
                 <td>${row.applicantName}</td>
                 <td>${row.loanTypeLabel}</td>
                 <td>${row.amount}</td>
-                <td>${row.disbursed}</td>
-                <td>${row.finalDueDate}</td>
-                <td>${row.statusLabel}</td>
-                <td>${row.paidAt}</td>
+                <td>${row.managerDecisionLabel}</td>
+                <td>${row.reviewedAt}</td>
+                <td>${row.currentStatusLabel}</td>
                 <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary">Open</a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">
-            <tr><td colspan="10">No disbursed loans matched the selected year.</td></tr>
+            <tr>
+                <td colspan="9" class="px-3 py-8 text-center text-slate-500">
+                    No manager-reviewed loans matched the selected period.
+                </td>
+            </tr>
         </c:if>
         </tbody>
     </table>

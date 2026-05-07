@@ -3,7 +3,7 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${pageContext.response.locale.language}">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -39,6 +39,7 @@
             --shell-content-gap: 14px;
             --shell-content-max: 1320px;
             --shell-nav-height: 3.6rem;
+            --shell-topbar-control-height: 2.55rem;
         }
         .text-xs {
             font-size: 0.8rem !important;
@@ -208,8 +209,8 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 2.55rem;
-            height: 2.55rem;
+            width: var(--shell-topbar-control-height);
+            height: var(--shell-topbar-control-height);
             padding: 0;
             border: 1px solid rgba(255,255,255,0.55);
             border-radius: 0.28rem;
@@ -223,6 +224,11 @@
         .erp-icon-btn:hover {
             background: #f8fafc;
             box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
+        }
+        .erp-topbar-btn {
+            height: var(--shell-topbar-control-height);
+            padding-top: 0;
+            padding-bottom: 0;
         }
         .shell-powered-by {
             display: flex;
@@ -256,9 +262,12 @@
             flex-shrink: 0;
         }
         @media (max-width: 768px) {
+            :root {
+                --shell-topbar-control-height: 2.35rem;
+            }
             .erp-icon-btn {
-                width: 2.35rem;
-                height: 2.35rem;
+                width: var(--shell-topbar-control-height);
+                height: var(--shell-topbar-control-height);
             }
             .erp-icon-btn svg {
                 width: 1.08rem;
@@ -305,9 +314,12 @@
             }
         }
         @media (max-width: 480px) {
+            :root {
+                --shell-topbar-control-height: 2.2rem;
+            }
             .erp-icon-btn {
-                width: 2.2rem;
-                height: 2.2rem;
+                width: var(--shell-topbar-control-height);
+                height: var(--shell-topbar-control-height);
             }
             .erp-icon-btn svg {
                 width: 1rem;
@@ -315,9 +327,12 @@
             }
         }
         @media (max-width: 374px) {
+            :root {
+                --shell-topbar-control-height: 2rem;
+            }
             .erp-icon-btn {
-                width: 2rem;
-                height: 2rem;
+                width: var(--shell-topbar-control-height);
+                height: var(--shell-topbar-control-height);
             }
             .erp-icon-btn svg {
                 width: 0.92rem;
@@ -551,7 +566,9 @@
             border: 1px solid var(--panel-border);
             border-radius: 0.4rem;
             box-shadow: var(--panel-shadow);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
         }
         .erp-table {
             width: 100%;
@@ -822,16 +839,13 @@
             color: #516680 !important;
         }
         #memberArchivePanel > a,
-        #adminSaccoPanel > a,
-        #adminSettingsPanel > a {
+        #adminSaccoPanel > a {
             border-radius: 0.25rem;
         }
         #memberArchivePanel > a:hover,
         #memberArchivePanel > a:focus-visible,
         #adminSaccoPanel > a:hover,
-        #adminSaccoPanel > a:focus-visible,
-        #adminSettingsPanel > a:hover,
-        #adminSettingsPanel > a:focus-visible {
+        #adminSaccoPanel > a:focus-visible {
             background: rgba(255, 255, 255, 0.72);
         }
         @media (min-width: 1024px) {
@@ -904,7 +918,7 @@
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/manager-decisions' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'BOARD' ? '/board/queue' : '/app/dashboard')))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
                 <c:choose>
                     <c:when test="${not empty activeSaccoLogoUrl}">
                         <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
@@ -1090,7 +1104,7 @@
             </div>
             <form action="/logout" method="post" class="m-0 shrink-0">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <button type="submit" class="app-btn btn-primary px-3 py-2 text-[0.78rem] sm:px-4 max-[374px]:px-2.5 max-[374px]:text-[0.72rem]"><spring:message code="nav.logout" /></button>
+                <button type="submit" class="app-btn erp-topbar-btn btn-primary px-3 text-[0.78rem] sm:px-4 max-[374px]:px-2.5 max-[374px]:text-[0.72rem]"><spring:message code="nav.logout" /></button>
             </form>
         </div>
     </div>

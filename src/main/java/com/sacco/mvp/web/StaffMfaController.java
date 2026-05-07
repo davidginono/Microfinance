@@ -91,8 +91,10 @@ public class StaffMfaController {
     private String defaultLanding(AppUserPrincipal principal) {
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case CHAIRPERSON -> "/chairperson/manager-decisions";
+            case LOAN_OFFICER -> "/loan-officer/queue";
             case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
+            case ACCOUNTANT -> "/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
+            case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
             case BOARD -> "/board/queue";
             case MEMBER -> "/app/dashboard";
         };

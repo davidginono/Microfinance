@@ -232,10 +232,20 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     }
 </style>
 
+<c:set var="dashboardBreadcrumbValue" value="${empty dashboardBreadcrumb ? 'Manager Panel / Dashboard' : dashboardBreadcrumb}" />
+<c:set var="dashboardPageTitleValue" value="${empty dashboardPageTitle ? 'Manager Dashboard' : dashboardPageTitle}" />
+<c:set var="dashboardSubtitleValue" value="${empty dashboardSubtitle ? 'Track disbursed loans quickly and keep an eye on how applications are distributed across workflow statuses.' : dashboardSubtitle}" />
+<c:set var="dashboardQueueLabelValue" value="${empty dashboardQueueLabel ? 'On Review By Manager' : dashboardQueueLabel}" />
+<c:set var="dashboardQueueValueValue" value="${empty dashboardQueueValue ? dashboardOnReviewByManagerLoans : dashboardQueueValue}" />
+<c:set var="dashboardQueueMetaValue" value="${empty dashboardQueueMeta ? 'Applications currently waiting for your action.' : dashboardQueueMeta}" />
+<c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? 'Queue waiting' : dashboardQueueFooterLabel}" />
+<c:set var="dashboardQueueIconValue" value="${empty dashboardQueueIcon ? 'M' : dashboardQueueIcon}" />
+<c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
+
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Manager Panel / Dashboard</p>
-    <h1 class="erp-page-title">Manager Dashboard</h1>
-    <p class="erp-page-subtitle">Track disbursed loans quickly and keep an eye on how applications are distributed across workflow statuses.</p>
+    <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
+    <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
+    <p class="erp-page-subtitle">${dashboardSubtitleValue}</p>
 </div>
 
 <section class="erp-stat-grid">
@@ -264,24 +274,24 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-stat-card erp-stat-amber">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">On Review By Manager</p>
-                <p class="erp-stat-value">${dashboardOnReviewByManagerLoans}</p>
-                <p class="erp-stat-meta">Applications currently waiting for your action.</p>
+                <p class="erp-stat-label">${dashboardQueueLabelValue}</p>
+                <p class="erp-stat-value">${dashboardQueueValueValue}</p>
+                <p class="erp-stat-meta">${dashboardQueueMetaValue}</p>
             </div>
-            <span class="erp-stat-icon">M</span>
+            <span class="erp-stat-icon">${dashboardQueueIconValue}</span>
         </div>
-        <div class="erp-stat-footer"><span>Queue waiting</span><span>${dashboardOnReviewByManagerLoans}</span></div>
+        <div class="erp-stat-footer"><span>${dashboardQueueFooterLabelValue}</span><span>${dashboardQueueValueValue}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Returned / Paid</p>
-                <p class="erp-stat-value">${dashboardPaidLoans}</p>
-                <p class="erp-stat-meta">Marked paid by a manager.</p>
+                <p class="erp-stat-label">Defaulted Loans</p>
+                <p class="erp-stat-value">${dashboardDefaultedLoans}</p>
+                <p class="erp-stat-meta">Defaulted in ${dashboardDisbursementYear}.</p>
             </div>
-            <span class="erp-stat-icon">P</span>
+            <span class="erp-stat-icon">F</span>
         </div>
-        <div class="erp-stat-footer"><span>Closed out loans</span><span>${dashboardPaidLoans}</span></div>
+        <div class="erp-stat-footer"><span>Current year</span><span>${dashboardDefaultedLoans}</span></div>
     </div>
 </section>
 
@@ -391,7 +401,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-panel-body">
         <div class="space-y-3">
             <c:forEach items="${dashboardDisbursementRows}" var="loan">
-                <a href="/manager/loan-applications/${loan.id}" class="block rounded border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50">
+                <a href="${dashboardDetailBasePathValue}/${loan.id}" class="block rounded border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="font-semibold text-slate-900">${loan.applicantName}</p>

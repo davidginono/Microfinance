@@ -25,6 +25,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LoanAttachmentService {
+    public static final String CATEGORY_APPLICATION_ATTACHMENT = "APPLICATION_ATTACHMENT";
+    public static final String CATEGORY_DISBURSEMENT_PROOF = "DISBURSEMENT_PROOF";
+
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
     private final Path rootPath = Paths.get("loan-uploads", "applications");
@@ -45,11 +48,16 @@ public class LoanAttachmentService {
     }
 
     public String store(UUID loanId, List<MultipartFile> files, String existingJson) {
+        return store(loanId, files, existingJson, CATEGORY_APPLICATION_ATTACHMENT);
+    }
+
+    public String store(UUID loanId, List<MultipartFile> files, String existingJson, String attachmentCategory) {
         List<Map<String, Object>> attachments = parse(existingJson);
         if (files == null || files.isEmpty()) {
             return writeJson(attachments);
         }
 
+        String normalizedCategory = normalizeCategory(attachmentCategory);
         Path loanFolder = rootPath.resolve(loanId.toString());
         try {
             Files.createDirectories(loanFolder);
@@ -73,6 +81,7 @@ public class LoanAttachmentService {
                 item.put("contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType());
                 item.put("size", file.getSize());
                 item.put("uploadedAt", OffsetDateTime.now().toString());
+                item.put("attachmentCategory", normalizedCategory);
                 attachments.add(item);
             }
         } catch (IOException e) {
@@ -85,6 +94,13 @@ public class LoanAttachmentService {
             throw new IllegalArgumentException("Failed to store attachments", e);
         }
         return writeJson(attachments);
+    }
+
+    private String normalizeCategory(String attachmentCategory) {
+        if (attachmentCategory == null || attachmentCategory.isBlank()) {
+            return CATEGORY_APPLICATION_ATTACHMENT;
+        }
+        return attachmentCategory.trim();
     }
 
     public List<Map<String, Object>> parse(String json) {

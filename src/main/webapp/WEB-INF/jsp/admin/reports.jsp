@@ -5,120 +5,119 @@
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Reports</p>
-    <h1 class="erp-page-title">Admin Reports</h1>
-    <p class="erp-page-subtitle">Review workflow and product totals.</p>
+    <h1 class="erp-page-title">Reporting & Export Architecture</h1>
+    <p class="erp-page-subtitle">Reference architecture for operational, disbursement, and audit reporting.</p>
 </div>
 
-<section class="erp-form-wrap">
-    <form action="/admin/reports/filter" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
-            <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                <option value="">All statuses</option>
-                <c:forEach items="${loanStatuses}" var="statusItem">
-                    <option value="${statusItem}" ${reports.statusFilter eq statusItem.name() ? 'selected' : ''}>${statusItem}</option>
-                </c:forEach>
-            </select>
-        </div>
-        <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">Loan Type</label>
-            <select name="loanType" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                <option value="">All loan types</option>
-                <c:forEach items="${loanTypes}" var="loanTypeItem">
-                    <option value="${loanTypeItem}" ${reports.loanTypeFilter eq loanTypeItem.name() ? 'selected' : ''}>${loanTypeItem}</option>
-                </c:forEach>
-            </select>
-        </div>
-        <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">From</label>
-            <input type="date" name="dateFrom" value="${reports.dateFrom}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
-        </div>
-        <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">To</label>
-            <input type="date" name="dateTo" value="${reports.dateTo}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
-        </div>
-        <div class="flex items-end gap-2">
-            <button type="submit" class="app-btn btn-primary">Apply</button>
-            <a href="/admin/reports" class="app-btn btn-neutral">Reset</a>
-        </div>
-    </form>
-</section>
-
-<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-    <div class="erp-section">
-        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Pending Guarantor Requests</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${reports.pendingGuarantorRequests}</p>
+<section class="erp-panel overflow-hidden">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <p class="erp-widget-title">25.1 Report Categories</p>
+        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Report Categories</h2>
     </div>
-    <div class="erp-section">
-        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Manager Rejections</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${reports.rejectedByManager}</p>
-    </div>
-    <div class="erp-section">
-        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Final Approved</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${reports.finalApproved}</p>
-    </div>
-    <div class="erp-section">
-        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Manager Decisions</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${reports.managerDecisionCount}</p>
-    </div>
-    <div class="erp-section">
-        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Filtered Applications</p>
-        <p class="mt-2 text-3xl font-bold text-slate-900">${reports.totalFilteredApplications}</p>
+    <div class="erp-panel-body overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                    <th class="px-4 py-3">Category</th>
+                    <th class="px-4 py-3">Reports</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-sacco-ink">Application reports</td>
+                    <td class="px-4 py-3">Submitted, approved, rejected, pending</td>
+                </tr>
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-sacco-ink">Workflow reports</td>
+                    <td class="px-4 py-3">Manager pending, committee pending, turnaround time</td>
+                </tr>
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-sacco-ink">Guarantor reports</td>
+                    <td class="px-4 py-3">Pending consent, accepted, rejected</td>
+                </tr>
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-sacco-ink">Disbursement reports</td>
+                    <td class="px-4 py-3">Pending disbursement, details captured, reconciliation</td>
+                </tr>
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-sacco-ink">Audit reports</td>
+                    <td class="px-4 py-3">Sensitive action history</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </section>
 
 <section class="grid gap-4 xl:grid-cols-2">
-    <div class="erp-panel">
-        <div class="erp-panel-header"><p class="erp-panel-title">Applications By Status</p></div>
-        <div class="erp-panel-body">
-        <div class="mb-4 space-y-3">
-            <c:forEach items="${reports.statusChart}" var="item">
-                <div>
-                    <div class="mb-1 flex items-center justify-between text-sm">
-                        <span class="font-semibold text-slate-800">${item.label}</span>
-                        <span class="text-slate-500">${item.count} (${item.percent}%)</span>
-                    </div>
-                    <div class="h-3 rounded-full bg-slate-100">
-                        <div class="h-3 rounded-full bg-sacco-blue" style="width:${item.percent}%"></div>
-                    </div>
-                </div>
-            </c:forEach>
+    <div class="erp-panel overflow-hidden">
+        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <p class="erp-widget-title">25.2 Disbursement Handoff Report</p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Disbursement Handoff Report</h2>
         </div>
-        <table class="erp-table">
-            <thead><tr><th>Status</th><th>Count</th></tr></thead>
-            <tbody>
-            <c:forEach items="${reports.applicationsByStatus}" var="entry">
-                <tr><td class="px-3 py-2">${entry.key}</td><td class="px-3 py-2">${entry.value}</td></tr>
-            </c:forEach>
-            </tbody>
-        </table>
+        <div class="erp-panel-body space-y-5">
+            <div>
+                <p class="text-sm font-semibold text-sacco-ink">Purpose</p>
+                <p class="mt-1 text-sm text-slate-600">
+                    Provide all approved application details required to proceed with disbursement in the financial system.
+                </p>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-sacco-ink">Recommended export formats</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                    <li>PDF</li>
+                    <li>Excel</li>
+                    <li>CSV</li>
+                </ul>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-sacco-ink">Report should include</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                    <li>Loan Application ID</li>
+                    <li>Member details</li>
+                    <li>Approved product</li>
+                    <li>Approved amount and tenure</li>
+                    <li>Estimated fee/insurance deductions</li>
+                    <li>Guarantor details</li>
+                    <li>Approval decision summary</li>
+                    <li>Prepared by and date</li>
+                </ul>
+            </div>
         </div>
     </div>
-
-    <div class="erp-panel">
-        <div class="erp-panel-header"><p class="erp-panel-title">Applications By Loan Type</p></div>
-        <div class="erp-panel-body">
-        <div class="mb-4 space-y-3">
-            <c:forEach items="${reports.typeChart}" var="item">
-                <div>
-                    <div class="mb-1 flex items-center justify-between text-sm">
-                        <span class="font-semibold text-slate-800">${item.label}</span>
-                        <span class="text-slate-500">${item.count} (${item.percent}%)</span>
-                    </div>
-                    <div class="h-3 rounded-full bg-slate-100">
-                        <div class="h-3 rounded-full bg-sacco-green" style="width:${item.percent}%"></div>
-                    </div>
-                </div>
-            </c:forEach>
+    <div class="erp-panel overflow-hidden">
+        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <p class="erp-widget-title">25.3 Reconciliation Report</p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Reconciliation Report</h2>
         </div>
-        <table class="erp-table">
-            <thead><tr><th>Loan Type</th><th>Count</th></tr></thead>
-            <tbody>
-            <c:forEach items="${reports.applicationsByType}" var="entry">
-                <tr><td class="px-3 py-2">${entry.key}</td><td class="px-3 py-2">${entry.value}</td></tr>
-            </c:forEach>
-            </tbody>
-        </table>
+        <div class="erp-panel-body space-y-5">
+            <div>
+                <p class="text-sm font-semibold text-sacco-ink">Purpose</p>
+                <p class="mt-1 text-sm text-slate-600">
+                    Identify approved applications not yet completed with Loan ID and disbursement details.
+                </p>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th class="px-4 py-3">Column</th>
+                            <th class="px-4 py-3">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Loan Application ID</td><td class="px-4 py-3">Application reference</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Member Number</td><td class="px-4 py-3">Member identifier</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Approved Amount</td><td class="px-4 py-3">Approved amount</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Handoff Status</td><td class="px-4 py-3">Pending/exported/captured/exception</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Loan ID</td><td class="px-4 py-3">Captured loan identifier</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Disbursement Date</td><td class="px-4 py-3">Captured disbursement date</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Disbursed Amount</td><td class="px-4 py-3">Captured amount</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Difference</td><td class="px-4 py-3">Disbursed amount minus approved amount</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Captured By</td><td class="px-4 py-3">User who captured details</td></tr>
+                        <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Remarks</td><td class="px-4 py-3">Notes or exceptions</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </section>

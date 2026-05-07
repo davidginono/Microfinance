@@ -1,13 +1,15 @@
 package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
-import com.sacco.mvp.domain.SavingsAccount;
+import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,9 +49,14 @@ class LoanWorkflowServiceTest {
     @Mock private EligibilityService eligibilityService;
     @Mock private OutboxService outboxService;
     @Mock private LoanAttachmentService loanAttachmentService;
+    @Mock private FinancialDetailsService financialDetailsService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock private ForesightDirectoryService foresightDirectoryService;
     @Mock private SaccoConfigurationService saccoConfigurationService;
     @Mock private ApplicationNumberService applicationNumberService;
+    @Mock private RoleDirectoryService roleDirectoryService;
+    @Mock private LoanProductWorkflowService loanProductWorkflowService;
+    @Mock private WorkflowRoutingService workflowRoutingService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
@@ -80,12 +87,6 @@ class LoanWorkflowServiceTest {
             .updatedAt(OffsetDateTime.now())
             .build();
 
-        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
-        when(formSchemaService.extractFormData(anyMap(), anyString())).thenReturn(Map.of("purpose", "Working capital"));
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("1000")))
-            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("9000"),
-                new BigDecimal("2999.70")));
-        when(eligibilityService.policySnapshotJson(any(), eq(2))).thenReturn("{}");
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> loanWorkflowService.saveDraft(
@@ -173,13 +174,19 @@ class LoanWorkflowServiceTest {
         when(eligibilityService.check(saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("1000")))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("9000"),
                 new BigDecimal("2999.70")));
+        when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("1000"), 3, null))
+            .thenReturn(Map.of("interestMethod", "FLAT_RATE", "interestRate", BigDecimal.ZERO));
+        doAnswer(invocation -> {
+            LoanApplication target = invocation.getArgument(0);
+            target.setStatus(LoanStatus.READY_FOR_MANAGER);
+            return LoanStatus.READY_FOR_MANAGER;
+        }).when(workflowRoutingService).moveToFirstReviewStage(any(LoanApplication.class), eq(memberId));
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
 
         LoanApplication submitted = loanWorkflowService.submit(appId, memberId);
 
         assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
         verify(guarantorRequestRepository, never()).save(any());
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("LOAN_READY_FOR_MANAGER"), eq(memberId), any());
     }
 
     @Test
@@ -287,15 +294,6 @@ class LoanWorkflowServiceTest {
             .build();
 
         when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
-        when(savingsAccountRepository.findByMemberId(guarantorId)).thenReturn(Optional.of(
-            SavingsAccount.builder()
-                .id(UUID.randomUUID())
-                .memberId(guarantorId)
-                .availableBalance(new BigDecimal("50000"))
-                .sharesBalance(BigDecimal.ZERO)
-                .depositsBalance(BigDecimal.ZERO)
-                .updatedAt(OffsetDateTime.now())
-                .build()));
         when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
         when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED))
             .thenReturn(1L);
@@ -307,5 +305,114 @@ class LoanWorkflowServiceTest {
         assertThat(request.getGuarantorSignatureVerifiedAt()).isEqualTo(verifiedAt);
         assertThat(app.getStatus()).isEqualTo(LoanStatus.AWAITING_GUARANTORS);
         verify(outboxService, never()).enqueue(eq("LOAN"), eq(appId), eq("LOAN_GUARANTORS_APPROVED"), any(), any());
+    }
+
+    @Test
+    void submitBlocksWhenFreshFinancialDataIsRequiredAndUpstreamIsUnavailable() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("150000"))
+            .tenorMonths(6)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(0)
+            .financialSnapshot("{\"requestedAmount\":150000}")
+            .formData("{}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .freshFinancialDataRequired(true)
+            .managerReviewRequired(true)
+            .committeeReviewRequired(false)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Member member = Member.builder()
+            .id(memberId)
+            .memberNo("MEM001")
+            .stationId("ST01")
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000"), 6, null))
+            .thenReturn(Map.of("interestMethod", "FLAT_RATE", "interestRate", new BigDecimal("0.1000")));
+        when(foresightDirectoryService.fetchAccountSummary("MEM001", "ST01"))
+            .thenThrow(new UpstreamAvailabilityException("down", null));
+
+        assertThatThrownBy(() -> loanWorkflowService.submit(appId, memberId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Fresh financial data is required for this loan product, but the upstream financial service is unavailable right now. Try again later.");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void submitRefreshesFinancialSnapshotFromCurrentProductConfiguration() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("150000"))
+            .tenorMonths(6)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(0)
+            .financialSnapshot("{\"interestMethod\":\"FLAT_RATE\",\"interestRate\":0.1000}")
+            .formData("{}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .freshFinancialDataRequired(false)
+            .managerReviewRequired(true)
+            .committeeReviewRequired(false)
+            .interestMethod(com.sacco.mvp.domain.InterestMethod.REDUCING_BALANCE)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000"), 6, null))
+            .thenReturn(Map.of("interestMethod", "REDUCING_BALANCE", "interestRate", new BigDecimal("0.1200")));
+        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("150000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("600000"),
+                new BigDecimal("199980.00")));
+        doAnswer(invocation -> {
+            LoanApplication target = invocation.getArgument(0);
+            target.setStatus(LoanStatus.READY_FOR_MANAGER);
+            return LoanStatus.READY_FOR_MANAGER;
+        }).when(workflowRoutingService).moveToFirstReviewStage(any(LoanApplication.class), eq(memberId));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LoanApplication submitted = loanWorkflowService.submit(appId, memberId);
+
+        assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
+        assertThat(submitted.getFinancialSnapshot()).contains("REDUCING_BALANCE");
+        assertThat(submitted.getFinancialSnapshot()).contains("0.1200");
     }
 }

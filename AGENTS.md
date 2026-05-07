@@ -108,6 +108,9 @@ Default local URL:
   - keep page-header explanations brief
   - keep card-header helper text brief or omit it when the title already explains the section
   - avoid stacking multiple instructional sentences when one short line is enough
+- Prefer plain-language labels for non-technical SACCO staff:
+  - avoid exposing internal codes or technical identifiers unless they are truly needed for the task
+  - choose wording a layperson can understand at first glance
 - Preserve responsiveness across:
   - small mobile screens
   - tablets
@@ -128,6 +131,10 @@ Default local URL:
   - `All Guarantors Approved`
   - `On Review By Manager`
   - `On Review By Board`
+- Treat station scope as the default tenant boundary for workspace roles:
+  - when a workflow, registry, report, member list, incident list, or loan listing is filtered by SACCO for a workspace admin or station-bound role, prefer filtering to the selected station as well
+  - `LoanApplication.stationId` is now the first-class station reference for loan workflow, reporting, archive, queue, and loan-document visibility paths; prefer it over rebuilding station scope from the applicant member record
+  - if a path cannot be fully station-scoped because the current data model still lacks a first-class station reference for that record type, call that out clearly before widening access
 
 ## Testing Checklist
 

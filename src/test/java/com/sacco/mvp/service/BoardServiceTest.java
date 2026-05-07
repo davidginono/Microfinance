@@ -161,18 +161,8 @@ class BoardServiceTest {
             .version(0)
             .build();
 
-        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberId(loanId, boardId)).thenReturn(Optional.of(review));
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.APPROVED)).thenReturn(0L);
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.REJECTED)).thenReturn(0L);
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        boardService.undoDecision(loanId, boardId);
-
-        assertThat(review.getDecision()).isEqualTo(BoardDecision.PENDING);
-        assertThat(review.getComment()).isNull();
-        assertThat(review.getBoardSignatureText()).isNull();
-        assertThat(review.getBoardSignatureVerifiedAt()).isNull();
-        assertThat(review.getDecidedAt()).isNull();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> boardService.undoDecision(loanId, boardId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Board review decisions cannot be reversed.");
     }
 }

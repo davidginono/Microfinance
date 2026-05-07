@@ -35,6 +35,8 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     List<Member> findBySaccoIdOrderByFullNameAsc(String saccoId);
 
+    List<Member> findByStationIdIgnoreCaseOrderByFullNameAsc(String stationId);
+
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
 
     boolean existsBySaccoIdAndPosition(String saccoId, Position position);
@@ -47,7 +49,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         where m.saccoId = :saccoId
           and (
             :query = ''
-            or lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
             or lower(coalesce(m.email, '')) like concat('%', :query, '%')
             or lower(coalesce(m.memberNo, '')) like concat('%', :query, '%')
           )

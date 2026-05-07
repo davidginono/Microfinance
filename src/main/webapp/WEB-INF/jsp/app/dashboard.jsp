@@ -225,9 +225,9 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
 <section class="space-y-4">
     <div class="erp-page-header">
-        <p class="erp-breadcrumb">Member Workspace / Dashboard</p>
-        <h1 class="erp-page-title" data-sticky-title-source="true">Dashboard</h1>
-        <p class="erp-page-heading">Welcome,
+        <p class="erp-breadcrumb"><spring:message code="dashboard.breadcrumb" /></p>
+        <h1 class="erp-page-title" data-sticky-title-source="true"><spring:message code="dashboard.title" /></h1>
+        <p class="erp-page-heading"><spring:message code="dashboard.welcome" />,
             <c:choose>
                 <c:when test="${not empty currentMember and not empty currentMember.fullName}">
                     ${currentMember.fullName}
@@ -237,115 +237,114 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </c:otherwise>
             </c:choose>
         </p>
-        <p class="erp-page-subtitle">
-            Track applications in progress, follow guarantor approvals, and monitor every active loan repayment timeline from one SACCO workspace.
-        </p>
+        <p class="erp-page-subtitle"><spring:message code="dashboard.subtitle" /></p>
     </div>
 
     <div class="erp-stat-grid">
         <div class="erp-stat-card erp-stat-blue">
             <div class="erp-stat-main">
                 <div>
-                    <p class="erp-stat-label">Applications</p>
+                    <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
                     <p class="erp-stat-value">${totalApplications}</p>
-                    <p class="erp-stat-meta">Applications still in workflow and waiting for a final outcome</p>
+                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.applications.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 7L13 3.293A1 1 0 0012.293 3H4z"/></svg>
                 </span>
             </div>
             <div class="erp-stat-footer">
-                <span>Awaiting decision: ${loansAwaitingDecision}</span>
+                <span><spring:message code="dashboard.stat.applications.footer" /> ${loansAwaitingDecision}</span>
             </div>
         </div>
         <div class="erp-stat-card erp-stat-green">
             <div class="erp-stat-main">
                 <div>
-                    <p class="erp-stat-label">Active Loans</p>
+                    <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
                     <p class="erp-stat-value">${activeLoanCount}</p>
-                    <p class="erp-stat-meta">Accepted loans that are still active and tracked in repayment timelines</p>
+                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.activeLoans.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v3H4V4zm0 5h12v7H4V9zm2 2v3h4v-3H6z"/></svg>
                 </span>
             </div>
             <div class="erp-stat-footer">
-                <span>Archived: ${archivedApplicationCount}</span>
+                <span><spring:message code="dashboard.stat.activeLoans.footer" /> ${archivedApplicationCount}</span>
             </div>
         </div>
         <div class="erp-stat-card erp-stat-amber">
             <div class="erp-stat-main">
                 <div>
-                    <p class="erp-stat-label">Guarantee Requests</p>
+                    <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
                     <p class="erp-stat-value">${pendingGuaranteeApprovals}</p>
-                    <p class="erp-stat-meta">Requests that still need your guarantor decision</p>
+                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.guarantorRequests.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v5a3 3 0 003 3h8a3 3 0 003-3v-5a2 2 0 00-2-2h-1V6a4 4 0 00-4-4z"/></svg>
                 </span>
             </div>
             <div class="erp-stat-footer">
-                <span>Queue: ${pendingGuaranteeApprovals}</span>
+                <span><spring:message code="dashboard.stat.guarantorRequests.footer" /> ${pendingGuaranteeApprovals}</span>
             </div>
         </div>
         <div class="erp-stat-card erp-stat-red">
             <div class="erp-stat-main">
                 <div>
-                    <p class="erp-stat-label">Archived Rejections</p>
+                    <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>
                     <p class="erp-stat-value">${rejectedLoanCount}</p>
-                    <p class="erp-stat-meta">Rejected applications moved out of the active workspace and into archives</p>
+                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.archivedRejections.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-10.293l-4 4a1 1 0 01-1.414 0l-2-2 1.414-1.414L9 9.586l3.293-3.293 1.414 1.414z"/></svg>
                 </span>
             </div>
             <div class="erp-stat-footer">
-                <span>Current records: ${currentApplicationCount}</span>
+                <span><spring:message code="dashboard.stat.archivedRejections.footer" /> ${currentApplicationCount}</span>
             </div>
         </div>
     </div>
 
-    <section class="erp-panel">
+    <section class="erp-panel" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
         <div class="erp-panel-header">
-            <p class="erp-panel-title">Financial Status</p>
+            <p class="erp-panel-title"><spring:message code="dashboard.panel.financialStatus" /></p>
         </div>
         <div class="erp-panel-body">
             <div>
                 <div>
-                    <p class="erp-widget-title">Member Balances</p>
-                    <h2 class="erp-widget-heading">Savings And Shares Overview</h2>
+                    <p class="erp-widget-title"><spring:message code="dashboard.widget.memberBalances" /></p>
+                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.savingsSharesOverview" /></h2>
                 </div>
             </div>
 
             <div class="mt-4 grid gap-4 md:grid-cols-2">
                 <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Savings</p>
-                    <p class="mt-2 text-2xl font-bold text-sacco-ink">${dashboardExternalAccountStatus.savingsLabel}</p>
-                    <p class="mt-2 text-sm text-slate-500">Current savings balance available to this member.</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.savings.label" /></p>
+                    <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
+                    <p class="mt-2 text-sm text-slate-500"><spring:message code="dashboard.savings.meta" /></p>
                 </div>
 
                 <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Shares</p>
-                    <p class="mt-2 text-2xl font-bold text-sacco-ink">${dashboardExternalAccountStatus.sharesLabel}</p>
-                    <p class="mt-2 text-sm text-slate-500">Current shares balance recorded for this member.</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.shares.label" /></p>
+                    <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
+                    <p class="mt-2 text-sm text-slate-500"><spring:message code="dashboard.shares.meta" /></p>
                 </div>
             </div>
+            <p class="mt-4 text-sm text-slate-500" data-live-account-status-message>${dashboardExternalAccountStatus.statusMessage}</p>
         </div>
     </section>
 
     <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
         <section class="erp-panel">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Application Status Bar Graph</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.panel.applicationStatusGraph" /></p>
             </div>
             <div class="erp-panel-body">
                 <div class="erp-toolbar">
                     <div>
-                        <p class="erp-widget-title">Workflow Distribution</p>
-                        <h2 class="erp-widget-heading">Applications By Status</h2>
+                        <p class="erp-widget-title"><spring:message code="dashboard.widget.workflowDistribution" /></p>
+                        <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.applicationsByStatus" /></h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
-                        ${currentApplicationCount} current record(s)
+                        ${currentApplicationCount} <spring:message code="dashboard.chart.currentRecords" />
                     </div>
                 </div>
 
@@ -369,7 +368,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         </div>
                     </c:when>
                     <c:otherwise>
-                        <div class="erp-section text-center text-sm text-slate-500">No active application statuses to chart yet.</div>
+                        <div class="erp-section text-center text-sm text-slate-500"><spring:message code="dashboard.empty.applicationStatuses" /></div>
                     </c:otherwise>
                 </c:choose>
             </div>
@@ -377,16 +376,16 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
         <section class="erp-panel 2xl:self-start">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Repayment Timelines</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.panel.repaymentTimelines" /></p>
             </div>
             <div class="erp-panel-body">
                 <div class="erp-toolbar gap-3">
                     <div>
-                        <p class="erp-widget-title">Active Loans Chart</p>
-                        <h2 class="erp-widget-heading">Time Left For Each Active Loan</h2>
+                        <p class="erp-widget-title"><spring:message code="dashboard.widget.activeLoansChart" /></p>
+                        <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.timeLeftEachActiveLoan" /></h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
-                        ${activeLoanChartCount} active loan(s)
+                        ${activeLoanChartCount} <spring:message code="dashboard.chart.activeLoansCount" />
                     </div>
                 </div>
                 <c:choose>
@@ -402,64 +401,64 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                         <div class="min-w-0">
                                             <div class="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
-                                                    <p class="erp-widget-title">Repayment Timer</p>
-                                                    <h3 class="mt-1 text-lg font-bold text-sacco-ink">Loan ID ${loanRow.loanId}</h3>
+                                                    <p class="erp-widget-title"><spring:message code="dashboard.repaymentTimer.label" /></p>
+                                                    <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="dashboard.loanId.prefix" /> ${loanRow.loanId}</h3>
                                                 </div>
                                                 <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">
                                                     <c:if test="${loanRow.repaymentStateLabel eq 'Paid'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
                                                 </span>
                                             </div>
-                                            <p class="mt-1 text-sm text-slate-500">Loan Amount: ${loanRow.amountLabel}</p>
+                                            <p class="mt-1 text-sm text-slate-500"><spring:message code="dashboard.loanAmount.label" /> ${loanRow.amountLabel}</p>
                                             <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-slate-600">
                                                 <div>
-                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Elapsed</p>
+                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.elapsed.label" /></p>
                                                     <p class="mt-1 font-semibold text-sacco-ink" data-repayment-timer="elapsed-days">${loanRow.elapsedDays} day(s)</p>
                                                 </div>
                                                 <div>
-                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Remaining</p>
+                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.remaining.label" /></p>
                                                     <p class="mt-1 font-semibold text-sacco-ink" data-repayment-timer="days-left">${loanRow.daysLeft} day(s)</p>
                                                 </div>
                                                 <div class="col-span-2">
-                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Final Due Date</p>
+                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.finalDueDate.label" /></p>
                                                     <p class="mt-1 font-semibold text-sacco-ink">${loanRow.finalDueDate}</p>
                                                 </div>
                                             </div>
                                             <div class="mt-4 rounded-md border border-slate-200 bg-slate-50">
                                                 <div class="border-b border-slate-200 px-3 py-2">
-                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Loan Payment Summary</p>
+                                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.paymentSummary.title" /></p>
                                                 </div>
                                                 <c:choose>
                                                     <c:when test="${loanRow.paymentSummaryAvailable}">
                                                         <div class="grid gap-3 px-3 py-3 sm:grid-cols-2">
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Product</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.product.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.loanDescription}</p>
                                                             </div>
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Last Payment</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.lastPayment.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.lastPaymentDate}</p>
                                                             </div>
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.outstanding.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.totalOutstanding}</p>
                                                             </div>
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Principal Paid</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.principalPaid.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.totalPrincipalPaid}</p>
                                                             </div>
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding Principal</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.outstandingPrincipal.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.outstandingPrincipal}</p>
                                                             </div>
                                                             <div>
-                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Outstanding Interest</p>
+                                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.outstandingInterest.label" /></p>
                                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink">${loanRow.outstandingInterest}</p>
                                                             </div>
                                                         </div>
                                                     </c:when>
                                                     <c:otherwise>
                                                         <div class="px-3 py-3 text-sm text-slate-500">
-                                                            Payment summary details will appear after the latest synced repayment record is fetched from memberportal.
+                                                            <spring:message code="dashboard.paymentSummary.pending" />
                                                         </div>
                                                     </c:otherwise>
                                                 </c:choose>
@@ -468,23 +467,23 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
                                         <div class="mx-auto flex w-full max-w-[170px] flex-col items-center gap-3">
                                             <div class="relative flex h-28 w-28 items-center justify-center rounded-full sm:h-32 sm:w-32"
-                                                 data-repayment-timer="ring"
+                                                data-repayment-timer="ring"
                                                  style="background: conic-gradient(#E2E8F0 0% ${loanRow.remainingPercent}%, #2F348D ${loanRow.remainingPercent}% 100%);">
                                                 <div class="flex h-18 w-18 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm sm:h-20 sm:w-20">
-                                                    <p class="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-400">Remaining</p>
+                                                    <p class="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.remaining.label" /></p>
                                                     <p class="mt-1 font-display text-xl text-sacco-ink sm:text-2xl" data-repayment-timer="remaining-percent">${loanRow.remainingPercent}%</p>
                                                     <p class="mt-1 text-[10px] text-slate-500" data-repayment-timer="countdown">${loanRow.countdown}</p>
                                                 </div>
                                             </div>
                                             <div class="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-center">
-                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Repayment Progress</p>
+                                                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.repaymentProgress.label" /></p>
                                                 <p class="mt-1 text-sm font-semibold text-sacco-ink" data-repayment-timer="progress-text">${loanRow.remainingPercent}% remaining</p>
                                             </div>
                                             <c:if test="${loanRow.canDismiss}">
                                                 <form method="post" action="${pageContext.request.contextPath}/app/dashboard/active-loans/${loanRow.fullId}/seen" class="w-full">
                                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                                     <button type="submit" class="app-btn btn-neutral w-full justify-center text-sm">
-                                                        Seen
+                                                        <spring:message code="dashboard.seen" />
                                                     </button>
                                                 </form>
                                             </c:if>
@@ -498,16 +497,12 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <div class="erp-section mt-4 text-center">
                             <c:choose>
                                 <c:when test="${activeLoanCount gt 0}">
-                                    <p class="font-display text-xl text-sacco-ink">No repayment timers to show right now</p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-500">
-                                        Expired timelines you have already marked as seen stay hidden here.
-                                    </p>
+                                    <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.repaymentTimers.empty.title" /></p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="dashboard.repaymentTimers.empty.subtitle" /></p>
                                 </c:when>
                                 <c:otherwise>
-                                    <p class="font-display text-xl text-sacco-ink">No active loans under repayment</p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-500">
-                                        Active accepted loans will appear here with their remaining repayment time plotted in a live chart.
-                                    </p>
+                                    <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.activeLoans.empty.title" /></p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="dashboard.activeLoans.empty.subtitle" /></p>
                                 </c:otherwise>
                             </c:choose>
                         </div>
@@ -520,17 +515,17 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     <div class="erp-content-grid">
         <section class="erp-panel">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Current Applications</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.panel.currentApplications" /></p>
             </div>
             <div class="erp-panel-body">
                 <div class="erp-table-wrap">
                     <table class="erp-table">
                         <thead>
                         <tr>
-                            <th>Loan Application ID</th>
-                            <th>Loan Type</th>
-                            <th>Amount</th>
-                            <th>Status</th>
+                            <th><spring:message code="dashboard.table.loanApplicationId" /></th>
+                            <th><spring:message code="dashboard.table.loanType" /></th>
+                            <th><spring:message code="dashboard.table.amount" /></th>
+                            <th><spring:message code="dashboard.table.status" /></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -544,7 +539,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         </c:forEach>
                         <c:if test="${empty myApplications}">
                             <tr>
-                                <td colspan="4">No current applications yet.</td>
+                                <td colspan="4"><spring:message code="dashboard.empty.currentApplications" /></td>
                             </tr>
                         </c:if>
                         </tbody>
@@ -555,16 +550,16 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
         <section class="erp-panel">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Guarantor Queue</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.panel.guarantorQueue" /></p>
             </div>
             <div class="erp-panel-body">
                 <div class="erp-table-wrap">
                     <table class="erp-table">
                         <thead>
                         <tr>
-                            <th>Loan Id</th>
-                            <th>Loan Amount</th>
-                            <th>Status</th>
+                            <th><spring:message code="dashboard.table.loanId" /></th>
+                            <th><spring:message code="dashboard.table.loanAmount" /></th>
+                            <th><spring:message code="dashboard.table.status" /></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -577,7 +572,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         </c:forEach>
                         <c:if test="${empty pendingGuarantees}">
                             <tr>
-                                <td colspan="3">No guarantor requests waiting.</td>
+                                <td colspan="3"><spring:message code="dashboard.empty.guarantorQueue" /></td>
                             </tr>
                         </c:if>
                         </tbody>
@@ -751,4 +746,5 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     }());
 </script>
 
+<%@ include file="../fragments/live-account-status-hydration.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

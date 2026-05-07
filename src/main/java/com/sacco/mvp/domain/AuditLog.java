@@ -94,6 +94,7 @@ public class AuditLog {
             case "ADMINUPDATEMEMBER" -> "Member access updated by admin";
             case "ADMINUPDATELOANPRODUCT" -> "Loan product settings updated";
             case "ADMINUPDATEBOARDREVIEWREQUIREMENT" -> "Board review requirement updated";
+            case "ADMINUPDATEAPPROVALFLOWCONFIGURATION" -> "Approval flow updated";
             case "ADMINUPDATEINCIDENT" -> "Incident reviewed by admin";
             case "ADMINBROADCAST" -> "Admin broadcast sent";
             case "ADMINREPLYTOMEMBER" -> "Admin replied to member";
@@ -113,7 +114,9 @@ public class AuditLog {
             case "ADMINCONTROLLER" -> "Admin tools";
             case "MANAGERCONTROLLER" -> "Manager panel";
             case "BOARDCONTROLLER" -> "Board panel";
-            case "CHAIRPERSONCONTROLLER" -> "Chairperson panel";
+            case "LOANOFFICERCONTROLLER" -> "Loan officer panel";
+            case "ACCOUNTANTCONTROLLER" -> "Accountant panel";
+            case "DISBURSEMENTCONTROLLER" -> "Disbursement panel";
             case "LOANDOCUMENTCONTROLLER" -> "Printable documents";
             case "NONMEMBERUSER", "STAFFUSER" -> "Staff account";
             case "MEMBER" -> "Member account";

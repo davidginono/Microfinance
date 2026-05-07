@@ -49,9 +49,36 @@
         const adminSaccoToggle = document.getElementById("adminSaccoToggle");
         const adminSaccoPanel = document.getElementById("adminSaccoPanel");
         const adminSaccoChevron = document.getElementById("adminSaccoChevron");
-        const adminSettingsToggle = document.getElementById("adminSettingsToggle");
-        const adminSettingsPanel = document.getElementById("adminSettingsPanel");
-        const adminSettingsChevron = document.getElementById("adminSettingsChevron");
+        const memberSettingsToggle = document.getElementById("memberSettingsToggle");
+        const memberSettingsPanel = document.getElementById("memberSettingsPanel");
+        const memberSettingsChevron = document.getElementById("memberSettingsChevron");
+        const sidebarStateScope = "${pageContext.session.id}";
+
+        function sidebarStateKey(name) {
+            return "sidebar:" + sidebarStateScope + ":" + name;
+        }
+
+        function registerExpandableMenu(toggle, panel, chevron, keyName) {
+            if (!toggle || !panel) {
+                return;
+            }
+            const storageKey = sidebarStateKey(keyName);
+            const applyExpanded = function (expanded) {
+                toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                panel.classList.toggle("hidden", !expanded);
+                if (chevron) {
+                    chevron.classList.toggle("rotate-180", expanded);
+                }
+            };
+            const storedState = window.sessionStorage.getItem(storageKey) === "true";
+            applyExpanded(storedState);
+            toggle.addEventListener("click", function () {
+                const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+                const nextExpanded = !isExpanded;
+                applyExpanded(nextExpanded);
+                window.sessionStorage.setItem(storageKey, String(nextExpanded));
+            });
+        }
 
         if (adminScopeToggle && adminScopePanel) {
             adminScopeToggle.addEventListener("click", function () {
@@ -64,62 +91,9 @@
             });
         }
 
-        if (memberArchiveToggle && memberArchivePanel) {
-            const archiveStorageKey = "memberArchiveSidebarExpanded";
-            const applyArchiveExpanded = function (expanded) {
-                memberArchiveToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-                memberArchivePanel.classList.toggle("hidden", !expanded);
-                if (memberArchiveChevron) {
-                    memberArchiveChevron.classList.toggle("rotate-180", expanded);
-                }
-            };
-            const storedArchiveState = window.localStorage.getItem(archiveStorageKey) === "true";
-            applyArchiveExpanded(storedArchiveState);
-            memberArchiveToggle.addEventListener("click", function () {
-                const isExpanded = memberArchiveToggle.getAttribute("aria-expanded") === "true";
-                const nextExpanded = !isExpanded;
-                applyArchiveExpanded(nextExpanded);
-                window.localStorage.setItem(archiveStorageKey, String(nextExpanded));
-            });
-        }
-
-        if (adminSaccoToggle && adminSaccoPanel) {
-            const saccoStorageKey = "adminSaccoSidebarExpanded";
-            const applySaccoExpanded = function (expanded) {
-                adminSaccoToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-                adminSaccoPanel.classList.toggle("hidden", !expanded);
-                if (adminSaccoChevron) {
-                    adminSaccoChevron.classList.toggle("rotate-180", expanded);
-                }
-            };
-            const storedSaccoState = window.localStorage.getItem(saccoStorageKey);
-            applySaccoExpanded(storedSaccoState === "true");
-            adminSaccoToggle.addEventListener("click", function () {
-                const isExpanded = adminSaccoToggle.getAttribute("aria-expanded") === "true";
-                const nextExpanded = !isExpanded;
-                applySaccoExpanded(nextExpanded);
-                window.localStorage.setItem(saccoStorageKey, String(nextExpanded));
-            });
-        }
-
-        if (adminSettingsToggle && adminSettingsPanel) {
-            const settingsStorageKey = "adminSettingsSidebarExpanded";
-            const applySettingsExpanded = function (expanded) {
-                adminSettingsToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-                adminSettingsPanel.classList.toggle("hidden", !expanded);
-                if (adminSettingsChevron) {
-                    adminSettingsChevron.classList.toggle("rotate-180", expanded);
-                }
-            };
-            const storedSettingsState = window.localStorage.getItem(settingsStorageKey) === "true";
-            applySettingsExpanded(storedSettingsState);
-            adminSettingsToggle.addEventListener("click", function () {
-                const isExpanded = adminSettingsToggle.getAttribute("aria-expanded") === "true";
-                const nextExpanded = !isExpanded;
-                applySettingsExpanded(nextExpanded);
-                window.localStorage.setItem(settingsStorageKey, String(nextExpanded));
-            });
-        }
+        registerExpandableMenu(memberSettingsToggle, memberSettingsPanel, memberSettingsChevron, "memberSettingsExpanded");
+        registerExpandableMenu(memberArchiveToggle, memberArchivePanel, memberArchiveChevron, "memberArchiveExpanded");
+        registerExpandableMenu(adminSaccoToggle, adminSaccoPanel, adminSaccoChevron, "adminSaccoExpanded");
     })();
 </script>
 </div>

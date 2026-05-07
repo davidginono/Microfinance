@@ -81,15 +81,16 @@ public class LoanPaymentTransactionSyncService {
             return 0;
         }
         Member applicant = applicantOpt.get();
+        String loanStationId = normalizeStationId(loan.getStationId());
         if (applicant.getMemberNo() == null || applicant.getMemberNo().isBlank()
-            || applicant.getStationId() == null || applicant.getStationId().isBlank()) {
+            || loanStationId == null) {
             log.warn("Skipping payment sync for application {}: member missing memberNo or stationId",
                 loan.getId());
             return 0;
         }
 
         List<LoanPaymentTransactionDto> transactions = client.fetchTransactions(
-            applicant.getMemberNo(), applicant.getStationId(), loan.getLoanId());
+            applicant.getMemberNo(), loanStationId, loan.getLoanId());
 
         int inserted = 0;
         OffsetDateTime fetchedAt = OffsetDateTime.now();
@@ -150,7 +151,7 @@ public class LoanPaymentTransactionSyncService {
                                            boolean finalInstallmentMonthMatched) {
         try {
             Optional<LoanPaymentSummaryDto> summaryOpt = loanPaymentSummaryClient.fetchSummary(
-                applicant.getMemberNo(), applicant.getStationId(), loan.getLoanId());
+                applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
             if (summaryOpt.isEmpty()) {
                 return;
             }
@@ -246,5 +247,13 @@ public class LoanPaymentTransactionSyncService {
     /** Type alias for callers that don't want to import the exception package. */
     public static Class<LoanPaymentLookupException> lookupFailureType() {
         return LoanPaymentLookupException.class;
+    }
+
+    private String normalizeStationId(String stationId) {
+        if (stationId == null) {
+            return null;
+        }
+        String normalized = stationId.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 }

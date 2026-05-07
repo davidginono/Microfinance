@@ -27,10 +27,13 @@ public class DataSeeder {
     private static final String IAA_SECONDARY_STATION_ID = "AR704";
     private static final String DEVELOPMENT_SHARED_EMAIL = "ginonodavid625@gmail.com";
     private static final String MINOR_ADMIN_MEMBER_NO_PREFIX = "MINDEV";
+    private static final String LOCAL_DEV_WORKFLOW_PASSWORD = "Pass123!";
+    private static final String LOCAL_DEV_TAHA_BOARD003_PASSWORD = "Board003!";
 
     private static final BigDecimal DEFAULT_RATIO = new BigDecimal("0.3333");
     private static final BigDecimal DEFAULT_INSURANCE_RATE = new BigDecimal("0.0150");
     private static final BigDecimal DEFAULT_INTEREST_RATE = new BigDecimal("0.1000");
+    private static final BigDecimal DEFAULT_MINIMUM_AMOUNT = BigDecimal.ZERO.setScale(2);
     private static final BigDecimal CHAPCHAP_EXTENDED_INTEREST_RATE = new BigDecimal("0.1200");
     private static final BigDecimal APPLICATION_FEE = new BigDecimal("15000.00");
 
@@ -88,15 +91,29 @@ public class DataSeeder {
             seedAccount(row(
                     "66b82e0c-e983-4fc2-aad5-13157516bb77", "2026-01-24T23:20:43.514392+03:00",
                     "ginonodavid625@gmail.com", "Bob Board Three", "BRD003",
-                    "$2a$10$USMdLhlzevWGnq6y4gADaOdhqAIQ0wZWJB5OiS5VCrgNhYca9NPmC",
+                    passwordEncoder.encode(LOCAL_DEV_TAHA_BOARD003_PASSWORD),
                     "0757000005", Position.BOARD, "2026-03-23T14:51:04.593618+03:00", 3,
                     "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_SECONDARY_STATION_ID, false, null, null),
                 null, null, null);
             seedAccount(row(
                     "de54fdfb-b44b-4e09-973c-fbc008ea55b8", "2026-01-25T23:20:43.514392+03:00",
-                    "ginonodavid625@gmail.com", "Cathy Chairperson", "CHR001",
-                    "$2a$10$01qD/ddGNR94Uu7WL27w7u.eIJUGnnSpC3kgUR2rcXAk48xFaf7Fa",
-                    "0757000006", Position.CHAIRPERSON, "2026-03-23T14:51:05.003517+03:00", 1,
+                    "ginonodavid625@gmail.com", "Cathy Loan Officer", "CHR001",
+                    passwordEncoder.encode(LOCAL_DEV_WORKFLOW_PASSWORD),
+                    "0757000006", Position.LOAN_OFFICER, "2026-03-23T14:51:05.003517+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "a7181a84-4fb7-4d48-953f-06d9e6e84c1a", "2026-01-26T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Andy Accountant", "ACC001",
+                    passwordEncoder.encode(LOCAL_DEV_WORKFLOW_PASSWORD),
+                    "0757000007", Position.ACCOUNTANT, "2026-03-23T14:51:05.403517+03:00", 1,
+                    "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
+                null, null, null);
+            seedAccount(row(
+                    "f11a6997-568d-4699-a672-e5e1f6c6c1ef", "2026-01-27T23:20:43.514392+03:00",
+                    "ginonodavid625@gmail.com", "Doris Disbursement", "DIS001",
+                    passwordEncoder.encode(LOCAL_DEV_WORKFLOW_PASSWORD),
+                    "0757000008", Position.DISBURSEMENT_OFFICER, "2026-03-23T14:51:05.803517+03:00", 1,
                     "SACCO-ARUSHA-001", MemberStatus.ACTIVE, IAA_PRIMARY_STATION_ID, false, null, null),
                 null, null, null);
             seedAccount(row(
@@ -201,6 +218,7 @@ public class DataSeeder {
         sacco.setBoardSize(3);
         sacco.setBoardQuorum(2);
         sacco.setMaxLoanSavingsRatio(DEFAULT_RATIO);
+        sacco.setApplicationFee(APPLICATION_FEE);
         sacco.setDefaultLanguage("en");
         if (sacco.getCreatedAt() == null) {
             sacco.setCreatedAt(now.minusDays(90));
@@ -249,10 +267,23 @@ public class DataSeeder {
                 .build());
 
         product.setGuarantorsRequired(guarantorsRequired);
+        product.setProductCode(loanType.defaultProductCode());
+        product.setProductDescription(loanType.defaultDescription());
+        product.setDisplayOrder(loanType.getDisplayOrder());
+        product.setMinimumAmount(DEFAULT_MINIMUM_AMOUNT);
+        product.setMaximumAmount(null);
         product.setMaxLoanSavingsRatio(savingsRatio);
         product.setInsuranceRate(insuranceRate);
         product.setInterestRate(interestRate);
+        product.setInterestMethod(InterestMethod.FLAT_RATE);
+        product.setMinRepaymentMonths(1);
         product.setMaxRepaymentMonths(maxRepaymentMonths);
+        product.setAllowApplicationWithActiveLoan(false);
+        product.setManagerReviewRequired(true);
+        product.setCommitteeReviewRequired(true);
+        product.setCommitteeMinimumVotes(2);
+        product.setCommitteeApprovalThreshold(2);
+        product.setProductStatus(LoanProductStatus.ACTIVE);
         product.setFormSchema(defaultLoanFormSchema());
         product.setActive(true);
         if (product.getCreatedAt() == null) {
@@ -266,30 +297,60 @@ public class DataSeeder {
                                BigDecimal availableBalance,
                                BigDecimal sharesBalance,
                                BigDecimal depositsBalance) {
-        Member member = memberRepository.findByMemberNo(row.memberNo())
+        Optional<Member> existingMember = memberRepository.findByMemberNo(row.memberNo());
+        Member member = existingMember
             .orElseGet(() -> Member.builder()
                 .id(UUID.fromString(row.id()))
                 .createdAt(row.createdAt())
                 .build());
+        boolean isNewMember = existingMember.isEmpty();
 
-        member.setSaccoId(IAA_SACCO_ID);
+        if (isNewMember || member.getSaccoId() == null || member.getSaccoId().isBlank()) {
+            member.setSaccoId(IAA_SACCO_ID);
+        }
         member.setMemberNo(row.memberNo());
-        member.setStationId(row.stationId());
-        member.setFullName(row.fullName());
-        member.setPhone(row.phone());
-        member.setEmail(resolveSeedEmail(row));
-        member.setSignatureText(row.signatureText());
-        member.setSignatureRegisteredAt(row.signatureRegisteredAt());
-        member.setMemberAccount(row.memberAccount());
-        member.setStatus(row.status());
-        member.setPosition(row.position());
-        member.setRank(row.rank());
-        member.setPasswordHash(row.passwordHash());
-        member.setProfileLastSyncedAt(row.profileLastSyncedAt());
+        if (isNewMember || member.getStationId() == null || member.getStationId().isBlank()) {
+            member.setStationId(row.stationId());
+        }
+        if (isNewMember || member.getFullName() == null || member.getFullName().isBlank()) {
+            member.setFullName(row.fullName());
+        }
+        if (isNewMember || member.getPhone() == null || member.getPhone().isBlank()) {
+            member.setPhone(row.phone());
+        }
+        if (isNewMember || member.getEmail() == null || member.getEmail().isBlank()) {
+            member.setEmail(resolveSeedEmail(row));
+        }
+        if (isNewMember || member.getSignatureText() == null || member.getSignatureText().isBlank()) {
+            member.setSignatureText(row.signatureText());
+        }
+        if (isNewMember || member.getSignatureRegisteredAt() == null) {
+            member.setSignatureRegisteredAt(row.signatureRegisteredAt());
+        }
+        if (isNewMember || member.getMemberAccount() == null) {
+            member.setMemberAccount(row.memberAccount());
+        }
+        if (isNewMember || member.getStatus() == null) {
+            member.setStatus(row.status());
+        }
+        if (isNewMember || member.getPosition() == null) {
+            member.setPosition(row.position());
+        }
+        if (isNewMember || member.getRank() == null) {
+            member.setRank(row.rank());
+        }
+        if (isNewMember || member.getPasswordHash() == null || member.getPasswordHash().isBlank()) {
+            member.setPasswordHash(row.passwordHash());
+        }
+        if (isNewMember || member.getProfileLastSyncedAt() == null) {
+            member.setProfileLastSyncedAt(row.profileLastSyncedAt());
+        }
         if (member.getCreatedAt() == null) {
             member.setCreatedAt(row.createdAt());
         }
-        member.setStaffRoles(resolveStaffRoles(row.position()));
+        if (isNewMember || member.getStaffRolesResolved().isEmpty()) {
+            member.setStaffRoles(resolveStaffRoles(row.position()));
+        }
 
         Member saved = memberRepository.save(member);
         if (saved.isMemberAccess()) {
@@ -596,6 +657,7 @@ public class DataSeeder {
         return LoanApplication.builder()
             .id(UUID.fromString(loanId))
             .saccoId(IAA_SACCO_ID)
+            .stationId(member.getStationId())
             .applicantMemberId(member.getId())
             .loanType(loanType)
             .amount(amount)

@@ -1,20 +1,25 @@
 package com.sacco.mvp.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -34,11 +39,18 @@ public class AdminService {
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
     private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
+    private static final int MAX_PRODUCT_VERSION_HISTORY = 3;
+    private static final int MAX_LOAN_PRODUCTS_VERSION_HISTORY = 3;
+    private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");
+    private static final DateTimeFormatter PRODUCT_VERSION_TIME_FORMATTER =
+        DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private final MemberRepository memberRepository;
     private final SavingsAccountRepository savingsAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
+    private final LoanProductVersionRepository loanProductVersionRepository;
+    private final LoanProductsVersionRepository loanProductsVersionRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final NotificationRepository notificationRepository;
     private final OutboxEventRepository outboxEventRepository;
@@ -54,17 +66,25 @@ public class AdminService {
     private final SaccoConfigurationService saccoConfigurationService;
     private final SaccoRegistryService saccoRegistryService;
     private final MinorAdminInvitationService minorAdminInvitationService;
+    private final ObjectMapper objectMapper;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
+        return dashboard(saccoId, null, adminId);
+    }
+
+    public AdminDashboard dashboard(String saccoId, String stationId, UUID adminId) {
         OffsetDateTime recentWindowStart = OffsetDateTime.now().minusDays(DASHBOARD_RECENT_WINDOW_DAYS);
-        List<Member> members = memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId);
-        List<LoanApplication> applications = loanApplicationRepository.findAll().stream()
+        List<Member> members = filterMembersByStation(memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId), stationId);
+        List<LoanApplication> applications = filterApplicationsByStation(loanApplicationRepository.findAll().stream()
             .filter(app -> saccoId.equals(app.getSaccoId()))
             .sorted(Comparator.comparing(LoanApplication::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-            .toList();
+            .toList(), stationId);
         List<OutboxEvent> failedEvents = outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus.FAILED);
         List<AuditLog> auditEntries = auditLogRepository.findTop100ByOrderByCreatedAtDesc();
-        List<AdminIncident> incidents = adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
+        List<AdminIncident> incidents = filterIncidentsByStation(
+            adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId),
+            stationId
+        );
 
         Map<MemberStatus, Long> memberCounts = members.stream()
             .collect(Collectors.groupingBy(Member::getStatus, () -> new EnumMap<>(MemberStatus.class), Collectors.counting()));
@@ -101,41 +121,41 @@ public class AdminService {
     }
 
     public List<UserAccessView> users(String saccoId) {
+        return users(saccoId, null);
+    }
+
+    public List<UserAccessView> users(String saccoId, String stationId) {
         List<UserAccessView> users = new java.util.ArrayList<>();
-        memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId)
-            .forEach(member -> users.add(UserAccessView.builder()
-                .accountId(member.getId())
-                .loginId(member.getMemberNo())
-                .fullName(member.getFullName())
-                .email(member.getEmail())
-                .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
-                .staffRoles(member.getStaffRolesResolved())
-                .status(member.getStatus())
-                .membershipLabel(resolveMembershipLabel(member))
-                .build()));
+        scopedUserAccessMembers(saccoId, stationId)
+            .forEach(member -> users.add(toUserAccessView(member)));
         users.sort(Comparator.comparing(UserAccessView::getFullName, String.CASE_INSENSITIVE_ORDER));
         return users;
     }
 
     public Page<UserAccessView> usersPage(String saccoId, String query, int page, int size) {
+        return usersPage(saccoId, null, query, page, size);
+    }
+
+    public Page<UserAccessView> usersPage(String saccoId, String stationId, String query, int page, int size) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? DEFAULT_USER_PAGE_SIZE : Math.min(size, MAX_USER_PAGE_SIZE);
+        if (stationId != null && !stationId.isBlank()) {
+            List<UserAccessView> filtered = scopedUserAccessMembers(saccoId, stationId).stream()
+                .filter(member -> matchesUserDirectoryQuery(member, normalizedQuery))
+                .map(this::toUserAccessView)
+                .toList();
+            int fromIndex = Math.min(safePage * safeSize, filtered.size());
+            int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+            return new PageImpl<>(filtered.subList(fromIndex, toIndex), PageRequest.of(safePage, safeSize), filtered.size());
+        }
         return memberRepository.findUserAccessPage(saccoId, normalizedQuery, PageRequest.of(safePage, safeSize))
-            .map(member -> UserAccessView.builder()
-                .accountId(member.getId())
-                .loginId(member.getMemberNo())
-                .fullName(member.getFullName())
-                .email(member.getEmail())
-                .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
-                .staffRoles(member.getStaffRolesResolved())
-                .status(member.getStatus())
-                .membershipLabel(resolveMembershipLabel(member))
-                .build());
+            .map(this::toUserAccessView);
     }
 
     @Transactional
     public Member createUser(String saccoId,
+                             String stationId,
                              UUID adminId,
                              Set<Position> actorRoles,
                              String memberNo,
@@ -146,7 +166,7 @@ public class AdminService {
         LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
         return createStaffAccount(
             saccoId,
-            null,
+            normalizeOptional(stationId),
             adminId,
             memberNo,
             fullName,
@@ -341,10 +361,17 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateUser(String saccoId, UUID adminId, Set<Position> actorRoles, UUID accountId, List<Position> positions, MemberStatus status) {
+    public void updateUser(String saccoId, String stationId, UUID adminId, Set<Position> actorRoles, UUID accountId, List<Position> positions, MemberStatus status) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        if (!saccoId.equals(member.getSaccoId())) {
+        String normalizedStationId = normalizeOptional(stationId);
+        boolean sameSacco = saccoId.equals(member.getSaccoId());
+        boolean sameStation = normalizedStationId == null
+            || normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId()));
+        if (normalizedStationId != null && !sameStation) {
+            throw new IllegalArgumentException("Member not found in this station.");
+        }
+        if (!sameSacco && normalizedStationId == null) {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
         boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
@@ -363,6 +390,15 @@ public class AdminService {
 
         Map<String, Object> before = snapshotMember(member);
         Position previousPosition = member.getPosition();
+        if (!sameSacco && sameStation) {
+            // Some legacy station users are still attached to an older SACCO id even though
+            // the current workspace already manages that station. Re-scope them when an
+            // admin updates their access so the saved role aligns with the visible slice.
+            member.setSaccoId(saccoId);
+        }
+        if (normalizedStationId != null) {
+            member.setStationId(normalizedStationId);
+        }
         member.setPosition(primaryRole);
         member.setStaffRoles(staffRoles);
         member.setMemberAccount(memberAccess);
@@ -382,7 +418,67 @@ public class AdminService {
     public List<LoanProductSetting> loanProducts(String saccoId) {
         saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
         return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
-            .sorted(Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .toList();
+    }
+
+    public Map<UUID, List<LoanProductVersionView>> loanProductVersions(String saccoId) {
+        List<LoanProductSetting> products = loanProducts(saccoId);
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> productIds = products.stream()
+            .map(LoanProductSetting::getId)
+            .toList();
+        List<LoanProductVersion> versions = loanProductVersionRepository.findByLoanProductSettingIdInOrderByCreatedAtDesc(productIds);
+        Map<UUID, String> actorNames = memberRepository.findAllById(
+                versions.stream()
+                    .map(LoanProductVersion::getCreatedByMemberId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+
+        Map<UUID, List<LoanProductVersionView>> versionsByProduct = new LinkedHashMap<>();
+        versions.forEach(version -> {
+            if (!saccoId.equals(version.getSaccoId())) {
+                return;
+            }
+            List<LoanProductVersionView> views = versionsByProduct.computeIfAbsent(
+                version.getLoanProductSettingId(),
+                ignored -> new java.util.ArrayList<>()
+            );
+            if (views.size() >= MAX_PRODUCT_VERSION_HISTORY) {
+                return;
+            }
+            LoanProductSnapshot snapshot = parseLoanProductSnapshot(version.getSnapshotJson());
+            views.add(toLoanProductVersionView(version, snapshot, actorNames.get(version.getCreatedByMemberId())));
+        });
+
+        products.forEach(product -> versionsByProduct.computeIfAbsent(product.getId(), ignored -> List.of()));
+        return versionsByProduct;
+    }
+
+    public List<LoanProductsVersionView> loanProductsVersionHistory(String saccoId) {
+        List<LoanProductsVersion> versions = loanProductsVersionRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
+        if (versions.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> actorNames = memberRepository.findAllById(
+                versions.stream()
+                    .map(LoanProductsVersion::getCreatedByMemberId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+
+        return versions.stream()
+            .limit(MAX_LOAN_PRODUCTS_VERSION_HISTORY)
+            .map(version -> toLoanProductsVersionView(
+                version,
+                parseLoanProductsSnapshot(version.getSnapshotJson()),
+                actorNames.get(version.getCreatedByMemberId())
+            ))
             .toList();
     }
 
@@ -399,10 +495,47 @@ public class AdminService {
         return roleDirectoryService.activeByRole(saccoId, Position.BOARD).size();
     }
 
+    public int activeLoanOfficerCount(String saccoId) {
+        return roleDirectoryService.activeByRole(saccoId, Position.LOAN_OFFICER).size();
+    }
+
+    public int activeAccountantCount(String saccoId) {
+        return roleDirectoryService.activeByRole(saccoId, Position.ACCOUNTANT).size();
+    }
+
+    public int activeDisbursementOfficerCount(String saccoId) {
+        return roleDirectoryService.activeByRole(saccoId, Position.DISBURSEMENT_OFFICER).size();
+    }
+
     @Transactional
-    public void updateLoanProduct(String saccoId, UUID adminId, UUID productId, Integer guarantorsRequired,
-                                  String productName, BigDecimal ratio, BigDecimal insuranceRate, BigDecimal interestRate,
-                                  Integer maxRepaymentMonths, boolean active) {
+    public void updateLoanProduct(String saccoId,
+                                  UUID adminId,
+                                  UUID productId,
+                                  String productCode,
+                                  String productName,
+                                  String productDescription,
+                                  Integer displayOrder,
+                                  BigDecimal minimumAmount,
+                                  BigDecimal maximumAmount,
+                                  Integer guarantorsRequired,
+                                  BigDecimal ratio,
+                                  BigDecimal insuranceRate,
+                                  BigDecimal annualRate,
+                                  InterestMethod interestMethod,
+                                  Integer minRepaymentMonths,
+                                  Integer maxRepaymentMonths,
+                                  boolean allowApplicationWithActiveLoan,
+                                  boolean freshFinancialDataRequired,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  ApprovalWorkflowStage workflowStartStage,
+                                  boolean committeeReviewRequired,
+                                  Integer committeePriority,
+                                  Integer committeeMinimumVotes,
+                                  Integer committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  Integer accountantPriority,
+                                  LoanProductStatus productStatus) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
         if (!saccoId.equals(product.getSaccoId())) {
@@ -410,63 +543,213 @@ public class AdminService {
         }
 
         Map<String, Object> before = snapshotProduct(product);
+        saveLoanProductSnapshot(product, adminId, "BEFORE_UPDATE");
+        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_UPDATE");
+        product.setProductCode(normalizeProductCode(saccoId, product.getLoanType(), productCode, product.getId(), productName));
         product.setProductName(normalizeProductName(product.getLoanType(), productName));
-        product.setGuarantorsRequired(guarantorsRequired);
-        product.setMaxLoanSavingsRatio(ratio);
-        product.setInsuranceRate(insuranceRate);
-        product.setInterestRate(interestRate);
-        product.setMaxRepaymentMonths(maxRepaymentMonths);
-        product.setActive(active);
+        product.setProductDescription(normalizeProductDescription(productDescription));
+        product.setDisplayOrder(normalizeDisplayOrder(displayOrder));
+        product.setMinimumAmount(normalizeMinimumAmount(minimumAmount));
+        product.setMaximumAmount(normalizeMaximumAmount(product.getMinimumAmount(), maximumAmount));
+        product.setGuarantorsRequired(normalizeGuarantorCount(guarantorsRequired));
+        product.setMaxLoanSavingsRatio(normalizeRatio(ratio));
+        product.setInsuranceRate(normalizeInsuranceRate(insuranceRate));
+        product.setInterestRate(normalizeAnnualRate(annualRate));
+        product.setInterestMethod(normalizeInterestMethod(interestMethod));
+        product.setMinRepaymentMonths(normalizeMinimumRepaymentMonths(minRepaymentMonths));
+        product.setMaxRepaymentMonths(normalizeMaximumRepaymentMonths(product.getMinimumRepaymentMonths(), maxRepaymentMonths));
+        product.setAllowApplicationWithActiveLoan(allowApplicationWithActiveLoan);
+        product.setFreshFinancialDataRequired(freshFinancialDataRequired);
+        validateWorkflowConfiguration(
+            saccoId,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority
+        );
+        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired, committeeReviewRequired);
+        product.setManagerReviewRequired(normalizedManagerReviewRequired);
+        product.setLoanOfficerReviewRequired(loanOfficerReviewRequired);
+        product.setWorkflowStartStage(normalizeWorkflowStartStage(workflowStartStage, loanOfficerReviewRequired));
+        product.setCommitteeReviewRequired(committeeReviewRequired);
+        product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, committeePriority, 3));
+        product.setCommitteeMinimumVotes(normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes));
+        product.setCommitteeApprovalThreshold(normalizeCommitteeApprovalThreshold(
+            committeeReviewRequired,
+            product.getCommitteeMinimumVotes(),
+            committeeApprovalThreshold
+        ));
+        product.setAccountantReviewRequired(accountantReviewRequired);
+        product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, accountantPriority, 4));
+        validateCommitteeConfiguration(saccoId, product.getCommitteeMinimumVotes(), product.getCommitteeApprovalThreshold(), committeeReviewRequired);
+        LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
+        product.setProductStatus(normalizedStatus);
+        product.setActive(normalizedStatus == LoanProductStatus.ACTIVE);
         product.setUpdatedAt(OffsetDateTime.now());
         loanProductSettingRepository.save(product);
         auditService.log("LOAN_PRODUCT", productId, "ADMIN_UPDATE_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
     }
 
     @Transactional
+    public void rollbackLoanProductVersion(String saccoId, UUID adminId, UUID productId, UUID versionId) {
+        LoanProductSetting product = loanProductSettingRepository.findById(productId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
+        if (!saccoId.equals(product.getSaccoId())) {
+            throw new IllegalArgumentException("Loan product not found in this SACCO");
+        }
+
+        LoanProductVersion version = loanProductVersionRepository.findById(versionId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan product version not found."));
+        if (!productId.equals(version.getLoanProductSettingId()) || !saccoId.equals(version.getSaccoId())) {
+            throw new IllegalArgumentException("Loan product version not found in this SACCO.");
+        }
+
+        Map<String, Object> before = snapshotProduct(product);
+        saveLoanProductSnapshot(product, adminId, "BEFORE_ROLLBACK");
+        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_ROLLBACK");
+        applyLoanProductSnapshot(product, parseLoanProductSnapshot(version.getSnapshotJson()));
+        product.setUpdatedAt(OffsetDateTime.now());
+        loanProductSettingRepository.save(product);
+        auditService.log("LOAN_PRODUCT", productId, "ADMIN_ROLLBACK_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
+    }
+
+    @Transactional
     public void createCustomizedLoanProduct(String saccoId,
                                             UUID adminId,
+                                            String productCode,
                                             String productName,
+                                            String productDescription,
+                                            Integer displayOrder,
+                                            BigDecimal minimumAmount,
+                                            BigDecimal maximumAmount,
                                             Integer guarantorsRequired,
                                             BigDecimal ratio,
                                             BigDecimal insuranceRate,
-                                            BigDecimal interestRate,
+                                            BigDecimal annualRate,
+                                            InterestMethod interestMethod,
+                                            Integer minRepaymentMonths,
                                             Integer maxRepaymentMonths,
-                                            boolean active) {
+                                            boolean allowApplicationWithActiveLoan,
+                                            boolean freshFinancialDataRequired,
+                                            boolean managerReviewRequired,
+                                            boolean loanOfficerReviewRequired,
+                                            ApprovalWorkflowStage workflowStartStage,
+                                            boolean committeeReviewRequired,
+                                            Integer committeePriority,
+                                            Integer committeeMinimumVotes,
+                                            Integer committeeApprovalThreshold,
+                                            boolean accountantReviewRequired,
+                                            Integer accountantPriority,
+                                            LoanProductStatus productStatus) {
+        LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
+        Integer normalizedCommitteeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes);
+        Integer normalizedCommitteeApprovalThreshold = normalizeCommitteeApprovalThreshold(
+            committeeReviewRequired,
+            normalizedCommitteeMinimumVotes,
+            committeeApprovalThreshold
+        );
+        validateWorkflowConfiguration(
+            saccoId,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            committeeReviewRequired,
+            committeePriority,
+            normalizedCommitteeMinimumVotes,
+            normalizedCommitteeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority
+        );
+        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired, committeeReviewRequired);
+        validateCommitteeConfiguration(saccoId, normalizedCommitteeMinimumVotes, normalizedCommitteeApprovalThreshold, committeeReviewRequired);
+        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_CREATE");
         LoanProductSetting product = saccoConfigurationService.createLoanProduct(
             saccoId,
             LoanType.CUSTOMIZED_LOAN,
+            normalizeProductCode(saccoId, LoanType.CUSTOMIZED_LOAN, productCode, null, productName),
             normalizeProductName(LoanType.CUSTOMIZED_LOAN, productName),
-            guarantorsRequired,
-            ratio,
-            insuranceRate,
-            interestRate,
-            maxRepaymentMonths,
-            active
+            normalizeProductDescription(productDescription),
+            normalizeDisplayOrder(displayOrder),
+            normalizeMinimumAmount(minimumAmount),
+            normalizeMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
+            normalizeGuarantorCount(guarantorsRequired),
+            normalizeRatio(ratio),
+            normalizeInsuranceRate(insuranceRate),
+            normalizeAnnualRate(annualRate),
+            normalizeInterestMethod(interestMethod),
+            normalizeMinimumRepaymentMonths(minRepaymentMonths),
+            normalizeMaximumRepaymentMonths(normalizeMinimumRepaymentMonths(minRepaymentMonths), maxRepaymentMonths),
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            normalizedManagerReviewRequired,
+            loanOfficerReviewRequired,
+            normalizeWorkflowStartStage(workflowStartStage, loanOfficerReviewRequired),
+            committeeReviewRequired,
+            normalizeStagePriority(committeeReviewRequired, committeePriority, 3),
+            normalizedCommitteeMinimumVotes,
+            normalizedCommitteeApprovalThreshold,
+            accountantReviewRequired,
+            normalizeStagePriority(accountantReviewRequired, accountantPriority, 4),
+            normalizedStatus,
+            normalizedStatus == LoanProductStatus.ACTIVE
         );
         auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_CUSTOMIZED_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
     }
 
     @Transactional
-    public void updateBoardReviewRequirement(String saccoId, UUID adminId, Integer boardQuorum) {
+    public void updateLoanApplicationFee(String saccoId, UUID adminId, BigDecimal applicationFee) {
         SaccoSettings settings = settings(saccoId);
-        int requiredReviewers = boardQuorum == null ? 0 : boardQuorum;
-        int activeBoardMembers = activeBoardMemberCount(saccoId);
+        Map<String, Object> before = snapshotSettings(settings);
+        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_GLOBAL_LOAN_SETTINGS_UPDATE");
+        settings.setApplicationFee(normalizeApplicationFee(applicationFee));
+        settings.setUpdatedAt(OffsetDateTime.now());
+        saccoSettingsRepository.save(settings);
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_LOAN_APPLICATION_FEE", adminId, before, snapshotSettings(settings));
+    }
 
-        if (requiredReviewers <= 0) {
-            throw new IllegalArgumentException("Required board reviewers must be at least 1.");
+    @Transactional
+    public void updateBoardReviewRequirement(String saccoId,
+                                             UUID adminId,
+                                             boolean loanOfficerReviewRequired,
+                                             boolean boardReviewRequired,
+                                             Integer boardQuorum) {
+        SaccoSettings settings = settings(saccoId);
+        int activeBoardMembers = activeBoardMemberCount(saccoId);
+        int activeAccountants = activeAccountantCount(saccoId);
+        int activeDisbursementOfficers = activeDisbursementOfficerCount(saccoId);
+        int requiredReviewers = boardQuorum == null
+            ? Math.max(settings.getBoardQuorum() == null ? 1 : settings.getBoardQuorum(), 1)
+            : boardQuorum;
+        if (boardReviewRequired) {
+            if (requiredReviewers <= 0) {
+                throw new IllegalArgumentException("Required board reviewers must be at least 1.");
+            }
+            if (activeBoardMembers <= 0) {
+                throw new IllegalArgumentException("No active board members are configured for this SACCO yet.");
+            }
+            if (requiredReviewers > activeBoardMembers) {
+                throw new IllegalArgumentException("Required board reviewers cannot be more than the active board members in this SACCO.");
+            }
         }
-        if (activeBoardMembers <= 0) {
-            throw new IllegalArgumentException("No active board members are configured for this SACCO yet.");
+        if (activeAccountants <= 0) {
+            throw new IllegalArgumentException("Add at least one active Accountant before saving the approval flow.");
         }
-        if (requiredReviewers > activeBoardMembers) {
-            throw new IllegalArgumentException("Required board reviewers cannot be more than the active board members in this SACCO.");
+        if (activeDisbursementOfficers <= 0) {
+            throw new IllegalArgumentException("Add at least one active Disbursement Officer before saving the approval flow.");
         }
 
         Map<String, Object> before = snapshotSettings(settings);
+        settings.setLoanOfficerReviewRequired(loanOfficerReviewRequired);
+        settings.setBoardReviewRequired(boardReviewRequired);
         settings.setBoardQuorum(requiredReviewers);
         settings.setUpdatedAt(OffsetDateTime.now());
         saccoSettingsRepository.save(settings);
-        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_BOARD_REVIEW_REQUIREMENT", adminId, before, snapshotSettings(settings));
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_APPROVAL_FLOW_CONFIGURATION", adminId, before, snapshotSettings(settings));
     }
 
     public List<NotificationViewService.NotificationView> adminMessages(UUID adminId) {
@@ -476,6 +759,11 @@ public class AdminService {
     }
 
     public Map<UUID, AdminIncident> adminMessageIncidentMap(List<NotificationViewService.NotificationView> messages) {
+        return adminMessageIncidentMap(messages, null);
+    }
+
+    public Map<UUID, AdminIncident> adminMessageIncidentMap(List<NotificationViewService.NotificationView> messages,
+                                                            String stationId) {
         if (messages == null || messages.isEmpty()) {
             return Map.of();
         }
@@ -487,26 +775,47 @@ public class AdminService {
         if (incidentIds.isEmpty()) {
             return Map.of();
         }
-        return adminIncidentRepository.findAllById(incidentIds).stream()
+        return filterIncidentsByStation(adminIncidentRepository.findAllById(incidentIds), stationId).stream()
             .collect(Collectors.toMap(AdminIncident::getId, incident -> incident, (left, right) -> left, LinkedHashMap::new));
     }
 
     public List<Member> activeMembers(String saccoId) {
-        return memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE);
+        return activeMembers(saccoId, null);
+    }
+
+    public List<Member> activeMembers(String saccoId, String stationId) {
+        return filterMembersByStation(
+            memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE),
+            stationId
+        );
     }
 
     public List<AdminIncident> incidents(String saccoId, IncidentStatus status, IncidentSeverity severity) {
-        return adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId).stream()
+        return incidents(saccoId, null, status, severity);
+    }
+
+    public List<AdminIncident> incidents(String saccoId,
+                                         String stationId,
+                                         IncidentStatus status,
+                                         IncidentSeverity severity) {
+        return filterIncidentsByStation(adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId), stationId).stream()
             .filter(item -> status == null || item.getStatus() == status)
             .filter(item -> severity == null || item.getSeverity() == severity)
             .toList();
     }
 
     public AdminIncident incident(String saccoId, UUID incidentId) {
+        return incident(saccoId, null, incidentId);
+    }
+
+    public AdminIncident incident(String saccoId, String stationId, UUID incidentId) {
         AdminIncident incident = adminIncidentRepository.findById(incidentId)
             .orElseThrow(() -> new IllegalArgumentException("Incident not found"));
         if (incident.getSaccoId() != null && !saccoId.equals(incident.getSaccoId())) {
             throw new IllegalArgumentException("Incident not found in this SACCO");
+        }
+        if (!filterIncidentsByStation(List.of(incident), stationId).contains(incident)) {
+            throw new IllegalArgumentException("Incident not found in this station");
         }
         return incident;
     }
@@ -514,7 +823,13 @@ public class AdminService {
     @Transactional
     public void updateIncident(String saccoId, UUID adminId, UUID incidentId, IncidentSeverity severity,
                                IncidentStatus status, String resolutionNote) {
-        AdminIncident incident = incident(saccoId, incidentId);
+        updateIncident(saccoId, null, adminId, incidentId, severity, status, resolutionNote);
+    }
+
+    @Transactional
+    public void updateIncident(String saccoId, String stationId, UUID adminId, UUID incidentId, IncidentSeverity severity,
+                               IncidentStatus status, String resolutionNote) {
+        AdminIncident incident = incident(saccoId, stationId, incidentId);
         Map<String, Object> before = snapshotIncident(incident);
         incident.setSeverity(severity);
         incident.setStatus(status);
@@ -533,9 +848,14 @@ public class AdminService {
 
     @Transactional
     public void broadcast(String saccoId, UUID adminId, String subject, String message) {
+        broadcast(saccoId, null, adminId, subject, message);
+    }
+
+    @Transactional
+    public void broadcast(String saccoId, String stationId, UUID adminId, String subject, String message) {
         Member admin = memberRepository.findById(adminId)
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
-        List<Member> recipients = memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE);
+        List<Member> recipients = activeMembers(saccoId, stationId);
         OffsetDateTime now = OffsetDateTime.now();
         for (Member recipient : recipients) {
             createNotification(recipient.getId(), "ADMIN_BROADCAST", "Admin Broadcast", subject, message,
@@ -547,12 +867,22 @@ public class AdminService {
 
     @Transactional
     public void replyToMember(String saccoId, UUID adminId, UUID memberId, String subject, String message) {
+        replyToMember(saccoId, null, adminId, memberId, subject, message);
+    }
+
+    @Transactional
+    public void replyToMember(String saccoId, String stationId, UUID adminId, UUID memberId, String subject, String message) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Recipient member not found"));
         Member admin = memberRepository.findById(adminId)
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
         if (!saccoId.equals(member.getSaccoId())) {
             throw new IllegalArgumentException("Recipient member not found in this SACCO");
+        }
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId != null
+            && !normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId()))) {
+            throw new IllegalArgumentException("Recipient member not found in this station");
         }
 
         createNotification(memberId, "ADMIN_REPLY", "Admin Reply", subject, message, adminId, admin.getFullName(),
@@ -684,6 +1014,7 @@ public class AdminService {
 
     private Map<String, Object> snapshotMember(Member member) {
         Map<String, Object> data = new LinkedHashMap<>();
+        data.put("saccoId", member.getSaccoId());
         data.put("memberNo", member.getMemberNo());
         data.put("fullName", member.getFullName());
         data.put("stationId", member.getStationId());
@@ -730,6 +1061,93 @@ public class AdminService {
             return "Staff";
         }
         return member.getStaffRolesResolved().isEmpty() ? "Member" : "Staff And Member";
+    }
+
+    private List<Member> filterMembersByStation(List<Member> members, String stationId) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            return members;
+        }
+        return members.stream()
+            .filter(member -> normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId())))
+            .toList();
+    }
+
+    private List<LoanApplication> filterApplicationsByStation(List<LoanApplication> applications,
+                                                              String stationId) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            return applications;
+        }
+        return applications.stream()
+            .filter(app -> normalizedStationId.equalsIgnoreCase(normalizeOptional(app.getStationId())))
+            .toList();
+    }
+
+    private List<Member> scopedUserAccessMembers(String saccoId, String stationId) {
+        List<Member> saccoMembers = memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            return saccoMembers;
+        }
+
+        List<Member> stationMembers = filterMembersByStation(saccoMembers, normalizedStationId);
+        List<Member> stationWideMatches = memberRepository.findByStationIdIgnoreCaseOrderByFullNameAsc(normalizedStationId);
+        if (stationWideMatches.isEmpty()) {
+            return stationMembers;
+        }
+
+        // Historical user records can remain attached to an earlier SACCO id while the
+        // active workspace is already operating on the selected station. Merge the
+        // current station slice so Minor Admins still see the users they manage there.
+        Map<UUID, Member> mergedById = new LinkedHashMap<>();
+        stationMembers.forEach(member -> mergedById.put(member.getId(), member));
+        stationWideMatches.forEach(member -> mergedById.putIfAbsent(member.getId(), member));
+        return mergedById.values().stream()
+            .sorted(Comparator.comparing(Member::getFullName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+            .toList();
+    }
+
+    private boolean matchesUserDirectoryQuery(Member member, String normalizedQuery) {
+        return normalizedQuery == null
+            || normalizedQuery.isBlank()
+            || lower(member.getEmail()).contains(normalizedQuery)
+            || lower(member.getMemberNo()).contains(normalizedQuery);
+    }
+
+    private List<AdminIncident> filterIncidentsByStation(List<AdminIncident> incidents, String stationId) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null || incidents == null || incidents.isEmpty()) {
+            return incidents;
+        }
+        Map<UUID, String> stationByReporterId = memberRepository.findAllById(
+                incidents.stream()
+                    .map(AdminIncident::getReportedByMemberId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, member -> normalizeOptional(member.getStationId()), (left, right) -> left));
+        return incidents.stream()
+            .filter(incident -> incident.getReportedByMemberId() == null
+                || normalizedStationId.equalsIgnoreCase(stationByReporterId.get(incident.getReportedByMemberId())))
+            .toList();
+    }
+
+    private UserAccessView toUserAccessView(Member member) {
+        return UserAccessView.builder()
+            .accountId(member.getId())
+            .loginId(member.getMemberNo())
+            .fullName(member.getFullName())
+            .email(member.getEmail())
+            .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
+            .staffRoles(member.getStaffRolesResolved())
+            .status(member.getStatus())
+            .membershipLabel(resolveMembershipLabel(member))
+            .build();
+    }
+
+    private String lower(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private int nextRank(String saccoId, Position position) {
@@ -861,16 +1279,274 @@ public class AdminService {
 
     private String normalizeProductName(LoanType loanType, String productName) {
         String normalized = normalizeOptional(productName);
-        if (loanType != LoanType.CUSTOMIZED_LOAN) {
-            return null;
-        }
         if (normalized == null) {
+            if (loanType != LoanType.CUSTOMIZED_LOAN) {
+                return null;
+            }
             throw new IllegalStateException("Enter the loan product name.");
         }
         if (normalized.length() > 120) {
             throw new IllegalStateException("Loan product name must be 120 characters or fewer.");
         }
         return normalized;
+    }
+
+    private String normalizeProductCode(String saccoId, LoanType loanType, String productCode, UUID existingId) {
+        return normalizeProductCode(saccoId, loanType, productCode, existingId, null);
+    }
+
+    private String normalizeProductCode(String saccoId,
+                                        LoanType loanType,
+                                        String productCode,
+                                        UUID existingId,
+                                        String productName) {
+        String normalized = normalizeOptional(productCode);
+        if (normalized == null) {
+            if (loanType != LoanType.CUSTOMIZED_LOAN) {
+                normalized = loanType.defaultProductCode();
+            } else {
+                normalized = generateProductCode(productName);
+                if (normalized == null) {
+                    throw new IllegalStateException("Enter the loan product name.");
+                }
+            }
+        }
+        normalized = normalized.toUpperCase().replace(' ', '_');
+        if (!normalized.matches("[A-Z0-9_-]{3,64}")) {
+            throw new IllegalStateException("Loan product code must be 3-64 characters using letters, numbers, hyphen, or underscore.");
+        }
+        boolean duplicate = existingId == null
+            ? loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCase(saccoId, normalized)
+            : loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot(saccoId, normalized, existingId);
+        if (duplicate) {
+            throw new IllegalStateException("That loan product code already exists in this SACCO.");
+        }
+        return normalized;
+    }
+
+    private String generateProductCode(String productName) {
+        String normalized = normalizeOptional(productName);
+        if (normalized == null) {
+            return null;
+        }
+        String generated = normalized
+            .toUpperCase()
+            .replaceAll("[^A-Z0-9]+", "_")
+            .replaceAll("^_+", "")
+            .replaceAll("_+$", "");
+        if (generated.length() < 3) {
+            return null;
+        }
+        return generated.length() > 64 ? generated.substring(0, 64) : generated;
+    }
+
+    private String normalizeProductDescription(String productDescription) {
+        String normalized = normalizeOptional(productDescription);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized.length() > 500) {
+            throw new IllegalStateException("Loan product description must be 500 characters or fewer.");
+        }
+        return normalized;
+    }
+
+    private Integer normalizeDisplayOrder(Integer displayOrder) {
+        if (displayOrder == null || displayOrder <= 0) {
+            throw new IllegalStateException("Display order must be at least 1.");
+        }
+        return displayOrder;
+    }
+
+    private BigDecimal normalizeMinimumAmount(BigDecimal minimumAmount) {
+        BigDecimal normalized = minimumAmount == null ? BigDecimal.ZERO : minimumAmount;
+        if (normalized.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Minimum amount cannot be negative.");
+        }
+        return normalized.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeMaximumAmount(BigDecimal minimumAmount, BigDecimal maximumAmount) {
+        if (maximumAmount == null) {
+            return null;
+        }
+        BigDecimal normalized = maximumAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        if (normalized.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Maximum amount must be greater than zero.");
+        }
+        if (minimumAmount != null && normalized.compareTo(minimumAmount) < 0) {
+            throw new IllegalStateException("Maximum amount cannot be lower than the minimum amount.");
+        }
+        return normalized;
+    }
+
+    private BigDecimal normalizeRatio(BigDecimal ratio) {
+        if (ratio == null || ratio.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Savings ratio must be greater than zero.");
+        }
+        return ratio.setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    private Integer normalizeGuarantorCount(Integer guarantorsRequired) {
+        if (guarantorsRequired == null || guarantorsRequired < 0) {
+            throw new IllegalStateException("Guarantors required cannot be negative.");
+        }
+        return guarantorsRequired;
+    }
+
+    private BigDecimal normalizeInsuranceRate(BigDecimal insuranceRate) {
+        if (insuranceRate == null || insuranceRate.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Insurance rate cannot be negative.");
+        }
+        return insuranceRate.setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeApplicationFee(BigDecimal applicationFee) {
+        if (applicationFee == null) {
+            return DEFAULT_APPLICATION_FEE.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        if (applicationFee.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Application fee cannot be negative.");
+        }
+        return applicationFee.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeAnnualRate(BigDecimal annualRate) {
+        if (annualRate == null || annualRate.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Annual interest rate cannot be negative.");
+        }
+        return annualRate.setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    private InterestMethod normalizeInterestMethod(InterestMethod interestMethod) {
+        return interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod;
+    }
+
+    private boolean normalizeManagerReviewRequired(boolean managerReviewRequired, boolean committeeReviewRequired) {
+        return committeeReviewRequired || managerReviewRequired;
+    }
+
+    private ApprovalWorkflowStage normalizeWorkflowStartStage(ApprovalWorkflowStage workflowStartStage,
+                                                              boolean loanOfficerReviewRequired) {
+        if (!loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.MANAGER;
+        }
+        return workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER
+            ? ApprovalWorkflowStage.LOAN_OFFICER
+            : ApprovalWorkflowStage.MANAGER;
+    }
+
+    private Integer normalizeStagePriority(boolean enabled, Integer priority, int fallbackPriority) {
+        if (!enabled) {
+            return fallbackPriority;
+        }
+        if (priority == null) {
+            return fallbackPriority;
+        }
+        if (priority != 3 && priority != 4) {
+            throw new IllegalStateException("Stage priority must be 3 or 4.");
+        }
+        return priority;
+    }
+
+    private void validateWorkflowConfiguration(String saccoId,
+                                               boolean managerReviewRequired,
+                                               boolean loanOfficerReviewRequired,
+                                               ApprovalWorkflowStage workflowStartStage,
+                                               boolean committeeReviewRequired,
+                                               Integer committeePriority,
+                                               Integer committeeMinimumVotes,
+                                               Integer committeeApprovalThreshold,
+                                               boolean accountantReviewRequired,
+                                               Integer accountantPriority) {
+        if (!managerReviewRequired && !committeeReviewRequired) {
+            throw new IllegalStateException("At least one approval step must be required: manager review or committee review.");
+        }
+        if (workflowStartStage != null
+            && workflowStartStage != ApprovalWorkflowStage.MANAGER
+            && workflowStartStage != ApprovalWorkflowStage.LOAN_OFFICER) {
+            throw new IllegalStateException("Workflow start stage must be Manager or Loan Officer.");
+        }
+        if (workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER && !loanOfficerReviewRequired) {
+            throw new IllegalStateException("Loan Officer must be enabled before it can be selected as the start stage.");
+        }
+        if (loanOfficerReviewRequired && activeLoanOfficerCount(saccoId) <= 0) {
+            throw new IllegalStateException("No active loan officers are configured for this SACCO yet.");
+        }
+        Integer normalizedCommitteePriority = normalizeStagePriority(committeeReviewRequired, committeePriority, 3);
+        Integer normalizedAccountantPriority = normalizeStagePriority(accountantReviewRequired, accountantPriority, 4);
+        if (committeeReviewRequired && accountantReviewRequired && normalizedCommitteePriority.equals(normalizedAccountantPriority)) {
+            throw new IllegalStateException("Committee and Accountant cannot share the same priority slot.");
+        }
+        if (committeeReviewRequired && committeeMinimumVotes != null && committeeApprovalThreshold != null
+            && committeeApprovalThreshold > committeeMinimumVotes) {
+            throw new IllegalStateException("Committee approval threshold cannot be greater than committee minimum votes.");
+        }
+    }
+
+    private Integer normalizeMinimumRepaymentMonths(Integer minRepaymentMonths) {
+        if (minRepaymentMonths == null || minRepaymentMonths <= 0) {
+            throw new IllegalStateException("Minimum repayment period must be at least 1 month.");
+        }
+        return minRepaymentMonths;
+    }
+
+    private Integer normalizeMaximumRepaymentMonths(Integer minRepaymentMonths, Integer maxRepaymentMonths) {
+        if (maxRepaymentMonths == null || maxRepaymentMonths <= 0) {
+            throw new IllegalStateException("Maximum repayment period must be at least 1 month.");
+        }
+        if (maxRepaymentMonths < minRepaymentMonths) {
+            throw new IllegalStateException("Maximum repayment period cannot be lower than the minimum repayment period.");
+        }
+        return maxRepaymentMonths;
+    }
+
+    private Integer normalizeCommitteeMinimumVotes(boolean committeeReviewRequired, Integer committeeMinimumVotes) {
+        if (!committeeReviewRequired) {
+            return 0;
+        }
+        if (committeeMinimumVotes == null || committeeMinimumVotes <= 0) {
+            throw new IllegalStateException("Committee minimum votes must be at least 1 when committee review is required.");
+        }
+        return committeeMinimumVotes;
+    }
+
+    private Integer normalizeCommitteeApprovalThreshold(boolean committeeReviewRequired,
+                                                        Integer committeeMinimumVotes,
+                                                        Integer committeeApprovalThreshold) {
+        if (!committeeReviewRequired) {
+            return 0;
+        }
+        if (committeeApprovalThreshold == null || committeeApprovalThreshold <= 0) {
+            throw new IllegalStateException("Committee approval threshold must be at least 1 when committee review is required.");
+        }
+        if (committeeApprovalThreshold > committeeMinimumVotes) {
+            throw new IllegalStateException("Committee approval threshold cannot be greater than committee minimum votes.");
+        }
+        return committeeApprovalThreshold;
+    }
+
+    private LoanProductStatus normalizeProductStatus(LoanProductStatus productStatus) {
+        return productStatus == null ? LoanProductStatus.ACTIVE : productStatus;
+    }
+
+    private void validateCommitteeConfiguration(String saccoId,
+                                                Integer committeeMinimumVotes,
+                                                Integer committeeApprovalThreshold,
+                                                boolean committeeReviewRequired) {
+        if (!committeeReviewRequired) {
+            return;
+        }
+        int activeBoardMembers = activeBoardMemberCount(saccoId);
+        if (activeBoardMembers <= 0) {
+            throw new IllegalStateException("No active board members are configured for this SACCO yet.");
+        }
+        if (committeeMinimumVotes != null && committeeMinimumVotes > activeBoardMembers) {
+            throw new IllegalStateException("Committee minimum votes cannot exceed the number of active board members.");
+        }
+        if (committeeApprovalThreshold != null && committeeApprovalThreshold > activeBoardMembers) {
+            throw new IllegalStateException("Committee approval threshold cannot exceed the number of active board members.");
+        }
     }
 
     private void ensureUserSettings(UUID memberId, OffsetDateTime now) {
@@ -930,17 +1606,289 @@ public class AdminService {
             .build());
     }
 
+    private void saveLoanProductSnapshot(LoanProductSetting product, UUID actorMemberId, String snapshotType) {
+        LoanProductSnapshot snapshot = LoanProductSnapshot.fromProduct(product);
+        int nextVersionNumber = loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(product.getId())
+            .map(existing -> existing.getVersionNumber() + 1)
+            .orElse(1);
+        loanProductVersionRepository.save(LoanProductVersion.builder()
+            .id(UUID.randomUUID())
+            .loanProductSettingId(product.getId())
+            .saccoId(product.getSaccoId())
+            .versionNumber(nextVersionNumber)
+            .snapshotType(snapshotType)
+            .snapshotJson(writeLoanProductSnapshot(snapshot))
+            .createdByMemberId(actorMemberId)
+            .createdAt(OffsetDateTime.now())
+            .build());
+    }
+
+    private void saveLoanProductsSnapshot(String saccoId, UUID actorMemberId, String snapshotType) {
+        LoanProductsSnapshot snapshot = buildLoanProductsSnapshot(saccoId);
+        int nextVersionNumber = loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc(saccoId)
+            .map(existing -> existing.getVersionNumber() + 1)
+            .orElse(1);
+        loanProductsVersionRepository.save(LoanProductsVersion.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .versionNumber(nextVersionNumber)
+            .snapshotType(snapshotType)
+            .snapshotJson(writeLoanProductsSnapshot(snapshot))
+            .createdByMemberId(actorMemberId)
+            .createdAt(OffsetDateTime.now())
+            .build());
+    }
+
+    private String writeLoanProductSnapshot(LoanProductSnapshot snapshot) {
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to save loan product version snapshot.", ex);
+        }
+    }
+
+    private String writeLoanProductsSnapshot(LoanProductsSnapshot snapshot) {
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to save loan products version snapshot.", ex);
+        }
+    }
+
+    private LoanProductSnapshot parseLoanProductSnapshot(String snapshotJson) {
+        try {
+            return objectMapper.readValue(snapshotJson, LoanProductSnapshot.class);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to read loan product version snapshot.", ex);
+        }
+    }
+
+    private LoanProductsSnapshot parseLoanProductsSnapshot(String snapshotJson) {
+        try {
+            return objectMapper.readValue(snapshotJson, LoanProductsSnapshot.class);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to read loan products version snapshot.", ex);
+        }
+    }
+
+    private LoanProductsSnapshot buildLoanProductsSnapshot(String saccoId) {
+        List<LoanProductSnapshot> products = loanProducts(saccoId).stream()
+            .map(LoanProductSnapshot::fromProduct)
+            .toList();
+        return new LoanProductsSnapshot(settings(saccoId).getResolvedApplicationFee(), products);
+    }
+
+    private void applyLoanProductSnapshot(LoanProductSetting product, LoanProductSnapshot snapshot) {
+        product.setProductCode(normalizeProductCode(product.getSaccoId(), product.getLoanType(), snapshot.productCode(), product.getId()));
+        product.setProductName(normalizeProductName(product.getLoanType(), snapshot.productName()));
+        product.setProductDescription(normalizeProductDescription(snapshot.productDescription()));
+        product.setDisplayOrder(normalizeDisplayOrder(snapshot.displayOrder()));
+        BigDecimal normalizedMinimumAmount = normalizeMinimumAmount(snapshot.minimumAmount());
+        product.setMinimumAmount(normalizedMinimumAmount);
+        product.setMaximumAmount(normalizeMaximumAmount(normalizedMinimumAmount, snapshot.maximumAmount()));
+        product.setGuarantorsRequired(normalizeGuarantorCount(snapshot.guarantorsRequired()));
+        product.setMaxLoanSavingsRatio(normalizeRatio(snapshot.maxLoanSavingsRatio()));
+        product.setInsuranceRate(normalizeInsuranceRate(snapshot.insuranceRate()));
+        product.setInterestRate(normalizeAnnualRate(snapshot.interestRate()));
+        product.setInterestMethod(normalizeInterestMethod(snapshot.interestMethod()));
+        int minRepaymentMonths = normalizeMinimumRepaymentMonths(snapshot.minRepaymentMonths());
+        product.setMinRepaymentMonths(minRepaymentMonths);
+        product.setMaxRepaymentMonths(normalizeMaximumRepaymentMonths(minRepaymentMonths, snapshot.maxRepaymentMonths()));
+        product.setAllowApplicationWithActiveLoan(Boolean.TRUE.equals(snapshot.allowApplicationWithActiveLoan()));
+        product.setFreshFinancialDataRequired(Boolean.TRUE.equals(snapshot.freshFinancialDataRequired()));
+        validateWorkflowConfiguration(
+            product.getSaccoId(),
+            Boolean.TRUE.equals(snapshot.managerReviewRequired()),
+            Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()),
+            snapshot.workflowStartStage(),
+            Boolean.TRUE.equals(snapshot.committeeReviewRequired()),
+            snapshot.committeePriority(),
+            snapshot.committeeMinimumVotes(),
+            snapshot.committeeApprovalThreshold(),
+            !Boolean.FALSE.equals(snapshot.accountantReviewRequired()),
+            snapshot.accountantPriority()
+        );
+        boolean managerReviewRequired = normalizeManagerReviewRequired(
+            Boolean.TRUE.equals(snapshot.managerReviewRequired()),
+            Boolean.TRUE.equals(snapshot.committeeReviewRequired())
+        );
+        boolean committeeReviewRequired = Boolean.TRUE.equals(snapshot.committeeReviewRequired());
+        product.setManagerReviewRequired(managerReviewRequired);
+        product.setLoanOfficerReviewRequired(Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
+        product.setWorkflowStartStage(normalizeWorkflowStartStage(snapshot.workflowStartStage(), Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired())));
+        product.setCommitteeReviewRequired(committeeReviewRequired);
+        product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, snapshot.committeePriority(), 3));
+        Integer committeeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, snapshot.committeeMinimumVotes());
+        Integer committeeApprovalThreshold = normalizeCommitteeApprovalThreshold(
+            committeeReviewRequired,
+            committeeMinimumVotes,
+            snapshot.committeeApprovalThreshold()
+        );
+        validateCommitteeConfiguration(product.getSaccoId(), committeeMinimumVotes, committeeApprovalThreshold, committeeReviewRequired);
+        product.setCommitteeMinimumVotes(committeeMinimumVotes);
+        product.setCommitteeApprovalThreshold(committeeApprovalThreshold);
+        boolean accountantReviewRequired = !Boolean.FALSE.equals(snapshot.accountantReviewRequired());
+        product.setAccountantReviewRequired(accountantReviewRequired);
+        product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, snapshot.accountantPriority(), 4));
+        LoanProductStatus normalizedStatus = normalizeProductStatus(snapshot.productStatus());
+        product.setProductStatus(normalizedStatus);
+        product.setActive(normalizedStatus == LoanProductStatus.ACTIVE);
+    }
+
     private Map<String, Object> snapshotProduct(LoanProductSetting product) {
+        LoanProductSnapshot snapshot = LoanProductSnapshot.fromProduct(product);
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("loanType", product.getLoanType());
-        data.put("productName", product.getProductName());
-        data.put("guarantorsRequired", product.getGuarantorsRequired());
-        data.put("ratio", product.getMaxLoanSavingsRatio());
-        data.put("insuranceRate", product.getInsuranceRate());
-        data.put("interestRate", product.getInterestRate());
-        data.put("maxRepaymentMonths", product.getMaxRepaymentMonths());
+        data.put("loanType", snapshot.loanType());
+        data.put("productCode", resolveProductCode(snapshot));
+        data.put("productName", snapshot.productName());
+        data.put("productDescription", snapshot.productDescription());
+        data.put("displayOrder", snapshot.displayOrder());
+        data.put("minimumAmount", snapshot.minimumAmount());
+        data.put("maximumAmount", snapshot.maximumAmount());
+        data.put("guarantorsRequired", snapshot.guarantorsRequired());
+        data.put("ratio", snapshot.maxLoanSavingsRatio());
+        data.put("insuranceRate", snapshot.insuranceRate());
+        data.put("interestRate", snapshot.interestRate());
+        data.put("interestMethod", snapshot.interestMethod());
+        data.put("minRepaymentMonths", snapshot.minRepaymentMonths());
+        data.put("maxRepaymentMonths", snapshot.maxRepaymentMonths());
+        data.put("allowApplicationWithActiveLoan", Boolean.TRUE.equals(snapshot.allowApplicationWithActiveLoan()));
+        data.put("freshFinancialDataRequired", Boolean.TRUE.equals(snapshot.freshFinancialDataRequired()));
+        data.put("managerReviewRequired", Boolean.TRUE.equals(snapshot.managerReviewRequired()));
+        data.put("loanOfficerReviewRequired", Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
+        data.put("workflowStartStage", snapshot.workflowStartStage());
+        data.put("committeeReviewRequired", Boolean.TRUE.equals(snapshot.committeeReviewRequired()));
+        data.put("committeePriority", snapshot.committeePriority());
+        data.put("committeeMinimumVotes", snapshot.committeeMinimumVotes());
+        data.put("committeeApprovalThreshold", snapshot.committeeApprovalThreshold());
+        data.put("accountantReviewRequired", !Boolean.FALSE.equals(snapshot.accountantReviewRequired()));
+        data.put("accountantPriority", snapshot.accountantPriority());
+        data.put("productStatus", snapshot.productStatus());
         data.put("active", product.getActive());
         return data;
+    }
+
+    private LoanProductVersionView toLoanProductVersionView(LoanProductVersion version,
+                                                            LoanProductSnapshot snapshot,
+                                                            String actorName) {
+        return new LoanProductVersionView(
+            version.getId(),
+            version.getVersionNumber(),
+            formatSnapshotTypeLabel(version.getSnapshotType()),
+            version.getCreatedAt() == null ? "" : version.getCreatedAt().format(PRODUCT_VERSION_TIME_FORMATTER),
+            actorName == null || actorName.isBlank() ? "System" : actorName,
+            resolveProductCode(snapshot),
+            resolveProductName(snapshot),
+            formatAmountRange(snapshot.minimumAmount(), snapshot.maximumAmount()),
+            snapshot.minRepaymentMonths() + " - " + snapshot.maxRepaymentMonths() + " month(s)",
+            formatInterestSummary(snapshot.interestMethod(), snapshot.interestRate()),
+            formatWorkflowSummary(snapshot),
+            snapshot.productStatus() == null ? LoanProductStatus.ACTIVE.name() : snapshot.productStatus().name()
+        );
+    }
+
+    private LoanProductsVersionView toLoanProductsVersionView(LoanProductsVersion version,
+                                                              LoanProductsSnapshot snapshot,
+                                                              String actorName) {
+        List<LoanProductSnapshot> products = snapshot.products() == null ? List.of() : snapshot.products();
+        String productsLabel = products.stream()
+            .map(this::resolveProductName)
+            .filter(name -> name != null && !name.isBlank())
+            .limit(4)
+            .collect(Collectors.joining(", "));
+        if (products.size() > 4) {
+            productsLabel = productsLabel + " +" + (products.size() - 4) + " more";
+        }
+        return new LoanProductsVersionView(
+            version.getId(),
+            version.getVersionNumber(),
+            formatSnapshotTypeLabel(version.getSnapshotType()),
+            version.getCreatedAt() == null ? "" : version.getCreatedAt().format(PRODUCT_VERSION_TIME_FORMATTER),
+            actorName == null || actorName.isBlank() ? "System" : actorName,
+            formatMoney(snapshot.applicationFee()),
+            products.size(),
+            productsLabel.isBlank() ? "No products" : productsLabel
+        );
+    }
+
+    private String resolveProductCode(LoanProductSnapshot snapshot) {
+        if (snapshot.productCode() != null && !snapshot.productCode().isBlank()) {
+            return snapshot.productCode();
+        }
+        return snapshot.loanType() == null ? "" : snapshot.loanType().defaultProductCode();
+    }
+
+    private String resolveProductName(LoanProductSnapshot snapshot) {
+        if (snapshot.productName() != null && !snapshot.productName().isBlank()) {
+            return snapshot.productName();
+        }
+        return snapshot.loanType() == null ? "" : snapshot.loanType().getDisplayLabel();
+    }
+
+    private String formatAmountRange(BigDecimal minimumAmount, BigDecimal maximumAmount) {
+        return formatMoney(minimumAmount) + " to " + (maximumAmount == null ? "Not set" : formatMoney(maximumAmount));
+    }
+
+    private String formatInterestSummary(InterestMethod interestMethod, BigDecimal interestRate) {
+        return formatInterestMethodLabel(interestMethod) + " / " + formatPercent(interestRate);
+    }
+
+    private String formatWorkflowSummary(LoanProductSnapshot snapshot) {
+        List<String> stages = new ArrayList<>();
+        boolean loanOfficerEnabled = Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired());
+        ApprovalWorkflowStage startStage = snapshot.workflowStartStage() == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerEnabled
+            ? ApprovalWorkflowStage.LOAN_OFFICER
+            : ApprovalWorkflowStage.MANAGER;
+        if (startStage == ApprovalWorkflowStage.LOAN_OFFICER) {
+            stages.add("Loan Officer");
+            stages.add("Manager");
+        } else {
+            stages.add("Manager");
+            if (loanOfficerEnabled) {
+                stages.add("Loan Officer");
+            }
+        }
+        if (Boolean.TRUE.equals(snapshot.committeeReviewRequired())) {
+            stages.add("Committee");
+        }
+        if (!Boolean.FALSE.equals(snapshot.accountantReviewRequired())) {
+            stages.add("Accountant");
+        }
+        stages.add("Disbursement");
+        return String.join(" -> ", stages);
+    }
+
+    private String formatSnapshotTypeLabel(String snapshotType) {
+        if ("BEFORE_ROLLBACK".equalsIgnoreCase(snapshotType)) {
+            return "Before rollback";
+        }
+        if ("BEFORE_UPDATE".equalsIgnoreCase(snapshotType)) {
+            return "Before update";
+        }
+        return "Saved snapshot";
+    }
+
+    private String formatInterestMethodLabel(InterestMethod interestMethod) {
+        return switch (interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod) {
+            case FLAT_RATE -> "Flat Rate";
+            case REDUCING_BALANCE -> "Reducing Balance";
+        };
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        if (amount == null) {
+            return "0.00";
+        }
+        return amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private String formatPercent(BigDecimal ratio) {
+        if (ratio == null) {
+            return "0.00%";
+        }
+        return ratio.multiply(BigDecimal.valueOf(100))
+            .setScale(2, java.math.RoundingMode.HALF_UP)
+            .toPlainString() + "%";
     }
 
     private Map<String, Object> snapshotSettings(SaccoSettings settings) {
@@ -948,6 +1896,10 @@ public class AdminService {
         data.put("requiredGuarantors", settings.getRequiredGuarantors());
         data.put("boardSize", settings.getBoardSize());
         data.put("boardQuorum", settings.getBoardQuorum());
+        data.put("loanOfficerReviewRequired", settings.isLoanOfficerReviewRequired());
+        data.put("boardReviewRequired", settings.isBoardReviewRequired());
+        data.put("approvalFlow", settings.resolvedApprovalFlow().stream().map(Enum::name).toList());
+        data.put("applicationFee", settings.getResolvedApplicationFee());
         data.put("defaultLanguage", settings.getDefaultLanguage());
         return data;
     }
@@ -1132,6 +2084,180 @@ public class AdminService {
 
         public int getTotalFilteredApplications() {
             return totalFilteredApplications;
+        }
+    }
+
+    public record LoanProductVersionView(
+        UUID id,
+        int versionNumber,
+        String snapshotType,
+        String savedAtLabel,
+        String savedByLabel,
+        String productCode,
+        String productName,
+        String amountRangeLabel,
+        String tenureLabel,
+        String interestLabel,
+        String workflowLabel,
+        String statusLabel
+    ) {
+        public UUID getId() {
+            return id;
+        }
+
+        public int getVersionNumber() {
+            return versionNumber;
+        }
+
+        public String getSnapshotType() {
+            return snapshotType;
+        }
+
+        public String getSavedAtLabel() {
+            return savedAtLabel;
+        }
+
+        public String getSavedByLabel() {
+            return savedByLabel;
+        }
+
+        public String getProductCode() {
+            return productCode;
+        }
+
+        public String getProductName() {
+            return productName;
+        }
+
+        public String getAmountRangeLabel() {
+            return amountRangeLabel;
+        }
+
+        public String getTenureLabel() {
+            return tenureLabel;
+        }
+
+        public String getInterestLabel() {
+            return interestLabel;
+        }
+
+        public String getWorkflowLabel() {
+            return workflowLabel;
+        }
+
+        public String getStatusLabel() {
+            return statusLabel;
+        }
+    }
+
+    public record LoanProductsVersionView(
+        UUID id,
+        int versionNumber,
+        String snapshotType,
+        String savedAtLabel,
+        String savedByLabel,
+        String applicationFeeLabel,
+        int productCount,
+        String productsLabel
+    ) {
+        public UUID getId() {
+            return id;
+        }
+
+        public int getVersionNumber() {
+            return versionNumber;
+        }
+
+        public String getSnapshotType() {
+            return snapshotType;
+        }
+
+        public String getSavedAtLabel() {
+            return savedAtLabel;
+        }
+
+        public String getSavedByLabel() {
+            return savedByLabel;
+        }
+
+        public String getApplicationFeeLabel() {
+            return applicationFeeLabel;
+        }
+
+        public int getProductCount() {
+            return productCount;
+        }
+
+        public String getProductsLabel() {
+            return productsLabel;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record LoanProductsSnapshot(
+        BigDecimal applicationFee,
+        List<LoanProductSnapshot> products
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record LoanProductSnapshot(
+        LoanType loanType,
+        String productCode,
+        String productName,
+        String productDescription,
+        Integer displayOrder,
+        BigDecimal minimumAmount,
+        BigDecimal maximumAmount,
+        Integer guarantorsRequired,
+        BigDecimal maxLoanSavingsRatio,
+        BigDecimal insuranceRate,
+        BigDecimal interestRate,
+        InterestMethod interestMethod,
+        Integer minRepaymentMonths,
+        Integer maxRepaymentMonths,
+        Boolean allowApplicationWithActiveLoan,
+        Boolean freshFinancialDataRequired,
+        Boolean managerReviewRequired,
+        Boolean loanOfficerReviewRequired,
+        ApprovalWorkflowStage workflowStartStage,
+        Boolean committeeReviewRequired,
+        Integer committeePriority,
+        Integer committeeMinimumVotes,
+        Integer committeeApprovalThreshold,
+        Boolean accountantReviewRequired,
+        Integer accountantPriority,
+        LoanProductStatus productStatus
+    ) {
+        public static LoanProductSnapshot fromProduct(LoanProductSetting product) {
+            return new LoanProductSnapshot(
+                product.getLoanType(),
+                product.getProductCode(),
+                product.getProductName(),
+                product.getProductDescription(),
+                product.getResolvedDisplayOrder(),
+                product.getMinimumAmount(),
+                product.getMaximumAmount(),
+                product.getGuarantorsRequired(),
+                product.getMaxLoanSavingsRatio(),
+                product.getInsuranceRate(),
+                product.getInterestRate(),
+                product.getInterestMethod(),
+                product.getMinimumRepaymentMonths(),
+                product.getMaxRepaymentMonths(),
+                product.getAllowApplicationWithActiveLoan(),
+                product.getFreshFinancialDataRequired(),
+                product.getManagerReviewRequired(),
+                product.getLoanOfficerReviewRequired(),
+                product.getWorkflowStartStage(),
+                product.getCommitteeReviewRequired(),
+                product.getCommitteePriority(),
+                product.getCommitteeMinimumVotes(),
+                product.getCommitteeApprovalThreshold(),
+                product.getAccountantReviewRequired(),
+                product.getAccountantPriority(),
+                product.getStatus()
+            );
         }
     }
 

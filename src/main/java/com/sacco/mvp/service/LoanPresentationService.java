@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
@@ -11,11 +12,21 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryDto;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import java.awt.Color;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -40,9 +51,10 @@ public class LoanPresentationService {
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
     private final LoanAttachmentService loanAttachmentService;
+    private final LoanProductSettingRepository loanProductSettingRepository;
 
     public Map<String, Object> parseFormFields(String json) {
-        return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "purpose", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
+        return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
     }
 
     public Map<String, Object> parseFinancialFields(String json) {
@@ -115,58 +127,82 @@ public class LoanPresentationService {
 
         List<String> labels = new ArrayList<>();
         boolean hasGuarantorStage = app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0;
+        LoanProductSetting product = resolveWorkflowProduct(app);
+        boolean hasManagerStage = product == null || product.isManagerReviewRequired();
+        boolean hasCommitteeStage = product == null || product.isCommitteeReviewRequired();
 
         labels.add("Draft");
         if (hasGuarantorStage) {
             labels.add("Awaiting Guarantors");
             labels.add("All Guarantors Approved");
         }
-        labels.add("On Review By Manager");
+        if (hasManagerStage) {
+            labels.add("On Review By Manager");
+        }
+        if (hasCommitteeStage) {
+            labels.add("On Review By Board");
+        }
 
-        int currentIndex;
+        int currentIndex = 0;
         switch (app.getStatus()) {
-            case DRAFT -> currentIndex = labels.size() - 1;
-            case SUBMITTED, AWAITING_GUARANTORS -> currentIndex = hasGuarantorStage ? 1 : labels.size() - 1;
-            case ALL_GUARANTORS_APPROVED -> currentIndex = hasGuarantorStage ? 2 : labels.size() - 1;
-            case READY_FOR_MANAGER -> currentIndex = labels.size() - 1;
+            case DRAFT -> currentIndex = 0;
+            case SUBMITTED, AWAITING_GUARANTORS -> currentIndex = hasGuarantorStage ? 1 : Math.max(labels.size() - 1, 0);
+            case ALL_GUARANTORS_APPROVED -> currentIndex = hasGuarantorStage ? 2 : Math.max(labels.size() - 1, 0);
+            case READY_FOR_MANAGER -> currentIndex = indexOfLabel(labels, "On Review By Manager");
             case MANAGER_REJECTED -> {
                 labels.add("Manager Rejected");
                 currentIndex = labels.size() - 1;
             }
-            default -> {
-                labels.add("On Review By Board");
-                switch (app.getStatus()) {
-                    case MANAGER_ACCEPTED, AWAITING_BOARD -> currentIndex = labels.size() - 1;
-                    case BOARD_REJECTED -> {
-                        labels.add("Board Rejected");
-                        currentIndex = labels.size() - 1;
-                    }
-                    default -> {
-                        labels.add("Board Approved");
-                        switch (app.getStatus()) {
-                            case BOARD_APPROVED -> currentIndex = labels.size() - 1;
-                            case FINAL_REJECTED -> {
-                                labels.add("Final Rejected");
-                                currentIndex = labels.size() - 1;
-                            }
-                            case FINAL_APPROVED -> {
-                                labels.add("Disbursed Loan");
-                                currentIndex = labels.size() - 1;
-                            }
-                            case DEFAULTED -> {
-                                labels.add("Disbursed Loan");
-                                labels.add("Defaulted");
-                                currentIndex = labels.size() - 1;
-                            }
-                            case PAID -> {
-                                labels.add("Disbursed Loan");
-                                labels.add("Paid");
-                                currentIndex = labels.size() - 1;
-                            }
-                            default -> currentIndex = labels.size() - 1;
-                        }
-                    }
+            case MANAGER_ACCEPTED -> {
+                if (hasCommitteeStage) {
+                    currentIndex = indexOfLabel(labels, "On Review By Board");
+                } else {
+                    labels.add("Ready for Disbursement");
+                    currentIndex = labels.size() - 1;
                 }
+            }
+            case AWAITING_BOARD -> currentIndex = indexOfLabel(labels, "On Review By Board");
+            case BOARD_REJECTED -> {
+                labels.add("Board Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            case BOARD_APPROVED -> {
+                labels.add("Reviewed By Board");
+                currentIndex = labels.size() - 1;
+            }
+            case FINAL_REJECTED -> {
+                labels.add(hasCommitteeStage ? "Reviewed By Board" : "Ready for Disbursement");
+                labels.add("Final Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            case FINAL_APPROVED -> {
+                if (!hasCommitteeStage) {
+                    labels.add("Ready for Disbursement");
+                } else {
+                    labels.add("Reviewed By Board");
+                }
+                labels.add("Disbursed Loan");
+                currentIndex = labels.size() - 1;
+            }
+            case DEFAULTED -> {
+                if (!hasCommitteeStage) {
+                    labels.add("Ready for Disbursement");
+                } else {
+                    labels.add("Reviewed By Board");
+                }
+                labels.add("Disbursed Loan");
+                labels.add("Defaulted");
+                currentIndex = labels.size() - 1;
+            }
+            case PAID -> {
+                if (!hasCommitteeStage) {
+                    labels.add("Ready for Disbursement");
+                } else {
+                    labels.add("Reviewed By Board");
+                }
+                labels.add("Disbursed Loan");
+                labels.add("Paid");
+                currentIndex = labels.size() - 1;
             }
         }
 
@@ -188,8 +224,25 @@ public class LoanPresentationService {
         return raw;
     }
 
+    public List<Map<String, Object>> parseApplicationAttachments(String json) {
+        return parseAttachments(json).stream()
+            .filter(item -> !LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
+            .toList();
+    }
+
+    public List<Map<String, Object>> parseDisbursementProofAttachments(String json) {
+        return parseAttachments(json).stream()
+            .filter(item -> LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
+            .toList();
+    }
+
     public Map<String, Object> parseRepaymentSummary(String json) {
         return parseRepaymentSummary(json, null);
+    }
+
+    private String attachmentCategory(Map<String, Object> item) {
+        Object category = item.get("attachmentCategory");
+        return category == null ? "" : String.valueOf(category);
     }
 
     public Map<String, Object> parseRepaymentSummary(String json, java.time.OffsetDateTime paidAt) {
@@ -203,6 +256,8 @@ public class LoanPresentationService {
             putValue(display, "First Repayment Date", raw.get("firstRepaymentDate"));
             putValue(display, "Final Due Date", raw.get("finalDueDate"));
             putValue(display, "Repayment Frequency", humanizeValue(raw.get("repaymentFrequency")));
+            putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
+            putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
             putMoney(display, "Installment Amount", raw.get("installmentAmount"));
             putValue(display, "Installments", raw.get("installments"));
             putValue(display, "Disbursement Reference", raw.get("disbursementReference"));
@@ -223,25 +278,38 @@ public class LoanPresentationService {
         }
         try {
             LoanPaymentSummaryDto summary = objectMapper.readValue(json, LoanPaymentSummaryDto.class);
-            return new LoanPaymentSummaryView(
-                true,
-                blankToDash(summary.loanDescription()),
-                summary.lastPaymentDate(),
-                blankToDash(summary.lastPaymentDate()),
-                summary.totalOutstanding(),
-                formatNullableMoney(summary.totalOutstanding()),
-                formatNullableMoney(summary.outstandingPrincipal()),
-                formatNullableMoney(summary.outstandingInterest()),
-                formatNullableMoney(summary.totalPrincipalPaid()),
-                formatNullableMoney(summary.totalInterestPaid())
-            );
+            return toLoanPaymentSummaryView(summary);
         } catch (Exception ex) {
             return LoanPaymentSummaryView.empty();
         }
     }
 
+    public LoanPaymentSummaryView toLoanPaymentSummaryView(LoanPaymentSummaryDto summary) {
+        if (summary == null) {
+            return LoanPaymentSummaryView.empty();
+        }
+        return new LoanPaymentSummaryView(
+            true,
+            blankToDash(summary.loanDescription()),
+            summary.lastPaymentDate(),
+            blankToDash(summary.lastPaymentDate()),
+            summary.totalOutstanding(),
+            formatNullableMoney(summary.totalOutstanding()),
+            formatNullableMoney(summary.outstandingPrincipal()),
+            formatNullableMoney(summary.outstandingInterest()),
+            formatNullableMoney(summary.totalPrincipalPaid()),
+            formatNullableMoney(summary.totalInterestPaid())
+        );
+    }
+
     public List<Map<String, Object>> parseRepaymentRows(String json) {
         return parseRepaymentRows(json, Collections.emptyList());
+    }
+
+    public List<Map<String, Object>> parseRepaymentRows(String json,
+                                                        List<LoanPaymentTransaction> transactions,
+                                                        LoanPaymentSummaryView paymentSummary) {
+        return parseRepaymentRowsInternal(json, transactions, paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary);
     }
 
     /**
@@ -250,6 +318,12 @@ public class LoanPresentationService {
      * calendar month as the installment's {@code dueDate}.
      */
     public List<Map<String, Object>> parseRepaymentRows(String json, List<LoanPaymentTransaction> transactions) {
+        return parseRepaymentRowsInternal(json, transactions, LoanPaymentSummaryView.empty());
+    }
+
+    private List<Map<String, Object>> parseRepaymentRowsInternal(String json,
+                                                                 List<LoanPaymentTransaction> transactions,
+                                                                 LoanPaymentSummaryView paymentSummary) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -260,6 +334,8 @@ public class LoanPresentationService {
                 return Collections.emptyList();
             }
             Map<YearMonth, PaidBucket> paidByMonth = bucketTransactionsByMonth(transactions);
+            YearMonth latestTransactionMonth = latestTransactionMonth(transactions);
+            String latestOutstandingBalance = latestOutstandingBalanceLabel(transactions, paymentSummary);
 
             List<Map<String, Object>> rows = new java.util.ArrayList<>();
             for (Object entry : schedule) {
@@ -272,20 +348,60 @@ public class LoanPresentationService {
                 Object dueDateValue = item.get("dueDate");
                 row.put("dueDate", dueDateValue);
                 row.put("amount", formatMoneyValue(item.get("amount")));
+                row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
 
                 PaidBucket bucket = lookupBucket(paidByMonth, dueDateValue);
+                row.put("outstandingBalance",
+                    isLatestTransactionMonth(dueDateValue, latestTransactionMonth) && !latestOutstandingBalance.isBlank()
+                        ? latestOutstandingBalance
+                        : "");
                 row.put("principalPaid", bucket == null ? "-" : formatMoney(bucket.principal));
                 row.put("interestPaid", bucket == null ? "-" : formatMoney(bucket.interest));
                 row.put("totalPaid", bucket == null ? "-" : formatMoney(bucket.total));
                 row.put("paymentDate", bucket == null || bucket.lastDate == null ? "-" : bucket.lastDate.toString());
-
-                String scheduledStatus = String.valueOf(item.get("status"));
-                row.put("status", humanizeValue(deriveStatus(scheduledStatus, item.get("amount"), bucket)));
                 rows.add(row);
             }
             return rows;
         } catch (Exception ex) {
             return Collections.emptyList();
+        }
+    }
+
+    private YearMonth latestTransactionMonth(List<LoanPaymentTransaction> transactions) {
+        if (transactions == null || transactions.isEmpty()) {
+            return null;
+        }
+        return transactions.stream()
+            .filter(java.util.Objects::nonNull)
+            .map(LoanPaymentTransaction::getReceiptDate)
+            .filter(java.util.Objects::nonNull)
+            .max(LocalDate::compareTo)
+            .map(YearMonth::from)
+            .orElse(null);
+    }
+
+    private String latestOutstandingBalanceLabel(List<LoanPaymentTransaction> transactions,
+                                                 LoanPaymentSummaryView paymentSummary) {
+        if (transactions == null || transactions.isEmpty() || paymentSummary == null || !paymentSummary.available()) {
+            return "";
+        }
+        return paymentSummary.totalOutstandingLabel() == null || "-".equals(paymentSummary.totalOutstandingLabel())
+            ? ""
+            : paymentSummary.totalOutstandingLabel();
+    }
+
+    private boolean isLatestTransactionMonth(Object dueDateValue, YearMonth latestTransactionMonth) {
+        if (latestTransactionMonth == null || dueDateValue == null) {
+            return false;
+        }
+        String raw = String.valueOf(dueDateValue);
+        if (raw.length() < 7) {
+            return false;
+        }
+        try {
+            return latestTransactionMonth.equals(YearMonth.parse(raw.substring(0, 7)));
+        } catch (DateTimeParseException ex) {
+            return false;
         }
     }
 
@@ -321,15 +437,17 @@ public class LoanPresentationService {
         }
     }
 
-    private String deriveStatus(String scheduledStatus, Object scheduledAmount, PaidBucket bucket) {
-        if (bucket == null || bucket.total.signum() <= 0) {
-            return scheduledStatus;
+    private LoanProductSetting resolveWorkflowProduct(LoanApplication app) {
+        if (app == null || app.getSaccoId() == null || app.getLoanType() == null) {
+            return null;
         }
-        BigDecimal scheduled = toBigDecimal(scheduledAmount);
-        if (scheduled != null && bucket.total.compareTo(scheduled) >= 0) {
-            return "PAID";
-        }
-        return "PARTIAL";
+        return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
+            .orElse(null);
+    }
+
+    private int indexOfLabel(List<String> labels, String target) {
+        int index = labels.indexOf(target);
+        return index >= 0 ? index : Math.max(labels.size() - 1, 0);
     }
 
     private BigDecimal toBigDecimal(Object value) {
@@ -351,6 +469,43 @@ public class LoanPresentationService {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private String humanizeInterestMethod(Object value) {
+        if (value == null) {
+            return "-";
+        }
+        String raw = String.valueOf(value).trim();
+        if (raw.isEmpty()) {
+            return "-";
+        }
+        return switch (raw) {
+            case "REDUCING_BALANCE" -> "Reducing Balance";
+            case "FLAT_RATE" -> "Flat Rate";
+            default -> humanizeValue(raw);
+        };
+    }
+
+    private String formatPercentValue(Object value) {
+        BigDecimal amount = toBigDecimal(value);
+        if (amount == null) {
+            return "-";
+        }
+        return amount.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
+    }
+
+    private String scheduledAmountBreakdown(Map<?, ?> item) {
+        String principal = formatMoneyValue(item.get("principalComponent"));
+        String interest = formatMoneyValue(item.get("interestComponent"));
+        boolean hasPrincipal = principal != null && !principal.isBlank() && !"-".equals(principal);
+        boolean hasInterest = interest != null && !interest.isBlank() && !"-".equals(interest);
+        if (!hasPrincipal && !hasInterest) {
+            return "";
+        }
+        if (!hasInterest || "TSh 0.00".equals(interest)) {
+            return "Principal " + principal;
+        }
+        return "Principal " + principal + " + Interest " + interest;
     }
 
     private static final class PaidBucket {
@@ -482,6 +637,40 @@ public class LoanPresentationService {
         appendApplicantSignature(html, app, applicant);
         html.append("</body></html>");
         return html.toString();
+    }
+
+    public byte[] buildPrintablePdf(LoanApplication app,
+                                    String saccoName,
+                                    Member applicant,
+                                    Map<String, Object> formFields,
+                                    Map<String, Object> financialFields,
+                                    List<GuarantorRequest> guarantorRequests,
+                                    Map<UUID, String> guarantorNames,
+                                    List<BoardReview> boardReviews,
+                                    Map<UUID, Member> boardMembers,
+                                    String managerReason) {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PrintableLoanApplicationPdfRenderer renderer = new PrintableLoanApplicationPdfRenderer(
+                document,
+                app,
+                saccoName,
+                applicant,
+                formFields,
+                financialFields,
+                parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()),
+                parseRepaymentRows(app.getRepaymentScheduleJson()),
+                guarantorRequests,
+                guarantorNames,
+                boardReviews,
+                boardMembers,
+                managerReason
+            );
+            renderer.render();
+            document.save(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to generate printable loan application PDF.", ex);
+        }
     }
 
     private void appendApplicantSignature(StringBuilder html, LoanApplication app, Member applicant) {
@@ -638,6 +827,7 @@ public class LoanPresentationService {
 
     private String humanizeFieldLabel(String key) {
         return switch (key) {
+            case "purpose" -> "Loan Purpose";
             case "nationalId" -> "National ID";
             case "employerName" -> "Employer Name";
             case "additionalNotes" -> "Additional Notes";
@@ -729,6 +919,13 @@ public class LoanPresentationService {
         return HtmlUtils.htmlEscape(value == null ? "" : value);
     }
 
+    private static String sanitizePdfText(String text) {
+        if (text == null || text.isBlank()) {
+            return "-";
+        }
+        return text.replace('\r', ' ').trim();
+    }
+
     private String blankToDash(Object value) {
         if (value == null) {
             return "-";
@@ -751,6 +948,482 @@ public class LoanPresentationService {
     ) {
         public static LoanPaymentSummaryView empty() {
             return new LoanPaymentSummaryView(false, "-", null, "-", null, "-", "-", "-", "-", "-");
+        }
+    }
+
+    private final class PrintableLoanApplicationPdfRenderer {
+        private static final float MARGIN = 38f;
+        private static final float TOP_MARGIN = 40f;
+        private static final float BOTTOM_MARGIN = 34f;
+        private static final float FOOTER_GAP = 22f;
+        private static final float TITLE_SIZE = 18f;
+        private static final float META_SIZE = 9f;
+        private static final float SECTION_SIZE = 10.5f;
+        private static final float BODY_SIZE = 8.2f;
+        private static final float SMALL_SIZE = 7.1f;
+        private static final float LINE_GAP = 3f;
+        private static final float CELL_PADDING_X = 6f;
+        private static final float CELL_PADDING_Y = 5f;
+        private static final Color TEXT_COLOR = new Color(41, 55, 71);
+        private static final Color MUTED_COLOR = new Color(87, 106, 126);
+        private static final Color BORDER_COLOR = new Color(225, 232, 238);
+        private static final Color HEADER_FILL = new Color(246, 248, 251);
+        private static final Color RULE_COLOR = new Color(60, 79, 97);
+
+        private final PDDocument document;
+        private final LoanApplication app;
+        private final String saccoName;
+        private final Member applicant;
+        private final Map<String, Object> formFields;
+        private final Map<String, Object> financialFields;
+        private final Map<String, Object> repaymentSummary;
+        private final List<Map<String, Object>> repaymentRows;
+        private final List<GuarantorRequest> guarantorRequests;
+        private final Map<UUID, String> guarantorNames;
+        private final List<BoardReview> boardReviews;
+        private final Map<UUID, Member> boardMembers;
+        private final String managerReason;
+        private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+        private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        private PDPage page;
+        private PDPageContentStream stream;
+        private float y;
+
+        private PrintableLoanApplicationPdfRenderer(PDDocument document,
+                                                    LoanApplication app,
+                                                    String saccoName,
+                                                    Member applicant,
+                                                    Map<String, Object> formFields,
+                                                    Map<String, Object> financialFields,
+                                                    Map<String, Object> repaymentSummary,
+                                                    List<Map<String, Object>> repaymentRows,
+                                                    List<GuarantorRequest> guarantorRequests,
+                                                    Map<UUID, String> guarantorNames,
+                                                    List<BoardReview> boardReviews,
+                                                    Map<UUID, Member> boardMembers,
+                                                    String managerReason) {
+            this.document = document;
+            this.app = app;
+            this.saccoName = saccoName;
+            this.applicant = applicant;
+            this.formFields = formFields == null ? Collections.emptyMap() : formFields;
+            this.financialFields = financialFields == null ? Collections.emptyMap() : financialFields;
+            this.repaymentSummary = repaymentSummary == null ? Collections.emptyMap() : repaymentSummary;
+            this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
+            this.guarantorRequests = guarantorRequests == null ? Collections.emptyList() : guarantorRequests;
+            this.guarantorNames = guarantorNames == null ? Collections.emptyMap() : guarantorNames;
+            this.boardReviews = boardReviews == null ? Collections.emptyList() : boardReviews;
+            this.boardMembers = boardMembers == null ? Collections.emptyMap() : boardMembers;
+            this.managerReason = managerReason;
+        }
+
+        private void render() throws IOException {
+            startNewPage();
+            drawHeader();
+            drawMetaTable();
+            drawSectionTable("Application Details", formFields);
+            drawSectionTable("SACCO Financial Details", financialFields);
+            drawSectionTable("Repayment Summary", repaymentSummary);
+            drawRepaymentRowsSection();
+            drawGuarantorSection();
+            drawBoardSection();
+            drawApplicantSignatureSection();
+            closePage();
+        }
+
+        private void startNewPage() throws IOException {
+            if (stream != null) {
+                drawFooter();
+                stream.close();
+            }
+            page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            stream = new PDPageContentStream(document, page);
+            y = page.getMediaBox().getHeight() - TOP_MARGIN;
+        }
+
+        private void closePage() throws IOException {
+            if (stream != null) {
+                drawFooter();
+                stream.close();
+                stream = null;
+            }
+        }
+
+        private void ensureSpace(float requiredHeight) throws IOException {
+            if (y - requiredHeight < (BOTTOM_MARGIN + FOOTER_GAP)) {
+                startNewPage();
+            }
+        }
+
+        private void drawHeader() throws IOException {
+            ensureSpace(56f);
+            writeText("Loan Application", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
+            writeRightAligned("Generated: " + LocalDate.now(), page.getMediaBox().getWidth() - MARGIN, y + 1f, regular, META_SIZE, MUTED_COLOR);
+            y -= 19f;
+            String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
+            writeText(saccoLabel, MARGIN, y, bold, META_SIZE + 0.5f, MUTED_COLOR);
+            y -= 16f;
+            drawRule();
+            y -= 14f;
+        }
+
+        private void drawMetaTable() throws IOException {
+            List<String[]> rows = new ArrayList<>();
+            rows.add(new String[]{"Loan Application ID", app.getApplicationNumber() == null ? "-" : app.getApplicationNumber().toString()});
+            rows.add(new String[]{"Loan ID", sanitizePdfText(app.getLoanId())});
+            rows.add(new String[]{"Applicant", sanitizePdfText(applicant.getFullName()) + " (" + sanitizePdfText(applicant.getMemberNo()) + ")"});
+            rows.add(new String[]{"Loan Type", sanitizePdfText(String.valueOf(app.getLoanType()))});
+            rows.add(new String[]{"Amount", formatMoney(app.getAmount())});
+            rows.add(new String[]{"Status", humanizeValue(app.getStatus())});
+            drawTable(new String[]{"Field", "Value"}, new float[]{contentWidth() * 0.36f, contentWidth() * 0.64f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+        }
+
+        private void drawSectionTable(String title, Map<String, Object> rowsMap) throws IOException {
+            drawSectionHeading(title);
+            if (rowsMap.isEmpty()) {
+                drawParagraph("No details available.", regular, META_SIZE, MUTED_COLOR);
+                y -= 6f;
+                return;
+            }
+            List<String[]> rows = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : rowsMap.entrySet()) {
+                rows.add(new String[]{sanitizePdfText(entry.getKey()), sanitizePdfText(String.valueOf(entry.getValue()))});
+            }
+            drawTable(new String[]{"Field", "Value"}, new float[]{contentWidth() * 0.36f, contentWidth() * 0.64f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+        }
+
+        private void drawRepaymentRowsSection() throws IOException {
+            drawSectionHeading("Repayment Timetable");
+            if (repaymentRows.isEmpty()) {
+                drawParagraph("No repayment timetable available.", regular, META_SIZE, MUTED_COLOR);
+                y -= 6f;
+                return;
+            }
+            List<String[]> rows = new ArrayList<>();
+            for (Map<String, Object> row : repaymentRows) {
+                rows.add(new String[]{
+                    sanitizePdfText(String.valueOf(row.get("installment"))),
+                    sanitizePdfText(String.valueOf(row.get("dueDate"))),
+                    sanitizePdfText(String.valueOf(row.get("amount"))),
+                    sanitizePdfText(String.valueOf(row.get("outstandingBalance"))),
+                    sanitizePdfText(String.valueOf(row.get("principalPaid"))),
+                    sanitizePdfText(String.valueOf(row.get("interestPaid"))),
+                    sanitizePdfText(String.valueOf(row.get("totalPaid"))),
+                    sanitizePdfText(String.valueOf(row.get("paymentDate")))
+                });
+            }
+            drawTable(
+                new String[]{"Installment", "Due Date", "Amount", "Outstanding", "Principal Paid", "Interest Paid", "Total Paid", "Payment Date"},
+                new float[]{48f, 62f, 64f, 68f, 68f, 64f, 58f, contentWidth() - 432f},
+                rows,
+                SMALL_SIZE,
+                SMALL_SIZE,
+                13f
+            );
+        }
+
+        private void drawGuarantorSection() throws IOException {
+            drawSectionHeading("Guarantor Summary");
+            List<String[]> rows = new ArrayList<>();
+            if (guarantorRequests.isEmpty()) {
+                rows.add(new String[]{"-", "No guarantor details available."});
+            } else {
+                for (GuarantorRequest request : guarantorRequests) {
+                    String guarantorLabel = guarantorNames.get(request.getGuarantorMemberId());
+                    if (guarantorLabel == null || guarantorLabel.isBlank()) {
+                        guarantorLabel = shortId(request.getGuarantorMemberId());
+                    }
+                    rows.add(new String[]{
+                        sanitizePdfText(guarantorLabel),
+                        humanizeValue(request.getStatus()),
+                        sanitizePdfText(request.getGuarantorSignatureText()),
+                        sanitizePdfText(formatTimestamp(request.getGuarantorSignatureVerifiedAt()))
+                    });
+                }
+            }
+            drawTable(new String[]{"Guarantor", "Status", "Signature", "Verified At"}, new float[]{140f, 84f, 180f, contentWidth() - 404f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+        }
+
+        private void drawBoardSection() throws IOException {
+            drawSectionHeading("Board Committee Assessors");
+            List<String[]> rows = new ArrayList<>();
+            if (boardReviews.isEmpty()) {
+                rows.add(new String[]{"-", "No board assessor details available."});
+            } else {
+                for (BoardReview review : boardReviews) {
+                    Member boardMember = boardMembers.get(review.getBoardMemberId());
+                    String assessor = boardMember == null ? shortId(review.getBoardMemberId()) : boardMember.getFullName();
+                    rows.add(new String[]{
+                        sanitizePdfText(assessor),
+                        sanitizePdfText(boardMember == null ? "-" : boardMember.getMemberNo()),
+                        humanizeValue(review.getDecision()),
+                        sanitizePdfText(review.getComment()),
+                        sanitizePdfText(formatTimestamp(review.getDecidedAt())),
+                        sanitizePdfText(review.getBoardSignatureText()),
+                        sanitizePdfText(formatTimestamp(review.getBoardSignatureVerifiedAt()))
+                    });
+                }
+            }
+            drawTable(
+                new String[]{"Assessor", "Member No", "Decision", "Comment", "Decision Date", "Signature", "Verified At"},
+                new float[]{96f, 62f, 78f, 116f, 82f, 124f, contentWidth() - 558f},
+                rows,
+                7.0f,
+                7.0f,
+                8f,
+                2.2f,
+                1.0f
+            );
+        }
+
+        private void drawApplicantSignatureSection() throws IOException {
+            String signatureText = app.getApplicantSignatureText();
+            if ((signatureText == null || signatureText.isBlank()) && applicant.getSignatureText() != null && !applicant.getSignatureText().isBlank()) {
+                signatureText = applicant.getSignatureText();
+            }
+            if ((signatureText == null || signatureText.isBlank())
+                && app.getApplicantSignatureVerifiedAt() == null
+                && (managerReason == null || managerReason.isBlank())) {
+                return;
+            }
+            drawSectionHeading("Applicant Signature");
+            List<String[]> rows = new ArrayList<>();
+            if (signatureText != null && !signatureText.isBlank()) {
+                rows.add(new String[]{"Signature Text", sanitizePdfText(signatureText)});
+            }
+            rows.add(new String[]{"Member Number", sanitizePdfText(applicant.getMemberNo())});
+            rows.add(new String[]{"Verified At", sanitizePdfText(formatTimestamp(app.getApplicantSignatureVerifiedAt()))});
+            if (managerReason != null && !managerReason.isBlank()) {
+                rows.add(new String[]{"Manager Reason", sanitizePdfText(managerReason)});
+            }
+            drawTable(new String[]{"Field", "Details"}, new float[]{contentWidth() * 0.28f, contentWidth() * 0.72f}, rows, BODY_SIZE, BODY_SIZE, 10f);
+        }
+
+        private void drawSectionHeading(String text) throws IOException {
+            ensureSpace(18f);
+            writeText(sanitizePdfText(text), MARGIN, y, bold, SECTION_SIZE, TEXT_COLOR);
+            y -= 16f;
+        }
+
+        private void drawParagraph(String text, PDType1Font font, float fontSize, Color color) throws IOException {
+            float width = contentWidth();
+            List<String> lines = wrapText(text, font, fontSize, width);
+            for (String line : lines) {
+                ensureSpace(fontSize + LINE_GAP + 2f);
+                writeText(line, MARGIN, y, font, fontSize, color);
+                y -= fontSize + LINE_GAP;
+            }
+        }
+
+        private void drawTable(String[] headers,
+                               float[] widths,
+                               List<String[]> rows,
+                               float headerFontSize,
+                               float bodyFontSize,
+                               float gapAfter) throws IOException {
+            drawTable(headers, widths, rows, headerFontSize, bodyFontSize, gapAfter, CELL_PADDING_Y, 2f);
+        }
+
+        private void drawTable(String[] headers,
+                               float[] widths,
+                               List<String[]> rows,
+                               float headerFontSize,
+                               float bodyFontSize,
+                               float gapAfter,
+                               float cellPaddingY,
+                               float extraLineGap) throws IOException {
+            drawRow(headers, widths, bold, headerFontSize, true, cellPaddingY, extraLineGap);
+            for (String[] row : rows) {
+                if (row == null) {
+                    continue;
+                }
+                float rowHeight = measureRowHeight(row, widths, regular, bodyFontSize, cellPaddingY, extraLineGap);
+                if (y - rowHeight < (BOTTOM_MARGIN + FOOTER_GAP)) {
+                    startNewPage();
+                    drawRow(headers, widths, bold, headerFontSize, true, cellPaddingY, extraLineGap);
+                }
+                drawRow(row, widths, regular, bodyFontSize, false, cellPaddingY, extraLineGap);
+            }
+            y -= gapAfter;
+        }
+
+        private void drawRow(String[] cells,
+                             float[] widths,
+                             PDType1Font font,
+                             float fontSize,
+                             boolean header) throws IOException {
+            drawRow(cells, widths, font, fontSize, header, CELL_PADDING_Y, 2f);
+        }
+
+        private void drawRow(String[] cells,
+                             float[] widths,
+                             PDType1Font font,
+                             float fontSize,
+                             boolean header,
+                             float cellPaddingY,
+                             float extraLineGap) throws IOException {
+            float rowHeight = measureRowHeight(cells, widths, font, fontSize, cellPaddingY, extraLineGap);
+            ensureSpace(rowHeight);
+
+            float x = MARGIN;
+            float lineHeight = fontSize + extraLineGap;
+            List<List<String>> wrappedCells = new ArrayList<>();
+            for (int i = 0; i < cells.length; i++) {
+                wrappedCells.add(wrapText(cells[i], font, fontSize, widths[i] - (CELL_PADDING_X * 2f)));
+            }
+
+            for (int i = 0; i < cells.length; i++) {
+                stream.setNonStrokingColor(header ? HEADER_FILL : Color.WHITE);
+                stream.addRect(x, y - rowHeight, widths[i], rowHeight);
+                stream.fill();
+                stream.setStrokingColor(BORDER_COLOR);
+                stream.addRect(x, y - rowHeight, widths[i], rowHeight);
+                stream.stroke();
+
+                float textY = y - cellPaddingY - fontSize;
+                for (String line : wrappedCells.get(i)) {
+                    writeText(line, x + CELL_PADDING_X, textY, font, fontSize, TEXT_COLOR);
+                    textY -= lineHeight;
+                }
+                x += widths[i];
+            }
+            y -= rowHeight;
+        }
+
+        private float measureRowHeight(String[] cells,
+                                       float[] widths,
+                                       PDType1Font font,
+                                       float fontSize) throws IOException {
+            return measureRowHeight(cells, widths, font, fontSize, CELL_PADDING_Y, 2f);
+        }
+
+        private float measureRowHeight(String[] cells,
+                                       float[] widths,
+                                       PDType1Font font,
+                                       float fontSize,
+                                       float cellPaddingY,
+                                       float extraLineGap) throws IOException {
+            float lineHeight = fontSize + extraLineGap;
+            int maxLines = 1;
+            for (int i = 0; i < cells.length; i++) {
+                List<String> lines = wrapText(cells[i], font, fontSize, widths[i] - (CELL_PADDING_X * 2f));
+                maxLines = Math.max(maxLines, lines.size());
+            }
+            return (cellPaddingY * 2f) + (maxLines * lineHeight);
+        }
+
+        private List<String> wrapText(String text,
+                                      PDType1Font font,
+                                      float fontSize,
+                                      float maxWidth) throws IOException {
+            List<String> lines = new ArrayList<>();
+            String safeText = sanitizePdfText(text);
+            for (String paragraph : safeText.split("\\n", -1)) {
+                if (paragraph.isBlank()) {
+                    lines.add("-");
+                    continue;
+                }
+                lines.addAll(wrapParagraph(paragraph, font, fontSize, maxWidth));
+            }
+            return lines.isEmpty() ? List.of("-") : lines;
+        }
+
+        private List<String> wrapParagraph(String text,
+                                           PDType1Font font,
+                                           float fontSize,
+                                           float maxWidth) throws IOException {
+            List<String> lines = new ArrayList<>();
+            StringBuilder current = new StringBuilder();
+            for (String token : text.split("\\s+")) {
+                List<String> pieces = splitLongToken(token, font, fontSize, maxWidth);
+                for (String piece : pieces) {
+                    String candidate = current.isEmpty() ? piece : current + " " + piece;
+                    if (stringWidth(candidate, font, fontSize) > maxWidth && !current.isEmpty()) {
+                        lines.add(current.toString());
+                        current = new StringBuilder(piece);
+                    } else {
+                        current = new StringBuilder(candidate);
+                    }
+                }
+            }
+            if (!current.isEmpty()) {
+                lines.add(current.toString());
+            }
+            return lines.isEmpty() ? List.of("-") : lines;
+        }
+
+        private List<String> splitLongToken(String token,
+                                            PDType1Font font,
+                                            float fontSize,
+                                            float maxWidth) throws IOException {
+            if (stringWidth(token, font, fontSize) <= maxWidth) {
+                return List.of(token);
+            }
+            List<String> parts = new ArrayList<>();
+            StringBuilder current = new StringBuilder();
+            for (char ch : token.toCharArray()) {
+                String candidate = current.toString() + ch;
+                if (stringWidth(candidate, font, fontSize) > maxWidth && !current.isEmpty()) {
+                    parts.add(current.toString());
+                    current = new StringBuilder(String.valueOf(ch));
+                } else {
+                    current.append(ch);
+                }
+            }
+            if (!current.isEmpty()) {
+                parts.add(current.toString());
+            }
+            return parts;
+        }
+
+        private float stringWidth(String text, PDType1Font font, float fontSize) throws IOException {
+            return font.getStringWidth(text) / 1000f * fontSize;
+        }
+
+        private void drawRule() throws IOException {
+            stream.setStrokingColor(RULE_COLOR);
+            stream.moveTo(MARGIN, y);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN, y);
+            stream.stroke();
+        }
+
+        private void drawFooter() throws IOException {
+            float footerY = BOTTOM_MARGIN + 10f;
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.moveTo(MARGIN, footerY + 10f);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN, footerY + 10f);
+            stream.stroke();
+            writeText("Prepared for printing", MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
+            writeRightAligned("Date: " + LocalDate.now(), page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
+        }
+
+        private void writeText(String text,
+                               float x,
+                               float baselineY,
+                               PDType1Font font,
+                               float fontSize,
+                               Color color) throws IOException {
+            stream.beginText();
+            stream.setNonStrokingColor(color);
+            stream.setFont(font, fontSize);
+            stream.newLineAtOffset(x, baselineY);
+            stream.showText(sanitizePdfText(text));
+            stream.endText();
+        }
+
+        private void writeRightAligned(String text,
+                                       float rightX,
+                                       float baselineY,
+                                       PDType1Font font,
+                                       float fontSize,
+                                       Color color) throws IOException {
+            float width = stringWidth(sanitizePdfText(text), font, fontSize);
+            writeText(text, rightX - width, baselineY, font, fontSize, color);
+        }
+
+        private float contentWidth() {
+            return page.getMediaBox().getWidth() - (MARGIN * 2f);
         }
     }
 

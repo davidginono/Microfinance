@@ -5,16 +5,22 @@ import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,13 +34,23 @@ public class ManagerService {
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final MemberRepository memberRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
+    private final LoanProductSettingRepository loanProductSettingRepository;
     private final OutboxService outboxService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final RoleDirectoryService roleDirectoryService;
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
+    private final LoanAttachmentService loanAttachmentService;
+    private final WorkflowRoutingService workflowRoutingService;
 
     public ManagerDashboard dashboard(String saccoId) {
-        List<LoanApplication> loans = loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
+        return dashboard(saccoId, null);
+    }
+
+    public ManagerDashboard dashboard(String saccoId, String stationId) {
+        List<LoanApplication> loans = filterLoansByApplicantStation(
+            loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId),
+            stationId
+        );
         LocalDate today = LocalDate.now();
         LocalDate currentYearStart = today.withDayOfYear(1);
         LocalDate recentCutoff = today.minusDays(30);
@@ -53,14 +69,30 @@ public class ManagerService {
             .filter(date -> !date.isBefore(currentYearStart))
             .count();
 
+        long defaultedLoansCurrentYear = loans.stream()
+            .filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED)
+            .map(this::dashboardDefaultedDate)
+            .filter(Objects::nonNull)
+            .filter(date -> !date.isBefore(currentYearStart))
+            .count();
+
         List<StatusCount> breakdown = new ArrayList<>();
         for (LoanStatus status : List.of(
             LoanStatus.DRAFT,
+            LoanStatus.SUBMITTED,
             LoanStatus.AWAITING_GUARANTORS,
             LoanStatus.ALL_GUARANTORS_APPROVED,
             LoanStatus.READY_FOR_MANAGER,
+            LoanStatus.MANAGER_ACCEPTED,
+            LoanStatus.AWAITING_LOAN_OFFICER,
+            LoanStatus.LOAN_OFFICER_APPROVED,
+            LoanStatus.LOAN_OFFICER_REJECTED,
             LoanStatus.AWAITING_BOARD,
             LoanStatus.BOARD_APPROVED,
+            LoanStatus.AWAITING_ACCOUNTANT,
+            LoanStatus.ACCOUNTANT_APPROVED,
+            LoanStatus.ACCOUNTANT_REJECTED,
+            LoanStatus.READY_FOR_DISBURSEMENT,
             LoanStatus.MANAGER_REJECTED,
             LoanStatus.BOARD_REJECTED,
             LoanStatus.FINAL_REJECTED,
@@ -87,6 +119,7 @@ public class ManagerService {
             loans.size(),
             totalDisbursed,
             counts.getOrDefault(LoanStatus.FINAL_APPROVED, 0L),
+            defaultedLoansCurrentYear,
             counts.getOrDefault(LoanStatus.PAID, 0L),
             counts.getOrDefault(LoanStatus.READY_FOR_MANAGER, 0L),
             counts.getOrDefault(LoanStatus.AWAITING_BOARD, 0L),
@@ -108,6 +141,16 @@ public class ManagerService {
         return loan.getCreatedAt() == null ? null : loan.getCreatedAt().toLocalDate();
     }
 
+    private LocalDate dashboardDefaultedDate(LoanApplication loan) {
+        if (loan.getUpdatedAt() != null) {
+            return loan.getUpdatedAt().toLocalDate();
+        }
+        if (loan.getFinalDueDate() != null) {
+            return loan.getFinalDueDate();
+        }
+        return loan.getCreatedAt() == null ? null : loan.getCreatedAt().toLocalDate();
+    }
+
     public List<LoanApplication> queue(String saccoId, LoanStatus status) {
         if (status == null) {
             return loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
@@ -116,10 +159,50 @@ public class ManagerService {
         return loanApplicationRepository.findBySaccoIdAndStatusOrderByCreatedAtAsc(saccoId, status);
     }
 
+    public List<LoanApplication> queue(String saccoId, List<LoanStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return queue(saccoId, LoanStatus.READY_FOR_MANAGER);
+        }
+        if (statuses.size() == 1) {
+            return queue(saccoId, statuses.get(0));
+        }
+        return loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(saccoId, statuses);
+    }
+
+    public List<LoanApplication> queue(String saccoId,
+                                       List<LoanStatus> statuses,
+                                       String searchTerm,
+                                       boolean searchByLoanId) {
+        return queue(saccoId, statuses, searchTerm, searchByLoanId, null);
+    }
+
+    public List<LoanApplication> queue(String saccoId,
+                                       List<LoanStatus> statuses,
+                                       String searchTerm,
+                                       boolean searchByLoanId,
+                                       String stationId) {
+        String normalizedSearchTerm = blankToNull(searchTerm);
+        List<LoanApplication> apps = filterLoansByApplicantStation(queue(saccoId, statuses), stationId);
+        if (normalizedSearchTerm == null) {
+            return apps;
+        }
+        String lookup = normalizedSearchTerm.toLowerCase(Locale.ENGLISH);
+        return apps.stream()
+            .filter(app -> matchesQueueSearch(app, lookup, searchByLoanId))
+            .toList();
+    }
+
     public LoanApplication get(UUID id, String saccoId) {
+        return get(id, saccoId, null);
+    }
+
+    public LoanApplication get(UUID id, String saccoId, String stationId) {
         LoanApplication app = loanApplicationRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         if (!app.getSaccoId().equals(saccoId)) {
+            throw new IllegalArgumentException("Forbidden");
+        }
+        if (!matchesApplicantStation(app, stationId)) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
@@ -162,6 +245,7 @@ public class ManagerService {
             .id(UUID.randomUUID())
             .loanApplicationId(loanId)
             .managerMemberId(managerId)
+            .reviewStage(ApprovalWorkflowStage.MANAGER)
             .decision(decision)
             .reasons(reasons)
             .createdAt(OffsetDateTime.now())
@@ -176,107 +260,111 @@ public class ManagerService {
             return;
         }
 
-        app.setStatus(LoanStatus.MANAGER_ACCEPTED);
-        loanApplicationRepository.save(app);
-
-        SaccoSettings settings = saccoSettingsRepository.findById(app.getSaccoId())
-            .orElseThrow(() -> new IllegalArgumentException("SACCO settings missing"));
-        int requiredBoardReviewers = settings.getBoardQuorum() == null || settings.getBoardQuorum() <= 0
-            ? Math.max(settings.getBoardSize() == null ? 0 : settings.getBoardSize(), 1)
-            : settings.getBoardQuorum();
-
-        List<RoleDirectoryService.RoleAccountRef> boardMembers = roleDirectoryService.activeByRole(app.getSaccoId(), Position.BOARD);
-        if (boardMembers.size() < requiredBoardReviewers) {
-            throw new IllegalStateException("Not enough board members");
-        }
-
-        // If the workflow was returned to manager review after an earlier board assignment,
-        // stale board review rows may still exist. Reset them before creating the fresh queue.
-        if (!boardReviewRepository.findByLoanApplicationId(loanId).isEmpty()) {
-            boardReviewRepository.deleteByLoanApplicationId(loanId);
-        }
-
-        boardMembers.stream().limit(requiredBoardReviewers).forEach(board -> {
-            boardReviewRepository.save(BoardReview.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(loanId)
-                .boardMemberId(board.getId())
-                .decision(BoardDecision.PENDING)
-                .createdAt(OffsetDateTime.now())
-                .build());
-
-            outboxService.enqueue("BOARD", loanId, "BOARD_REVIEW_ASSIGNED", board.getId(),
-                Map.of("loanId", loanId.toString()));
-        });
-
-        app.setStatus(LoanStatus.AWAITING_BOARD);
-        app.setUpdatedAt(OffsetDateTime.now());
+        workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.MANAGER, managerId);
         loanApplicationRepository.save(app);
     }
 
     @Transactional
-    public void finalizeDecision(UUID applicationId,
-                                 String decision,
-                                 UUID managerId,
-                                 LocalDate disbursementDate,
-                                 LocalDate firstRepaymentDate,
-                                 RepaymentFrequency repaymentFrequency,
-                                 BigDecimal installmentAmount,
-                                 String loanId,
-                                 String disbursementReference,
-                                 String disbursementNotes) {
-        LoanApplication app = getManagedApplication(applicationId, managerId);
-
-        if ("FINAL_APPROVE".equals(decision) && app.getStatus() == LoanStatus.BOARD_APPROVED) {
-            RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
-            validateDisbursement(disbursementDate, firstRepaymentDate);
-            String normalisedLoanId = blankToNull(loanId);
-            if (normalisedLoanId == null) {
-                throw new IllegalArgumentException("Loan ID is required to disburse this loan");
-            }
-            if (!LOAN_ID_PATTERN.matcher(normalisedLoanId).matches()) {
-                throw new IllegalArgumentException("Loan ID must be 4-20 digits (numbers only)");
-            }
-            if (!normalisedLoanId.equals(app.getLoanId())
-                && loanApplicationRepository.existsBySaccoIdAndLoanId(app.getSaccoId(), normalisedLoanId)) {
-                throw new IllegalArgumentException("Loan ID is already used in this SACCO");
-            }
-            RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
-                app,
-                disbursementDate,
-                firstRepaymentDate,
-                effectiveFrequency,
-                installmentAmount,
-                disbursementReference,
-                disbursementNotes
-            );
-            app.setDisbursementDate(disbursementDate);
-            app.setFirstRepaymentDate(firstRepaymentDate);
-            app.setRepaymentFrequency(effectiveFrequency);
-            app.setInstallmentAmount(schedule.installmentAmount());
-            app.setFinalDueDate(schedule.finalDueDate());
-            app.setLoanId(normalisedLoanId);
-            app.setDisbursementReference(blankToNull(disbursementReference));
-            app.setDisbursementNotes(blankToNull(disbursementNotes));
-            app.setRepaymentScheduleJson(schedule.scheduleJson());
-            app.setStatus(LoanStatus.FINAL_APPROVED);
-        } else if ("FINAL_REJECT".equals(decision) && app.getStatus() == LoanStatus.BOARD_REJECTED) {
-            app.setStatus(LoanStatus.FINAL_REJECTED);
-        } else {
-            throw new IllegalStateException("Invalid finalization state");
+    public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons) {
+        LoanApplication app = getAccountantApplication(loanId, accountantId);
+        if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
+            throw new IllegalStateException("Application is not ready for accountant review");
         }
+        managerReviewRepository.save(ManagerReview.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .managerMemberId(accountantId)
+            .reviewStage(ApprovalWorkflowStage.ACCOUNTANT)
+            .decision(decision)
+            .reasons(reasons)
+            .createdAt(OffsetDateTime.now())
+            .build());
+        if (decision == ManagerDecision.REJECT) {
+            app.setStatus(LoanStatus.ACCOUNTANT_REJECTED);
+            app.setUpdatedAt(OffsetDateTime.now());
+            loanApplicationRepository.save(app);
+            outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
+                Map.of("reasons", reasons == null ? "" : reasons));
+            return;
+        }
+        workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.ACCOUNTANT, accountantId);
+        loanApplicationRepository.save(app);
+    }
 
+    @Transactional
+    public void disburseLoan(UUID applicationId,
+                             UUID disbursementOfficerId,
+                             LocalDate disbursementDate,
+                             LocalDate firstRepaymentDate,
+                             RepaymentFrequency repaymentFrequency,
+                             BigDecimal installmentAmount,
+                             String loanId,
+                             String disbursementReference,
+                             String disbursementNotes,
+                             MultipartFile disbursementProofFile) {
+        LoanApplication app = getDisbursementApplication(applicationId, disbursementOfficerId);
+        if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
+            throw new IllegalStateException("Application is not ready for disbursement");
+        }
+        RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
+        validateDisbursement(disbursementDate, firstRepaymentDate);
+        if (disbursementProofFile == null || disbursementProofFile.isEmpty()) {
+            throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
+        }
+        String normalisedLoanId = blankToNull(loanId);
+        if (normalisedLoanId == null) {
+            throw new IllegalArgumentException("Loan ID is required to disburse this loan");
+        }
+        if (!LOAN_ID_PATTERN.matcher(normalisedLoanId).matches()) {
+            throw new IllegalArgumentException("Loan ID must be 4-20 digits (numbers only)");
+        }
+        if (!normalisedLoanId.equals(app.getLoanId())
+            && loanApplicationRepository.existsBySaccoIdAndLoanId(app.getSaccoId(), normalisedLoanId)) {
+            throw new IllegalArgumentException("Loan ID is already used in this SACCO");
+        }
+        RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
+            app,
+            disbursementDate,
+            firstRepaymentDate,
+            effectiveFrequency,
+            installmentAmount,
+            disbursementReference,
+            disbursementNotes
+        );
+        app.setDisbursementDate(disbursementDate);
+        app.setFirstRepaymentDate(firstRepaymentDate);
+        app.setRepaymentFrequency(effectiveFrequency);
+        app.setInstallmentAmount(schedule.installmentAmount());
+        app.setFinalDueDate(schedule.finalDueDate());
+        app.setLoanId(normalisedLoanId);
+        app.setDisbursementReference(blankToNull(disbursementReference));
+        app.setDisbursementNotes(blankToNull(disbursementNotes));
+        app.setRepaymentScheduleJson(schedule.scheduleJson());
+        app.setAttachmentsJson(loanAttachmentService.store(
+            app.getId(),
+            List.of(disbursementProofFile),
+            app.getAttachmentsJson(),
+            LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF
+        ));
+        managerReviewRepository.save(ManagerReview.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(applicationId)
+            .managerMemberId(disbursementOfficerId)
+            .reviewStage(ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+            .decision(ManagerDecision.ACCEPT)
+            .reasons(blankToNull(disbursementNotes))
+            .createdAt(OffsetDateTime.now())
+            .build());
+        app.setStatus(LoanStatus.FINAL_APPROVED);
         app.setUpdatedAt(OffsetDateTime.now());
         loanApplicationRepository.save(app);
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("managerId", managerId.toString());
-        if (app.getStatus() == LoanStatus.FINAL_APPROVED) {
-            details.put("finalDueDate", String.valueOf(app.getFinalDueDate()));
-            details.put("firstRepaymentDate", String.valueOf(app.getFirstRepaymentDate()));
-            details.put("repaymentFrequency", app.getRepaymentFrequency() == null ? "" : app.getRepaymentFrequency().name());
-            details.put("installmentAmount", app.getInstallmentAmount());
-            details.put("loanId", app.getLoanId());
-        }
+        details.put("managerId", disbursementOfficerId.toString());
+        details.put("finalDueDate", String.valueOf(app.getFinalDueDate()));
+        details.put("firstRepaymentDate", String.valueOf(app.getFirstRepaymentDate()));
+        details.put("repaymentFrequency", app.getRepaymentFrequency() == null ? "" : app.getRepaymentFrequency().name());
+        details.put("installmentAmount", app.getInstallmentAmount());
+        details.put("loanId", app.getLoanId());
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
             details);
     }
@@ -313,10 +401,36 @@ public class ManagerService {
         return loanPaymentTransactionSyncService.syncRecent(app, monthsBack);
     }
 
+    public boolean matchesApplicantStation(LoanApplication loan, String stationId) {
+        if (loan == null || stationId == null || stationId.isBlank()) {
+            return true;
+        }
+        String loanStationId = blankToNull(loan.getStationId());
+        return loanStationId != null && loanStationId.equalsIgnoreCase(stationId);
+    }
+
     private LoanApplication getManagedApplication(UUID loanId, UUID managerId) {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         if (!roleDirectoryService.hasActiveRoleInSacco(managerId, app.getSaccoId(), Position.MANAGER)) {
+            throw new IllegalArgumentException("Forbidden");
+        }
+        return app;
+    }
+
+    private LoanApplication getAccountantApplication(UUID loanId, UUID accountantId) {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        if (!roleDirectoryService.hasActiveRoleInSacco(accountantId, app.getSaccoId(), Position.ACCOUNTANT)) {
+            throw new IllegalArgumentException("Forbidden");
+        }
+        return app;
+    }
+
+    private LoanApplication getDisbursementApplication(UUID loanId, UUID disbursementOfficerId) {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        if (!roleDirectoryService.hasActiveRoleInSacco(disbursementOfficerId, app.getSaccoId(), Position.DISBURSEMENT_OFFICER)) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
@@ -335,8 +449,26 @@ public class ManagerService {
         }
     }
 
+    private boolean matchesQueueSearch(LoanApplication app, String lookup, boolean searchByLoanId) {
+        if (searchByLoanId) {
+            String loanId = blankToNull(app.getLoanId());
+            return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(lookup);
+        }
+        Long applicationNumber = app.getApplicationNumber();
+        return applicationNumber != null && String.valueOf(applicationNumber).contains(lookup);
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private List<LoanApplication> filterLoansByApplicantStation(List<LoanApplication> loans, String stationId) {
+        if (stationId == null || stationId.isBlank() || loans.isEmpty()) {
+            return loans;
+        }
+        return loans.stream()
+            .filter(loan -> stationId.equalsIgnoreCase(blankToNull(loan.getStationId())))
+            .toList();
     }
 
     private boolean isWithinReversalWindow(OffsetDateTime referenceAt) {
@@ -363,6 +495,7 @@ public class ManagerService {
         long totalLoans,
         long totalDisbursedLoans,
         long activeDisbursedLoans,
+        long defaultedLoansCurrentYear,
         long paidLoans,
         long onReviewByManagerLoans,
         long onReviewByBoardLoans,

@@ -1,7 +1,10 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanProductSetting;
+import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,9 +17,11 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class SaccoConfigurationService {
+    private static final BigDecimal DEFAULT_MINIMUM_AMOUNT = BigDecimal.ZERO.setScale(2);
     private static final BigDecimal DEFAULT_RATIO = new BigDecimal("0.3333");
     private static final BigDecimal DEFAULT_INSURANCE_RATE = new BigDecimal("0.0150");
     private static final BigDecimal DEFAULT_INTEREST_RATE = new BigDecimal("0.1000");
+    private static final int DEFAULT_MIN_REPAYMENT_MONTHS = 1;
 
     private final LoanProductSettingRepository loanProductSettingRepository;
 
@@ -41,12 +46,31 @@ public class SaccoConfigurationService {
         loanProductSettingRepository.save(newLoanProduct(
             saccoId,
             loanType,
+            loanType.defaultProductCode(),
+            null,
+            loanType.defaultDescription(),
+            loanType.getDisplayOrder(),
+            DEFAULT_MINIMUM_AMOUNT,
             null,
             guarantorsRequired,
             DEFAULT_RATIO,
             DEFAULT_INSURANCE_RATE,
             DEFAULT_INTEREST_RATE,
+            InterestMethod.FLAT_RATE,
+            DEFAULT_MIN_REPAYMENT_MONTHS,
             maxRepaymentMonths,
+            false,
+            false,
+            true,
+            null,
+            ApprovalWorkflowStage.MANAGER,
+            true,
+            3,
+            2,
+            2,
+            true,
+            4,
+            LoanProductStatus.ACTIVE,
             true,
             now
         ));
@@ -55,12 +79,31 @@ public class SaccoConfigurationService {
     @Transactional
     public LoanProductSetting createLoanProduct(String saccoId,
                                                 LoanType loanType,
+                                                String productCode,
                                                 String productName,
+                                                String productDescription,
+                                                Integer displayOrder,
+                                                BigDecimal minimumAmount,
+                                                BigDecimal maximumAmount,
                                                 Integer guarantorsRequired,
                                                 BigDecimal maxLoanSavingsRatio,
                                                 BigDecimal insuranceRate,
                                                 BigDecimal interestRate,
+                                                InterestMethod interestMethod,
+                                                Integer minRepaymentMonths,
                                                 Integer maxRepaymentMonths,
+                                                boolean allowApplicationWithActiveLoan,
+                                                boolean freshFinancialDataRequired,
+                                                boolean managerReviewRequired,
+                                                Boolean loanOfficerReviewRequired,
+                                                ApprovalWorkflowStage workflowStartStage,
+                                                boolean committeeReviewRequired,
+                                                Integer committeePriority,
+                                                Integer committeeMinimumVotes,
+                                                Integer committeeApprovalThreshold,
+                                                boolean accountantReviewRequired,
+                                                Integer accountantPriority,
+                                                LoanProductStatus productStatus,
                                                 boolean active) {
         if (loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
             throw new IllegalStateException("That loan product already exists for this SACCO.");
@@ -69,12 +112,31 @@ public class SaccoConfigurationService {
         return loanProductSettingRepository.save(newLoanProduct(
             saccoId,
             loanType,
+            productCode,
             productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
             guarantorsRequired,
             maxLoanSavingsRatio == null ? DEFAULT_RATIO : maxLoanSavingsRatio,
             insuranceRate == null ? DEFAULT_INSURANCE_RATE : insuranceRate,
             interestRate == null ? DEFAULT_INTEREST_RATE : interestRate,
+            interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod,
+            minRepaymentMonths == null ? DEFAULT_MIN_REPAYMENT_MONTHS : minRepaymentMonths,
             maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority,
+            productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus,
             active,
             now
         ));
@@ -82,26 +144,64 @@ public class SaccoConfigurationService {
 
     private LoanProductSetting newLoanProduct(String saccoId,
                                               LoanType loanType,
+                                              String productCode,
                                               String productName,
+                                              String productDescription,
+                                              Integer displayOrder,
+                                              BigDecimal minimumAmount,
+                                              BigDecimal maximumAmount,
                                               Integer guarantorsRequired,
                                               BigDecimal maxLoanSavingsRatio,
                                               BigDecimal insuranceRate,
                                               BigDecimal interestRate,
+                                              InterestMethod interestMethod,
+                                              Integer minRepaymentMonths,
                                               Integer maxRepaymentMonths,
+                                              boolean allowApplicationWithActiveLoan,
+                                              boolean freshFinancialDataRequired,
+                                              boolean managerReviewRequired,
+                                              Boolean loanOfficerReviewRequired,
+                                              ApprovalWorkflowStage workflowStartStage,
+                                              boolean committeeReviewRequired,
+                                              Integer committeePriority,
+                                              Integer committeeMinimumVotes,
+                                              Integer committeeApprovalThreshold,
+                                              boolean accountantReviewRequired,
+                                              Integer accountantPriority,
+                                              LoanProductStatus productStatus,
                                               boolean active,
                                               OffsetDateTime now) {
         return LoanProductSetting.builder()
             .id(UUID.randomUUID())
             .saccoId(saccoId)
             .loanType(loanType)
+            .productCode(productCode)
             .productName(productName)
+            .productDescription(productDescription)
+            .displayOrder(displayOrder)
+            .minimumAmount(minimumAmount == null ? DEFAULT_MINIMUM_AMOUNT : minimumAmount)
+            .maximumAmount(maximumAmount)
             .guarantorsRequired(guarantorsRequired)
             .maxLoanSavingsRatio(maxLoanSavingsRatio)
             .insuranceRate(insuranceRate)
             .interestRate(interestRate)
+            .interestMethod(interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod)
+            .minRepaymentMonths(minRepaymentMonths == null ? DEFAULT_MIN_REPAYMENT_MONTHS : minRepaymentMonths)
             .maxRepaymentMonths(maxRepaymentMonths)
+            .allowApplicationWithActiveLoan(allowApplicationWithActiveLoan)
+            .freshFinancialDataRequired(freshFinancialDataRequired)
+            .managerReviewRequired(managerReviewRequired)
+            .loanOfficerReviewRequired(loanOfficerReviewRequired)
+            .workflowStartStage(workflowStartStage == null ? ApprovalWorkflowStage.MANAGER : workflowStartStage)
+            .committeeReviewRequired(committeeReviewRequired)
+            .committeePriority(committeePriority)
+            .committeeMinimumVotes(committeeMinimumVotes)
+            .committeeApprovalThreshold(committeeApprovalThreshold)
+            .accountantReviewRequired(accountantReviewRequired)
+            .accountantPriority(accountantPriority)
+            .productStatus(productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus)
             .formSchema(defaultLoanFormSchema())
-            .active(active)
+            .active(active && (productStatus == null || productStatus == LoanProductStatus.ACTIVE))
             .createdAt(now)
             .updatedAt(now)
             .build();

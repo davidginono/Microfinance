@@ -16,6 +16,9 @@ public class MemberRegistrationForm {
     @NotBlank(message = "Enter your email address.")
     private String email;
 
+    @NotBlank(message = "Enter your phone number.")
+    private String phone;
+
     @NotBlank(message = "Enter your full names.")
     private String fullName;
 

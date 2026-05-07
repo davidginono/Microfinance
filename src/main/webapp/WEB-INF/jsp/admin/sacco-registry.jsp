@@ -19,9 +19,21 @@
             <c:if test="${superAdmin}">
                 <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco">Add SACCO</button>
             </c:if>
+            <c:if test="${not superAdmin and not empty registeredSaccos}">
+                <button type="button"
+                        class="app-btn btn-primary"
+                        data-sacco-modal-open="add-station-${registeredSaccos[0].saccoId}">
+                    Add Station
+                </button>
+            </c:if>
         </div>
     </div>
     <div class="erp-panel-body">
+        <c:if test="${not superAdmin}">
+            <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Add a new station from the button above, or use Edit Stations to review the full station list.
+            </div>
+        </c:if>
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table min-w-[680px]">
                 <thead>
@@ -65,7 +77,7 @@
                             <button type="button"
                                     class="app-btn btn-primary"
                                     data-sacco-modal-open="edit-${sacco.saccoId}">
-                                Edit
+                                ${superAdmin ? 'Edit' : 'Edit Stations'}
                             </button>
                         </td>
                     </tr>
@@ -154,14 +166,45 @@
 </div>
 </c:if>
 
+<c:if test="${not superAdmin and not empty registeredSaccos}">
+<div class="app-modal-overlay hidden" data-sacco-modal="add-station-${registeredSaccos[0].saccoId}">
+    <div class="app-modal-panel app-modal-panel--compact">
+        <div class="app-modal-scroll">
+            <div class="app-modal-header">
+                <div>
+                    <p class="erp-panel-title">Add Station</p>
+                    <p class="mt-2 text-sm text-slate-500">Save one new station ID for this SACCO workspace.</p>
+                </div>
+                <button type="button" class="app-modal-close" data-sacco-modal-close="add-station-${registeredSaccos[0].saccoId}" aria-label="Close modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </div>
+            <form action="/admin/saccos/${registeredSaccos[0].saccoId}/stations" method="post" class="app-modal-body space-y-4">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <label class="block text-sm font-semibold text-slate-700">
+                    Station ID
+                    <input name="stationId" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="Enter the new station ID" />
+                </label>
+                <div class="app-modal-actions">
+                    <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="add-station-${registeredSaccos[0].saccoId}">Cancel</button>
+                    <button type="submit" class="app-btn btn-primary">Save Station</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</c:if>
+
 <c:forEach items="${registeredSaccos}" var="sacco">
     <div class="app-modal-overlay hidden" data-sacco-modal="edit-${sacco.saccoId}">
         <div class="app-modal-panel app-modal-panel--compact">
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-panel-title">Edit SACCO</p>
-                        <p class="mt-2 text-sm text-slate-500">Update the SACCO name and active station IDs.</p>
+                        <p class="erp-panel-title">${superAdmin ? 'Edit SACCO' : 'Edit Stations'}</p>
+                        <p class="mt-2 text-sm text-slate-500">${superAdmin ? 'Update the SACCO name and active station IDs.' : 'Review and update the active station IDs for this SACCO workspace.'}</p>
                     </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="edit-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

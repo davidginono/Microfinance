@@ -24,6 +24,10 @@ public class ManagerReview {
     private UUID managerMemberId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "review_stage", nullable = false)
+    private ApprovalWorkflowStage reviewStage;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ManagerDecision decision;
 

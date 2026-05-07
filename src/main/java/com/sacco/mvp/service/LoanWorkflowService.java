@@ -1,6 +1,9 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
+import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
+import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -24,9 +27,14 @@ public class LoanWorkflowService {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
     private static final List<LoanStatus> REVIEW_ONWARD_LOCK_STATUSES = List.of(
         LoanStatus.READY_FOR_MANAGER,
-        LoanStatus.MANAGER_ACCEPTED,
+        LoanStatus.AWAITING_LOAN_OFFICER,
         LoanStatus.AWAITING_BOARD,
-        LoanStatus.BOARD_APPROVED
+        LoanStatus.AWAITING_ACCOUNTANT,
+        LoanStatus.READY_FOR_DISBURSEMENT
+    );
+    private static final List<LoanStatus> ACTIVE_LOAN_LOCK_STATUSES = List.of(
+        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DEFAULTED
     );
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
@@ -40,20 +48,25 @@ public class LoanWorkflowService {
     private final OutboxService outboxService;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
+    private final FinancialDetailsService financialDetailsService;
     private final ObjectMapper objectMapper;
+    private final ForesightDirectoryService foresightDirectoryService;
     private final SaccoConfigurationService saccoConfigurationService;
     private final ApplicationNumberService applicationNumberService;
+    private final RoleDirectoryService roleDirectoryService;
+    private final LoanProductWorkflowService loanProductWorkflowService;
+    private final WorkflowRoutingService workflowRoutingService;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
         if (!products.isEmpty()) {
             return products.stream()
-                .sorted(java.util.Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+                .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
                 .toList();
         }
         saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
         return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
-            .sorted(java.util.Comparator.comparingInt(product -> product.getLoanType().getDisplayOrder()))
+            .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
     }
 
@@ -70,6 +83,32 @@ public class LoanWorkflowService {
         return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, REVIEW_ONWARD_LOCK_STATUSES)
             .stream()
             .findFirst();
+    }
+
+    public Optional<LoanApplication> findActiveDisbursedLoan(UUID memberId) {
+        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, ACTIVE_LOAN_LOCK_STATUSES)
+            .stream()
+            .findFirst();
+    }
+
+    public void assertCanApplyForProduct(String saccoId, UUID memberId, LoanProductSetting product) {
+        if (product == null) {
+            throw new IllegalArgumentException("Loan product not found");
+        }
+        if (!Objects.equals(product.getSaccoId(), saccoId)) {
+            throw new IllegalArgumentException("Loan product not found");
+        }
+        if (!product.isAvailableForApplications()) {
+            throw new IllegalStateException("This loan product is not currently available for new applications.");
+        }
+        findActiveDisbursedLoan(memberId).ifPresent(activeLoan -> {
+            if (!product.isApplicationWithActiveLoanAllowed()) {
+                throw new IllegalStateException(
+                    "You already have active loan " + loanReference(activeLoan)
+                        + ". This product does not allow a new application while an active loan is still open."
+                );
+            }
+        });
     }
 
     public boolean canRequestTopUp(LoanApplication app) {
@@ -102,21 +141,8 @@ public class LoanWorkflowService {
                                      List<UUID> guarantorIds, String financialSnapshotJson, UUID topUpSourceLoanId,
                                      List<MultipartFile> attachments) {
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
-        LoanProductSetting product = formSchemaService.getSchema(saccoId, loanType);
-        validateRepaymentPeriod(product, tenorMonths);
-        Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
-        formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
-        validateGuarantorSelection(saccoId, applicantId, product.getGuarantorsRequired(), guarantorIds);
-
-        EligibilityService.EligibilityResult eligibility = eligibilityService.check(saccoId, applicantId, loanType, amount);
-        String snapshot = eligibilityService.policySnapshotJson(eligibility, product.getGuarantorsRequired());
-
-        LoanApplication application = existingId == null
-            ? LoanApplication.builder()
-                .id(UUID.randomUUID())
-                .applicationNumber(applicationNumberService.nextFor(saccoId))
-                .createdAt(OffsetDateTime.now())
-                .build()
+        LoanApplication existingDraft = existingId == null
+            ? null
             : loanApplicationRepository.findByIdAndApplicantMemberId(existingId, applicantId)
                 .map(existing -> {
                     if (existing.getStatus() != LoanStatus.DRAFT) {
@@ -125,8 +151,43 @@ public class LoanWorkflowService {
                     return existing;
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Loan draft not found"));
+        String applicantStationId = existingDraft != null
+            ? coalesceStationId(existingDraft.getStationId(), resolveMemberStationId(applicantId))
+            : requireMemberStationId(applicantId);
+        LoanProductSetting product = formSchemaService.getSchema(saccoId, loanType);
+        assertCanApplyForProduct(saccoId, applicantId, product);
+        validateRequestedAmount(product, amount);
+        validateRepaymentPeriod(product, tenorMonths);
+        Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
+        formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
+        appendLoanPurpose(formData, requestParams.get("purpose"));
+        validateGuarantorSelection(
+            saccoId,
+            applicantStationId,
+            applicantId,
+            product.getGuarantorsRequired(),
+            guarantorIds
+        );
+
+        EligibilityService.EligibilityResult eligibility = eligibilityService.check(saccoId, applicantId, loanType, amount);
+        String snapshot = eligibilityService.policySnapshotJson(
+            eligibility,
+            product.getGuarantorsRequired(),
+            loanProductWorkflowService.snapshotData(
+                loanProductWorkflowService.resolveForProduct(saccoId, product)
+            )
+        );
+
+        LoanApplication application = existingDraft == null
+            ? LoanApplication.builder()
+                .id(UUID.randomUUID())
+                .applicationNumber(applicationNumberService.nextFor(saccoId))
+                .createdAt(OffsetDateTime.now())
+                .build()
+            : existingDraft;
 
         application.setSaccoId(saccoId);
+        application.setStationId(applicantStationId);
         application.setApplicantMemberId(applicantId);
         application.setTopUpSourceLoanId(topUpSourceLoan == null ? null : topUpSourceLoan.getId());
         application.setLoanType(loanType);
@@ -147,6 +208,20 @@ public class LoanWorkflowService {
         LoanApplication saved = loanApplicationRepository.save(application);
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
         return loanApplicationRepository.save(saved);
+    }
+
+    private void appendLoanPurpose(Map<String, Object> formData, String purpose) {
+        if (purpose == null) {
+            return;
+        }
+        String normalizedPurpose = purpose.trim().replaceAll("\\s+", " ");
+        if (normalizedPurpose.isBlank()) {
+            return;
+        }
+        if (normalizedPurpose.length() > 1000) {
+            normalizedPurpose = normalizedPurpose.substring(0, 1000).trim();
+        }
+        formData.put("purpose", normalizedPurpose);
     }
 
     private boolean isTopUpBlockedFor(LoanApplication app) {
@@ -178,20 +253,27 @@ public class LoanWorkflowService {
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             throw new IllegalStateException("Load SACCO financial details before submitting the application");
         }
+        LoanProductSetting product = resolveWorkflowProduct(app);
+        syncFinancialSnapshotToCurrentProduct(app);
+        refreshFinancialSnapshotIfRequired(app, product);
 
         EligibilityService.EligibilityResult result = eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(),
             app.getLoanType(), app.getAmount());
         if (!result.eligible()) {
             throw new IllegalStateException("Amount exceeds eligibility cap");
         }
+        app.setPolicySnapshot(eligibilityService.policySnapshotJson(
+            result,
+            app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
+            loanProductWorkflowService.snapshotData(
+                loanProductWorkflowService.resolveForProduct(app.getSaccoId(), product)
+            )
+        ));
 
         app.setSubmittedAt(OffsetDateTime.now());
 
         if (app.getRequiredGuarantors() == 0) {
-            assertApplicantCanAdvanceToManagerReview(memberId);
-            app.setStatus(LoanStatus.READY_FOR_MANAGER);
-            outboxService.enqueue("LOAN", app.getId(), "LOAN_READY_FOR_MANAGER", memberId,
-                Map.of("loanId", app.getId().toString()));
+            moveIntoConfiguredReviewStage(app, memberId);
         } else {
             List<UUID> selectedGuarantors = parseSelectedGuarantors(app.getSelectedGuarantors());
             if (selectedGuarantors.size() != app.getRequiredGuarantors()) {
@@ -214,14 +296,25 @@ public class LoanWorkflowService {
         if (app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
             throw new IllegalStateException("Only applications with all guarantors approved can be submitted to manager");
         }
+        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            throw new IllegalStateException("Load SACCO financial details before submitting the application");
+        }
+        LoanProductSetting product = resolveWorkflowProduct(app);
+        syncFinancialSnapshotToCurrentProduct(app);
+        refreshFinancialSnapshotIfRequired(app, product);
+        EligibilityService.EligibilityResult result = eligibilityService.check(
+            app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount()
+        );
+        app.setPolicySnapshot(eligibilityService.policySnapshotJson(
+            result,
+            app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
+            loanProductWorkflowService.snapshotData(
+                loanProductWorkflowService.resolveForProduct(app.getSaccoId(), product)
+            )
+        ));
 
-        assertApplicantCanAdvanceToManagerReview(memberId);
-        app.setStatus(LoanStatus.READY_FOR_MANAGER);
-        app.setUpdatedAt(OffsetDateTime.now());
-        LoanApplication submitted = loanApplicationRepository.save(app);
-        outboxService.enqueue("LOAN", app.getId(), "LOAN_READY_FOR_MANAGER", memberId,
-            Map.of("loanId", app.getId().toString()));
-        return submitted;
+        moveIntoConfiguredReviewStage(app, memberId);
+        return loanApplicationRepository.save(app);
     }
 
     private void assertApplicantCanAdvanceToManagerReview(UUID applicantId) {
@@ -236,8 +329,11 @@ public class LoanWorkflowService {
 
     private String humanizeApplicationLockStatus(LoanStatus status) {
         return switch (status) {
-            case READY_FOR_MANAGER, MANAGER_ACCEPTED -> "On Review By Manager";
+            case READY_FOR_MANAGER -> "On Review By Manager";
+            case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case AWAITING_BOARD, BOARD_APPROVED -> "On Review By Board";
+            case AWAITING_ACCOUNTANT, ACCOUNTANT_APPROVED -> "On Review By Accountant";
+            case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             default -> status.name().replace('_', ' ');
         };
     }
@@ -260,24 +356,28 @@ public class LoanWorkflowService {
         return loanPaymentTransactionSyncService.syncRecent(app, monthsBack);
     }
 
-    public Page<Member> searchGuarantors(String saccoId, UUID applicantId, String q, int page, int size) {
+    public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, int page, int size) {
         String query = q == null ? "" : q.trim();
         if (query.isBlank()) {
             return Page.empty(PageRequest.of(page, size));
         }
 
+        String normalizedStationId = normalizeOptional(stationId);
         Optional<Member> exactMemberNo = memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(
             saccoId, MemberStatus.ACTIVE, query);
-        if (exactMemberNo.isPresent() && !exactMemberNo.get().getId().equals(applicantId)) {
+        if (exactMemberNo.isPresent()
+            && !exactMemberNo.get().getId().equals(applicantId)
+            && matchesStation(exactMemberNo.get(), normalizedStationId)) {
             return new PageImpl<>(List.of(exactMemberNo.get()), PageRequest.of(page, size), 1);
         }
 
-        if (!query.matches("\\d{6}")) {
+        if (!query.matches("\\d{4,20}")) {
             return Page.empty(PageRequest.of(page, size));
         }
 
         List<Member> matches = memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
             .filter(member -> !member.getId().equals(applicantId))
+            .filter(member -> matchesStation(member, normalizedStationId))
             .filter(member -> {
                 String memberNo = member.getMemberNo() == null ? "" : member.getMemberNo();
                 String digits = memberNo.replaceAll("\\D", "");
@@ -554,10 +654,17 @@ public class LoanWorkflowService {
     }
 
     private List<UUID> normalizeGuarantorSelection(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
-        return validateGuarantorSelection(app.getSaccoId(), applicantId, app.getRequiredGuarantors(), guarantorIds);
+        return validateGuarantorSelection(
+            app.getSaccoId(),
+            coalesceStationId(app.getStationId(), requireMemberStationId(applicantId)),
+            applicantId,
+            app.getRequiredGuarantors(),
+            guarantorIds
+        );
     }
 
     private List<UUID> validateGuarantorSelection(String saccoId,
+                                                  String stationId,
                                                   UUID applicantId,
                                                   Integer requiredGuarantors,
                                                   List<UUID> guarantorIds) {
@@ -582,9 +689,61 @@ public class LoanWorkflowService {
             if (!guarantor.getSaccoId().equals(saccoId) || guarantor.getStatus() != MemberStatus.ACTIVE) {
                 throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
             }
+            if (!matchesStation(guarantor, stationId)) {
+                throw new IllegalArgumentException("Guarantor must be in the same station");
+            }
         }
 
         return uniqueGuarantors;
+    }
+
+    private String resolveMemberStationId(UUID memberId) {
+        if (memberId == null) {
+            return null;
+        }
+        return memberRepository.findById(memberId)
+            .map(Member::getStationId)
+            .map(this::normalizeStationId)
+            .orElse(null);
+    }
+
+    private String requireMemberStationId(UUID memberId) {
+        String stationId = resolveMemberStationId(memberId);
+        if (stationId == null) {
+            throw new IllegalStateException("Applicant station is not configured.");
+        }
+        return stationId;
+    }
+
+    private boolean matchesStation(Member member, String stationId) {
+        String normalizedStationId = normalizeStationId(stationId);
+        if (normalizedStationId == null) {
+            return true;
+        }
+        return member != null
+            && member.getStationId() != null
+            && normalizedStationId.equalsIgnoreCase(member.getStationId());
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String coalesceStationId(String primaryStationId, String fallbackStationId) {
+        String normalizedPrimary = normalizeStationId(primaryStationId);
+        return normalizedPrimary != null ? normalizedPrimary : normalizeStationId(fallbackStationId);
+    }
+
+    private String normalizeStationId(String stationId) {
+        if (stationId == null) {
+            return null;
+        }
+        String normalized = stationId.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 
     private void refreshGuarantorRequestsForSubmission(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
@@ -627,14 +786,154 @@ public class LoanWorkflowService {
         }
     }
 
+    private void validateRequestedAmount(LoanProductSetting product, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Loan amount must be greater than zero.");
+        }
+        if (product.getMinimumAmount() != null && amount.compareTo(product.getMinimumAmount()) < 0) {
+            throw new IllegalArgumentException(
+                "Loan amount cannot be below " + product.getMinimumAmount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                    + " for this loan product"
+            );
+        }
+        if (product.getMaximumAmount() != null && amount.compareTo(product.getMaximumAmount()) > 0) {
+            throw new IllegalArgumentException(
+                "Loan amount cannot exceed " + product.getMaximumAmount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                    + " for this loan product"
+            );
+        }
+    }
+
     private void validateRepaymentPeriod(LoanProductSetting product, Integer tenorMonths) {
         if (tenorMonths == null || tenorMonths <= 0) {
             throw new IllegalArgumentException("Repayment period must be at least 1 month");
+        }
+        int minimumMonths = product.getMinimumRepaymentMonths();
+        if (tenorMonths < minimumMonths) {
+            throw new IllegalArgumentException("Repayment period cannot be below " + minimumMonths + " month(s) for this loan product");
         }
         if (product.getMaxRepaymentMonths() != null
             && product.getMaxRepaymentMonths() > 0
             && tenorMonths > product.getMaxRepaymentMonths()) {
             throw new IllegalArgumentException("Repayment period cannot exceed " + product.getMaxRepaymentMonths() + " month(s) for this loan product");
         }
+    }
+
+    private void moveIntoConfiguredReviewStage(LoanApplication app, UUID actorMemberId) {
+        assertApplicantCanAdvanceToManagerReview(app.getApplicantMemberId());
+        workflowRoutingService.moveToFirstReviewStage(app, actorMemberId);
+        app.setUpdatedAt(OffsetDateTime.now());
+    }
+
+    private LoanProductSetting resolveWorkflowProduct(LoanApplication app) {
+        if (app == null || app.getSaccoId() == null || app.getLoanType() == null) {
+            return null;
+        }
+        return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
+            .orElse(null);
+    }
+
+    private void syncFinancialSnapshotToCurrentProduct(LoanApplication app) {
+        if (app == null) {
+            return;
+        }
+        Map<String, Object> latestSnapshot = new LinkedHashMap<>(financialDetailsService.generateSnapshot(
+            app.getSaccoId(),
+            app.getApplicantMemberId(),
+            app.getLoanType(),
+            app.getAmount(),
+            app.getTenorMonths(),
+            app.getTopUpSourceLoanId()
+        ));
+        latestSnapshot.putAll(extractLiveFinancialValues(app.getFinancialSnapshot()));
+        app.setFinancialSnapshot(writeJson(latestSnapshot, "Failed to refresh financial snapshot."));
+    }
+
+    private void refreshFinancialSnapshotIfRequired(LoanApplication app, LoanProductSetting product) {
+        if (app == null || product == null || !product.isFreshFinancialDataRequired()) {
+            return;
+        }
+        Member member = memberRepository.findById(app.getApplicantMemberId())
+            .orElseThrow(() -> new IllegalArgumentException("Applicant account not found."));
+        if (member.getMemberNo() == null || member.getMemberNo().isBlank()) {
+            throw new IllegalStateException("Fresh financial data is required for this loan product, but the applicant member number is missing.");
+        }
+        String stationId = normalizeStationId(app.getStationId());
+        if (stationId == null) {
+            throw new IllegalStateException("Fresh financial data is required for this loan product, but the applicant station ID is missing.");
+        }
+        try {
+            ForesightAccountSummary summary = foresightDirectoryService.fetchAccountSummary(member.getMemberNo(), stationId);
+            app.setFinancialSnapshot(mergeFreshFinancialData(app.getFinancialSnapshot(), summary));
+        } catch (UpstreamAvailabilityException ex) {
+            throw new IllegalStateException(
+                "Fresh financial data is required for this loan product, but the upstream financial service is unavailable right now. Try again later.",
+                ex
+            );
+        } catch (IllegalStateException ex) {
+            throw new IllegalStateException(
+                "Fresh financial data is required for this loan product, but the live financial balances could not be refreshed right now.",
+                ex
+            );
+        }
+    }
+
+    private String mergeFreshFinancialData(String rawJson, ForesightAccountSummary summary) {
+        try {
+            Map<String, Object> snapshot = rawJson == null || rawJson.isBlank()
+                ? new LinkedHashMap<>()
+                : objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+            snapshot.put("liveSavingsBalance", summary == null || summary.savingsBalance() == null
+                ? BigDecimal.ZERO
+                : summary.savingsBalance());
+            snapshot.put("liveSharesBalance", summary == null || summary.sharesBalance() == null
+                ? BigDecimal.ZERO
+                : summary.sharesBalance());
+            snapshot.put("liveDepositsBalance", summary == null || summary.depositsBalance() == null
+                ? BigDecimal.ZERO
+                : summary.depositsBalance());
+            snapshot.put("liveFinancialDataFetchedAt", OffsetDateTime.now().toString());
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to refresh the stored financial snapshot.", ex);
+        }
+    }
+
+    private Map<String, Object> extractLiveFinancialValues(String rawJson) {
+        Map<String, Object> liveValues = new LinkedHashMap<>();
+        if (rawJson == null || rawJson.isBlank()) {
+            return liveValues;
+        }
+        try {
+            Map<String, Object> snapshot = objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+            for (String key : List.of(
+                "liveSavingsBalance",
+                "liveSharesBalance",
+                "liveDepositsBalance",
+                "liveFinancialDataFetchedAt"
+            )) {
+                if (snapshot.containsKey(key)) {
+                    liveValues.put(key, snapshot.get(key));
+                }
+            }
+        } catch (Exception ignored) {
+            return liveValues;
+        }
+        return liveValues;
+    }
+
+    private String writeJson(Map<String, Object> payload, String messageOnFailure) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            throw new IllegalStateException(messageOnFailure, ex);
+        }
+    }
+
+    private String loanReference(LoanApplication app) {
+        if (app.getApplicationNumber() != null) {
+            return app.getApplicationNumber().toString();
+        }
+        return app.getId().toString().substring(0, 8);
     }
 }

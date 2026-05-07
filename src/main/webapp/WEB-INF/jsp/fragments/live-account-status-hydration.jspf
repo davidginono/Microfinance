@@ -1,0 +1,84 @@
+<script>
+    (() => {
+        const LIVE_ACCOUNT_STATUS_TIMEOUT_MS = 10000;
+
+        function applyLiveAccountStatus(container, payload) {
+            if (!container || !payload) {
+                return;
+            }
+            const savings = container.querySelector("[data-live-account-status-savings]");
+            const shares = container.querySelector("[data-live-account-status-shares]");
+            const message = container.querySelector("[data-live-account-status-message]");
+            const box = container.querySelector("[data-live-account-status-box]");
+
+            if (savings) {
+                savings.textContent = payload.savingsLabel || "-";
+            }
+            if (shares) {
+                shares.textContent = payload.sharesLabel || "-";
+            }
+            if (message) {
+                message.textContent = payload.statusMessage || "";
+            }
+            if (!box) {
+                return;
+            }
+            if (payload.available) {
+                box.classList.add("hidden");
+                return;
+            }
+            box.classList.remove("hidden");
+            box.textContent = payload.statusMessage || "Live balances are unavailable right now.";
+            box.classList.remove("border-amber-200", "bg-amber-50", "text-amber-800", "border-slate-200", "bg-slate-50", "text-slate-600");
+            if (payload.pending) {
+                box.classList.add("border-slate-200", "bg-slate-50", "text-slate-600");
+            } else {
+                box.classList.add("border-amber-200", "bg-amber-50", "text-amber-800");
+            }
+        }
+
+        function hydrateLiveAccountStatus(container) {
+            const url = container.getAttribute("data-live-account-status-url");
+            if (!url) {
+                return;
+            }
+            const controller = typeof AbortController === "function" ? new AbortController() : null;
+            const timeoutId = controller
+                ? window.setTimeout(() => controller.abort(), LIVE_ACCOUNT_STATUS_TIMEOUT_MS)
+                : null;
+            fetch(url, {
+                headers: {
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin",
+                signal: controller ? controller.signal : undefined
+            })
+                .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+                .then(({ ok, payload }) => {
+                    if (!ok) {
+                        throw new Error((payload && payload.message) || "Live balances are unavailable right now.");
+                    }
+                    applyLiveAccountStatus(container, payload);
+                })
+                .catch((error) => {
+                    const statusMessage = error && error.name === "AbortError"
+                        ? "Live balances are taking too long to load. Try again later."
+                        : (error && error.message ? error.message : "Live balances are unavailable right now.");
+                    applyLiveAccountStatus(container, {
+                        available: false,
+                        pending: false,
+                        savingsLabel: "-",
+                        sharesLabel: "-",
+                        statusMessage
+                    });
+                })
+                .finally(() => {
+                    if (timeoutId !== null) {
+                        window.clearTimeout(timeoutId);
+                    }
+                });
+        }
+
+        document.querySelectorAll("[data-live-account-status-url]").forEach(hydrateLiveAccountStatus);
+    })();
+</script>

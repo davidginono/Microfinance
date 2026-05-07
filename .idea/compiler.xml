@@ -13,9 +13,21 @@
         <module name="sacco-loan-mvp" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="api-gateway" target="21" />
+      <module name="auth-service" target="21" />
+      <module name="config-server" target="21" />
+      <module name="discovery-server" target="21" />
+      <module name="loan-service" target="21" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="api-gateway" options="-parameters" />
+      <module name="auth-service" options="-parameters" />
+      <module name="config-server" options="-parameters" />
+      <module name="discovery-server" options="-parameters" />
+      <module name="loan-service" options="-parameters" />
       <module name="sacco-loan-mvp" options="-parameters -proc:full" />
     </option>
   </component>

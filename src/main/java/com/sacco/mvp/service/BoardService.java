@@ -3,7 +3,6 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,36 +18,56 @@ import java.util.UUID;
 public class BoardService {
     private final BoardReviewRepository boardReviewRepository;
     private final LoanApplicationRepository loanApplicationRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
     private final OutboxService outboxService;
+    private final LoanProductWorkflowService loanProductWorkflowService;
+    private final WorkflowRoutingService workflowRoutingService;
 
     public List<LoanApplication> assignedPending(UUID boardMemberId) {
-        List<BoardReview> reviews = boardReviewRepository.findByBoardMemberIdAndDecision(boardMemberId, BoardDecision.PENDING);
+        return assignedPending(boardMemberId, ApprovalWorkflowStage.BOARD);
+    }
+
+    public List<LoanApplication> assignedPending(UUID boardMemberId, ApprovalWorkflowStage stage) {
+        List<BoardReview> reviews = boardReviewRepository.findByBoardMemberIdAndReviewStageAndDecision(
+            boardMemberId, stage, BoardDecision.PENDING);
         List<LoanApplication> apps = new ArrayList<>();
         for (BoardReview review : reviews) {
             loanApplicationRepository.findById(review.getLoanApplicationId())
-                .filter(app -> app.getStatus() == LoanStatus.AWAITING_BOARD)
+                .filter(app -> app.getStatus() == (stage == ApprovalWorkflowStage.LOAN_OFFICER
+                    ? LoanStatus.AWAITING_LOAN_OFFICER
+                    : LoanStatus.AWAITING_BOARD))
                 .ifPresent(apps::add);
         }
         return apps;
     }
 
     public List<BoardReview> assignedAll(UUID boardMemberId) {
-        return boardReviewRepository.findByBoardMemberIdOrderByCreatedAtDesc(boardMemberId);
+        return assignedAll(boardMemberId, ApprovalWorkflowStage.BOARD);
+    }
+
+    public List<BoardReview> assignedAll(UUID boardMemberId, ApprovalWorkflowStage stage) {
+        return boardReviewRepository.findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(boardMemberId, stage);
     }
 
     public BoardReview getMyReview(UUID loanId, UUID boardMemberId) {
-        return boardReviewRepository.findByLoanApplicationIdAndBoardMemberId(loanId, boardMemberId)
+        return getMyReview(loanId, boardMemberId, ApprovalWorkflowStage.BOARD);
+    }
+
+    public BoardReview getMyReview(UUID loanId, UUID boardMemberId, ApprovalWorkflowStage stage) {
+        return boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(loanId, boardMemberId, stage)
             .orElseThrow(() -> new IllegalArgumentException("Board assignment not found"));
     }
 
     public List<BoardReview> reviewsForLoan(UUID loanId) {
-        return boardReviewRepository.findByLoanApplicationId(loanId);
+        return reviewsForLoan(loanId, ApprovalWorkflowStage.BOARD);
+    }
+
+    public List<BoardReview> reviewsForLoan(UUID loanId, ApprovalWorkflowStage stage) {
+        return boardReviewRepository.findByLoanApplicationIdAndReviewStage(loanId, stage);
     }
 
     @Transactional
     public void decide(UUID loanId, UUID boardMemberId, BoardDecision decision, String comment) {
-        decide(loanId, boardMemberId, decision, comment, null, null);
+        decide(loanId, boardMemberId, ApprovalWorkflowStage.BOARD, decision, comment, null, null);
     }
 
     @Transactional
@@ -58,11 +77,22 @@ public class BoardService {
                        String comment,
                        String signatureText,
                        OffsetDateTime verifiedAt) {
+        decide(loanId, boardMemberId, ApprovalWorkflowStage.BOARD, decision, comment, signatureText, verifiedAt);
+    }
+
+    @Transactional
+    public void decide(UUID loanId,
+                       UUID boardMemberId,
+                       ApprovalWorkflowStage stage,
+                       BoardDecision decision,
+                       String comment,
+                       String signatureText,
+                       OffsetDateTime verifiedAt) {
         if (decision == BoardDecision.PENDING) {
             throw new IllegalArgumentException("Decision must be APPROVED or REJECTED");
         }
 
-        BoardReview review = boardReviewRepository.findByLoanApplicationIdAndBoardMemberId(loanId, boardMemberId)
+        BoardReview review = boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(loanId, boardMemberId, stage)
             .orElseThrow(() -> new IllegalArgumentException("Board assignment not found"));
         if (review.getDecision() != BoardDecision.PENDING) {
             throw new IllegalStateException("Board member already decided");
@@ -70,12 +100,20 @@ public class BoardService {
 
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (app.getStatus() != LoanStatus.AWAITING_BOARD) {
-            throw new IllegalStateException("Application not in board stage");
+        LoanStatus expectedStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
+            ? LoanStatus.AWAITING_LOAN_OFFICER
+            : LoanStatus.AWAITING_BOARD;
+        if (app.getStatus() != expectedStatus) {
+            throw new IllegalStateException("Application not in " + stage.getDisplayLabel().toLowerCase() + " stage");
+        }
+
+        String normalizedComment = normalizeComment(comment);
+        if (decision == BoardDecision.REJECTED && normalizedComment == null) {
+            throw new IllegalArgumentException("Add a comment before rejecting this review.");
         }
 
         review.setDecision(decision);
-        review.setComment(comment);
+        review.setComment(normalizedComment);
         if (decision == BoardDecision.APPROVED) {
             review.setBoardSignatureText(signatureText == null ? null : signatureText.trim());
             review.setBoardSignatureVerifiedAt(verifiedAt);
@@ -85,7 +123,7 @@ public class BoardService {
         }
         review.setDecidedAt(OffsetDateTime.now());
         boardReviewRepository.save(review);
-        evaluateOutcome(app);
+        evaluateOutcome(app, stage, boardMemberId);
     }
 
     @Transactional
@@ -93,36 +131,55 @@ public class BoardService {
         throw new IllegalStateException("Board review decisions cannot be reversed.");
     }
 
-    private void evaluateOutcome(LoanApplication app) {
+    private void evaluateOutcome(LoanApplication app,
+                                 ApprovalWorkflowStage stage,
+                                 UUID actorMemberId) {
         UUID loanId = app.getId();
-        long approvals = boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.APPROVED);
-        long rejections = boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.REJECTED);
-        int quorum = saccoSettingsRepository.findById(app.getSaccoId())
-            .map(SaccoSettings::getBoardQuorum)
-            .filter(value -> value != null && value > 0)
-            .orElse(2);
+        long approvals = boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, stage, BoardDecision.APPROVED);
+        long rejections = boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, stage, BoardDecision.REJECTED);
+        LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
+        int minimumVotes = stage == ApprovalWorkflowStage.LOAN_OFFICER
+            ? 1
+            : Math.max(workflow.committeeMinimumVotes(), 1);
+        int approvalThreshold = stage == ApprovalWorkflowStage.LOAN_OFFICER
+            ? 1
+            : Math.max(workflow.committeeApprovalThreshold(), 1);
+        long totalDecisions = approvals + rejections;
+        long rejectionThreshold = Math.max(1, minimumVotes - approvalThreshold + 1L);
 
-        LoanStatus nextStatus = LoanStatus.AWAITING_BOARD;
-        if (approvals >= quorum) {
-            nextStatus = LoanStatus.BOARD_APPROVED;
-        } else if (rejections >= quorum) {
-            nextStatus = LoanStatus.BOARD_REJECTED;
+        if (approvals >= approvalThreshold) {
+            workflowRoutingService.advanceAfterApproval(app, stage, actorMemberId);
+            loanApplicationRepository.save(app);
+            return;
+        }
+
+        LoanStatus nextStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
+            ? LoanStatus.AWAITING_LOAN_OFFICER
+            : LoanStatus.AWAITING_BOARD;
+        if (rejections >= rejectionThreshold || (totalDecisions >= minimumVotes && approvals < approvalThreshold)) {
+            nextStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
+                ? LoanStatus.LOAN_OFFICER_REJECTED
+                : LoanStatus.BOARD_REJECTED;
         }
 
         if (app.getStatus() == nextStatus) {
             return;
-        }
-
-        app.setStatus(nextStatus);
-        app.setUpdatedAt(OffsetDateTime.now());
-        loanApplicationRepository.save(app);
-
-        if (nextStatus == LoanStatus.BOARD_APPROVED) {
-            outboxService.enqueue("LOAN", loanId, "BOARD_APPROVED", app.getApplicantMemberId(),
-                Map.of("loanId", loanId.toString()));
-        } else if (nextStatus == LoanStatus.BOARD_REJECTED) {
-            outboxService.enqueue("LOAN", loanId, "BOARD_REJECTED", app.getApplicantMemberId(),
+        } else if (rejections >= rejectionThreshold || (totalDecisions >= minimumVotes && approvals < approvalThreshold)) {
+            app.setStatus(nextStatus);
+            app.setUpdatedAt(OffsetDateTime.now());
+            loanApplicationRepository.save(app);
+            outboxService.enqueue("LOAN", loanId, nextStatus.name(), app.getApplicantMemberId(),
                 Map.of("loanId", loanId.toString()));
         }
+    }
+
+    private String normalizeComment(String comment) {
+        if (comment == null) {
+            return null;
+        }
+        String normalized = comment.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }

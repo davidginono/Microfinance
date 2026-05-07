@@ -4,12 +4,14 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Duration;
 
 @Service
 @Slf4j
@@ -19,6 +21,12 @@ public class ForesightDirectoryService {
 
     @Value("${external.foresight.base-url:https://api.foresightfin.app}")
     private String baseUrl;
+
+    @Value("${external.foresight.connect-timeout:3s}")
+    private Duration connectTimeout;
+
+    @Value("${external.foresight.read-timeout:8s}")
+    private Duration readTimeout;
 
     public ForesightMemberProfile fetchMemberProfileByEmail(String email) {
         log.info("Foresight member-profile lookup by email started: {}", email);
@@ -51,10 +59,14 @@ public class ForesightDirectoryService {
         } catch (RestClientResponseException ex) {
             log.warn("Foresight account-summary lookup failed with status {}. Response body: {}",
                 ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External account summary service is temporarily unavailable.", ex);
+            }
             throw new IllegalStateException("External account summary lookup failed with status " + ex.getRawStatusCode() + ".", ex);
         } catch (ResourceAccessException ex) {
             log.warn("Foresight account-summary lookup could not reach the external directory: {}", ex.getMessage());
-            throw new IllegalStateException("Unable to reach the external member directory.", ex);
+            throw new UpstreamAvailabilityException("Unable to reach the external member directory.", ex);
         }
     }
 
@@ -88,7 +100,15 @@ public class ForesightDirectoryService {
 
     private RestClient client() {
         return restClientBuilder
+            .requestFactory(requestFactory())
             .baseUrl(baseUrl)
             .build();
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
+        return requestFactory;
     }
 }

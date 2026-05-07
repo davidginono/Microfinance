@@ -30,6 +30,9 @@ public class LoanApplication {
     @Column(name = "sacco_id", nullable = false)
     private String saccoId;
 
+    @Column(name = "station_id")
+    private String stationId;
+
     @Column(name = "applicant_member_id", nullable = false)
     private UUID applicantMemberId;
 

@@ -2,12 +2,16 @@ package com.sacco.mvp.web;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.ManagerDecision;
+import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryClient;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -18,6 +22,7 @@ import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.ReversalRequestService;
+import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +31,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -55,10 +61,13 @@ public class ManagerController {
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
+    private final LoanPaymentSummaryClient loanPaymentSummaryClient;
+    private final ManagerReviewRepository managerReviewRepository;
+    private final WorkflowStatusPresentationService workflowStatusPresentationService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId());
+        ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
         Map<UUID, String> applicantNames = memberRepository.findAllById(
                 dashboard.recentDisbursements().stream()
                     .map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId)
@@ -71,7 +80,8 @@ public class ManagerController {
         model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardOnReviewByManagerLoans", dashboard.onReviewByManagerLoans());
-        model.addAttribute("dashboardPaidLoans", dashboard.paidLoans());
+        model.addAttribute("dashboardQueueValue", dashboard.onReviewByManagerLoans());
+        model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardStatusChartRows", buildDashboardStatusChartRows(dashboard.statusBreakdown()));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
@@ -96,33 +106,25 @@ public class ManagerController {
     }
 
     private List<Map<String, Object>> buildDashboardStatusChartRows(List<ManagerService.StatusCount> statusBreakdown) {
-        long maxCount = statusBreakdown.stream()
-            .map(ManagerService.StatusCount::count)
-            .max(Long::compareTo)
-            .orElse(1L);
-        long safeMax = Math.max(1L, maxCount);
-
-        return statusBreakdown.stream()
-            .map(entry -> {
-                long count = entry.count();
-                long widthPercent = count <= 0 ? 0L : Math.max(8L, Math.round((count * 100.0d) / safeMax));
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("status", entry.status().name());
-                row.put("label", dashboardStatusLabel(entry.status()));
-                row.put("count", count);
-                row.put("widthPercent", widthPercent);
-                row.put("color", dashboardStatusColor(entry.status()));
-                return row;
-            })
-            .toList();
+        return workflowStatusPresentationService.buildDashboardStatusChartRows(statusBreakdown);
     }
 
     @GetMapping("/loan-applications")
     public String queue(@AuthenticationPrincipal AppUserPrincipal principal,
+                        @RequestParam(required = false) String filter,
+                        @RequestParam(required = false) String searchId,
                         @RequestParam(required = false) LoanStatus status,
                         Model model) {
-        LoanStatus effectiveStatus = status == null ? LoanStatus.READY_FOR_MANAGER : status;
-        List<com.sacco.mvp.domain.LoanApplication> apps = managerService.queue(principal.getSaccoId(), effectiveStatus);
+        QueueFilter currentFilter = resolveQueueFilter(filter, status);
+        boolean loanIdSearch = "DISBURSED".equals(currentFilter.key());
+        String normalizedSearchId = normalizeQueueSearch(searchId);
+        List<com.sacco.mvp.domain.LoanApplication> apps = managerService.queue(
+            principal.getSaccoId(),
+            currentFilter.statuses(),
+            normalizedSearchId,
+            loanIdSearch,
+            principal.getStationId()
+        );
         Map<UUID, String> applicantNames = memberRepository.findAllById(
                 apps.stream().map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId).collect(Collectors.toSet()))
             .stream()
@@ -130,13 +132,73 @@ public class ManagerController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
-        model.addAttribute("status", effectiveStatus);
+        model.addAttribute("currentFilterKey", currentFilter.key());
+        model.addAttribute("currentFilterLabel", currentFilter.label());
+        model.addAttribute("queueSearchValue", normalizedSearchId);
+        model.addAttribute("queueSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
+        model.addAttribute("queueSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
         return "manager/queue";
+    }
+
+    @GetMapping("/archive")
+    public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
+                          @RequestParam(required = false) String filter,
+                          @RequestParam(required = false) String searchId,
+                          Model model) {
+        ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        String normalizedSearchId = normalizeQueueSearch(searchId);
+        boolean loanIdSearch = currentFilter.usesLoanId();
+        List<ManagerReview> latestReviews = latestManagerReviews(principal.getMemberId());
+        Map<UUID, com.sacco.mvp.domain.LoanApplication> loanMap = loanApplicationRepository.findAllById(
+                latestReviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
+            .stream()
+            .filter(loan -> principal.getSaccoId().equals(loan.getSaccoId()))
+            .filter(loan -> managerService.matchesApplicantStation(loan, principal.getStationId()))
+            .collect(Collectors.toMap(
+                com.sacco.mvp.domain.LoanApplication::getId,
+                loan -> loan,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        List<ArchiveEntry> archiveEntries = latestReviews.stream()
+            .map(review -> {
+                com.sacco.mvp.domain.LoanApplication loan = loanMap.get(review.getLoanApplicationId());
+                return loan == null ? null : new ArchiveEntry(review, loan, dashboardStatusLabel(loan.getStatus()));
+            })
+            .filter(Objects::nonNull)
+            .filter(entry -> currentFilter.matches(entry.review(), entry.loan()))
+            .filter(entry -> matchesManagerArchiveSearch(entry.loan(), normalizedSearchId, loanIdSearch))
+            .toList();
+        Map<UUID, String> applicantNames = memberRepository.findAllById(
+                archiveEntries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+
+        model.addAttribute("archiveRows", archiveEntries.stream()
+            .map(entry -> {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", entry.loan().getId().toString());
+                row.put("applicationNumber", entry.loan().getApplicationNumber() == null ? "-" : entry.loan().getApplicationNumber().toString());
+                row.put("loanId", entry.loan().getLoanId() == null || entry.loan().getLoanId().isBlank() ? "-" : entry.loan().getLoanId());
+                row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), shortLoanId(entry.loan().getApplicantMemberId())));
+                row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
+                row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected");
+                row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : REPORT_DATE_TIME.format(entry.review().getCreatedAt()));
+                row.put("currentStatusLabel", entry.currentStatusLabel());
+                return row;
+            })
+            .toList());
+        model.addAttribute("currentFilterKey", currentFilter.key());
+        model.addAttribute("currentFilterLabel", currentFilter.label());
+        model.addAttribute("queueSearchValue", normalizedSearchId);
+        model.addAttribute("archiveSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
+        model.addAttribute("archiveSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
+        return "manager/archive";
     }
 
     @GetMapping("/loan-applications/{id}")
     public String detail(@PathVariable UUID id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        var app = managerService.get(id, principal.getSaccoId());
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         List<com.sacco.mvp.domain.GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
         Map<UUID, String> guarantorNames = memberRepository.findAllById(
@@ -144,24 +206,30 @@ public class ManagerController {
                     .collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
-        ExternalAccountStatusService.ExternalAccountStatusView applicantExternalAccountStatus =
-            externalAccountStatusService.resolve(applicant);
         String managerReason =
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "";
         List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
+            .collect(Collectors.toMap(
+                com.sacco.mvp.domain.LoanApplication::getId,
+                this::storedActiveLoanPaymentSummary,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
-        model.addAttribute("applicantExternalAccountStatus", applicantExternalAccountStatus);
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
-        model.addAttribute("attachments", loanPresentationService.parseAttachments(app.getAttachmentsJson()));
+        model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
+        model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
             app.getRepaymentScheduleJson(),
-            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId())));
+            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
+            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("managerReason", managerReason);
         model.addAttribute("guarantorRequests", guarantorRequests);
@@ -178,6 +246,10 @@ public class ManagerController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
+                row.put("outstandingBalance", activeLoanSummaries.getOrDefault(
+                    loan.getId(),
+                    LoanPresentationService.LoanPaymentSummaryView.empty()
+                ).totalOutstandingLabel());
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -193,12 +265,56 @@ public class ManagerController {
                 .map(com.sacco.mvp.domain.LoanApplication::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        model.addAttribute("reviewBasePath", "/manager");
+        model.addAttribute("reviewPanelBreadcrumb", "Manager Panel / Review Detail");
+        model.addAttribute("reviewPanelTitle", "Manager Review");
+        model.addAttribute("reviewPanelSubtitle", "Inspect applicant details and move the application through the configured workflow.");
+        model.addAttribute("reviewCommentLabel", "Reasons");
+        model.addAttribute("reviewCommentPlaceholder", "Write the reason for approval note or rejection");
+        model.addAttribute("approveActionLabel", "Approve Loan");
+        model.addAttribute("rejectActionLabel", "Reject Loan");
+        model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.READY_FOR_MANAGER);
+        model.addAttribute("showManagerReversalRequests", true);
+        model.addAttribute("showDisbursementForm", false);
+        model.addAttribute("disbursementNotesLabel", "Manager Notes");
+        model.addAttribute("disbursementActionLabel", "Disburse Loan");
+        model.addAttribute("showUndoForm", app.getStatus() == LoanStatus.MANAGER_REJECTED);
+        model.addAttribute("allowPaymentSync", true);
         model.addAttribute("managerUndoWindowOpen",
             app.getStatus() == LoanStatus.MANAGER_REJECTED
                 && app.getUpdatedAt() != null
                 && app.getUpdatedAt().plusHours(24).isAfter(OffsetDateTime.now()));
-        addReviewDisplayAttributes(model, app, applicantExternalAccountStatus, managerReason);
+        addReviewDisplayAttributes(model, app, managerReason);
         return "manager/detail";
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-financial-status")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
+                                                                        @AuthenticationPrincipal AppUserPrincipal principal) {
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
+    @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
+                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        List<Map<String, String>> rows = activeApplicantLoans.stream()
+            .map(loan -> {
+                LoanPresentationService.LoanPaymentSummaryView summary = resolveActiveLoanPaymentSummary(loan, applicant);
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", loan.getId().toString());
+                row.put("outstandingBalance", summary.totalOutstandingLabel());
+                return row;
+            })
+            .toList();
+        return ResponseEntity.ok(Map.of("rows", rows));
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
@@ -206,7 +322,7 @@ public class ManagerController {
     public ResponseEntity<Map<String, Object>> guarantorFinancialStatus(@PathVariable UUID loanId,
                                                                         @PathVariable UUID guarantorId,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
-        managerService.get(loanId, principal.getSaccoId());
+        managerService.get(loanId, principal.getSaccoId(), principal.getStationId());
         boolean guarantorAssigned = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
             .anyMatch(request -> guarantorId.equals(request.getGuarantorMemberId()));
         if (!guarantorAssigned) {
@@ -231,7 +347,15 @@ public class ManagerController {
                          RedirectAttributes ra) {
         managerService.decide(id, principal.getMemberId(), decision, reasons);
         if (decision == ManagerDecision.ACCEPT) {
-            ra.addFlashAttribute("message", "Manager accepted. Status moved to ON REVIEW BY BOARD.");
+            LoanStatus updatedStatus = managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus();
+            String message = switch (updatedStatus) {
+                case AWAITING_LOAN_OFFICER -> "Manager accepted. Status moved to ON REVIEW BY LOAN OFFICER.";
+                case AWAITING_BOARD -> "Manager accepted. Status moved to ON REVIEW BY BOARD.";
+                case AWAITING_ACCOUNTANT -> "Manager accepted. Status moved to ON REVIEW BY ACCOUNTANT.";
+                case READY_FOR_DISBURSEMENT -> "Manager accepted. Loan is now READY FOR DISBURSEMENT.";
+                default -> "Manager accepted. The application moved to the next configured stage.";
+            };
+            ra.addFlashAttribute("message", message);
         } else {
             ra.addFlashAttribute("message", "Manager rejected application.");
         }
@@ -289,17 +413,9 @@ public class ManagerController {
                            @RequestParam(required = false) String loanId,
                            @RequestParam(required = false) String disbursementReference,
                            @RequestParam(required = false) String disbursementNotes,
+                           @RequestParam(required = false) MultipartFile disbursementProofFile,
                            RedirectAttributes ra) {
-        try {
-            managerService.finalizeDecision(id, decision, principal.getMemberId(),
-                disbursementDate, firstRepaymentDate, null, null,
-                loanId, disbursementReference, disbursementNotes);
-            ra.addFlashAttribute("message", "FINAL_APPROVE".equalsIgnoreCase(decision)
-                ? "Loan disbursed successfully."
-                : "Application finalized");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
+        ra.addFlashAttribute("error", "Managers can no longer disburse loans. Use the Disbursement Officer queue instead.");
         return "redirect:/manager/loan-applications/" + id;
     }
 
@@ -324,42 +440,37 @@ public class ManagerController {
 
     @GetMapping("/reports")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
-                          @RequestParam(required = false) Integer year,
-                          @RequestParam(defaultValue = "false") boolean returnedOnly,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                          @RequestParam(required = false) String decisionFilter,
                           Model model) {
-        LoanReportService.ManagerLoanReport report = loanReportService.managerReport(
-            principal.getSaccoId(), year, returnedOnly);
+        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            model.addAttribute("error", "From date cannot be after to date.");
+            effectiveFrom = effectiveTo.withDayOfMonth(1);
+        }
+        LoanReportService.ManagerWorkflowReport report = loanReportService.managerWorkflowReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), effectiveFrom, effectiveTo, decisionFilter);
         Map<UUID, String> applicantNames = report.applicantMap().values().stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
         model.addAttribute("report", report);
         model.addAttribute("applicantNames", applicantNames);
-        model.addAttribute("reportYears", loanReportService.managerReportYears(principal.getSaccoId()));
-        model.addAttribute("yearValue", String.valueOf(report.year()));
-        model.addAttribute("returnedOnlyChecked", report.returnedOnly() ? "checked" : "");
-        model.addAttribute("returnedOnlyValue", String.valueOf(report.returnedOnly()));
-        model.addAttribute("reportDisbursedCount", report.summary().disbursedCount());
-        model.addAttribute("reportDisbursedAmountLabel", report.summary().getDisbursedAmountLabel());
-        model.addAttribute("reportPaidCount", report.summary().paidCount());
-        model.addAttribute("reportPaidAmountLabel", report.summary().getPaidAmountLabel());
-        model.addAttribute("reportOngoingCount", report.summary().ongoingCount());
-        model.addAttribute("reportRows", report.loans().stream()
-            .map(loan -> {
+        model.addAttribute("fromDateValue", report.fromDate().toString());
+        model.addAttribute("toDateValue", report.toDate().toString());
+        model.addAttribute("decisionFilterValue", report.decisionFilter());
+        model.addAttribute("reportRows", report.entries().stream()
+            .map(entry -> {
                 Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", loan.getId().toString());
-                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
-                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
-                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
-                row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
-                row.put("amount", loan.getAmount() == null ? "-" : loan.getAmount().toPlainString());
-                row.put("disbursed", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
-                row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
-                row.put("statusLabel", switch (loan.getStatus()) {
-                    case FINAL_APPROVED -> "DISBURSED LOAN";
-                    case DEFAULTED -> "DEFAULTED";
-                    case PAID -> "PAID";
-                    default -> loan.getStatus().name();
-                });
-                row.put("paidAt", loan.getPaidAt() == null ? "-" : loan.getPaidAt().format(REPORT_DATE_TIME));
+                row.put("id", entry.loan().getId().toString());
+                row.put("shortId", entry.loan().getApplicationNumber() == null ? "" : entry.loan().getApplicationNumber().toString());
+                row.put("loanId", entry.loan().getLoanId() == null ? "" : entry.loan().getLoanId());
+                row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
+                row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
+                row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
+                row.put("managerDecisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected");
+                row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
+                row.put("currentStatusLabel", dashboardStatusLabel(entry.loan().getStatus()));
                 return row;
             })
             .toList());
@@ -453,12 +564,12 @@ public class ManagerController {
     private boolean shouldHideField(String key) {
         String normalized = key.trim().toLowerCase(Locale.ROOT);
         return normalized.equals("_csrf")
-            || normalized.equals("purpose")
             || normalized.equals("additionalnotes");
     }
 
     private String humanizeFieldLabel(String key) {
         return switch (key) {
+            case "purpose" -> "Loan Purpose";
             case "nationalId" -> "National ID";
             case "employerName" -> "Employer Name";
             case "additionalNotes" -> "Additional Notes";
@@ -493,48 +604,43 @@ public class ManagerController {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(Locale.ROOT);
     }
 
+    private LoanPresentationService.LoanPaymentSummaryView resolveActiveLoanPaymentSummary(com.sacco.mvp.domain.LoanApplication loan,
+                                                                                           Member applicant) {
+        LoanPresentationService.LoanPaymentSummaryView fallback =
+            loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
+        if (loan == null || applicant == null || loan.getLoanId() == null || loan.getLoanId().isBlank()) {
+            return fallback;
+        }
+        String stationId = loan.getStationId();
+        if (applicant.getMemberNo() == null || applicant.getMemberNo().isBlank()
+            || stationId == null || stationId.isBlank()) {
+            return fallback;
+        }
+        try {
+            return loanPaymentSummaryClient.fetchSummary(applicant.getMemberNo(), stationId, loan.getLoanId())
+                .map(loanPresentationService::toLoanPaymentSummaryView)
+                .orElse(fallback);
+        } catch (LoanPaymentLookupException ex) {
+            return fallback;
+        }
+    }
+
+    private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(com.sacco.mvp.domain.LoanApplication loan) {
+        return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
+    }
+
     private String dashboardStatusLabel(LoanStatus status) {
-        return switch (status) {
-            case SUBMITTED -> "Submitted";
-            case READY_FOR_MANAGER -> "On Review By Manager";
-            case AWAITING_BOARD -> "On Review By Board";
-            case FINAL_APPROVED -> "Disbursed Loan";
-            case DEFAULTED -> "Defaulted / Not Paid";
-            case PAID -> "Paid";
-            case MANAGER_REJECTED -> "Manager Rejected";
-            case BOARD_REJECTED -> "Board Rejected";
-            case FINAL_REJECTED -> "Final Rejected";
-            case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
-            case AWAITING_GUARANTORS -> "Awaiting Guarantors";
-            case BOARD_APPROVED -> "Reviewed";
-            case MANAGER_ACCEPTED -> "Manager Accepted";
-            case DRAFT -> "Draft";
-        };
+        return workflowStatusPresentationService.dashboardStatusLabel(status);
     }
 
     private String dashboardStatusColor(LoanStatus status) {
-        return switch (status) {
-            case DRAFT -> "#60A5FA";
-            case SUBMITTED -> "#94A3B8";
-            case AWAITING_GUARANTORS -> "#F59E0B";
-            case ALL_GUARANTORS_APPROVED -> "#0F766E";
-            case READY_FOR_MANAGER -> "#14B8A6";
-            case AWAITING_BOARD -> "#6366F1";
-            case BOARD_APPROVED -> "#2F348D";
-            case FINAL_APPROVED -> "#22C55E";
-            case DEFAULTED -> "#DC2626";
-            case PAID -> "#16A34A";
-            case MANAGER_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "#F43F5E";
-            case MANAGER_ACCEPTED -> "#0EA5E9";
-        };
+        return workflowStatusPresentationService.dashboardStatusColor(status);
     }
 
     private void addReviewDisplayAttributes(Model model,
                                             com.sacco.mvp.domain.LoanApplication app,
-                                            ExternalAccountStatusService.ExternalAccountStatusView accountStatus,
                                             String managerReason) {
-        boolean showReviewSidebar = !accountStatus.isAvailable()
-            || (managerReason != null && !managerReason.isBlank())
+        boolean showReviewSidebar = (managerReason != null && !managerReason.isBlank())
             || app.getStatus() == LoanStatus.AWAITING_BOARD
             || app.getDisbursementDate() != null;
 
@@ -546,11 +652,119 @@ public class ManagerController {
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
         model.addAttribute("managerStatusBadgeClass", switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case AWAITING_BOARD, MANAGER_ACCEPTED -> "bg-blue-50 text-blue-700";
-            case BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case AWAITING_BOARD -> "bg-blue-50 text-blue-700";
+            case MANAGER_ACCEPTED, BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         });
     }
+
+    private Map<String, Object> externalAccountStatusPayload(ExternalAccountStatusService.ExternalAccountStatusView status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("available", status.isAvailable());
+        payload.put("pending", status.isPending());
+        payload.put("savingsLabel", status.getSavingsLabel());
+        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("statusMessage", status.getStatusMessage());
+        return payload;
+    }
+
+    private QueueFilter resolveQueueFilter(String filter, LoanStatus status) {
+        String key = normalizeQueueFilterKey(filter, status);
+        return switch (key) {
+            case "AWAITING_BOARD" -> new QueueFilter(
+                "AWAITING_BOARD",
+                "On Review By Board",
+                List.of(LoanStatus.AWAITING_BOARD)
+            );
+            case "REVIEWED_READY" -> new QueueFilter(
+                "REVIEWED_READY",
+                "Reviewed & Ready for Disbursement",
+                List.of(LoanStatus.BOARD_APPROVED, LoanStatus.MANAGER_ACCEPTED)
+            );
+            case "DISBURSED" -> new QueueFilter(
+                "DISBURSED",
+                "Disbursed Loans",
+                List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID)
+            );
+            default -> new QueueFilter(
+                "READY_FOR_MANAGER",
+                "On Review By Manager",
+                List.of(LoanStatus.READY_FOR_MANAGER)
+            );
+        };
+    }
+
+    private String normalizeQueueFilterKey(String filter, LoanStatus status) {
+        if (filter != null && !filter.isBlank()) {
+            return filter.trim().toUpperCase(Locale.ENGLISH);
+        }
+        if (status == null) {
+            return "READY_FOR_MANAGER";
+        }
+        return switch (status) {
+            case READY_FOR_MANAGER -> "READY_FOR_MANAGER";
+            case AWAITING_BOARD -> "AWAITING_BOARD";
+            case BOARD_APPROVED, MANAGER_ACCEPTED -> "REVIEWED_READY";
+            case FINAL_APPROVED, DEFAULTED, PAID -> "DISBURSED";
+            default -> "READY_FOR_MANAGER";
+        };
+    }
+
+    private ArchiveFilter resolveArchiveFilter(String filter) {
+        String key = filter == null || filter.isBlank() ? "ALL" : filter.trim().toUpperCase(Locale.ENGLISH);
+        return switch (key) {
+            case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", ManagerDecision.ACCEPT, List.of(), false);
+            case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", ManagerDecision.REJECT, List.of(), false);
+            case "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("APPROVED_FOR_DISBURSEMENT", "Approved for Disbursement", null,
+                List.of(LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
+            default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of(), false);
+        };
+    }
+
+    private String normalizeQueueSearch(String searchId) {
+        return searchId == null ? "" : searchId.trim();
+    }
+
+    private List<ManagerReview> latestManagerReviews(UUID managerId) {
+        Map<UUID, ManagerReview> latestByLoan = new LinkedHashMap<>();
+        for (ManagerReview review : managerReviewRepository.findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(
+            managerId, ApprovalWorkflowStage.MANAGER)) {
+            latestByLoan.putIfAbsent(review.getLoanApplicationId(), review);
+        }
+        return latestByLoan.values().stream()
+            .sorted(Comparator.comparing(ManagerReview::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .toList();
+    }
+
+    private boolean matchesManagerArchiveSearch(com.sacco.mvp.domain.LoanApplication app, String searchId, boolean loanIdSearch) {
+        if (searchId == null || searchId.isBlank()) {
+            return true;
+        }
+        if (loanIdSearch) {
+            String loanId = app.getLoanId();
+            return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(searchId.toLowerCase(Locale.ENGLISH));
+        }
+        Long applicationNumber = app.getApplicationNumber();
+        return applicationNumber != null && String.valueOf(applicationNumber).contains(searchId);
+    }
+
+    private record QueueFilter(String key, String label, List<LoanStatus> statuses) {}
+
+    private record ArchiveFilter(String key,
+                                 String label,
+                                 ManagerDecision decision,
+                                 List<LoanStatus> statuses,
+                                 boolean usesLoanId) {
+        private boolean matches(ManagerReview review, com.sacco.mvp.domain.LoanApplication loan) {
+            boolean decisionMatches = decision == null || review.getDecision() == decision;
+            boolean statusMatches = statuses == null || statuses.isEmpty() || statuses.contains(loan.getStatus());
+            return decisionMatches && statusMatches;
+        }
+    }
+
+    private record ArchiveEntry(ManagerReview review,
+                                com.sacco.mvp.domain.LoanApplication loan,
+                                String currentStatusLabel) {}
 }
