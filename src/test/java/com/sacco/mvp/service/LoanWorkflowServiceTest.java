@@ -8,6 +8,8 @@ import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
@@ -21,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,9 +60,228 @@ class LoanWorkflowServiceTest {
     @Mock private RoleDirectoryService roleDirectoryService;
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
     @Mock private WorkflowRoutingService workflowRoutingService;
+    @Mock private LoanQualificationPolicyService loanQualificationPolicyService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
+
+    @Test
+    void submitToManagerRequiresFeeReceiptWhenPaymentInstructionsAreConfigured() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("100000"))
+            .tenorMonths(6)
+            .status(LoanStatus.ALL_GUARANTORS_APPROVED)
+            .requiredGuarantors(1)
+            .financialSnapshot("{\"principalPlusInterest\":120000.00}")
+            .attachmentsJson("[]")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId(saccoId)
+            .loanFeePaymentAccount("255700000000")
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(settings));
+        when(loanAttachmentService.parse("[]")).thenReturn(List.of());
+
+        assertThatThrownBy(() -> loanWorkflowService.submitToManager(appId, memberId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Upload the insurance and application fees payment receipt before submitting this loan for review.");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void saveDraftRejectsGuarantorCommitmentsThatDoNotMatchPrincipalPlusInterest() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorOne = UUID.randomUUID();
+        UUID guarantorTwo = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(2)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(memberRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+            UUID memberId = invocation.getArgument(0);
+            return Optional.of(activeMember(memberId, saccoId, "ST01"));
+        });
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            applicantId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            null,
+            List.of(guarantorOne, guarantorTwo),
+            Map.of(guarantorOne, new BigDecimal("50000"), guarantorTwo, new BigDecimal("40000")),
+            "{\"principalPlusInterest\":120000.00}",
+            null,
+            null
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("must add up exactly to the principal plus interest");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void saveDraftRejectsStaffOnlyGuarantorSelection() {
+        UUID applicantId = UUID.randomUUID();
+        UUID staffOnlyGuarantor = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+        when(memberRepository.findById(staffOnlyGuarantor)).thenReturn(Optional.of(staffOnlyMember(staffOnlyGuarantor, saccoId, "ST01")));
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            applicantId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            null,
+            List.of(staffOnlyGuarantor),
+            Map.of(staffOnlyGuarantor, new BigDecimal("120000")),
+            "{\"principalPlusInterest\":120000.00}",
+            null,
+            null
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Guarantor must have member access");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void searchGuarantorsExcludesStaffOnlyAccounts() {
+        UUID applicantId = UUID.randomUUID();
+        UUID staffOnlyId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        Member staffOnly = staffOnlyMember(staffOnlyId, saccoId, "ST01");
+        staffOnly.setMemberNo("0101");
+
+        when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "0101"))
+            .thenReturn(Optional.of(staffOnly));
+        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE))
+            .thenReturn(List.of(staffOnly));
+
+        var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "0101", 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    void submitCreatesGuarantorRequestsWithApplicantAssignedCommitments() {
+        UUID appId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorOne = UUID.randomUUID();
+        UUID guarantorTwo = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("100000"))
+            .tenorMonths(6)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(2)
+            .selectedGuarantors("[{\"id\":\"" + guarantorOne + "\",\"amount\":\"60000.00\"},{\"id\":\"" + guarantorTwo + "\",\"amount\":\"60000.00\"}]")
+            .financialSnapshot("{\"principalPlusInterest\":120000.00}")
+            .formData("{}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .freshFinancialDataRequired(false)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
+            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
+                new BigDecimal("166650.00")));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(memberRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+            UUID memberId = invocation.getArgument(0);
+            return Optional.of(activeMember(memberId, saccoId, "ST01"));
+        });
+
+        loanWorkflowService.submit(appId, applicantId);
+
+        verify(guarantorRequestRepository).deleteByLoanApplicationId(appId);
+        verify(guarantorRequestRepository, times(2)).save(argThat(request ->
+            request.getStatus() == GuarantorRequestStatus.PENDING
+                && request.getCommittedAmount() == null
+                && (new BigDecimal("60000.00").compareTo(request.getRequestedAmount()) == 0)
+        ));
+    }
+
+    private Member activeMember(UUID id, String saccoId, String stationId) {
+        return Member.builder()
+            .id(id)
+            .saccoId(saccoId)
+            .stationId(stationId)
+            .memberNo(id.toString().substring(0, 8))
+            .fullName("Member " + id.toString().substring(0, 8))
+            .status(MemberStatus.ACTIVE)
+            .memberAccount(true)
+            .build();
+    }
+
+    private Member staffOnlyMember(UUID id, String saccoId, String stationId) {
+        Member member = activeMember(id, saccoId, stationId);
+        member.setMemberAccount(false);
+        return member;
+    }
 
     @Test
     void saveDraftRejectsEditingApplicationOutsideDraftStatus() {
@@ -98,6 +320,7 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "Working capital"),
             appId,
             List.of(UUID.randomUUID(), UUID.randomUUID()),
+            Map.of(),
             "{\"balance\":1000}",
             null,
             null
@@ -135,6 +358,7 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "Working capital"),
             null,
             List.of(),
+            Map.of(),
             "{\"balance\":1000}",
             sourceLoanId,
             null

@@ -40,6 +40,19 @@ public class RoleDirectoryService {
         return deduplicateAndSort(refs);
     }
 
+    public List<RoleAccountRef> activeByAnyRoleInStation(String saccoId, String stationId, java.util.Collection<Position> positions) {
+        if (positions == null || positions.isEmpty() || stationId == null || stationId.isBlank()) {
+            return List.of();
+        }
+        String normalizedStationId = stationId.trim();
+        List<RoleAccountRef> refs = new ArrayList<>();
+        memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
+            .filter(member -> normalizedStationId.equalsIgnoreCase(member.getStationId() == null ? "" : member.getStationId().trim()))
+            .filter(member -> member.getStaffRolesResolved().stream().anyMatch(positions::contains))
+            .forEach(member -> refs.add(fromMember(member)));
+        return deduplicateAndSort(refs);
+    }
+
     public List<RoleAccountRef> activeGlobalByRole(Position position) {
         List<RoleAccountRef> refs = new ArrayList<>();
         memberRepository.findAll().stream()
@@ -75,6 +88,7 @@ public class RoleDirectoryService {
             .identifier(member.getMemberNo())
             .fullName(member.getFullName())
             .email(member.getEmail())
+            .stationId(member.getStationId())
             .memberBased(true)
             .build();
     }
@@ -87,6 +101,7 @@ public class RoleDirectoryService {
         String identifier;
         String fullName;
         String email;
+        String stationId;
         boolean memberBased;
     }
 }

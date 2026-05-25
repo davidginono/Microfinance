@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "board_reviews", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"loan_application_id", "board_member_id"})
+    @UniqueConstraint(columnNames = {"loan_application_id", "board_member_id", "review_stage"})
 })
 @Getter
 @Setter

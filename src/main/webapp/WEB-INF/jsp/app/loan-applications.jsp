@@ -5,9 +5,9 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / Applications</p>
+    <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Applications" /></p>
     <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
-    <p class="erp-page-subtitle">Review every loan application, its current workflow stage, and any manager feedback.</p>
+    <p class="erp-page-subtitle"><spring:message code="apps.subtitle" text="Review every loan application, its current workflow stage, and any manager feedback." /></p>
 </div>
 <c:set var="hasAwaitingGuarantors" value="false" />
 <c:forEach items="${apps}" var="a">
@@ -16,8 +16,8 @@
     </c:if>
 </c:forEach>
 <c:if test="${hasAwaitingGuarantors}">
-    <div class="erp-section mb-3 border-amber-200 bg-amber-50 text-sm text-amber-800">
-        Waiting for guarantor approval. This page auto-refreshes every 1 hour.
+    <div class="erp-section mb-3 border-sky-200 bg-sky-50 text-sm text-sky-800">
+        <spring:message code="loan.view.awaitingGuarantors" text="Waiting for guarantor approval. This page auto-refreshes every 1 hour." />
     </div>
     <script>
         setTimeout(function () { window.location.reload(); }, 3600000);
@@ -27,7 +27,7 @@
     <table class="erp-table">
         <thead>
             <tr>
-                <th class="px-3 py-2 text-left">Loan Application ID</th>
+                <th class="px-3 py-2 text-left"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
                 <th class="px-3 py-2 text-left">
                     <spring:message code="loan.type" />
                 </th>
@@ -37,8 +37,8 @@
                 <th class="px-3 py-2 text-left">
                     <spring:message code="loan.status" />
                 </th>
-                <th class="px-3 py-2 text-left">Reason</th>
-                <th class="px-3 py-2 text-left">Date</th>
+                <th class="px-3 py-2 text-left"><spring:message code="common.reason" text="Reason" /></th>
+                <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
                 <th class="px-3 py-2 text-left"></th>
             </tr>
         </thead>

@@ -232,13 +232,19 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     }
 </style>
 
-<c:set var="dashboardBreadcrumbValue" value="${empty dashboardBreadcrumb ? 'Manager Panel / Dashboard' : dashboardBreadcrumb}" />
-<c:set var="dashboardPageTitleValue" value="${empty dashboardPageTitle ? 'Manager Dashboard' : dashboardPageTitle}" />
-<c:set var="dashboardSubtitleValue" value="${empty dashboardSubtitle ? 'Track disbursed loans quickly and keep an eye on how applications are distributed across workflow statuses.' : dashboardSubtitle}" />
-<c:set var="dashboardQueueLabelValue" value="${empty dashboardQueueLabel ? 'On Review By Manager' : dashboardQueueLabel}" />
+<spring:message code="manager.dashboard.breadcrumb" text="Manager Panel / Dashboard" var="dashboardDefaultBreadcrumb" />
+<spring:message code="manager.dashboard.title" text="Manager Dashboard" var="dashboardDefaultTitle" />
+<spring:message code="manager.dashboard.subtitle" text="Track disbursed loans quickly and keep an eye on how applications are distributed across workflow statuses." var="dashboardDefaultSubtitle" />
+<spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" var="dashboardDefaultQueueLabel" />
+<spring:message code="manager.dashboard.queueMeta" text="Applications currently waiting for your action." var="dashboardDefaultQueueMeta" />
+<spring:message code="manager.dashboard.queueWaiting" text="Queue waiting" var="dashboardDefaultQueueFooter" />
+<c:set var="dashboardBreadcrumbValue" value="${empty dashboardBreadcrumb ? dashboardDefaultBreadcrumb : dashboardBreadcrumb}" />
+<c:set var="dashboardPageTitleValue" value="${empty dashboardPageTitle ? dashboardDefaultTitle : dashboardPageTitle}" />
+<c:set var="dashboardSubtitleValue" value="${empty dashboardSubtitle ? dashboardDefaultSubtitle : dashboardSubtitle}" />
+<c:set var="dashboardQueueLabelValue" value="${empty dashboardQueueLabel ? dashboardDefaultQueueLabel : dashboardQueueLabel}" />
 <c:set var="dashboardQueueValueValue" value="${empty dashboardQueueValue ? dashboardOnReviewByManagerLoans : dashboardQueueValue}" />
-<c:set var="dashboardQueueMetaValue" value="${empty dashboardQueueMeta ? 'Applications currently waiting for your action.' : dashboardQueueMeta}" />
-<c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? 'Queue waiting' : dashboardQueueFooterLabel}" />
+<c:set var="dashboardQueueMetaValue" value="${empty dashboardQueueMeta ? dashboardDefaultQueueMeta : dashboardQueueMeta}" />
+<c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? dashboardDefaultQueueFooter : dashboardQueueFooterLabel}" />
 <c:set var="dashboardQueueIconValue" value="${empty dashboardQueueIcon ? 'M' : dashboardQueueIcon}" />
 <c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
 
@@ -252,9 +258,9 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-stat-card erp-stat-green">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Total Loans Disbursed</p>
+                <p class="erp-stat-label"><spring:message code="manager.dashboard.totalDisbursed" text="Total Loans Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardTotalDisbursedLoans}</p>
-                <p class="erp-stat-meta">Disbursed in ${dashboardDisbursementYear}.</p>
+                <p class="erp-stat-meta"><spring:message code="manager.dashboard.disbursedIn" arguments="${dashboardDisbursementYear}" text="Disbursed in this year." /></p>
             </div>
             <span class="erp-stat-icon">D</span>
         </div>
@@ -263,13 +269,13 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-stat-card erp-stat-blue">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Active Disbursed</p>
+                <p class="erp-stat-label"><spring:message code="manager.dashboard.activeDisbursed" text="Active Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardActiveDisbursedLoans}</p>
-                <p class="erp-stat-meta">Still waiting for repayment confirmation.</p>
+                <p class="erp-stat-meta"><spring:message code="manager.dashboard.activeDisbursedMeta" text="Still waiting for repayment confirmation." /></p>
             </div>
             <span class="erp-stat-icon">A</span>
         </div>
-        <div class="erp-stat-footer"><span>Currently ongoing</span><span>${dashboardActiveDisbursedLoans}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentlyOngoing" text="Currently ongoing" /></span><span>${dashboardActiveDisbursedLoans}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-amber">
         <div class="erp-stat-main">
@@ -285,21 +291,21 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Defaulted Loans</p>
+                <p class="erp-stat-label"><spring:message code="archive.defaultedLoans" text="Defaulted Loans" /></p>
                 <p class="erp-stat-value">${dashboardDefaultedLoans}</p>
-                <p class="erp-stat-meta">Defaulted in ${dashboardDisbursementYear}.</p>
+                <p class="erp-stat-meta"><spring:message code="manager.dashboard.defaultedIn" arguments="${dashboardDisbursementYear}" text="Defaulted in this year." /></p>
             </div>
             <span class="erp-stat-icon">F</span>
         </div>
-        <div class="erp-stat-footer"><span>Current year</span><span>${dashboardDefaultedLoans}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentYear" text="Current year" /></span><span>${dashboardDefaultedLoans}</span></div>
     </div>
 </section>
 
 <section class="erp-panel">
     <div class="erp-panel-header">
         <div>
-            <p class="erp-panel-title">Application Status Pie Chart</p>
-            <p class="mt-1 text-sm text-slate-500">A clearer view of how applications are spread across each workflow stage.</p>
+            <p class="erp-panel-title"><spring:message code="manager.dashboard.statusPieTitle" text="Application Status Pie Chart" /></p>
+            <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.dashboard.statusPieHelp" text="A clearer view of how applications are spread across each workflow stage." /></p>
         </div>
     </div>
     <div class="erp-panel-body">
@@ -317,7 +323,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
                 </div>
             </c:when>
             <c:otherwise>
-                <div class="erp-section text-center text-sm text-slate-500">No application statuses to chart yet.</div>
+                <div class="erp-section text-center text-sm text-slate-500"><spring:message code="manager.dashboard.noStatusChart" text="No application statuses to chart yet." /></div>
             </c:otherwise>
         </c:choose>
     </div>
@@ -394,8 +400,8 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <section class="erp-panel mt-4">
     <div class="erp-panel-header">
         <div>
-            <p class="erp-panel-title">Recent Disbursements</p>
-            <p class="mt-1 text-sm text-slate-500">Loans disbursed within the last ${dashboardRecentDisbursementDays} days.</p>
+            <p class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" text="Recent Disbursements" /></p>
+            <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.dashboard.recentDisbursementsHelp" arguments="${dashboardRecentDisbursementDays}" text="Loans disbursed within the recent period." /></p>
         </div>
     </div>
     <div class="erp-panel-body">
@@ -412,18 +418,18 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
                         </span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
-                        <span>Loan Application ID: ${loan.shortId}</span>
+                        <span><spring:message code="loan.applicationId" text="Loan Application ID" />: ${loan.shortId}</span>
                         <c:if test="${not empty loan.loanId}">
-                            <span>Loan ID: ${loan.loanId}</span>
+                            <span><spring:message code="loan.loanId" text="Loan ID" />: ${loan.loanId}</span>
                         </c:if>
-                        <span>Amount: ${loan.amount}</span>
-                        <span>Disbursed: ${loan.disbursementDate}</span>
+                        <span><spring:message code="common.amount" text="Amount" />: ${loan.amount}</span>
+                        <span><spring:message code="analytics.disbursed" text="Disbursed" />: ${loan.disbursementDate}</span>
                     </div>
                 </a>
             </c:forEach>
             <c:if test="${empty dashboardDisbursementRows}">
                 <div class="erp-section-muted">
-                    <p class="text-slate-600">No loans were disbursed in the last ${dashboardRecentDisbursementDays} days.</p>
+                    <p class="text-slate-600"><spring:message code="manager.dashboard.noRecentDisbursements" arguments="${dashboardRecentDisbursementDays}" text="No loans were disbursed in the recent period." /></p>
                 </div>
             </c:if>
         </div>

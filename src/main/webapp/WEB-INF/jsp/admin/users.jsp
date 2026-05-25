@@ -1,27 +1,28 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/modal-shell.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / Users & Roles</p>
-    <h1 class="erp-page-title">Users & Roles</h1>
-    <p class="erp-page-subtitle">Manage access and roles for the current workspace station.</p>
+    <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users & Roles" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users & Roles" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage access and roles for the current workspace station." /></p>
 </div>
 
 <div class="erp-toolbar">
-    <div class="text-sm text-slate-500">Add User is for staff accounts only.</div>
-    <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user">Add User</button>
+    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Add User is for staff accounts only." /></div>
+    <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add User" /></button>
 </div>
 
 <div class="erp-panel overflow-hidden">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
-                <p class="erp-widget-title">Filter And View Options</p>
-                <p class="mt-2 text-sm leading-6 text-slate-500">Search users by member number or email and page the results.</p>
+                <p class="erp-widget-title"><spring:message code="common.filterViewOptions" text="Filter And View Options" /></p>
+                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search users by member number or email and page the results." /></p>
             </div>
             <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                 <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
@@ -252,6 +253,22 @@
                     </div>
                 </div>
 
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Claims</p>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        <c:forEach items="${availableClaims}" var="claim">
+                            <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                                <input type="checkbox"
+                                       name="claims"
+                                       value="${claim}"
+                                       ${user.claims.contains(claim) ? 'checked' : ''}
+                                       class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                <span>${claim}</span>
+                            </label>
+                        </c:forEach>
+                    </div>
+                </div>
+
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Status
                     <select name="status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
@@ -315,6 +332,22 @@
                 initializedRoleGroups.add(groupKey);
                 syncAdminOnlyRoleGroup(groupKey);
             }
+        });
+
+        document.querySelectorAll('form').forEach((form) => {
+            const disburseLoan = form.querySelector('input[name="claims"][value="DISBURSE_LOAN"]');
+            const accessQueue = form.querySelector('input[name="claims"][value="ACCESS_DISBURSEMENT_QUEUE"]');
+            if (!disburseLoan || !accessQueue) {
+                return;
+            }
+            function syncDisbursementClaims() {
+                if (disburseLoan.checked) {
+                    accessQueue.checked = true;
+                }
+            }
+            disburseLoan.addEventListener('change', syncDisbursementClaims);
+            form.addEventListener('submit', syncDisbursementClaims);
+            syncDisbursementClaims();
         });
 
         function closeAllUserModals() {

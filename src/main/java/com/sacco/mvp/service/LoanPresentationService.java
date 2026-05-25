@@ -2,9 +2,9 @@ package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
-import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
@@ -12,7 +12,6 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryDto;
-import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -21,12 +20,19 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import javax.imageio.ImageIO;
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -51,7 +57,7 @@ public class LoanPresentationService {
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
     private final LoanAttachmentService loanAttachmentService;
-    private final LoanProductSettingRepository loanProductSettingRepository;
+    private final LoanProductWorkflowService loanProductWorkflowService;
 
     public Map<String, Object> parseFormFields(String json) {
         return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
@@ -127,21 +133,18 @@ public class LoanPresentationService {
 
         List<String> labels = new ArrayList<>();
         boolean hasGuarantorStage = app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0;
-        LoanProductSetting product = resolveWorkflowProduct(app);
-        boolean hasManagerStage = product == null || product.isManagerReviewRequired();
-        boolean hasCommitteeStage = product == null || product.isCommitteeReviewRequired();
+        LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
 
         labels.add("Draft");
         if (hasGuarantorStage) {
             labels.add("Awaiting Guarantors");
             labels.add("All Guarantors Approved");
         }
-        if (hasManagerStage) {
-            labels.add("On Review By Manager");
-        }
-        if (hasCommitteeStage) {
-            labels.add("On Review By Board");
-        }
+        workflow.stages().stream()
+            .filter(stage -> stage != ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+            .map(this::progressLabel)
+            .forEach(labels::add);
+        labels.add("Approved For Disbursement");
 
         int currentIndex = 0;
         switch (app.getStatus()) {
@@ -153,53 +156,43 @@ public class LoanPresentationService {
                 labels.add("Manager Rejected");
                 currentIndex = labels.size() - 1;
             }
-            case MANAGER_ACCEPTED -> {
-                if (hasCommitteeStage) {
-                    currentIndex = indexOfLabel(labels, "On Review By Board");
-                } else {
-                    labels.add("Ready for Disbursement");
-                    currentIndex = labels.size() - 1;
-                }
+            case MANAGER_ACCEPTED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Manager");
+            case AWAITING_LOAN_OFFICER -> currentIndex = indexOfLabel(labels, "On Review By Loan Officer");
+            case LOAN_OFFICER_REJECTED -> {
+                labels.add("Loan Officer Rejected");
+                currentIndex = labels.size() - 1;
             }
+            case LOAN_OFFICER_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Loan Officer");
             case AWAITING_BOARD -> currentIndex = indexOfLabel(labels, "On Review By Board");
             case BOARD_REJECTED -> {
                 labels.add("Board Rejected");
                 currentIndex = labels.size() - 1;
             }
-            case BOARD_APPROVED -> {
-                labels.add("Reviewed By Board");
+            case BOARD_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Board");
+            case AWAITING_ACCOUNTANT -> currentIndex = indexOfLabel(labels, "On Review By Accountant");
+            case ACCOUNTANT_REJECTED -> {
+                labels.add("Accountant Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            case ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> currentIndex = indexOfLabel(labels, "Approved For Disbursement");
+            case FORFEITED -> {
+                labels.add("Forfeited");
                 currentIndex = labels.size() - 1;
             }
             case FINAL_REJECTED -> {
-                labels.add(hasCommitteeStage ? "Reviewed By Board" : "Ready for Disbursement");
                 labels.add("Final Rejected");
                 currentIndex = labels.size() - 1;
             }
             case FINAL_APPROVED -> {
-                if (!hasCommitteeStage) {
-                    labels.add("Ready for Disbursement");
-                } else {
-                    labels.add("Reviewed By Board");
-                }
                 labels.add("Disbursed Loan");
                 currentIndex = labels.size() - 1;
             }
             case DEFAULTED -> {
-                if (!hasCommitteeStage) {
-                    labels.add("Ready for Disbursement");
-                } else {
-                    labels.add("Reviewed By Board");
-                }
                 labels.add("Disbursed Loan");
                 labels.add("Defaulted");
                 currentIndex = labels.size() - 1;
             }
             case PAID -> {
-                if (!hasCommitteeStage) {
-                    labels.add("Ready for Disbursement");
-                } else {
-                    labels.add("Reviewed By Board");
-                }
                 labels.add("Disbursed Loan");
                 labels.add("Paid");
                 currentIndex = labels.size() - 1;
@@ -227,12 +220,19 @@ public class LoanPresentationService {
     public List<Map<String, Object>> parseApplicationAttachments(String json) {
         return parseAttachments(json).stream()
             .filter(item -> !LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
+            .filter(item -> !LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(attachmentCategory(item)))
             .toList();
     }
 
     public List<Map<String, Object>> parseDisbursementProofAttachments(String json) {
         return parseAttachments(json).stream()
             .filter(item -> LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
+            .toList();
+    }
+
+    public List<Map<String, Object>> parseFeeInsuranceReceiptAttachments(String json) {
+        return parseAttachments(json).stream()
+            .filter(item -> LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(attachmentCategory(item)))
             .toList();
     }
 
@@ -437,17 +437,27 @@ public class LoanPresentationService {
         }
     }
 
-    private LoanProductSetting resolveWorkflowProduct(LoanApplication app) {
-        if (app == null || app.getSaccoId() == null || app.getLoanType() == null) {
-            return null;
-        }
-        return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
-            .orElse(null);
-    }
-
     private int indexOfLabel(List<String> labels, String target) {
         int index = labels.indexOf(target);
         return index >= 0 ? index : Math.max(labels.size() - 1, 0);
+    }
+
+    private int nextConfiguredStageIndex(List<String> labels, String currentLabel) {
+        int current = indexOfLabel(labels, currentLabel);
+        if (current >= 0 && current + 1 < labels.size()) {
+            return current + 1;
+        }
+        return Math.max(labels.size() - 1, 0);
+    }
+
+    private String progressLabel(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case MANAGER -> "On Review By Manager";
+            case LOAN_OFFICER -> "On Review By Loan Officer";
+            case BOARD -> "On Review By Board";
+            case ACCOUNTANT -> "On Review By Accountant";
+            case DISBURSEMENT_OFFICER -> "Approved For Disbursement";
+        };
     }
 
     private BigDecimal toBigDecimal(Object value) {
@@ -620,6 +630,8 @@ public class LoanPresentationService {
         }
         appendTable(html, "Application Details", formFields);
         appendTable(html, "SACCO Financial Details", financialFields);
+        appendAttachmentTable(html, "Fees & Insurance Receipt", parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
+        appendAttachmentTable(html, "Disbursement Proof", parseDisbursementProofAttachments(app.getAttachmentsJson()));
         appendTable(html, "Repayment Summary", parseRepaymentSummary(app.getRepaymentScheduleJson()));
 
         List<Map<String, Object>> repaymentRows = parseRepaymentRows(app.getRepaymentScheduleJson());
@@ -657,6 +669,8 @@ public class LoanPresentationService {
                 applicant,
                 formFields,
                 financialFields,
+                parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()),
+                parseDisbursementProofAttachments(app.getAttachmentsJson()),
                 parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()),
                 parseRepaymentRows(app.getRepaymentScheduleJson()),
                 guarantorRequests,
@@ -846,6 +860,18 @@ public class LoanPresentationService {
         return timestamp == null ? "-" : timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
+    private String attachmentUploadedAtLabel(Map<String, Object> attachment) {
+        if (attachment == null) {
+            return "-";
+        }
+        Object uploadedAt = attachment.get("uploadedAt");
+        if (uploadedAt == null || String.valueOf(uploadedAt).isBlank()) {
+            return "-";
+        }
+        String value = String.valueOf(uploadedAt);
+        return value.length() >= 16 ? value.substring(0, 16).replace('T', ' ') : value.replace('T', ' ');
+    }
+
     private String formatNullableMoney(BigDecimal amount) {
         return amount == null ? "-" : formatMoney(amount);
     }
@@ -907,6 +933,24 @@ public class LoanPresentationService {
                 html.append("<tr><td>").append(esc(entry.getKey())).append("</td><td>")
                     .append(esc(String.valueOf(entry.getValue()))).append("</td></tr>");
             }
+        }
+        html.append("</tbody></table>");
+    }
+
+    private void appendAttachmentTable(StringBuilder html, String title, List<Map<String, Object>> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return;
+        }
+        html.append("<h2>").append(esc(title)).append("</h2>");
+        html.append("<table><thead><tr><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody>");
+        for (Map<String, Object> attachment : attachments) {
+            html.append("<tr><td>")
+                .append(esc(String.valueOf(attachment.getOrDefault("originalName", "-"))))
+                .append("</td><td>")
+                .append(esc(String.valueOf(attachment.getOrDefault("sizeLabel", "-"))))
+                .append("</td><td>")
+                .append(esc(attachmentUploadedAtLabel(attachment)))
+                .append("</td></tr>");
         }
         html.append("</tbody></table>");
     }
@@ -976,6 +1020,8 @@ public class LoanPresentationService {
         private final Member applicant;
         private final Map<String, Object> formFields;
         private final Map<String, Object> financialFields;
+        private final List<Map<String, Object>> feeInsuranceReceiptAttachments;
+        private final List<Map<String, Object>> disbursementProofAttachments;
         private final Map<String, Object> repaymentSummary;
         private final List<Map<String, Object>> repaymentRows;
         private final List<GuarantorRequest> guarantorRequests;
@@ -995,6 +1041,8 @@ public class LoanPresentationService {
                                                     Member applicant,
                                                     Map<String, Object> formFields,
                                                     Map<String, Object> financialFields,
+                                                    List<Map<String, Object>> feeInsuranceReceiptAttachments,
+                                                    List<Map<String, Object>> disbursementProofAttachments,
                                                     Map<String, Object> repaymentSummary,
                                                     List<Map<String, Object>> repaymentRows,
                                                     List<GuarantorRequest> guarantorRequests,
@@ -1008,6 +1056,8 @@ public class LoanPresentationService {
             this.applicant = applicant;
             this.formFields = formFields == null ? Collections.emptyMap() : formFields;
             this.financialFields = financialFields == null ? Collections.emptyMap() : financialFields;
+            this.feeInsuranceReceiptAttachments = feeInsuranceReceiptAttachments == null ? Collections.emptyList() : feeInsuranceReceiptAttachments;
+            this.disbursementProofAttachments = disbursementProofAttachments == null ? Collections.emptyList() : disbursementProofAttachments;
             this.repaymentSummary = repaymentSummary == null ? Collections.emptyMap() : repaymentSummary;
             this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
             this.guarantorRequests = guarantorRequests == null ? Collections.emptyList() : guarantorRequests;
@@ -1023,6 +1073,8 @@ public class LoanPresentationService {
             drawMetaTable();
             drawSectionTable("Application Details", formFields);
             drawSectionTable("SACCO Financial Details", financialFields);
+            drawAttachmentSection("Fees & Insurance Receipt", feeInsuranceReceiptAttachments);
+            drawAttachmentSection("Disbursement Proof", disbursementProofAttachments);
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();
             drawGuarantorSection();
@@ -1093,6 +1145,107 @@ public class LoanPresentationService {
             drawTable(new String[]{"Field", "Value"}, new float[]{contentWidth() * 0.36f, contentWidth() * 0.64f}, rows, BODY_SIZE, BODY_SIZE, 14f);
         }
 
+        private void drawAttachmentSection(String title, List<Map<String, Object>> attachments) throws IOException {
+            if (attachments == null || attachments.isEmpty()) {
+                return;
+            }
+            drawSectionHeading(title);
+            List<String[]> rows = new ArrayList<>();
+            for (Map<String, Object> attachment : attachments) {
+                rows.add(new String[]{
+                    sanitizePdfText(String.valueOf(attachment.getOrDefault("originalName", "-"))),
+                    sanitizePdfText(String.valueOf(attachment.getOrDefault("sizeLabel", "-"))),
+                    sanitizePdfText(attachmentUploadedAtLabel(attachment))
+                });
+            }
+            drawTable(
+                new String[]{"File", "Size", "Uploaded"},
+                new float[]{contentWidth() * 0.50f, contentWidth() * 0.18f, contentWidth() * 0.32f},
+                rows,
+                BODY_SIZE,
+                BODY_SIZE,
+                14f
+            );
+            drawAttachmentPreviews(attachments);
+        }
+
+        private void drawAttachmentPreviews(List<Map<String, Object>> attachments) throws IOException {
+            for (Map<String, Object> attachment : attachments) {
+                String attachmentId = String.valueOf(attachment.getOrDefault("id", ""));
+                if (attachmentId.isBlank()) {
+                    continue;
+                }
+                String displayName = sanitizePdfText(String.valueOf(attachment.getOrDefault("originalName", "Receipt")));
+                try {
+                    LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(app.getId(), attachmentId, app.getAttachmentsJson());
+                    drawAttachmentResource(displayName, resource);
+                } catch (Exception ex) {
+                    drawParagraph(displayName + " could not be loaded for print preview.", regular, META_SIZE, MUTED_COLOR);
+                    y -= 4f;
+                }
+            }
+        }
+
+        private void drawAttachmentResource(String displayName, LoanAttachmentService.AttachmentResource resource) throws IOException {
+            String contentType = resource.getContentType() == null ? "" : resource.getContentType().toLowerCase(Locale.ROOT);
+            Path path = resource.getPath();
+            if (contentType.startsWith("image/")) {
+                BufferedImage image = ImageIO.read(path.toFile());
+                if (image != null) {
+                    drawAttachmentImage(displayName, image);
+                    return;
+                }
+            }
+            if ("application/pdf".equals(contentType) || displayName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+                drawAttachmentPdf(displayName, path);
+                return;
+            }
+            drawParagraph(displayName + " is attached. Preview is available from the application detail page.", regular, META_SIZE, MUTED_COLOR);
+            y -= 4f;
+        }
+
+        private void drawAttachmentPdf(String displayName, Path path) throws IOException {
+            try (PDDocument source = Loader.loadPDF(path.toFile())) {
+                PDFRenderer pdfRenderer = new PDFRenderer(source);
+                for (int pageIndex = 0; pageIndex < source.getNumberOfPages(); pageIndex++) {
+                    BufferedImage pageImage = pdfRenderer.renderImageWithDPI(pageIndex, 120);
+                    String label = source.getNumberOfPages() == 1
+                        ? displayName
+                        : displayName + " (page " + (pageIndex + 1) + " of " + source.getNumberOfPages() + ")";
+                    drawAttachmentImage(label, pageImage);
+                }
+            }
+        }
+
+        private void drawAttachmentImage(String label, BufferedImage image) throws IOException {
+            if (image == null) {
+                return;
+            }
+            ensureSpace(36f);
+            writeText(label, MARGIN, y, bold, BODY_SIZE, TEXT_COLOR);
+            y -= 12f;
+
+            float maxWidth = contentWidth();
+            float availableHeight = y - (BOTTOM_MARGIN + FOOTER_GAP);
+            float fullPagePreviewHeight = page.getMediaBox().getHeight() - TOP_MARGIN - BOTTOM_MARGIN - FOOTER_GAP - 18f;
+            if (availableHeight < 120f) {
+                startNewPage();
+                writeText(label, MARGIN, y, bold, BODY_SIZE, TEXT_COLOR);
+                y -= 12f;
+                availableHeight = y - (BOTTOM_MARGIN + FOOTER_GAP);
+            }
+            float targetWidth = maxWidth;
+            float targetHeight = image.getHeight() * (targetWidth / image.getWidth());
+            float maxHeight = Math.min(availableHeight, fullPagePreviewHeight);
+            if (targetHeight > maxHeight) {
+                targetHeight = maxHeight;
+                targetWidth = image.getWidth() * (targetHeight / image.getHeight());
+            }
+            PDImageXObject pdfImage = LosslessFactory.createFromImage(document, image);
+            stream.drawImage(pdfImage, MARGIN, y - targetHeight, targetWidth, targetHeight);
+            y -= targetHeight + 14f;
+        }
+
         private void drawRepaymentRowsSection() throws IOException {
             drawSectionHeading("Repayment Timetable");
             if (repaymentRows.isEmpty()) {
@@ -1149,7 +1302,7 @@ public class LoanPresentationService {
             drawSectionHeading("Board Committee Assessors");
             List<String[]> rows = new ArrayList<>();
             if (boardReviews.isEmpty()) {
-                rows.add(new String[]{"-", "No board assessor details available."});
+                rows.add(new String[]{"-", "-", "-", "No board assessor details available.", "-"});
             } else {
                 for (BoardReview review : boardReviews) {
                     Member boardMember = boardMembers.get(review.getBoardMemberId());
@@ -1159,22 +1312,34 @@ public class LoanPresentationService {
                         sanitizePdfText(boardMember == null ? "-" : boardMember.getMemberNo()),
                         humanizeValue(review.getDecision()),
                         sanitizePdfText(review.getComment()),
-                        sanitizePdfText(formatTimestamp(review.getDecidedAt())),
-                        sanitizePdfText(review.getBoardSignatureText()),
-                        sanitizePdfText(formatTimestamp(review.getBoardSignatureVerifiedAt()))
+                        boardSignOffText(review)
                     });
                 }
             }
             drawTable(
-                new String[]{"Assessor", "Member No", "Decision", "Comment", "Decision Date", "Signature", "Verified At"},
-                new float[]{96f, 62f, 78f, 116f, 82f, 124f, contentWidth() - 558f},
+                new String[]{"Assessor", "Member No", "Decision", "Comment", "Sign-off"},
+                new float[]{118f, 62f, 70f, 154f, contentWidth() - 404f},
                 rows,
-                7.0f,
-                7.0f,
-                8f,
-                2.2f,
-                1.0f
+                SMALL_SIZE,
+                SMALL_SIZE,
+                10f
             );
+        }
+
+        private String boardSignOffText(BoardReview review) {
+            String signature = sanitizePdfText(review.getBoardSignatureText());
+            String verifiedAt = sanitizePdfText(formatTimestamp(review.getBoardSignatureVerifiedAt()));
+            String decidedAt = sanitizePdfText(formatTimestamp(review.getDecidedAt()));
+            List<String> parts = new ArrayList<>();
+            if (!signature.equals("-")) {
+                parts.add(signature);
+            }
+            if (!verifiedAt.equals("-")) {
+                parts.add("Verified: " + verifiedAt);
+            } else if (!decidedAt.equals("-")) {
+                parts.add("Decided: " + decidedAt);
+            }
+            return parts.isEmpty() ? "-" : String.join("\n", parts);
         }
 
         private void drawApplicantSignatureSection() throws IOException {

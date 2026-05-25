@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -218,7 +219,7 @@ public class AccountantController {
                 row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT
-                    ? "Approved for Disbursement"
+                    ? "Ready for Disbursement"
                     : "Rejected");
                 row.put("reviewedAt", entry.review().getCreatedAt() == null
                     ? "-"
@@ -237,10 +238,12 @@ public class AccountantController {
         LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        Map<UUID, String> guarantorNames = memberRepository.findAllById(
-                guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()))
-            .stream()
+        List<Member> guarantorMembers = memberRepository.findAllById(
+            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
         Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
@@ -253,10 +256,12 @@ public class AccountantController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -267,6 +272,7 @@ public class AccountantController {
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
+        model.addAttribute("guarantorMembersById", guarantorMembersById);
         model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -365,9 +371,10 @@ public class AccountantController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
                          @RequestParam(required = false) String reasons,
+                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
-            managerService.decideAccountant(id, principal.getMemberId(), decision, reasons);
+            managerService.decideAccountant(id, principal.getMemberId(), decision, reasons, parseGuarantorCommitments(request));
             ra.addFlashAttribute("message", decision == ManagerDecision.ACCEPT
                 ? "Accountant approved the loan for disbursement."
                 : "Accountant rejected the loan.");
@@ -375,6 +382,20 @@ public class AccountantController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/accountant/loan-applications/" + id;
+    }
+
+    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        request.getParameterMap().forEach((key, values) -> {
+            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
+                return;
+            }
+            try {
+                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        });
+        return commitments;
     }
 
     @GetMapping("/notifications")
@@ -529,7 +550,7 @@ public class AccountantController {
     private ArchiveFilter resolveArchiveFilter(String filter) {
         String key = filter == null || filter.isBlank() ? "ALL" : filter.trim().toUpperCase(Locale.ENGLISH);
         return switch (key) {
-            case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved for Disbursement", ManagerDecision.ACCEPT, true);
+            case "APPROVED" -> new ArchiveFilter("APPROVED", "Ready for Disbursement", ManagerDecision.ACCEPT, true);
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected", ManagerDecision.REJECT, false);
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, false);
         };

@@ -7,6 +7,410 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<style>
+    .member-dashboard-flow-shell {
+        overflow-x: auto;
+        max-width: 100%;
+        padding-bottom: 0.45rem;
+        overscroll-behavior-x: contain;
+    }
+    .member-dashboard-flow-track {
+        width: fit-content;
+        min-width: 100%;
+        padding: 0.85rem 0 0.5rem;
+    }
+    .member-dashboard-flow-list {
+        display: flex;
+        align-items: flex-start;
+    }
+    .member-dashboard-flow-step-wrap {
+        display: flex;
+        min-width: max-content;
+    }
+    .member-dashboard-flow-step {
+        width: 9.35rem;
+        flex: 0 0 9.35rem;
+        text-align: center;
+    }
+    .member-dashboard-flow-node-wrap {
+        position: relative;
+        display: flex;
+        justify-content: center;
+    }
+    .member-dashboard-flow-node {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 6.25rem;
+        height: 6.25rem;
+        margin: 0 auto;
+        border-width: 3px;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7);
+    }
+    .member-dashboard-flow-node--completed {
+        border-color: #6ee7a0;
+        background: radial-gradient(circle at top, #f4fff7 0%, #e8faee 100%);
+        color: #0ea63c;
+    }
+    .member-dashboard-flow-node--current {
+        border-color: #2563eb;
+        background: radial-gradient(circle at top, #f8fbff 0%, #eaf3ff 100%);
+        color: #2563eb;
+    }
+    .member-dashboard-flow-node--pending {
+        border-color: #d1d5db;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        color: #6b7280;
+    }
+    .member-dashboard-flow-check {
+        position: absolute;
+        top: 0.15rem;
+        right: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        background: #10b83c;
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 800;
+        box-shadow: 0 0 0 3px #ffffff;
+    }
+    .member-dashboard-flow-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .member-dashboard-flow-icon svg {
+        width: 2.85rem;
+        height: 2.85rem;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    .member-dashboard-flow-icon--completed {
+        color: #0ea63c;
+    }
+    .member-dashboard-flow-icon--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-icon--pending {
+        color: #6b7280;
+    }
+    .member-dashboard-flow-connector {
+        width: 2.7rem;
+        flex: 0 0 2.7rem;
+        height: 0.25rem;
+        border-radius: 9999px;
+        margin-top: 3rem;
+    }
+    .member-dashboard-flow-connector--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-flow-connector--current {
+        background: #2563eb;
+    }
+    .member-dashboard-flow-connector--pending {
+        background: #d1d5db;
+    }
+    .member-dashboard-flow-number {
+        margin-top: 1rem;
+        font-size: 2.55rem;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+    }
+    .member-dashboard-flow-number--completed {
+        color: #16a34a;
+    }
+    .member-dashboard-flow-number--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-number--pending {
+        color: #4b5563;
+    }
+    .member-dashboard-flow-label {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        line-height: 1.2;
+        font-weight: 800;
+        color: #172033;
+        min-height: 2.15rem;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-flow-text--completed {
+        color: #15803d;
+    }
+    .member-dashboard-flow-text--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-text--pending {
+        color: #f59e0b;
+    }
+    .member-dashboard-flow-text--not-started {
+        color: #94a3b8;
+    }
+    .member-dashboard-flow-status {
+        margin-top: 0.65rem;
+        font-size: 0.88rem;
+        line-height: 1.2;
+        font-weight: 700;
+        min-height: 1.15rem;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-flow-meta {
+        margin-top: 0.45rem;
+        font-size: 0.82rem;
+        line-height: 1.2;
+        font-weight: 600;
+    }
+    .member-dashboard-flow-meta--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-date {
+        margin-top: 0.45rem;
+        font-size: 0.82rem;
+        line-height: 1.2;
+        color: #6b7280;
+        min-height: 1.05rem;
+    }
+    .member-dashboard-flow-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.4rem;
+    }
+    .member-dashboard-flow-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .member-dashboard-flow-dot {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 9999px;
+        display: inline-block;
+    }
+    .member-dashboard-flow-dot--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-flow-dot--current {
+        background: #2563eb;
+    }
+    .member-dashboard-flow-dot--pending {
+        background: #f59e0b;
+    }
+    .member-dashboard-flow-dot--not-started {
+        background: #d1d5db;
+    }
+    .member-dashboard-flow-summary-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .member-dashboard-flow-summary-grid > div {
+        min-width: 0;
+    }
+    .member-dashboard-mobile-flow {
+        display: none;
+    }
+    .member-dashboard-mobile-step {
+        display: grid;
+        grid-template-columns: 3.75rem minmax(0, 1fr);
+        gap: 0.9rem;
+        align-items: flex-start;
+    }
+    .member-dashboard-mobile-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .member-dashboard-mobile-node {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.75rem;
+        height: 3.75rem;
+        border-width: 3px;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .member-dashboard-mobile-line {
+        width: 0.2rem;
+        min-height: 2.9rem;
+        margin-top: 0.45rem;
+        border-radius: 9999px;
+        background: #d1d5db;
+    }
+    .member-dashboard-mobile-line--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-mobile-line--current {
+        background: #2563eb;
+    }
+    .member-dashboard-mobile-body {
+        min-width: 0;
+        padding-top: 0.2rem;
+    }
+    .member-dashboard-mobile-step-number {
+        font-size: 0.8rem;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+    }
+    .member-dashboard-mobile-title {
+        margin-top: 0.4rem;
+        font-size: 1.02rem;
+        line-height: 1.25;
+        font-weight: 800;
+        color: #172033;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-mobile-status {
+        margin-top: 0.45rem;
+        font-size: 0.95rem;
+        line-height: 1.2;
+        font-weight: 700;
+    }
+    .member-dashboard-mobile-meta {
+        margin-top: 0.25rem;
+        font-size: 0.84rem;
+        line-height: 1.2;
+        font-weight: 600;
+        color: #2563eb;
+    }
+    .member-dashboard-mobile-date {
+        margin-top: 0.35rem;
+        font-size: 0.84rem;
+        line-height: 1.25;
+        color: #64748b;
+    }
+    @media (min-width: 1024px) {
+        .member-dashboard-flow-shell {
+            overflow-x: visible;
+        }
+        .member-dashboard-flow-track {
+            width: 100%;
+            min-width: 0;
+            padding-top: 0.7rem;
+        }
+        .member-dashboard-flow-list {
+            width: 100%;
+            min-width: 0;
+            justify-content: space-between;
+        }
+        .member-dashboard-flow-step-wrap {
+            flex: 1 1 0;
+            min-width: 0;
+            align-items: flex-start;
+        }
+        .member-dashboard-flow-step {
+            width: auto;
+            flex: 1 1 0;
+            min-width: 0;
+        }
+        .member-dashboard-flow-connector {
+            width: clamp(1rem, 1.6vw, 1.8rem);
+            flex: 0 0 clamp(1rem, 1.6vw, 1.8rem);
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.82rem;
+        }
+        .member-dashboard-flow-status {
+            font-size: 0.8rem;
+        }
+        .member-dashboard-flow-date,
+        .member-dashboard-flow-meta {
+            font-size: 0.72rem;
+        }
+    }
+    @media (max-width: 768px) {
+        .member-dashboard-mobile-flow {
+            display: block;
+        }
+        .member-dashboard-flow-shell--desktop {
+            display: none;
+        }
+        .member-dashboard-flow-track {
+            padding-top: 0.55rem;
+        }
+        .member-dashboard-flow-step {
+            width: 7.25rem;
+            flex-basis: 7.25rem;
+        }
+        .member-dashboard-flow-node {
+            width: 4.55rem;
+            height: 4.55rem;
+        }
+        .member-dashboard-flow-icon svg {
+            width: 2rem;
+            height: 2rem;
+        }
+        .member-dashboard-flow-connector {
+            width: 1.55rem;
+            flex-basis: 1.55rem;
+            margin-top: 2.15rem;
+        }
+        .member-dashboard-flow-check {
+            right: 0.55rem;
+            width: 1.55rem;
+            height: 1.55rem;
+            font-size: 0.8rem;
+        }
+        .member-dashboard-flow-number {
+            font-size: 2rem;
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.8rem;
+            min-height: 1.95rem;
+        }
+        .member-dashboard-flow-status,
+        .member-dashboard-flow-date,
+        .member-dashboard-flow-meta {
+            font-size: 0.76rem;
+        }
+    }
+    @media (min-width: 769px) and (max-width: 1023px) {
+        .member-dashboard-flow-step {
+            width: 8.2rem;
+            flex-basis: 8.2rem;
+        }
+        .member-dashboard-flow-node {
+            width: 5.3rem;
+            height: 5.3rem;
+        }
+        .member-dashboard-flow-icon svg {
+            width: 2.25rem;
+            height: 2.25rem;
+        }
+        .member-dashboard-flow-connector {
+            width: 1.9rem;
+            flex-basis: 1.9rem;
+            margin-top: 2.55rem;
+        }
+        .member-dashboard-flow-check {
+            right: 0.72rem;
+        }
+        .member-dashboard-flow-number {
+            font-size: 2.25rem;
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.82rem;
+        }
+    }
+</style>
 
 <%!
 private static String esc(Object value) {
@@ -332,56 +736,250 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </section>
 
-    <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
-        <section class="erp-panel">
+    <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+        <section class="erp-panel min-w-0">
             <div class="erp-panel-header">
-                <p class="erp-panel-title"><spring:message code="dashboard.panel.applicationStatusGraph" /></p>
+                <p class="erp-panel-title">Current Loan Application</p>
             </div>
-            <div class="erp-panel-body">
+            <div class="erp-panel-body min-w-0">
                 <div class="erp-toolbar">
                     <div>
-                        <p class="erp-widget-title"><spring:message code="dashboard.widget.workflowDistribution" /></p>
-                        <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.applicationsByStatus" /></h2>
+                        <p class="erp-widget-title">Workflow Progress</p>
+                        <h2 class="erp-widget-heading">Track The Status Of Your Current Loan</h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
-                        ${currentApplicationCount} <spring:message code="dashboard.chart.currentRecords" />
+                        ${currentApplicationCount} current record(s)
                     </div>
                 </div>
 
                 <c:choose>
-                    <c:when test="${not empty statusChartRows}">
-                        <div id="statusChartWrap" class="relative overflow-hidden rounded border border-slate-200 bg-white p-3 sm:p-4">
-                            <svg viewBox="0 0 <%= statusChartWidth %> <%= statusChartHeight %>" class="block w-full">
-                                <rect x="0" y="0" width="<%= statusChartWidth %>" height="<%= statusChartHeight %>" rx="8" fill="#ffffff"></rect>
-                                <%= statusGrid.toString() %>
-                                <line x1="<%= statusLeftPad %>" y1="<%= statusTopPad %>" x2="<%= statusLeftPad %>" y2="<%= statusChartHeight - statusBottomPad %>" stroke="#CBD5E1" stroke-width="1.5"></line>
-                                <line x1="<%= statusLeftPad %>" y1="<%= statusChartHeight - statusBottomPad %>" x2="<%= statusChartWidth - statusRightPad %>" y2="<%= statusChartHeight - statusBottomPad %>" stroke="#CBD5E1" stroke-width="1.5"></line>
-                                <%= statusYLabels.toString() %>
-                                <%= statusBars.toString() %>
-                                <%= statusValues.toString() %>
-                                <%= statusLabels.toString() %>
-                            </svg>
-                            <div id="statusChartTooltip" class="pointer-events-none absolute hidden rounded border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg">
-                                <p id="statusChartTooltipTitle" class="text-sacco-ink"></p>
-                                <p id="statusChartTooltipValue" class="mt-1 text-slate-500"></p>
+                    <c:when test="${not empty currentWorkflowApplication}">
+                        <div class="mt-4 min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-4 sm:p-5">
+                            <div class="member-dashboard-flow-summary-grid">
+                                <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Loan Application ID</p>
+                                    <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowApplicationNumber}</p>
+                                </div>
+                                <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Amount</p>
+                                    <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowAmountLabel}</p>
+                                </div>
+                                <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Current Status</p>
+                                    <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowStatusLabel}</p>
+                                </div>
+                            </div>
+                            <c:if test="${not empty currentWorkflowUpdatedAtLabel}">
+                                <div class="mt-3 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                                    Updated ${currentWorkflowUpdatedAtLabel}
+                                </div>
+                            </c:if>
+
+                            <div class="member-dashboard-mobile-flow mt-6 space-y-4">
+                                <c:forEach items="${currentWorkflowSteps}" var="step" varStatus="loop">
+                                    <div class="member-dashboard-mobile-step">
+                                        <div class="member-dashboard-mobile-rail">
+                                            <div class="member-dashboard-mobile-node ${step.nodeClasses}">
+                                                <span class="member-dashboard-flow-icon ${step.iconClasses}" aria-hidden="true">
+                                                    <c:choose>
+                                                        <c:when test="${step.iconKey eq 'applicant'}">
+                                                            <svg viewBox="0 0 24 24">
+                                                                <circle cx="12" cy="8" r="3.2"></circle>
+                                                                <path d="M5.5 18.2c1.9-3 4.1-4.4 6.5-4.4s4.6 1.4 6.5 4.4"></path>
+                                                            </svg>
+                                                        </c:when>
+                                                        <c:when test="${step.iconKey eq 'guarantors'}">
+                                                            <svg viewBox="0 0 24 24">
+                                                                <circle cx="10" cy="8" r="3"></circle>
+                                                                <path d="M4.8 17.8c1.6-2.8 3.5-4 5.2-4 1.8 0 3.8 1.2 5.4 4"></path>
+                                                                <rect x="14.6" y="12.6" width="4.2" height="5" rx="0.8"></rect>
+                                                                <path d="M15.7 12.6v-1.2a1 1 0 011-1h.2a1 1 0 011 1v1.2"></path>
+                                                            </svg>
+                                                        </c:when>
+                                                        <c:when test="${step.iconKey eq 'manager'}">
+                                                            <svg viewBox="0 0 24 24">
+                                                                <circle cx="12" cy="7.8" r="3"></circle>
+                                                                <path d="M6 18.3c1.8-3 4-4.4 6-4.4s4.2 1.4 6 4.4"></path>
+                                                                <path d="M12 11.4v3.4"></path>
+                                                                <path d="M10.9 15.1L12 16.3l1.1-1.2"></path>
+                                                            </svg>
+                                                        </c:when>
+                                                        <c:when test="${step.iconKey eq 'review'}">
+                                                            <svg viewBox="0 0 24 24">
+                                                                <circle cx="10" cy="10" r="4.6"></circle>
+                                                                <path d="M13.4 13.4L18.2 18.2"></path>
+                                                                <path d="M8 10.2l1.4 1.4 2.8-3"></path>
+                                                            </svg>
+                                                        </c:when>
+                                                        <c:when test="${step.iconKey eq 'disbursement'}">
+                                                            <svg viewBox="0 0 24 24">
+                                                                <path d="M5.5 9.2h13"></path>
+                                                                <path d="M7 9.2V7.6h10v1.6"></path>
+                                                                <path d="M6.8 9.2v7.2"></path>
+                                                                <path d="M17.2 9.2v7.2"></path>
+                                                                <path d="M4.8 16.4h14.4"></path>
+                                                                <path d="M12 12v2.8"></path>
+                                                                <path d="M10.4 13.8L12 15.4l1.6-1.6"></path>
+                                                            </svg>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <svg viewBox="0 0 24 24">
+                                                                <path d="M4.5 9.4L12 5.8l7.5 3.6"></path>
+                                                                <path d="M6.4 10.5v6.6"></path>
+                                                                <path d="M10.2 10.5v6.6"></path>
+                                                                <path d="M13.8 10.5v6.6"></path>
+                                                                <path d="M17.6 10.5v6.6"></path>
+                                                                <path d="M4.5 18.2h15"></path>
+                                                            </svg>
+                                                        </c:otherwise>
+                                                    </c:choose>
+                                                </span>
+                                                <c:if test="${step.stateKey eq 'completed'}">
+                                                    <span class="member-dashboard-flow-check">&#10003;</span>
+                                                </c:if>
+                                            </div>
+                                            <c:if test="${not loop.last}">
+                                                <div class="member-dashboard-mobile-line ${step.connectorClasses eq 'member-dashboard-flow-connector--completed' ? 'member-dashboard-mobile-line--completed' : (step.connectorClasses eq 'member-dashboard-flow-connector--current' ? 'member-dashboard-mobile-line--current' : '')}"></div>
+                                            </c:if>
+                                        </div>
+                                        <div class="member-dashboard-mobile-body">
+                                            <p class="member-dashboard-mobile-step-number">Step ${step.stepNumber}</p>
+                                            <p class="member-dashboard-mobile-title">${step.label}</p>
+                                            <p class="member-dashboard-mobile-status ${step.textClasses}">${step.stateLabel}</p>
+                                            <c:if test="${not empty step.metaLabel}">
+                                                <p class="member-dashboard-mobile-meta">${step.metaLabel}</p>
+                                            </c:if>
+                                            <c:if test="${not empty step.dateLabel}">
+                                                <p class="member-dashboard-mobile-date">${step.dateLabel}</p>
+                                            </c:if>
+                                        </div>
+                                    </div>
+                                </c:forEach>
+                            </div>
+
+                            <div class="member-dashboard-flow-shell member-dashboard-flow-shell--desktop mt-6">
+                                <div class="member-dashboard-flow-track">
+                                    <div class="member-dashboard-flow-list">
+                                        <c:forEach items="${currentWorkflowSteps}" var="step" varStatus="loop">
+                                            <div class="member-dashboard-flow-step-wrap">
+                                                <div class="member-dashboard-flow-step">
+                                                    <div class="member-dashboard-flow-node-wrap">
+                                                        <div class="member-dashboard-flow-node ${step.nodeClasses}">
+                                                            <span class="member-dashboard-flow-icon ${step.iconClasses}" aria-hidden="true">
+                                                                <c:choose>
+                                                                    <c:when test="${step.iconKey eq 'applicant'}">
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <circle cx="12" cy="8" r="3.2"></circle>
+                                                                            <path d="M5.5 18.2c1.9-3 4.1-4.4 6.5-4.4s4.6 1.4 6.5 4.4"></path>
+                                                                        </svg>
+                                                                    </c:when>
+                                                                    <c:when test="${step.iconKey eq 'guarantors'}">
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <circle cx="10" cy="8" r="3"></circle>
+                                                                            <path d="M4.8 17.8c1.6-2.8 3.5-4 5.2-4 1.8 0 3.8 1.2 5.4 4"></path>
+                                                                            <rect x="14.6" y="12.6" width="4.2" height="5" rx="0.8"></rect>
+                                                                            <path d="M15.7 12.6v-1.2a1 1 0 011-1h.2a1 1 0 011 1v1.2"></path>
+                                                                        </svg>
+                                                                    </c:when>
+                                                                    <c:when test="${step.iconKey eq 'manager'}">
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <circle cx="12" cy="7.8" r="3"></circle>
+                                                                            <path d="M6 18.3c1.8-3 4-4.4 6-4.4s4.2 1.4 6 4.4"></path>
+                                                                            <path d="M12 11.4v3.4"></path>
+                                                                            <path d="M10.9 15.1L12 16.3l1.1-1.2"></path>
+                                                                        </svg>
+                                                                    </c:when>
+                                                                    <c:when test="${step.iconKey eq 'review'}">
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <circle cx="10" cy="10" r="4.6"></circle>
+                                                                            <path d="M13.4 13.4L18.2 18.2"></path>
+                                                                            <path d="M8 10.2l1.4 1.4 2.8-3"></path>
+                                                                        </svg>
+                                                                    </c:when>
+                                                                    <c:when test="${step.iconKey eq 'disbursement'}">
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <path d="M5.5 9.2h13"></path>
+                                                                            <path d="M7 9.2V7.6h10v1.6"></path>
+                                                                            <path d="M6.8 9.2v7.2"></path>
+                                                                            <path d="M17.2 9.2v7.2"></path>
+                                                                            <path d="M4.8 16.4h14.4"></path>
+                                                                            <path d="M12 12v2.8"></path>
+                                                                            <path d="M10.4 13.8L12 15.4l1.6-1.6"></path>
+                                                                        </svg>
+                                                                    </c:when>
+                                                                    <c:otherwise>
+                                                                        <svg viewBox="0 0 24 24">
+                                                                            <path d="M4.5 9.4L12 5.8l7.5 3.6"></path>
+                                                                            <path d="M6.4 10.5v6.6"></path>
+                                                                            <path d="M10.2 10.5v6.6"></path>
+                                                                            <path d="M13.8 10.5v6.6"></path>
+                                                                            <path d="M17.6 10.5v6.6"></path>
+                                                                            <path d="M4.5 18.2h15"></path>
+                                                                        </svg>
+                                                                    </c:otherwise>
+                                                                </c:choose>
+                                                            </span>
+                                                        </div>
+                                                        <c:if test="${step.stateKey eq 'completed'}">
+                                                            <span class="member-dashboard-flow-check">&#10003;</span>
+                                                        </c:if>
+                                                    </div>
+                                                    <p class="member-dashboard-flow-number ${step.numberClasses}">${step.stepNumber}</p>
+                                                    <p class="member-dashboard-flow-label">${step.label}</p>
+                                                    <p class="member-dashboard-flow-status ${step.textClasses}">${step.stateLabel}</p>
+                                                    <c:if test="${not empty step.metaLabel}">
+                                                        <p class="member-dashboard-flow-meta member-dashboard-flow-meta--current">${step.metaLabel}</p>
+                                                    </c:if>
+                                                    <c:if test="${not empty step.dateLabel}">
+                                                        <p class="member-dashboard-flow-date">${step.dateLabel}</p>
+                                                    </c:if>
+                                                </div>
+                                                <c:if test="${not loop.last}">
+                                                    <div class="member-dashboard-flow-connector ${step.connectorClasses}"></div>
+                                                </c:if>
+                                            </div>
+                                        </c:forEach>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="member-dashboard-flow-legend mt-6 border-t border-slate-200 pt-4">
+                                <span class="member-dashboard-flow-legend-item">
+                                    <span class="member-dashboard-flow-dot member-dashboard-flow-dot--completed"></span>
+                                    Completed
+                                </span>
+                                <span class="member-dashboard-flow-legend-item">
+                                    <span class="member-dashboard-flow-dot member-dashboard-flow-dot--current"></span>
+                                    In progress
+                                </span>
+                                <span class="member-dashboard-flow-legend-item">
+                                    <span class="member-dashboard-flow-dot member-dashboard-flow-dot--pending"></span>
+                                    Pending
+                                </span>
+                                <span class="member-dashboard-flow-legend-item">
+                                    <span class="member-dashboard-flow-dot member-dashboard-flow-dot--not-started"></span>
+                                    Not started
+                                </span>
                             </div>
                         </div>
                     </c:when>
                     <c:otherwise>
-                        <div class="erp-section text-center text-sm text-slate-500"><spring:message code="dashboard.empty.applicationStatuses" /></div>
+                        <div class="erp-section mt-4 text-center text-sm text-slate-500">
+                            There is no current loan application to track right now.
+                        </div>
                     </c:otherwise>
                 </c:choose>
             </div>
         </section>
 
-        <section class="erp-panel 2xl:self-start">
+        <section class="erp-panel min-w-0 xl:self-start">
             <div class="erp-panel-header">
-                <p class="erp-panel-title"><spring:message code="dashboard.panel.repaymentTimelines" /></p>
+                <p class="erp-panel-title">Active Loans</p>
             </div>
-            <div class="erp-panel-body">
+            <div class="erp-panel-body min-w-0">
                 <div class="erp-toolbar gap-3">
                     <div>
-                        <p class="erp-widget-title"><spring:message code="dashboard.widget.activeLoansChart" /></p>
+                        <p class="erp-widget-title">Repayment Progress</p>
                         <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.timeLeftEachActiveLoan" /></h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
@@ -390,23 +988,39 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </div>
                 <c:choose>
                     <c:when test="${not empty activeLoanChartRows}">
-                        <div class="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-1 3xl:grid-cols-2">
+                        <div class="mt-4 flex flex-wrap gap-4 text-xs font-semibold text-slate-500">
+                            <span class="inline-flex items-center gap-2">
+                                <span class="inline-block h-3 w-3 rounded-full" style="background:#2F348D;"></span>
+                                Remaining time
+                            </span>
+                            <span class="inline-flex items-center gap-2">
+                                <span class="inline-block h-3 w-3 rounded-full" style="background:#E2E8F0;"></span>
+                                Time already used
+                            </span>
+                        </div>
+                        <div class="mt-4 grid gap-4 2xl:grid-cols-2">
                             <c:forEach items="${activeLoanChartRows}" var="loanRow">
-                                <div class="rounded border border-slate-200 bg-white p-4"
+                                <div class="min-w-0 overflow-hidden rounded border border-slate-200 bg-white p-4"
                                      data-repayment-timer="card"
                                      data-start-date="${loanRow.startDate}"
                                      data-final-due-date="${loanRow.finalDueDate}"
                                      data-total-days="${loanRow.totalDays}">
-                                    <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_160px] sm:items-center">
-                                        <div class="min-w-0">
+                                    <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_152px] xl:items-center">
+                                        <div class="min-w-0 overflow-hidden">
                                             <div class="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
                                                     <p class="erp-widget-title"><spring:message code="dashboard.repaymentTimer.label" /></p>
                                                     <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="dashboard.loanId.prefix" /> ${loanRow.loanId}</h3>
                                                 </div>
-                                                <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">
-                                                    <c:if test="${loanRow.repaymentStateLabel eq 'Paid'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
-                                                </span>
+                                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                                    <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">
+                                                        <c:if test="${loanRow.repaymentStateLabel eq 'Paid'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
+                                                    </span>
+                                                    <a href="${pageContext.request.contextPath}/app/loan-applications/${loanRow.fullId}#repayment-plan"
+                                                       class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">
+                                                        View Repayment Schedule
+                                                    </a>
+                                                </div>
                                             </div>
                                             <p class="mt-1 text-sm text-slate-500"><spring:message code="dashboard.loanAmount.label" /> ${loanRow.amountLabel}</p>
                                             <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-slate-600">
@@ -465,10 +1079,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                             </div>
                                         </div>
 
-                                        <div class="mx-auto flex w-full max-w-[170px] flex-col items-center gap-3">
+                                        <div class="mx-auto flex w-full max-w-[152px] flex-col items-center gap-3">
                                             <div class="relative flex h-28 w-28 items-center justify-center rounded-full sm:h-32 sm:w-32"
                                                 data-repayment-timer="ring"
-                                                 style="background: conic-gradient(#E2E8F0 0% ${loanRow.remainingPercent}%, #2F348D ${loanRow.remainingPercent}% 100%);">
+                                                 style="background: conic-gradient(#2F348D 0% ${loanRow.remainingPercent}%, #E2E8F0 ${loanRow.remainingPercent}% 100%);">
                                                 <div class="flex h-18 w-18 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm sm:h-20 sm:w-20">
                                                     <p class="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="dashboard.remaining.label" /></p>
                                                     <p class="mt-1 font-display text-xl text-sacco-ink sm:text-2xl" data-repayment-timer="remaining-percent">${loanRow.remainingPercent}%</p>
@@ -508,76 +1122,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         </div>
                     </c:otherwise>
                 </c:choose>
-            </div>
-        </section>
-    </div>
-
-    <div class="erp-content-grid">
-        <section class="erp-panel">
-            <div class="erp-panel-header">
-                <p class="erp-panel-title"><spring:message code="dashboard.panel.currentApplications" /></p>
-            </div>
-            <div class="erp-panel-body">
-                <div class="erp-table-wrap">
-                    <table class="erp-table">
-                        <thead>
-                        <tr>
-                            <th><spring:message code="dashboard.table.loanApplicationId" /></th>
-                            <th><spring:message code="dashboard.table.loanType" /></th>
-                            <th><spring:message code="dashboard.table.amount" /></th>
-                            <th><spring:message code="dashboard.table.status" /></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <c:forEach items="${myApplications}" var="app" end="4">
-                            <tr>
-                                <td>${app.applicationNumber}</td>
-                                <td><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></td>
-                                <td>${app.amount}</td>
-                                <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
-                            </tr>
-                        </c:forEach>
-                        <c:if test="${empty myApplications}">
-                            <tr>
-                                <td colspan="4"><spring:message code="dashboard.empty.currentApplications" /></td>
-                            </tr>
-                        </c:if>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <section class="erp-panel">
-            <div class="erp-panel-header">
-                <p class="erp-panel-title"><spring:message code="dashboard.panel.guarantorQueue" /></p>
-            </div>
-            <div class="erp-panel-body">
-                <div class="erp-table-wrap">
-                    <table class="erp-table">
-                        <thead>
-                        <tr>
-                            <th><spring:message code="dashboard.table.loanId" /></th>
-                            <th><spring:message code="dashboard.table.loanAmount" /></th>
-                            <th><spring:message code="dashboard.table.status" /></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <c:forEach items="${pendingGuarantees}" var="request" end="4">
-                            <tr>
-                                <td>${fn:substring(request.loanApplicationId, 0, 8)}</td>
-                                <td>${guaranteeLoanAmounts[request.loanApplicationId]}</td>
-                                <td>${request.status}</td>
-                            </tr>
-                        </c:forEach>
-                        <c:if test="${empty pendingGuarantees}">
-                            <tr>
-                                <td colspan="3"><spring:message code="dashboard.empty.guarantorQueue" /></td>
-                            </tr>
-                        </c:if>
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </section>
     </div>
@@ -685,7 +1229,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 progressEl.textContent = formatPercent(remainingPercent) + ' remaining';
             }
             if (ringEl) {
-                ringEl.style.background = 'conic-gradient(#E2E8F0 0% ' + remainingPercent + '%, #2F348D ' + remainingPercent + '% 100%)';
+                ringEl.style.background = 'conic-gradient(#2F348D 0% ' + remainingPercent + '%, #E2E8F0 ' + remainingPercent + '% 100%)';
             }
         }
 
@@ -702,44 +1246,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             refresh();
             window.setInterval(refresh, 60000);
         }
-
-        function bindTooltip(wrapId, selector, tooltipId, titleId, valueRenderer) {
-            var wrap = document.getElementById(wrapId);
-            var tooltip = document.getElementById(tooltipId);
-            var title = document.getElementById(titleId);
-            if (!wrap || !tooltip || !title) {
-                return;
-            }
-            var points = wrap.querySelectorAll(selector);
-            Array.prototype.forEach.call(points, function (point) {
-                point.addEventListener('mouseenter', function () {
-                    title.textContent = point.getAttribute('data-label') || '';
-                    valueRenderer(point);
-                    tooltip.classList.remove('hidden');
-                });
-                point.addEventListener('mousemove', function (event) {
-                    var wrapRect = wrap.getBoundingClientRect();
-                    var left = event.clientX - wrapRect.left + 14;
-                    var top = event.clientY - wrapRect.top - 14;
-                    tooltip.style.left = left + 'px';
-                    tooltip.style.top = top + 'px';
-                });
-                point.addEventListener('mouseleave', function () {
-                    tooltip.classList.add('hidden');
-                });
-            });
-        }
-
-        bindTooltip(
-            'statusChartWrap',
-            '.dashboard-status-hover',
-            'statusChartTooltip',
-            'statusChartTooltipTitle',
-            function (point) {
-                document.getElementById('statusChartTooltipValue').textContent =
-                    (point.getAttribute('data-value') || '0') + ' application(s)';
-            }
-        );
 
         startRepaymentTimers();
 

@@ -36,6 +36,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -168,23 +170,28 @@ public class LoanOfficerController {
         BoardReview myReview = boardService.getMyReview(id, principal.getMemberId(), STAGE);
         List<BoardReview> stageReviews = boardService.reviewsForLoan(id, STAGE);
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        Map<UUID, String> guarantorNames = memberRepository.findAllById(
-                guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()))
-            .stream()
+        List<Member> guarantorMembers = memberRepository.findAllById(
+            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
         Map<UUID, Member> reviewers = memberRepository.findAllById(
                 stageReviews.stream().map(BoardReview::getBoardMemberId).collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(Member::getId, member -> member));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("myReview", myReview);
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
+        model.addAttribute("guarantorMembersById", guarantorMembersById);
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
@@ -233,6 +240,18 @@ public class LoanOfficerController {
         return ResponseEntity.ok(payload);
     }
 
+    @GetMapping("/loan-applications/{id}/applicant-financial-status")
+    @ResponseBody
+    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
+                                                                        @AuthenticationPrincipal AppUserPrincipal principal) {
+        boardService.getMyReview(id, principal.getMemberId(), STAGE);
+        LoanApplication app = loanApplicationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
     @PostMapping("/loan-applications/{id}/request-signature-otp")
     @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
     @ResponseBody
@@ -275,6 +294,7 @@ public class LoanOfficerController {
                          @RequestParam BoardDecision decision,
                          @RequestParam(required = false) String comment,
                          @RequestParam(required = false) String boardSignatureOtpCode,
+                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
             if (decision == BoardDecision.APPROVED) {
@@ -288,7 +308,8 @@ public class LoanOfficerController {
                     decision,
                     comment,
                     reviewer.getSignatureText(),
-                    OffsetDateTime.now()
+                    OffsetDateTime.now(),
+                    parseGuarantorCommitments(request)
                 );
                 emailOtpService.consumeOtpById(otpTokenId);
             } else {
@@ -299,6 +320,20 @@ public class LoanOfficerController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/loan-officer/loan-applications/" + id;
+    }
+
+    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        request.getParameterMap().forEach((key, values) -> {
+            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
+                return;
+            }
+            try {
+                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        });
+        return commitments;
     }
 
     @PostMapping("/loan-applications/{id}/undo")
@@ -509,5 +544,15 @@ public class LoanOfficerController {
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         };
+    }
+
+    private Map<String, Object> externalAccountStatusPayload(ExternalAccountStatusService.ExternalAccountStatusView status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("available", status.isAvailable());
+        payload.put("pending", status.isPending());
+        payload.put("savingsLabel", status.getSavingsLabel());
+        payload.put("sharesLabel", status.getSharesLabel());
+        payload.put("statusMessage", status.getStatusMessage());
+        return payload;
     }
 }

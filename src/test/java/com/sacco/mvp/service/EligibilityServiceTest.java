@@ -3,8 +3,10 @@ package com.sacco.mvp.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
+import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SavingsAccountRepository;
+import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +31,10 @@ class EligibilityServiceTest {
     @Mock
     private LoanProductSettingRepository loanProductSettingRepository;
     @Mock
+    private MemberRepository memberRepository;
+    @Mock
+    private ForesightDirectoryService foresightDirectoryService;
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks
@@ -42,6 +48,7 @@ class EligibilityServiceTest {
         when(savingsAccountRepository.findByMemberId(memberId)).thenReturn(Optional.of(
             SavingsAccount.builder().id(UUID.randomUUID()).memberId(memberId)
                 .availableBalance(new BigDecimal("300000.00")).updatedAt(OffsetDateTime.now()).build()));
+        when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
 
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, LoanType.EDUCATION_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().id(UUID.randomUUID()).saccoId(saccoId)

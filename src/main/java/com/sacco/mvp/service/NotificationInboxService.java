@@ -68,12 +68,36 @@ public class NotificationInboxService {
         );
     }
 
+    public List<NotificationViewService.NotificationView> allViewsByType(UUID memberId, String type) {
+        if (memberId == null || type == null || type.isBlank()) {
+            return Collections.emptyList();
+        }
+        return notificationViewService.toViews(
+            notificationRepository.findByRecipientMemberIdAndTypeOrderByCreatedAtDesc(memberId, type)
+        );
+    }
+
     @Transactional
     public int markAllAsRead(UUID memberId) {
         if (memberId == null) {
             return 0;
         }
         return notificationRepository.markAllAsReadForMember(memberId);
+    }
+
+    @Transactional
+    public int markAllAsReadByTypes(UUID memberId, Collection<String> types) {
+        if (memberId == null || types == null || types.isEmpty()) {
+            return 0;
+        }
+        List<String> normalizedTypes = types.stream()
+            .filter(type -> type != null && !type.isBlank())
+            .distinct()
+            .toList();
+        if (normalizedTypes.isEmpty()) {
+            return 0;
+        }
+        return notificationRepository.markAllAsReadForMemberAndTypes(memberId, normalizedTypes);
     }
 
     @Transactional
@@ -99,7 +123,7 @@ public class NotificationInboxService {
         String loanId = stringValue(details.get("loanId"));
         String incidentId = stringValue(details.get("incidentId"));
 
-        if (position != null && position.isAdminRole() && !incidentId.isBlank()) {
+        if (position != null && position.isAdminRole() && "SUPPORT_MESSAGE".equals(notification.getType()) && !incidentId.isBlank()) {
             return "/admin/incidents/" + incidentId;
         }
         if (!loanId.isBlank()) {

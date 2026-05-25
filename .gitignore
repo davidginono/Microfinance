@@ -1,4 +1,5 @@
 target/
+loan-uploads/
 node_modules/
 docs/
 *.class

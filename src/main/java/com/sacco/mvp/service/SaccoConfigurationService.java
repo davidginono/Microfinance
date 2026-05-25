@@ -64,12 +64,15 @@ public class SaccoConfigurationService {
             true,
             null,
             ApprovalWorkflowStage.MANAGER,
+            1,
+            2,
             true,
             3,
             2,
             2,
             true,
             4,
+            true,
             LoanProductStatus.ACTIVE,
             true,
             now
@@ -97,12 +100,15 @@ public class SaccoConfigurationService {
                                                 boolean managerReviewRequired,
                                                 Boolean loanOfficerReviewRequired,
                                                 ApprovalWorkflowStage workflowStartStage,
+                                                Integer managerPriority,
+                                                Integer loanOfficerPriority,
                                                 boolean committeeReviewRequired,
                                                 Integer committeePriority,
                                                 Integer committeeMinimumVotes,
                                                 Integer committeeApprovalThreshold,
                                                 boolean accountantReviewRequired,
                                                 Integer accountantPriority,
+                                                boolean disbursementOfficerRequired,
                                                 LoanProductStatus productStatus,
                                                 boolean active) {
         if (loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
@@ -130,12 +136,15 @@ public class SaccoConfigurationService {
             managerReviewRequired,
             loanOfficerReviewRequired,
             workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
             committeeReviewRequired,
             committeePriority,
             committeeMinimumVotes,
             committeeApprovalThreshold,
             accountantReviewRequired,
             accountantPriority,
+            disbursementOfficerRequired,
             productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus,
             active,
             now
@@ -162,12 +171,15 @@ public class SaccoConfigurationService {
                                               boolean managerReviewRequired,
                                               Boolean loanOfficerReviewRequired,
                                               ApprovalWorkflowStage workflowStartStage,
+                                              Integer managerPriority,
+                                              Integer loanOfficerPriority,
                                               boolean committeeReviewRequired,
                                               Integer committeePriority,
                                               Integer committeeMinimumVotes,
                                               Integer committeeApprovalThreshold,
                                               boolean accountantReviewRequired,
                                               Integer accountantPriority,
+                                              boolean disbursementOfficerRequired,
                                               LoanProductStatus productStatus,
                                               boolean active,
                                               OffsetDateTime now) {
@@ -191,7 +203,9 @@ public class SaccoConfigurationService {
             .allowApplicationWithActiveLoan(allowApplicationWithActiveLoan)
             .freshFinancialDataRequired(freshFinancialDataRequired)
             .managerReviewRequired(managerReviewRequired)
+            .managerPriority(managerPriority == null ? 1 : managerPriority)
             .loanOfficerReviewRequired(loanOfficerReviewRequired)
+            .loanOfficerPriority(loanOfficerPriority == null ? 2 : loanOfficerPriority)
             .workflowStartStage(workflowStartStage == null ? ApprovalWorkflowStage.MANAGER : workflowStartStage)
             .committeeReviewRequired(committeeReviewRequired)
             .committeePriority(committeePriority)
@@ -199,6 +213,9 @@ public class SaccoConfigurationService {
             .committeeApprovalThreshold(committeeApprovalThreshold)
             .accountantReviewRequired(accountantReviewRequired)
             .accountantPriority(accountantPriority)
+            .disbursementOfficerRequired(disbursementOfficerRequired)
+            .guarantorCommitmentRequired(false)
+            .guarantorCommitmentStage(ApprovalWorkflowStage.MANAGER)
             .productStatus(productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus)
             .formSchema(defaultLoanFormSchema())
             .active(active && (productStatus == null || productStatus == LoanProductStatus.ACTIVE))

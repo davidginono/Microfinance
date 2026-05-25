@@ -19,17 +19,17 @@
         <div class="min-w-0">
             <div class="loan-hero-primary-grid">
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label">Loan Application ID</div>
+                    <div class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
                 <c:if test="${not empty disbursedLoanId}">
                     <div class="loan-hero-inline-fact">
-                        <div class="loan-hero-inline-label">Loan ID</div>
+                        <div class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></div>
                         <div class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</div>
                     </div>
                 </c:if>
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label">Status</div>
+                    <div class="loan-hero-inline-label"><spring:message code="common.status" text="Status" /></div>
                     <div class="loan-hero-inline-value">
                         <span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${managerStatusBadgeClass}">
                             <spring:message code="loan.status.${app.status}" text="${app.status}" />
@@ -39,13 +39,19 @@
             </div>
             <div class="mt-4 loan-hero-facts-grid sm:grid-cols-2">
                 <div class="loan-hero-fact">
-                    <div class="loan-hero-fact-label">Applicant Name</div>
-                    <div class="loan-hero-fact-value">${applicant.fullName}</div>
+                    <div class="loan-hero-fact-label"><spring:message code="loan.applicantName" text="Applicant Name" /></div>
+                    <div class="loan-hero-fact-value"><c:out value="${applicant.fullName}" /></div>
                 </div>
                 <div class="loan-hero-fact">
-                    <div class="loan-hero-fact-label">Loan Type</div>
+                    <div class="loan-hero-fact-label"><spring:message code="loan.type" text="Loan Type" /></div>
                     <div class="loan-hero-fact-value"><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></div>
                 </div>
+                <c:if test="${not empty formFields['Loan Purpose']}">
+                    <div class="loan-hero-fact sm:col-span-2">
+                        <div class="loan-hero-fact-label"><spring:message code="loan.purpose" text="Loan Purpose" /></div>
+                        <div class="loan-hero-fact-value"><c:out value="${formFields['Loan Purpose']}" /></div>
+                    </div>
+                </c:if>
             </div>
         </div>
     </div>
@@ -55,30 +61,30 @@
              data-live-account-status-url="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status">
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="loan-view-summary-card px-4 py-4">
-                    <div class="loan-stat-label">Loan Amount</div>
+                    <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
                     <div class="loan-stat-value">${app.amount}</div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
-                    <div class="loan-stat-label">Tenor</div>
+                    <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
                     <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
-                    <div class="loan-stat-label">Current Savings</div>
-                    <div class="loan-stat-value" data-live-account-status-savings>Loading...</div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
+                    <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
-                    <div class="loan-stat-label">Current Shares</div>
-                    <div class="loan-stat-value" data-live-account-status-shares>Loading...</div>
+                    <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
+                    <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
                  data-live-account-status-box>
-                Loading live balances...
+                ${applicantExternalAccountStatus.statusMessage}
             </div>
         </div>
 
         <div class="mt-6 loan-simple-progress">
-            <h3 class="text-lg font-semibold text-slate-900">Progress</h3>
+            <h3 class="text-lg font-semibold text-slate-900"><spring:message code="loan.progress" text="Progress" /></h3>
             <div class="loan-simple-progress-list">
                 <c:forEach items="${loanProgressItems}" var="item">
                     <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
@@ -95,19 +101,19 @@
 <div class="mt-4 space-y-4">
     <c:if test="${not empty managerReason}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
-            <strong>Current Rejection Reason:</strong> ${managerReason}
+            <strong><spring:message code="review.currentRejectionReason" text="Current Rejection Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
     <c:if test="${app.status eq 'AWAITING_BOARD'}">
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Loan is on review by board. Waiting for decisions.
+            <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
         </div>
     </c:if>
     <div class="loan-view-summary-card px-5 py-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Applicant Details</p>
-                <p class="mt-2 text-base text-slate-600">Key applicant information for review before making a decision.</p>
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>
+                <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantDetailsHelp" text="Key applicant information for review before making a decision." /></p>
             </div>
             <c:if test="${not empty repaymentCountdown}">
                 <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">${repaymentCountdown}</span>
@@ -115,11 +121,11 @@
         </div>
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Full Name</div>
+                <div class="applicant-info-label"><spring:message code="member.fullName" text="Full Name" /></div>
                 <div class="applicant-info-value">${applicant.fullName}</div>
             </div>
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Member Number</div>
+                <div class="applicant-info-label"><spring:message code="member.memberNumber" text="Member Number" /></div>
                 <div class="applicant-info-value">${applicant.memberNo}</div>
             </div>
             <div class="applicant-info-card">
@@ -162,8 +168,8 @@
 <div class="loan-view-summary-card px-5 py-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Applicant Active Loans</p>
-            <p class="mt-2 text-base text-slate-600">Other disbursed loans that are still active for this applicant at the time of review.</p>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
+            <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -178,11 +184,11 @@
         <c:when test="${not empty activeApplicantLoans}">
             <div class="mt-5 grid gap-3 sm:grid-cols-2">
                 <div class="applicant-info-card">
-                    <div class="applicant-info-label">Active Loans</div>
+                    <div class="applicant-info-label"><spring:message code="analytics.activeLoans" text="Active Loans" /></div>
                     <div class="applicant-info-value">${activeApplicantLoanCount}</div>
                 </div>
                 <div class="applicant-info-card">
-                    <div class="applicant-info-label">Total Active Amount</div>
+                    <div class="applicant-info-label"><spring:message code="analytics.totalActiveAmount" text="Total Active Amount" /></div>
                     <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
                 </div>
             </div>
@@ -190,13 +196,13 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left">Loan</th>
-                        <th class="px-3 py-2 text-left">Type</th>
-                        <th class="px-3 py-2 text-left">Amount</th>
-                        <th class="px-3 py-2 text-left">Outstanding Balance</th>
-                        <th class="px-3 py-2 text-left">Installment</th>
-                        <th class="px-3 py-2 text-left">Disbursed</th>
-                        <th class="px-3 py-2 text-left">Final Due</th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.single" text="Loan" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="common.type" text="Type" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="common.amount" text="Amount" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
                     </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -227,19 +233,19 @@
         </c:when>
         <c:otherwise>
             <div class="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                This applicant has no other active disbursed loans at the moment.
+                <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
             </div>
         </c:otherwise>
     </c:choose>
 </div>
 
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Loan Details</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
-            <th class="px-3 py-2 text-left">Section</th>
-            <th class="px-3 py-2 text-left">Value</th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.section" text="Section" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.value" text="Value" /></th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -251,6 +257,38 @@
         </c:forEach>
         <c:if test="${empty financialFields}">
             <tr><td colspan="2" class="px-3 py-3 text-slate-500">No official financial details loaded yet.</td></tr>
+        </c:if>
+        </tbody>
+    </table>
+</div>
+
+<div class="erp-table-wrap overflow-x-auto">
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Fees & Insurance Receipt</h5>
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50">
+        <tr>
+            <th class="px-3 py-2 text-left">File</th>
+            <th class="px-3 py-2 text-left">Size</th>
+            <th class="px-3 py-2 text-left">Uploaded</th>
+            <th class="px-3 py-2 text-left"></th>
+        </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+        <c:forEach items="${feeInsuranceReceiptAttachments}" var="file">
+            <tr>
+                <td class="px-3 py-2">${file.originalName}</td>
+                <td class="px-3 py-2">${file.sizeLabel}</td>
+                <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
+                <td class="px-3 py-2">
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
+                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
+                    </div>
+                </td>
+            </tr>
+        </c:forEach>
+        <c:if test="${empty feeInsuranceReceiptAttachments}">
+            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No fees or insurance payment receipt uploaded yet.</td></tr>
         </c:if>
         </tbody>
     </table>
@@ -276,7 +314,7 @@
                     <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
                     <td class="px-3 py-2">
                         <div class="flex flex-wrap gap-2">
-                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}?inline=true" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
                         </div>
                     </td>
@@ -307,25 +345,26 @@
                 <td class="px-3 py-2">${file.originalName}</td>
                 <td class="px-3 py-2">${file.sizeLabel}</td>
                 <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
-                <td class="px-3 py-2"><a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a></td>
+                <td class="px-3 py-2"><a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary"><spring:message code="common.download" text="Download" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty attachments}">
-            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No attachments uploaded.</td></tr>
+            <tr><td colspan="4" class="px-3 py-3 text-slate-500"><spring:message code="loan.attachments.empty" text="No attachments uploaded." /></td></tr>
         </c:if>
         </tbody>
     </table>
 </div>
 
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Guarantor Requests</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantorRequests" text="Guarantor Requests" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
-            <th class="px-3 py-2 text-left">Guarantor</th>
-            <th class="px-3 py-2 text-left">Status</th>
-            <th class="px-3 py-2 text-left">Date</th>
-            <th class="px-3 py-2 text-left">Financial Status</th>
+            <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.status" text="Status" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="financial.status" text="Financial Status" /></th>
         </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -335,6 +374,12 @@
                     <c:choose>
                         <c:when test="${not empty guarantorNames[g.guarantorMemberId]}">${guarantorNames[g.guarantorMemberId]}</c:when>
                         <c:otherwise>#${fn:substring(g.guarantorMemberId, 0, 8)}</c:otherwise>
+                    </c:choose>
+                </td>
+                <td class="px-3 py-2">
+                    <c:choose>
+                        <c:when test="${not empty guarantorMembersById[g.guarantorMemberId] and not empty guarantorMembersById[g.guarantorMemberId].memberNo}">${guarantorMembersById[g.guarantorMemberId].memberNo}</c:when>
+                        <c:otherwise>-</c:otherwise>
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">${g.status}</td>
@@ -349,15 +394,15 @@
                             class="app-btn btn-neutral guarantor-financial-trigger"
                             data-url="${reviewBasePath}/loan-applications/${app.id}/guarantors/${g.guarantorMemberId}/financial-status">
                         <span class="guarantor-financial-spinner hidden" data-financial-spinner></span>
-                        <span data-financial-label>Load Status</span>
+                        <span data-financial-label><spring:message code="financial.loadStatus" text="Load Status" /></span>
                     </button>
                     <div class="guarantor-financial-result hidden">
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label">Savings</span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Savings" /></span>
                             <span class="guarantor-financial-result-value" data-financial-savings>-</span>
                         </div>
                         <div class="guarantor-financial-result-row">
-                            <span class="guarantor-financial-result-label">Shares</span>
+                            <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Shares" /></span>
                             <span class="guarantor-financial-result-value" data-financial-shares>-</span>
                         </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>
@@ -366,7 +411,7 @@
             </tr>
         </c:forEach>
         <c:if test="${empty guarantorRequests}">
-            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No guarantors selected yet.</td></tr>
+            <tr><td colspan="5" class="px-3 py-3 text-slate-500"><spring:message code="loan.guarantor.empty" text="No guarantors selected yet." /></td></tr>
         </c:if>
         </tbody>
     </table>
@@ -375,7 +420,7 @@
 <c:if test="${not empty repaymentSummary}">
     <div class="erp-section">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Repayment Schedule</h5>
+            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></h5>
             <c:if test="${not empty repaymentCountdown}">
                 <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">${repaymentCountdown}</span>
             </c:if>
@@ -390,23 +435,35 @@
         </div>
         <c:if test="${not empty repaymentRows}">
             <c:if test="${allowPaymentSync and not empty app.loanId}">
-                <form action="${reviewBasePath}/loan-applications/${app.id}/sync-payments" method="post" class="mt-4 flex items-center justify-end">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <button type="submit" class="app-btn btn-neutral">Refresh Payments</button>
-                </form>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">
+                    <c:if test="${app.status eq 'DEFAULTED'}">
+                        <form action="${reviewBasePath}/loan-applications/${app.id}/recheck-defaulted-payment"
+                              method="post"
+                              data-confirm-title="Recheck Defaulted Loan"
+                              data-confirm-message="Verify this defaulted loan against the payment system now? If the outstanding balance is zero, the status will change to PAID and guarantor capacity will be released."
+                              data-confirm-proceed="Recheck Loan">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                            <button type="submit" class="app-btn btn-primary">Recheck Defaulted Loan</button>
+                        </form>
+                    </c:if>
+                    <form action="${reviewBasePath}/loan-applications/${app.id}/sync-payments" method="post">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                        <button type="submit" class="app-btn btn-neutral"><spring:message code="loan.repayment.refresh" text="Refresh Payments" /></button>
+                    </form>
+                </div>
             </c:if>
             <div class="mt-3 erp-table-wrap overflow-x-auto">
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left">Installment</th>
-                        <th class="px-3 py-2 text-left">Due Date</th>
-                        <th class="px-3 py-2 text-left">Scheduled Amount</th>
-                        <th class="px-3 py-2 text-left">Outstanding Balance</th>
-                        <th class="px-3 py-2 text-left">Principal Paid</th>
-                        <th class="px-3 py-2 text-left">Interest Paid</th>
-                        <th class="px-3 py-2 text-left">Total Paid</th>
-                        <th class="px-3 py-2 text-left">Payment Date</th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
                     </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -435,10 +492,46 @@
 </c:if>
 
 <c:if test="${showReviewDecisionForm}">
-    <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3">
+    <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3" data-manager-decision-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
         <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
+        <c:if test="${not empty guarantorRequests}">
+            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+                <p class="erp-widget-title">Guarantor Commitments</p>
+                <p class="mt-1 text-sm text-slate-500">Applicant-assigned guarantor commitments. Review only; staff cannot edit these amounts.</p>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    <c:forEach items="${guarantorRequests}" var="request">
+                        <c:if test="${request.status eq 'APPROVED'}">
+                            <div class="rounded-md border border-slate-200 bg-white p-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Guarantor</p>
+                                <p class="mt-1 text-sm font-semibold text-sacco-ink">
+                                    <c:choose>
+                                        <c:when test="${not empty guarantorNames[request.guarantorMemberId]}">${guarantorNames[request.guarantorMemberId]}</c:when>
+                                        <c:otherwise>#${fn:substring(request.guarantorMemberId, 0, 8)}</c:otherwise>
+                                    </c:choose>
+                                </p>
+                                <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Member No</p>
+                                <p class="mt-1 text-sm font-semibold text-sacco-ink">
+                                    <c:choose>
+                                        <c:when test="${not empty guarantorMembersById[request.guarantorMemberId] and not empty guarantorMembersById[request.guarantorMemberId].memberNo}">${guarantorMembersById[request.guarantorMemberId].memberNo}</c:when>
+                                        <c:otherwise>-</c:otherwise>
+                                    </c:choose>
+                                </p>
+                                <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Committed Amount</p>
+                                <p class="mt-1 text-lg font-bold text-sacco-ink">
+                                    <c:choose>
+                                        <c:when test="${not empty request.committedAmount}">${request.committedAmount}</c:when>
+                                        <c:otherwise>${request.requestedAmount}</c:otherwise>
+                                    </c:choose>
+                                </p>
+                                <p class="mt-1 text-xs text-slate-500">Approved by guarantor</p>
+                            </div>
+                        </c:if>
+                    </c:forEach>
+                </div>
+            </div>
+        </c:if>
         <div class="flex flex-wrap gap-2">
             <button type="submit" name="decision" value="ACCEPT" class="app-btn btn-primary">${approveActionLabel}</button>
             <button type="submit" name="decision" value="REJECT" class="app-btn btn-reject">${rejectActionLabel}</button>
@@ -496,15 +589,15 @@
         </div>
         <div class="grid gap-4 md:grid-cols-2">
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Date</label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.disbursementDate" text="Disbursement Date" /></label>
                 <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">First Repayment Date</label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.firstRepayment" text="First Repayment Date" /></label>
                 <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">Loan ID <span class="text-rose-600">*</span></label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
                 <input type="text" name="loanId" value="${app.loanId}"
                        pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
                        title="Enter the SACCO loan-book number (4-20 digits)"
@@ -532,6 +625,11 @@
                    required />
             <p class="mt-1 text-xs text-slate-500">Attach the receipt, voucher, or signed proof the applicant can later view.</p>
         </div>
+        <c:if test="${empty feeInsuranceReceiptAttachments}">
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                The applicant's fees and insurance payment receipt is required before disbursement.
+            </div>
+        </c:if>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
             <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="Optional disbursement or repayment instructions">${app.disbursementNotes}</textarea>
@@ -544,14 +642,14 @@
     <form action="${reviewBasePath}/loan-applications/${app.id}/undo-decision"
           method="post"
           class="erp-form-wrap"
-          data-confirm-title="Reverse Manager Action"
+          data-confirm-title='<spring:message code="review.reverseManagerAction" text="Reverse Manager Action" />'
           data-confirm-message="Return this rejected application to the manager queue for another review?"
           data-confirm-proceed="Return to Queue">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <button type="submit"
                 class="app-btn btn-neutral ${managerUndoWindowOpen ? '' : 'action-button-disabled'}"
                 ${managerUndoWindowOpen ? '' : 'disabled'}>
-            Reverse Last Manager Action
+            <spring:message code="review.reverseLastManagerAction" text="Reverse Last Manager Action" />
         </button>
     </form>
 </c:if>
@@ -561,6 +659,41 @@
         <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Print Loan Application</a>
     </div>
 </div>
+
+<script>
+    (() => {
+        document.querySelectorAll("form[data-manager-decision-form='true']").forEach((form) => {
+            const reasonsField = form.querySelector("textarea[name='reasons']");
+            reasonsField?.addEventListener("input", () => {
+                reasonsField.setCustomValidity("");
+            });
+
+            form.addEventListener("submit", (event) => {
+                const decision = event.submitter ? event.submitter.value : "";
+                if (decision === "REJECT") {
+                    if (reasonsField && !reasonsField.value.trim()) {
+                        event.preventDefault();
+                        reasonsField.setCustomValidity("Add a reason before rejecting this loan application.");
+                        reasonsField.reportValidity();
+                        reasonsField.focus();
+                        return;
+                    }
+                    form.dataset.confirmEyebrow = "Confirm Rejection";
+                    form.dataset.confirmTitle = "Reject Loan Review";
+                    form.dataset.confirmMessage = "Reject this loan application? The applicant will see the rejection and the application will leave this review queue.";
+                    form.dataset.confirmProceed = "Reject Review";
+                    return;
+                }
+                if (decision === "ACCEPT") {
+                    form.dataset.confirmEyebrow = "Confirm Approval";
+                    form.dataset.confirmTitle = "Approve Loan Review";
+                    form.dataset.confirmMessage = "Approve this loan application review? Your decision will be recorded and the application will move to the next configured workflow step.";
+                    form.dataset.confirmProceed = "Approve Review";
+                }
+            });
+        });
+    })();
+</script>
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/guarantor-financial-fetch.jspf" %>

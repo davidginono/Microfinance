@@ -27,6 +27,7 @@ import java.util.UUID;
 public class LoanAttachmentService {
     public static final String CATEGORY_APPLICATION_ATTACHMENT = "APPLICATION_ATTACHMENT";
     public static final String CATEGORY_DISBURSEMENT_PROOF = "DISBURSEMENT_PROOF";
+    public static final String CATEGORY_FEE_INSURANCE_RECEIPT = "FEE_INSURANCE_RECEIPT";
 
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;

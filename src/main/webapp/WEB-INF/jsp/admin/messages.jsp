@@ -1,38 +1,39 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / Incidents</p>
-    <h1 class="erp-page-title">Incidents</h1>
-    <p class="erp-page-subtitle">Review member incidents and reply where needed.</p>
+    <p class="erp-breadcrumb"><spring:message code="admin.incidents.breadcrumb" text="Admin Tools / Incidents" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="admin.messages.subtitle" text="Review member incidents and reply where needed." /></p>
 </div>
 
 <section class="erp-form-wrap">
     <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-3">
         <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">Status</label>
+            <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="common.status" text="Status" /></label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                <option value="">All statuses</option>
+                <option value=""><spring:message code="common.allStatuses" text="All statuses" /></option>
                 <c:forEach items="${incidentStatuses}" var="item">
                     <option value="${item}" ${selectedStatus eq item.name() ? 'selected' : ''}>${item}</option>
                 </c:forEach>
             </select>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700">Severity</label>
+            <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="admin.incidents.severity" text="Severity" /></label>
             <select name="severity" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                <option value="">All severities</option>
+                <option value=""><spring:message code="admin.incidents.allSeverities" text="All severities" /></option>
                 <c:forEach items="${incidentSeverities}" var="item">
                     <option value="${item}" ${selectedSeverity eq item.name() ? 'selected' : ''}>${item}</option>
                 </c:forEach>
             </select>
         </div>
         <div class="flex items-end gap-2">
-            <button type="submit" class="app-btn btn-primary">Apply Filters</button>
-            <a href="/admin/messages" class="app-btn btn-neutral">Clear</a>
+            <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
+            <a href="/admin/messages" class="app-btn btn-neutral"><spring:message code="common.clear" text="Clear" /></a>
         </div>
     </form>
 </section>
@@ -73,7 +74,7 @@
                     <td class="px-3 py-2">${incidentMeta != null ? incidentMeta.status : '-'}</td>
                     <td class="px-3 py-2">
                         <c:if test="${not empty item.incidentId}">
-                            <a href="/admin/incidents/${item.incidentId}" class="app-btn btn-neutral">Open Incident</a>
+                            <a href="/admin/messages/${item.id}/open" class="app-btn btn-neutral">Open Incident</a>
                         </c:if>
                         <c:if test="${empty item.incidentId}">-</c:if>
                     </td>

@@ -74,6 +74,7 @@ public class WorkflowRoutingService {
                                    ApprovalWorkflowStage stage,
                                    LoanProductWorkflowService.WorkflowDefinition workflow) {
         boardReviewRepository.deleteByLoanApplicationIdAndReviewStage(app.getId(), stage);
+        boardReviewRepository.flush();
         if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
             RoleDirectoryService.RoleAccountRef loanOfficer = roleDirectoryService.activeByRole(app.getSaccoId(), Position.LOAN_OFFICER).stream()
                 .findFirst()

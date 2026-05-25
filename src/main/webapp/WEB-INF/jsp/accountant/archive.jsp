@@ -33,29 +33,29 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Accountant Panel / Archive</p>
-    <h1 class="erp-page-title">Accountant Archive</h1>
-    <p class="erp-page-subtitle">Open the loan applications you have already reviewed and track where they are now.</p>
+    <p class="erp-breadcrumb"><spring:message code="accountant.archive.breadcrumb" text="Accountant Panel / Archive" /></p>
+    <h1 class="erp-page-title"><spring:message code="accountant.archive.title" text="Accountant Archive" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="accountant.archive.subtitle" text="Open the loan applications you have already reviewed and track where they are now." /></p>
 </div>
 
 <div class="erp-toolbar">
     <div class="space-y-3">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <div class="erp-filter-row">
             <a href="/accountant/archive?filter=ALL"
                class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                All Reviewed Loans
+                <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
             </a>
             <a href="/accountant/archive?filter=APPROVED"
                class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-                Approved for Disbursement
+                <spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" />
             </a>
             <a href="/accountant/archive?filter=REJECTED"
                class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-                Rejected
+                <spring:message code="review.rejected" text="Rejected" />
             </a>
         </div>
         <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form">
@@ -71,9 +71,9 @@
             </label>
             <div class="accountant-archive-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/accountant/archive?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/accountant/archive?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -84,12 +84,12 @@
         <thead>
         <tr>
             <th>${archivePrimaryColumnLabel}</th>
-            <th>Applicant</th>
-            <th>Amount</th>
-            <th>Decision</th>
-            <th>Reviewed At</th>
-            <th>Current Status</th>
-            <th>Action</th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="review.decision" text="Decision" /></th>
+            <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
+            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
+            <th><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -110,19 +110,19 @@
                 <td>${entry.loan.amount}</td>
                 <td>
                     <c:choose>
-                        <c:when test="${entry.review.decision eq 'ACCEPT'}">Approved for Disbursement</c:when>
-                        <c:otherwise>Rejected</c:otherwise>
+                        <c:when test="${entry.review.decision eq 'ACCEPT'}"><spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" /></c:when>
+                        <c:otherwise><spring:message code="review.rejected" text="Rejected" /></c:otherwise>
                     </c:choose>
                 </td>
                 <td>${fn:replace(fn:substring(entry.review.createdAt, 0, 16), 'T', ' ')}</td>
                 <td><spring:message code="loan.status.${entry.loan.status}" text="${entry.loan.status}" /></td>
-                <td><a href="/accountant/loan-applications/${entry.loan.id}" class="app-btn btn-primary">Open</a></td>
+                <td><a href="/accountant/loan-applications/${entry.loan.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty archiveEntries}">
             <tr>
                 <td colspan="7" class="px-3 py-8 text-center text-slate-500">
-                    No accountant-reviewed loan applications matched the current filter.
+                    <spring:message code="accountant.archive.empty" text="No accountant-reviewed loan applications matched the current filter." />
                 </td>
             </tr>
         </c:if>

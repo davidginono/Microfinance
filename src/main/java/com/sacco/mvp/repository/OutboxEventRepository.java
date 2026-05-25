@@ -52,5 +52,67 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
                                         @Param("loanId") String loanId,
                                         Pageable pageable);
 
+    @Query(
+        value = """
+            select distinct oe.*
+            from outbox_events oe
+            left join loan_applications la on la.id = oe.aggregate_id
+            left join members applicant on applicant.id = la.applicant_member_id
+            left join members entity_member on entity_member.id = oe.aggregate_id
+            where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
+              and oe.created_at >= coalesce(:dateFrom, oe.created_at)
+              and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and (
+                cast(:saccoId as text) is null
+                or la.sacco_id = cast(:saccoId as text)
+                or applicant.sacco_id = cast(:saccoId as text)
+                or entity_member.sacco_id = cast(:saccoId as text)
+                or cast(oe.payload as text) ilike concat('%', cast(:saccoId as text), '%')
+              )
+              and (
+                cast(:stationId as text) is null
+                or la.station_id = cast(:stationId as text)
+                or applicant.station_id = cast(:stationId as text)
+                or entity_member.station_id = cast(:stationId as text)
+                or cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+              )
+            order by oe.created_at desc
+            """,
+        countQuery = """
+            select count(distinct oe.id)
+            from outbox_events oe
+            left join loan_applications la on la.id = oe.aggregate_id
+            left join members applicant on applicant.id = la.applicant_member_id
+            left join members entity_member on entity_member.id = oe.aggregate_id
+            where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
+              and oe.created_at >= coalesce(:dateFrom, oe.created_at)
+              and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and (
+                cast(:saccoId as text) is null
+                or la.sacco_id = cast(:saccoId as text)
+                or applicant.sacco_id = cast(:saccoId as text)
+                or entity_member.sacco_id = cast(:saccoId as text)
+                or cast(oe.payload as text) ilike concat('%', cast(:saccoId as text), '%')
+              )
+              and (
+                cast(:stationId as text) is null
+                or la.station_id = cast(:stationId as text)
+                or applicant.station_id = cast(:stationId as text)
+                or entity_member.station_id = cast(:stationId as text)
+                or cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+              )
+            """,
+        nativeQuery = true
+    )
+    Page<OutboxEvent> searchMonitorViewScoped(@Param("status") String status,
+                                              @Param("dateFrom") OffsetDateTime dateFrom,
+                                              @Param("dateTo") OffsetDateTime dateTo,
+                                              @Param("loanId") String loanId,
+                                              @Param("saccoId") String saccoId,
+                                              @Param("stationId") String stationId,
+                                              Pageable pageable);
+
     long countByStatus(OutboxStatus status);
 }

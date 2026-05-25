@@ -9,6 +9,28 @@
     <p class="erp-page-subtitle">Read-only platform view for ${saccoDetail.summary.saccoId}.</p>
 </div>
 
+<section class="erp-panel mb-4 overflow-hidden">
+    <div class="erp-panel-header">
+        <p class="erp-panel-title">Station Scope</p>
+    </div>
+    <form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end">
+        <input type="hidden" name="section" value="${selectedSection}" />
+        <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Station
+            <select name="stationId" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;">
+                <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}>All stations</option>
+                <c:forEach items="${saccoDetail.stationOptions}" var="station">
+                    <option value="${station}" ${saccoDetail.selectedStationId eq station ? 'selected' : ''}>${station}</option>
+                </c:forEach>
+            </select>
+        </label>
+        <div class="flex flex-wrap gap-2 lg:justify-end">
+            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral px-5" style="height:3rem;min-height:3rem;">Reset</a>
+            <button type="submit" class="app-btn btn-primary px-5" style="height:3rem;min-height:3rem;">Apply Filter</button>
+        </div>
+    </form>
+</section>
+
 <section class="erp-panel">
     <div class="erp-panel-body space-y-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -37,6 +59,61 @@
             </span>
         </div>
 
+        <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Station Access</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${saccoDetail.summary.accessBadgeClass}">
+                            ${saccoDetail.summary.accessStatusLabel}
+                        </span>
+                        <span class="text-sm text-slate-500">Payment due: ${saccoDetail.summary.paymentDueDateLabel}</span>
+                    </div>
+                    <c:if test="${not empty saccoDetail.summary.accessRestrictionReason}">
+                        <p class="mt-2 text-sm text-slate-600">${saccoDetail.summary.accessRestrictionReason}</p>
+                    </c:if>
+                    <c:if test="${saccoDetail.summary.accessSuspended}">
+                        <p class="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-600">Suspended ${saccoDetail.summary.accessSuspendedAtLabel}</p>
+                    </c:if>
+                </div>
+                <div class="flex flex-col gap-2 sm:min-w-[24rem] lg:max-w-[36rem]">
+                    <c:choose>
+                        <c:when test="${not saccoDetail.stationScoped}">
+                            <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
+                                Select one station above to suspend or restore access.
+                            </div>
+                        </c:when>
+                        <c:when test="${saccoDetail.summary.accessSuspended}">
+                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/restore" method="post" class="flex flex-wrap justify-end gap-2">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
+                                <button type="submit" class="app-btn btn-primary justify-center px-5 sm:min-w-[12rem]" style="height:3rem;min-height:3rem;">Restore Access</button>
+                            </form>
+                        </c:when>
+                        <c:otherwise>
+                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend" method="post" class="flex flex-col gap-3">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
+                                <div class="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                                    <label class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                        Reason
+                                        <input name="reason" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" placeholder="Suspension reason" />
+                                    </label>
+                                    <label class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                        Payment Due
+                                        <input name="paymentDueDate" type="date" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" />
+                                    </label>
+                                </div>
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <button type="submit" class="app-btn btn-reject justify-center px-5 sm:min-w-[12rem]" style="height:3rem;min-height:3rem;">Suspend Access</button>
+                                </div>
+                            </form>
+                        </c:otherwise>
+                    </c:choose>
+                </div>
+            </div>
+        </div>
+
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Members</p>
@@ -62,12 +139,13 @@
     </div>
 </section>
 
+<c:set var="stationTabQuery" value="${empty saccoDetail.selectedStationId ? '' : '&stationId='.concat(saccoDetail.selectedStationId)}" />
 <div class="mt-4 flex flex-wrap gap-2">
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=overview" class="erp-filter-tab ${selectedSection eq 'overview' ? 'is-active' : ''}">Overview</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=loans" class="erp-filter-tab ${selectedSection eq 'loans' ? 'is-active' : ''}">Loans</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=members" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Members</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=financials" class="erp-filter-tab ${selectedSection eq 'financials' ? 'is-active' : ''}">Financials</a>
-    <a href="/admin/saccos/${saccoDetail.saccoId}?section=audit" class="erp-filter-tab ${selectedSection eq 'audit' ? 'is-active' : ''}">Audit</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=overview${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'overview' ? 'is-active' : ''}">Overview</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=loans${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'loans' ? 'is-active' : ''}">Loans</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Members</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=financials${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'financials' ? 'is-active' : ''}">Financials</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=audit${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'audit' ? 'is-active' : ''}">Audit</a>
 </div>
 
 <c:choose>

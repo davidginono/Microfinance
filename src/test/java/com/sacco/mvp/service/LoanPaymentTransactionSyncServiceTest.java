@@ -72,6 +72,7 @@ class LoanPaymentTransactionSyncServiceTest {
             .applicationNumber(77L)
             .loanId("1001")
             .saccoId("SACCO-1")
+            .stationId("ST-1")
             .applicantMemberId(memberId)
             .status(LoanStatus.FINAL_APPROVED)
             .finalDueDate(LocalDate.of(2026, 4, 30))
@@ -151,6 +152,7 @@ class LoanPaymentTransactionSyncServiceTest {
             .applicationNumber(91L)
             .loanId("1002")
             .saccoId("SACCO-1")
+            .stationId("ST-1")
             .applicantMemberId(memberId)
             .status(LoanStatus.FINAL_APPROVED)
             .finalDueDate(LocalDate.of(2026, 6, 30))
@@ -222,6 +224,7 @@ class LoanPaymentTransactionSyncServiceTest {
             .applicationNumber(105L)
             .loanId("1003")
             .saccoId("SACCO-1")
+            .stationId("ST-1")
             .applicantMemberId(memberId)
             .status(LoanStatus.FINAL_APPROVED)
             .finalDueDate(pastDueDate)
@@ -281,6 +284,69 @@ class LoanPaymentTransactionSyncServiceTest {
             eq("LOAN"),
             eq(loanApplicationId),
             eq("DEFAULTED"),
+            eq(memberId),
+            argThat((Map<String, Object> details) -> "SYNC".equals(details.get("source"))));
+    }
+
+    @Test
+    void syncRecentAndRefreshSummaryMarksDefaultedLoanPaidEvenWithoutNewTransactions() {
+        UUID memberId = UUID.randomUUID();
+        UUID loanApplicationId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        LoanApplication loan = LoanApplication.builder()
+            .id(loanApplicationId)
+            .applicationNumber(205L)
+            .loanId("1005")
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .applicantMemberId(memberId)
+            .status(LoanStatus.DEFAULTED)
+            .finalDueDate(now.toLocalDate().minusDays(20))
+            .createdAt(now.minusMonths(8))
+            .updatedAt(now.minusDays(2))
+            .build();
+        Member applicant = Member.builder()
+            .id(memberId)
+            .saccoId("SACCO-1")
+            .memberNo("MBR-005")
+            .stationId("ST-1")
+            .fullName("Recovered Member")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MEMBER)
+            .createdAt(now)
+            .build();
+        LoanPaymentSummaryDto summary = new LoanPaymentSummaryDto(
+            1005L,
+            "Recovered Loan",
+            money("200000.00"),
+            money("220000.00"),
+            money("12.0"),
+            now.toLocalDate().minusMonths(7),
+            now.toLocalDate(),
+            money("200000.00"),
+            money("20000.00"),
+            money("200000.00"),
+            money("20000.00"),
+            money("0.00"),
+            money("0.00"),
+            money("0.00")
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(applicant));
+        when(transactionClient.fetchTransactions("MBR-005", "ST-1", "1005")).thenReturn(List.of());
+        when(summaryClient.fetchSummary("MBR-005", "ST-1", "1005")).thenReturn(Optional.of(summary));
+
+        int inserted = syncService.syncRecentAndRefreshSummary(loan, 24);
+
+        assertThat(inserted).isZero();
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
+        assertThat(loan.getPaidAt()).isNotNull();
+        assertThat(loan.getLoanPaymentSummaryJson()).contains("Recovered Loan");
+        verify(loanApplicationRepository).save(loan);
+        verify(outboxService).enqueue(
+            eq("LOAN"),
+            eq(loanApplicationId),
+            eq("PAID"),
             eq(memberId),
             argThat((Map<String, Object> details) -> "SYNC".equals(details.get("source"))));
     }

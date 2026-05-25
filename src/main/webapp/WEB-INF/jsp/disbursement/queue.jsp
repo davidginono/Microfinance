@@ -33,14 +33,14 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Disbursement Panel / Queue</p>
-    <h1 class="erp-page-title">Disbursement Queue</h1>
-    <p class="erp-page-subtitle">Release approved loans that are ready for final disbursement.</p>
+    <p class="erp-breadcrumb"><spring:message code="disbursement.queue.breadcrumb" text="Disbursement Panel / Queue" /></p>
+    <h1 class="erp-page-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="disbursement.queue.subtitle" text="Release approved loans that are ready for final disbursement." /></p>
 </div>
 <div class="erp-toolbar">
     <div class="space-y-3">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form">
@@ -56,9 +56,9 @@
             </label>
             <div class="disbursement-queue-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/disbursement/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/disbursement/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -67,12 +67,12 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Application ID</th>
-            <th>Applicant</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Action</th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="common.status" text="Status" /></th>
+            <th><spring:message code="loan.date" text="Date" /></th>
+            <th><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -94,7 +94,7 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">
-                    <a href="/disbursement/loan-applications/${app.id}" class="app-btn btn-primary">Open</a>
+                    <a href="/disbursement/loan-applications/${app.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a>
                 </td>
             </tr>
         </c:forEach>

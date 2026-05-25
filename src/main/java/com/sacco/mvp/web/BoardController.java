@@ -26,6 +26,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -109,23 +111,28 @@ public class BoardController {
         BoardReview myReview = boardService.getMyReview(id, principal.getMemberId());
         List<BoardReview> boardReviews = boardService.reviewsForLoan(id);
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        Map<UUID, String> guarantorNames = memberRepository.findAllById(
-                guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()))
-            .stream()
+        List<Member> guarantorMembers = memberRepository.findAllById(
+            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
+        Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
         Map<UUID, Member> boardMembers = memberRepository.findAllById(
                 boardReviews.stream().map(BoardReview::getBoardMemberId).collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(Member::getId, member -> member));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("myReview", myReview);
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
+        model.addAttribute("guarantorMembersById", guarantorMembersById);
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
@@ -174,6 +181,18 @@ public class BoardController {
         return ResponseEntity.ok(payload);
     }
 
+    @GetMapping("/loan-applications/{id}/applicant-financial-status")
+    @ResponseBody
+    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
+                                                                        @AuthenticationPrincipal AppUserPrincipal principal) {
+        boardService.getMyReview(id, principal.getMemberId());
+        LoanApplication app = loanApplicationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
     @PostMapping("/loan-applications/{id}/request-signature-otp")
     @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
     @ResponseBody
@@ -216,6 +235,7 @@ public class BoardController {
                          @RequestParam BoardDecision decision,
                          @RequestParam(required = false) String comment,
                          @RequestParam(required = false) String boardSignatureOtpCode,
+                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
             if (decision == BoardDecision.APPROVED) {
@@ -225,10 +245,12 @@ public class BoardController {
                 boardService.decide(
                     id,
                     principal.getMemberId(),
+                    com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD,
                     decision,
                     comment,
                     boardMember.getSignatureText(),
-                    OffsetDateTime.now()
+                    OffsetDateTime.now(),
+                    parseGuarantorCommitments(request)
                 );
                 emailOtpService.consumeOtpById(otpTokenId);
             } else {
@@ -239,6 +261,20 @@ public class BoardController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/board/loan-applications/" + id;
+    }
+
+    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        request.getParameterMap().forEach((key, values) -> {
+            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
+                return;
+            }
+            try {
+                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        });
+        return commitments;
     }
 
     @PostMapping("/loan-applications/{id}/undo")

@@ -44,11 +44,17 @@ public class AdminScopeService {
 
         session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
         session.setAttribute(SESSION_STATION_ID, selectedStationId);
+        String currentStationId = selectedStationId;
 
         return new AdminScopeView(
             selectedSacco.saccoId(),
             selectedSacco.saccoName(),
             selectedStationId,
+            selectedSacco.getStations().stream()
+                .filter(station -> station.stationId().equals(currentStationId))
+                .findFirst()
+                .map(SaccoRegistryService.StationView::getAddressLocationLabel)
+                .orElse("Location not set"),
             options
         );
     }
@@ -115,6 +121,7 @@ public class AdminScopeService {
         private String saccoId;
         private String saccoName;
         private String stationId;
+        private String stationAddressLocation;
         private List<SaccoRegistryService.RegisteredSaccoView> options;
     }
 }

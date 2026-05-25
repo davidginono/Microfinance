@@ -51,6 +51,45 @@ public class SaccoSettings {
     @Column(name = "application_fee", precision = 18, scale = 2)
     private BigDecimal applicationFee;
 
+    @Column(name = "loan_fee_payment_method", length = 120)
+    private String loanFeePaymentMethod;
+
+    @Column(name = "loan_fee_payment_account", length = 120)
+    private String loanFeePaymentAccount;
+
+    @Column(name = "loan_fee_payment_payee", length = 160)
+    private String loanFeePaymentPayee;
+
+    @Column(name = "loan_fee_payment_instructions", length = 500)
+    private String loanFeePaymentInstructions;
+
+    @Column(name = "applicant_max_defaulted_loans")
+    private Integer applicantMaxDefaultedLoans;
+
+    @Column(name = "applicant_max_active_loan_amount", precision = 18, scale = 2)
+    private BigDecimal applicantMaxActiveLoanAmount;
+
+    @Column(name = "applicant_max_forfeited_loans")
+    private Integer applicantMaxForfeitedLoans;
+
+    @Column(name = "applicant_forfeited_lookback_days")
+    private Integer applicantForfeitedLookbackDays;
+
+    @Column(name = "applicant_forfeited_wait_days")
+    private Integer applicantForfeitedWaitDays;
+
+    @Column(name = "guarantor_min_savings", precision = 18, scale = 2)
+    private BigDecimal guarantorMinSavings;
+
+    @Column(name = "guarantor_max_active_loan_amount", precision = 18, scale = 2)
+    private BigDecimal guarantorMaxActiveLoanAmount;
+
+    @Column(name = "guarantor_max_guaranteed_loan_amount", precision = 18, scale = 2)
+    private BigDecimal guarantorMaxGuaranteedLoanAmount;
+
+    @Column(name = "guarantor_max_defaulted_loans")
+    private Integer guarantorMaxDefaultedLoans;
+
     @Column(name = "default_language", nullable = false)
     private String defaultLanguage;
 
@@ -70,6 +109,14 @@ public class SaccoSettings {
 
     public boolean isBoardReviewRequired() {
         return boardReviewRequired == null || boardReviewRequired;
+    }
+
+    public boolean isLoanFeePaymentConfigured() {
+        return hasText(loanFeePaymentAccount) || hasText(loanFeePaymentInstructions);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     public List<ApprovalWorkflowStage> resolvedApprovalFlow() {

@@ -50,7 +50,7 @@ public class WorkflowStatusPresentationService {
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case AWAITING_BOARD -> "On Review By Board";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
-            case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Approved for Disbursement";
+            case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
             case FINAL_APPROVED -> "Disbursed Loan";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
@@ -58,6 +58,7 @@ public class WorkflowStatusPresentationService {
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case BOARD_REJECTED -> "Board Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
+            case FORFEITED -> "Forfeited";
             case FINAL_REJECTED -> "Final Rejected";
             case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
             case AWAITING_GUARANTORS -> "Awaiting Guarantors";
@@ -83,7 +84,7 @@ public class WorkflowStatusPresentationService {
             case FINAL_APPROVED -> "#22C55E";
             case DEFAULTED -> "#DC2626";
             case PAID -> "#16A34A";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "#F43F5E";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, FINAL_REJECTED -> "#F43F5E";
         };
     }
 }

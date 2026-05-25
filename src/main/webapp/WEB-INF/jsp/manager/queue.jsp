@@ -56,32 +56,32 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Manager Panel / Queue</p>
-    <h1 class="erp-page-title">Manager Queue</h1>
-    <p class="erp-page-subtitle">Move across workflow stages, inspect applicant details, and finalize the records waiting on manager action.</p>
+    <p class="erp-breadcrumb"><spring:message code="manager.queue.breadcrumb" text="Manager Panel / Queue" /></p>
+    <h1 class="erp-page-title"><spring:message code="manager.queue.title" text="Manager Queue" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="manager.queue.subtitle" text="Move across workflow stages, inspect applicant details, and finalize the records waiting on manager action." /></p>
 </div>
 <div class="erp-toolbar manager-queue-filter-toolbar">
     <div class="manager-queue-filter-stack">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <div class="erp-filter-row">
             <a href="/manager/loan-applications?filter=READY_FOR_MANAGER"
                class="erp-filter-tab ${currentFilterKey eq 'READY_FOR_MANAGER' ? 'is-active' : ''}">
-                On Review By Manager
+                <spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" />
             </a>
             <a href="/manager/loan-applications?filter=AWAITING_BOARD"
                class="erp-filter-tab ${currentFilterKey eq 'AWAITING_BOARD' ? 'is-active' : ''}">
-                On Review By Board
+                <spring:message code="loan.status.AWAITING_BOARD" text="On Review By Board" />
             </a>
             <a href="/manager/loan-applications?filter=REVIEWED_READY"
                class="erp-filter-tab ${currentFilterKey eq 'REVIEWED_READY' ? 'is-active' : ''}">
-                Reviewed &amp; Ready for Disbursement
+                <spring:message code="manager.queue.reviewedReady" text="Reviewed & Ready for Disbursement" />
             </a>
             <a href="/manager/loan-applications?filter=DISBURSED"
                class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                Disbursed Loans
+                <spring:message code="manager.queue.disbursedLoans" text="Disbursed Loans" />
             </a>
         </div>
         <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form">
@@ -97,9 +97,9 @@
             </label>
             <div class="manager-queue-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/manager/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/manager/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -108,15 +108,15 @@
 <table class="erp-table">
     <thead>
     <tr>
-        <th>Loan Application ID</th>
+        <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
         <c:if test="${currentFilterKey eq 'DISBURSED'}">
-            <th>Loan ID</th>
+            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
         </c:if>
-        <th>Applicant</th>
-        <th>Amount</th>
-        <th>Status</th>
-        <th>Date</th>
-        <th>Actions</th>
+        <th><spring:message code="common.applicant" text="Applicant" /></th>
+        <th><spring:message code="common.amount" text="Amount" /></th>
+        <th><spring:message code="common.status" text="Status" /></th>
+        <th><spring:message code="loan.date" text="Date" /></th>
+        <th><spring:message code="common.actions" text="Actions" /></th>
     </tr>
     </thead>
     <tbody>

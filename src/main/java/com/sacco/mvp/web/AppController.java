@@ -10,9 +10,13 @@ import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.AdminService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanWorkflowService;
+import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanQualificationPolicyService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.LoanProductWorkflowService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
@@ -47,20 +51,26 @@ public class AppController {
     private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
     private static final String DISMISSED_ACTIVE_LOAN_CHARTS_KEY = "dismissedActiveLoanCharts";
     private final LoanWorkflowService loanWorkflowService;
+    private final LoanAnalyticsService loanAnalyticsService;
+    private final LoanQualificationPolicyService loanQualificationPolicyService;
     private final FormSchemaService formSchemaService;
     private final EligibilityService eligibilityService;
     private final FinancialDetailsService financialDetailsService;
     private final LoanPresentationService loanPresentationService;
     private final LoanReportService loanReportService;
+    private final LoanProductWorkflowService loanProductWorkflowService;
     private final AdminService adminService;
     private final EmailOtpService emailOtpService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
     private final ReversalRequestService reversalRequestService;
+    private final LoanAttachmentService loanAttachmentService;
     private final MemberRepository memberRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
+    private final ManagerReviewRepository managerReviewRepository;
+    private final BoardReviewRepository boardReviewRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
@@ -90,6 +100,11 @@ public class AppController {
         long loansAwaitingDecision = currentApplications.stream()
             .filter(this::isAwaitingDecisionStage)
             .count();
+        LoanApplication currentWorkflowApplication = currentApplications.stream()
+            .sorted(Comparator.comparing(LoanApplication::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .findFirst()
+            .orElse(null);
         Set<UUID> dismissedActiveLoanChartIds = dismissedActiveLoanChartIds(principal.getMemberId());
         List<Map<String, Object>> activeLoanChartRows = buildActiveLoanChartRows(activeLoans, dismissedActiveLoanChartIds);
         Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
@@ -108,6 +123,27 @@ public class AppController {
         model.addAttribute("activeLoanChartRows", activeLoanChartRows);
         model.addAttribute("archivedApplicationCount", archivedApplications.size());
         model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
+        model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
+        model.addAttribute("currentWorkflowApplicationNumber",
+            currentWorkflowApplication == null || currentWorkflowApplication.getApplicationNumber() == null
+                ? "-"
+                : String.valueOf(currentWorkflowApplication.getApplicationNumber()));
+        model.addAttribute("currentWorkflowAmountLabel",
+            currentWorkflowApplication == null
+                ? "-"
+                : loanPresentationService.formatMoneyDisplay(currentWorkflowApplication.getAmount()));
+        model.addAttribute("currentWorkflowStatusLabel",
+            currentWorkflowApplication == null
+                ? ""
+                : dashboardStatusLabel(currentWorkflowApplication.getStatus()));
+        model.addAttribute("currentWorkflowUpdatedAtLabel",
+            currentWorkflowApplication == null
+                ? ""
+                : formatDashboardWorkflowTimestamp(currentWorkflowApplication.getUpdatedAt()));
+        model.addAttribute("currentWorkflowSteps",
+            currentWorkflowApplication == null
+                ? List.of()
+                : buildDashboardWorkflowSteps(currentWorkflowApplication));
         addGuaranteeContext(pendingGuarantees, model);
         return "app/dashboard";
     }
@@ -144,6 +180,12 @@ public class AppController {
     public String products(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<LoanProductSetting> products = loanWorkflowService.listProducts(principal.getSaccoId());
         model.addAttribute("products", products);
+        Optional<String> applicantPolicyReason = loanQualificationPolicyService.applicantFailureReason(
+            principal.getSaccoId(),
+            principal.getMemberId()
+        );
+        model.addAttribute("applicantPolicyEligible", applicantPolicyReason.isEmpty());
+        model.addAttribute("applicantPolicyReason", applicantPolicyReason.orElse(""));
         loanWorkflowService.findApplicationInProgress(principal.getMemberId()).ifPresent(app -> {
             model.addAttribute("applicationLockApp", app);
             model.addAttribute("applicationLockStatusLabel", dashboardStatusLabel(app.getStatus()));
@@ -201,35 +243,108 @@ public class AppController {
 
     @GetMapping("/reports")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
-    public String reports(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
-        model.addAttribute("reportOwnerName", report.member().getFullName());
-        model.addAttribute("reportDisbursedCount", report.summary().disbursedCount());
-        model.addAttribute("reportDisbursedAmountLabel", report.summary().getDisbursedAmountLabel());
-        model.addAttribute("reportPaidCount", report.summary().paidCount());
-        model.addAttribute("reportPaidAmountLabel", report.summary().getPaidAmountLabel());
-        model.addAttribute("reportOngoingCount", report.summary().ongoingCount());
-        model.addAttribute("reportDetails", report.details().stream()
-            .map(detail -> {
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("loanApplicationIdLabel", detail.loanApplicationIdLabel());
-                row.put("loanIdLabel", detail.loanIdLabel());
-                row.put("memberDetailsLabel", detail.memberDetailsLabel());
-                row.put("approvedProductLabel", detail.approvedProductLabel());
-                row.put("approvedAmountLabel", detail.approvedAmountLabel());
-                row.put("tenureLabel", detail.tenureLabel());
-                row.put("deductionSummaryLabel", detail.deductionSummaryLabel());
-                row.put("guarantorDetailsLabel", detail.guarantorDetailsLabel());
-                row.put("approvalDecisionSummaryLabel", detail.approvalDecisionSummaryLabel());
-                row.put("disbursementDateLabel", detail.disbursementDateLabel());
-                row.put("finalDueDateLabel", detail.finalDueDateLabel());
-                row.put("statusLabel", detail.statusLabel());
-                row.put("preparedByLabel", detail.preparedByLabel());
-                row.put("preparedDateLabel", detail.preparedDateLabel());
-                return row;
-            })
-            .toList());
+    public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
+                          @RequestParam(required = false) LocalDate fromDate,
+                          @RequestParam(required = false) LocalDate toDate,
+                          @RequestParam(required = false) LoanType loanType,
+                          Model model) {
+        LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusYears(1) : fromDate;
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            LocalDate swap = resolvedFrom;
+            resolvedFrom = resolvedTo;
+            resolvedTo = swap;
+        }
+        ReportsDateRange previousRange = previousRange(resolvedFrom, resolvedTo);
+        LoanAnalyticsService.MemberLoanAnalytics analytics =
+            loanAnalyticsService.forMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null);
+        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics =
+            loanAnalyticsService.forMember(principal.getMemberId(), previousRange.fromDate(), previousRange.toDate(), loanType, null);
+        List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
+            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null);
+        Map<String, LoanAnalyticsService.MetricDelta> metricDeltas = loanAnalyticsService.metricDeltas(analytics, previousAnalytics)
+            .stream()
+            .collect(Collectors.toMap(LoanAnalyticsService.MetricDelta::key, java.util.function.Function.identity()));
+        LoanQualificationPolicyService.EligibilitySummary eligibilitySummary =
+            loanQualificationPolicyService.eligibilitySummary(principal.getSaccoId(), principal.getMemberId());
+        model.addAttribute("analytics", analytics);
+        model.addAttribute("metricCards", memberMetricCards(analytics, metricDeltas));
+        model.addAttribute("metricPeriodLabel", previousPeriodLabel(resolvedFrom, resolvedTo));
+        model.addAttribute("fromDate", resolvedFrom);
+        model.addAttribute("toDate", resolvedTo);
+        model.addAttribute("loanType", loanType);
+        model.addAttribute("loanTypes", LoanType.values());
+        model.addAttribute("trendSeriesJson", toJson(trendSeries));
+        model.addAttribute("eligibilitySummary", eligibilitySummary);
+        model.addAttribute("canApply", eligibilitySummary.canApply());
+        model.addAttribute("canGuarantee", eligibilitySummary.canGuarantee());
+        model.addAttribute("riskNote", eligibilitySummary.reason());
         return "app/reports";
+    }
+
+    private ReportsDateRange previousRange(LocalDate fromDate, LocalDate toDate) {
+        long days = Math.max(java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate), 0);
+        LocalDate previousTo = fromDate.minusDays(1);
+        LocalDate previousFrom = previousTo.minusDays(days);
+        return new ReportsDateRange(previousFrom, previousTo);
+    }
+
+    private String previousPeriodLabel(LocalDate fromDate, LocalDate toDate) {
+        long days = Math.max(java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate) + 1, 1);
+        if (days >= 60) {
+            long months = Math.max(1, Math.round(days / 30.4375d));
+            return months == 1 ? "previous month" : "previous " + months + " months";
+        }
+        return days == 1 ? "previous day" : "previous " + days + " days";
+    }
+
+    private List<MemberMetricCard> memberMetricCards(LoanAnalyticsService.MemberLoanAnalytics analytics,
+                                                     Map<String, LoanAnalyticsService.MetricDelta> deltas) {
+        return List.of(
+            memberMetricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied", deltas),
+            memberMetricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Applied", deltas),
+            memberMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed", deltas),
+            memberMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid", deltas),
+            memberMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted", deltas),
+            memberMetricCard("forfeited", "Forfeited Loan Applications", analytics.forfeitedLoans(), "rose", "Forfeited", deltas),
+            memberMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected", deltas)
+        );
+    }
+
+    private MemberMetricCard memberMetricCard(String key,
+                                              String label,
+                                              long value,
+                                              String tone,
+                                              String sparkName,
+                                              Map<String, LoanAnalyticsService.MetricDelta> deltas) {
+        BigDecimal percent = deltas.getOrDefault(key, new LoanAnalyticsService.MetricDelta(key, BigDecimal.ZERO, false)).percent();
+        boolean positive = percent.compareTo(BigDecimal.ZERO) >= 0;
+        return new MemberMetricCard(key, label, value, tone, sparkName, formatAnalyticsPercent(percent), positive);
+    }
+
+    private String formatAnalyticsPercent(BigDecimal value) {
+        String sign = value.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
+        return sign + value.setScale(2, RoundingMode.HALF_UP) + "%";
+    }
+
+    public record MemberMetricCard(String key, String label, long value, String tone, String sparkName, String percentLabel, boolean positive) {
+        public String getKey() { return key; }
+        public String getLabel() { return label; }
+        public long getValue() { return value; }
+        public String getTone() { return tone; }
+        public String getSparkName() { return sparkName; }
+        public String getPercentLabel() { return percentLabel; }
+        public boolean isPositive() { return positive; }
+    }
+
+    private record ReportsDateRange(LocalDate fromDate, LocalDate toDate) {}
+
+    private String toJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            return "[]";
+        }
     }
 
     private List<Map<String, Object>> buildActiveLoanChartRows(List<LoanApplication> activeLoans,
@@ -320,6 +435,264 @@ public class AppController {
             .toList();
     }
 
+    private List<Map<String, Object>> buildDashboardWorkflowSteps(LoanApplication app) {
+        List<String> labels = List.of(
+            "Applicant",
+            "Guarantors",
+            "Manager",
+            "Further Review",
+            "Ready for Release",
+            "Disbursement"
+        );
+        List<String> iconKeys = List.of(
+            "applicant",
+            "guarantors",
+            "manager",
+            "review",
+            "disbursement",
+            "bank"
+        );
+        int currentIndex = dashboardWorkflowStepIndex(app == null ? null : app.getStatus());
+        boolean workflowFinished = isDashboardWorkflowFinished(app);
+        List<String> stageDates = List.of(
+            dashboardApplicantStageDate(app),
+            dashboardGuarantorStageDate(app),
+            dashboardManagerStageDate(app),
+            dashboardFurtherReviewStageDate(app),
+            dashboardReadyForDisbursementDate(app),
+            dashboardDisbursedDate(app)
+        );
+        List<Map<String, Object>> steps = new ArrayList<>();
+        for (int i = 0; i < labels.size(); i++) {
+            String stateKey;
+            if (i < currentIndex || (workflowFinished && i == currentIndex)) {
+                stateKey = "completed";
+            } else if (i == currentIndex) {
+                stateKey = "current";
+            } else {
+                stateKey = "pending";
+            }
+            Map<String, Object> step = new LinkedHashMap<>();
+            step.put("stepNumber", i + 1);
+            step.put("label", labels.get(i));
+            step.put("stateKey", stateKey);
+            step.put("stateLabel", dashboardWorkflowStateLabel(i, stateKey, app));
+            step.put("metaLabel", dashboardWorkflowMetaLabel(stateKey));
+            step.put("dateLabel", "pending".equals(stateKey) ? "" : stageDates.get(i));
+            step.put("nodeClasses", workflowNodeClasses(stateKey));
+            step.put("textClasses", workflowTextClasses(stateKey));
+            step.put("numberClasses", workflowNumberClasses(stateKey));
+            step.put("iconClasses", workflowIconClasses(stateKey));
+            step.put("connectorClasses", workflowConnectorClasses(i, currentIndex));
+            step.put("iconKey", iconKeys.get(i));
+            steps.add(step);
+        }
+        return steps;
+    }
+
+    private int dashboardWorkflowStepIndex(LoanStatus status) {
+        if (status == null) {
+            return 0;
+        }
+        return switch (status) {
+            case DRAFT -> 0;
+            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 1;
+            case READY_FOR_MANAGER, MANAGER_ACCEPTED, MANAGER_REJECTED -> 2;
+            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_APPROVED, LOAN_OFFICER_REJECTED,
+                AWAITING_BOARD, BOARD_APPROVED, BOARD_REJECTED,
+                AWAITING_ACCOUNTANT, ACCOUNTANT_APPROVED, ACCOUNTANT_REJECTED -> 3;
+            case READY_FOR_DISBURSEMENT, FORFEITED, FINAL_REJECTED -> 4;
+            case FINAL_APPROVED, DEFAULTED, PAID -> 5;
+        };
+    }
+
+    private String dashboardWorkflowStateLabel(int index, String stateKey, LoanApplication app) {
+        if ("completed".equals(stateKey)) {
+            return switch (index) {
+                case 0 -> "Submitted";
+                case 1 -> "Approved";
+                case 2, 3 -> "Approved";
+                case 4 -> "Ready";
+                case 5 -> "Disbursed";
+                default -> "Completed";
+            };
+        }
+        if ("current".equals(stateKey)) {
+            return switch (index) {
+                case 0 -> "Draft Saved";
+                case 1 -> "Awaiting Approval";
+                case 2, 3 -> "In Review";
+                case 4 -> "Pending Release";
+                case 5 -> "Disbursed";
+                default -> "In Review";
+            };
+        }
+        return "Pending";
+    }
+
+    private String dashboardWorkflowMetaLabel(String stateKey) {
+        return "current".equals(stateKey) ? "Current Stage" : "";
+    }
+
+    private String workflowNodeClasses(String stateKey) {
+        return switch (stateKey) {
+            case "completed" -> "member-dashboard-flow-node--completed";
+            case "current" -> "member-dashboard-flow-node--current";
+            default -> "member-dashboard-flow-node--pending";
+        };
+    }
+
+    private String workflowTextClasses(String stateKey) {
+        return switch (stateKey) {
+            case "completed" -> "member-dashboard-flow-text--completed";
+            case "current" -> "member-dashboard-flow-text--current";
+            case "pending" -> "member-dashboard-flow-text--pending";
+            default -> "member-dashboard-flow-text--not-started";
+        };
+    }
+
+    private String workflowNumberClasses(String stateKey) {
+        return switch (stateKey) {
+            case "completed" -> "member-dashboard-flow-number--completed";
+            case "current" -> "member-dashboard-flow-number--current";
+            default -> "member-dashboard-flow-number--pending";
+        };
+    }
+
+    private String workflowIconClasses(String stateKey) {
+        return switch (stateKey) {
+            case "completed" -> "member-dashboard-flow-icon--completed";
+            case "current" -> "member-dashboard-flow-icon--current";
+            default -> "member-dashboard-flow-icon--pending";
+        };
+    }
+
+    private String workflowConnectorClasses(int index, int currentIndex) {
+        if (index < currentIndex) {
+            return "member-dashboard-flow-connector--completed";
+        }
+        if (index == currentIndex) {
+            return "member-dashboard-flow-connector--current";
+        }
+        return "member-dashboard-flow-connector--pending";
+    }
+
+    private boolean isDashboardWorkflowFinished(LoanApplication app) {
+        if (app == null) {
+            return false;
+        }
+        return app.getStatus() == LoanStatus.FINAL_APPROVED
+            || app.getStatus() == LoanStatus.DEFAULTED
+            || app.getStatus() == LoanStatus.PAID;
+    }
+
+    private String dashboardApplicantStageDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        if (app.getSubmittedAt() != null) {
+            return formatDashboardWorkflowTimestamp(app.getSubmittedAt());
+        }
+        return formatDashboardWorkflowTimestamp(app.getCreatedAt());
+    }
+
+    private String formatDashboardWorkflowTimestamp(OffsetDateTime timestamp) {
+        if (timestamp == null) {
+            return "";
+        }
+        return timestamp.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH));
+    }
+
+    private String formatDashboardWorkflowDate(LocalDate date) {
+        if (date == null) {
+            return "";
+        }
+        return date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH));
+    }
+
+    private String dashboardGuarantorStageDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        if (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0) {
+            return formatDashboardWorkflowTimestamp(app.getSubmittedAt());
+        }
+        return guarantorRequestRepository.findByLoanApplicationId(app.getId()).stream()
+            .map(GuarantorRequest::getDecidedAt)
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder())
+            .map(this::formatDashboardWorkflowTimestamp)
+            .orElseGet(() -> formatDashboardWorkflowTimestamp(app.getSubmittedAt()));
+    }
+
+    private String dashboardManagerStageDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.MANAGER).stream()
+            .map(ManagerReview::getCreatedAt)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .map(this::formatDashboardWorkflowTimestamp)
+            .orElse("");
+    }
+
+    private String dashboardFurtherReviewStageDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        Optional<String> loanOfficerReview = managerReviewRepository
+            .findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.LOAN_OFFICER)
+            .stream()
+            .map(ManagerReview::getCreatedAt)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .map(this::formatDashboardWorkflowTimestamp);
+        if (loanOfficerReview.isPresent()) {
+            return loanOfficerReview.get();
+        }
+        Optional<String> boardReview = boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), ApprovalWorkflowStage.BOARD).stream()
+            .map(review -> review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt())
+            .filter(Objects::nonNull)
+            .min(Comparator.naturalOrder())
+            .map(this::formatDashboardWorkflowTimestamp);
+        if (boardReview.isPresent()) {
+            return boardReview.get();
+        }
+        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.ACCOUNTANT).stream()
+            .map(ManagerReview::getCreatedAt)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .map(this::formatDashboardWorkflowTimestamp)
+            .orElse("");
+    }
+
+    private String dashboardReadyForDisbursementDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        if (app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT
+            || app.getStatus() == LoanStatus.FINAL_APPROVED
+            || app.getStatus() == LoanStatus.DEFAULTED
+            || app.getStatus() == LoanStatus.PAID) {
+            return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
+        }
+        return "";
+    }
+
+    private String dashboardDisbursedDate(LoanApplication app) {
+        if (app == null) {
+            return "";
+        }
+        if (app.getDisbursementDate() != null) {
+            return formatDashboardWorkflowDate(app.getDisbursementDate());
+        }
+        if (app.getStatus() == LoanStatus.FINAL_APPROVED || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
+            return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
+        }
+        return "";
+    }
+
     @GetMapping("/loan-applications/new")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
     public String newApp(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -355,7 +728,7 @@ public class AppController {
             }
             formValues.put("topUpLoanId", topUpLoanId.toString());
         }
-        return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), null, model);
+        return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), Collections.emptyMap(), null, model);
     }
 
     @GetMapping("/loan-applications/{id}/edit")
@@ -385,6 +758,7 @@ public class AppController {
             app.getLoanType(),
             formValues,
             parseUuidList(app.getSelectedGuarantors()),
+            parseSelectedGuarantorCommitments(app.getSelectedGuarantors()),
             app.getRequiredGuarantors(),
             model
         );
@@ -413,18 +787,25 @@ public class AppController {
         formPayload.remove("tenorMonths");
         formPayload.remove("applicationId");
         formPayload.remove("action");
+        formPayload.remove("termsAccepted");
         formPayload.remove("guarantorIds");
         formPayload.remove("financialSnapshotJson");
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
+        formPayload.entrySet().removeIf(entry -> entry.getKey().startsWith("guarantorCommitmentAmount_"));
+        Map<UUID, BigDecimal> guarantorCommitments = parseGuarantorCommitments(params);
 
         try {
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
                 if (applicationId == null) {
                     throw new IllegalStateException("Save the application as a draft before submitting it.");
                 }
+                boolean submitsDirectlyToStaff = requiresApplicantOtpBeforeImmediateSubmission(principal.getSaccoId(), loanType);
+                if (submitsDirectlyToStaff) {
+                    requireTermsAccepted(params.get("termsAccepted"));
+                }
                 UUID applicantSignatureOtpTokenId = null;
-                if (requiresApplicantOtpBeforeImmediateSubmission(principal.getSaccoId(), loanType)) {
+                if (submitsDirectlyToStaff) {
                     applicantSignatureOtpTokenId = validateApplicantSignatureOtp(principal.getMemberId(), applicantSignatureOtpCode);
                 }
                 LoanApplication submitted = loanWorkflowService.saveAndSubmit(
@@ -436,6 +817,7 @@ public class AppController {
                     formPayload,
                     applicationId,
                     guarantorIds,
+                    guarantorCommitments,
                     financialSnapshotJson,
                     topUpLoanId,
                     attachments
@@ -461,18 +843,26 @@ public class AppController {
             }
 
             LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), loanType,
-                amount, tenorMonths, formPayload, applicationId, guarantorIds, financialSnapshotJson, topUpLoanId, attachments);
+                amount, tenorMonths, formPayload, applicationId, guarantorIds, guarantorCommitments,
+                financialSnapshotJson, topUpLoanId, attachments);
 
             ra.addFlashAttribute("message", "Draft saved successfully. You can continue editing.");
             return "redirect:/app/loan-applications/" + app.getId() + "/edit";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            model.addAttribute("error", humanizeLoanFormError(ex.getMessage(), principal, loanType));
+            String errorMessage = humanizeLoanFormError(ex.getMessage(), principal, loanType);
+            model.addAttribute("error", errorMessage);
+            if (ex instanceof LoanWorkflowService.GuarantorValidationException guarantorEx
+                && guarantorEx.getGuarantorId() != null) {
+                model.addAttribute("guarantorValidationErrorId", guarantorEx.getGuarantorId().toString());
+                model.addAttribute("guarantorValidationErrorMessage", errorMessage);
+            }
             Integer requiredGuarantorsOverride = resolveDraftRequiredGuarantors(principal.getMemberId(), applicationId);
             return prepareLoanNewModel(
                 principal,
                 loanType,
                 submittedValues,
                 guarantorIds,
+                guarantorCommitments,
                 requiredGuarantorsOverride,
                 model
             );
@@ -492,9 +882,11 @@ public class AppController {
             guarantorIds.add(req.getGuarantorMemberId());
         }
         Map<UUID, String> guarantorNames = new HashMap<>();
+        Map<UUID, Member> guarantorMembersById = new HashMap<>();
         if (!guarantorIds.isEmpty()) {
             for (Member member : memberRepository.findAllById(guarantorIds)) {
                 guarantorNames.put(member.getId(), member.getFullName());
+                guarantorMembersById.put(member.getId(), member);
             }
         }
         model.addAttribute("app", app);
@@ -504,9 +896,14 @@ public class AppController {
             app.getTopUpSourceLoanId() == null ? null
                 : loanApplicationRepository.findByIdAndApplicantMemberId(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
         model.addAttribute("canRequestTopUp", loanWorkflowService.canRequestTopUp(app));
+        model.addAttribute("canForfeitApplication", loanWorkflowService.canForfeitReviewApplication(app));
+        model.addAttribute("forfeitWaitDays",
+            loanQualificationPolicyService.applicantForfeitedWaitDays(app.getSaccoId(), app.getApplicantMemberId()).orElse(null));
+        model.addAttribute("loanFinalSubmitLabel", finalSubmitLabel(app));
         model.addAttribute("formFields", loanPresentationService.parseFormFields(app.getFormData()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
+        model.addAttribute("guarantorMembersById", guarantorMembersById);
         Map<UUID, ReversalRequest> pendingGuarantorUndoRequests = new HashMap<>();
         for (GuarantorRequest guarantorRequest : guarantorRequests) {
             ReversalRequest pendingUndo = reversalRequestService.pendingGuarantorUndo(guarantorRequest.getId());
@@ -529,6 +926,11 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
+        model.addAttribute("loanFeePaymentSettings", saccoSettingsRepository.findById(app.getSaccoId()).orElse(null));
+        model.addAttribute("loanFeeReceiptUploaded", loanWorkflowService.hasLoanFeeReceipt(app));
+        model.addAttribute("loanFeeReceiptMissingBlocksDisbursement", loanFeeReceiptMissingBlocksDisbursement(app));
+        model.addAttribute("canUploadLoanFeeReceipt", canUploadLoanFeeReceipt(app));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -553,9 +955,63 @@ public class AppController {
         model.addAttribute("statusTimeline", List.of(
             LoanStatus.DRAFT, LoanStatus.AWAITING_GUARANTORS, LoanStatus.ALL_GUARANTORS_APPROVED, LoanStatus.READY_FOR_MANAGER,
             LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.BOARD_APPROVED,
-            LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
+            LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FORFEITED, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
+    }
+
+    private boolean loanFeeReceiptMissingBlocksDisbursement(LoanApplication app) {
+        if (app == null || loanWorkflowService.hasLoanFeeReceipt(app)) {
+            return false;
+        }
+        return canUploadLoanFeeReceipt(app);
+    }
+
+    private boolean canUploadLoanFeeReceipt(LoanApplication app) {
+        if (app == null) {
+            return false;
+        }
+        return switch (app.getStatus()) {
+            case ALL_GUARANTORS_APPROVED,
+                 READY_FOR_MANAGER,
+                 MANAGER_ACCEPTED,
+                 AWAITING_LOAN_OFFICER,
+                 LOAN_OFFICER_APPROVED,
+                 AWAITING_BOARD,
+                 BOARD_APPROVED,
+                 AWAITING_ACCOUNTANT,
+                 ACCOUNTANT_APPROVED,
+                 READY_FOR_DISBURSEMENT -> true;
+            default -> false;
+        };
+    }
+
+    @PostMapping("/loan-applications/{id}/fee-insurance-receipt")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    public String uploadFeeInsuranceReceipt(@PathVariable UUID id,
+                                            @AuthenticationPrincipal AppUserPrincipal principal,
+                                            @RequestParam(required = false) MultipartFile feeInsuranceReceiptFile,
+                                            RedirectAttributes ra) {
+        try {
+            LoanApplication app = loanWorkflowService.getMine(id, principal.getMemberId());
+            if (!canUploadLoanFeeReceipt(app)) {
+                throw new IllegalStateException("Upload the fees and insurance receipt after all guarantors have approved this application and before disbursement.");
+            }
+            if (feeInsuranceReceiptFile == null || feeInsuranceReceiptFile.isEmpty()) {
+                throw new IllegalArgumentException("Choose the payment receipt file to upload.");
+            }
+            app.setAttachmentsJson(loanAttachmentService.store(
+                app.getId(),
+                List.of(feeInsuranceReceiptFile),
+                app.getAttachmentsJson(),
+                LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT
+            ));
+            loanApplicationRepository.save(app);
+            ra.addFlashAttribute("message", "Fees and insurance payment receipt uploaded.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + id;
     }
 
     private void addMemberLoanViewDisplayAttributes(Model model, LoanApplication app) {
@@ -563,6 +1019,25 @@ public class AppController {
         model.addAttribute("disbursedLoanId", app.getLoanId());
         model.addAttribute("loanStatusBadgeClass", memberLoanStatusBadgeClass(app.getStatus()));
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
+    }
+
+    private String finalSubmitLabel(LoanApplication app) {
+        LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
+        ApprovalWorkflowStage firstStage = workflow.stages().isEmpty() ? ApprovalWorkflowStage.MANAGER : workflow.stages().getFirst();
+        return "Submit to " + workflowStageLabel(firstStage);
+    }
+
+    private String workflowStageLabel(ApprovalWorkflowStage stage) {
+        if (stage == null) {
+            return "Review";
+        }
+        return switch (stage) {
+            case MANAGER -> "Manager";
+            case LOAN_OFFICER -> "Loan Officer";
+            case BOARD -> "Committee";
+            case ACCOUNTANT -> "Accountant";
+            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+        };
     }
 
     private int memberLoanProgressStep(LoanStatus status) {
@@ -576,7 +1051,7 @@ public class AppController {
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
                 AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
-            case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
+            case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
     }
 
@@ -591,7 +1066,7 @@ public class AppController {
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
                 AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
-            case FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
+            case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
         };
     }
 
@@ -603,7 +1078,7 @@ public class AppController {
             case DRAFT -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, DEFAULTED -> "bg-rose-50 text-rose-700";
             case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
                 FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
@@ -615,9 +1090,13 @@ public class AppController {
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
     public String submit(@PathVariable UUID id, @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam(required = false) String applicantSignatureOtpCode,
+                         @RequestParam(required = false) String termsAccepted,
                          RedirectAttributes ra) {
         try {
             LoanApplication current = loanWorkflowService.getMine(id, principal.getMemberId());
+            if (requiresTermsBeforeStaffSubmission(current)) {
+                requireTermsAccepted(termsAccepted);
+            }
             UUID applicantSignatureOtpTokenId = validateApplicantSignatureOtpIfRequired(current, principal.getMemberId(), applicantSignatureOtpCode);
             LoanApplication app = loanWorkflowService.submit(id, principal.getMemberId());
             if (app.getStatus() == LoanStatus.AWAITING_GUARANTORS) {
@@ -654,6 +1133,20 @@ public class AppController {
         }
     }
 
+    private void requireTermsAccepted(String termsAccepted) {
+        if (!"true".equalsIgnoreCase(String.valueOf(termsAccepted))) {
+            throw new IllegalStateException("Accept the terms and conditions before submitting this loan application.");
+        }
+    }
+
+    private boolean requiresTermsBeforeStaffSubmission(LoanApplication app) {
+        if (app == null) {
+            return false;
+        }
+        return app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED
+            || (app.getStatus() == LoanStatus.DRAFT && (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0));
+    }
+
     @PostMapping("/loan-applications/{id}/cancel")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
     public String cancelSubmission(@PathVariable UUID id,
@@ -668,6 +1161,24 @@ public class AppController {
             }
             loanWorkflowService.cancelSubmission(id, principal.getMemberId());
             ra.addFlashAttribute("message", "Application moved back to draft.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/forfeit")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    public String forfeitApplication(@PathVariable UUID id,
+                                     @AuthenticationPrincipal AppUserPrincipal principal,
+                                     @RequestParam String forfeitOtpCode,
+                                     RedirectAttributes ra) {
+        try {
+            Member member = requireMemberWithEmail(principal.getMemberId());
+            UUID otpTokenId = emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.LOAN_APPLICATION_FORFEIT, forfeitOtpCode);
+            loanWorkflowService.forfeitReviewApplication(id, principal.getMemberId());
+            emailOtpService.consumeOtpById(otpTokenId);
+            ra.addFlashAttribute("message", "Application forfeited successfully.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -735,27 +1246,30 @@ public class AppController {
     @GetMapping("/guarantors/search")
     @ResponseBody
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                      @RequestParam(defaultValue = "") String q) {
+                                                      @RequestParam(defaultValue = "") String q,
+                                                      @RequestParam(required = false) BigDecimal amount) {
         String query = q == null ? "" : q.trim().toUpperCase(Locale.ROOT);
         boolean fourDigitsOrMore = query.matches("\\d{4,20}");
         boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
         if (!fourDigitsOrMore && !fullMemberNo) {
             return Collections.emptyList();
         }
-        return loanWorkflowService.searchGuarantors(
+        return loanWorkflowService.searchGuarantorCandidates(
                 principal.getSaccoId(),
                 principal.getStationId(),
                 principal.getMemberId(),
                 query,
+                amount,
                 0,
                 6)
-            .getContent()
             .stream()
-            .map(member -> {
+            .map(candidate -> {
                 Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", member.getId().toString());
-                row.put("memberNo", member.getMemberNo());
-                row.put("fullName", member.getFullName());
+                row.put("id", candidate.id().toString());
+                row.put("memberNo", candidate.memberNo());
+                row.put("fullName", candidate.fullName());
+                row.put("eligible", Boolean.toString(candidate.eligible()));
+                row.put("disabledReason", candidate.disabledReason());
                 return row;
             })
             .toList();
@@ -780,6 +1294,12 @@ public class AppController {
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
             response.put("message", "Loan details loaded");
+            BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
+            if (principalPlusInterest == null) {
+                principalPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
+            }
+            response.put("principalPlusInterest", principalPlusInterest == null ? "" : principalPlusInterest.setScale(2, RoundingMode.HALF_UP).toPlainString());
+            response.put("principalPlusInterestLabel", principalPlusInterest == null ? "" : formatTzs(principalPlusInterest));
             Map<String, Object> eligibilityMap = new LinkedHashMap<>();
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
@@ -832,6 +1352,33 @@ public class AppController {
         return "app/guarantee-requests";
     }
 
+    @GetMapping("/guaranteed-loans")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    public String guaranteedLoans(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+        List<GuarantorRequest> requests = loanWorkflowService.myGuarantorRequests(principal.getMemberId());
+        Map<UUID, LoanApplication> loansById = loanApplicationsById(requests);
+        List<Map<String, Object>> rows = requests.stream()
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
+            .filter(request -> {
+                LoanApplication loan = loansById.get(request.getLoanApplicationId());
+                return loan != null && isActiveRepaymentLoan(loan);
+            })
+            .map(request -> {
+                LoanApplication loan = loansById.get(request.getLoanApplicationId());
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("request", request);
+                row.put("loan", loan);
+                row.put("statusLabel", loan == null ? "Not available" : loan.getStatus().name().replace('_', ' '));
+                row.put("daysLeft", loan == null || loan.getFinalDueDate() == null
+                    ? null
+                    : Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), loan.getFinalDueDate())));
+                return row;
+            })
+            .toList();
+        model.addAttribute("guaranteedLoans", rows);
+        return "app/guaranteed-loans";
+    }
+
     @PostMapping("/guarantee-requests/{requestId}/approve")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS') and @authz.isGuarantorAssignee(#requestId, principal)")
     public String approveRequest(@PathVariable UUID requestId,
@@ -868,13 +1415,28 @@ public class AppController {
     @PostMapping("/guarantee-requests/request-signature-otp")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> requestGuarantorSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal) {
+    public ResponseEntity<Map<String, Object>> requestGuarantorSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                            @RequestParam(required = false) UUID requestId) {
         try {
             Member member = requireMemberWithSavedSignature(
                 principal.getMemberId(),
                 "Add an email address to your member profile before requesting a guarantor OTP.",
                 "Register your signature first before approving guarantor requests."
             );
+            if (requestId != null) {
+                GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+                    .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+                if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+                    throw new IllegalStateException("Request already decided");
+                }
+                LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
+                    .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+                BigDecimal requestedAmount = request.getRequestedAmount();
+                if (requestedAmount == null || requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new IllegalStateException("This guarantee request does not have an assigned commitment amount.");
+                }
+                loanQualificationPolicyService.assertGuarantorCanCommit(application.getSaccoId(), principal.getMemberId(), requestedAmount);
+            }
             emailOtpService.issueOtp(
                 member.getEmail(),
                 EmailOtpPurpose.GUARANTOR_SIGNATURE,
@@ -935,6 +1497,36 @@ public class AppController {
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", "Verified"
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/request-forfeit-otp")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestForfeitOtp(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                 @RequestParam UUID applicationId) {
+        try {
+            LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
+            if (!loanWorkflowService.canForfeitReviewApplication(application)) {
+                throw new IllegalStateException("This application cannot be forfeited at its current stage.");
+            }
+            Member member = requireMemberWithEmail(principal.getMemberId());
+            emailOtpService.issueOtp(
+                member.getEmail(),
+                EmailOtpPurpose.LOAN_APPLICATION_FORFEIT,
+                member.getId(),
+                "Your loan application forfeit code",
+                "Use this OTP code to confirm that you want to forfeit this loan application."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "We sent a forfeit confirmation code to " + member.getEmail() + "."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -1025,6 +1617,49 @@ public class AppController {
         return "app/support";
     }
 
+    @GetMapping("/support/archive")
+    public String supportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
+                                 Model model) {
+        model.addAttribute("supportArchive", adminService.memberSupportArchive(principal.getMemberId()));
+        return "app/support-archive";
+    }
+
+    @GetMapping("/support/replies")
+    public String supportReplies(@AuthenticationPrincipal AppUserPrincipal principal,
+                                 @RequestParam(required = false) UUID highlight,
+                                 Model model) {
+        model.addAttribute("replies", notificationInboxService.allViewsByType(principal.getMemberId(), "ADMIN_REPLY"));
+        model.addAttribute("broadcasts", notificationInboxService.allViewsByType(principal.getMemberId(), "ADMIN_BROADCAST"));
+        model.addAttribute("highlightNotificationId", highlight);
+        return "app/support-replies";
+    }
+
+    @GetMapping("/support/replies/{id}/open")
+    public String openSupportReply(@PathVariable UUID id,
+                                   @AuthenticationPrincipal AppUserPrincipal principal,
+                                   RedirectAttributes ra) {
+        try {
+            return "redirect:" + notificationInboxService.openForMember(
+                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/app/support/replies");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/app/support/replies";
+        }
+    }
+
+    @PostMapping("/support/replies/mark-all-read")
+    public String markAllSupportRepliesRead(@AuthenticationPrincipal AppUserPrincipal principal,
+                                            RedirectAttributes ra) {
+        int updated = notificationInboxService.markAllAsReadByTypes(
+            principal.getMemberId(),
+            List.of("ADMIN_REPLY", "ADMIN_BROADCAST")
+        );
+        ra.addFlashAttribute("message", updated > 0
+            ? "All support replies have been marked as read."
+            : "There were no unread support replies.");
+        return "redirect:/app/support/replies";
+    }
+
     @GetMapping("/settings")
     @PreAuthorize("hasRole('MEMBER')")
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -1099,6 +1734,7 @@ public class AppController {
                                        LoanType loanType,
                                        Map<String, String> formValues,
                                        List<UUID> guarantorIds,
+                                       Map<UUID, BigDecimal> selectedGuarantorCommitments,
                                        Integer requiredGuarantorsOverride,
                                        Model model) {
         LoanProductSetting schema = formSchemaService.getSchema(principal.getSaccoId(), loanType);
@@ -1118,7 +1754,10 @@ public class AppController {
         model.addAttribute("requiredGuarantors", requiredGuarantors);
         model.addAttribute("formValues", formValues == null ? Collections.emptyMap() : formValues);
         model.addAttribute("selectedGuarantorLookup", toLookupMap(guarantorIds));
-        model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds));
+        Map<UUID, BigDecimal> commitmentValues = selectedGuarantorCommitments == null || selectedGuarantorCommitments.isEmpty()
+            ? parseGuarantorCommitments(formValues)
+            : selectedGuarantorCommitments;
+        model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds, commitmentValues));
         model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
         model.addAttribute("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
         model.addAttribute("ratioPercentLabel",
@@ -1180,6 +1819,17 @@ public class AppController {
         return "TSh " + format.format(safeAmount);
     }
 
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).replace(",", "").trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     private String humanizeLoanFormError(String message, AppUserPrincipal principal, LoanType loanType) {
         if (message != null && message.contains("Amount exceeds eligibility cap")) {
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
@@ -1205,13 +1855,22 @@ public class AppController {
     private Member requireMemberWithSavedSignature(UUID memberId,
                                                    String missingEmailMessage,
                                                    String missingSignatureMessage) {
+        Member member = requireMemberWithEmail(memberId, missingEmailMessage);
+        if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
+            throw new IllegalStateException(missingSignatureMessage);
+        }
+        return member;
+    }
+
+    private Member requireMemberWithEmail(UUID memberId) {
+        return requireMemberWithEmail(memberId, "Your member profile needs an email address before requesting an OTP.");
+    }
+
+    private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException(missingEmailMessage);
-        }
-        if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
-            throw new IllegalStateException(missingSignatureMessage);
         }
         return member;
     }
@@ -1267,20 +1926,28 @@ public class AppController {
             .orElse("");
     }
 
-    private List<Map<String, String>> selectedGuarantorItems(List<UUID> guarantorIds) {
+    private List<Map<String, String>> selectedGuarantorItems(List<UUID> guarantorIds,
+                                                            Map<UUID, BigDecimal> guarantorCommitments) {
         if (guarantorIds == null || guarantorIds.isEmpty()) {
             return Collections.emptyList();
         }
-        return memberRepository.findAllById(guarantorIds).stream()
-            .sorted(Comparator.comparing(Member::getFullName))
-            .map(member -> {
-                Map<String, String> item = new LinkedHashMap<>();
-                item.put("id", member.getId().toString());
-                item.put("memberNo", member.getMemberNo());
-                item.put("fullName", member.getFullName());
-                return item;
-            })
-            .collect(Collectors.toList());
+        Map<UUID, Member> membersById = memberRepository.findAllById(guarantorIds).stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
+        List<Map<String, String>> items = new ArrayList<>();
+        for (UUID guarantorId : guarantorIds) {
+            Member member = membersById.get(guarantorId);
+            if (member == null) {
+                continue;
+            }
+            Map<String, String> item = new LinkedHashMap<>();
+            item.put("id", member.getId().toString());
+            item.put("memberNo", member.getMemberNo());
+            item.put("fullName", member.getFullName());
+            BigDecimal amount = guarantorCommitments == null ? null : guarantorCommitments.get(member.getId());
+            item.put("amount", amount == null ? "" : amount.setScale(2, RoundingMode.HALF_UP).toPlainString());
+            items.add(item);
+        }
+        return items;
     }
 
     private Map<String, String> parseJsonAsStringMap(String json) {
@@ -1304,10 +1971,62 @@ public class AppController {
             return Collections.emptyList();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<List<UUID>>() {});
+            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
+            List<UUID> values = new ArrayList<>();
+            for (Object item : raw) {
+                if (item instanceof String text) {
+                    values.add(UUID.fromString(text));
+                } else if (item instanceof Map<?, ?> map && map.get("id") != null) {
+                    values.add(UUID.fromString(String.valueOf(map.get("id"))));
+                }
+            }
+            return values;
         } catch (Exception ex) {
             return Collections.emptyList();
         }
+    }
+
+    private Map<UUID, BigDecimal> parseSelectedGuarantorCommitments(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
+            Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+            for (Object item : raw) {
+                if (item instanceof Map<?, ?> map && map.get("id") != null && map.get("amount") != null) {
+                    BigDecimal amount = readBigDecimal(map.get("amount"));
+                    if (amount != null) {
+                        commitments.put(UUID.fromString(String.valueOf(map.get("id"))), amount);
+                    }
+                }
+            }
+            return commitments;
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private Map<UUID, BigDecimal> parseGuarantorCommitments(Map<String, String> params) {
+        if (params == null || params.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (!entry.getKey().startsWith("guarantorCommitmentAmount_")) {
+                continue;
+            }
+            BigDecimal amount = readBigDecimal(entry.getValue());
+            if (amount == null) {
+                continue;
+            }
+            try {
+                UUID guarantorId = UUID.fromString(entry.getKey().substring("guarantorCommitmentAmount_".length()));
+                commitments.put(guarantorId, amount);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return commitments;
     }
 
     private void addGuaranteeContext(List<GuarantorRequest> requests, Model model) {
@@ -1337,6 +2056,7 @@ public class AppController {
         Map<UUID, String> guaranteeNames = new HashMap<>();
         Map<UUID, LoanType> guaranteeLoanTypes = new HashMap<>();
         Map<UUID, BigDecimal> guaranteeLoanAmounts = new HashMap<>();
+        Map<UUID, String> guaranteeCommitmentAmounts = new HashMap<>();
         for (Map.Entry<UUID, LoanApplication> entry : applicationById.entrySet()) {
             LoanApplication application = entry.getValue();
             guaranteeNames.put(entry.getKey(),
@@ -1344,10 +2064,14 @@ public class AppController {
             guaranteeLoanTypes.put(entry.getKey(), application.getLoanType());
             guaranteeLoanAmounts.put(entry.getKey(), application.getAmount());
         }
+        for (GuarantorRequest request : requests) {
+            guaranteeCommitmentAmounts.put(request.getId(), formatTzs(request.getRequestedAmount()));
+        }
 
         model.addAttribute("guaranteeNames", guaranteeNames);
         model.addAttribute("guaranteeLoanTypes", guaranteeLoanTypes);
         model.addAttribute("guaranteeLoanAmounts", guaranteeLoanAmounts);
+        model.addAttribute("guaranteeCommitmentAmounts", guaranteeCommitmentAmounts);
     }
 
     private void addGuaranteeActionContext(List<GuarantorRequest> requests, Model model) {
@@ -1356,12 +2080,23 @@ public class AppController {
         Map<UUID, ReversalRequest> pendingRemovalRequests = new HashMap<>();
         Map<UUID, Boolean> removalAllowed = new HashMap<>();
         Map<UUID, String> removalExpiryLabels = new HashMap<>();
+        Map<UUID, Boolean> guaranteePolicyEligible = new HashMap<>();
+        Map<UUID, String> guaranteePolicyReasons = new HashMap<>();
         for (GuarantorRequest request : requests) {
             ReversalRequest pendingUndo = reversalRequestService.pendingGuarantorUndo(request.getId());
             if (pendingUndo != null) {
                 pendingRemovalRequests.put(request.getId(), pendingUndo);
             }
             LoanApplication application = applicationById.get(request.getLoanApplicationId());
+            Optional<String> policyReason = application == null
+                ? Optional.of("Loan application not found.")
+                : loanQualificationPolicyService.guarantorFailureReason(
+                    application.getSaccoId(),
+                    request.getGuarantorMemberId(),
+                    request.getRequestedAmount()
+                );
+            guaranteePolicyEligible.put(request.getId(), policyReason.isEmpty());
+            policyReason.ifPresent(reason -> guaranteePolicyReasons.put(request.getId(), reason));
             boolean stageOpen = isGuarantorRemovalStageOpen(application);
             boolean canRequestRemoval = stageOpen && isWithinReversalWindow(request.getDecidedAt());
             removalAllowed.put(request.getId(), canRequestRemoval);
@@ -1372,6 +2107,8 @@ public class AppController {
         model.addAttribute("guaranteePendingRemovalRequests", pendingRemovalRequests);
         model.addAttribute("guaranteeRemovalAllowed", removalAllowed);
         model.addAttribute("guaranteeRemovalExpiryLabels", removalExpiryLabels);
+        model.addAttribute("guaranteePolicyEligible", guaranteePolicyEligible);
+        model.addAttribute("guaranteePolicyReasons", guaranteePolicyReasons);
     }
 
     private LoanApplication resolveTopUpSourceLoan(UUID memberId, String topUpLoanId) {
@@ -1411,6 +2148,7 @@ public class AppController {
                 case "DISBURSED" -> app.getStatus() == LoanStatus.FINAL_APPROVED;
                 case "DEFAULTED" -> app.getStatus() == LoanStatus.DEFAULTED;
                 case "PAID" -> app.getStatus() == LoanStatus.PAID;
+                case "FORFEITED" -> app.getStatus() == LoanStatus.FORFEITED;
                 case "REJECTED" -> isRejectedStatus(app.getStatus());
                 default -> true;
             })
@@ -1441,8 +2179,13 @@ public class AppController {
 
     private List<LoanApplication> activeRepaymentLoans(List<LoanApplication> apps) {
         return apps.stream()
-            .filter(app -> app.getStatus() == LoanStatus.FINAL_APPROVED || app.getStatus() == LoanStatus.DEFAULTED)
+            .filter(this::isActiveRepaymentLoan)
             .toList();
+    }
+
+    private boolean isActiveRepaymentLoan(LoanApplication app) {
+        return app != null
+            && (app.getStatus() == LoanStatus.FINAL_APPROVED || app.getStatus() == LoanStatus.DEFAULTED);
     }
 
     private String repaymentStateLabel(LoanApplication app,
@@ -1587,6 +2330,7 @@ public class AppController {
 
     private boolean isPendingApplication(LoanApplication app) {
         return !isRejectedStatus(app.getStatus())
+            && app.getStatus() != LoanStatus.FORFEITED
             && app.getStatus() != LoanStatus.FINAL_APPROVED
             && app.getStatus() != LoanStatus.DEFAULTED
             && app.getStatus() != LoanStatus.PAID;
@@ -1601,6 +2345,7 @@ public class AppController {
 
     private boolean isArchived(LoanApplication app) {
         return isRejectedStatus(app.getStatus())
+            || app.getStatus() == LoanStatus.FORFEITED
             || app.getStatus() == LoanStatus.FINAL_APPROVED
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID;
@@ -1696,6 +2441,9 @@ public class AppController {
         if (status == LoanStatus.DRAFT) {
             return "Draft";
         }
+        if (status == LoanStatus.SUBMITTED) {
+            return "Submitted";
+        }
         if (status == LoanStatus.AWAITING_GUARANTORS) {
             return "Awaiting Guarantors";
         }
@@ -1705,11 +2453,47 @@ public class AppController {
         if (status == LoanStatus.READY_FOR_MANAGER) {
             return "On Review By Manager";
         }
+        if (status == LoanStatus.MANAGER_ACCEPTED) {
+            return "Manager Approved";
+        }
+        if (status == LoanStatus.AWAITING_LOAN_OFFICER) {
+            return "On Review By Loan Officer";
+        }
+        if (status == LoanStatus.LOAN_OFFICER_APPROVED) {
+            return "Loan Officer Approved";
+        }
+        if (status == LoanStatus.LOAN_OFFICER_REJECTED) {
+            return "Loan Officer Rejected";
+        }
         if (status == LoanStatus.AWAITING_BOARD) {
             return "On Review By Board";
         }
+        if (status == LoanStatus.BOARD_APPROVED) {
+            return "Board Approved";
+        }
+        if (status == LoanStatus.BOARD_REJECTED) {
+            return "Board Rejected";
+        }
+        if (status == LoanStatus.AWAITING_ACCOUNTANT) {
+            return "On Review By Accountant";
+        }
+        if (status == LoanStatus.ACCOUNTANT_APPROVED) {
+            return "Accountant Approved";
+        }
+        if (status == LoanStatus.ACCOUNTANT_REJECTED) {
+            return "Accountant Rejected";
+        }
+        if (status == LoanStatus.READY_FOR_DISBURSEMENT) {
+            return "Ready for Disbursement";
+        }
         if (status == LoanStatus.FINAL_APPROVED) {
             return "Disbursed Loan";
+        }
+        if (status == LoanStatus.FINAL_REJECTED) {
+            return "Final Rejected";
+        }
+        if (status == LoanStatus.FORFEITED) {
+            return "Forfeited";
         }
         if (status == LoanStatus.DEFAULTED) {
             return "Defaulted / Not Paid";
@@ -1744,6 +2528,9 @@ public class AppController {
         }
         if (status == LoanStatus.PAID) {
             return "#0F766E";
+        }
+        if (status == LoanStatus.FORFEITED) {
+            return "#F43F5E";
         }
         return "#94A3B8";
     }

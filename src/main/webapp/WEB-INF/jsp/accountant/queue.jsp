@@ -33,38 +33,38 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Accountant Panel / Queue</p>
-    <h1 class="erp-page-title">Accountant Queue</h1>
-    <p class="erp-page-subtitle">Review approved loans before they move to the disbursement officer.</p>
+    <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
+    <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement officer." /></p>
 </div>
 <div class="erp-toolbar">
     <div class="space-y-3">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <div class="erp-filter-row">
             <a href="/accountant/loan-applications?filter=AWAITING_ACCOUNTANT"
                class="erp-filter-tab ${currentFilterKey eq 'AWAITING_ACCOUNTANT' ? 'is-active' : ''}">
-                On Review By Accountant
+                <spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" />
             </a>
         </div>
         <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Loan Application ID
+                <spring:message code="loan.applicationId" text="Loan Application ID" />
                 <input type="search"
                        name="searchId"
                        value="${fn:escapeXml(queueSearchValue)}"
-                       placeholder="Search loan application ID"
+                       placeholder='<spring:message code="common.searchLoanApplicationId" text="Search loan application ID" />'
                        inputmode="numeric"
                        class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
             </label>
             <div class="accountant-queue-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/accountant/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/accountant/loan-applications?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -73,12 +73,12 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Application ID</th>
-            <th>Applicant</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Action</th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="common.status" text="Status" /></th>
+            <th><spring:message code="loan.date" text="Date" /></th>
+            <th><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>

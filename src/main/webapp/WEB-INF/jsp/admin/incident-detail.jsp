@@ -66,4 +66,42 @@
     </div>
 </section>
 
+<c:if test="${isPlatformAdminIdentity or incident.source eq 'Member Support'}">
+    <section class="grid gap-4 xl:grid-cols-2">
+        <div class="erp-form-wrap">
+            <h5 class="erp-panel-title">${isPlatformAdminIdentity ? 'Reply To SACCO Admin' : 'Reply To Member'}</h5>
+            <form action="/admin/incidents/${incident.id}/reply" method="post" class="mt-4 space-y-4">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Subject</label>
+                    <input name="subject" value="Re: ${incident.subject}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
+                    <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
+                </div>
+                <button type="submit" class="app-btn btn-primary">Send Reply</button>
+            </form>
+        </div>
+
+        <c:if test="${isPlatformAdminIdentity}">
+        <div class="erp-form-wrap">
+            <h5 class="erp-panel-title">Broadcast To Minor Admins</h5>
+            <form action="/admin/incidents/broadcast-minor-admins" method="post" class="mt-4 space-y-4">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Subject</label>
+                    <input name="subject" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
+                    <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
+                </div>
+                <button type="submit" class="app-btn btn-primary">Send Broadcast</button>
+            </form>
+        </div>
+        </c:if>
+    </section>
+</c:if>
+
 <%@ include file="../fragments/footer.jspf" %>

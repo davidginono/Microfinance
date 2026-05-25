@@ -24,6 +24,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -133,6 +134,28 @@ public class LoanDocumentController {
             .body(Files.readAllBytes(resource.getPath()));
     }
 
+    @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}/view")
+    @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
+    public String viewAttachment(@PathVariable UUID loanId,
+                                 @PathVariable String attachmentId,
+                                 Model model) {
+        LoanApplication app = loanApplicationRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+        LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(loanId, attachmentId, app.getAttachmentsJson());
+        String contentType = resource.getContentType() == null || resource.getContentType().isBlank()
+            ? "application/octet-stream"
+            : resource.getContentType();
+
+        model.addAttribute("previewFileName", resource.getOriginalName());
+        model.addAttribute("previewInlineUrl",
+            "/documents/loan-applications/" + loanId + "/attachments/" + attachmentId + "?inline=true");
+        model.addAttribute("previewDownloadUrl",
+            "/documents/loan-applications/" + loanId + "/attachments/" + attachmentId);
+        model.addAttribute("previewIsImage", contentType.startsWith("image/"));
+        model.addAttribute("previewIsPdf", MediaType.APPLICATION_PDF_VALUE.equalsIgnoreCase(contentType));
+        return "documents/attachment-view";
+    }
+
     @GetMapping("/documents/reports/member-loans.pdf")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
     public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal) {
@@ -199,7 +222,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/disbursement-loans.pdf")
-    @PreAuthorize("hasRole('DISBURSEMENT_OFFICER') and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
     public ResponseEntity<byte[]> downloadDisbursementLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {

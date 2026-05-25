@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -32,50 +33,50 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Disbursement Panel / Archive</p>
-    <h1 class="erp-page-title">Disbursement Archive</h1>
-    <p class="erp-page-subtitle">Open the loans you already released and track where they are now.</p>
+    <p class="erp-breadcrumb"><spring:message code="disbursement.archive.breadcrumb" text="Disbursement Panel / Archive" /></p>
+    <h1 class="erp-page-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="disbursement.archive.subtitle" text="Open the loans you already released and track where they are now." /></p>
 </div>
 
 <div class="erp-toolbar">
     <div class="space-y-3">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <div class="erp-filter-row">
             <a href="/disbursement/archive?filter=ALL"
                class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                All Disbursed Loans
+                <spring:message code="archive.allDisbursedLoans" text="All Disbursed Loans" />
             </a>
             <a href="/disbursement/archive?filter=DISBURSED"
                class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                Active Disbursed Loans
+                <spring:message code="archive.activeDisbursedLoans" text="Active Disbursed Loans" />
             </a>
             <a href="/disbursement/archive?filter=PAID"
                class="erp-filter-tab ${currentFilterKey eq 'PAID' ? 'is-active' : ''}">
-                Paid Loans
+                <spring:message code="archive.paidLoans" text="Paid Loans" />
             </a>
             <a href="/disbursement/archive?filter=DEFAULTED"
                class="erp-filter-tab ${currentFilterKey eq 'DEFAULTED' ? 'is-active' : ''}">
-                Defaulted Loans
+                <spring:message code="archive.defaultedLoans" text="Defaulted Loans" />
             </a>
         </div>
         <form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Loan ID
+                <spring:message code="loan.loanId" text="Loan ID" />
                 <input type="search"
                        name="searchId"
                        value="${fn:escapeXml(queueSearchValue)}"
-                       placeholder="Search loan ID"
+                       placeholder='<spring:message code="common.searchLoanId" text="Search loan ID" />'
                        class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
             </label>
             <div class="disbursement-archive-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/disbursement/archive?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/disbursement/archive?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -85,13 +86,13 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan ID</th>
-            <th>Loan Application ID</th>
-            <th>Applicant</th>
-            <th>Amount</th>
-            <th>Disbursed At</th>
-            <th>Current Status</th>
-            <th>Action</th>
+            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="review.disbursedAt" text="Disbursed At" /></th>
+            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
+            <th><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -103,13 +104,13 @@
                 <td>${row.amount}</td>
                 <td>${row.disbursedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary">Open</a></td>
+                <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty archiveRows}">
             <tr>
                 <td colspan="7" class="px-3 py-8 text-center text-slate-500">
-                    No disbursed loans matched the current filter.
+                    <spring:message code="disbursement.archive.empty" text="No disbursed loans matched the current filter." />
                 </td>
             </tr>
         </c:if>

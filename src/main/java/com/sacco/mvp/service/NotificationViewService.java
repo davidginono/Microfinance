@@ -141,6 +141,7 @@ public class NotificationViewService {
             case "FINAL_APPROVED" -> "Loan Approved";
             case "DEFAULTED" -> "Loan Defaulted";
             case "PAID" -> "Loan Marked As Paid";
+            case "LOAN_FORFEITED" -> "Loan Forfeited";
             case "FINAL_REJECTED" -> "Loan Rejected";
             case "LOAN_READY_FOR_MANAGER" -> "On Review By Manager";
             case "LOAN_READY_FOR_ACCOUNTANT" -> "On Review By Accountant";
@@ -184,6 +185,7 @@ public class NotificationViewService {
                     : "Your manager marked this disbursed loan as fully paid.";
             }
             case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
+            case "LOAN_FORFEITED" -> "The applicant forfeited this loan application during review.";
             case "FINAL_REJECTED" -> "Your loan application has been finally rejected.";
             case "LOAN_READY_FOR_MANAGER" -> "Your application is now on review by manager.";
             case "LOAN_READY_FOR_ACCOUNTANT" -> "Your application is now on review by accountant.";

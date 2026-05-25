@@ -28,12 +28,14 @@
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
 <div class="erp-table-wrap overflow-x-auto">
 <table class="erp-table">
-    <thead><tr><th>Loan Reference</th><th>Guarantee Name</th><th>Loan Type</th><th>Loan Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Loan Reference</th><th>Guarantee Name</th><th>Loan Type</th><th>Loan Amount</th><th>Your Commitment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
         <c:set var="removalExpiryLabel" value="${guaranteeRemovalExpiryLabels[req.id]}" />
         <c:set var="canRequestRemoval" value="${req.status eq 'APPROVED' and guaranteeRemovalAllowed[req.id] and empty pendingRemoval}" />
+        <c:set var="policyEligible" value="${guaranteePolicyEligible[req.id] ne false}" />
+        <c:set var="policyReason" value="${guaranteePolicyReasons[req.id]}" />
         <tr>
             <td>${fn:substring(req.loanApplicationId, 0, 8)}</td>
             <td>${guaranteeNames[req.loanApplicationId]}</td>
@@ -43,6 +45,7 @@
                 </c:if>
             </td>
             <td>${guaranteeLoanAmounts[req.loanApplicationId]}</td>
+            <td>${guaranteeCommitmentAmounts[req.id]}</td>
             <td>${req.status}</td>
             <td>
                 <c:choose>
@@ -54,10 +57,14 @@
                 <c:if test="${req.status eq 'PENDING'}">
                     <div class="min-w-[240px] space-y-3">
                         <button type="button"
-                                class="app-btn btn-approve"
-                                data-guarantee-modal-open="approve-${req.id}">
+                                class="app-btn ${policyEligible ? 'btn-approve' : 'btn-neutral action-button-disabled'}"
+                                data-guarantee-modal-open="approve-${req.id}"
+                                ${policyEligible ? '' : 'disabled'}>
                             Approve
                         </button>
+                        <c:if test="${not policyEligible}">
+                            <p class="max-w-xs text-xs leading-5 text-rose-600">${policyReason}</p>
+                        </c:if>
                         <button type="button"
                                 class="app-btn btn-reject"
                                 data-guarantee-modal-open="reject-${req.id}">
@@ -95,13 +102,15 @@
         </tr>
     </c:forEach>
     <c:if test="${empty requests}">
-        <tr><td colspan="7" class="px-3 py-3 text-slate-500">No guarantee requests found.</td></tr>
+        <tr><td colspan="8" class="px-3 py-3 text-slate-500">No guarantee requests found.</td></tr>
     </c:if>
     </tbody>
 </table>
 </div>
 
 <c:forEach items="${requests}" var="req">
+    <c:set var="policyEligible" value="${guaranteePolicyEligible[req.id] ne false}" />
+    <c:set var="policyReason" value="${guaranteePolicyReasons[req.id]}" />
     <c:if test="${req.status eq 'PENDING'}">
         <div class="app-modal-overlay hidden"
              data-guarantee-modal="approve-${req.id}">
@@ -137,7 +146,16 @@
                 </div>
                 <form action="/app/guarantee-requests/${req.id}/approve" method="post" class="app-modal-body space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <c:if test="${not policyEligible}">
+                        <div class="app-modal-section border-rose-200 bg-rose-50 text-sm leading-6 text-rose-700">
+                            ${policyReason}
+                        </div>
+                    </c:if>
                     <div class="app-modal-section text-sm leading-7 text-slate-700">
+                        <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your Commitment Amount</p>
+                            <p class="mt-1 text-xl font-bold text-sacco-ink">${guaranteeCommitmentAmounts[req.id]}</p>
+                        </div>
                         <p>
                             <strong>Guarantor Declaration:</strong>
                             I,
@@ -155,6 +173,7 @@
                                name="guarantorDeclarationAccepted"
                                value="true"
                                class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue"
+                               ${policyEligible ? '' : 'disabled'}
                                required />
                         <span>I confirm that I agree to the guarantor declaration above before approving this request.</span>
                     </label>
@@ -166,10 +185,14 @@
                                 <c:if test="${not hasGuarantorSignature}">
                                     <p class="mt-2 text-sm text-rose-600">Add your signature on your member account before requesting OTP.</p>
                                 </c:if>
+                                <c:if test="${not policyEligible}">
+                                    <p class="mt-2 text-sm text-rose-600">${policyReason}</p>
+                                </c:if>
                             </div>
                             <button type="button"
                                     class="app-btn btn-primary otp-request-button guarantor-otp-request inline-flex items-center justify-center gap-2"
-                                    ${hasGuarantorSignature ? '' : 'disabled'}
+                                    ${hasGuarantorSignature and policyEligible ? '' : 'disabled'}
+                                    data-request-id="${req.id}"
                                     data-guarantor-feedback="approve-feedback-${req.id}">
                                 <span class="otp-button-spinner hidden"></span>
                                 <span class="otp-button-label">Send OTP Code</span>
@@ -204,7 +227,7 @@
                         </button>
                         <button type="submit"
                                 class="app-btn btn-approve"
-                                ${hasGuarantorSignature ? '' : 'disabled'}>
+                                ${hasGuarantorSignature and policyEligible ? '' : 'disabled'}>
                             Confirm Approval
                         </button>
                     </div>
@@ -489,6 +512,7 @@
                 const otpInput = form ? form.querySelector("input[name='guarantorSignatureOtpCode']") : null;
                 const statusBox = form ? form.querySelector(".guarantor-otp-live-status") : null;
                 const proceedButton = form ? form.querySelector("button[type='submit'].btn-approve") : null;
+                const requestId = button.getAttribute("data-request-id") || "";
                 const otpUi = bindOtpLiveStatus(otpInput, statusBox, proceedButton);
                 otpUi.reset();
                 setOtpButtonState(button, "loading", "Send OTP Code", "Sending...", "OTP Sent");
@@ -500,7 +524,8 @@
                             "Accept": "application/json"
                         },
                         body: new URLSearchParams({
-                            "${_csrf.parameterName}": csrfToken
+                            "${_csrf.parameterName}": csrfToken,
+                            "requestId": requestId
                         })
                     });
                     const payload = await response.json();

@@ -1,10 +1,14 @@
 package com.sacco.mvp.config;
 
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserDetailsService;
+import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.service.StaffMfaService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,6 +26,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -35,7 +42,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    MemberRepository memberRepository,
+                                                   SaccoStationRepository saccoStationRepository,
                                                    AdminScopeService adminScopeService,
+                                                   SaccoAccessFilter saccoAccessFilter,
+                                                   AuthzService authzService,
                                                    StaffMfaService staffMfaService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
@@ -45,8 +55,14 @@ public class SecurityConfig {
                 .requestMatchers("/loan-officer/**").hasRole("LOAN_OFFICER")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/accountant/**").hasRole("ACCOUNTANT")
-                .requestMatchers("/disbursement/**").hasRole("DISBURSEMENT_OFFICER")
+                .requestMatchers("/disbursement/**").access(new WebExpressionAuthorizationManager(
+                    "isAuthenticated() and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"))
                 .requestMatchers("/board/**").hasRole("BOARD")
+                .requestMatchers("/staff/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && authzService.staffAnalyticsAccess(appUser));
+                })
                 .requestMatchers("/app/**").hasRole("MEMBER")
                 .anyRequest().authenticated())
             .formLogin(form -> form
@@ -61,6 +77,20 @@ public class SecurityConfig {
                             .map(member -> {
                                 if (member.getStatus() != MemberStatus.ACTIVE) {
                                     return "This account is not active.";
+                                }
+                                String suspensionReason = member.getSaccoId() == null || member.getStationId() == null
+                                    ? null
+                                    : saccoStationRepository.findBySaccoIdAndStationId(member.getSaccoId(), member.getStationId())
+                                    .filter(SaccoStation::isAccessSuspended)
+                                    .map(station -> {
+                                        String reason = station.getAccessRestrictionReason();
+                                        return reason == null || reason.isBlank()
+                                            ? "This station workspace has been suspended. Contact the platform administrator."
+                                            : "This station workspace has been suspended: " + reason.trim();
+                                    })
+                                    .orElse(null);
+                                if (suspensionReason != null && !member.getStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)) {
+                                    return suspensionReason;
                                 }
                                 if ("staff-password".equals(loginType)) {
                                     if (member.getStaffRolesResolved().isEmpty()) {
@@ -167,7 +197,8 @@ public class SecurityConfig {
                 .permitAll())
             .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
             .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
-            .csrf(Customizer.withDefaults());
+            .csrf(Customizer.withDefaults())
+            .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class);
 
         return http.build();
     }

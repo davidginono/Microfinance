@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
@@ -38,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -133,6 +135,23 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/notifications/{id}/open")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    public String openAdminNotification(@PathVariable UUID id,
+                                        @AuthenticationPrincipal AppUserPrincipal principal,
+                                        RedirectAttributes ra) {
+        try {
+            return "redirect:" + notificationInboxService.openForMember(
+                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(),
+                principal.hasRole(Position.ADMIN) ? "/admin/incidents" : "/admin/support/replies");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return principal != null && principal.hasRole(Position.ADMIN)
+                ? "redirect:/admin/incidents"
+                : "redirect:/admin/support/replies";
+        }
+    }
+
     @PostMapping("/messages/mark-all-read")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String markAllMessagesRead(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -146,18 +165,47 @@ public class AdminController {
         return "redirect:/admin/incidents";
     }
 
+    @PostMapping("/notifications/mark-all-read")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    public String markAllAdminNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                RedirectAttributes ra) {
+        int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
+        ra.addFlashAttribute("message", updated > 0
+            ? "All notifications have been marked as read."
+            : "There were no unread notifications.");
+        return principal != null && principal.hasRole(Position.ADMIN)
+            ? "redirect:/admin/incidents"
+            : "redirect:/admin/support/replies";
+    }
+
     @GetMapping("/incidents")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
     public String incidents(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam(required = false) IncidentStatus status,
                             @RequestParam(required = false) IncidentSeverity severity,
+                            @RequestParam(required = false) String saccoId,
+                            @RequestParam(required = false) String stationId,
                             Model model) {
-        model.addAttribute("incidents", adminService.incidents(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
-            status,
-            severity
-        ));
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
+        String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
+        model.addAttribute("incidents", superAdmin
+            ? adminService.platformSupportIncidents(
+                scopedSaccoId.isBlank() ? null : scopedSaccoId,
+                scopedStationId.isBlank() ? null : scopedStationId,
+                status,
+                severity
+            )
+            : adminService.incidents(
+                scopedSaccoId.isBlank() ? null : scopedSaccoId,
+                scopedStationId.isBlank() ? null : scopedStationId,
+                status,
+                severity
+            ));
+        addAdminScopeFilters(model, scopedSaccoId, scopedStationId, superAdmin);
+        if (superAdmin) {
+            model.addAttribute("minorAdmins", adminService.minorAdmins());
+        }
         model.addAttribute("incidentStatuses", IncidentStatus.values());
         model.addAttribute("incidentSeverities", IncidentSeverity.values());
         model.addAttribute("selectedStatus", status == null ? "" : status.name());
@@ -166,31 +214,58 @@ public class AdminController {
     }
 
     @GetMapping("/incidents/{id}")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
     public String incidentDetail(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
+                                 @RequestParam(required = false) String saccoId,
+                                 @RequestParam(required = false) String stationId,
                                  Model model) {
-        model.addAttribute("incident", adminService.incident(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
-            id
-        ));
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        com.sacco.mvp.domain.AdminIncident incident = superAdmin
+            ? adminService.platformSupportIncident(
+                normalizeTextParam(saccoId).isBlank() ? null : normalizeTextParam(saccoId),
+                normalizeTextParam(stationId).isBlank() ? null : normalizeTextParam(stationId),
+                id
+            )
+            : adminService.incident(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                id
+            );
+        if (superAdmin) {
+            adminService.markPlatformSupportIncidentRead(id, principal.getMemberId());
+        } else {
+            adminService.markMemberSupportIncidentRead(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                id,
+                principal.getMemberId()
+            );
+        }
+        model.addAttribute("incident", incident);
+        model.addAttribute("selectedSaccoId", superAdmin ? normalizeTextParam(saccoId) : "");
+        model.addAttribute("selectedStationId", superAdmin ? normalizeTextParam(stationId) : "");
+        model.addAttribute("reporterMembers", superAdmin ? java.util.List.of() : java.util.List.of());
         model.addAttribute("incidentStatuses", IncidentStatus.values());
         model.addAttribute("incidentSeverities", IncidentSeverity.values());
         return "admin/incident-detail";
     }
 
     @PostMapping("/incidents/{id}")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateIncident(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam IncidentSeverity severity,
                                  @RequestParam IncidentStatus status,
                                  @RequestParam(required = false) String resolutionNote,
                                  RedirectAttributes ra) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        if (superAdmin) {
+            adminService.platformSupportIncident(null, null, id);
+        }
         adminService.updateIncident(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
+            superAdmin ? null : adminScopeService.currentSaccoId(principal),
+            superAdmin ? null : adminScopeService.currentStationId(principal),
             principal.getMemberId(),
             id,
             severity,
@@ -199,6 +274,124 @@ public class AdminController {
         );
         ra.addFlashAttribute("message", "Incident updated.");
         return "redirect:/admin/incidents/" + id;
+    }
+
+    @PostMapping("/incidents/{id}/reply")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String replyToSupportReporter(@PathVariable UUID id,
+                                         @AuthenticationPrincipal AppUserPrincipal principal,
+                                         @RequestParam String subject,
+                                         @RequestParam String message,
+                                         RedirectAttributes ra) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        if (superAdmin) {
+            adminService.replyToPlatformSupportReporter(id, principal.getMemberId(), subject, message);
+            ra.addFlashAttribute("message", "Reply sent to the SACCO admin.");
+        } else {
+            adminService.replyToMemberSupportReporter(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                id,
+                principal.getMemberId(),
+                subject,
+                message
+            );
+            ra.addFlashAttribute("message", "Reply sent to the member.");
+        }
+        return "redirect:/admin/incidents/" + id;
+    }
+
+    @PostMapping("/incidents/broadcast-minor-admins")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String broadcastToMinorAdmins(@AuthenticationPrincipal AppUserPrincipal principal,
+                                         @RequestParam String subject,
+                                         @RequestParam String message,
+                                         RedirectAttributes ra) {
+        adminService.broadcastToMinorAdmins(principal.getMemberId(), subject, message);
+        ra.addFlashAttribute("message", "Broadcast sent to minor admins.");
+        return "redirect:/admin/incidents";
+    }
+
+    @PostMapping("/incidents/reply-minor-admin")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String replyToMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                    @RequestParam UUID memberId,
+                                    @RequestParam String subject,
+                                    @RequestParam String message,
+                                    RedirectAttributes ra) {
+        adminService.replyToMinorAdmin(principal.getMemberId(), memberId, subject, message);
+        ra.addFlashAttribute("message", "Reply sent to the minor admin.");
+        return "redirect:/admin/incidents";
+    }
+
+    @GetMapping("/support")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String adminSupport() {
+        return "admin/support";
+    }
+
+    @GetMapping("/support/archive")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String adminSupportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      Model model) {
+        model.addAttribute("supportArchive", adminService.platformSupportArchive(principal.getMemberId()));
+        return "admin/support-archive";
+    }
+
+    @GetMapping("/support/replies")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String adminSupportReplies(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam(required = false) UUID highlight,
+                                      Model model) {
+        model.addAttribute("replies", notificationInboxService.allViewsByType(principal.getMemberId(), "ADMIN_REPLY"));
+        model.addAttribute("broadcasts", notificationInboxService.allViewsByType(principal.getMemberId(), "ADMIN_BROADCAST"));
+        model.addAttribute("highlightNotificationId", highlight);
+        return "admin/support-replies";
+    }
+
+    @GetMapping("/support/replies/{id}/open")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String openAdminSupportReply(@PathVariable UUID id,
+                                        @AuthenticationPrincipal AppUserPrincipal principal,
+                                        RedirectAttributes ra) {
+        try {
+            return "redirect:" + notificationInboxService.openForMember(
+                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/admin/support/replies");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/admin/support/replies";
+        }
+    }
+
+    @PostMapping("/support/replies/mark-all-read")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String markAllAdminSupportRepliesRead(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                 RedirectAttributes ra) {
+        int updated = notificationInboxService.markAllAsReadByTypes(
+            principal.getMemberId(),
+            List.of("ADMIN_REPLY", "ADMIN_BROADCAST")
+        );
+        ra.addFlashAttribute("message", updated > 0
+            ? "All support replies have been marked as read."
+            : "There were no unread support replies.");
+        return "redirect:/admin/support/replies";
+    }
+
+    @PostMapping("/support")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String sendAdminSupport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @RequestParam String subject,
+                                   @RequestParam String message,
+                                   RedirectAttributes ra) {
+        adminService.submitPlatformSupport(
+            adminScopeService.currentSaccoId(principal),
+            adminScopeService.currentStationId(principal),
+            principal.getMemberId(),
+            subject,
+            message
+        );
+        ra.addFlashAttribute("message", "Your message has been sent to the platform admin.");
+        return "redirect:/admin/support";
     }
 
     @PostMapping("/messages/reply")
@@ -259,6 +452,7 @@ public class AdminController {
         model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
             ? Position.staffAssignableRoles()
             : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
+        model.addAttribute("availableClaims", UserClaim.values());
         model.addAttribute("statuses", MemberStatus.values());
         return "admin/users";
     }
@@ -292,6 +486,7 @@ public class AdminController {
     public String updateUser(@PathVariable UUID id,
                              @AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
+                             @RequestParam(name = "claims", required = false) java.util.List<UserClaim> claims,
                              @RequestParam MemberStatus status,
                              RedirectAttributes ra) {
         adminService.updateUser(
@@ -301,7 +496,8 @@ public class AdminController {
             principal.getGrantedPositions(),
             id,
             positions,
-            status
+            status,
+            claims
         );
         ra.addFlashAttribute("message", "User updated.");
         return "redirect:/admin/users";
@@ -318,15 +514,31 @@ public class AdminController {
         model.addAttribute("productVersionsByProductId", adminService.loanProductVersions(saccoId));
         model.addAttribute("loanProductsVersions", adminService.loanProductsVersionHistory(saccoId));
         model.addAttribute("customizedProductExists", adminService.customizedLoanProductExists(saccoId));
-        model.addAttribute("settings", adminService.settings(saccoId));
+        var settings = adminService.settings(saccoId);
+        var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
+        model.addAttribute("settings", settings);
+        model.addAttribute("currentStationPolicy", stationPolicy);
+        model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
+        model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
+        model.addAttribute("policyApplicantMaxActiveLoanAmount", stationPolicy == null ? settings.getApplicantMaxActiveLoanAmount() : stationPolicy.getApplicantMaxActiveLoanAmount());
+        model.addAttribute("policyApplicantMaxForfeitedLoans", stationPolicy == null ? settings.getApplicantMaxForfeitedLoans() : stationPolicy.getApplicantMaxForfeitedLoans());
+        model.addAttribute("policyApplicantForfeitedLookbackDays", stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays());
+        Integer applicantForfeitedWaitDays = stationPolicy == null ? settings.getApplicantForfeitedWaitDays() : stationPolicy.getApplicantForfeitedWaitDays();
+        Integer applicantForfeitedLookbackDays = stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays();
+        model.addAttribute("policyApplicantForfeitedWaitDays", applicantForfeitedWaitDays == null ? applicantForfeitedLookbackDays : applicantForfeitedWaitDays);
+        model.addAttribute("policyGuarantorMinSavings", stationPolicy == null ? settings.getGuarantorMinSavings() : stationPolicy.getGuarantorMinSavings());
+        model.addAttribute("policyGuarantorMaxActiveLoanAmount", stationPolicy == null ? settings.getGuarantorMaxActiveLoanAmount() : stationPolicy.getGuarantorMaxActiveLoanAmount());
+        model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
+        model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
         model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
         model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
-        model.addAttribute("approvalFlowStageLabels", adminService.settings(saccoId).resolvedApprovalFlow().stream()
+        model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
+        model.addAttribute("approvalFlowStageLabels", settings.resolvedApprovalFlow().stream()
             .map(ApprovalWorkflowStage::getDisplayLabel)
             .toList());
-        model.addAttribute("settingsSection", "board".equalsIgnoreCase(section) ? "board" : "loan");
+        model.addAttribute("settingsSection", normalizeSettingsSection(section));
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
         return "admin/settings-controls";
@@ -360,6 +572,7 @@ public class AdminController {
                                     @RequestParam(required = false) Integer committeeApprovalThreshold,
                                     @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                     @RequestParam(required = false) Integer accountantPriority,
+                                    @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                     @RequestParam(defaultValue = "1") Integer managerPriority,
                                     @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
                                     @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
@@ -371,6 +584,7 @@ public class AdminController {
             BigDecimal insuranceRate = percentToRatio(insurancePercent);
             BigDecimal annualRate = percentToRatio(annualInterestPercent);
             ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
+                managerReviewRequired,
                 loanOfficerReviewRequired,
                 workflowStartStage,
                 managerPriority,
@@ -380,8 +594,8 @@ public class AdminController {
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, insuranceRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
-                resolvedWorkflowStartStage, committeeReviewRequired, committeePriority, committeeMinimumVotes,
-                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, productStatus);
+                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
+                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, disbursementOfficerRequired, productStatus);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -416,6 +630,7 @@ public class AdminController {
                                               @RequestParam(required = false) Integer committeeApprovalThreshold,
                                               @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                               @RequestParam(required = false) Integer accountantPriority,
+                                              @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                               @RequestParam(defaultValue = "1") Integer managerPriority,
                                               @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
                                               @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
@@ -424,6 +639,7 @@ public class AdminController {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
             ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
+                managerReviewRequired,
                 loanOfficerReviewRequired,
                 workflowStartStage,
                 managerPriority,
@@ -450,12 +666,15 @@ public class AdminController {
                 managerReviewRequired,
                 loanOfficerReviewRequired,
                 resolvedWorkflowStartStage,
+                managerPriority,
+                loanOfficerPriority,
                 committeeReviewRequired,
                 committeePriority,
                 committeeMinimumVotes,
                 committeeApprovalThreshold,
                 accountantReviewRequired,
                 accountantPriority,
+                disbursementOfficerRequired,
                 productStatus
             );
             ra.addFlashAttribute("message", "Customized loan product added.");
@@ -485,28 +704,145 @@ public class AdminController {
         return loanSettingsRedirect(resolvedModalKey);
     }
 
-    private ApprovalWorkflowStage resolveLoanOfficerWorkflowStartStage(boolean loanOfficerReviewRequired,
+    @PostMapping("/settings-controls/loan-fee-payment")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateLoanFeePaymentInstructions(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                   @RequestParam(required = false) String loanFeePaymentMethod,
+                                                   @RequestParam(required = false) String loanFeePaymentAccount,
+                                                   @RequestParam(required = false) String loanFeePaymentPayee,
+                                                   @RequestParam(required = false) String loanFeePaymentInstructions,
+                                                   RedirectAttributes ra) {
+        try {
+            adminService.updateLoanFeePaymentInstructions(
+                adminScopeService.currentSaccoId(principal),
+                principal.getMemberId(),
+                loanFeePaymentMethod,
+                loanFeePaymentAccount,
+                loanFeePaymentPayee,
+                loanFeePaymentInstructions
+            );
+            ra.addFlashAttribute("message", "Loan fee payment instructions updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=payment";
+    }
+
+    @PostMapping("/settings-controls/language")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateWorkspaceDefaultLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                 @RequestParam String defaultLanguage,
+                                                 RedirectAttributes ra) {
+        try {
+            adminService.updateDefaultLanguage(
+                adminScopeService.currentSaccoId(principal),
+                principal.getMemberId(),
+                defaultLanguage
+            );
+            ra.addFlashAttribute("message", "Language settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=language";
+    }
+
+    @PostMapping("/settings-controls/qualification-policies")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
+                                              @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
+                                              @RequestParam(required = false) BigDecimal applicantMaxActiveLoanAmount,
+                                              @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
+                                              @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
+                                              @RequestParam(required = false) Integer applicantForfeitedWaitDays,
+                                              @RequestParam(required = false) BigDecimal guarantorMinSavings,
+                                              @RequestParam(required = false) BigDecimal guarantorMaxActiveLoanAmount,
+                                              @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
+                                              @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
+                                              RedirectAttributes ra) {
+        try {
+            adminService.updateStationQualificationPolicies(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                principal.getMemberId(),
+                applicantMaxDefaultedLoans,
+                applicantMaxActiveLoanAmount,
+                applicantMaxForfeitedLoans,
+                applicantForfeitedLookbackDays,
+                applicantForfeitedWaitDays,
+                guarantorMinSavings,
+                guarantorMaxActiveLoanAmount,
+                guarantorMaxGuaranteedLoanAmount,
+                guarantorMaxDefaultedLoans
+            );
+            ra.addFlashAttribute("message", "Station qualification policies updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=guarantor";
+    }
+
+    @PostMapping("/settings-controls/station-qualification-policies")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateStationQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                     @RequestParam String stationId,
+                                                     @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
+                                                     @RequestParam(required = false) BigDecimal applicantMaxActiveLoanAmount,
+                                                     @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
+                                                     @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
+                                                     @RequestParam(required = false) Integer applicantForfeitedWaitDays,
+                                                     @RequestParam(required = false) BigDecimal guarantorMinSavings,
+                                                     @RequestParam(required = false) BigDecimal guarantorMaxActiveLoanAmount,
+                                                     @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
+                                                     @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
+                                                     RedirectAttributes ra) {
+        try {
+            adminService.updateStationQualificationPolicies(
+                adminScopeService.currentSaccoId(principal),
+                stationId,
+                principal.getMemberId(),
+                applicantMaxDefaultedLoans,
+                applicantMaxActiveLoanAmount,
+                applicantMaxForfeitedLoans,
+                applicantForfeitedLookbackDays,
+                applicantForfeitedWaitDays,
+                guarantorMinSavings,
+                guarantorMaxActiveLoanAmount,
+                guarantorMaxGuaranteedLoanAmount,
+                guarantorMaxDefaultedLoans
+            );
+            ra.addFlashAttribute("message", "Station qualification policies updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=guarantor";
+    }
+
+    private ApprovalWorkflowStage resolveLoanOfficerWorkflowStartStage(boolean managerReviewRequired,
+                                                                       boolean loanOfficerReviewRequired,
                                                                        ApprovalWorkflowStage workflowStartStage,
                                                                        Integer managerPriority,
                                                                        Integer loanOfficerPriority) {
         int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
         int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
-        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 2) {
-            throw new IllegalStateException("Manager priority must be 1 or 2.");
+        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 4) {
+            throw new IllegalStateException("Manager priority must be between 1 and 4.");
         }
-        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 2) {
-            throw new IllegalStateException("Loan Officer priority must be 1 or 2.");
+        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 4) {
+            throw new IllegalStateException("Loan Officer priority must be between 1 and 4.");
+        }
+        if (!managerReviewRequired && loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.LOAN_OFFICER;
         }
         if (!loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.MANAGER;
+        }
+        if (!managerReviewRequired) {
             return ApprovalWorkflowStage.MANAGER;
         }
         if (resolvedManagerPriority == resolvedLoanOfficerPriority) {
             throw new IllegalStateException("Manager and Loan Officer cannot share the same priority slot.");
         }
-        if (workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER && resolvedLoanOfficerPriority == 1) {
-            return ApprovalWorkflowStage.LOAN_OFFICER;
-        }
-        return resolvedManagerPriority == 1 ? ApprovalWorkflowStage.MANAGER : ApprovalWorkflowStage.LOAN_OFFICER;
+        return resolvedLoanOfficerPriority < resolvedManagerPriority ? ApprovalWorkflowStage.LOAN_OFFICER : ApprovalWorkflowStage.MANAGER;
     }
 
     private String loanSettingsRedirect(String modalKey) {
@@ -516,6 +852,22 @@ public class AdminController {
         }
         return "redirect:/admin/settings-controls?section=loan&modal="
             + UriUtils.encode(normalizedModalKey, StandardCharsets.UTF_8);
+    }
+
+    private String normalizeSettingsSection(String section) {
+        if ("board".equalsIgnoreCase(section)) {
+            return "board";
+        }
+        if ("guarantor".equalsIgnoreCase(section)) {
+            return "guarantor";
+        }
+        if ("payment".equalsIgnoreCase(section)) {
+            return "payment";
+        }
+        if ("language".equalsIgnoreCase(section)) {
+            return "language";
+        }
+        return "loan";
     }
 
     private String normalizeLoanSettingsModalKey(String modalKey) {
@@ -575,13 +927,17 @@ public class AdminController {
             case "Loan Officer must be enabled before it can be selected as the start stage.",
                  "No active loan officers are configured for this SACCO yet." ->
                 fieldErrors.put("loanOfficerReviewRequired", "Assign at least one active Loan Officer before using this stage.");
-            case "Manager priority must be 1 or 2." ->
-                fieldErrors.put("managerPriority", "Manager priority must be 1 or 2.");
-            case "Loan Officer priority must be 1 or 2." ->
-                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be 1 or 2.");
+            case "Manager priority must be between 1 and 4." ->
+                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 4.");
+            case "Loan Officer priority must be between 1 and 4." ->
+                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 4.");
+            case "Review priority must be between 1 and 4." -> {
+                fieldErrors.put("managerPriority", "Review priority must be between 1 and 4.");
+                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 4.");
+            }
             case "Manager and Loan Officer cannot share the same priority slot." -> {
-                fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer. One must be 1 and the other 2.");
-                fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer. One must be 1 and the other 2.");
+                fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer.");
+                fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer.");
             }
             case "Stage priority must be 3 or 4." -> {
                 fieldErrors.put("committeePriority", "Committee priority must be 3 or 4.");
@@ -659,20 +1015,35 @@ public class AdminController {
     public String outbox(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
                          @RequestParam(required = false) String loanId,
+                         @RequestParam(required = false) String saccoId,
+                         @RequestParam(required = false) String stationId,
                          @RequestParam(defaultValue = "0") int page,
                          @RequestParam(defaultValue = "50") int size,
+                         @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
+        String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
         Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
         if (!dateErrors.isEmpty()) {
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             applyDateErrors(model, dateErrors);
             return "admin/outbox";
         }
         try {
-            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage = adminService.outboxEvents(page, size, null, dateFrom, dateTo, loanId);
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, eventsPage);
+            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage = adminService.outboxEvents(
+                page,
+                size,
+                null,
+                dateFrom,
+                dateTo,
+                loanId,
+                scopedSaccoId.isBlank() ? null : scopedSaccoId,
+                scopedStationId.isBlank() ? null : scopedStationId
+            );
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, eventsPage);
         } catch (IllegalArgumentException | DataAccessException ex) {
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that outbox filter. Adjust the values and try again."));
         }
         return "admin/outbox";
@@ -698,20 +1069,34 @@ public class AdminController {
     public String events(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
                          @RequestParam(required = false) String actorId,
+                         @RequestParam(required = false) String saccoId,
+                         @RequestParam(required = false) String stationId,
                          @RequestParam(defaultValue = "0") int page,
                          @RequestParam(defaultValue = "50") int size,
+                         @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
+        String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
         Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
         if (!dateErrors.isEmpty()) {
-            populateEventsFilterModel(model, dateFrom, dateTo, actorId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             applyDateErrors(model, dateErrors);
             return "admin/events";
         }
         try {
-            Page<com.sacco.mvp.domain.AuditLog> entriesPage = adminService.eventEntries(page, size, dateFrom, dateTo, actorId);
-            populateEventsFilterModel(model, dateFrom, dateTo, actorId, entriesPage);
+            Page<com.sacco.mvp.domain.AuditLog> entriesPage = adminService.eventEntries(
+                page,
+                size,
+                dateFrom,
+                dateTo,
+                actorId,
+                scopedSaccoId.isBlank() ? null : scopedSaccoId,
+                scopedStationId.isBlank() ? null : scopedStationId
+            );
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, scopedSaccoId, scopedStationId, superAdmin, entriesPage);
         } catch (IllegalArgumentException | DataAccessException ex) {
-            populateEventsFilterModel(model, dateFrom, dateTo, actorId, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateEventsFilterModel(model, dateFrom, dateTo, actorId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that event log filter. Adjust the values and try again."));
         }
         return "admin/events";
@@ -725,15 +1110,10 @@ public class AdminController {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-saccos";
         }
-
-        java.util.List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos();
-        if (principal != null) {
-            String scopedSaccoId = adminScopeService.currentSaccoId(principal);
-            registeredSaccos = registeredSaccos.stream()
-                .filter(sacco -> sacco.saccoId().equals(scopedSaccoId))
-                .toList();
-        }
-        model.addAttribute("superAdmin", superAdmin);
+        java.util.List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos().stream()
+            .filter(sacco -> sacco.saccoId().equals(adminScopeService.currentSaccoId(principal)))
+            .toList();
+        model.addAttribute("superAdmin", false);
         model.addAttribute("registeredSaccos", registeredSaccos);
         return "admin/sacco-registry";
     }
@@ -750,11 +1130,37 @@ public class AdminController {
     @PreAuthorize("@authz.platformAdminIdentity(principal)")
     public String saccoDetail(@PathVariable String saccoId,
                               @RequestParam(required = false) String section,
+                              @RequestParam(required = false) String stationId,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               Model model) {
         model.addAttribute("selectedSection", platformAdminService.normalizeSection(section));
-        model.addAttribute("saccoDetail", platformAdminService.saccoDetail(saccoId));
+        model.addAttribute("saccoDetail", platformAdminService.saccoDetail(saccoId, stationId));
         return "admin/sacco-detail";
+    }
+
+    @PostMapping("/saccos/{saccoId}/language")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updatePlatformSaccoDefaultLanguage(@PathVariable String saccoId,
+                                                     @RequestParam String defaultLanguage,
+                                                     @RequestParam(required = false) String section,
+                                                     @RequestParam(required = false) String stationId,
+                                                     @AuthenticationPrincipal AppUserPrincipal principal,
+                                                     RedirectAttributes ra) {
+        try {
+            adminService.updateDefaultLanguage(saccoId, principal.getMemberId(), defaultLanguage);
+            ra.addFlashAttribute("message", "SACCO language settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        String normalizedSection = platformAdminService.normalizeSection(section);
+        StringBuilder redirect = new StringBuilder("redirect:/admin/saccos/")
+            .append(UriUtils.encode(saccoId, StandardCharsets.UTF_8))
+            .append("?section=")
+            .append(UriUtils.encode(normalizedSection, StandardCharsets.UTF_8));
+        if (stationId != null && !stationId.isBlank()) {
+            redirect.append("&stationId=").append(UriUtils.encode(stationId.trim(), StandardCharsets.UTF_8));
+        }
+        return redirect.toString();
     }
 
     @GetMapping("/saccos/minor-admins")
@@ -768,7 +1174,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String registerSacco(@RequestParam String saccoId,
                                 @RequestParam String saccoName,
                                 @RequestParam String stationIds,
@@ -893,24 +1299,27 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}")
-    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateSacco(@PathVariable String saccoId,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String saccoName,
                               @RequestParam String stationIds,
+                              @RequestParam(name = "stationAddressIds", required = false) List<String> stationAddressIds,
+                              @RequestParam(name = "stationAddressLocations", required = false) List<String> stationAddressLocations,
                               @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                               RedirectAttributes ra) {
         try {
             if (principal != null && principal.hasRole(Position.ADMIN)) {
-                saccoRegistryService.updateSacco(saccoId, saccoName, stationIds, logoFile);
-                ra.addFlashAttribute("message", "SACCO registry updated.");
+                saccoRegistryService.updateSacco(
+                    saccoId,
+                    saccoName,
+                    stationIds,
+                    stationAddressLocationMap(stationAddressIds, stationAddressLocations),
+                    logoFile
+                );
+                ra.addFlashAttribute("message", "SACCO registration updated.");
             } else {
-                String scopedSaccoId = adminScopeService.currentSaccoId(principal);
-                if (!scopedSaccoId.equalsIgnoreCase(saccoId)) {
-                    throw new IllegalStateException("Minor admins can only manage stations for their own SACCO.");
-                }
-                saccoRegistryService.updateStationsOnly(scopedSaccoId, stationIds);
-                ra.addFlashAttribute("message", "Station registry updated.");
+                throw new IllegalStateException("Only Super Admins can manage SACCO stations.");
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -923,20 +1332,47 @@ public class AdminController {
             : "redirect:/admin/saccos";
     }
 
+    @PostMapping("/saccos/{saccoId}/access/suspend")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String suspendStationAccess(@PathVariable String saccoId,
+                                       @AuthenticationPrincipal AppUserPrincipal principal,
+                                       @RequestParam String stationId,
+                                       @RequestParam String reason,
+                                       @RequestParam(required = false) LocalDate paymentDueDate,
+                                       RedirectAttributes ra) {
+        try {
+            adminService.suspendStationAccess(saccoId, stationId, principal.getMemberId(), reason, paymentDueDate);
+            ra.addFlashAttribute("message", "Station access suspended.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return stationAccessRedirect(saccoId, stationId);
+    }
+
+    @PostMapping("/saccos/{saccoId}/access/restore")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String restoreStationAccess(@PathVariable String saccoId,
+                                      @AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam String stationId,
+                                      RedirectAttributes ra) {
+        try {
+            adminService.restoreStationAccess(saccoId, stationId, principal.getMemberId());
+            ra.addFlashAttribute("message", "Station access restored.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return stationAccessRedirect(saccoId, stationId);
+    }
+
     @PostMapping("/saccos/{saccoId}/stations")
-    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String addStation(@PathVariable String saccoId,
                              @AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam String stationId,
+                             @RequestParam String addressLocation,
                              RedirectAttributes ra) {
         try {
-            if (principal != null && !principal.hasRole(Position.ADMIN)) {
-                String scopedSaccoId = adminScopeService.currentSaccoId(principal);
-                if (!scopedSaccoId.equalsIgnoreCase(saccoId)) {
-                    throw new IllegalStateException("Minor admins can only manage stations for their own SACCO.");
-                }
-            }
-            saccoRegistryService.addStation(saccoId, stationId);
+            saccoRegistryService.addStation(saccoId, stationId, addressLocation);
             ra.addFlashAttribute("message", "Station added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -947,6 +1383,32 @@ public class AdminController {
         return principal != null && principal.hasRole(Position.ADMIN)
             ? "redirect:/admin/saccos/registry"
             : "redirect:/admin/saccos";
+    }
+
+    private Map<String, String> stationAddressLocationMap(List<String> stationAddressIds, List<String> stationAddressLocations) {
+        Map<String, String> addressLocations = new LinkedHashMap<>();
+        if (stationAddressIds == null || stationAddressLocations == null) {
+            return addressLocations;
+        }
+        int count = Math.min(stationAddressIds.size(), stationAddressLocations.size());
+        for (int i = 0; i < count; i++) {
+            String stationId = normalizeTextParam(stationAddressIds.get(i));
+            if (!stationId.isBlank()) {
+                addressLocations.put(stationId, stationAddressLocations.get(i));
+            }
+        }
+        return addressLocations;
+    }
+
+    private String stationAccessRedirect(String saccoId, String stationId) {
+        StringBuilder redirect = new StringBuilder("redirect:/admin/saccos/")
+            .append(UriUtils.encode(saccoId, StandardCharsets.UTF_8))
+            .append("?section=overview");
+        String normalizedStationId = normalizeTextParam(stationId);
+        if (!normalizedStationId.isBlank()) {
+            redirect.append("&stationId=").append(UriUtils.encode(normalizedStationId, StandardCharsets.UTF_8));
+        }
+        return redirect.toString();
     }
 
     @PostMapping("/scope")
@@ -995,12 +1457,24 @@ public class AdminController {
                                            String dateTo,
                                            String loanId,
                                            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
+        populateOutboxFilterModel(model, dateFrom, dateTo, loanId, "", "", false, eventsPage);
+    }
+
+    private void populateOutboxFilterModel(Model model,
+                                           String dateFrom,
+                                           String dateTo,
+                                           String loanId,
+                                           String saccoId,
+                                           String stationId,
+                                           boolean superAdmin,
+                                           Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
         model.addAttribute("events", eventsPage.getContent());
         model.addAttribute("eventsPage", eventsPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
         model.addAttribute("selectedLoanId", normalizeTextParam(loanId));
-        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(dateFrom, dateTo, loanId, eventsPage.getSize()));
+        addAdminScopeFilters(model, saccoId, stationId, superAdmin);
+        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(dateFrom, dateTo, loanId, saccoId, stationId, eventsPage.getSize()));
         model.addAttribute("selectedPageSize", eventsPage.getSize());
     }
 
@@ -1009,13 +1483,43 @@ public class AdminController {
                                            String dateTo,
                                            String actorId,
                                            Page<com.sacco.mvp.domain.AuditLog> entriesPage) {
+        populateEventsFilterModel(model, dateFrom, dateTo, actorId, "", "", false, entriesPage);
+    }
+
+    private void populateEventsFilterModel(Model model,
+                                           String dateFrom,
+                                           String dateTo,
+                                           String actorId,
+                                           String saccoId,
+                                           String stationId,
+                                           boolean superAdmin,
+                                           Page<com.sacco.mvp.domain.AuditLog> entriesPage) {
         model.addAttribute("entries", entriesPage.getContent());
         model.addAttribute("entriesPage", entriesPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
         model.addAttribute("selectedActorId", normalizeTextParam(actorId));
-        model.addAttribute("eventsPaginationQuery", buildEventsPaginationQuery(dateFrom, dateTo, actorId, entriesPage.getSize()));
+        addAdminScopeFilters(model, saccoId, stationId, superAdmin);
+        model.addAttribute("eventsPaginationQuery", buildEventsPaginationQuery(dateFrom, dateTo, actorId, saccoId, stationId, entriesPage.getSize()));
         model.addAttribute("selectedPageSize", entriesPage.getSize());
+    }
+
+    private void addAdminScopeFilters(Model model, String saccoId, String stationId, boolean superAdmin) {
+        String selectedSaccoId = normalizeTextParam(saccoId);
+        String selectedStationId = normalizeTextParam(stationId);
+        java.util.List<SaccoRegistryService.RegisteredSaccoView> saccos = superAdmin
+            ? saccoRegistryService.listRegisteredSaccos()
+            : java.util.List.of();
+        java.util.List<String> stationOptions = saccos.stream()
+            .filter(sacco -> selectedSaccoId.equals(sacco.saccoId()))
+            .findFirst()
+            .map(SaccoRegistryService.RegisteredSaccoView::stationIds)
+            .orElse(java.util.List.of());
+        model.addAttribute("superAdminScopeFilters", superAdmin);
+        model.addAttribute("registeredSaccos", saccos);
+        model.addAttribute("selectedSaccoId", selectedSaccoId);
+        model.addAttribute("selectedStationId", selectedStationId);
+        model.addAttribute("selectedStationOptions", stationOptions);
     }
 
     private String resolveFilterErrorMessage(RuntimeException ex, String fallback) {
@@ -1058,6 +1562,10 @@ public class AdminController {
     }
 
     private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanId, int size) {
+        return buildOutboxPaginationQuery(dateFrom, dateTo, loanId, null, null, size);
+    }
+
+    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanId, String saccoId, String stationId, int size) {
         StringBuilder query = new StringBuilder("&size=").append(size);
         if (dateFrom != null && !dateFrom.isBlank()) {
             query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
@@ -1068,10 +1576,20 @@ public class AdminController {
         if (loanId != null && !loanId.isBlank()) {
             query.append("&loanId=").append(UriUtils.encode(loanId.trim(), StandardCharsets.UTF_8));
         }
+        if (saccoId != null && !saccoId.isBlank()) {
+            query.append("&saccoId=").append(UriUtils.encode(saccoId.trim(), StandardCharsets.UTF_8));
+        }
+        if (stationId != null && !stationId.isBlank()) {
+            query.append("&stationId=").append(UriUtils.encode(stationId.trim(), StandardCharsets.UTF_8));
+        }
         return query.toString();
     }
 
     private String buildEventsPaginationQuery(String dateFrom, String dateTo, String actorId, int size) {
+        return buildEventsPaginationQuery(dateFrom, dateTo, actorId, null, null, size);
+    }
+
+    private String buildEventsPaginationQuery(String dateFrom, String dateTo, String actorId, String saccoId, String stationId, int size) {
         StringBuilder query = new StringBuilder("&size=").append(size);
         if (dateFrom != null && !dateFrom.isBlank()) {
             query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
@@ -1081,6 +1599,12 @@ public class AdminController {
         }
         if (actorId != null && !actorId.isBlank()) {
             query.append("&actorId=").append(UriUtils.encode(actorId.trim(), StandardCharsets.UTF_8));
+        }
+        if (saccoId != null && !saccoId.isBlank()) {
+            query.append("&saccoId=").append(UriUtils.encode(saccoId.trim(), StandardCharsets.UTF_8));
+        }
+        if (stationId != null && !stationId.isBlank()) {
+            query.append("&stationId=").append(UriUtils.encode(stationId.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
     }

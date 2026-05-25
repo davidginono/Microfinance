@@ -34,8 +34,9 @@ public class UserClaimService {
         }
         return userSettingsRepository.findById(memberId)
             .map(UserSettings::getNotificationPrefs)
+            .map(this::parsePrefs)
+            .filter(prefs -> prefs.containsKey("claims"))
             .map(this::parseClaims)
-            .filter(claims -> !claims.isEmpty())
             .orElse(defaults);
     }
 
@@ -63,6 +64,10 @@ public class UserClaimService {
 
     public Set<UserClaim> parseClaims(String notificationPrefs) {
         Map<String, Object> prefs = parsePrefs(notificationPrefs);
+        return parseClaims(prefs);
+    }
+
+    private Set<UserClaim> parseClaims(Map<String, Object> prefs) {
         Object rawClaims = prefs.get("claims");
         if (!(rawClaims instanceof List<?> items)) {
             return EnumSet.noneOf(UserClaim.class);
@@ -92,7 +97,10 @@ public class UserClaimService {
                 }
                 case MANAGER -> claims.add(UserClaim.REVIEW_MANAGER_QUEUE);
                 case ACCOUNTANT -> claims.add(UserClaim.REVIEW_ACCOUNTANT_QUEUE);
-                case DISBURSEMENT_OFFICER -> claims.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
+                case DISBURSEMENT_OFFICER -> {
+                    claims.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
+                    claims.add(UserClaim.DISBURSE_LOAN);
+                }
                 case BOARD -> claims.add(UserClaim.REVIEW_BOARD_QUEUE);
                 case LOAN_OFFICER -> claims.add(UserClaim.REVIEW_LOAN_OFFICER_QUEUE);
                 case ADMIN, MINOR_ADMIN -> {

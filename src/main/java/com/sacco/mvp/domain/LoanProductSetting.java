@@ -86,6 +86,12 @@ public class LoanProductSetting {
     @Column(name = "workflow_start_stage", length = 32)
     private ApprovalWorkflowStage workflowStartStage;
 
+    @Column(name = "manager_priority")
+    private Integer managerPriority;
+
+    @Column(name = "loan_officer_priority")
+    private Integer loanOfficerPriority;
+
     @Column(name = "committee_review_required")
     private Boolean committeeReviewRequired;
 
@@ -103,6 +109,16 @@ public class LoanProductSetting {
 
     @Column(name = "accountant_priority")
     private Integer accountantPriority;
+
+    @Column(name = "disbursement_officer_required")
+    private Boolean disbursementOfficerRequired;
+
+    @Column(name = "guarantor_commitment_required")
+    private Boolean guarantorCommitmentRequired;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guarantor_commitment_stage", length = 32)
+    private ApprovalWorkflowStage guarantorCommitmentStage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "product_status", length = 32)
@@ -175,8 +191,22 @@ public class LoanProductSetting {
             : ApprovalWorkflowStage.MANAGER;
     }
 
+    public int getResolvedManagerPriority() {
+        if (managerPriority != null && managerPriority > 0) {
+            return managerPriority;
+        }
+        return getResolvedWorkflowStartStage() == ApprovalWorkflowStage.LOAN_OFFICER ? 2 : 1;
+    }
+
+    public int getResolvedLoanOfficerPriority() {
+        if (loanOfficerPriority != null && loanOfficerPriority > 0) {
+            return loanOfficerPriority;
+        }
+        return getResolvedWorkflowStartStage() == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2;
+    }
+
     public int getResolvedCommitteePriority() {
-        return committeePriority != null && (committeePriority == 3 || committeePriority == 4)
+        return committeePriority != null && committeePriority >= 1 && committeePriority <= 4
             ? committeePriority
             : 3;
     }
@@ -196,9 +226,21 @@ public class LoanProductSetting {
     }
 
     public int getResolvedAccountantPriority() {
-        return accountantPriority != null && (accountantPriority == 3 || accountantPriority == 4)
+        return accountantPriority != null && accountantPriority >= 1 && accountantPriority <= 4
             ? accountantPriority
             : 4;
+    }
+
+    public boolean isDisbursementOfficerRequired() {
+        return disbursementOfficerRequired == null || disbursementOfficerRequired;
+    }
+
+    public boolean isGuarantorCommitmentRequired() {
+        return Boolean.TRUE.equals(guarantorCommitmentRequired);
+    }
+
+    public ApprovalWorkflowStage getResolvedGuarantorCommitmentStage() {
+        return guarantorCommitmentStage == null ? ApprovalWorkflowStage.MANAGER : guarantorCommitmentStage;
     }
 
     public LoanProductStatus getStatus() {

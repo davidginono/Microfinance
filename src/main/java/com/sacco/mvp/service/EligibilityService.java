@@ -50,7 +50,7 @@ public class EligibilityService {
             .getMaxLoanSavingsRatio();
     }
 
-    private BigDecimal resolveSavings(UUID memberId) {
+    public BigDecimal resolveSavings(UUID memberId) {
         BigDecimal localSavings = savingsAccountRepository.findByMemberId(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Savings account missing"))
             .getAvailableBalance();

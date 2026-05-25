@@ -107,9 +107,8 @@
     });
 
     triggers.forEach(function (btn) {
-        // Legacy inline result panel is no longer used — keep it hidden.
+        // Keep the inline savings/share cards in sync with the modal.
         var legacy = btn.parentElement ? btn.parentElement.querySelector('.guarantor-financial-result') : null;
-        if (legacy) legacy.remove();
         var label = btn.querySelector('[data-financial-label]');
         if (label && /^\s*Load Status\s*$/i.test(label.textContent)) {
             label.textContent = 'View Status';
@@ -139,6 +138,15 @@
                         if (savingsEl) savingsEl.textContent = data.savingsLabel || '-';
                         if (sharesEl) sharesEl.textContent = data.sharesLabel || '-';
                         if (noteEl) noteEl.textContent = data.statusMessage || '';
+                        if (legacy) {
+                            var inlineSavings = legacy.querySelector('[data-financial-savings]');
+                            var inlineShares = legacy.querySelector('[data-financial-shares]');
+                            var inlineNote = legacy.querySelector('[data-financial-note]');
+                            if (inlineSavings) inlineSavings.textContent = data.savingsLabel || '-';
+                            if (inlineShares) inlineShares.textContent = data.sharesLabel || '-';
+                            if (inlineNote) inlineNote.textContent = data.statusMessage || '';
+                            legacy.classList.remove('hidden');
+                        }
                         setState('ready');
                     } else {
                         if (errorEl) errorEl.textContent = (result.payload && result.payload.message) || 'Unable to load status.';

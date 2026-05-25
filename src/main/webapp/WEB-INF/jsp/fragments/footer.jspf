@@ -46,12 +46,42 @@
         const memberArchiveToggle = document.getElementById("memberArchiveToggle");
         const memberArchivePanel = document.getElementById("memberArchivePanel");
         const memberArchiveChevron = document.getElementById("memberArchiveChevron");
+        const memberSupportToggle = document.getElementById("memberSupportToggle");
+        const memberSupportPanel = document.getElementById("memberSupportPanel");
+        const memberSupportChevron = document.getElementById("memberSupportChevron");
         const adminSaccoToggle = document.getElementById("adminSaccoToggle");
         const adminSaccoPanel = document.getElementById("adminSaccoPanel");
         const adminSaccoChevron = document.getElementById("adminSaccoChevron");
+        const adminSupportToggle = document.getElementById("adminSupportToggle");
+        const adminSupportPanel = document.getElementById("adminSupportPanel");
+        const adminSupportChevron = document.getElementById("adminSupportChevron");
+        const adminSettingsToggle = document.getElementById("adminSettingsToggle");
+        const adminSettingsPanel = document.getElementById("adminSettingsPanel");
+        const adminSettingsChevron = document.getElementById("adminSettingsChevron");
         const memberSettingsToggle = document.getElementById("memberSettingsToggle");
         const memberSettingsPanel = document.getElementById("memberSettingsPanel");
         const memberSettingsChevron = document.getElementById("memberSettingsChevron");
+        const staffSettingsToggle = document.getElementById("staffSettingsToggle");
+        const staffSettingsPanel = document.getElementById("staffSettingsPanel");
+        const staffSettingsChevron = document.getElementById("staffSettingsChevron");
+        const staffDashboardToggle = document.getElementById("staffDashboardToggle");
+        const staffDashboardPanel = document.getElementById("staffDashboardPanel");
+        const staffDashboardChevron = document.getElementById("staffDashboardChevron");
+        const managerOfficeToggle = document.getElementById("managerOfficeToggle");
+        const managerOfficePanel = document.getElementById("managerOfficePanel");
+        const managerOfficeChevron = document.getElementById("managerOfficeChevron");
+        const boardOfficeToggle = document.getElementById("boardOfficeToggle");
+        const boardOfficePanel = document.getElementById("boardOfficePanel");
+        const boardOfficeChevron = document.getElementById("boardOfficeChevron");
+        const loanOfficerOfficeToggle = document.getElementById("loanOfficerOfficeToggle");
+        const loanOfficerOfficePanel = document.getElementById("loanOfficerOfficePanel");
+        const loanOfficerOfficeChevron = document.getElementById("loanOfficerOfficeChevron");
+        const accountantOfficeToggle = document.getElementById("accountantOfficeToggle");
+        const accountantOfficePanel = document.getElementById("accountantOfficePanel");
+        const accountantOfficeChevron = document.getElementById("accountantOfficeChevron");
+        const disbursementOfficeToggle = document.getElementById("disbursementOfficeToggle");
+        const disbursementOfficePanel = document.getElementById("disbursementOfficePanel");
+        const disbursementOfficeChevron = document.getElementById("disbursementOfficeChevron");
         const sidebarStateScope = "${pageContext.session.id}";
 
         function sidebarStateKey(name) {
@@ -70,7 +100,9 @@
                     chevron.classList.toggle("rotate-180", expanded);
                 }
             };
-            const storedState = window.sessionStorage.getItem(storageKey) === "true";
+            const stored = window.sessionStorage.getItem(storageKey);
+            const activeState = toggle.getAttribute("aria-expanded") === "true";
+            const storedState = activeState || (stored === null ? false : stored === "true");
             applyExpanded(storedState);
             toggle.addEventListener("click", function () {
                 const isExpanded = toggle.getAttribute("aria-expanded") === "true";
@@ -92,8 +124,18 @@
         }
 
         registerExpandableMenu(memberSettingsToggle, memberSettingsPanel, memberSettingsChevron, "memberSettingsExpanded");
+        registerExpandableMenu(staffDashboardToggle, staffDashboardPanel, staffDashboardChevron, "staffDashboardExpanded");
+        registerExpandableMenu(staffSettingsToggle, staffSettingsPanel, staffSettingsChevron, "staffSettingsExpanded");
         registerExpandableMenu(memberArchiveToggle, memberArchivePanel, memberArchiveChevron, "memberArchiveExpanded");
+        registerExpandableMenu(memberSupportToggle, memberSupportPanel, memberSupportChevron, "memberSupportExpanded");
         registerExpandableMenu(adminSaccoToggle, adminSaccoPanel, adminSaccoChevron, "adminSaccoExpanded");
+        registerExpandableMenu(adminSupportToggle, adminSupportPanel, adminSupportChevron, "adminSupportExpanded");
+        registerExpandableMenu(adminSettingsToggle, adminSettingsPanel, adminSettingsChevron, "adminSettingsExpanded");
+        registerExpandableMenu(managerOfficeToggle, managerOfficePanel, managerOfficeChevron, "managerOfficeExpanded");
+        registerExpandableMenu(boardOfficeToggle, boardOfficePanel, boardOfficeChevron, "boardOfficeExpanded");
+        registerExpandableMenu(loanOfficerOfficeToggle, loanOfficerOfficePanel, loanOfficerOfficeChevron, "loanOfficerOfficeExpanded");
+        registerExpandableMenu(accountantOfficeToggle, accountantOfficePanel, accountantOfficeChevron, "accountantOfficeExpanded");
+        registerExpandableMenu(disbursementOfficeToggle, disbursementOfficePanel, disbursementOfficeChevron, "disbursementOfficeExpanded");
     })();
 </script>
 </div>

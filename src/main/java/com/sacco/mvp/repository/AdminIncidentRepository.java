@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UUID> {
     List<AdminIncident> findBySaccoIdOrderByCreatedAtDesc(String saccoId);
 
+    List<AdminIncident> findByReportedByMemberIdOrderByCreatedAtDesc(UUID reportedByMemberId);
+
     List<AdminIncident> findBySaccoIdAndStatusOrderByCreatedAtDesc(String saccoId, IncidentStatus status);
 
     List<AdminIncident> findBySaccoIdAndSeverityOrderByCreatedAtDesc(String saccoId, IncidentSeverity severity);

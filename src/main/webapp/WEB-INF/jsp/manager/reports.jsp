@@ -1,41 +1,42 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Manager Panel / Loan Reports</p>
-    <h1 class="erp-page-title">Manager Review Reports</h1>
-    <p class="erp-page-subtitle">Filter the loans you reviewed by date range and decision, then compare your decision with the loan's current workflow status.</p>
+    <p class="erp-breadcrumb"><spring:message code="manager.reports.breadcrumb" text="Manager Panel / Loan Reports" /></p>
+    <h1 class="erp-page-title"><spring:message code="manager.reports.title" text="Manager Review Reports" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="manager.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then compare your decision with the loan's current workflow status." /></p>
 </div>
 
 <form method="get" action="/manager/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 lg:grid-cols-4">
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">From Date</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
                name="fromDate"
                value="${fromDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">To Date</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
                name="toDate"
                value="${toDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Decision</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
         <select name="decisionFilter" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-            <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}>All decisions</option>
-            <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}>Approved</option>
-            <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}>Rejected</option>
+            <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
+            <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}><spring:message code="review.approved" text="Approved" /></option>
+            <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
         </select>
     </div>
     <div class="flex items-end gap-2">
-        <button type="submit" class="app-btn btn-primary">Generate Report</button>
-        <a href="/documents/reports/manager-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}&decisionFilter=${decisionFilterValue}" class="app-btn btn-neutral">Download PDF</a>
+        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generate" text="Generate Report" /></button>
+        <a href="/documents/reports/manager-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}&decisionFilter=${decisionFilterValue}" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" text="Download PDF" /></a>
     </div>
 </form>
 
@@ -43,14 +44,14 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Application ID</th>
-            <th>Loan ID</th>
-            <th>Applicant</th>
-            <th>Loan Type</th>
-            <th>Amount</th>
-            <th>Manager Decision</th>
-            <th>Reviewed At</th>
-            <th>Current Status</th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="loan.type" text="Loan Type" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="review.managerDecision" text="Manager Decision" /></th>
+            <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
+            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th></th>
         </tr>
         </thead>
@@ -65,13 +66,13 @@
                 <td>${row.managerDecisionLabel}</td>
                 <td>${row.reviewedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary">Open</a></td>
+                <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">
             <tr>
                 <td colspan="9" class="px-3 py-8 text-center text-slate-500">
-                    No manager-reviewed loans matched the selected period.
+                    <spring:message code="manager.reports.empty" text="No manager-reviewed loans matched the selected period." />
                 </td>
             </tr>
         </c:if>

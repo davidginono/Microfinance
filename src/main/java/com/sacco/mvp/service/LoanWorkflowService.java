@@ -36,6 +36,17 @@ public class LoanWorkflowService {
         LoanStatus.FINAL_APPROVED,
         LoanStatus.DEFAULTED
     );
+    private static final Set<LoanStatus> MEMBER_FORFEITABLE_REVIEW_STATUSES = EnumSet.of(
+        LoanStatus.READY_FOR_MANAGER,
+        LoanStatus.MANAGER_ACCEPTED,
+        LoanStatus.AWAITING_LOAN_OFFICER,
+        LoanStatus.LOAN_OFFICER_APPROVED,
+        LoanStatus.AWAITING_BOARD,
+        LoanStatus.BOARD_APPROVED,
+        LoanStatus.AWAITING_ACCOUNTANT,
+        LoanStatus.ACCOUNTANT_APPROVED,
+        LoanStatus.READY_FOR_DISBURSEMENT
+    );
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
@@ -56,6 +67,7 @@ public class LoanWorkflowService {
     private final RoleDirectoryService roleDirectoryService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final WorkflowRoutingService workflowRoutingService;
+    private final LoanQualificationPolicyService loanQualificationPolicyService;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -101,6 +113,7 @@ public class LoanWorkflowService {
         if (!product.isAvailableForApplications()) {
             throw new IllegalStateException("This loan product is not currently available for new applications.");
         }
+        loanQualificationPolicyService.assertApplicantEligible(saccoId, memberId);
         findActiveDisbursedLoan(memberId).ifPresent(activeLoan -> {
             if (!product.isApplicationWithActiveLoanAllowed()) {
                 throw new IllegalStateException(
@@ -118,6 +131,10 @@ public class LoanWorkflowService {
         return !isTopUpBlockedFor(app)
             && app.getFinalDueDate() != null
             && !app.getFinalDueDate().isBefore(LocalDate.now());
+    }
+
+    public boolean canForfeitReviewApplication(LoanApplication app) {
+        return app != null && MEMBER_FORFEITABLE_REVIEW_STATUSES.contains(app.getStatus());
     }
 
     public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId) {
@@ -138,8 +155,8 @@ public class LoanWorkflowService {
     @Transactional
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                     List<UUID> guarantorIds, String financialSnapshotJson, UUID topUpSourceLoanId,
-                                     List<MultipartFile> attachments) {
+                                     List<UUID> guarantorIds, Map<UUID, BigDecimal> guarantorCommitments,
+                                     String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments) {
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
         LoanApplication existingDraft = existingId == null
             ? null
@@ -166,7 +183,15 @@ public class LoanWorkflowService {
             applicantStationId,
             applicantId,
             product.getGuarantorsRequired(),
+            amount,
             guarantorIds
+        );
+        Map<UUID, BigDecimal> normalizedGuarantorCommitments = normalizeGuarantorCommitments(
+            saccoId,
+            product.getGuarantorsRequired(),
+            guarantorIds,
+            guarantorCommitments,
+            financialSnapshotJson
         );
 
         EligibilityService.EligibilityResult eligibility = eligibilityService.check(saccoId, applicantId, loanType, amount);
@@ -197,7 +222,7 @@ public class LoanWorkflowService {
         application.setFormData(formSchemaService.toJson(formData));
         application.setRequiredGuarantors(product.getGuarantorsRequired());
         application.setPolicySnapshot(snapshot);
-        application.setSelectedGuarantors(toJson(guarantorIds == null ? Collections.emptyList() : new ArrayList<>(new LinkedHashSet<>(guarantorIds))));
+        application.setSelectedGuarantors(toGuarantorSelectionJson(guarantorIds, normalizedGuarantorCommitments));
         application.setFinancialSnapshot(normalizeJson(financialSnapshotJson, "Load SACCO financial details again before saving the draft."));
         if (application.getAttachmentsJson() == null) {
             application.setAttachmentsJson("[]");
@@ -218,8 +243,11 @@ public class LoanWorkflowService {
         if (normalizedPurpose.isBlank()) {
             return;
         }
-        if (normalizedPurpose.length() > 1000) {
-            normalizedPurpose = normalizedPurpose.substring(0, 1000).trim();
+        if (!normalizedPurpose.equals(normalizedPurpose.toUpperCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("Loan purpose must be written in capital letters.");
+        }
+        if (normalizedPurpose.split("\\s+").length > 10) {
+            throw new IllegalArgumentException("Loan purpose must be 10 words or fewer.");
         }
         formData.put("purpose", normalizedPurpose);
     }
@@ -232,10 +260,11 @@ public class LoanWorkflowService {
     @Transactional
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                         List<UUID> guarantorIds, String financialSnapshotJson, UUID topUpSourceLoanId,
-                                         List<MultipartFile> attachments) {
+                                         List<UUID> guarantorIds, Map<UUID, BigDecimal> guarantorCommitments,
+                                         String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments) {
         LoanApplication saved = saveDraft(
-            saccoId, applicantId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds, financialSnapshotJson, topUpSourceLoanId, attachments);
+            saccoId, applicantId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+            guarantorCommitments, financialSnapshotJson, topUpSourceLoanId, attachments);
         LoanApplication submitted = submit(saved.getId(), applicantId);
         // Return reloaded row to guarantee caller sees persisted status/form data.
         return getMine(submitted.getId(), applicantId);
@@ -256,6 +285,7 @@ public class LoanWorkflowService {
         LoanProductSetting product = resolveWorkflowProduct(app);
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
+        loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
 
         EligibilityService.EligibilityResult result = eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(),
             app.getLoanType(), app.getAmount());
@@ -284,7 +314,12 @@ public class LoanWorkflowService {
         app.setUpdatedAt(OffsetDateTime.now());
         LoanApplication submitted = loanApplicationRepository.save(app);
         if (submitted.getRequiredGuarantors() > 0) {
-            refreshGuarantorRequestsForSubmission(submitted, memberId, parseSelectedGuarantors(submitted.getSelectedGuarantors()));
+            refreshGuarantorRequestsForSubmission(
+                submitted,
+                memberId,
+                parseSelectedGuarantors(submitted.getSelectedGuarantors()),
+                parseSelectedGuarantorCommitments(submitted.getSelectedGuarantors())
+            );
             return getMine(submitted.getId(), memberId);
         }
         return submitted;
@@ -296,12 +331,14 @@ public class LoanWorkflowService {
         if (app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
             throw new IllegalStateException("Only applications with all guarantors approved can be submitted to manager");
         }
+        requireLoanFeeReceiptIfConfigured(app);
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             throw new IllegalStateException("Load SACCO financial details before submitting the application");
         }
         LoanProductSetting product = resolveWorkflowProduct(app);
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
+        loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
         EligibilityService.EligibilityResult result = eligibilityService.check(
             app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount()
         );
@@ -315,6 +352,24 @@ public class LoanWorkflowService {
 
         moveIntoConfiguredReviewStage(app, memberId);
         return loanApplicationRepository.save(app);
+    }
+
+    public boolean hasLoanFeeReceipt(LoanApplication app) {
+        if (app == null) {
+            return false;
+        }
+        return loanAttachmentService.parse(app.getAttachmentsJson()).stream()
+            .anyMatch(item -> LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(String.valueOf(item.get("attachmentCategory"))));
+    }
+
+    private void requireLoanFeeReceiptIfConfigured(LoanApplication app) {
+        SaccoSettings settings = app == null ? null : saccoSettingsRepository.findById(app.getSaccoId()).orElse(null);
+        if (settings == null || !settings.isLoanFeePaymentConfigured()) {
+            return;
+        }
+        if (!hasLoanFeeReceipt(app)) {
+            throw new IllegalStateException("Upload the insurance and application fees payment receipt before submitting this loan for review.");
+        }
     }
 
     private void assertApplicantCanAdvanceToManagerReview(UUID applicantId) {
@@ -367,6 +422,7 @@ public class LoanWorkflowService {
             saccoId, MemberStatus.ACTIVE, query);
         if (exactMemberNo.isPresent()
             && !exactMemberNo.get().getId().equals(applicantId)
+            && exactMemberNo.get().isMemberAccess()
             && matchesStation(exactMemberNo.get(), normalizedStationId)) {
             return new PageImpl<>(List.of(exactMemberNo.get()), PageRequest.of(page, size), 1);
         }
@@ -377,6 +433,7 @@ public class LoanWorkflowService {
 
         List<Member> matches = memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
             .filter(member -> !member.getId().equals(applicantId))
+            .filter(Member::isMemberAccess)
             .filter(member -> matchesStation(member, normalizedStationId))
             .filter(member -> {
                 String memberNo = member.getMemberNo() == null ? "" : member.getMemberNo();
@@ -387,6 +444,27 @@ public class LoanWorkflowService {
             .toList();
 
         return new PageImpl<>(matches, PageRequest.of(page, size), matches.size());
+    }
+
+    public List<GuarantorCandidate> searchGuarantorCandidates(String saccoId,
+                                                              String stationId,
+                                                              UUID applicantId,
+                                                              String q,
+                                                              BigDecimal pendingLoanAmount,
+                                                              int page,
+                                                              int size) {
+        return searchGuarantors(saccoId, stationId, applicantId, q, page, size).getContent().stream()
+            .map(member -> {
+                String reason = loanQualificationPolicyService.guarantorFailureReason(saccoId, member.getId(), pendingLoanAmount).orElse("");
+                return new GuarantorCandidate(
+                    member.getId(),
+                    member.getMemberNo(),
+                    member.getFullName(),
+                    reason.isBlank(),
+                    reason
+                );
+            })
+            .toList();
     }
 
     @Transactional
@@ -404,54 +482,7 @@ public class LoanWorkflowService {
             loanApplicationRepository.save(app);
             return;
         }
-        if (app.getStatus() != LoanStatus.AWAITING_GUARANTORS) {
-            throw new IllegalStateException("Guarantors must be selected before submitting the application");
-        }
-
-        List<GuarantorRequest> existingRequests = guarantorRequestRepository.findByLoanApplicationId(appId);
-        Map<UUID, GuarantorRequest> existingByGuarantor = new LinkedHashMap<>();
-        for (GuarantorRequest existingRequest : existingRequests) {
-            if (existingRequest.getGuarantorMemberId() != null) {
-                existingByGuarantor.putIfAbsent(existingRequest.getGuarantorMemberId(), existingRequest);
-            }
-        }
-
-        for (GuarantorRequest existingRequest : existingRequests) {
-            if (!uniqueGuarantors.contains(existingRequest.getGuarantorMemberId())) {
-                guarantorRequestRepository.delete(existingRequest);
-            }
-        }
-        guarantorRequestRepository.flush();
-
-        for (UUID guarantorId : uniqueGuarantors) {
-            GuarantorRequest request = existingByGuarantor.get(guarantorId);
-            boolean newlyAssigned = request == null;
-            if (request == null) {
-                request = GuarantorRequest.builder()
-                    .id(UUID.randomUUID())
-                    .loanApplicationId(appId)
-                    .guarantorMemberId(guarantorId)
-                    .createdAt(OffsetDateTime.now())
-                    .build();
-            }
-
-            request.setStatus(GuarantorRequestStatus.PENDING);
-            request.setRequestedAmount(null);
-            request.setCommittedAmount(null);
-            request.setDecisionReason(null);
-            request.setGuarantorSignatureText(null);
-            request.setGuarantorSignatureVerifiedAt(null);
-            request.setDecidedAt(null);
-            guarantorRequestRepository.save(request);
-
-            if (newlyAssigned) {
-                outboxService.enqueue("GUARANTOR_REQUEST", appId, "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
-                    Map.of("loanId", appId.toString()));
-            }
-        }
-
-        app.setStatus(LoanStatus.AWAITING_GUARANTORS);
-        loanApplicationRepository.save(app);
+        throw new IllegalStateException("Guarantor commitments are locked after the application is submitted.");
     }
 
     public List<GuarantorRequest> myPendingGuarantorRequests(UUID memberId) {
@@ -485,10 +516,16 @@ public class LoanWorkflowService {
         if (request.getStatus() != GuarantorRequestStatus.PENDING) {
             throw new IllegalStateException("Request already decided");
         }
+        LoanApplication app = loanApplicationRepository.findById(request.getLoanApplicationId())
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+        BigDecimal requestedAmount = request.getRequestedAmount();
+        if (requestedAmount == null || requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("This guarantee request does not have an assigned commitment amount.");
+        }
+        loanQualificationPolicyService.assertGuarantorCanCommit(app.getSaccoId(), guarantorId, requestedAmount);
 
         request.setStatus(GuarantorRequestStatus.APPROVED);
-        request.setRequestedAmount(null);
-        request.setCommittedAmount(null);
+        request.setCommittedAmount(requestedAmount.setScale(2, java.math.RoundingMode.HALF_UP));
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
         request.setGuarantorSignatureVerifiedAt(verifiedAt);
         request.setDecidedAt(OffsetDateTime.now());
@@ -565,6 +602,19 @@ public class LoanWorkflowService {
     }
 
     @Transactional
+    public void forfeitReviewApplication(UUID appId, UUID applicantId) {
+        LoanApplication app = getMine(appId, applicantId);
+        if (!canForfeitReviewApplication(app)) {
+            throw new IllegalStateException("This application cannot be forfeited at its current stage.");
+        }
+        app.setStatus(LoanStatus.FORFEITED);
+        app.setUpdatedAt(OffsetDateTime.now());
+        loanApplicationRepository.save(app);
+        outboxService.enqueue("LOAN", appId, "LOAN_FORFEITED", app.getApplicantMemberId(),
+            Map.of("loanId", app.getId().toString()));
+    }
+
+    @Transactional
     public void deleteApplication(UUID appId, UUID applicantId) {
         LoanApplication app = getMine(appId, applicantId);
         if (app.getStatus() != LoanStatus.DRAFT
@@ -629,6 +679,28 @@ public class LoanWorkflowService {
         }
     }
 
+    private String toGuarantorSelectionJson(List<UUID> guarantorIds, Map<UUID, BigDecimal> commitments) {
+        List<UUID> uniqueGuarantors = guarantorIds == null ? Collections.emptyList() : new ArrayList<>(new LinkedHashSet<>(guarantorIds));
+        if (uniqueGuarantors.isEmpty()) {
+            return "[]";
+        }
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (UUID guarantorId : uniqueGuarantors) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("id", guarantorId.toString());
+            BigDecimal amount = commitments == null ? null : commitments.get(guarantorId);
+            if (amount != null) {
+                row.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+            }
+            rows.add(row);
+        }
+        try {
+            return objectMapper.writeValueAsString(rows);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to save selected guarantors", e);
+        }
+    }
+
     private void deleteApplicationRecords(LoanApplication app) {
         UUID appId = app.getId();
         guarantorRequestRepository.deleteByLoanApplicationId(appId);
@@ -647,9 +719,36 @@ public class LoanWorkflowService {
             return Collections.emptyList();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<List<UUID>>() {});
+            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
+            List<UUID> values = new ArrayList<>();
+            for (Object item : raw) {
+                if (item instanceof String text) {
+                    values.add(UUID.fromString(text));
+                } else if (item instanceof Map<?, ?> map && map.get("id") != null) {
+                    values.add(UUID.fromString(String.valueOf(map.get("id"))));
+                }
+            }
+            return values;
         } catch (Exception e) {
             return Collections.emptyList();
+        }
+    }
+
+    private Map<UUID, BigDecimal> parseSelectedGuarantorCommitments(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
+            Map<UUID, BigDecimal> values = new LinkedHashMap<>();
+            for (Object item : raw) {
+                if (item instanceof Map<?, ?> map && map.get("id") != null && map.get("amount") != null) {
+                    values.put(UUID.fromString(String.valueOf(map.get("id"))), new BigDecimal(String.valueOf(map.get("amount"))));
+                }
+            }
+            return values;
+        } catch (Exception e) {
+            return Collections.emptyMap();
         }
     }
 
@@ -659,6 +758,7 @@ public class LoanWorkflowService {
             coalesceStationId(app.getStationId(), requireMemberStationId(applicantId)),
             applicantId,
             app.getRequiredGuarantors(),
+            app.getAmount(),
             guarantorIds
         );
     }
@@ -667,6 +767,7 @@ public class LoanWorkflowService {
                                                   String stationId,
                                                   UUID applicantId,
                                                   Integer requiredGuarantors,
+                                                  BigDecimal pendingLoanAmount,
                                                   List<UUID> guarantorIds) {
         if (requiredGuarantors == null || requiredGuarantors <= 0) {
             return Collections.emptyList();
@@ -689,12 +790,121 @@ public class LoanWorkflowService {
             if (!guarantor.getSaccoId().equals(saccoId) || guarantor.getStatus() != MemberStatus.ACTIVE) {
                 throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
             }
+            if (!guarantor.isMemberAccess()) {
+                throw new IllegalArgumentException("Guarantor must have member access");
+            }
             if (!matchesStation(guarantor, stationId)) {
                 throw new IllegalArgumentException("Guarantor must be in the same station");
+            }
+            try {
+                loanQualificationPolicyService.assertGuarantorEligible(saccoId, guarantorId, pendingLoanAmount);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                throw guarantorValidationException(guarantor, ex);
             }
         }
 
         return uniqueGuarantors;
+    }
+
+    private Map<UUID, BigDecimal> normalizeGuarantorCommitments(String saccoId,
+                                                                Integer requiredGuarantors,
+                                                                List<UUID> guarantorIds,
+                                                                Map<UUID, BigDecimal> rawCommitments,
+                                                                String financialSnapshotJson) {
+        if (requiredGuarantors == null || requiredGuarantors <= 0) {
+            return Collections.emptyMap();
+        }
+        List<UUID> uniqueGuarantors = guarantorIds == null ? Collections.emptyList() : new ArrayList<>(new LinkedHashSet<>(guarantorIds));
+        if (uniqueGuarantors.size() != requiredGuarantors) {
+            throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " guarantors");
+        }
+        BigDecimal requiredTotal = principalPlusInterest(financialSnapshotJson);
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        BigDecimal assignedTotal = BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP);
+        for (UUID guarantorId : uniqueGuarantors) {
+            Member guarantor = memberRepository.findById(guarantorId)
+                .orElse(null);
+            BigDecimal amount = rawCommitments == null ? null : rawCommitments.get(guarantorId);
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw guarantorValidationException(guarantorId, guarantor, "Assign a commitment amount for this guarantor.");
+            }
+            BigDecimal normalized = amount.setScale(2, java.math.RoundingMode.HALF_UP);
+            if (normalized.compareTo(requiredTotal) > 0) {
+                throw guarantorValidationException(guarantorId, guarantor, "This guarantor's commitment amount cannot be greater than the total amount to be returned.");
+            }
+            try {
+                loanQualificationPolicyService.assertGuarantorCanCommit(saccoId, guarantorId, normalized);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                throw guarantorValidationException(guarantorId, guarantor, ex.getMessage());
+            }
+            commitments.put(guarantorId, normalized);
+            assignedTotal = assignedTotal.add(normalized).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        if (assignedTotal.compareTo(requiredTotal) != 0) {
+            throw new IllegalArgumentException(
+                "Guarantor commitment amounts must add up exactly to the principal plus interest: "
+                    + requiredTotal.toPlainString()
+            );
+        }
+        return commitments;
+    }
+
+    private GuarantorValidationException guarantorValidationException(Member guarantor, RuntimeException ex) {
+        UUID guarantorId = guarantor == null ? null : guarantor.getId();
+        return guarantorValidationException(guarantorId, guarantor, ex.getMessage());
+    }
+
+    private GuarantorValidationException guarantorValidationException(UUID guarantorId, Member guarantor, String message) {
+        String label = guarantor == null
+            ? "This guarantor"
+            : guarantor.getFullName() + " (" + guarantor.getMemberNo() + ")";
+        String detail = message == null || message.isBlank() ? "This guarantor cannot be used for this loan." : message;
+        return new GuarantorValidationException(guarantorId, label + ": " + detail);
+    }
+
+    public static class GuarantorValidationException extends IllegalArgumentException {
+        private final UUID guarantorId;
+
+        public GuarantorValidationException(UUID guarantorId, String message) {
+            super(message);
+            this.guarantorId = guarantorId;
+        }
+
+        public UUID getGuarantorId() {
+            return guarantorId;
+        }
+    }
+
+    private BigDecimal principalPlusInterest(String financialSnapshotJson) {
+        if (financialSnapshotJson == null || financialSnapshotJson.isBlank()) {
+            throw new IllegalStateException("Load the loan details before assigning guarantor commitment amounts.");
+        }
+        try {
+            Map<String, Object> snapshot = objectMapper.readValue(financialSnapshotJson, new TypeReference<Map<String, Object>>() {});
+            BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
+            if (principalPlusInterest == null) {
+                principalPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
+            }
+            if (principalPlusInterest == null || principalPlusInterest.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Loan details do not include the principal plus interest total.");
+            }
+            return principalPlusInterest.setScale(2, java.math.RoundingMode.HALF_UP);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Load the loan details again before assigning guarantor commitment amounts.", ex);
+        }
+    }
+
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).replace(",", "").trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String resolveMemberStationId(UUID memberId) {
@@ -746,8 +956,18 @@ public class LoanWorkflowService {
         return normalized.isBlank() ? null : normalized;
     }
 
-    private void refreshGuarantorRequestsForSubmission(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
+    private void refreshGuarantorRequestsForSubmission(LoanApplication app,
+                                                       UUID applicantId,
+                                                       List<UUID> guarantorIds,
+                                                       Map<UUID, BigDecimal> guarantorCommitments) {
         List<UUID> uniqueGuarantors = normalizeGuarantorSelection(app, applicantId, guarantorIds);
+        Map<UUID, BigDecimal> normalizedCommitments = normalizeGuarantorCommitments(
+            app.getSaccoId(),
+            app.getRequiredGuarantors(),
+            uniqueGuarantors,
+            guarantorCommitments,
+            app.getFinancialSnapshot()
+        );
 
         guarantorRequestRepository.deleteByLoanApplicationId(app.getId());
         guarantorRequestRepository.flush();
@@ -762,7 +982,7 @@ public class LoanWorkflowService {
                     .build());
 
             request.setStatus(GuarantorRequestStatus.PENDING);
-            request.setRequestedAmount(null);
+            request.setRequestedAmount(normalizedCommitments.get(guarantorId));
             request.setCommittedAmount(null);
             request.setDecisionReason(null);
             request.setGuarantorSignatureText(null);
@@ -935,5 +1155,14 @@ public class LoanWorkflowService {
             return app.getApplicationNumber().toString();
         }
         return app.getId().toString().substring(0, 8);
+    }
+
+    public record GuarantorCandidate(
+        UUID id,
+        String memberNo,
+        String fullName,
+        boolean eligible,
+        String disabledReason
+    ) {
     }
 }

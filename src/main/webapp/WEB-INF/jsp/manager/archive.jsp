@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -32,33 +33,33 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Manager Panel / Archive</p>
-    <h1 class="erp-page-title">Manager Archive</h1>
-    <p class="erp-page-subtitle">Open the loans you already reviewed and track what happened after your decision.</p>
+    <p class="erp-breadcrumb"><spring:message code="manager.archive.breadcrumb" text="Manager Panel / Archive" /></p>
+    <h1 class="erp-page-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="manager.archive.subtitle" text="Open the loans you already reviewed and track what happened after your decision." /></p>
 </div>
 
 <div class="erp-toolbar">
     <div class="space-y-3">
         <div>
-            <p class="erp-widget-title">Current Filter</p>
+            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
         <div class="erp-filter-row">
             <a href="/manager/archive?filter=ALL"
                class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                All Reviewed Loans
+                <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
             </a>
             <a href="/manager/archive?filter=APPROVED"
                class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-                Approved Loans
+                <spring:message code="archive.approvedLoans" text="Approved Loans" />
             </a>
             <a href="/manager/archive?filter=REJECTED"
                class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-                Rejected Loans
+                <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
             </a>
             <a href="/manager/archive?filter=APPROVED_FOR_DISBURSEMENT"
                class="erp-filter-tab ${currentFilterKey eq 'APPROVED_FOR_DISBURSEMENT' ? 'is-active' : ''}">
-                Approved for Disbursement
+                <spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" />
             </a>
         </div>
         <form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form">
@@ -74,9 +75,9 @@
             </label>
             <div class="manager-archive-search-actions">
                 <c:if test="${not empty queueSearchValue}">
-                    <a href="/manager/archive?filter=${currentFilterKey}" class="app-btn btn-neutral">Reset</a>
+                    <a href="/manager/archive?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary">Search</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
     </div>
@@ -86,14 +87,14 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Application ID</th>
-            <th>Loan ID</th>
-            <th>Applicant</th>
-            <th>Amount</th>
-            <th>Manager Decision</th>
-            <th>Reviewed At</th>
-            <th>Current Status</th>
-            <th>Action</th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="review.managerDecision" text="Manager Decision" /></th>
+            <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
+            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
+            <th><spring:message code="common.action" text="Action" /></th>
         </tr>
         </thead>
         <tbody>
@@ -106,13 +107,13 @@
                 <td>${row.decisionLabel}</td>
                 <td>${row.reviewedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary">Open</a></td>
+                <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty archiveRows}">
             <tr>
                 <td colspan="8" class="px-3 py-8 text-center text-slate-500">
-                    No manager-reviewed loan applications matched the current filter.
+                    <spring:message code="manager.archive.empty" text="No manager-reviewed loan applications matched the current filter." />
                 </td>
             </tr>
         </c:if>

@@ -55,7 +55,7 @@ public class LoanPaymentTransactionSyncService {
      */
     @Transactional
     public int syncMonth(LoanApplication loan, YearMonth target) {
-        return syncInternal(loan, transaction -> target.equals(YearMonth.from(transaction.receiptDate())));
+        return syncInternal(loan, transaction -> target.equals(YearMonth.from(transaction.receiptDate())), false);
     }
 
     /**
@@ -66,10 +66,18 @@ public class LoanPaymentTransactionSyncService {
     @Transactional
     public int syncRecent(LoanApplication loan, int monthsBack) {
         YearMonth cutoff = YearMonth.now().minusMonths(Math.max(monthsBack - 1, 0));
-        return syncInternal(loan, transaction -> !YearMonth.from(transaction.receiptDate()).isBefore(cutoff));
+        return syncInternal(loan, transaction -> !YearMonth.from(transaction.receiptDate()).isBefore(cutoff), false);
     }
 
-    private int syncInternal(LoanApplication loan, java.util.function.Predicate<LoanPaymentTransactionDto> filter) {
+    @Transactional
+    public int syncRecentAndRefreshSummary(LoanApplication loan, int monthsBack) {
+        YearMonth cutoff = YearMonth.now().minusMonths(Math.max(monthsBack - 1, 0));
+        return syncInternal(loan, transaction -> !YearMonth.from(transaction.receiptDate()).isBefore(cutoff), true);
+    }
+
+    private int syncInternal(LoanApplication loan,
+                             java.util.function.Predicate<LoanPaymentTransactionDto> filter,
+                             boolean refreshSummaryEvenWithoutTransactions) {
         if (loan.getLoanId() == null || loan.getLoanId().isBlank()) {
             log.debug("Skipping payment sync for application {} without a loan ID", loan.getId());
             return 0;
@@ -133,7 +141,7 @@ public class LoanPaymentTransactionSyncService {
                 .build());
             inserted++;
         }
-        if (matchedTransactions) {
+        if (matchedTransactions || refreshSummaryEvenWithoutTransactions) {
             refreshLoanPaymentSummary(loan, applicant, fetchedAt, matchedFinalInstallmentMonth);
         }
         return inserted;

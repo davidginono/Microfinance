@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -158,6 +159,137 @@ class SaccoRegistryServiceTest {
         service.updateSacco("SACCO-1", "Example Sacco", "STN001", logoFile);
 
         org.junit.jupiter.api.Assertions.assertTrue(saccoLogoStorageService.hasLogo("SACCO-1"));
+    }
+
+    @Test
+    void updateSaccoStoresStationAddressLocation() {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            null,
+            saccoLogoStorageService
+        );
+
+        OffsetDateTime now = OffsetDateTime.now();
+        RegisteredSacco existingSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoStation station = SaccoStation.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .stationId("STN001")
+            .addressLocation("Old Location")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-1")
+            .externalStationId("STN001")
+            .externalSaccoName("Example Sacco")
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .defaultLanguage("en")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(existingSacco));
+        when(saccoStationRepository.findBySaccoIdOrderByStationIdAsc("SACCO-1"))
+            .thenReturn(List.of(station));
+        when(saccoSettingsRepository.findById("SACCO-1")).thenReturn(Optional.of(settings));
+
+        service.updateSacco(
+            "SACCO-1",
+            "Example Sacco",
+            "STN001",
+            Map.of("STN001", "Arusha CBD"),
+            null
+        );
+
+        verify(saccoStationRepository).save(argThat(updated -> updated != null
+            && "STN001".equals(updated.getStationId())
+            && "Arusha CBD".equals(updated.getAddressLocation())));
+    }
+
+    @Test
+    void addStationStoresAddressLocation() {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            null,
+            saccoLogoStorageService
+        );
+
+        OffsetDateTime now = OffsetDateTime.now();
+        RegisteredSacco existingSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoStation existingStation = SaccoStation.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .stationId("STN001")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoStation addedStation = SaccoStation.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .stationId("STN002")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-1")
+            .externalStationId("STN001")
+            .externalSaccoName("Example Sacco")
+            .requiredGuarantors(3)
+            .boardSize(3)
+            .boardQuorum(2)
+            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
+            .defaultLanguage("en")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(existingSacco));
+        when(saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc("SACCO-1"))
+            .thenReturn(List.of(existingStation));
+        when(saccoStationRepository.findBySaccoIdOrderByStationIdAsc("SACCO-1"))
+            .thenReturn(List.of(existingStation));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-1", "STN002"))
+            .thenReturn(Optional.of(addedStation));
+        when(saccoSettingsRepository.findById("SACCO-1")).thenReturn(Optional.of(settings));
+
+        service.addStation("SACCO-1", "STN002", "Arusha CBD");
+
+        verify(saccoStationRepository).save(argThat(station -> station != null
+            && "STN002".equals(station.getStationId())
+            && "Arusha CBD".equals(station.getAddressLocation())));
     }
 
     private byte[] pngBytes(int width, int height) throws IOException {

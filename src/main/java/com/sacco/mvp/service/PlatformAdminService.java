@@ -7,12 +7,16 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.RegisteredSacco;
+import com.sacco.mvp.domain.SaccoAccessStatus;
+import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.domain.SavingsAccount;
 import com.sacco.mvp.repository.AuditLogRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.OutboxEventRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
+import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.SavingsAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +55,7 @@ public class PlatformAdminService {
     private final SavingsAccountRepository savingsAccountRepository;
     private final AuditLogRepository auditLogRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
 
     public PlatformDashboard dashboard() {
@@ -77,21 +82,47 @@ public class PlatformAdminService {
     }
 
     public SaccoDetailView saccoDetail(String saccoId) {
+        return saccoDetail(saccoId, null);
+    }
+
+    public SaccoDetailView saccoDetail(String saccoId, String stationId) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
         RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalArgumentException("SACCO not found."));
         PortfolioSnapshot snapshot = buildSnapshot();
-        SaccoSummary summary = snapshot.summaryById().get(normalizedSaccoId);
-        if (summary == null) {
+        if (!snapshot.summaryById().containsKey(normalizedSaccoId)) {
             throw new IllegalArgumentException("SACCO not found.");
         }
 
-        List<Member> members = snapshot.membersBySacco().getOrDefault(normalizedSaccoId, List.of());
+        List<SaccoStation> activeStations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(normalizedSaccoId);
+        List<String> stationOptions = activeStations.stream()
+            .map(station -> station.getStationId())
+            .toList();
+        if (normalizedStationId != null && !stationOptions.contains(normalizedStationId)) {
+            throw new IllegalArgumentException("Station not found for this SACCO.");
+        }
+
+        List<Member> members = snapshot.membersBySacco().getOrDefault(normalizedSaccoId, List.of()).stream()
+            .filter(member -> normalizedStationId == null || normalizedStationId.equalsIgnoreCase(member.getStationId()))
+            .toList();
         Map<UUID, Member> membersById = members.stream().collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
-        List<LoanApplication> loans = snapshot.loansBySacco().getOrDefault(normalizedSaccoId, List.of());
+        List<LoanApplication> loans = snapshot.loansBySacco().getOrDefault(normalizedSaccoId, List.of()).stream()
+            .filter(loan -> normalizedStationId == null || normalizedStationId.equalsIgnoreCase(loan.getStationId()))
+            .toList();
         Set<UUID> memberIds = membersById.keySet();
         Set<UUID> loanIds = loans.stream().map(LoanApplication::getId).collect(Collectors.toSet());
+        SaccoSettings settings = saccoSettingsRepository.findById(normalizedSaccoId).orElse(null);
+        SaccoSummary summary = buildSummary(
+            sacco,
+            normalizedStationId == null ? stationOptions : List.of(normalizedStationId),
+            members,
+            loans,
+            savingsTotalForMembers(memberIds),
+            settings,
+            resolveStationAccess(activeStations, normalizedStationId)
+        );
 
         long paidLoanCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
         long overdueLoanCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
@@ -121,7 +152,9 @@ public class PlatformAdminService {
             recentLoans,
             relatedAudit,
             paidLoanCount,
-            overdueLoanCount
+            overdueLoanCount,
+            stationOptions,
+            normalizedStationId
         );
     }
 
@@ -174,8 +207,11 @@ public class PlatformAdminService {
 
         List<SaccoSummary> summaries = new ArrayList<>();
         Map<String, SaccoSummary> summaryById = new LinkedHashMap<>();
+        Map<String, SaccoSettings> settingsBySacco = saccoSettingsRepository.findAllById(saccoIds).stream()
+            .collect(Collectors.toMap(SaccoSettings::getSaccoId, settings -> settings, (left, right) -> left, LinkedHashMap::new));
         for (RegisteredSacco sacco : registeredSaccos) {
-            List<String> stationIds = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId()).stream()
+            List<SaccoStation> activeStations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
+            List<String> stationIds = activeStations.stream()
                 .map(station -> station.getStationId())
                 .toList();
             SaccoSummary summary = buildSummary(
@@ -183,7 +219,9 @@ public class PlatformAdminService {
                 stationIds,
                 membersBySacco.getOrDefault(sacco.getSaccoId(), List.of()),
                 loansBySacco.getOrDefault(sacco.getSaccoId(), List.of()),
-                savingsBySacco.getOrDefault(sacco.getSaccoId(), BigDecimal.ZERO)
+                savingsBySacco.getOrDefault(sacco.getSaccoId(), BigDecimal.ZERO),
+                settingsBySacco.get(sacco.getSaccoId()),
+                resolveStationAccess(activeStations, null)
             );
             summaries.add(summary);
             summaryById.put(summary.saccoId(), summary);
@@ -196,7 +234,9 @@ public class PlatformAdminService {
                                       List<String> stationIds,
                                       List<Member> members,
                                       List<LoanApplication> loans,
-                                      BigDecimal totalSavings) {
+                                      BigDecimal totalSavings,
+                                      SaccoSettings settings,
+                                      StationAccessSnapshot stationAccess) {
         List<LoanApplication> disbursedLoans = loans.stream()
             .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED
                 || loan.getStatus() == LoanStatus.DEFAULTED
@@ -241,8 +281,62 @@ public class PlatformAdminService {
             statusMeta.label(),
             statusMeta.tone(),
             statusMeta.note(),
-            totalDisbursed.signum() == 0
+            totalDisbursed.signum() == 0,
+            stationAccess.accessStatus(),
+            stationAccess.paymentDueDate(),
+            stationAccess.accessSuspendedAt(),
+            stationAccess.accessRestrictionReason(),
+            settings == null ? "en" : settings.getDefaultLanguage()
         );
+    }
+
+    private StationAccessSnapshot resolveStationAccess(List<SaccoStation> stations, String stationId) {
+        List<SaccoStation> candidates = stations == null ? List.of() : stations;
+        if (stationId != null && !stationId.isBlank()) {
+            return candidates.stream()
+                .filter(station -> stationId.equalsIgnoreCase(station.getStationId()))
+                .findFirst()
+                .map(station -> new StationAccessSnapshot(
+                    station.getResolvedAccessStatus(),
+                    station.getPaymentDueDate(),
+                    station.getAccessSuspendedAt(),
+                    station.getAccessRestrictionReason()
+                ))
+                .orElse(StationAccessSnapshot.active());
+        }
+        List<SaccoStation> suspended = candidates.stream()
+            .filter(SaccoStation::isAccessSuspended)
+            .toList();
+        if (!suspended.isEmpty()) {
+            OffsetDateTime suspendedAt = suspended.stream()
+                .map(SaccoStation::getAccessSuspendedAt)
+                .filter(value -> value != null)
+                .max(OffsetDateTime::compareTo)
+                .orElse(null);
+            return new StationAccessSnapshot(
+                SaccoAccessStatus.SUSPENDED,
+                suspended.stream().map(SaccoStation::getPaymentDueDate).filter(value -> value != null).min(LocalDate::compareTo).orElse(null),
+                suspendedAt,
+                suspended.size() == 1
+                    ? suspended.getFirst().getStationId() + ": " + nullSafeReason(suspended.getFirst().getAccessRestrictionReason())
+                    : suspended.size() + " stations suspended"
+            );
+        }
+        boolean paymentDue = candidates.stream()
+            .anyMatch(station -> station.getResolvedAccessStatus() == SaccoAccessStatus.PAYMENT_DUE);
+        if (paymentDue) {
+            return new StationAccessSnapshot(
+                SaccoAccessStatus.PAYMENT_DUE,
+                candidates.stream().map(SaccoStation::getPaymentDueDate).filter(value -> value != null).min(LocalDate::compareTo).orElse(null),
+                null,
+                null
+            );
+        }
+        return StationAccessSnapshot.active();
+    }
+
+    private String nullSafeReason(String reason) {
+        return reason == null || reason.isBlank() ? "Access suspended" : reason.trim();
     }
 
     private List<AuditItem> recentAuditItems(List<AuditLog> auditLogs, int limit) {
@@ -282,6 +376,17 @@ public class PlatformAdminService {
             return false;
         }
         return value.toLowerCase(Locale.ROOT).contains(fragment.toLowerCase(Locale.ROOT));
+    }
+
+    private BigDecimal savingsTotalForMembers(Set<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return savingsAccountRepository.findAll().stream()
+            .filter(account -> memberIds.contains(account.getMemberId()))
+            .map(SavingsAccount::getAvailableBalance)
+            .map(PlatformAdminService::safeAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private String resolveApplicantName(UUID applicantMemberId, Map<UUID, Member> membersById) {
@@ -331,6 +436,10 @@ public class PlatformAdminService {
 
     private static String normalizeSaccoId(String saccoId) {
         return saccoId == null ? "" : saccoId.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeOptional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static String shortId(UUID id) {
@@ -458,7 +567,9 @@ public class PlatformAdminService {
         List<LoanItem> recentLoans,
         List<AuditItem> recentAuditEntries,
         long paidLoanCount,
-        long overdueLoanCount
+        long overdueLoanCount,
+        List<String> stationOptions,
+        String selectedStationId
     ) {
         public String getSaccoId() {
             return saccoId;
@@ -483,6 +594,29 @@ public class PlatformAdminService {
         public long getOverdueLoanCount() {
             return overdueLoanCount;
         }
+
+        public List<String> getStationOptions() {
+            return stationOptions;
+        }
+
+        public String getSelectedStationId() {
+            return selectedStationId;
+        }
+
+        public boolean isStationScoped() {
+            return selectedStationId != null && !selectedStationId.isBlank();
+        }
+    }
+
+    private record StationAccessSnapshot(
+        SaccoAccessStatus accessStatus,
+        LocalDate paymentDueDate,
+        OffsetDateTime accessSuspendedAt,
+        String accessRestrictionReason
+    ) {
+        static StationAccessSnapshot active() {
+            return new StationAccessSnapshot(SaccoAccessStatus.ACTIVE, null, null, null);
+        }
     }
 
     public record SaccoSummary(
@@ -504,7 +638,12 @@ public class PlatformAdminService {
         String healthStatus,
         String healthTone,
         String healthNote,
-        boolean newPortfolio
+        boolean newPortfolio,
+        SaccoAccessStatus accessStatus,
+        LocalDate paymentDueDate,
+        OffsetDateTime accessSuspendedAt,
+        String accessRestrictionReason,
+        String defaultLanguage
     ) {
         public String getSaccoId() {
             return saccoId;
@@ -580,6 +719,58 @@ public class PlatformAdminService {
 
         public boolean isNewPortfolio() {
             return newPortfolio;
+        }
+
+        public SaccoAccessStatus getAccessStatus() {
+            return accessStatus == null ? SaccoAccessStatus.ACTIVE : accessStatus;
+        }
+
+        public LocalDate getPaymentDueDate() {
+            return paymentDueDate;
+        }
+
+        public OffsetDateTime getAccessSuspendedAt() {
+            return accessSuspendedAt;
+        }
+
+        public String getAccessRestrictionReason() {
+            return accessRestrictionReason;
+        }
+
+        public String getDefaultLanguage() {
+            return defaultLanguage == null || defaultLanguage.isBlank() ? "en" : defaultLanguage;
+        }
+
+        public String getDefaultLanguageLabel() {
+            return "sw".equalsIgnoreCase(getDefaultLanguage()) ? "Kiswahili" : "English";
+        }
+
+        public boolean isAccessSuspended() {
+            return getAccessStatus() == SaccoAccessStatus.SUSPENDED;
+        }
+
+        public String getAccessStatusLabel() {
+            return switch (getAccessStatus()) {
+                case ACTIVE -> "Station Access Active";
+                case PAYMENT_DUE -> "Station Payment Due";
+                case SUSPENDED -> "Station Access Suspended";
+            };
+        }
+
+        public String getPaymentDueDateLabel() {
+            return paymentDueDate == null ? "Not set" : paymentDueDate.format(DATE_LABEL);
+        }
+
+        public String getAccessSuspendedAtLabel() {
+            return accessSuspendedAt == null ? "Not suspended" : accessSuspendedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
+        }
+
+        public String getAccessBadgeClass() {
+            return switch (getAccessStatus()) {
+                case ACTIVE -> "border-emerald-200 bg-emerald-50 text-emerald-700";
+                case PAYMENT_DUE -> "border-amber-200 bg-amber-50 text-amber-700";
+                case SUSPENDED -> "border-rose-200 bg-rose-50 text-rose-700";
+            };
         }
 
         public int getStationCount() {

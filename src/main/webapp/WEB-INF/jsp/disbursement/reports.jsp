@@ -1,32 +1,33 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Disbursement Panel / Reports</p>
-    <h1 class="erp-page-title">Disbursement Reports</h1>
-    <p class="erp-page-subtitle">Filter the loans you disbursed by date range and export the report when needed.</p>
+    <p class="erp-breadcrumb"><spring:message code="disbursement.reports.breadcrumb" text="Disbursement Panel / Reports" /></p>
+    <h1 class="erp-page-title"><spring:message code="disbursement.reports.title" text="Disbursement Reports" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="disbursement.reports.subtitle" text="Filter the loans you disbursed by date range and export the report when needed." /></p>
 </div>
 
 <form method="get" action="/disbursement/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 lg:grid-cols-3">
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">From Date</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
                name="fromDate"
                value="${fromDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">To Date</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
                name="toDate"
                value="${toDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="flex items-end gap-2">
-        <button type="submit" class="app-btn btn-primary">Generate Report</button>
-        <a href="/documents/reports/disbursement-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}" class="app-btn btn-neutral">Download PDF</a>
+        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generate" text="Generate Report" /></button>
+        <a href="/documents/reports/disbursement-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" text="Download PDF" /></a>
     </div>
 </form>
 
@@ -34,13 +35,13 @@
     <table class="erp-table">
         <thead>
         <tr>
-            <th>Loan Application ID</th>
-            <th>Loan ID</th>
-            <th>Applicant</th>
-            <th>Loan Type</th>
-            <th>Amount</th>
-            <th>Disbursed At</th>
-            <th>Current Status</th>
+            <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
+            <th><spring:message code="common.applicant" text="Applicant" /></th>
+            <th><spring:message code="loan.type" text="Loan Type" /></th>
+            <th><spring:message code="common.amount" text="Amount" /></th>
+            <th><spring:message code="review.disbursedAt" text="Disbursed At" /></th>
+            <th><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th></th>
         </tr>
         </thead>
@@ -54,13 +55,13 @@
                 <td>${row.amount}</td>
                 <td>${row.disbursedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary">Open</a></td>
+                <td><a href="/disbursement/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">
             <tr>
                 <td colspan="8" class="px-3 py-8 text-center text-slate-500">
-                    No disbursed loans matched the selected period.
+                    <spring:message code="disbursement.reports.empty" text="No disbursed loans matched the selected period." />
                 </td>
             </tr>
         </c:if>

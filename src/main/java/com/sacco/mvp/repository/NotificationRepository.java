@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,7 +22,14 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(UUID recipientMemberId);
     List<Notification> findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
 
+    List<Notification> findByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
+    List<Notification> findByTypeOrderByCreatedAtDesc(String type);
+
     @Modifying
     @Query("update Notification n set n.readAt = CURRENT_TIMESTAMP where n.recipientMemberId = :memberId and n.readAt is null")
     int markAllAsReadForMember(@Param("memberId") UUID memberId);
+
+    @Modifying
+    @Query("update Notification n set n.readAt = CURRENT_TIMESTAMP where n.recipientMemberId = :memberId and n.type in :types and n.readAt is null")
+    int markAllAsReadForMemberAndTypes(@Param("memberId") UUID memberId, @Param("types") Collection<String> types);
 }

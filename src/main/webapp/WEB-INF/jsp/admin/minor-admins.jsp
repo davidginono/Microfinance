@@ -6,8 +6,8 @@
 <%@ include file="../fragments/modal-shell.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / SACCO Registry / Minor Admin Registration</p>
-    <h1 class="erp-page-title">Minor Admin Registration</h1>
+    <p class="erp-breadcrumb">Admin Tools / SACCO Registration / Minor Admins Registration</p>
+    <h1 class="erp-page-title">Minor Admins Registration</h1>
     <p class="erp-page-subtitle">Register SACCO-specific Minor Admin accounts under the correct station.</p>
 </div>
 

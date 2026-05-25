@@ -142,6 +142,12 @@
     </div>
 </c:if>
 
+<c:if test="${applicantPolicyEligible eq false}">
+    <div class="erp-section mb-4 text-sm leading-6 text-rose-700">
+        ${applicantPolicyReason}
+    </div>
+</c:if>
+
 <div class="erp-table-wrap overflow-x-auto">
     <table class="erp-table">
         <thead>
@@ -150,6 +156,7 @@
                 <th><spring:message code="products.table.amountRules" /></th>
                 <th><spring:message code="products.table.guarantors" /></th>
                 <th><spring:message code="products.table.annualInterest" /></th>
+                <th>Repayment Method</th>
                 <th><spring:message code="products.table.tenure" /></th>
                 <th><spring:message code="products.table.action" /></th>
             </tr>
@@ -185,6 +192,12 @@
                         <c:otherwise><fmt:formatNumber value="${p.interestRate * 100}" minFractionDigits="0" maxFractionDigits="2" />%</c:otherwise>
                     </c:choose>
                 </td>
+                <td>
+                    <c:choose>
+                        <c:when test="${p.interestMethod eq 'REDUCING_BALANCE'}">Reducing Balance</c:when>
+                        <c:otherwise>Flat Rate</c:otherwise>
+                    </c:choose>
+                </td>
                 <td>${p.minimumRepaymentMonths} - ${p.maxRepaymentMonths} month(s)</td>
                 <td>
                     <c:choose>
@@ -192,6 +205,14 @@
                             <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
                                 <spring:message code="products.action.applicationOnReview" />
                             </button>
+                        </c:when>
+                        <c:when test="${applicantPolicyEligible eq false}">
+                            <div class="space-y-2">
+                                <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
+                                    Not Eligible
+                                </button>
+                                <p class="max-w-xs text-xs leading-5 text-rose-600">${applicantPolicyReason}</p>
+                            </div>
                         </c:when>
                         <c:when test="${not empty activeDisbursedLoanApp and not p.applicationWithActiveLoanAllowed}">
                             <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>

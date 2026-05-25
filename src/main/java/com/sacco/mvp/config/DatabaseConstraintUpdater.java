@@ -69,7 +69,7 @@ public class DatabaseConstraintUpdater implements CommandLineRunner {
                 'MANAGER_REJECTED','MANAGER_ACCEPTED','AWAITING_LOAN_OFFICER','LOAN_OFFICER_REJECTED',
                 'LOAN_OFFICER_APPROVED','AWAITING_BOARD','BOARD_REJECTED','BOARD_APPROVED',
                 'AWAITING_ACCOUNTANT','ACCOUNTANT_REJECTED','ACCOUNTANT_APPROVED','READY_FOR_DISBURSEMENT',
-                'FINAL_REJECTED','FINAL_APPROVED','DEFAULTED','PAID'
+                'FORFEITED','FINAL_REJECTED','FINAL_APPROVED','DEFAULTED','PAID'
             ))
             """);
         ensureWorkflowColumns();
@@ -107,6 +107,39 @@ public class DatabaseConstraintUpdater implements CommandLineRunner {
         jdbcTemplate.execute("""
             alter table if exists board_reviews
             alter column review_stage set not null
+            """);
+        jdbcTemplate.execute("""
+            do $$
+            declare
+                old_constraint_name text;
+            begin
+                select tc.constraint_name into old_constraint_name
+                from information_schema.table_constraints tc
+                join information_schema.constraint_column_usage ccu
+                  on tc.constraint_name = ccu.constraint_name
+                 and tc.table_schema = ccu.table_schema
+                where tc.table_schema = current_schema()
+                  and tc.table_name = 'board_reviews'
+                  and tc.constraint_type = 'UNIQUE'
+                group by tc.constraint_name
+                having array_agg(ccu.column_name::text order by ccu.column_name::text) = array['board_member_id','loan_application_id'];
+
+                if old_constraint_name is not null then
+                    execute format('alter table board_reviews drop constraint %I', old_constraint_name);
+                end if;
+
+                if not exists (
+                    select 1
+                    from information_schema.table_constraints
+                    where table_schema = current_schema()
+                      and table_name = 'board_reviews'
+                      and constraint_name = 'uk_board_reviews_loan_member_stage'
+                ) then
+                    alter table board_reviews
+                    add constraint uk_board_reviews_loan_member_stage
+                    unique (loan_application_id, board_member_id, review_stage);
+                end if;
+            end $$;
             """);
         jdbcTemplate.execute("""
             alter table if exists manager_reviews

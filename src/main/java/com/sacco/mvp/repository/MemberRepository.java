@@ -43,6 +43,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     boolean existsBySaccoIdAndPositionAndIdNot(String saccoId, Position position, UUID id);
 
+    boolean existsBySaccoIdAndStationIdIgnoreCaseAndPosition(String saccoId, String stationId, Position position);
+
+    boolean existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(String saccoId, String stationId, Position position, UUID id);
+
     @Query("""
         select m
         from Member m

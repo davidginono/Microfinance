@@ -36,7 +36,16 @@ public class LoanProductWorkflowService {
             : settings != null && settings.isLoanOfficerReviewRequired();
         boolean committeeReviewRequired = product.isCommitteeReviewRequired();
         boolean accountantReviewRequired = product.isAccountantReviewRequired();
-        ApprovalWorkflowStage startStage = resolveStartStage(product.getResolvedWorkflowStartStage(), loanOfficerReviewRequired);
+        boolean disbursementOfficerRequired = product.isDisbursementOfficerRequired();
+        int managerPriority = product.getResolvedManagerPriority();
+        int loanOfficerPriority = product.getResolvedLoanOfficerPriority();
+        ApprovalWorkflowStage startStage = resolveStartStage(
+            product.getResolvedWorkflowStartStage(),
+            managerReviewRequired,
+            managerPriority,
+            loanOfficerReviewRequired,
+            loanOfficerPriority
+        );
         int committeePriority = product.getResolvedCommitteePriority();
         int accountantPriority = product.getResolvedAccountantPriority();
         if (committeeReviewRequired && accountantReviewRequired && committeePriority == accountantPriority) {
@@ -44,17 +53,20 @@ public class LoanProductWorkflowService {
         }
 
         return new WorkflowDefinition(
-            orderedStages(managerReviewRequired, loanOfficerReviewRequired, startStage, committeeReviewRequired,
+            orderedStages(managerReviewRequired, managerPriority, loanOfficerReviewRequired, loanOfficerPriority, committeeReviewRequired,
                 committeePriority, accountantReviewRequired, accountantPriority),
             startStage,
             managerReviewRequired,
+            managerPriority,
             loanOfficerReviewRequired,
+            loanOfficerPriority,
             committeeReviewRequired,
             committeePriority,
             committeeReviewRequired ? product.getResolvedCommitteeMinimumVotes() : 0,
             committeeReviewRequired ? product.getResolvedCommitteeApprovalThreshold() : 0,
             accountantReviewRequired,
-            accountantPriority
+            accountantPriority,
+            disbursementOfficerRequired
         );
     }
 
@@ -79,13 +91,16 @@ public class LoanProductWorkflowService {
         data.put("approvalFlow", definition.stages().stream().map(Enum::name).toList());
         data.put("workflowStartStage", definition.startStage().name());
         data.put("managerReviewRequired", definition.managerReviewRequired());
+        data.put("managerPriority", definition.managerPriority());
         data.put("loanOfficerReviewRequired", definition.loanOfficerReviewRequired());
+        data.put("loanOfficerPriority", definition.loanOfficerPriority());
         data.put("committeeReviewRequired", definition.committeeReviewRequired());
         data.put("committeePriority", definition.committeePriority());
         data.put("committeeMinimumVotes", definition.committeeMinimumVotes());
         data.put("committeeApprovalThreshold", definition.committeeApprovalThreshold());
         data.put("accountantReviewRequired", definition.accountantReviewRequired());
         data.put("accountantPriority", definition.accountantPriority());
+        data.put("disbursementOfficerRequired", definition.disbursementOfficerRequired());
         return data;
     }
 
@@ -108,20 +123,34 @@ public class LoanProductWorkflowService {
             if (stages.isEmpty()) {
                 return null;
             }
-            ApprovalWorkflowStage startStage = ApprovalWorkflowStage.valueOf(String.valueOf(
+            ApprovalWorkflowStage snapshotStartStage = ApprovalWorkflowStage.valueOf(String.valueOf(
                 data.getOrDefault("workflowStartStage", ApprovalWorkflowStage.MANAGER.name())
             ));
+            boolean managerReviewRequired = booleanValue(data.getOrDefault("managerReviewRequired", true));
+            int managerPriority = intValue(data.get("managerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 2 : 1);
+            boolean loanOfficerReviewRequired = booleanValue(data.get("loanOfficerReviewRequired"));
+            int loanOfficerPriority = intValue(data.get("loanOfficerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2);
+            ApprovalWorkflowStage startStage = resolveStartStage(
+                snapshotStartStage,
+                managerReviewRequired,
+                managerPriority,
+                loanOfficerReviewRequired,
+                loanOfficerPriority
+            );
             return new WorkflowDefinition(
                 List.copyOf(stages),
-                resolveStartStage(startStage, booleanValue(data.get("loanOfficerReviewRequired"))),
-                booleanValue(data.getOrDefault("managerReviewRequired", true)),
-                booleanValue(data.get("loanOfficerReviewRequired")),
+                startStage,
+                managerReviewRequired,
+                managerPriority,
+                loanOfficerReviewRequired,
+                loanOfficerPriority,
                 booleanValue(data.getOrDefault("committeeReviewRequired", false)),
                 intValue(data.get("committeePriority"), 3),
                 intValue(data.get("committeeMinimumVotes"), 0),
                 intValue(data.get("committeeApprovalThreshold"), 0),
                 booleanValue(data.getOrDefault("accountantReviewRequired", true)),
-                intValue(data.get("accountantPriority"), 4)
+                intValue(data.get("accountantPriority"), 4),
+                booleanValue(data.getOrDefault("disbursementOfficerRequired", true))
             );
         } catch (Exception ex) {
             return null;
@@ -135,38 +164,36 @@ public class LoanProductWorkflowService {
             ? 1
             : Math.max(settings.getBoardQuorum(), 1);
         return new WorkflowDefinition(
-            orderedStages(true, loanOfficerReviewRequired, ApprovalWorkflowStage.MANAGER, committeeReviewRequired, 3, true, 4),
+            orderedStages(true, 1, loanOfficerReviewRequired, 2, committeeReviewRequired, 3, true, 4),
             ApprovalWorkflowStage.MANAGER,
             true,
+            1,
             loanOfficerReviewRequired,
+            2,
             committeeReviewRequired,
             3,
             committeeReviewRequired ? committeeMinimumVotes : 0,
             committeeReviewRequired ? committeeMinimumVotes : 0,
             true,
-            4
+            4,
+            true
         );
     }
 
     private List<ApprovalWorkflowStage> orderedStages(boolean managerReviewRequired,
+                                                      int managerPriority,
                                                       boolean loanOfficerReviewRequired,
-                                                      ApprovalWorkflowStage startStage,
+                                                      int loanOfficerPriority,
                                                       boolean committeeReviewRequired,
                                                       int committeePriority,
                                                       boolean accountantReviewRequired,
                                                       int accountantPriority) {
         List<StagePriority> stages = new ArrayList<>();
         if (managerReviewRequired) {
-            stages.add(new StagePriority(
-                startStage == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerReviewRequired ? 2 : 1,
-                ApprovalWorkflowStage.MANAGER
-            ));
+            stages.add(new StagePriority(managerPriority, ApprovalWorkflowStage.MANAGER));
         }
         if (loanOfficerReviewRequired) {
-            stages.add(new StagePriority(
-                startStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2,
-                ApprovalWorkflowStage.LOAN_OFFICER
-            ));
+            stages.add(new StagePriority(loanOfficerPriority, ApprovalWorkflowStage.LOAN_OFFICER));
         }
         if (committeeReviewRequired) {
             stages.add(new StagePriority(committeePriority, ApprovalWorkflowStage.BOARD));
@@ -181,9 +208,21 @@ public class LoanProductWorkflowService {
             .toList();
     }
 
-    private ApprovalWorkflowStage resolveStartStage(ApprovalWorkflowStage startStage, boolean loanOfficerReviewRequired) {
+    private ApprovalWorkflowStage resolveStartStage(ApprovalWorkflowStage startStage,
+                                                    boolean managerReviewRequired,
+                                                    int managerPriority,
+                                                    boolean loanOfficerReviewRequired,
+                                                    int loanOfficerPriority) {
+        if (!managerReviewRequired && loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.LOAN_OFFICER;
+        }
         if (!loanOfficerReviewRequired) {
             return ApprovalWorkflowStage.MANAGER;
+        }
+        if (managerReviewRequired && loanOfficerPriority != managerPriority) {
+            return loanOfficerPriority < managerPriority
+                ? ApprovalWorkflowStage.LOAN_OFFICER
+                : ApprovalWorkflowStage.MANAGER;
         }
         return startStage == ApprovalWorkflowStage.LOAN_OFFICER
             ? ApprovalWorkflowStage.LOAN_OFFICER
@@ -217,13 +256,71 @@ public class LoanProductWorkflowService {
         List<ApprovalWorkflowStage> stages,
         ApprovalWorkflowStage startStage,
         boolean managerReviewRequired,
+        int managerPriority,
         boolean loanOfficerReviewRequired,
+        int loanOfficerPriority,
         boolean committeeReviewRequired,
         int committeePriority,
         int committeeMinimumVotes,
         int committeeApprovalThreshold,
         boolean accountantReviewRequired,
-        int accountantPriority
+        int accountantPriority,
+        boolean disbursementOfficerRequired
     ) {
+        public WorkflowDefinition(List<ApprovalWorkflowStage> stages,
+                                  ApprovalWorkflowStage startStage,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  boolean committeeReviewRequired,
+                                  int committeePriority,
+                                  int committeeMinimumVotes,
+                                  int committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  int accountantPriority) {
+            this(
+                stages,
+                startStage,
+                managerReviewRequired,
+                startStage == ApprovalWorkflowStage.LOAN_OFFICER ? 2 : 1,
+                loanOfficerReviewRequired,
+                startStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2,
+                committeeReviewRequired,
+                committeePriority,
+                committeeMinimumVotes,
+                committeeApprovalThreshold,
+                accountantReviewRequired,
+                accountantPriority,
+                true
+            );
+        }
+
+        public WorkflowDefinition(List<ApprovalWorkflowStage> stages,
+                                  ApprovalWorkflowStage startStage,
+                                  boolean managerReviewRequired,
+                                  int managerPriority,
+                                  boolean loanOfficerReviewRequired,
+                                  int loanOfficerPriority,
+                                  boolean committeeReviewRequired,
+                                  int committeePriority,
+                                  int committeeMinimumVotes,
+                                  int committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  int accountantPriority) {
+            this(
+                stages,
+                startStage,
+                managerReviewRequired,
+                managerPriority,
+                loanOfficerReviewRequired,
+                loanOfficerPriority,
+                committeeReviewRequired,
+                committeePriority,
+                committeeMinimumVotes,
+                committeeApprovalThreshold,
+                accountantReviewRequired,
+                accountantPriority,
+                true
+            );
+        }
     }
 }

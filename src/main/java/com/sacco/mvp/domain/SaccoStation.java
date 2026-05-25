@@ -2,6 +2,8 @@ package com.sacco.mvp.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -34,12 +36,40 @@ public class SaccoStation {
     @Column(name = "station_id", nullable = false)
     private String stationId;
 
+    @Column(name = "address_location")
+    private String addressLocation;
+
     @Column(name = "active", nullable = false)
     private boolean active;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_status")
+    @Builder.Default
+    private SaccoAccessStatus accessStatus = SaccoAccessStatus.ACTIVE;
+
+    @Column(name = "payment_due_date")
+    private java.time.LocalDate paymentDueDate;
+
+    @Column(name = "access_suspended_at")
+    private OffsetDateTime accessSuspendedAt;
+
+    @Column(name = "access_suspended_by_member_id")
+    private UUID accessSuspendedByMemberId;
+
+    @Column(name = "access_restriction_reason", length = 500)
+    private String accessRestrictionReason;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    public SaccoAccessStatus getResolvedAccessStatus() {
+        return accessStatus == null ? SaccoAccessStatus.ACTIVE : accessStatus;
+    }
+
+    public boolean isAccessSuspended() {
+        return getResolvedAccessStatus() == SaccoAccessStatus.SUSPENDED;
+    }
 }

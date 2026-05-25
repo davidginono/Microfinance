@@ -48,31 +48,31 @@
 <div class="erp-panel overflow-hidden">
     <form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form">
         <label class="board-queue-search-label text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Loan Application ID
+            <spring:message code="loan.applicationId" text="Loan Application ID" />
             <input type="search"
                    name="searchId"
                    value="${fn:escapeXml(boardSearchValue)}"
-                   placeholder="Search loan application ID"
+                   placeholder='<spring:message code="common.searchLoanApplicationId" text="Search loan application ID" />'
                    inputmode="numeric"
                    class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
         </label>
         <div class="board-queue-search-actions">
             <c:if test="${not empty boardSearchValue}">
-                <a href="${boardListRoute}" class="app-btn btn-neutral">Reset</a>
+                <a href="${boardListRoute}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
             </c:if>
-            <button type="submit" class="app-btn btn-primary">Search</button>
+            <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
         </div>
     </form>
     <div class="erp-table-wrap overflow-x-auto border-0 shadow-none">
         <table class="erp-table">
             <thead>
             <tr>
-                <th>Loan Application ID</th>
-                <th>Applicant</th>
-                <th>Amount</th>
-                <th>Application Status</th>
-                <th>My Review</th>
-                <th>Date</th>
+                <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                <th><spring:message code="common.applicant" text="Applicant" /></th>
+                <th><spring:message code="common.amount" text="Amount" /></th>
+                <th><spring:message code="common.applicationStatus" text="Application Status" /></th>
+                <th><spring:message code="board.myReview" text="My Review" /></th>
+                <th><spring:message code="loan.date" text="Date" /></th>
                 <th></th>
             </tr>
             </thead>
@@ -98,8 +98,8 @@
                     <td class="px-3 py-2">
                         <a class="app-btn ${myDecisions[app.id] eq 'PENDING' ? 'btn-primary' : 'btn-neutral'}" href="${reviewBasePath}/loan-applications/${app.id}">
                             <c:choose>
-                                <c:when test="${myDecisions[app.id] eq 'PENDING'}">Review</c:when>
-                                <c:otherwise>View</c:otherwise>
+                                <c:when test="${myDecisions[app.id] eq 'PENDING'}"><spring:message code="common.review" text="Review" /></c:when>
+                                <c:otherwise><spring:message code="common.view" text="View" /></c:otherwise>
                             </c:choose>
                         </a>
                     </td>

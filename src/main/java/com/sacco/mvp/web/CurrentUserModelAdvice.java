@@ -50,10 +50,10 @@ public class CurrentUserModelAdvice {
             return 0;
         }
         if (isPlatformAdminIdentity(principal)) {
-            return 0;
-        }
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return notificationInboxService.unreadIncidentCount(principal.getMemberId());
+        }
+        if (principal.hasRole(Position.MINOR_ADMIN)) {
+            return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
         }
         return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
     }
@@ -65,10 +65,10 @@ public class CurrentUserModelAdvice {
             return Collections.emptyList();
         }
         if (isPlatformAdminIdentity(principal)) {
-            return Collections.emptyList();
-        }
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return notificationInboxService.unreadIncidentViews(principal.getMemberId());
+        }
+        if (principal.hasRole(Position.MINOR_ADMIN)) {
+            return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
         }
         return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
     }
@@ -79,10 +79,10 @@ public class CurrentUserModelAdvice {
             return "/login";
         }
         if (isPlatformAdminIdentity(principal)) {
-            return "/admin/dashboard";
+            return "/admin/incidents";
         }
         if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return "/admin/incidents";
+            return "/admin/support/replies";
         }
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
@@ -98,7 +98,7 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("notificationPanelSubtitle")
     public String notificationPanelSubtitle(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (isPlatformAdminIdentity(principal)) {
-            return "Platform activity is available from the dashboard and event log.";
+            return "Latest SACCO support incidents requiring platform attention";
         }
         if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return "Latest member support incidents requiring admin attention";
@@ -109,7 +109,7 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("notificationPanelEmptyState")
     public String notificationPanelEmptyState(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (isPlatformAdminIdentity(principal)) {
-            return "No platform notifications.";
+            return "No SACCO support incidents yet.";
         }
         if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return "No member support incidents yet.";
@@ -123,10 +123,10 @@ public class CurrentUserModelAdvice {
             return "/login";
         }
         if (isPlatformAdminIdentity(principal)) {
-            return "/admin/dashboard";
+            return "/admin/notifications/";
         }
         if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return "/admin/messages/";
+            return "/admin/notifications/";
         }
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";

@@ -361,10 +361,16 @@
             const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
             const availableAbove = rect.top - viewportPadding;
             const desiredHeight = Math.min(state.menu.scrollHeight || 0, 272);
-            const openUpward = availableBelow < Math.min(desiredHeight, 180) && availableAbove > availableBelow;
+            const forcedDirection = state.select.dataset.neoDirection;
+            const forceDown = forcedDirection === 'down';
+            const openUpward = forceDown
+                ? false
+                : availableBelow < Math.min(desiredHeight, 180) && availableAbove > availableBelow;
             const maxHeight = Math.max(120, openUpward ? availableAbove : availableBelow);
             const menuHeight = Math.min(desiredHeight || 272, maxHeight);
-            const top = openUpward
+            const top = forceDown
+                ? rect.bottom - 1
+                : openUpward
                 ? Math.max(viewportPadding, rect.top - menuHeight + 1)
                 : Math.min(window.innerHeight - menuHeight - viewportPadding, rect.bottom - 1);
 

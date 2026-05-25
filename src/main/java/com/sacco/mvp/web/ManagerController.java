@@ -35,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -201,11 +202,13 @@ public class ManagerController {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         List<com.sacco.mvp.domain.GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        Map<UUID, String> guarantorNames = memberRepository.findAllById(
-                guarantorRequests.stream().map(com.sacco.mvp.domain.GuarantorRequest::getGuarantorMemberId)
-                    .collect(Collectors.toSet()))
-            .stream()
+        List<Member> guarantorMembers = memberRepository.findAllById(
+            guarantorRequests.stream().map(com.sacco.mvp.domain.GuarantorRequest::getGuarantorMemberId)
+                .collect(Collectors.toSet()));
+        Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
         String managerReason =
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "";
         List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
@@ -220,10 +223,12 @@ public class ManagerController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -234,6 +239,7 @@ public class ManagerController {
         model.addAttribute("managerReason", managerReason);
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
+        model.addAttribute("guarantorMembersById", guarantorMembersById);
         model.addAttribute("pendingManagerStageWithdrawal", reversalRequestService.pendingManagerStageWithdrawal(id));
         model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
             .map(loan -> {
@@ -344,8 +350,9 @@ public class ManagerController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
                          @RequestParam(required = false) String reasons,
+                         HttpServletRequest request,
                          RedirectAttributes ra) {
-        managerService.decide(id, principal.getMemberId(), decision, reasons);
+        managerService.decide(id, principal.getMemberId(), decision, reasons, parseGuarantorCommitments(request));
         if (decision == ManagerDecision.ACCEPT) {
             LoanStatus updatedStatus = managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus();
             String message = switch (updatedStatus) {
@@ -360,6 +367,22 @@ public class ManagerController {
             ra.addFlashAttribute("message", "Manager rejected application.");
         }
         return "redirect:/manager/loan-applications/" + id;
+    }
+
+    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
+        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
+        request.getParameterMap().forEach((key, values) -> {
+            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
+                return;
+            }
+            try {
+                UUID guarantorId = UUID.fromString(key.substring("guarantorCommitmentAmount_".length()));
+                commitments.put(guarantorId, new BigDecimal(values[0].trim()));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed browser fields; service validation handles missing required commitments.
+            }
+        });
+        return commitments;
     }
 
     @PostMapping("/loan-applications/{id}/undo-decision")
@@ -432,6 +455,30 @@ public class ManagerController {
                     : "Payment transactions refreshed; " + inserted + " new record(s) added.");
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/manager/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/recheck-defaulted-payment")
+    public String recheckDefaultedPayment(@PathVariable UUID id,
+                                          @AuthenticationPrincipal AppUserPrincipal principal,
+                                          @RequestParam(name = "monthsBack", defaultValue = "24") int monthsBack,
+                                          RedirectAttributes ra) {
+        try {
+            ManagerService.DefaultedLoanRecheckResult result =
+                managerService.recheckDefaultedLoanPaymentStatus(id, principal.getMemberId(), monthsBack);
+            if (result.paid()) {
+                ra.addFlashAttribute("message", "Foresight confirms this defaulted loan is fully paid. Status changed to PAID and guarantor capacity has been released.");
+            } else {
+                ra.addFlashAttribute("message",
+                    result.insertedTransactions() == 0
+                        ? "Payment status rechecked. The loan is still marked as " + result.status().name().replace('_', ' ') + "."
+                        : "Payment status rechecked with " + result.insertedTransactions() + " new record(s). The loan is still marked as " + result.status().name().replace('_', ' ') + ".");
+            }
+        } catch (LoanPaymentLookupException ex) {
+            ra.addFlashAttribute("error", "Payment status could not be verified: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -717,7 +764,7 @@ public class ManagerController {
         return switch (key) {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", ManagerDecision.ACCEPT, List.of(), false);
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", ManagerDecision.REJECT, List.of(), false);
-            case "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("APPROVED_FOR_DISBURSEMENT", "Approved for Disbursement", null,
+            case "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("APPROVED_FOR_DISBURSEMENT", "Ready for Disbursement", null,
                 List.of(LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of(), false);
         };

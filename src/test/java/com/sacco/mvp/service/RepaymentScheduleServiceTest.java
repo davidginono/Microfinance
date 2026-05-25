@@ -109,7 +109,7 @@ class RepaymentScheduleServiceTest {
         assertThat(new BigDecimal(String.valueOf(summary.get("interestRate"))).compareTo(new BigDecimal("0.1000"))).isZero();
         assertThat(new BigDecimal(String.valueOf(
             repaymentScheduleService.parseRows(result.scheduleJson()).getFirst().get("interestComponent")
-        )).compareTo(new BigDecimal("0.00"))).isZero();
+        )).compareTo(new BigDecimal("0.00"))).isPositive();
     }
 
     private LoanApplication baseApplication(String financialSnapshot) {

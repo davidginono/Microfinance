@@ -25,6 +25,21 @@ public class AuthzService {
         return principal != null && !principal.hasRole(Position.ADMIN);
     }
 
+    public boolean notAdminClass(AppUserPrincipal principal) {
+        return principal != null
+            && !principal.hasRole(Position.ADMIN)
+            && !principal.hasRole(Position.MINOR_ADMIN);
+    }
+
+    public boolean staffAnalyticsAccess(AppUserPrincipal principal) {
+        return notAdminClass(principal)
+            && (principal.hasRole(Position.LOAN_OFFICER)
+                || principal.hasRole(Position.MANAGER)
+                || principal.hasRole(Position.ACCOUNTANT)
+                || principal.hasRole(Position.DISBURSEMENT_OFFICER)
+                || principal.hasRole(Position.BOARD));
+    }
+
     public boolean platformAdminIdentity(AppUserPrincipal principal) {
         return principal != null && principal.hasRole(Position.ADMIN);
     }
@@ -77,7 +92,9 @@ public class AuthzService {
                 }
                 if ((principal.hasRole(com.sacco.mvp.domain.Position.MANAGER)
                     || principal.hasRole(com.sacco.mvp.domain.Position.ACCOUNTANT)
-                    || principal.hasRole(com.sacco.mvp.domain.Position.DISBURSEMENT_OFFICER))
+                    || principal.hasRole(com.sacco.mvp.domain.Position.DISBURSEMENT_OFFICER)
+                    || (!principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN)
+                        && principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")))
                     && app.getSaccoId().equals(principal.getSaccoId())
                     && sameStationScope(app, principal)) {
                     return true;

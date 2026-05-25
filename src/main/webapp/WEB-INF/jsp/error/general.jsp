@@ -142,11 +142,13 @@
     </style>
 </head>
 <body>
+<c:set var="errorSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'SACCO Loan Management'}" />
+<c:set var="errorSaccoLogoText" value="${not empty activeSaccoLogoText ? activeSaccoLogoText : 'SC'}" />
 <div class="error-shell">
     <div class="error-topbar">
-        <div class="error-badge">IA</div>
+        <div class="error-badge">${errorSaccoLogoText}</div>
         <div>
-            <p class="error-brand-title">IAA SACCOs LTD</p>
+            <p class="error-brand-title">${errorSaccoName}</p>
             <p class="error-brand-subtitle">Loan Management System</p>
         </div>
     </div>

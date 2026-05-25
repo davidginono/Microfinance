@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
@@ -25,7 +26,9 @@ import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -52,6 +55,8 @@ public class AdminService {
     private final LoanProductVersionRepository loanProductVersionRepository;
     private final LoanProductsVersionRepository loanProductsVersionRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
+    private final SaccoStationRepository saccoStationRepository;
+    private final SaccoStationPolicyRepository saccoStationPolicyRepository;
     private final NotificationRepository notificationRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final AuditLogRepository auditLogRepository;
@@ -187,6 +192,7 @@ public class AdminService {
         if (member.getStatus() != MemberStatus.INVITED) {
             throw new IllegalStateException("Only accounts awaiting activation can be resent.");
         }
+        ensureMinorAdminSlotAvailable(member.getSaccoId(), member.getStationId(), accountId);
         minorAdminInvitationService.issueInvitation(member, adminId);
         auditService.log("STAFF_USER", member.getId(), "ADMIN_RESEND_MINOR_ADMIN_INVITE", adminId, null, snapshotMember(member));
     }
@@ -217,6 +223,7 @@ public class AdminService {
         if (member.getStatus() == MemberStatus.ACTIVE) {
             throw new IllegalStateException("That account is already active.");
         }
+        ensureMinorAdminSlotAvailable(member.getSaccoId(), member.getStationId(), accountId);
         Map<String, Object> before = snapshotMember(member);
         member.setStatus(MemberStatus.INVITED);
         member.setPasswordHash(INVITED_ACCOUNT_PASSWORD_PLACEHOLDER);
@@ -281,7 +288,7 @@ public class AdminService {
 
         String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
         String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
-        ensureMinorAdminSlotAvailable(resolvedSaccoId, accountId);
+        ensureMinorAdminSlotAvailable(resolvedSaccoId, resolvedStationId, accountId);
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
@@ -361,7 +368,28 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateUser(String saccoId, String stationId, UUID adminId, Set<Position> actorRoles, UUID accountId, List<Position> positions, MemberStatus status) {
+    public void updateUser(String saccoId,
+                           String stationId,
+                           UUID adminId,
+                           Set<Position> actorRoles,
+                           UUID accountId,
+                           List<Position> positions,
+                           MemberStatus status) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Member not found"));
+        List<UserClaim> defaultClaims = new ArrayList<>(userClaimService.defaultClaims(positions, member.isMemberAccess()));
+        updateUser(saccoId, stationId, adminId, actorRoles, accountId, positions, status, defaultClaims);
+    }
+
+    @Transactional
+    public void updateUser(String saccoId,
+                           String stationId,
+                           UUID adminId,
+                           Set<Position> actorRoles,
+                           UUID accountId,
+                           List<Position> positions,
+                           MemberStatus status,
+                           List<UserClaim> claims) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         String normalizedStationId = normalizeOptional(stationId);
@@ -380,8 +408,10 @@ public class AdminService {
         }
         LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
-            ensureMinorAdminSlotAvailable(saccoId, accountId);
+            String slotStationId = normalizedStationId != null ? normalizedStationId : member.getStationId();
+            ensureMinorAdminSlotAvailable(saccoId, slotStationId, accountId);
         }
+        List<UserClaim> normalizedClaims = normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
         if (accountId.equals(adminId) && (!Position.containsAdminRole(staffRoles) || status != MemberStatus.ACTIVE)) {
@@ -407,11 +437,11 @@ public class AdminService {
             member.setRank(nextRank(saccoId, primaryRole == null ? Position.MEMBER : primaryRole));
         }
         memberRepository.save(member);
+        ensureUserSettings(accountId, OffsetDateTime.now());
         if (memberAccess) {
-            ensureUserSettings(accountId, OffsetDateTime.now());
             ensureSavingsAccount(accountId, OffsetDateTime.now());
         }
-        userClaimService.updateClaims(accountId, new java.util.ArrayList<>(userClaimService.defaultClaims(staffRoles, memberAccess)));
+        userClaimService.updateClaims(accountId, normalizedClaims);
         auditService.log("MEMBER", accountId, "ADMIN_UPDATE_MEMBER", adminId, before, snapshotMember(member));
     }
 
@@ -491,6 +521,66 @@ public class AdminService {
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings not found"));
     }
 
+    @Transactional
+    public void updateDefaultLanguage(String saccoId, UUID adminId, String defaultLanguage) {
+        SaccoSettings settings = settings(saccoId);
+        Map<String, Object> before = snapshotSettings(settings);
+        settings.setDefaultLanguage(normalizeDefaultLanguage(defaultLanguage));
+        settings.setUpdatedAt(OffsetDateTime.now());
+        saccoSettingsRepository.save(settings);
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_DEFAULT_LANGUAGE", adminId, before, snapshotSettings(settings));
+    }
+
+    @Transactional
+    public void suspendStationAccess(String saccoId, String stationId, UUID adminId, String reason, LocalDate paymentDueDate) {
+        String normalizedSaccoId = normalizeOptional(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalArgumentException("Select the SACCO.");
+        }
+        if (normalizedStationId == null) {
+            throw new IllegalArgumentException("Select the station to suspend.");
+        }
+        SaccoStation station = saccoStationRepository.findBySaccoIdAndStationId(normalizedSaccoId, normalizedStationId)
+            .orElseThrow(() -> new IllegalArgumentException("Station not found for this SACCO."));
+        String normalizedReason = normalizeOptional(reason);
+        if (normalizedReason == null) {
+            throw new IllegalArgumentException("Enter the reason for suspending this station.");
+        }
+        Map<String, Object> before = snapshotStationAccess(station);
+        station.setAccessStatus(SaccoAccessStatus.SUSPENDED);
+        station.setPaymentDueDate(paymentDueDate);
+        station.setAccessSuspendedAt(OffsetDateTime.now());
+        station.setAccessSuspendedByMemberId(adminId);
+        station.setAccessRestrictionReason(normalizedReason.length() > 500 ? normalizedReason.substring(0, 500) : normalizedReason);
+        station.setUpdatedAt(OffsetDateTime.now());
+        saccoStationRepository.save(station);
+        auditService.log("SACCO_STATION", station.getId(), "PLATFORM_SUSPEND_STATION_ACCESS", adminId, before, snapshotStationAccess(station));
+    }
+
+    @Transactional
+    public void restoreStationAccess(String saccoId, String stationId, UUID adminId) {
+        String normalizedSaccoId = normalizeOptional(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalArgumentException("Select the SACCO.");
+        }
+        if (normalizedStationId == null) {
+            throw new IllegalArgumentException("Select the station to restore.");
+        }
+        SaccoStation station = saccoStationRepository.findBySaccoIdAndStationId(normalizedSaccoId, normalizedStationId)
+            .orElseThrow(() -> new IllegalArgumentException("Station not found for this SACCO."));
+        Map<String, Object> before = snapshotStationAccess(station);
+        station.setAccessStatus(SaccoAccessStatus.ACTIVE);
+        station.setPaymentDueDate(null);
+        station.setAccessSuspendedAt(null);
+        station.setAccessSuspendedByMemberId(null);
+        station.setAccessRestrictionReason(null);
+        station.setUpdatedAt(OffsetDateTime.now());
+        saccoStationRepository.save(station);
+        auditService.log("SACCO_STATION", station.getId(), "PLATFORM_RESTORE_STATION_ACCESS", adminId, before, snapshotStationAccess(station));
+    }
+
     public int activeBoardMemberCount(String saccoId) {
         return roleDirectoryService.activeByRole(saccoId, Position.BOARD).size();
     }
@@ -505,6 +595,20 @@ public class AdminService {
 
     public int activeDisbursementOfficerCount(String saccoId) {
         return roleDirectoryService.activeByRole(saccoId, Position.DISBURSEMENT_OFFICER).size();
+    }
+
+    public int activeDisbursementClaimHolderCount(String saccoId) {
+        return (int) memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
+            .filter(member -> {
+                Set<UserClaim> claims = userClaimService.effectiveClaims(
+                    member.getId(),
+                    member.getStaffRolesResolved(),
+                    member.isMemberAccess()
+                );
+                return claims.contains(UserClaim.ACCESS_DISBURSEMENT_QUEUE)
+                    && claims.contains(UserClaim.DISBURSE_LOAN);
+            })
+            .count();
     }
 
     @Transactional
@@ -536,6 +640,138 @@ public class AdminService {
                                   boolean accountantReviewRequired,
                                   Integer accountantPriority,
                                   LoanProductStatus productStatus) {
+        updateLoanProduct(
+            saccoId,
+            adminId,
+            productId,
+            productCode,
+            productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
+            guarantorsRequired,
+            ratio,
+            insuranceRate,
+            annualRate,
+            interestMethod,
+            minRepaymentMonths,
+            maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            null,
+            null,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority,
+            productStatus
+        );
+    }
+
+    @Transactional
+    public void updateLoanProduct(String saccoId,
+                                  UUID adminId,
+                                  UUID productId,
+                                  String productCode,
+                                  String productName,
+                                  String productDescription,
+                                  Integer displayOrder,
+                                  BigDecimal minimumAmount,
+                                  BigDecimal maximumAmount,
+                                  Integer guarantorsRequired,
+                                  BigDecimal ratio,
+                                  BigDecimal insuranceRate,
+                                  BigDecimal annualRate,
+                                  InterestMethod interestMethod,
+                                  Integer minRepaymentMonths,
+                                  Integer maxRepaymentMonths,
+                                  boolean allowApplicationWithActiveLoan,
+                                  boolean freshFinancialDataRequired,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  ApprovalWorkflowStage workflowStartStage,
+                                  Integer managerPriority,
+                                  Integer loanOfficerPriority,
+                                  boolean committeeReviewRequired,
+                                  Integer committeePriority,
+                                  Integer committeeMinimumVotes,
+                                  Integer committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  Integer accountantPriority,
+                                  LoanProductStatus productStatus) {
+        updateLoanProduct(
+            saccoId,
+            adminId,
+            productId,
+            productCode,
+            productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
+            guarantorsRequired,
+            ratio,
+            insuranceRate,
+            annualRate,
+            interestMethod,
+            minRepaymentMonths,
+            maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority,
+            true,
+            productStatus
+        );
+    }
+
+    @Transactional
+    public void updateLoanProduct(String saccoId,
+                                  UUID adminId,
+                                  UUID productId,
+                                  String productCode,
+                                  String productName,
+                                  String productDescription,
+                                  Integer displayOrder,
+                                  BigDecimal minimumAmount,
+                                  BigDecimal maximumAmount,
+                                  Integer guarantorsRequired,
+                                  BigDecimal ratio,
+                                  BigDecimal insuranceRate,
+                                  BigDecimal annualRate,
+                                  InterestMethod interestMethod,
+                                  Integer minRepaymentMonths,
+                                  Integer maxRepaymentMonths,
+                                  boolean allowApplicationWithActiveLoan,
+                                  boolean freshFinancialDataRequired,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  ApprovalWorkflowStage workflowStartStage,
+                                  Integer managerPriority,
+                                  Integer loanOfficerPriority,
+                                  boolean committeeReviewRequired,
+                                  Integer committeePriority,
+                                  Integer committeeMinimumVotes,
+                                  Integer committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  Integer accountantPriority,
+                                  boolean disbursementOfficerRequired,
+                                  LoanProductStatus productStatus) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
         if (!saccoId.equals(product.getSaccoId())) {
@@ -565,17 +801,24 @@ public class AdminService {
             managerReviewRequired,
             loanOfficerReviewRequired,
             workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
             committeeReviewRequired,
             committeePriority,
             committeeMinimumVotes,
             committeeApprovalThreshold,
             accountantReviewRequired,
-            accountantPriority
+            accountantPriority,
+            disbursementOfficerRequired
         );
-        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired, committeeReviewRequired);
+        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired);
+        int normalizedManagerPriority = normalizeReviewPriority(managerReviewRequired, managerPriority, 1);
+        int normalizedLoanOfficerPriority = normalizeReviewPriority(loanOfficerReviewRequired, loanOfficerPriority, 2);
         product.setManagerReviewRequired(normalizedManagerReviewRequired);
+        product.setManagerPriority(normalizedManagerPriority);
         product.setLoanOfficerReviewRequired(loanOfficerReviewRequired);
-        product.setWorkflowStartStage(normalizeWorkflowStartStage(workflowStartStage, loanOfficerReviewRequired));
+        product.setLoanOfficerPriority(normalizedLoanOfficerPriority);
+        product.setWorkflowStartStage(normalizeWorkflowStartStage(workflowStartStage, normalizedManagerReviewRequired, loanOfficerReviewRequired));
         product.setCommitteeReviewRequired(committeeReviewRequired);
         product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, committeePriority, 3));
         product.setCommitteeMinimumVotes(normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes));
@@ -586,6 +829,7 @@ public class AdminService {
         ));
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, accountantPriority, 4));
+        product.setDisbursementOfficerRequired(disbursementOfficerRequired);
         validateCommitteeConfiguration(saccoId, product.getCommitteeMinimumVotes(), product.getCommitteeApprovalThreshold(), committeeReviewRequired);
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         product.setProductStatus(normalizedStatus);
@@ -639,12 +883,15 @@ public class AdminService {
                                             boolean managerReviewRequired,
                                             boolean loanOfficerReviewRequired,
                                             ApprovalWorkflowStage workflowStartStage,
+                                            Integer managerPriority,
+                                            Integer loanOfficerPriority,
                                             boolean committeeReviewRequired,
                                             Integer committeePriority,
                                             Integer committeeMinimumVotes,
                                             Integer committeeApprovalThreshold,
                                             boolean accountantReviewRequired,
                                             Integer accountantPriority,
+                                            boolean disbursementOfficerRequired,
                                             LoanProductStatus productStatus) {
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         Integer normalizedCommitteeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes);
@@ -658,14 +905,19 @@ public class AdminService {
             managerReviewRequired,
             loanOfficerReviewRequired,
             workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
             committeeReviewRequired,
             committeePriority,
             normalizedCommitteeMinimumVotes,
             normalizedCommitteeApprovalThreshold,
             accountantReviewRequired,
-            accountantPriority
+            accountantPriority,
+            disbursementOfficerRequired
         );
-        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired, committeeReviewRequired);
+        boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired);
+        int normalizedManagerPriority = normalizeReviewPriority(managerReviewRequired, managerPriority, 1);
+        int normalizedLoanOfficerPriority = normalizeReviewPriority(loanOfficerReviewRequired, loanOfficerPriority, 2);
         validateCommitteeConfiguration(saccoId, normalizedCommitteeMinimumVotes, normalizedCommitteeApprovalThreshold, committeeReviewRequired);
         saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_CREATE");
         LoanProductSetting product = saccoConfigurationService.createLoanProduct(
@@ -688,13 +940,16 @@ public class AdminService {
             freshFinancialDataRequired,
             normalizedManagerReviewRequired,
             loanOfficerReviewRequired,
-            normalizeWorkflowStartStage(workflowStartStage, loanOfficerReviewRequired),
+            normalizeWorkflowStartStage(workflowStartStage, normalizedManagerReviewRequired, loanOfficerReviewRequired),
+            normalizedManagerPriority,
+            normalizedLoanOfficerPriority,
             committeeReviewRequired,
             normalizeStagePriority(committeeReviewRequired, committeePriority, 3),
             normalizedCommitteeMinimumVotes,
             normalizedCommitteeApprovalThreshold,
             accountantReviewRequired,
             normalizeStagePriority(accountantReviewRequired, accountantPriority, 4),
+            disbursementOfficerRequired,
             normalizedStatus,
             normalizedStatus == LoanProductStatus.ACTIVE
         );
@@ -713,6 +968,147 @@ public class AdminService {
     }
 
     @Transactional
+    public void updateLoanFeePaymentInstructions(String saccoId,
+                                                 UUID adminId,
+                                                 String paymentMethod,
+                                                 String paymentAccount,
+                                                 String paymentPayee,
+                                                 String paymentInstructions) {
+        SaccoSettings settings = settings(saccoId);
+        Map<String, Object> before = snapshotSettings(settings);
+        settings.setLoanFeePaymentMethod(normalizePaymentMethod(paymentMethod));
+        settings.setLoanFeePaymentAccount(normalizePaymentAccount(paymentAccount));
+        settings.setLoanFeePaymentPayee(normalizePaymentPayee(paymentPayee));
+        settings.setLoanFeePaymentInstructions(normalizePaymentInstructions(paymentInstructions));
+        settings.setUpdatedAt(OffsetDateTime.now());
+        saccoSettingsRepository.save(settings);
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_LOAN_FEE_PAYMENT_INSTRUCTIONS", adminId, before, snapshotSettings(settings));
+    }
+
+    private String normalizePaymentMethod(String paymentMethod) {
+        String normalized = normalizeOptional(paymentMethod);
+        if (normalized == null) {
+            throw new IllegalStateException("Payment method is required.");
+        }
+        if (normalized.length() > 120 || !normalized.matches("[A-Za-z &/().,+-]{2,120}")) {
+            throw new IllegalStateException("Enter a valid payment method.");
+        }
+        return normalized;
+    }
+
+    private String normalizePaymentAccount(String paymentAccount) {
+        String normalized = normalizeOptional(paymentAccount);
+        if (normalized == null) {
+            throw new IllegalStateException("Payment number or account is required.");
+        }
+        if (normalized.length() > 40 || !normalized.matches("[A-Za-z0-9 +/().-]{5,40}") || !normalized.matches(".*\\d.*")) {
+            throw new IllegalStateException("Enter a valid payment number or account.");
+        }
+        return normalized;
+    }
+
+    private String normalizePaymentPayee(String paymentPayee) {
+        String normalized = normalizeOptional(paymentPayee);
+        if (normalized == null) {
+            throw new IllegalStateException("Payee name is required.");
+        }
+        if (normalized.length() > 160 || !normalized.matches("[A-Za-z0-9 &/().,'-]{2,160}")) {
+            throw new IllegalStateException("Enter a valid payee name.");
+        }
+        return normalized;
+    }
+
+    private String normalizePaymentInstructions(String paymentInstructions) {
+        String normalized = normalizeOptional(paymentInstructions);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized.length() > 500) {
+            throw new IllegalStateException("Applicant payment instructions must be 500 characters or fewer.");
+        }
+        return normalized;
+    }
+
+    @Transactional
+    public void updateQualificationPolicies(String saccoId,
+                                            UUID adminId,
+                                            Integer applicantMaxDefaultedLoans,
+                                            BigDecimal applicantMaxActiveLoanAmount,
+                                            Integer applicantMaxForfeitedLoans,
+                                            Integer applicantForfeitedLookbackDays,
+                                            Integer applicantForfeitedWaitDays,
+                                            BigDecimal guarantorMinSavings,
+                                            BigDecimal guarantorMaxActiveLoanAmount,
+                                            BigDecimal guarantorMaxGuaranteedLoanAmount,
+                                            Integer guarantorMaxDefaultedLoans) {
+        SaccoSettings settings = settings(saccoId);
+        Map<String, Object> before = snapshotSettings(settings);
+        settings.setApplicantMaxDefaultedLoans(nonNegative(applicantMaxDefaultedLoans, "Defaulted loan limit cannot be negative."));
+        settings.setApplicantMaxActiveLoanAmount(nonNegativeAmount(applicantMaxActiveLoanAmount, "Active loan amount limit cannot be negative."));
+        settings.setApplicantMaxForfeitedLoans(nonNegative(applicantMaxForfeitedLoans, "Forfeited application limit cannot be negative."));
+        settings.setApplicantForfeitedLookbackDays(nonNegative(applicantForfeitedLookbackDays, "Forfeited restriction days cannot be negative."));
+        settings.setApplicantForfeitedWaitDays(nonNegative(applicantForfeitedWaitDays, "Forfeited application waiting period cannot be negative."));
+        settings.setGuarantorMinSavings(nonNegativeAmount(guarantorMinSavings, "Minimum guarantor savings cannot be negative."));
+        settings.setGuarantorMaxActiveLoanAmount(nonNegativeAmount(guarantorMaxActiveLoanAmount, "Guarantor active loan amount limit cannot be negative."));
+        settings.setGuarantorMaxGuaranteedLoanAmount(nonNegativeWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count cannot be negative.", "Maximum guarantee count must be a whole number."));
+        settings.setGuarantorMaxDefaultedLoans(nonNegative(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit cannot be negative."));
+        settings.setUpdatedAt(OffsetDateTime.now());
+        saccoSettingsRepository.save(settings);
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_QUALIFICATION_POLICIES", adminId, before, snapshotSettings(settings));
+    }
+
+    @Transactional
+    public void updateStationQualificationPolicies(String saccoId,
+                                                   String stationId,
+                                                   UUID adminId,
+                                                   Integer applicantMaxDefaultedLoans,
+                                                   BigDecimal applicantMaxActiveLoanAmount,
+                                                   Integer applicantMaxForfeitedLoans,
+                                                   Integer applicantForfeitedLookbackDays,
+                                                   Integer applicantForfeitedWaitDays,
+                                                   BigDecimal guarantorMinSavings,
+                                                   BigDecimal guarantorMaxActiveLoanAmount,
+                                                   BigDecimal guarantorMaxGuaranteedLoanAmount,
+                                                   Integer guarantorMaxDefaultedLoans) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            throw new IllegalArgumentException("Choose a station before saving station policies.");
+        }
+        SaccoStationPolicy policy = saccoStationPolicyRepository.findBySaccoIdAndStationId(saccoId, normalizedStationId)
+            .orElseGet(() -> SaccoStationPolicy.builder()
+                .id(UUID.randomUUID())
+                .saccoId(saccoId)
+                .stationId(normalizedStationId)
+                .createdAt(OffsetDateTime.now())
+                .build());
+        Map<String, Object> before = snapshotStationPolicy(policy);
+        policy.setApplicantMaxDefaultedLoans(nonNegative(applicantMaxDefaultedLoans, "Defaulted loan limit cannot be negative."));
+        policy.setApplicantMaxActiveLoanAmount(nonNegativeAmount(applicantMaxActiveLoanAmount, "Active loan amount limit cannot be negative."));
+        policy.setApplicantMaxForfeitedLoans(nonNegative(applicantMaxForfeitedLoans, "Forfeited application limit cannot be negative."));
+        policy.setApplicantForfeitedLookbackDays(nonNegative(applicantForfeitedLookbackDays, "Forfeited restriction days cannot be negative."));
+        policy.setApplicantForfeitedWaitDays(nonNegative(applicantForfeitedWaitDays, "Forfeited application waiting period cannot be negative."));
+        policy.setGuarantorMinSavings(nonNegativeAmount(guarantorMinSavings, "Minimum guarantor savings cannot be negative."));
+        policy.setGuarantorMaxActiveLoanAmount(nonNegativeAmount(guarantorMaxActiveLoanAmount, "Guarantor active loan amount limit cannot be negative."));
+        policy.setGuarantorMaxGuaranteedLoanAmount(nonNegativeWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count cannot be negative.", "Maximum guarantee count must be a whole number."));
+        policy.setGuarantorMaxDefaultedLoans(nonNegative(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit cannot be negative."));
+        policy.setUpdatedAt(OffsetDateTime.now());
+        saccoStationPolicyRepository.save(policy);
+        auditService.log("SACCO_STATION_POLICY", policy.getId(), "ADMIN_UPDATE_STATION_QUALIFICATION_POLICIES", adminId, before, snapshotStationPolicy(policy));
+    }
+
+    public List<SaccoStationPolicy> stationQualificationPolicies(String saccoId) {
+        return saccoStationPolicyRepository.findBySaccoIdOrderByStationIdAsc(saccoId);
+    }
+
+    public Optional<SaccoStationPolicy> stationQualificationPolicy(String saccoId, String stationId) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            return Optional.empty();
+        }
+        return saccoStationPolicyRepository.findBySaccoIdAndStationId(saccoId, normalizedStationId);
+    }
+
+    @Transactional
     public void updateBoardReviewRequirement(String saccoId,
                                              UUID adminId,
                                              boolean loanOfficerReviewRequired,
@@ -721,7 +1117,7 @@ public class AdminService {
         SaccoSettings settings = settings(saccoId);
         int activeBoardMembers = activeBoardMemberCount(saccoId);
         int activeAccountants = activeAccountantCount(saccoId);
-        int activeDisbursementOfficers = activeDisbursementOfficerCount(saccoId);
+        int activeDisbursementClaimHolders = activeDisbursementClaimHolderCount(saccoId);
         int requiredReviewers = boardQuorum == null
             ? Math.max(settings.getBoardQuorum() == null ? 1 : settings.getBoardQuorum(), 1)
             : boardQuorum;
@@ -739,8 +1135,8 @@ public class AdminService {
         if (activeAccountants <= 0) {
             throw new IllegalArgumentException("Add at least one active Accountant before saving the approval flow.");
         }
-        if (activeDisbursementOfficers <= 0) {
-            throw new IllegalArgumentException("Add at least one active Disbursement Officer before saving the approval flow.");
+        if (activeDisbursementClaimHolders <= 0) {
+            throw new IllegalArgumentException("Grant disbursement queue and release claims to at least one active staff user before saving the approval flow.");
         }
 
         Map<String, Object> before = snapshotSettings(settings);
@@ -798,9 +1194,43 @@ public class AdminService {
                                          String stationId,
                                          IncidentStatus status,
                                          IncidentSeverity severity) {
-        return filterIncidentsByStation(adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId), stationId).stream()
+        List<AdminIncident> base = normalizeOptional(saccoId) == null
+            ? adminIncidentRepository.findAll().stream()
+                .sorted(Comparator.comparing(AdminIncident::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList()
+            : adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
+        return filterIncidentsByStation(base, stationId).stream()
             .filter(item -> status == null || item.getStatus() == status)
             .filter(item -> severity == null || item.getSeverity() == severity)
+            .toList();
+    }
+
+    public List<AdminIncident> platformSupportIncidents(String saccoId,
+                                                        String stationId,
+                                                        IncidentStatus status,
+                                                        IncidentSeverity severity) {
+        return incidents(saccoId, stationId, status, severity).stream()
+            .filter(this::isPlatformSupportIncident)
+            .toList();
+    }
+
+    public List<SupportArchiveView> platformSupportArchive(UUID reporterId) {
+        if (reporterId == null) {
+            return List.of();
+        }
+        return adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
+            .filter(this::isPlatformSupportIncident)
+            .map(this::toSupportArchiveView)
+            .toList();
+    }
+
+    public List<SupportArchiveView> memberSupportArchive(UUID reporterId) {
+        if (reporterId == null) {
+            return List.of();
+        }
+        return adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
+            .filter(this::isMemberSupportIncident)
+            .map(this::toSupportArchiveView)
             .toList();
     }
 
@@ -811,13 +1241,136 @@ public class AdminService {
     public AdminIncident incident(String saccoId, String stationId, UUID incidentId) {
         AdminIncident incident = adminIncidentRepository.findById(incidentId)
             .orElseThrow(() -> new IllegalArgumentException("Incident not found"));
-        if (incident.getSaccoId() != null && !saccoId.equals(incident.getSaccoId())) {
+        if (normalizeOptional(saccoId) != null && incident.getSaccoId() != null && !saccoId.equals(incident.getSaccoId())) {
             throw new IllegalArgumentException("Incident not found in this SACCO");
         }
         if (!filterIncidentsByStation(List.of(incident), stationId).contains(incident)) {
             throw new IllegalArgumentException("Incident not found in this station");
         }
         return incident;
+    }
+
+    public AdminIncident platformSupportIncident(String saccoId, String stationId, UUID incidentId) {
+        AdminIncident incident = incident(saccoId, stationId, incidentId);
+        if (!isPlatformSupportIncident(incident)) {
+            throw new IllegalArgumentException("Incident not found");
+        }
+        return incident;
+    }
+
+    public AdminIncident memberSupportIncident(String saccoId, String stationId, UUID incidentId) {
+        AdminIncident incident = incident(saccoId, stationId, incidentId);
+        if (!isMemberSupportIncident(incident)) {
+            throw new IllegalArgumentException("Incident not found");
+        }
+        return incident;
+    }
+
+    @Transactional
+    public void markPlatformSupportIncidentRead(UUID incidentId, UUID adminId) {
+        AdminIncident incident = platformSupportIncident(null, null, incidentId);
+        markIncidentRelatedNotificationRead(incident, adminId);
+    }
+
+    @Transactional
+    public void markMemberSupportIncidentRead(String saccoId, String stationId, UUID incidentId, UUID adminId) {
+        AdminIncident incident = memberSupportIncident(saccoId, stationId, incidentId);
+        markIncidentRelatedNotificationRead(incident, adminId);
+    }
+
+    private void markIncidentRelatedNotificationRead(AdminIncident incident, UUID adminId) {
+        if (incident == null || adminId == null) {
+            return;
+        }
+        notificationRepository.findByTypeOrderByCreatedAtDesc("SUPPORT_MESSAGE").stream()
+            .filter(notification -> adminId.equals(notification.getRecipientMemberId()))
+            .filter(notification -> incident.getId().equals(notificationIncidentId(notification)))
+            .filter(notification -> notification.getReadAt() == null)
+            .forEach(notification -> {
+                notification.setReadAt(OffsetDateTime.now());
+                notificationRepository.save(notification);
+            });
+        if (incident.getRelatedNotificationId() == null) {
+            return;
+        }
+        notificationRepository.findById(incident.getRelatedNotificationId())
+            .filter(notification -> adminId.equals(notification.getRecipientMemberId()))
+            .filter(notification -> notification.getReadAt() == null)
+            .ifPresent(notification -> {
+                notification.setReadAt(OffsetDateTime.now());
+                notificationRepository.save(notification);
+            });
+    }
+
+    @Transactional
+    public void replyToPlatformSupportReporter(UUID incidentId, UUID adminId, String subject, String message) {
+        AdminIncident incident = platformSupportIncident(null, null, incidentId);
+        if (incident.getReportedByMemberId() == null) {
+            throw new IllegalArgumentException("Incident reporter not found");
+        }
+        Member admin = memberRepository.findById(adminId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        Member reporter = memberRepository.findById(incident.getReportedByMemberId())
+            .orElseThrow(() -> new IllegalArgumentException("Incident reporter not found"));
+        createNotification(reporter.getId(), "ADMIN_REPLY", "Platform Admin Reply", subject, message,
+            adminId, admin.getFullName(), Map.of("incidentId", incident.getId().toString()), OffsetDateTime.now());
+        auditService.log("NOTIFICATION", reporter.getId(), "PLATFORM_ADMIN_REPLY_TO_MINOR_ADMIN", adminId, null,
+            Map.of("incidentId", incident.getId(), "subject", subject, "message", message));
+    }
+
+    @Transactional
+    public void replyToMemberSupportReporter(String saccoId, String stationId, UUID incidentId, UUID adminId, String subject, String message) {
+        AdminIncident incident = memberSupportIncident(saccoId, stationId, incidentId);
+        if (incident.getReportedByMemberId() == null) {
+            throw new IllegalArgumentException("Incident reporter not found");
+        }
+        Member admin = memberRepository.findById(adminId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        Member reporter = memberRepository.findById(incident.getReportedByMemberId())
+            .orElseThrow(() -> new IllegalArgumentException("Incident reporter not found"));
+        if (!saccoId.equals(reporter.getSaccoId())) {
+            throw new IllegalArgumentException("Incident reporter not found in this SACCO");
+        }
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId != null
+            && !normalizedStationId.equalsIgnoreCase(normalizeOptional(reporter.getStationId()))) {
+            throw new IllegalArgumentException("Incident reporter not found in this station");
+        }
+        createNotification(reporter.getId(), "ADMIN_REPLY", "Station Admin Reply", subject, message,
+            adminId, admin.getFullName(),
+            Map.of("incidentId", incident.getId().toString(), "recipientMemberNo", reporter.getMemberNo()),
+            OffsetDateTime.now());
+        auditService.log("NOTIFICATION", reporter.getId(), "ADMIN_REPLY_TO_MEMBER_SUPPORT_REPORTER", adminId, null,
+            Map.of("incidentId", incident.getId(), "subject", subject, "message", message, "recipientMemberNo", reporter.getMemberNo()));
+    }
+
+    @Transactional
+    public void broadcastToMinorAdmins(UUID adminId, String subject, String message) {
+        Member admin = memberRepository.findById(adminId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        List<RoleDirectoryService.RoleAccountRef> recipients = roleDirectoryService.activeGlobalByRole(Position.MINOR_ADMIN);
+        OffsetDateTime now = OffsetDateTime.now();
+        for (RoleDirectoryService.RoleAccountRef recipient : recipients) {
+            createNotification(recipient.getId(), "ADMIN_BROADCAST", "Platform Admin Broadcast", subject, message,
+                adminId, admin.getFullName(), Map.of("recipientMemberNo", recipient.getIdentifier()), now);
+        }
+        auditService.log("NOTIFICATION", null, "PLATFORM_ADMIN_BROADCAST_MINOR_ADMINS", adminId, null,
+            Map.of("subject", subject, "message", message, "recipientCount", recipients.size()));
+    }
+
+    @Transactional
+    public void replyToMinorAdmin(UUID adminId, UUID memberId, String subject, String message) {
+        Member admin = memberRepository.findById(adminId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        Member recipient = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Recipient admin not found"));
+        if (!recipient.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+            throw new IllegalArgumentException("Recipient admin not found");
+        }
+        createNotification(memberId, "ADMIN_REPLY", "Platform Admin Reply", subject, message,
+            adminId, admin.getFullName(), Map.of("recipientMemberNo", recipient.getMemberNo()), OffsetDateTime.now());
+        auditService.log("NOTIFICATION", memberId, "PLATFORM_ADMIN_REPLY_TO_MINOR_ADMIN", adminId, null,
+            Map.of("subject", subject, "message", message, "recipientMemberNo", recipient.getMemberNo()));
     }
 
     @Transactional
@@ -895,30 +1448,92 @@ public class AdminService {
     public void submitSupport(String saccoId, UUID memberId, String subject, String message) {
         Member sender = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+        if (!saccoId.equals(sender.getSaccoId())) {
+            throw new IllegalArgumentException("Member not found in this SACCO");
+        }
+        String normalizedStationId = normalizeOptional(sender.getStationId());
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRoleInStation(
             saccoId,
-            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+            normalizedStationId,
+            List.of(Position.MINOR_ADMIN)
         );
         if (admins.isEmpty()) {
-            throw new IllegalStateException("No active admin is configured for this SACCO");
+            throw new IllegalStateException("No active minor admin is configured for your station");
         }
-        adminAlertService.openSupportIncident(
+        adminAlertService.openSupportIncidentForAdmins(
+            admins,
             saccoId,
             memberId,
             "Member Support",
             subject,
             message,
             IncidentSeverity.MEDIUM,
-            Map.of("memberNo", sender.getMemberNo(), "senderName", sender.getFullName())
+            Map.of(
+                "memberNo", sender.getMemberNo(),
+                "senderName", sender.getFullName(),
+                "stationId", normalizedStationId == null ? "" : normalizedStationId
+            )
         );
         auditService.log("SUPPORT", memberId, "MEMBER_SUPPORT_MESSAGE", memberId, null,
             Map.of("subject", subject, "message", message, "adminCount", admins.size()));
     }
 
+    @Transactional
+    public void submitPlatformSupport(String saccoId, String stationId, UUID memberId, String subject, String message) {
+        Member sender = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        if (!saccoId.equals(sender.getSaccoId())) {
+            throw new IllegalArgumentException("Admin not found in this SACCO");
+        }
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId != null && !normalizedStationId.equalsIgnoreCase(normalizeOptional(sender.getStationId()))) {
+            throw new IllegalArgumentException("Admin not found in this station");
+        }
+        adminAlertService.openPlatformSupportIncident(
+            saccoId,
+            memberId,
+            "Workspace Admin Support",
+            subject,
+            message,
+            IncidentSeverity.MEDIUM,
+            Map.of(
+                "memberNo", sender.getMemberNo(),
+                "senderName", sender.getFullName(),
+                "stationId", normalizedStationId == null ? "" : normalizedStationId
+            )
+        );
+        auditService.log("SUPPORT", memberId, "WORKSPACE_ADMIN_SUPPORT_MESSAGE", memberId, null,
+            Map.of("subject", subject, "message", message, "saccoId", saccoId, "stationId", normalizedStationId == null ? "" : normalizedStationId));
+    }
+
     public Page<OutboxEvent> outboxEvents(int page, int size, OutboxStatus status, String dateFrom, String dateTo, String loanId) {
+        return outboxEvents(page, size, status, dateFrom, dateTo, loanId, null, null);
+    }
+
+    public Page<OutboxEvent> outboxEvents(int page,
+                                          int size,
+                                          OutboxStatus status,
+                                          String dateFrom,
+                                          String dateTo,
+                                          String loanId,
+                                          String saccoId,
+                                          String stationId) {
         PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizePageSize(size));
         String normalizedLoanId = normalizeOptional(loanId);
+        String normalizedSaccoId = normalizeOptional(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
+        if (normalizedSaccoId != null || normalizedStationId != null) {
+            return outboxEventRepository.searchMonitorViewScoped(
+                status == null ? null : status.name(),
+                dateRange.start(),
+                dateRange.endExclusive(),
+                normalizedLoanId,
+                normalizedSaccoId,
+                normalizedStationId,
+                pageRequest
+            );
+        }
         return outboxEventRepository.searchMonitorView(
             status == null ? null : status.name(),
             dateRange.start(),
@@ -945,8 +1560,30 @@ public class AdminService {
     }
 
     public Page<AuditLog> auditEntries(int page, int size, String dateFrom, String dateTo, String actorId) {
+        return auditEntries(page, size, dateFrom, dateTo, actorId, null, null);
+    }
+
+    public Page<AuditLog> auditEntries(int page,
+                                       int size,
+                                       String dateFrom,
+                                       String dateTo,
+                                       String actorId,
+                                       String saccoId,
+                                       String stationId) {
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
         String normalizedActorId = normalizeOptional(actorId);
+        String normalizedSaccoId = normalizeOptional(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedSaccoId != null || normalizedStationId != null) {
+            return auditLogRepository.searchEventLogViewScoped(
+                dateRange.start(),
+                dateRange.endExclusive(),
+                normalizedActorId,
+                normalizedSaccoId,
+                normalizedStationId,
+                PageRequest.of(normalizePage(page), normalizePageSize(size))
+            );
+        }
         return auditLogRepository.searchEventLogView(
             dateRange.start(),
             dateRange.endExclusive(),
@@ -957,6 +1594,16 @@ public class AdminService {
 
     public Page<AuditLog> eventEntries(int page, int size, String dateFrom, String dateTo, String actorId) {
         return auditEntries(page, size, dateFrom, dateTo, actorId);
+    }
+
+    public Page<AuditLog> eventEntries(int page,
+                                       int size,
+                                       String dateFrom,
+                                       String dateTo,
+                                       String actorId,
+                                       String saccoId,
+                                       String stationId) {
+        return auditEntries(page, size, dateFrom, dateTo, actorId, saccoId, stationId);
     }
 
     public ReportData reports(String saccoId, String statusFilter, String loanTypeFilter, String dateFrom, String dateTo) {
@@ -1047,6 +1694,25 @@ public class AdminService {
         return staffRoles;
     }
 
+    private List<UserClaim> normalizeAssignableClaims(Set<Position> staffRoles,
+                                                      boolean memberAccess,
+                                                      List<UserClaim> requestedClaims) {
+        Set<UserClaim> defaults = userClaimService.defaultClaims(staffRoles, memberAccess);
+        if (Position.containsAdminRole(staffRoles)) {
+            return new ArrayList<>(defaults);
+        }
+        if (requestedClaims == null) {
+            return new ArrayList<>();
+        }
+        LinkedHashSet<UserClaim> normalized = requestedClaims.stream()
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (normalized.contains(UserClaim.DISBURSE_LOAN)) {
+            normalized.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
+        }
+        return new ArrayList<>(normalized);
+    }
+
     private String formatRoleSummary(Set<Position> staffRoles, boolean memberAccess) {
         if (memberAccess && (staffRoles == null || staffRoles.isEmpty())) {
             return "MEMBER";
@@ -1133,6 +1799,62 @@ public class AdminService {
             .toList();
     }
 
+    private boolean isPlatformSupportIncident(AdminIncident incident) {
+        return incident != null
+            && "SUPPORT_MESSAGE".equals(incident.getCategory())
+            && "Workspace Admin Support".equals(incident.getSource());
+    }
+
+    private boolean isMemberSupportIncident(AdminIncident incident) {
+        return incident != null
+            && "SUPPORT_MESSAGE".equals(incident.getCategory())
+            && "Member Support".equals(incident.getSource());
+    }
+
+    private SupportArchiveView toSupportArchiveView(AdminIncident incident) {
+        boolean readBySuperAdmin = incidentReadByRecipient(incident);
+        return new SupportArchiveView(
+            incident.getId(),
+            incident.getSubject(),
+            incident.getMessage(),
+            incident.getStatus(),
+            incident.getCreatedAt(),
+            readBySuperAdmin
+        );
+    }
+
+    private boolean incidentReadByRecipient(AdminIncident incident) {
+        if (incident == null) {
+            return false;
+        }
+        if (incident.getRelatedNotificationId() != null
+            && notificationRepository.findById(incident.getRelatedNotificationId())
+                .map(notification -> notification.getReadAt() != null)
+                .orElse(false)) {
+            return true;
+        }
+        return notificationRepository.findByTypeOrderByCreatedAtDesc("SUPPORT_MESSAGE").stream()
+            .filter(notification -> incident.getId().equals(notificationIncidentId(notification)))
+            .anyMatch(notification -> notification.getReadAt() != null);
+    }
+
+    private UUID notificationIncidentId(Notification notification) {
+        if (notification == null || notification.getPayload() == null || notification.getPayload().isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = objectMapper.readValue(notification.getPayload(), new TypeReference<Map<String, Object>>() {});
+            Object detailsValue = payload.get("details");
+            if (!(detailsValue instanceof Map<?, ?> details)) {
+                return null;
+            }
+            Object incidentId = details.get("incidentId");
+            return incidentId == null ? null : UUID.fromString(String.valueOf(incidentId));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     private UserAccessView toUserAccessView(Member member) {
         return UserAccessView.builder()
             .accountId(member.getId())
@@ -1141,6 +1863,7 @@ public class AdminService {
             .email(member.getEmail())
             .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
             .staffRoles(member.getStaffRolesResolved())
+            .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess()))
             .status(member.getStatus())
             .membershipLabel(resolveMembershipLabel(member))
             .build();
@@ -1156,12 +1879,16 @@ public class AdminService {
             .orElse(0) + 1;
     }
 
-    private void ensureMinorAdminSlotAvailable(String saccoId, UUID existingAccountId) {
+    private void ensureMinorAdminSlotAvailable(String saccoId, String stationId, UUID existingAccountId) {
+        String normalizedStationId = normalizeOptional(stationId);
+        if (normalizedStationId == null) {
+            throw new IllegalStateException("Select a station ID.");
+        }
         boolean occupied = existingAccountId == null
-            ? memberRepository.existsBySaccoIdAndPosition(saccoId, Position.MINOR_ADMIN)
-            : memberRepository.existsBySaccoIdAndPositionAndIdNot(saccoId, Position.MINOR_ADMIN, existingAccountId);
+            ? memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition(saccoId, normalizedStationId, Position.MINOR_ADMIN)
+            : memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(saccoId, normalizedStationId, Position.MINOR_ADMIN, existingAccountId);
         if (occupied) {
-            throw new IllegalStateException("Each SACCO can only have one Minor Admin account. Update the existing one instead.");
+            throw new IllegalStateException("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
         }
     }
 
@@ -1175,14 +1902,14 @@ public class AdminService {
                                       LinkedHashSet<Position> staffRoles,
                                       String auditAction) {
         Position primaryRole = Position.primaryRole(staffRoles, false);
+        String normalizedStationId = normalizeOptional(stationId);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
-            ensureMinorAdminSlotAvailable(saccoId, null);
+            ensureMinorAdminSlotAvailable(saccoId, normalizedStationId, null);
         }
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeOptional(phone);
-        String normalizedStationId = normalizeOptional(stationId);
 
         if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {
             throw new IllegalStateException("That user ID is already in use.");
@@ -1275,6 +2002,13 @@ public class AdminService {
         }
         String normalized = value.trim().replaceAll("\\s+", " ");
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private String limitText(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private String normalizeProductName(LoanType loanType, String productName) {
@@ -1411,6 +2145,40 @@ public class AdminService {
         return applicationFee.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
+    private Integer nonNegative(Integer value, String message) {
+        if (value == null) {
+            return null;
+        }
+        if (value < 0) {
+            throw new IllegalStateException(message);
+        }
+        return value;
+    }
+
+    private BigDecimal nonNegativeAmount(BigDecimal value, String message) {
+        if (value == null) {
+            return null;
+        }
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException(message);
+        }
+        return value.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal nonNegativeWholeNumber(BigDecimal value, String negativeMessage, String fractionMessage) {
+        if (value == null) {
+            return null;
+        }
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException(negativeMessage);
+        }
+        try {
+            return new BigDecimal(value.toBigIntegerExact());
+        } catch (ArithmeticException ex) {
+            throw new IllegalStateException(fractionMessage);
+        }
+    }
+
     private BigDecimal normalizeAnnualRate(BigDecimal annualRate) {
         if (annualRate == null || annualRate.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalStateException("Annual interest rate cannot be negative.");
@@ -1422,12 +2190,16 @@ public class AdminService {
         return interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod;
     }
 
-    private boolean normalizeManagerReviewRequired(boolean managerReviewRequired, boolean committeeReviewRequired) {
-        return committeeReviewRequired || managerReviewRequired;
+    private boolean normalizeManagerReviewRequired(boolean managerReviewRequired) {
+        return managerReviewRequired;
     }
 
     private ApprovalWorkflowStage normalizeWorkflowStartStage(ApprovalWorkflowStage workflowStartStage,
+                                                              boolean managerReviewRequired,
                                                               boolean loanOfficerReviewRequired) {
+        if (!managerReviewRequired && loanOfficerReviewRequired) {
+            return ApprovalWorkflowStage.LOAN_OFFICER;
+        }
         if (!loanOfficerReviewRequired) {
             return ApprovalWorkflowStage.MANAGER;
         }
@@ -1443,24 +2215,51 @@ public class AdminService {
         if (priority == null) {
             return fallbackPriority;
         }
-        if (priority != 3 && priority != 4) {
-            throw new IllegalStateException("Stage priority must be 3 or 4.");
+        if (priority < 1 || priority > 4) {
+            throw new IllegalStateException("Stage priority must be between 1 and 4.");
         }
         return priority;
+    }
+
+    private Integer normalizeReviewPriority(boolean enabled, Integer priority, int fallbackPriority) {
+        if (!enabled) {
+            return fallbackPriority;
+        }
+        if (priority == null) {
+            return fallbackPriority;
+        }
+        if (priority < 1 || priority > 4) {
+            throw new IllegalStateException("Review priority must be between 1 and 4.");
+        }
+        return priority;
+    }
+
+    private void validateUniquePriority(String firstLabel,
+                                        boolean firstEnabled,
+                                        Integer firstPriority,
+                                        String secondLabel,
+                                        boolean secondEnabled,
+                                        Integer secondPriority) {
+        if (firstEnabled && secondEnabled && firstPriority != null && firstPriority.equals(secondPriority)) {
+            throw new IllegalStateException(firstLabel + " and " + secondLabel + " cannot share the same priority slot.");
+        }
     }
 
     private void validateWorkflowConfiguration(String saccoId,
                                                boolean managerReviewRequired,
                                                boolean loanOfficerReviewRequired,
                                                ApprovalWorkflowStage workflowStartStage,
+                                               Integer managerPriority,
+                                               Integer loanOfficerPriority,
                                                boolean committeeReviewRequired,
                                                Integer committeePriority,
                                                Integer committeeMinimumVotes,
                                                Integer committeeApprovalThreshold,
                                                boolean accountantReviewRequired,
-                                               Integer accountantPriority) {
-        if (!managerReviewRequired && !committeeReviewRequired) {
-            throw new IllegalStateException("At least one approval step must be required: manager review or committee review.");
+                                               Integer accountantPriority,
+                                               boolean disbursementOfficerRequired) {
+        if (!managerReviewRequired && !loanOfficerReviewRequired && !committeeReviewRequired && !accountantReviewRequired) {
+            throw new IllegalStateException("At least one review or approval step must be required before disbursement.");
         }
         if (workflowStartStage != null
             && workflowStartStage != ApprovalWorkflowStage.MANAGER
@@ -1473,8 +2272,21 @@ public class AdminService {
         if (loanOfficerReviewRequired && activeLoanOfficerCount(saccoId) <= 0) {
             throw new IllegalStateException("No active loan officers are configured for this SACCO yet.");
         }
+        if (disbursementOfficerRequired && activeDisbursementOfficerCount(saccoId) <= 0) {
+            throw new IllegalStateException("Add at least one active Disbursement Officer before requiring that workflow role.");
+        }
+        if (!disbursementOfficerRequired && activeDisbursementClaimHolderCount(saccoId) <= 0) {
+            throw new IllegalStateException("Grant disbursement queue and release claims to at least one active staff user before removing the Disbursement Officer requirement.");
+        }
         Integer normalizedCommitteePriority = normalizeStagePriority(committeeReviewRequired, committeePriority, 3);
         Integer normalizedAccountantPriority = normalizeStagePriority(accountantReviewRequired, accountantPriority, 4);
+        Integer normalizedManagerPriority = normalizeReviewPriority(managerReviewRequired, managerPriority, 1);
+        Integer normalizedLoanOfficerPriority = normalizeReviewPriority(loanOfficerReviewRequired, loanOfficerPriority, 2);
+        validateUniquePriority("Manager", managerReviewRequired, normalizedManagerPriority, "Loan Officer", loanOfficerReviewRequired, normalizedLoanOfficerPriority);
+        validateUniquePriority("Manager", managerReviewRequired, normalizedManagerPriority, "Committee", committeeReviewRequired, normalizedCommitteePriority);
+        validateUniquePriority("Manager", managerReviewRequired, normalizedManagerPriority, "Accountant", accountantReviewRequired, normalizedAccountantPriority);
+        validateUniquePriority("Loan Officer", loanOfficerReviewRequired, normalizedLoanOfficerPriority, "Committee", committeeReviewRequired, normalizedCommitteePriority);
+        validateUniquePriority("Loan Officer", loanOfficerReviewRequired, normalizedLoanOfficerPriority, "Accountant", accountantReviewRequired, normalizedAccountantPriority);
         if (committeeReviewRequired && accountantReviewRequired && normalizedCommitteePriority.equals(normalizedAccountantPriority)) {
             throw new IllegalStateException("Committee and Accountant cannot share the same priority slot.");
         }
@@ -1572,6 +2384,8 @@ public class AdminService {
         private String roleSummary;
         @lombok.Builder.Default
         private Set<Position> staffRoles = new LinkedHashSet<>();
+        @lombok.Builder.Default
+        private Set<UserClaim> claims = new LinkedHashSet<>();
         private MemberStatus status;
         private String membershipLabel;
     }
@@ -1701,21 +2515,27 @@ public class AdminService {
             Boolean.TRUE.equals(snapshot.managerReviewRequired()),
             Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()),
             snapshot.workflowStartStage(),
+            snapshot.managerPriority(),
+            snapshot.loanOfficerPriority(),
             Boolean.TRUE.equals(snapshot.committeeReviewRequired()),
             snapshot.committeePriority(),
             snapshot.committeeMinimumVotes(),
             snapshot.committeeApprovalThreshold(),
             !Boolean.FALSE.equals(snapshot.accountantReviewRequired()),
-            snapshot.accountantPriority()
+            snapshot.accountantPriority(),
+            !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired())
         );
-        boolean managerReviewRequired = normalizeManagerReviewRequired(
-            Boolean.TRUE.equals(snapshot.managerReviewRequired()),
-            Boolean.TRUE.equals(snapshot.committeeReviewRequired())
-        );
+        boolean managerReviewRequired = normalizeManagerReviewRequired(Boolean.TRUE.equals(snapshot.managerReviewRequired()));
         boolean committeeReviewRequired = Boolean.TRUE.equals(snapshot.committeeReviewRequired());
         product.setManagerReviewRequired(managerReviewRequired);
+        product.setManagerPriority(normalizeReviewPriority(managerReviewRequired, snapshot.managerPriority(), 1));
         product.setLoanOfficerReviewRequired(Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
-        product.setWorkflowStartStage(normalizeWorkflowStartStage(snapshot.workflowStartStage(), Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired())));
+        product.setLoanOfficerPriority(normalizeReviewPriority(Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()), snapshot.loanOfficerPriority(), 2));
+        product.setWorkflowStartStage(normalizeWorkflowStartStage(
+            snapshot.workflowStartStage(),
+            managerReviewRequired,
+            Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired())
+        ));
         product.setCommitteeReviewRequired(committeeReviewRequired);
         product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, snapshot.committeePriority(), 3));
         Integer committeeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, snapshot.committeeMinimumVotes());
@@ -1730,6 +2550,7 @@ public class AdminService {
         boolean accountantReviewRequired = !Boolean.FALSE.equals(snapshot.accountantReviewRequired());
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, snapshot.accountantPriority(), 4));
+        product.setDisbursementOfficerRequired(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
         LoanProductStatus normalizedStatus = normalizeProductStatus(snapshot.productStatus());
         product.setProductStatus(normalizedStatus);
         product.setActive(normalizedStatus == LoanProductStatus.ACTIVE);
@@ -1755,7 +2576,9 @@ public class AdminService {
         data.put("allowApplicationWithActiveLoan", Boolean.TRUE.equals(snapshot.allowApplicationWithActiveLoan()));
         data.put("freshFinancialDataRequired", Boolean.TRUE.equals(snapshot.freshFinancialDataRequired()));
         data.put("managerReviewRequired", Boolean.TRUE.equals(snapshot.managerReviewRequired()));
+        data.put("managerPriority", snapshot.managerPriority());
         data.put("loanOfficerReviewRequired", Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
+        data.put("loanOfficerPriority", snapshot.loanOfficerPriority());
         data.put("workflowStartStage", snapshot.workflowStartStage());
         data.put("committeeReviewRequired", Boolean.TRUE.equals(snapshot.committeeReviewRequired()));
         data.put("committeePriority", snapshot.committeePriority());
@@ -1763,6 +2586,7 @@ public class AdminService {
         data.put("committeeApprovalThreshold", snapshot.committeeApprovalThreshold());
         data.put("accountantReviewRequired", !Boolean.FALSE.equals(snapshot.accountantReviewRequired()));
         data.put("accountantPriority", snapshot.accountantPriority());
+        data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
         data.put("productStatus", snapshot.productStatus());
         data.put("active", product.getActive());
         return data;
@@ -1835,18 +2659,23 @@ public class AdminService {
 
     private String formatWorkflowSummary(LoanProductSnapshot snapshot) {
         List<String> stages = new ArrayList<>();
+        boolean managerEnabled = Boolean.TRUE.equals(snapshot.managerReviewRequired());
         boolean loanOfficerEnabled = Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired());
         ApprovalWorkflowStage startStage = snapshot.workflowStartStage() == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerEnabled
             ? ApprovalWorkflowStage.LOAN_OFFICER
             : ApprovalWorkflowStage.MANAGER;
-        if (startStage == ApprovalWorkflowStage.LOAN_OFFICER) {
+        if (startStage == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerEnabled) {
             stages.add("Loan Officer");
-            stages.add("Manager");
-        } else {
+            if (managerEnabled) {
+                stages.add("Manager");
+            }
+        } else if (managerEnabled) {
             stages.add("Manager");
             if (loanOfficerEnabled) {
                 stages.add("Loan Officer");
             }
+        } else if (loanOfficerEnabled) {
+            stages.add("Loan Officer");
         }
         if (Boolean.TRUE.equals(snapshot.committeeReviewRequired())) {
             stages.add("Committee");
@@ -1854,7 +2683,9 @@ public class AdminService {
         if (!Boolean.FALSE.equals(snapshot.accountantReviewRequired())) {
             stages.add("Accountant");
         }
-        stages.add("Disbursement");
+        stages.add(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired())
+            ? "Disbursement Officer"
+            : "Disbursement Release");
         return String.join(" -> ", stages);
     }
 
@@ -1891,6 +2722,16 @@ public class AdminService {
             .toPlainString() + "%";
     }
 
+    private String normalizeDefaultLanguage(String defaultLanguage) {
+        if (defaultLanguage == null || defaultLanguage.isBlank()) {
+            return "en";
+        }
+        return switch (defaultLanguage.trim().toLowerCase(Locale.ROOT)) {
+            case "sw", "sw_tz", "sw-tz", "kiswahili", "swahili" -> "sw";
+            default -> "en";
+        };
+    }
+
     private Map<String, Object> snapshotSettings(SaccoSettings settings) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("requiredGuarantors", settings.getRequiredGuarantors());
@@ -1900,7 +2741,42 @@ public class AdminService {
         data.put("boardReviewRequired", settings.isBoardReviewRequired());
         data.put("approvalFlow", settings.resolvedApprovalFlow().stream().map(Enum::name).toList());
         data.put("applicationFee", settings.getResolvedApplicationFee());
+        data.put("loanFeePaymentMethod", settings.getLoanFeePaymentMethod());
+        data.put("loanFeePaymentAccount", settings.getLoanFeePaymentAccount());
+        data.put("loanFeePaymentPayee", settings.getLoanFeePaymentPayee());
+        data.put("loanFeePaymentInstructions", settings.getLoanFeePaymentInstructions());
         data.put("defaultLanguage", settings.getDefaultLanguage());
+        data.put("applicantMaxForfeitedLoans", settings.getApplicantMaxForfeitedLoans());
+        data.put("applicantForfeitedLookbackDays", settings.getApplicantForfeitedLookbackDays());
+        data.put("applicantForfeitedWaitDays", settings.getApplicantForfeitedWaitDays());
+        return data;
+    }
+
+    private Map<String, Object> snapshotStationAccess(SaccoStation station) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("saccoId", station.getSaccoId());
+        data.put("stationId", station.getStationId());
+        data.put("accessStatus", station.getResolvedAccessStatus());
+        data.put("paymentDueDate", station.getPaymentDueDate());
+        data.put("accessSuspendedAt", station.getAccessSuspendedAt());
+        data.put("accessSuspendedByMemberId", station.getAccessSuspendedByMemberId());
+        data.put("accessRestrictionReason", station.getAccessRestrictionReason());
+        return data;
+    }
+
+    private Map<String, Object> snapshotStationPolicy(SaccoStationPolicy policy) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("saccoId", policy.getSaccoId());
+        data.put("stationId", policy.getStationId());
+        data.put("applicantMaxDefaultedLoans", policy.getApplicantMaxDefaultedLoans());
+        data.put("applicantMaxActiveLoanAmount", policy.getApplicantMaxActiveLoanAmount());
+        data.put("applicantMaxForfeitedLoans", policy.getApplicantMaxForfeitedLoans());
+        data.put("applicantForfeitedLookbackDays", policy.getApplicantForfeitedLookbackDays());
+        data.put("applicantForfeitedWaitDays", policy.getApplicantForfeitedWaitDays());
+        data.put("guarantorMinSavings", policy.getGuarantorMinSavings());
+        data.put("guarantorMaxActiveLoanAmount", policy.getGuarantorMaxActiveLoanAmount());
+        data.put("guarantorMaxGuaranteedLoanAmount", policy.getGuarantorMaxGuaranteedLoanAmount());
+        data.put("guarantorMaxDefaultedLoans", policy.getGuarantorMaxDefaultedLoans());
         return data;
     }
 
@@ -1923,6 +2799,43 @@ public class AdminService {
             ))
             .sorted(Comparator.comparingLong(ChartItem::getCount).reversed())
             .toList();
+    }
+
+    public record SupportArchiveView(
+        UUID id,
+        String subject,
+        String message,
+        IncidentStatus status,
+        OffsetDateTime createdAt,
+        boolean readBySuperAdmin
+    ) {
+        public UUID getId() {
+            return id;
+        }
+
+        public String getSubject() {
+            return subject;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public IncidentStatus getStatus() {
+            return status;
+        }
+
+        public OffsetDateTime getCreatedAt() {
+            return createdAt;
+        }
+
+        public boolean isReadBySuperAdmin() {
+            return readBySuperAdmin;
+        }
+
+        public String getReadLabel() {
+            return readBySuperAdmin ? "Read by Super Admin" : "Not read yet";
+        }
     }
 
     public record AdminDashboard(
@@ -2219,7 +3132,9 @@ public class AdminService {
         Boolean allowApplicationWithActiveLoan,
         Boolean freshFinancialDataRequired,
         Boolean managerReviewRequired,
+        Integer managerPriority,
         Boolean loanOfficerReviewRequired,
+        Integer loanOfficerPriority,
         ApprovalWorkflowStage workflowStartStage,
         Boolean committeeReviewRequired,
         Integer committeePriority,
@@ -2227,6 +3142,7 @@ public class AdminService {
         Integer committeeApprovalThreshold,
         Boolean accountantReviewRequired,
         Integer accountantPriority,
+        Boolean disbursementOfficerRequired,
         LoanProductStatus productStatus
     ) {
         public static LoanProductSnapshot fromProduct(LoanProductSetting product) {
@@ -2248,7 +3164,9 @@ public class AdminService {
                 product.getAllowApplicationWithActiveLoan(),
                 product.getFreshFinancialDataRequired(),
                 product.getManagerReviewRequired(),
+                product.getResolvedManagerPriority(),
                 product.getLoanOfficerReviewRequired(),
+                product.getResolvedLoanOfficerPriority(),
                 product.getWorkflowStartStage(),
                 product.getCommitteeReviewRequired(),
                 product.getCommitteePriority(),
@@ -2256,6 +3174,7 @@ public class AdminService {
                 product.getCommitteeApprovalThreshold(),
                 product.getAccountantReviewRequired(),
                 product.getAccountantPriority(),
+                product.getDisbursementOfficerRequired(),
                 product.getStatus()
             );
         }

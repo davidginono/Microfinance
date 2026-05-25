@@ -45,7 +45,7 @@ public class RepaymentScheduleService {
         InterestMethod interestMethod = resolveInterestMethod(app, product);
         BigDecimal baseInstallment = installmentOverride != null && installmentOverride.compareTo(BigDecimal.ZERO) > 0
             ? installmentOverride.setScale(2, RoundingMode.HALF_UP)
-            : defaultInstallment(app.getAmount(), installments, configuredRate, interestMethod, frequency);
+            : defaultInstallment(app.getAmount(), installments, configuredRate, interestMethod, frequency, app.getTenorMonths());
 
         List<Map<String, Object>> rows = new ArrayList<>();
         BigDecimal runningTotal = BigDecimal.ZERO;
@@ -53,6 +53,8 @@ public class RepaymentScheduleService {
         BigDecimal remainingPrincipal = app.getAmount().setScale(2, RoundingMode.HALF_UP);
         LocalDate dueDate = firstRepaymentDate;
         BigDecimal periodicRate = periodicRate(configuredRate, frequency);
+        BigDecimal totalFlatInterest = totalFlatInterest(app.getAmount(), configuredRate, app.getTenorMonths());
+        BigDecimal runningInterest = BigDecimal.ZERO;
         for (int index = 1; index <= installments; index++) {
             BigDecimal installmentAmount;
             BigDecimal principalComponent;
@@ -73,12 +75,24 @@ public class RepaymentScheduleService {
                 remainingPrincipal = remainingPrincipal.subtract(principalComponent).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
                 runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
             } else {
-                installmentAmount = index == installments
-                    ? app.getAmount().subtract(runningTotal).setScale(2, RoundingMode.HALF_UP)
-                    : baseInstallment;
-                principalComponent = installmentAmount;
-                interestComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                BigDecimal principalBase = app.getAmount().divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
+                BigDecimal interestBase = totalFlatInterest.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
+                principalComponent = index == installments
+                    ? app.getAmount().subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
+                    : principalBase;
+                interestComponent = index == installments
+                    ? totalFlatInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
+                    : interestBase;
+                installmentAmount = installmentOverride != null && installmentOverride.compareTo(BigDecimal.ZERO) > 0
+                    ? (index == installments
+                        ? app.getAmount().add(totalFlatInterest).subtract(runningTotal).setScale(2, RoundingMode.HALF_UP)
+                        : baseInstallment)
+                    : principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                if (installmentOverride != null && installmentOverride.compareTo(BigDecimal.ZERO) > 0) {
+                    interestComponent = installmentAmount.subtract(principalComponent).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+                }
                 runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
+                runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
                 remainingPrincipal = app.getAmount().subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             }
 
@@ -168,7 +182,8 @@ public class RepaymentScheduleService {
                                           int installments,
                                           BigDecimal annualRate,
                                           InterestMethod interestMethod,
-                                          RepaymentFrequency frequency) {
+                                          RepaymentFrequency frequency,
+                                          int tenorMonths) {
         if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
@@ -182,7 +197,18 @@ public class RepaymentScheduleService {
             return BigDecimal.valueOf(principal.doubleValue() * rateDouble / factor)
                 .setScale(2, RoundingMode.HALF_UP);
         }
-        return principal.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
+        BigDecimal totalDue = principal.add(totalFlatInterest(principal, annualRate, tenorMonths));
+        return totalDue.divide(BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal totalFlatInterest(BigDecimal principal, BigDecimal annualRate, int tenorMonths) {
+        if (principal == null || annualRate == null || annualRate.compareTo(BigDecimal.ZERO) <= 0 || tenorMonths <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return principal
+            .multiply(annualRate)
+            .multiply(BigDecimal.valueOf(tenorMonths))
+            .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal periodicRate(BigDecimal annualRate, RepaymentFrequency frequency) {

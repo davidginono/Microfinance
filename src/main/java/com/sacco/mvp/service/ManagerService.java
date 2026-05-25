@@ -227,9 +227,21 @@ public class ManagerService {
 
     @Transactional
     public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons) {
+        decide(loanId, managerId, decision, reasons, Map.of());
+    }
+
+    @Transactional
+    public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons, Map<UUID, BigDecimal> guarantorCommitments) {
         LoanApplication app = getManagedApplication(loanId, managerId);
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
+        }
+        String normalizedReasons = normalizeDecisionReasons(reasons);
+        if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
+            throw new IllegalStateException("Add a reason before rejecting this loan application.");
+        }
+        if (decision == ManagerDecision.ACCEPT) {
+            applyGuarantorCommitmentsIfRequired(app, ApprovalWorkflowStage.MANAGER, guarantorCommitments);
         }
         int requiredGuarantors = app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0);
         if (requiredGuarantors > 0) {
@@ -247,7 +259,7 @@ public class ManagerService {
             .managerMemberId(managerId)
             .reviewStage(ApprovalWorkflowStage.MANAGER)
             .decision(decision)
-            .reasons(reasons)
+            .reasons(normalizedReasons)
             .createdAt(OffsetDateTime.now())
             .build());
 
@@ -256,7 +268,7 @@ public class ManagerService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "MANAGER_REJECTED", app.getApplicantMemberId(),
-                Map.of("reasons", reasons == null ? "" : reasons));
+                Map.of("reasons", normalizedReasons));
             return;
         }
 
@@ -266,9 +278,21 @@ public class ManagerService {
 
     @Transactional
     public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons) {
+        decideAccountant(loanId, accountantId, decision, reasons, Map.of());
+    }
+
+    @Transactional
+    public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons, Map<UUID, BigDecimal> guarantorCommitments) {
         LoanApplication app = getAccountantApplication(loanId, accountantId);
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
             throw new IllegalStateException("Application is not ready for accountant review");
+        }
+        String normalizedReasons = normalizeDecisionReasons(reasons);
+        if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
+            throw new IllegalStateException("Add a reason before rejecting this loan application.");
+        }
+        if (decision == ManagerDecision.ACCEPT) {
+            applyGuarantorCommitmentsIfRequired(app, ApprovalWorkflowStage.ACCOUNTANT, guarantorCommitments);
         }
         managerReviewRepository.save(ManagerReview.builder()
             .id(UUID.randomUUID())
@@ -276,7 +300,7 @@ public class ManagerService {
             .managerMemberId(accountantId)
             .reviewStage(ApprovalWorkflowStage.ACCOUNTANT)
             .decision(decision)
-            .reasons(reasons)
+            .reasons(normalizedReasons)
             .createdAt(OffsetDateTime.now())
             .build());
         if (decision == ManagerDecision.REJECT) {
@@ -284,11 +308,41 @@ public class ManagerService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
-                Map.of("reasons", reasons == null ? "" : reasons));
+                Map.of("reasons", normalizedReasons));
             return;
         }
         workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.ACCOUNTANT, accountantId);
         loanApplicationRepository.save(app);
+    }
+
+    public void applyGuarantorCommitmentsIfRequired(LoanApplication app,
+                                                    ApprovalWorkflowStage stage,
+                                                    Map<UUID, BigDecimal> guarantorCommitments) {
+        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType()).orElse(null);
+        if (product == null || !product.isGuarantorCommitmentRequired()
+            || product.getResolvedGuarantorCommitmentStage() != stage) {
+            return;
+        }
+        List<GuarantorRequest> requests = guarantorRequestRepository.findByLoanApplicationId(app.getId()).stream()
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
+            .toList();
+        if (requests.isEmpty()) {
+            throw new IllegalStateException("Approved guarantors are required before verifying commitments.");
+        }
+        for (GuarantorRequest request : requests) {
+            BigDecimal amount = request.getCommittedAmount() == null
+                ? request.getRequestedAmount()
+                : request.getCommittedAmount();
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException("Every approved guarantor must have an applicant-assigned commitment amount before review approval.");
+            }
+            request.setCommittedAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
+        }
+        guarantorRequestRepository.saveAll(requests);
+    }
+
+    private String normalizeDecisionReasons(String reasons) {
+        return reasons == null ? "" : reasons.trim();
     }
 
     @Transactional
@@ -306,6 +360,7 @@ public class ManagerService {
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
             throw new IllegalStateException("Application is not ready for disbursement");
         }
+        requireFeeInsuranceReceiptIfConfigured(app);
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
         validateDisbursement(disbursementDate, firstRepaymentDate);
         if (disbursementProofFile == null || disbursementProofFile.isEmpty()) {
@@ -398,7 +453,22 @@ public class ManagerService {
         if (app.getLoanId() == null || app.getLoanId().isBlank()) {
             throw new IllegalStateException("This loan has not been disbursed yet.");
         }
-        return loanPaymentTransactionSyncService.syncRecent(app, monthsBack);
+        return loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+    }
+
+    public DefaultedLoanRecheckResult recheckDefaultedLoanPaymentStatus(UUID applicationId, UUID managerId, int monthsBack) {
+        LoanApplication app = getManagedApplication(applicationId, managerId);
+        if (app.getStatus() != LoanStatus.DEFAULTED) {
+            throw new IllegalStateException("Only defaulted loans can be rechecked with this action.");
+        }
+        if (app.getLoanId() == null || app.getLoanId().isBlank()) {
+            throw new IllegalStateException("This defaulted loan does not have a loan ID to verify.");
+        }
+        int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+        return new DefaultedLoanRecheckResult(inserted, app.getStatus() == LoanStatus.PAID, app.getStatus());
+    }
+
+    public record DefaultedLoanRecheckResult(int insertedTransactions, boolean paid, LoanStatus status) {
     }
 
     public boolean matchesApplicantStation(LoanApplication loan, String stationId) {
@@ -427,10 +497,14 @@ public class ManagerService {
         return app;
     }
 
-    private LoanApplication getDisbursementApplication(UUID loanId, UUID disbursementOfficerId) {
+    private LoanApplication getDisbursementApplication(UUID loanId, UUID disbursementActorId) {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (!roleDirectoryService.hasActiveRoleInSacco(disbursementOfficerId, app.getSaccoId(), Position.DISBURSEMENT_OFFICER)) {
+        Member actor = memberRepository.findById(disbursementActorId)
+            .orElseThrow(() -> new IllegalArgumentException("Forbidden"));
+        if (actor.getStatus() != MemberStatus.ACTIVE
+            || !app.getSaccoId().equals(actor.getSaccoId())
+            || !matchesApplicantStation(app, actor.getStationId())) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
@@ -446,6 +520,18 @@ public class ManagerService {
         }
         if (firstRepaymentDate.isBefore(disbursementDate)) {
             throw new IllegalArgumentException("First repayment date cannot be before disbursement date");
+        }
+    }
+
+    private void requireFeeInsuranceReceiptIfConfigured(LoanApplication app) {
+        SaccoSettings settings = saccoSettingsRepository.findById(app.getSaccoId()).orElse(null);
+        if (settings == null || !settings.isLoanFeePaymentConfigured()) {
+            return;
+        }
+        boolean hasReceipt = loanAttachmentService.parse(app.getAttachmentsJson()).stream()
+            .anyMatch(item -> LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(String.valueOf(item.get("attachmentCategory"))));
+        if (!hasReceipt) {
+            throw new IllegalStateException("The applicant must upload the insurance and application fees payment receipt before disbursement.");
         }
     }
 

@@ -4,7 +4,9 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
@@ -42,6 +44,7 @@ public class AuthController {
     private final MemberRegistrationService memberRegistrationService;
     private final EmailOtpService emailOtpService;
     private final MemberRepository memberRepository;
+    private final SaccoStationRepository saccoStationRepository;
     private final UserClaimService userClaimService;
     private final SaccoRegistryService saccoRegistryService;
     private final AdminScopeService adminScopeService;
@@ -178,6 +181,13 @@ public class AuthController {
                 "message", "No member account was found for that email address. Please register yourself first."
             ));
         }
+        String accessBlockedMessage = suspendedAccessMessage(member);
+        if (accessBlockedMessage != null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", accessBlockedMessage
+            ));
+        }
 
         emailOtpService.issueOtp(
             normalizedEmail,
@@ -203,13 +213,14 @@ public class AuthController {
         }
 
         try {
-            emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.LOGIN, otpCode);
             Member member = memberRepository.findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
             if (!member.isMemberAccess()) {
                 throw new IllegalStateException("You are not registered as a member. Sign in through Staff instead.");
             }
+            ensureSaccoAccessAllowed(member);
+            emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.LOGIN, otpCode);
             signInMember(member, request);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -246,6 +257,13 @@ public class AuthController {
                 "message", "No active staff account matches that email address."
             ));
         }
+        String accessBlockedMessage = suspendedAccessMessage(user);
+        if (accessBlockedMessage != null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", accessBlockedMessage
+            ));
+        }
 
         emailOtpService.issueOtp(
             normalizedEmail,
@@ -275,12 +293,13 @@ public class AuthController {
         }
 
         try {
-            emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
             Member user = memberRepository
                 .findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(existing -> !existing.getStaffRolesResolved().isEmpty())
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
+            ensureSaccoAccessAllowed(user);
+            emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
             signInPrincipal(new AppUserPrincipal(
                 user,
                 userClaimService.effectiveClaims(user.getId(), user.getStaffRolesResolved(), user.isMemberAccess())
@@ -298,6 +317,7 @@ public class AuthController {
     }
 
     private void signInMember(Member member, HttpServletRequest request) {
+        ensureSaccoAccessAllowed(member);
         AppUserPrincipal principal = new AppUserPrincipal(
             member,
             userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess())
@@ -312,6 +332,36 @@ public class AuthController {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    }
+
+    private void ensureSaccoAccessAllowed(Member member) {
+        String message = suspendedAccessMessage(member);
+        if (message != null) {
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private String suspendedAccessMessage(Member member) {
+        if (member == null || member.getStaffRolesResolved().contains(Position.ADMIN)) {
+            return null;
+        }
+        String saccoId = member.getSaccoId();
+        String stationId = member.getStationId();
+        if (saccoId == null || saccoId.isBlank() || stationId == null || stationId.isBlank()) {
+            return null;
+        }
+        return saccoStationRepository.findBySaccoIdAndStationId(saccoId, stationId)
+            .filter(SaccoStation::isAccessSuspended)
+            .map(this::suspendedMessage)
+            .orElse(null);
+    }
+
+    private String suspendedMessage(SaccoStation station) {
+        String reason = station.getAccessRestrictionReason();
+        if (reason == null || reason.isBlank()) {
+            return "This station workspace has been suspended. Contact the platform administrator.";
+        }
+        return "This station workspace has been suspended: " + reason.trim();
     }
 
     private String defaultLanding(Member member) {

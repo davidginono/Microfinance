@@ -1,51 +1,55 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/modal-shell.jspf" %>
 
+<spring:message code="admin.saccoRegistry.saccoRegistration" text="SACCO Registration" var="saccoRegistrationLabel" />
+<spring:message code="admin.saccoRegistry.stationRegistry" text="Station Registry" var="stationRegistryLabel" />
+<spring:message code="admin.saccoRegistry.saccoRegistrationSubtitle" text="Register SACCO workspaces and manage the stations under each SACCO." var="saccoRegistrationSubtitle" />
+<spring:message code="admin.saccoRegistry.stationRegistrySubtitle" text="Manage station IDs for your SACCO workspace." var="stationRegistrySubtitle" />
+<spring:message code="admin.saccoRegistry.currentSaccoStations" text="Current SACCO Stations" var="currentSaccoStationsLabel" />
+<spring:message code="admin.saccoRegistry.editSacco" text="Edit SACCO" var="editSaccoLabel" />
+<spring:message code="admin.saccoRegistry.editStations" text="Edit Stations" var="editStationsLabel" />
+<spring:message code="admin.saccoRegistry.editSaccoHelp" text="Update the SACCO name and active station IDs." var="editSaccoHelp" />
+<spring:message code="admin.saccoRegistry.editStationsHelp" text="Review and update the active station IDs for this SACCO workspace." var="editStationsHelp" />
+<spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" var="saveChangesLabel" />
+<spring:message code="admin.saccoRegistry.saveStations" text="Save Stations" var="saveStationsLabel" />
+
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / ${superAdmin ? 'SACCO Registry' : 'Station Registry'}</p>
-    <h1 class="erp-page-title">${superAdmin ? 'SACCO Registry' : 'Station Registry'}</h1>
-    <p class="erp-page-subtitle">${superAdmin ? 'Manage registered SACCO workspaces.' : 'Manage station IDs for your SACCO workspace.'}</p>
+    <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</p>
+    <h1 class="erp-page-title">${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</h1>
+    <p class="erp-page-subtitle">${superAdmin ? saccoRegistrationSubtitle : stationRegistrySubtitle}</p>
 </div>
 
 <div class="erp-panel">
     <div class="erp-panel-header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="erp-panel-title">${superAdmin ? 'SACCO Registry' : 'Current SACCO Stations'}</p>
+                <p class="erp-panel-title">${superAdmin ? saccoRegistrationLabel : currentSaccoStationsLabel}</p>
             </div>
             <c:if test="${superAdmin}">
-                <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco">Add SACCO</button>
-            </c:if>
-            <c:if test="${not superAdmin and not empty registeredSaccos}">
-                <button type="button"
-                        class="app-btn btn-primary"
-                        data-sacco-modal-open="add-station-${registeredSaccos[0].saccoId}">
-                    Add Station
-                </button>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco"><spring:message code="admin.saccoRegistry.addSacco" text="Add SACCO" /></button>
+                </div>
             </c:if>
         </div>
     </div>
     <div class="erp-panel-body">
-        <c:if test="${not superAdmin}">
-            <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Add a new station from the button above, or use Edit Stations to review the full station list.
-            </div>
-        </c:if>
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table min-w-[680px]">
                 <thead>
                 <tr>
-                    <th>Logo</th>
+                    <th><spring:message code="admin.saccoRegistry.logo" text="Logo" /></th>
                     <th>SACCO ID</th>
-                    <th>SACCO Name</th>
-                    <th>Stations</th>
+                    <th><spring:message code="admin.saccoRegistry.saccoName" text="SACCO Name" /></th>
+                    <th><spring:message code="admin.saccoRegistry.access" text="Access" /></th>
+                    <th><spring:message code="admin.saccoRegistry.stations" text="Stations" /></th>
                     <c:if test="${superAdmin}">
-                        <th>Details</th>
+                        <th><spring:message code="admin.saccoRegistry.details" text="Details" /></th>
                     </c:if>
-                    <th>Action</th>
+                    <th><spring:message code="common.action" text="Action" /></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -67,24 +71,54 @@
                         </td>
                         <td class="font-semibold text-slate-800">${sacco.saccoId}</td>
                         <td>${sacco.saccoName}</td>
-                        <td>${sacco.stationIds}</td>
+                        <td>
+                            <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${sacco.accessBadgeClass}">
+                                ${sacco.accessStatusLabel}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="space-y-1">
+                                <c:forEach items="${sacco.stations}" var="station">
+                                    <div>
+                                        <p class="font-semibold text-slate-800">${station.stationId}</p>
+                                        <p class="text-xs text-slate-500">${station.addressLocationLabel}</p>
+                                    </div>
+                                </c:forEach>
+                            </div>
+                        </td>
                         <c:if test="${superAdmin}">
                             <td class="whitespace-nowrap">
-                                <a href="/admin/saccos/${sacco.saccoId}?section=overview" class="app-btn btn-neutral">View Details</a>
+                                <a href="/admin/saccos/${sacco.saccoId}?section=overview" class="app-btn btn-neutral"><spring:message code="admin.saccoRegistry.viewDetails" text="View Details" /></a>
                             </td>
                         </c:if>
                         <td class="whitespace-nowrap">
-                            <button type="button"
-                                    class="app-btn btn-primary"
-                                    data-sacco-modal-open="edit-${sacco.saccoId}">
-                                ${superAdmin ? 'Edit' : 'Edit Stations'}
-                            </button>
+                            <div class="flex flex-wrap gap-2">
+                                <c:choose>
+                                    <c:when test="${superAdmin}">
+                                        <button type="button"
+                                                class="app-btn btn-neutral"
+                                                data-sacco-modal-open="add-station-${sacco.saccoId}">
+                                            <spring:message code="admin.saccoRegistry.addStation" text="Add Station" />
+                                        </button>
+                                        <button type="button"
+                                                class="app-btn btn-primary"
+                                                data-sacco-modal-open="edit-${sacco.saccoId}">
+                                            ${editSaccoLabel}
+                                        </button>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <span class="inline-flex rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500">
+                                            Managed by Super Admin
+                                        </span>
+                                    </c:otherwise>
+                                </c:choose>
+                            </div>
                         </td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty registeredSaccos}">
                     <tr>
-                        <td colspan="${superAdmin ? 6 : 5}" class="text-slate-500">No SACCOs have been registered yet.</td>
+                        <td colspan="${superAdmin ? 7 : 6}" class="text-slate-500">No SACCOs have been registered yet.</td>
                     </tr>
                 </c:if>
                 </tbody>
@@ -99,8 +133,8 @@
         <div class="app-modal-scroll">
             <div class="app-modal-header">
                 <div>
-                    <p class="erp-panel-title">Add SACCO</p>
-                    <p class="mt-2 text-sm text-slate-500">Save the SACCO and its station IDs.</p>
+                    <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addSacco" text="Add SACCO" /></p>
+                    <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addSaccoHelp" text="Save the SACCO and its station IDs." /></p>
                 </div>
                 <button type="button" class="app-modal-close" data-sacco-modal-close="create-sacco" aria-label="Close modal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -115,7 +149,7 @@
                     <input name="saccoId" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. SACCO-ARUSHA-001" />
                 </label>
                 <label class="block text-sm font-semibold text-slate-700">
-                    SACCO Name
+                    <spring:message code="admin.saccoRegistry.saccoName" text="SACCO Name" />
                     <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. IAA SACCOS LTD" />
                 </label>
                 <label class="block text-sm font-semibold text-slate-700">
@@ -154,11 +188,11 @@
                     </div>
                 </div>
                 <div class="app-modal-section text-sm text-slate-600">
-                    Add at least one station ID for every SACCO. Admin selection and member registration will use these values.
+                    <spring:message code="admin.saccoRegistry.stationHelp" text="Add at least one station ID for every SACCO. Admin selection and member registration will use these values." />
                 </div>
                 <div class="app-modal-actions">
-                    <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="create-sacco">Cancel</button>
-                    <button type="submit" class="app-btn btn-primary">Save SACCO</button>
+                    <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="create-sacco"><spring:message code="common.cancel" text="Cancel" /></button>
+                    <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveSacco" text="Save SACCO" /></button>
                 </div>
             </form>
         </div>
@@ -166,45 +200,47 @@
 </div>
 </c:if>
 
-<c:if test="${not superAdmin and not empty registeredSaccos}">
-<div class="app-modal-overlay hidden" data-sacco-modal="add-station-${registeredSaccos[0].saccoId}">
-    <div class="app-modal-panel app-modal-panel--compact">
-        <div class="app-modal-scroll">
-            <div class="app-modal-header">
-                <div>
-                    <p class="erp-panel-title">Add Station</p>
-                    <p class="mt-2 text-sm text-slate-500">Save one new station ID for this SACCO workspace.</p>
-                </div>
-                <button type="button" class="app-modal-close" data-sacco-modal-close="add-station-${registeredSaccos[0].saccoId}" aria-label="Close modal">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
-            </div>
-            <form action="/admin/saccos/${registeredSaccos[0].saccoId}/stations" method="post" class="app-modal-body space-y-4">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <label class="block text-sm font-semibold text-slate-700">
-                    Station ID
-                    <input name="stationId" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="Enter the new station ID" />
-                </label>
-                <div class="app-modal-actions">
-                    <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="add-station-${registeredSaccos[0].saccoId}">Cancel</button>
-                    <button type="submit" class="app-btn btn-primary">Save Station</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-</c:if>
-
+<c:if test="${superAdmin}">
 <c:forEach items="${registeredSaccos}" var="sacco">
+    <div class="app-modal-overlay hidden" data-sacco-modal="add-station-${sacco.saccoId}">
+        <div class="app-modal-panel app-modal-panel--compact">
+            <div class="app-modal-scroll">
+                <div class="app-modal-header">
+                    <div>
+                        <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addStation" text="Add Station" /></p>
+                        <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addStationHelp" text="Save one new station under this SACCO." /></p>
+                    </div>
+                    <button type="button" class="app-modal-close" data-sacco-modal-close="add-station-${sacco.saccoId}" aria-label="Close modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
+                <form action="/admin/saccos/${sacco.saccoId}/stations" method="post" class="app-modal-body space-y-4">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <label class="block text-sm font-semibold text-slate-700">
+                        Station ID
+                        <input name="stationId" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="Enter the new station ID" />
+                    </label>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        <spring:message code="admin.saccoRegistry.stationAddressLocation" text="Station Address / Location" />
+                        <input name="addressLocation" type="text" required maxlength="255" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. Arusha CBD, Sokoine Road" />
+                    </label>
+                    <div class="app-modal-actions">
+                        <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="add-station-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveStation" text="Save Station" /></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <div class="app-modal-overlay hidden" data-sacco-modal="edit-${sacco.saccoId}">
         <div class="app-modal-panel app-modal-panel--compact">
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-panel-title">${superAdmin ? 'Edit SACCO' : 'Edit Stations'}</p>
-                        <p class="mt-2 text-sm text-slate-500">${superAdmin ? 'Update the SACCO name and active station IDs.' : 'Review and update the active station IDs for this SACCO workspace.'}</p>
+                        <p class="erp-panel-title">${editSaccoLabel}</p>
+                        <p class="mt-2 text-sm text-slate-500">${editSaccoHelp}</p>
                     </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="edit-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -218,26 +254,26 @@
                         SACCO ID
                         <input type="text" readonly class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="${sacco.saccoId}" />
                     </label>
-                    <c:choose>
-                        <c:when test="${superAdmin}">
-                            <label class="block text-sm font-semibold text-slate-700">
-                                SACCO Name
-                                <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${sacco.saccoName}" />
-                            </label>
-                        </c:when>
-                        <c:otherwise>
-                            <input type="hidden" name="saccoName" value="${sacco.saccoName}" />
-                            <label class="block text-sm font-semibold text-slate-700">
-                                SACCO Name
-                                <input type="text" readonly class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="${sacco.saccoName}" />
-                            </label>
-                        </c:otherwise>
-                    </c:choose>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        <spring:message code="admin.saccoRegistry.saccoName" text="SACCO Name" />
+                        <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${sacco.saccoName}" />
+                    </label>
                     <label class="block text-sm font-semibold text-slate-700">
                         Station IDs
                         <textarea name="stationIds" rows="5" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800">${sacco.stationIdsText}</textarea>
                     </label>
-                    <c:if test="${superAdmin}">
+                    <div class="rounded border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"><spring:message code="admin.saccoRegistry.stationLocations" text="Station Locations" /></p>
+                        <div class="mt-3 grid gap-3">
+                            <c:forEach items="${sacco.stations}" var="station">
+                                <label class="block text-sm font-semibold text-slate-700">
+                                    ${station.stationId}
+                                    <input type="hidden" name="stationAddressIds" value="${station.stationId}" />
+                                    <input name="stationAddressLocations" type="text" maxlength="255" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" value="${station.addressLocation}" placeholder="Enter station address or location" />
+                                </label>
+                            </c:forEach>
+                        </div>
+                    </div>
                     <div class="rounded border border-slate-200 bg-slate-50 p-4">
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO Logo</p>
                         <div class="mt-3 flex items-start gap-4">
@@ -280,16 +316,16 @@
                             </div>
                         </div>
                     </div>
-                    </c:if>
                     <div class="app-modal-actions">
-                        <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}">Cancel</button>
-                        <button type="submit" class="app-btn btn-primary">${superAdmin ? 'Save Changes' : 'Save Stations'}</button>
+                        <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                        <button type="submit" class="app-btn btn-primary">${saveChangesLabel}</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </c:forEach>
+</c:if>
 
 <script>
     (function () {

@@ -1,72 +1,73 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Admin Tools / Dashboard</p>
-    <h1 class="erp-page-title">Admin Dashboard</h1>
-    <p class="erp-page-subtitle">Track incidents, outbox delivery, and storage.</p>
+    <p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" text="Admin Tools / Dashboard" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.dashboard.title" text="Admin Dashboard" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="admin.dashboard.subtitle" text="Track incidents, outbox delivery, and storage." /></p>
 </div>
 
 <section class="erp-stat-grid">
     <div class="erp-stat-card erp-stat-blue">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Members</p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.members" text="Members" /></p>
                 <p class="erp-stat-value">${dashboard.totalMembers}</p>
-                <p class="erp-stat-meta">Active: ${dashboard.activeMemberCount} | Inactive: ${dashboard.inactiveMemberCount}</p>
+                <p class="erp-stat-meta"><spring:message code="admin.dashboard.active" text="Active" />: ${dashboard.activeMemberCount} | <spring:message code="admin.dashboard.inactive" text="Inactive" />: ${dashboard.inactiveMemberCount}</p>
             </div>
             <span class="erp-stat-icon">M</span>
         </div>
-        <div class="erp-stat-footer"><span>Users in SACCO</span><span>${dashboard.totalMembers}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.usersInSacco" text="Users in SACCO" /></span><span>${dashboard.totalMembers}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-green">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Applications</p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.applications" text="Applications" /></p>
                 <p class="erp-stat-value">${dashboard.totalApplications}</p>
-                <p class="erp-stat-meta">On Review By Manager: ${dashboard.onReviewByManagerCount} | Board: ${dashboard.awaitingBoardCount}</p>
+                <p class="erp-stat-meta"><spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" />: ${dashboard.onReviewByManagerCount} | <spring:message code="role.committee" text="Board" />: ${dashboard.awaitingBoardCount}</p>
             </div>
             <span class="erp-stat-icon">A</span>
         </div>
-        <div class="erp-stat-footer"><span>Workflow volume</span><span>${dashboard.totalApplications}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.workflowVolume" text="Workflow volume" /></span><span>${dashboard.totalApplications}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-amber">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Outbox Failures</p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.outboxFailures" text="Outbox Failures" /></p>
                 <p class="erp-stat-value">${dashboard.outboxFailedCount}</p>
-                <p class="erp-stat-meta">New: ${dashboard.outboxNewCount} | Published: ${dashboard.outboxPublishedCount}</p>
+                <p class="erp-stat-meta"><spring:message code="admin.dashboard.new" text="New" />: ${dashboard.outboxNewCount} | <spring:message code="admin.dashboard.published" text="Published" />: ${dashboard.outboxPublishedCount}</p>
             </div>
             <span class="erp-stat-icon">O</span>
         </div>
-        <div class="erp-stat-footer"><span>Needs attention</span><span>${dashboard.outboxFailedCount}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.needsAttention" text="Needs attention" /></span><span>${dashboard.outboxFailedCount}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label">Storage</p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.storage" text="Storage" /></p>
                 <c:choose>
                     <c:when test="${dashboard.attachmentStorageReady}">
-                        <p class="erp-stat-value">OK</p>
+                        <p class="erp-stat-value"><spring:message code="admin.dashboard.ok" text="OK" /></p>
                     </c:when>
                     <c:otherwise>
-                        <p class="erp-stat-value">ISSUE</p>
+                        <p class="erp-stat-value"><spring:message code="admin.dashboard.issue" text="ISSUE" /></p>
                     </c:otherwise>
                 </c:choose>
-                <p class="erp-stat-meta">Attachment storage readiness</p>
+                <p class="erp-stat-meta"><spring:message code="admin.dashboard.storageReadiness" text="Attachment storage readiness" /></p>
             </div>
             <span class="erp-stat-icon">S</span>
         </div>
         <div class="erp-stat-footer">
-            <span>Health check</span>
+            <span><spring:message code="admin.dashboard.healthCheck" text="Health check" /></span>
             <c:choose>
                 <c:when test="${dashboard.attachmentStorageReady}">
-                    <span>Stable</span>
+                    <span><spring:message code="admin.dashboard.stable" text="Stable" /></span>
                 </c:when>
                 <c:otherwise>
-                    <span>Review</span>
+                    <span><spring:message code="common.review" text="Review" /></span>
                 </c:otherwise>
             </c:choose>
         </div>
@@ -77,14 +78,14 @@
     <div class="erp-panel-header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="erp-panel-title">Database Utilization</p>
-                <p class="mt-1 text-sm text-slate-500">Real-time PostgreSQL storage and connection usage sampled every 15 seconds.</p>
+                <p class="erp-panel-title"><spring:message code="admin.dashboard.databaseUtilization" text="Database Utilization" /></p>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.dashboard.databaseUtilizationHelp" text="Real-time PostgreSQL storage and connection usage sampled every 15 seconds." /></p>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700">Size: <span id="dbUtilizationSize">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700">Connections: <span id="dbUtilizationConnections">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700">Usage: <span id="dbUtilizationPercent">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700">Updated: <span id="dbUtilizationUpdated">-</span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.size" text="Size" />: <span id="dbUtilizationSize">-</span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.connections" text="Connections" />: <span id="dbUtilizationConnections">-</span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.usage" text="Usage" />: <span id="dbUtilizationPercent">-</span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.updated" text="Updated" />: <span id="dbUtilizationUpdated">-</span></span>
             </div>
         </div>
     </div>
@@ -99,8 +100,8 @@
     <div class="erp-panel">
         <div class="erp-panel-header">
             <div>
-                <p class="erp-panel-title">Recent Events</p>
-                <p class="mt-1 text-sm text-slate-500">Last 30 days.</p>
+                <p class="erp-panel-title"><spring:message code="admin.dashboard.recentEvents" text="Recent Events" /></p>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.dashboard.last30Days" text="Last 30 days." /></p>
             </div>
         </div>
         <div class="erp-panel-body">
@@ -115,7 +116,7 @@
                 </div>
             </c:forEach>
             <c:if test="${empty dashboard.recentAuditEntries}">
-                <p class="text-slate-500">No events in the last 30 days.</p>
+                <p class="text-slate-500"><spring:message code="admin.dashboard.noRecentEvents" text="No events in the last 30 days." /></p>
             </c:if>
         </div>
         </div>
@@ -124,13 +125,13 @@
     <div class="erp-panel">
         <div class="erp-panel-header">
             <div>
-                <p class="erp-panel-title">Recent Incidents</p>
-                <p class="mt-1 text-sm text-slate-500">Last 30 days.</p>
+                <p class="erp-panel-title"><spring:message code="admin.dashboard.recentIncidents" text="Recent Incidents" /></p>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.dashboard.last30Days" text="Last 30 days." /></p>
             </div>
         </div>
         <div class="erp-panel-body">
         <div class="mb-3">
-            <a href="/admin/incidents" class="app-btn btn-primary">Open Incidents</a>
+            <a href="/admin/incidents" class="app-btn btn-primary"><spring:message code="admin.dashboard.openIncidents" text="Open Incidents" /></a>
         </div>
         <div class="space-y-3">
             <c:forEach items="${dashboard.recentIncidents}" var="incident">
@@ -146,7 +147,7 @@
                 </a>
             </c:forEach>
             <c:if test="${empty dashboard.recentIncidents}">
-                <p class="text-slate-500">No incidents in the last 30 days.</p>
+                <p class="text-slate-500"><spring:message code="admin.dashboard.noRecentIncidents" text="No incidents in the last 30 days." /></p>
             </c:if>
         </div>
         </div>
@@ -154,12 +155,12 @@
 </section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title">Failed Outbox Events</p></div>
+    <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="admin.dashboard.failedOutboxEvents" text="Failed Outbox Events" /></p></div>
     <div class="erp-panel-body">
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table">
                 <thead>
-                <tr><th>Event</th><th>Aggregate</th><th>Created</th></tr>
+                <tr><th><spring:message code="admin.dashboard.event" text="Event" /></th><th><spring:message code="admin.dashboard.aggregate" text="Aggregate" /></th><th><spring:message code="admin.dashboard.created" text="Created" /></th></tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${dashboard.failedOutboxEvents}" var="event">
@@ -170,7 +171,7 @@
                     </tr>
                 </c:forEach>
                 <c:if test="${empty dashboard.failedOutboxEvents}">
-                    <tr><td colspan="3" class="text-slate-500">No failed outbox events.</td></tr>
+                    <tr><td colspan="3" class="text-slate-500"><spring:message code="admin.dashboard.noFailedOutboxEvents" text="No failed outbox events." /></td></tr>
                 </c:if>
                 </tbody>
             </table>
@@ -178,6 +179,8 @@
     </div>
 </section>
 
+<spring:message code="admin.dashboard.databaseSizeMb" text="Database Size (MB)" var="databaseSizeMbLabel" />
+<spring:message code="admin.dashboard.unableLoadDatabaseMetrics" text="Unable to load database utilization metrics right now." var="unableLoadDatabaseMetricsLabel" />
 <script>
     (function () {
         const canvas = document.getElementById('dbUtilizationChart');
@@ -328,7 +331,7 @@
             ctx.fillStyle = '#0f766e';
             ctx.fillRect(padding.left, 10, 12, 12);
             ctx.fillStyle = '#334155';
-            ctx.fillText('Database Size (MB)', padding.left + 18, 20);
+            ctx.fillText('${databaseSizeMbLabel}', padding.left + 18, 20);
             ctx.fillStyle = '#2563eb';
             ctx.fillRect(padding.left + 180, 10, 12, 12);
             ctx.fillStyle = '#334155';
@@ -354,7 +357,7 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = '#64748b';
                     ctx.font = '14px Manrope, sans-serif';
-                    ctx.fillText('Unable to load database utilization metrics right now.', 18, 32);
+                    ctx.fillText('${unableLoadDatabaseMetricsLabel}', 18, 32);
                 });
         }
 

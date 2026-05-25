@@ -2,8 +2,9 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.BoardReviewRepository;
+import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,8 +25,11 @@ class BoardServiceTest {
 
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;
-    @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Mock private OutboxService outboxService;
+    @Mock private LoanProductWorkflowService loanProductWorkflowService;
+    @Mock private WorkflowRoutingService workflowRoutingService;
+    @Mock private LoanProductSettingRepository loanProductSettingRepository;
+    @Mock private GuarantorRequestRepository guarantorRequestRepository;
 
     @InjectMocks
     private BoardService boardService;
@@ -61,22 +65,32 @@ class BoardServiceTest {
             .version(0)
             .build();
 
-        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberId(loanId, boardId)).thenReturn(Optional.of(review));
+        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
+            loanId, boardId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(review));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.APPROVED)).thenReturn(2L);
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.REJECTED)).thenReturn(0L);
-        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(
-            SaccoSettings.builder()
-                .saccoId(saccoId)
-                .externalStationId(saccoId)
-                .requiredGuarantors(3)
-                .boardSize(3)
-                .boardQuorum(2)
-                .maxLoanSavingsRatio(new BigDecimal("0.3333"))
-                .defaultLanguage("en")
-                .createdAt(OffsetDateTime.now())
-                .updatedAt(OffsetDateTime.now())
-                .build()));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.EDUCATION_LOAN))
+            .thenReturn(Optional.empty());
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.BOARD, BoardDecision.APPROVED)).thenReturn(2L);
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.BOARD, BoardDecision.REJECTED)).thenReturn(0L);
+        when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(new LoanProductWorkflowService.WorkflowDefinition(
+            java.util.List.of(ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.DISBURSEMENT_OFFICER),
+            ApprovalWorkflowStage.MANAGER,
+            false,
+            false,
+            true,
+            3,
+            2,
+            2,
+            false,
+            4
+        ));
+        when(workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.BOARD, boardId))
+            .thenAnswer(invocation -> {
+                app.setStatus(LoanStatus.BOARD_APPROVED);
+                return LoanStatus.BOARD_APPROVED;
+            });
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
 
         boardService.decide(loanId, boardId, BoardDecision.APPROVED, "Looks good", "Board Signer", verifiedAt);
@@ -84,7 +98,7 @@ class BoardServiceTest {
         assertThat(app.getStatus()).isEqualTo(LoanStatus.BOARD_APPROVED);
         assertThat(review.getBoardSignatureText()).isEqualTo("Board Signer");
         assertThat(review.getBoardSignatureVerifiedAt()).isEqualTo(verifiedAt);
-        verify(outboxService).enqueue(eq("LOAN"), eq(loanId), eq("BOARD_APPROVED"), eq(app.getApplicantMemberId()), any());
+        verify(workflowRoutingService).advanceAfterApproval(app, ApprovalWorkflowStage.BOARD, boardId);
     }
 
     @Test
@@ -116,16 +130,95 @@ class BoardServiceTest {
             .version(0)
             .build();
 
-        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberId(loanId, boardId)).thenReturn(Optional.of(review));
+        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
+            loanId, boardId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(review));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.APPROVED)).thenReturn(0L);
-        when(boardReviewRepository.countByLoanApplicationIdAndDecision(loanId, BoardDecision.REJECTED)).thenReturn(1L);
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.BOARD, BoardDecision.APPROVED)).thenReturn(0L);
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.BOARD, BoardDecision.REJECTED)).thenReturn(1L);
+        when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(new LoanProductWorkflowService.WorkflowDefinition(
+            java.util.List.of(ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.DISBURSEMENT_OFFICER),
+            ApprovalWorkflowStage.MANAGER,
+            false,
+            false,
+            true,
+            3,
+            1,
+            1,
+            false,
+            4
+        ));
 
         boardService.decide(loanId, boardId, BoardDecision.REJECTED, "Insufficient support", "Should Clear", OffsetDateTime.now());
 
         assertThat(review.getBoardSignatureText()).isNull();
         assertThat(review.getBoardSignatureVerifiedAt()).isNull();
         assertThat(review.getDecision()).isEqualTo(BoardDecision.REJECTED);
+    }
+
+    @Test
+    void loanOfficerApprovalAdvancesToNextConfiguredManagerStage() {
+        UUID loanId = UUID.randomUUID();
+        UUID loanOfficerId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        BoardReview review = BoardReview.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .boardMemberId(loanOfficerId)
+            .reviewStage(ApprovalWorkflowStage.LOAN_OFFICER)
+            .decision(BoardDecision.PENDING)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId(saccoId)
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .status(LoanStatus.AWAITING_LOAN_OFFICER)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
+            loanId, loanOfficerId, ApprovalWorkflowStage.LOAN_OFFICER)).thenReturn(Optional.of(review));
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.CUSTOMIZED_LOAN))
+            .thenReturn(Optional.empty());
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.LOAN_OFFICER, BoardDecision.APPROVED)).thenReturn(1L);
+        when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
+            loanId, ApprovalWorkflowStage.LOAN_OFFICER, BoardDecision.REJECTED)).thenReturn(0L);
+        when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(new LoanProductWorkflowService.WorkflowDefinition(
+            java.util.List.of(
+                ApprovalWorkflowStage.LOAN_OFFICER,
+                ApprovalWorkflowStage.MANAGER,
+                ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+            ),
+            ApprovalWorkflowStage.LOAN_OFFICER,
+            true,
+            2,
+            true,
+            1,
+            false,
+            3,
+            0,
+            0,
+            false,
+            4,
+            true
+        ));
+        when(workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.LOAN_OFFICER, loanOfficerId))
+            .thenAnswer(invocation -> {
+                app.setStatus(LoanStatus.READY_FOR_MANAGER);
+                return LoanStatus.READY_FOR_MANAGER;
+            });
+
+        boardService.decide(loanId, loanOfficerId, ApprovalWorkflowStage.LOAN_OFFICER,
+            BoardDecision.APPROVED, "Looks good", "Loan Officer", OffsetDateTime.now());
+
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
+        verify(workflowRoutingService).advanceAfterApproval(app, ApprovalWorkflowStage.LOAN_OFFICER, loanOfficerId);
     }
 
     @Test

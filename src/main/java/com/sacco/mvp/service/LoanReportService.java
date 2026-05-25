@@ -57,6 +57,17 @@ public class LoanReportService {
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
+    private static final List<LoanStatus> REJECTED_STATUSES = List.of(
+        LoanStatus.MANAGER_REJECTED,
+        LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.BOARD_REJECTED,
+        LoanStatus.ACCOUNTANT_REJECTED,
+        LoanStatus.FINAL_REJECTED
+    );
+    private static final List<LoanStatus> ACTIVE_STATUSES = List.of(
+        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DEFAULTED
+    );
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final LoanApplicationRepository loanApplicationRepository;
@@ -76,7 +87,7 @@ public class LoanReportService {
         List<LoanApplication> summaryLoans = loans.stream()
             .filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus()))
             .toList();
-        return new MemberLoanReport(member, summarize(summaryLoans), loans, buildMemberLoanDetails(member, loans));
+        return new MemberLoanReport(member, summarize(summaryLoans), summarizeMemberAnalytics(loans), loans, buildMemberLoanDetails(member, loans));
     }
 
     public ManagerLoanReport managerReport(String saccoId, Integer year, boolean returnedOnly) {
@@ -455,7 +466,7 @@ public class LoanReportService {
         lines.add("");
         lines.add("Summary");
         lines.add("Reviewed loans: " + report.summary().reviewedCount());
-        lines.add("Approved for disbursement: " + report.summary().approvedCount());
+        lines.add("Ready for disbursement: " + report.summary().approvedCount());
         lines.add("Rejected: " + report.summary().rejectedCount());
         lines.add("Reviewed amount: " + formatMoney(report.summary().reviewedAmount()));
         lines.add("");
@@ -534,6 +545,32 @@ public class LoanReportService {
         return new LoanSummary(loans.size(), paidCount, ongoingCount, disbursedAmount, paidAmount);
     }
 
+    private MemberLoanAnalyticsSummary summarizeMemberAnalytics(Collection<LoanApplication> loans) {
+        Collection<LoanApplication> safeLoans = loans == null ? List.of() : loans;
+        long appliedCount = safeLoans.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count();
+        long activeCount = safeLoans.stream().filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus())).count();
+        long disbursedCount = safeLoans.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count();
+        long paidCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
+        long defaultedCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
+        long forfeitedCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.FORFEITED).count();
+        long rejectedCount = safeLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count();
+        BigDecimal activeAmount = safeLoans.stream()
+            .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
+            .map(LoanApplication::getAmount)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new MemberLoanAnalyticsSummary(
+            appliedCount,
+            activeCount,
+            disbursedCount,
+            paidCount,
+            defaultedCount,
+            forfeitedCount,
+            rejectedCount,
+            activeAmount
+        );
+    }
+
     private byte[] renderPdf(List<String> lines) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PDFCursor cursor = new PDFCursor(document);
@@ -580,7 +617,7 @@ public class LoanReportService {
         }
         line.append(loan.getLoanType() == null ? "-" : humanizeLoanType(loan.getLoanType().name())).append(" | ");
         line.append(formatMoney(loan.getAmount())).append(" | ");
-        line.append(review.getDecision() == ManagerDecision.ACCEPT ? "APPROVED FOR DISBURSEMENT" : "REJECTED").append(" | ");
+        line.append(review.getDecision() == ManagerDecision.ACCEPT ? "READY FOR DISBURSEMENT" : "REJECTED").append(" | ");
         line.append("Reviewed ").append(formatTimestamp(review.getCreatedAt()));
         return line.toString();
     }
@@ -630,6 +667,7 @@ public class LoanReportService {
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case BOARD_REJECTED -> "Board Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
+            case FORFEITED -> "Forfeited";
             case FINAL_REJECTED -> "Final Rejected";
             case FINAL_APPROVED -> "Disbursed Loan";
             case DEFAULTED -> "Defaulted";
@@ -661,7 +699,7 @@ public class LoanReportService {
             return "All decisions";
         }
         return "APPROVED".equalsIgnoreCase(decisionFilter)
-            ? "Approved for disbursement"
+            ? "Ready for disbursement"
             : "Rejected";
     }
 
@@ -902,6 +940,7 @@ public class LoanReportService {
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case ACCOUNTANT_APPROVED -> "Accountant Approved";
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
+            case FORFEITED -> "Forfeited";
             case FINAL_REJECTED -> "Final Rejected";
             case FINAL_APPROVED -> "Disbursed Loan";
             case DEFAULTED -> "Defaulted / Not Paid";
@@ -968,9 +1007,25 @@ public class LoanReportService {
     public record MemberLoanReport(
         Member member,
         LoanSummary summary,
+        MemberLoanAnalyticsSummary analytics,
         List<LoanApplication> loans,
         List<MemberLoanDetail> details
     ) {}
+
+    public record MemberLoanAnalyticsSummary(
+        long appliedCount,
+        long activeCount,
+        long disbursedCount,
+        long paidCount,
+        long defaultedCount,
+        long forfeitedCount,
+        long rejectedCount,
+        BigDecimal activeAmount
+    ) {
+        public String getActiveAmountLabel() {
+            return formatMoneyStatic(activeAmount);
+        }
+    }
 
     public record MemberLoanDetail(
         UUID loanId,
@@ -1206,6 +1261,7 @@ public class LoanReportService {
             startNewPage();
             drawHeader();
             drawSummaryTable();
+            drawAnalyticsTable();
             drawDetailedLoansSection();
             drawApprovalSection();
             closePage();
@@ -1276,6 +1332,34 @@ public class LoanReportService {
             y -= 16f;
         }
 
+        private void drawAnalyticsTable() throws IOException {
+            MemberLoanAnalyticsSummary analytics = report.analytics();
+            if (analytics == null) {
+                return;
+            }
+            drawSectionHeading("Loan Status Analytics");
+            List<String[]> rows = List.of(
+                new String[]{"Applied Loans", String.valueOf(analytics.appliedCount())},
+                new String[]{"Active Loans", String.valueOf(analytics.activeCount())},
+                new String[]{"Disbursed Loans", String.valueOf(analytics.disbursedCount())},
+                new String[]{"Paid Loans", String.valueOf(analytics.paidCount())},
+                new String[]{"Defaulted Loans", String.valueOf(analytics.defaultedCount())},
+                new String[]{"Forfeited Loan Applications", String.valueOf(analytics.forfeitedCount())},
+                new String[]{"Rejected Loans", String.valueOf(analytics.rejectedCount())},
+                new String[]{"Active Loan Amount", sanitizePdfText(analytics.getActiveAmountLabel())}
+            );
+            float width = contentWidth();
+            drawTable(
+                new String[]{"Metric", "Value"},
+                new float[]{width * 0.58f, width * 0.42f},
+                rows,
+                BODY_SIZE,
+                BODY_SIZE,
+                14f
+            );
+            y -= 6f;
+        }
+
         private void drawDetailedLoansSection() throws IOException {
             drawSectionHeading("Detailed Loan Applications");
             drawParagraph("This layout uses structured tables for better clarity and PDF readability.", regular, META_SIZE, MUTED_COLOR);
@@ -1315,32 +1399,54 @@ public class LoanReportService {
 
         private void drawApprovalSection() throws IOException {
             drawSectionHeading("Approval & Member Details");
-            List<String[]> rows = new ArrayList<>();
             List<MemberLoanDetail> details = report.details() == null ? List.of() : report.details();
             if (details.isEmpty()) {
+                List<String[]> rows = new ArrayList<>();
                 rows.add(new String[]{"Field", "No loan applications found for this member yet."});
-            } else {
-                boolean multipleLoans = details.size() > 1;
-                int index = 1;
-                for (MemberLoanDetail detail : details) {
-                    String prefix = multipleLoans ? "Loan " + index + " " : "";
-                    rows.add(new String[]{prefix + "Member Contact", stackText(detail.memberDetailsLabel(), " | ")});
-                    rows.add(new String[]{prefix + "Guarantor", stackText(detail.guarantorDetailsLabel(), "; ")});
-                    rows.add(new String[]{prefix + "Committee Decision", stackText(detail.approvalDecisionSummaryLabel(), " | ", "; ")});
-                    rows.add(new String[]{prefix + "Prepared By", sanitizePdfText(detail.preparedByLabel()) + " / " + sanitizePdfText(detail.preparedDateLabel())});
-                    index++;
-                }
+                float width = contentWidth();
+                drawTable(
+                    new String[]{"Field", "Details"},
+                    new float[]{width * 0.32f, width * 0.68f},
+                    rows,
+                    BODY_SIZE,
+                    BODY_SIZE,
+                    14f
+                );
+                return;
             }
 
-            float width = contentWidth();
-            drawTable(
-                new String[]{"Field", "Details"},
-                new float[]{width * 0.32f, width * 0.68f},
-                rows,
-                BODY_SIZE,
-                BODY_SIZE,
-                14f
-            );
+            int index = 1;
+            for (MemberLoanDetail detail : details) {
+                drawLoanDetailTitle(detail, index++);
+                List<String[]> rows = new ArrayList<>();
+                rows.add(new String[]{"Member Contact", stackText(detail.memberDetailsLabel(), " | ")});
+                rows.add(new String[]{"Guarantor", stackText(detail.guarantorDetailsLabel(), "; ")});
+                rows.add(new String[]{"Committee Decision", stackText(detail.approvalDecisionSummaryLabel(), " | ", "; ")});
+                rows.add(new String[]{"Prepared By", sanitizePdfText(detail.preparedByLabel()) + " / " + sanitizePdfText(detail.preparedDateLabel())});
+
+                float width = contentWidth();
+                drawTable(
+                    new String[]{"Field", "Details"},
+                    new float[]{width * 0.32f, width * 0.68f},
+                    rows,
+                    BODY_SIZE,
+                    BODY_SIZE,
+                    12f
+                );
+            }
+        }
+
+        private void drawLoanDetailTitle(MemberLoanDetail detail, int index) throws IOException {
+            ensureSpace(18f);
+            String loanId = "-".equals(detail.loanIdLabel())
+                ? ""
+                : " | Loan ID " + sanitizePdfText(detail.loanIdLabel());
+            String title = "Loan " + index
+                + ": " + sanitizePdfText(detail.approvedProductLabel())
+                + " | Application " + sanitizePdfText(detail.loanApplicationIdLabel())
+                + loanId;
+            writeText(title, MARGIN, y, bold, BODY_SIZE + 0.6f, TEXT_COLOR);
+            y -= 12f;
         }
 
         private void drawSectionHeading(String text) throws IOException {
