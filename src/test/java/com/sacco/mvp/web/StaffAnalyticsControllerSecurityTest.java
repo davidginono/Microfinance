@@ -78,20 +78,21 @@ class StaffAnalyticsControllerSecurityTest {
     void managerCanReachStaffAnalytics() throws Exception {
         AppUserPrincipal principal = principal(Position.MANAGER, false);
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
-        when(loanAnalyticsService.forStaff(any(), any(), any(), any(), any()))
+        when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO));
-        when(loanAnalyticsService.statusTrendForStaff(any(), any(), any(), any(), any())).thenReturn(List.of());
-        when(loanAnalyticsService.productPerformanceForStaff(any(), any(), any(), any())).thenReturn(List.of());
+        when(loanAnalyticsService.statusTrendForStation(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(loanAnalyticsService.productPerformanceForStation(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.productChartSeries(any())).thenReturn(List.of());
         when(loanAnalyticsService.metricDeltas(any(), any())).thenReturn(List.of());
-        when(loanAnalyticsService.staffPortfolio(any(), any(), any(), any(), any()))
+        when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
 
         mockMvc.perform(get("/staff/analytics").with(authentication(authenticationFor(principal))))
             .andExpect(status().isOk())
             .andExpect(view().name("staff/analytics"));
 
-        verify(loanAnalyticsService, times(2)).forStaff(any(), any(), any(), any(), any());
+        verify(loanAnalyticsService, times(2)).forStation(any(), any(), any(), any(), any(), any());
+        verify(loanAnalyticsService, never()).forStaff(any(), any(), any(), any(), any());
     }
 
     @Test

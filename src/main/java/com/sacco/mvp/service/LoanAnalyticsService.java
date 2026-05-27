@@ -81,6 +81,15 @@ public class LoanAnalyticsService {
         return summarize(staffLoans(principal, fromDate, toDate, loanType, loanStatus));
     }
 
+    public MemberLoanAnalytics forStation(String saccoId,
+                                          String stationId,
+                                          LocalDate fromDate,
+                                          LocalDate toDate,
+                                          LoanType loanType,
+                                          LoanStatus loanStatus) {
+        return summarize(stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus));
+    }
+
     public List<MetricTrendSeries> statusTrendForMember(UUID memberId,
                                                         LocalDate fromDate,
                                                         LocalDate toDate,
@@ -129,6 +138,28 @@ public class LoanAnalyticsService {
         );
     }
 
+    public List<MetricTrendSeries> statusTrendForStation(String saccoId,
+                                                         String stationId,
+                                                         LocalDate fromDate,
+                                                         LocalDate toDate,
+                                                         LoanType loanType,
+                                                         LoanStatus loanStatus) {
+        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
+        List<YearMonth> months = monthsBetween(start, end);
+        List<LoanApplication> loans = stationLoans(saccoId, stationId, start, end, loanType, loanStatus);
+
+        return List.of(
+            trendSeries("Applied", "#2563eb", months, loans, app -> app.getStatus() != LoanStatus.DRAFT),
+            trendSeries("Active", "#059669", months, loans, app -> ACTIVE_STATUSES.contains(app.getStatus())),
+            trendSeries("Disbursed", "#059669", months, loans, app -> DISBURSED_STATUSES.contains(app.getStatus())),
+            trendSeries("Paid", "#7c3aed", months, loans, app -> app.getStatus() == LoanStatus.PAID),
+            trendSeries("Defaulted", "#dc2626", months, loans, app -> app.getStatus() == LoanStatus.DEFAULTED),
+            trendSeries("Forfeited", "#f97316", months, loans, app -> app.getStatus() == LoanStatus.FORFEITED),
+            trendSeries("Rejected", "#475569", months, loans, app -> REJECTED_STATUSES.contains(app.getStatus()))
+        );
+    }
+
     public List<LoanProductPerformance> productPerformanceForMember(String saccoId,
                                                                     String stationId,
                                                                     UUID memberId,
@@ -146,6 +177,14 @@ public class LoanAnalyticsService {
                                                                    LoanStatus loanStatus) {
         return productPerformance(principal == null ? null : principal.getSaccoId(),
             staffLoans(principal, fromDate, toDate, null, loanStatus));
+    }
+
+    public List<LoanProductPerformance> productPerformanceForStation(String saccoId,
+                                                                     String stationId,
+                                                                     LocalDate fromDate,
+                                                                     LocalDate toDate,
+                                                                     LoanStatus loanStatus) {
+        return productPerformance(saccoId, stationLoans(saccoId, stationId, fromDate, toDate, null, loanStatus));
     }
 
     public List<MetricDelta> metricDeltas(MemberLoanAnalytics current, MemberLoanAnalytics previous) {
@@ -184,6 +223,32 @@ public class LoanAnalyticsService {
             ? "High"
             : defaultedRate.compareTo(BigDecimal.valueOf(5)) >= 0 ? "Moderate" : "Low";
         return new StaffPortfolioSummary(events.size(), approved, rejected, disbursed, defaultedAfterApproval, defaultedRate, riskLevel);
+    }
+
+    public StaffPortfolioSummary stationPortfolio(String saccoId,
+                                                  String stationId,
+                                                  LocalDate fromDate,
+                                                  LocalDate toDate,
+                                                  LoanType loanType,
+                                                  LoanStatus loanStatus) {
+        MemberLoanAnalytics analytics = forStation(saccoId, stationId, fromDate, toDate, loanType, loanStatus);
+        BigDecimal defaultedRate = analytics.disbursedLoans() == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(analytics.defaultedLoans())
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(analytics.disbursedLoans()), 2, RoundingMode.HALF_UP);
+        String riskLevel = defaultedRate.compareTo(BigDecimal.valueOf(10)) >= 0
+            ? "High"
+            : defaultedRate.compareTo(BigDecimal.valueOf(5)) >= 0 ? "Moderate" : "Low";
+        return new StaffPortfolioSummary(
+            analytics.appliedLoans(),
+            analytics.disbursedLoans(),
+            analytics.rejectedLoans(),
+            analytics.disbursedLoans(),
+            analytics.defaultedLoans(),
+            defaultedRate,
+            riskLevel
+        );
     }
 
     public List<Map<String, Object>> productChartSeries(List<LoanProductPerformance> performance) {
@@ -249,6 +314,24 @@ public class LoanAnalyticsService {
                                               LoanStatus loanStatus) {
         return loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId)
             .stream()
+            .filter(app -> withinRange(app.getCreatedAt(), fromDate, toDate))
+            .filter(app -> loanType == null || app.getLoanType() == loanType)
+            .filter(app -> loanStatus == null || app.getStatus() == loanStatus)
+            .toList();
+    }
+
+    private List<LoanApplication> stationLoans(String saccoId,
+                                               String stationId,
+                                               LocalDate fromDate,
+                                               LocalDate toDate,
+                                               LoanType loanType,
+                                               LoanStatus loanStatus) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return List.of();
+        }
+        return loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId)
+            .stream()
+            .filter(app -> matchesStation(app, stationId))
             .filter(app -> withinRange(app.getCreatedAt(), fromDate, toDate))
             .filter(app -> loanType == null || app.getLoanType() == loanType)
             .filter(app -> loanStatus == null || app.getStatus() == loanStatus)

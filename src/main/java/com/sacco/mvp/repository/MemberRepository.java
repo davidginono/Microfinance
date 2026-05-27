@@ -14,6 +14,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
+    interface StatusCountProjection {
+        MemberStatus getStatus();
+        long getTotal();
+    }
+
     Optional<Member> findByMemberNo(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
 
@@ -60,4 +65,22 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     Page<Member> findUserAccessPage(@Param("saccoId") String saccoId,
                                     @Param("query") String query,
                                     Pageable pageable);
+
+    @Query("""
+        select m.status as status, count(m) as total
+        from Member m
+        where m.saccoId = :saccoId
+          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+        group by m.status
+        """)
+    List<StatusCountProjection> countByStatusForScope(@Param("saccoId") String saccoId,
+                                                      @Param("stationId") String stationId);
+
+    @Query("""
+        select count(m)
+        from Member m
+        where m.saccoId = :saccoId
+          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+        """)
+    long countForScope(@Param("saccoId") String saccoId, @Param("stationId") String stationId);
 }

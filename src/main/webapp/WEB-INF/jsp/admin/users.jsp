@@ -257,13 +257,18 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Claims</p>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${availableClaims}" var="claim">
-                            <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                            <c:set var="memberOnlyClaimDisabled" value="${(claim eq 'APPLY_LOANS' or claim eq 'APPROVE_GUARANTOR_REQUESTS') and not user.memberAccess}" />
+                            <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
                                 <input type="checkbox"
                                        name="claims"
                                        value="${claim}"
                                        ${user.claims.contains(claim) ? 'checked' : ''}
+                                       ${memberOnlyClaimDisabled ? 'disabled' : ''}
                                        class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
                                 <span>${claim}</span>
+                                <c:if test="${memberOnlyClaimDisabled}">
+                                    <span class="ml-auto text-xs font-normal text-slate-400">Members only</span>
+                                </c:if>
                             </label>
                         </c:forEach>
                     </div>

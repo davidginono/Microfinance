@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.SaccoSettings;
@@ -50,10 +51,6 @@ public class LoanQualificationPolicyService {
         if (maxDefaulted != null && analytics.defaultedLoans() >= maxDefaulted) {
             return Optional.of("You cannot apply because your defaulted loan count has reached the station policy limit.");
         }
-        BigDecimal maxActiveAmount = positive(policy.applicantMaxActiveLoanAmount());
-        if (maxActiveAmount != null && loanAnalyticsService.activeLoanAmount(memberId, stationId).compareTo(maxActiveAmount) >= 0) {
-            return Optional.of("You cannot apply because your active loan amount has reached the station policy limit.");
-        }
         Integer waitDays = positive(applicantForfeitedWaitDays(policy));
         if (waitDays != null) {
             Optional<ForfeitedApplicationRestriction> restriction = forfeitedApplicationRestriction(memberId, stationId, waitDays);
@@ -86,19 +83,25 @@ public class LoanQualificationPolicyService {
     }
 
     public Optional<String> guarantorFailureReason(String saccoId, UUID guarantorMemberId, BigDecimal pendingGuaranteedAmount) {
+        return guarantorFailureReason(saccoId, guarantorMemberId, pendingGuaranteedAmount, null);
+    }
+
+    public Optional<String> guarantorFailureReason(String saccoId, UUID guarantorMemberId, BigDecimal pendingGuaranteedAmount, LoanProductSetting product) {
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
         if (settings == null) {
             return Optional.empty();
         }
         String stationId = resolveMemberStationId(guarantorMemberId);
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
-        BigDecimal minSavings = positive(policy.guarantorMinSavings());
+        BigDecimal minSavings = product == null || !product.isGuarantorMinSavingsCheckRequired()
+            ? null
+            : positive(product.getGuarantorMinimumSavings());
         if (minSavings != null && eligibilityService.resolveSavings(guarantorMemberId).compareTo(minSavings) < 0) {
-            return Optional.of("Disabled: savings are below the station guarantor minimum.");
+            return Optional.of("Disabled: savings are below this loan product's guarantor minimum.");
         }
-        BigDecimal maxActiveAmount = positive(policy.guarantorMaxActiveLoanAmount());
-        if (maxActiveAmount != null && loanAnalyticsService.activeLoanAmount(guarantorMemberId, stationId).compareTo(maxActiveAmount) >= 0) {
-            return Optional.of("Disabled: active loan amount has reached the station guarantor limit.");
+        if (!policy.guarantorWithActiveLoanAllowed()
+            && nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, stationId)).compareTo(BigDecimal.ZERO) > 0) {
+            return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }
         Integer maxDefaulted = positive(policy.guarantorMaxDefaultedLoans());
         if (maxDefaulted != null && loanAnalyticsService.summarizeAllTime(guarantorMemberId, stationId).defaultedLoans() >= maxDefaulted) {
@@ -128,24 +131,6 @@ public class LoanQualificationPolicyService {
         });
     }
 
-    public void assertGuarantorCanCommit(String saccoId, UUID guarantorMemberId, BigDecimal commitmentAmount) {
-        if (commitmentAmount == null || commitmentAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Assigned guarantor commitment amount must be greater than zero.");
-        }
-        assertGuarantorEligible(saccoId, guarantorMemberId, commitmentAmount);
-        BigDecimal availableSavings = availableGuarantorSavings(saccoId, guarantorMemberId);
-        if (availableSavings.compareTo(commitmentAmount) < 0) {
-            throw new IllegalStateException("This guarantor does not have enough available savings after existing active guarantee commitments are deducted.");
-        }
-    }
-
-    public BigDecimal availableGuarantorSavings(String saccoId, UUID guarantorMemberId) {
-        String stationId = resolveMemberStationId(guarantorMemberId);
-        BigDecimal savings = nonNegative(eligibilityService.resolveSavings(guarantorMemberId));
-        BigDecimal activeCommitments = guaranteedActiveAmount(saccoId, guarantorMemberId, stationId);
-        return savings.subtract(activeCommitments).max(BigDecimal.ZERO).setScale(2, java.math.RoundingMode.HALF_UP);
-    }
-
     private BigDecimal guaranteedActiveAmount(String saccoId, UUID guarantorMemberId, String stationId) {
         return guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(
                 guarantorMemberId,
@@ -155,7 +140,7 @@ public class LoanQualificationPolicyService {
             .map(request -> loanApplicationRepository.findById(request.getLoanApplicationId())
                 .filter(app -> matchesScope(app, saccoId, stationId))
                 .filter(this::isActiveGuaranteeLoan)
-                .map(app -> firstNonNull(request.getCommittedAmount(), firstNonNull(request.getRequestedAmount(), app.getAmount())))
+                .map(LoanApplication::getAmount)
                 .orElse(null))
             .filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -179,12 +164,11 @@ public class LoanQualificationPolicyService {
             : saccoStationPolicyRepository.findBySaccoIdAndStationId(settings.getSaccoId(), stationId).orElse(null);
         return new ResolvedQualificationPolicy(
             firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantMaxDefaultedLoans(), settings.getApplicantMaxDefaultedLoans()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantMaxActiveLoanAmount(), settings.getApplicantMaxActiveLoanAmount()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantMaxForfeitedLoans(), settings.getApplicantMaxForfeitedLoans()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantForfeitedLookbackDays(), settings.getApplicantForfeitedLookbackDays()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantForfeitedWaitDays(), settings.getApplicantForfeitedWaitDays()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMinSavings(), settings.getGuarantorMinSavings()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxActiveLoanAmount(), settings.getGuarantorMaxActiveLoanAmount()),
+            firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()) == null
+                || firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxGuaranteedLoanAmount(), settings.getGuarantorMaxGuaranteedLoanAmount()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxDefaultedLoans(), settings.getGuarantorMaxDefaultedLoans())
         );
@@ -278,22 +262,20 @@ public class LoanQualificationPolicyService {
         return value == null || value.compareTo(BigDecimal.ZERO) <= 0 ? null : value;
     }
 
+    private BigDecimal nullToZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
     private Integer positiveGuaranteeCount(BigDecimal value) {
         return value == null || value.compareTo(BigDecimal.ZERO) <= 0 ? null : value.intValue();
     }
 
-    private BigDecimal nonNegative(BigDecimal value) {
-        return value == null || value.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : value;
-    }
-
     private record ResolvedQualificationPolicy(
         Integer applicantMaxDefaultedLoans,
-        BigDecimal applicantMaxActiveLoanAmount,
         Integer applicantMaxForfeitedLoans,
         Integer applicantForfeitedLookbackDays,
         Integer applicantForfeitedWaitDays,
-        BigDecimal guarantorMinSavings,
-        BigDecimal guarantorMaxActiveLoanAmount,
+        boolean guarantorWithActiveLoanAllowed,
         BigDecimal guarantorMaxGuaranteedLoanAmount,
         Integer guarantorMaxDefaultedLoans
     ) {

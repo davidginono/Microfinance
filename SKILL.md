@@ -122,4 +122,9 @@ description: UI and navigation governance for SACCOS_LMS. Use when generating or
 - Prefer uncontrolled inputs; controlled inputs must be cheap per keystroke
 - Add `<link rel="preconnect">` for CDN/asset domains
 - Critical fonts: `<link rel="preload" as="font">` with `font-display: swap`
-
+- Backend changes must keep a path to at least 1,000 requests per second:
+  - no new request-path `findAll()` or unbounded tenant-wide reads
+  - use tenant/station-scoped pagination, SQL counts, `exists`, `top`, projections, or aggregate queries
+  - add matching indexes for new high-traffic query shapes
+  - keep outbox, report, notification, upload, and external integration work async or batchable
+  - preserve workflow behavior while reducing RAM and database load

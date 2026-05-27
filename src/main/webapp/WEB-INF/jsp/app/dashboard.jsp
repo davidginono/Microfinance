@@ -998,7 +998,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 Time already used
                             </span>
                         </div>
-                        <div class="mt-4 grid gap-4 2xl:grid-cols-2">
+                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             <c:forEach items="${activeLoanChartRows}" var="loanRow">
                                 <div class="min-w-0 overflow-hidden rounded border border-slate-200 bg-white p-4"
                                      data-repayment-timer="card"

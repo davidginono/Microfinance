@@ -28,7 +28,7 @@
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
 <div class="erp-table-wrap overflow-x-auto">
 <table class="erp-table">
-    <thead><tr><th>Loan Reference</th><th>Guarantee Name</th><th>Loan Type</th><th>Loan Amount</th><th>Your Commitment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Loan Reference</th><th>Guarantee Name</th><th>Loan Type</th><th>Loan Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
@@ -45,7 +45,6 @@
                 </c:if>
             </td>
             <td>${guaranteeLoanAmounts[req.loanApplicationId]}</td>
-            <td>${guaranteeCommitmentAmounts[req.id]}</td>
             <td>${req.status}</td>
             <td>
                 <c:choose>
@@ -102,7 +101,7 @@
         </tr>
     </c:forEach>
     <c:if test="${empty requests}">
-        <tr><td colspan="8" class="px-3 py-3 text-slate-500">No guarantee requests found.</td></tr>
+        <tr><td colspan="7" class="px-3 py-3 text-slate-500">No guarantee requests found.</td></tr>
     </c:if>
     </tbody>
 </table>
@@ -152,10 +151,6 @@
                         </div>
                     </c:if>
                     <div class="app-modal-section text-sm leading-7 text-slate-700">
-                        <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your Commitment Amount</p>
-                            <p class="mt-1 text-xl font-bold text-sacco-ink">${guaranteeCommitmentAmounts[req.id]}</p>
-                        </div>
                         <p>
                             <strong>Guarantor Declaration:</strong>
                             I,

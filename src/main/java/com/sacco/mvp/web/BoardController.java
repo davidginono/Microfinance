@@ -16,7 +16,9 @@ import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,10 +53,62 @@ public class BoardController {
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
     private final NotificationInboxService notificationInboxService;
+    private final ManagerService managerService;
+    private final WorkflowStatusPresentationService workflowStatusPresentationService;
 
     @GetMapping("/assigned")
     public String assigned() {
         return "redirect:/board/queue";
+    }
+
+    @GetMapping("/dashboard")
+    public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+        ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
+        Map<UUID, String> applicantNames = memberRepository.findAllById(
+                dashboard.recentDisbursements().stream()
+                    .map(LoanApplication::getApplicantMemberId)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+
+        model.addAttribute("dashboardBreadcrumb", "Board Panel / Dashboard");
+        model.addAttribute("dashboardPageTitle", "Board Dashboard");
+        model.addAttribute("dashboardSubtitle", "Track board review decisions and keep an eye on loans waiting for board action.");
+        model.addAttribute("dashboardQueueLabel", "On Review By Board");
+        model.addAttribute("dashboardQueueValue",
+            workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD));
+        model.addAttribute("dashboardQueueMeta", "Applications currently waiting for your action.");
+        model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
+        model.addAttribute("dashboardQueueIcon", "B");
+        model.addAttribute("dashboardDetailBasePath", "/board/loan-applications");
+        model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
+        model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
+        model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
+        model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
+        model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
+        model.addAttribute("dashboardChartTitle", "Board Decision Chart");
+        model.addAttribute("dashboardChartHelp", "A board-focused view of applications waiting for board review, approved by board, and rejected by board.");
+        model.addAttribute("dashboardStatusChartRows",
+            workflowStatusPresentationService.buildBoardDashboardChartRows(
+                dashboard.statusBreakdown(),
+                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+            ));
+        model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
+            .map(loan -> {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", loan.getId().toString());
+                row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
+                row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
+                row.put("statusLabel", workflowStatusPresentationService.dashboardStatusLabel(loan.getStatus()));
+                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
+                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
+                row.put("amount", loan.getAmount() == null ? "-" : loan.getAmount().toPlainString());
+                row.put("disbursementDate", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
+                return row;
+            })
+            .toList());
+        model.addAttribute("dashboardRecentDisbursementDays", 30);
+        return "manager/dashboard";
     }
 
     @GetMapping("/queue")
@@ -129,7 +184,6 @@ public class BoardController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
@@ -235,7 +289,6 @@ public class BoardController {
                          @RequestParam BoardDecision decision,
                          @RequestParam(required = false) String comment,
                          @RequestParam(required = false) String boardSignatureOtpCode,
-                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
             if (decision == BoardDecision.APPROVED) {
@@ -249,8 +302,7 @@ public class BoardController {
                     decision,
                     comment,
                     boardMember.getSignatureText(),
-                    OffsetDateTime.now(),
-                    parseGuarantorCommitments(request)
+                    OffsetDateTime.now()
                 );
                 emailOtpService.consumeOtpById(otpTokenId);
             } else {
@@ -261,20 +313,6 @@ public class BoardController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/board/loan-applications/" + id;
-    }
-
-    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
-        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-        request.getParameterMap().forEach((key, values) -> {
-            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
-                return;
-            }
-            try {
-                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
-            } catch (IllegalArgumentException ignored) {
-            }
-        });
-        return commitments;
     }
 
     @PostMapping("/loan-applications/{id}/undo")

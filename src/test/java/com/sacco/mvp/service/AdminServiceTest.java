@@ -434,6 +434,55 @@ class AdminServiceTest {
     }
 
     @Test
+    void updateUserRemovesMemberOnlyClaimsFromStaffOnlyAccounts() {
+        UUID accountId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("MGR001")
+            .fullName("Manager User")
+            .email("manager@example.com")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .build();
+        UserSettings settings = UserSettings.builder()
+            .memberId(accountId)
+            .language("en")
+            .notificationPrefs("{}")
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .updatedAt(OffsetDateTime.now().minusDays(1))
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userSettingsRepository.existsById(accountId)).thenReturn(true);
+        when(userSettingsRepository.findById(accountId)).thenReturn(Optional.of(settings));
+        when(userSettingsRepository.save(any(UserSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            adminId,
+            Set.of(Position.ADMIN),
+            accountId,
+            List.of(Position.MANAGER),
+            MemberStatus.ACTIVE,
+            List.of(UserClaim.APPLY_LOANS, UserClaim.APPROVE_GUARANTOR_REQUESTS, UserClaim.REVIEW_MANAGER_QUEUE)
+        );
+
+        verify(userSettingsRepository).save(argThat(saved ->
+            saved.getNotificationPrefs().contains("REVIEW_MANAGER_QUEUE")
+                && !saved.getNotificationPrefs().contains("APPLY_LOANS")
+                && !saved.getNotificationPrefs().contains("APPROVE_GUARANTOR_REQUESTS")
+        ));
+    }
+
+    @Test
     void updateUserAllowsExistingMinorAdminToKeepSameSlot() {
         UUID accountId = UUID.randomUUID();
         Member member = Member.builder()
@@ -1105,6 +1154,8 @@ class AdminServiceTest {
             true,
             2,
             true,
+            false,
+            BigDecimal.ZERO,
             LoanProductStatus.ACTIVE
         );
 
@@ -1168,6 +1219,8 @@ class AdminServiceTest {
             true,
             4,
             true,
+            false,
+            BigDecimal.ZERO,
             LoanProductStatus.ACTIVE
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -1204,104 +1257,4 @@ class AdminServiceTest {
         assertThat(settings.getApplicationFee()).isEqualByComparingTo("22000.00");
     }
 
-    @Test
-    void updateLoanFeePaymentInstructionsPersistsValidatedSettings() {
-        UUID adminId = UUID.randomUUID();
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(saccoSettingsRepository.save(any(SaccoSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        adminService.updateLoanFeePaymentInstructions(
-            "SACCO-01",
-            adminId,
-            "M-Pesa",
-            "255746359369",
-            "TAHA SACCOS",
-            "Pay the fees and upload the receipt before submission."
-        );
-
-        verify(saccoSettingsRepository).save(settings);
-        assertThat(settings.getLoanFeePaymentMethod()).isEqualTo("M-Pesa");
-        assertThat(settings.getLoanFeePaymentAccount()).isEqualTo("255746359369");
-        assertThat(settings.getLoanFeePaymentPayee()).isEqualTo("TAHA SACCOS");
-        assertThat(settings.getLoanFeePaymentInstructions()).isEqualTo("Pay the fees and upload the receipt before submission.");
-    }
-
-    @Test
-    void updateLoanFeePaymentInstructionsRejectsInvalidAccount() {
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-
-        assertThatThrownBy(() -> adminService.updateLoanFeePaymentInstructions(
-            "SACCO-01",
-            UUID.randomUUID(),
-            "M-Pesa",
-            "ACCOUNT",
-            "TAHA SACCOS",
-            "Pay the fees and upload the receipt before submission."
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Enter a valid payment number or account.");
-
-        verify(saccoSettingsRepository, never()).save(any(SaccoSettings.class));
-    }
-
-    @Test
-    void updateLoanFeePaymentInstructionsRejectsNumericPaymentMethod() {
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-
-        assertThatThrownBy(() -> adminService.updateLoanFeePaymentInstructions(
-            "SACCO-01",
-            UUID.randomUUID(),
-            "3455666",
-            "42810009963",
-            "saccos1",
-            null
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Enter a valid payment method.");
-
-        verify(saccoSettingsRepository, never()).save(any(SaccoSettings.class));
-    }
-
-    @Test
-    void updateLoanFeePaymentInstructionsAllowsBlankApplicantInstructions() {
-        UUID adminId = UUID.randomUUID();
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(saccoSettingsRepository.save(any(SaccoSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        adminService.updateLoanFeePaymentInstructions(
-            "SACCO-01",
-            adminId,
-            "Bank",
-            "42810009963",
-            "saccos1",
-            " "
-        );
-
-        verify(saccoSettingsRepository).save(settings);
-        assertThat(settings.getLoanFeePaymentInstructions()).isNull();
-    }
 }

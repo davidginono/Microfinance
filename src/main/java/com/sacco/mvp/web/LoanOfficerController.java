@@ -82,7 +82,7 @@ public class LoanOfficerController {
 
         model.addAttribute("dashboardBreadcrumb", "Loan Officer Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Loan Officer Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track the disbursed portfolio and keep an eye on loans waiting for loan officer review.");
+        model.addAttribute("dashboardSubtitle", "Track loan officer review decisions and keep an eye on loans waiting for your action.");
         model.addAttribute("dashboardQueueLabel", "On Review By Loan Officer");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_LOAN_OFFICER));
@@ -95,8 +95,13 @@ public class LoanOfficerController {
         model.addAttribute("dashboardDisbursementYear", java.time.LocalDate.now().getYear());
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
+        model.addAttribute("dashboardChartTitle", "Loan Officer Review Chart");
+        model.addAttribute("dashboardChartHelp", "A loan-officer-focused view of applications waiting for review, approved, and rejected.");
         model.addAttribute("dashboardStatusChartRows",
-            workflowStatusPresentationService.buildDashboardStatusChartRows(dashboard.statusBreakdown()));
+            workflowStatusPresentationService.buildLoanOfficerDashboardChartRows(
+                dashboard.statusBreakdown(),
+                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+            ));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -188,7 +193,6 @@ public class LoanOfficerController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
@@ -294,7 +298,6 @@ public class LoanOfficerController {
                          @RequestParam BoardDecision decision,
                          @RequestParam(required = false) String comment,
                          @RequestParam(required = false) String boardSignatureOtpCode,
-                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
             if (decision == BoardDecision.APPROVED) {
@@ -308,8 +311,7 @@ public class LoanOfficerController {
                     decision,
                     comment,
                     reviewer.getSignatureText(),
-                    OffsetDateTime.now(),
-                    parseGuarantorCommitments(request)
+                    OffsetDateTime.now()
                 );
                 emailOtpService.consumeOtpById(otpTokenId);
             } else {
@@ -320,20 +322,6 @@ public class LoanOfficerController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/loan-officer/loan-applications/" + id;
-    }
-
-    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
-        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-        request.getParameterMap().forEach((key, values) -> {
-            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
-                return;
-            }
-            try {
-                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
-            } catch (IllegalArgumentException ignored) {
-            }
-        });
-        return commitments;
     }
 
     @PostMapping("/loan-applications/{id}/undo")

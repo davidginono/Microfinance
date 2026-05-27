@@ -3,6 +3,7 @@ package com.sacco.mvp.web;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.GuarantorRequest;
+import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.ManagerDecision;
@@ -16,6 +17,7 @@ import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -67,6 +69,7 @@ public class DisbursementController {
     private final NotificationInboxService notificationInboxService;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
+    private final EmailOtpService emailOtpService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -93,8 +96,10 @@ public class DisbursementController {
         model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
+        model.addAttribute("dashboardChartTitle", "Disbursement Status Chart");
+        model.addAttribute("dashboardChartHelp", "A disbursement-focused view of loans ready for release and the current disbursed portfolio status.");
         model.addAttribute("dashboardStatusChartRows",
-            workflowStatusPresentationService.buildDashboardStatusChartRows(dashboard.statusBreakdown()));
+            workflowStatusPresentationService.buildDisbursementDashboardChartRows(dashboard.statusBreakdown()));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -256,7 +261,6 @@ public class DisbursementController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -370,9 +374,11 @@ public class DisbursementController {
                            @RequestParam(required = false) String loanId,
                            @RequestParam(required = false) String disbursementReference,
                            @RequestParam(required = false) String disbursementNotes,
+                           @RequestParam(required = false) String disbursementOtpCode,
                            @RequestParam(required = false) MultipartFile disbursementProofFile,
                            RedirectAttributes ra) {
         try {
+            UUID otpTokenId = validateDisbursementOtp(principal.getMemberId(), disbursementOtpCode);
             managerService.disburseLoan(
                 id,
                 principal.getMemberId(),
@@ -385,11 +391,42 @@ public class DisbursementController {
                 disbursementNotes,
                 disbursementProofFile
             );
+            emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", "Loan disbursed successfully.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/disbursement/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/request-disbursement-otp")
+    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestDisbursementOtp(@PathVariable UUID id,
+                                                                      @AuthenticationPrincipal AppUserPrincipal principal) {
+        try {
+            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
+                throw new IllegalStateException("This loan is no longer ready for disbursement.");
+            }
+            Member officer = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a disbursement OTP.");
+            emailOtpService.issueOtp(
+                officer.getEmail(),
+                EmailOtpPurpose.BOARD_SIGNATURE,
+                officer.getId(),
+                "Your SACCO LMS disbursement code",
+                "Use this OTP code to confirm the loan disbursement action."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "We sent a disbursement code to " + officer.getEmail() + "."
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
     }
 
     @GetMapping("/notifications")
@@ -444,6 +481,20 @@ public class DisbursementController {
             throw new IllegalArgumentException("This loan is not available in the disbursement panel.");
         }
         return app;
+    }
+
+    private UUID validateDisbursementOtp(UUID memberId, String otpCode) {
+        Member member = requireMemberWithEmail(memberId, "Add an email address to your member profile before confirming disbursement.");
+        return emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
+    }
+
+    private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
+        if (member.getEmail() == null || member.getEmail().isBlank()) {
+            throw new IllegalStateException(missingEmailMessage);
+        }
+        return member;
     }
 
     private Map<String, Object> parseJsonObject(String json) {

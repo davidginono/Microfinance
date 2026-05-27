@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,5 +17,7 @@ public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UU
     List<AdminIncident> findBySaccoIdAndStatusOrderByCreatedAtDesc(String saccoId, IncidentStatus status);
 
     List<AdminIncident> findBySaccoIdAndSeverityOrderByCreatedAtDesc(String saccoId, IncidentSeverity severity);
+
+    List<AdminIncident> findTop50BySaccoIdAndCreatedAtAfterOrderByCreatedAtDesc(String saccoId, OffsetDateTime createdAt);
 }
 

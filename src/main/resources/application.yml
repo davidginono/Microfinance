@@ -1,18 +1,13 @@
 spring:
   config:
     import: optional:file:./application-local.yml
-  devtools:
-    restart:
-      enabled: true
-    livereload:
-      enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sacco}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
     properties:
       hibernate:
         format_sql: false
@@ -25,7 +20,7 @@ spring:
   web:
     resources:
       cache:
-        period: 0
+        period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:3600}
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
     port: ${SPRING_MAIL_PORT:587}
@@ -40,10 +35,17 @@ spring:
 
 server:
   port: 8080
+  compression:
+    enabled: ${SERVER_COMPRESSION_ENABLED:true}
   servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: ${SERVER_SERVLET_SESSION_COOKIE_SECURE:false}
+        same-site: lax
     jsp:
       init-parameters:
-        development: true
+        development: ${SERVER_SERVLET_JSP_DEVELOPMENT:false}
 
 logging:
   level:
@@ -56,6 +58,10 @@ app:
     demo-data-enabled: ${APP_SEED_DEMO_DATA_ENABLED:false}
   outbox:
     scheduler-enabled: true
+    batch-size: ${APP_OUTBOX_BATCH_SIZE:250}
+    fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:500}
+  application-numbers:
+    block-size: ${APP_APPLICATION_NUMBERS_BLOCK_SIZE:100}
   loan-payments:
     sync-enabled: true
     sync-cron: "0 0 10 1 * *"

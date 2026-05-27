@@ -66,7 +66,11 @@ class LoanWorkflowServiceTest {
     private LoanWorkflowService loanWorkflowService;
 
     @Test
-    void submitToManagerRequiresFeeReceiptWhenPaymentInstructionsAreConfigured() {
+    void submitToManagerDoesNotRequireLegacyFeeReceipt() {
+        // Scenario: the removed fee receipt gate must not block manager handoff.
+        // Given guarantors have approved and the loan has only normal application attachments
+        // When the applicant submits the loan to manager review
+        // Then the workflow advances without checking for a fee receipt.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -74,34 +78,55 @@ class LoanWorkflowServiceTest {
             .id(appId)
             .applicantMemberId(memberId)
             .saccoId(saccoId)
+            .stationId("ST01")
             .loanType(LoanType.DEVELOPMENT_LOAN)
             .amount(new BigDecimal("100000"))
             .tenorMonths(6)
             .status(LoanStatus.ALL_GUARANTORS_APPROVED)
             .requiredGuarantors(1)
             .financialSnapshot("{\"principalPlusInterest\":120000.00}")
-            .attachmentsJson("[]")
+            .attachmentsJson("[{\"attachmentCategory\":\"APPLICATION_ATTACHMENT\"}]")
+            .formData("{}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .freshFinancialDataRequired(false)
+            .managerReviewRequired(true)
+            .committeeReviewRequired(false)
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build();
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId(saccoId)
-            .loanFeePaymentAccount("255700000000")
-            .build();
 
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
-        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(settings));
-        when(loanAttachmentService.parse("[]")).thenReturn(List.of());
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
+            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
+        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
+                new BigDecimal("166650.00")));
+        when(eligibilityService.policySnapshotJson(any(), anyInt(), any())).thenReturn("{}");
+        doAnswer(invocation -> {
+            LoanApplication target = invocation.getArgument(0);
+            target.setStatus(LoanStatus.READY_FOR_MANAGER);
+            return LoanStatus.READY_FOR_MANAGER;
+        }).when(workflowRoutingService).moveToFirstReviewStage(any(LoanApplication.class), eq(memberId));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> loanWorkflowService.submitToManager(appId, memberId))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Upload the insurance and application fees payment receipt before submitting this loan for review.");
+        LoanApplication submitted = loanWorkflowService.submitToManager(appId, memberId);
 
-        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+        assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
+        verifyNoInteractions(loanAttachmentService, saccoSettingsRepository);
     }
 
     @Test
-    void saveDraftRejectsGuarantorCommitmentsThatDoNotMatchPrincipalPlusInterest() {
+    void saveDraftStoresSelectedGuarantorsWithoutCommitmentAmounts() {
+        // Scenario: applicants choose guarantors only; no commitment split is stored for new drafts.
         UUID applicantId = UUID.randomUUID();
         UUID guarantorOne = UUID.randomUUID();
         UUID guarantorTwo = UUID.randomUUID();
@@ -112,6 +137,7 @@ class LoanWorkflowServiceTest {
             .saccoId(saccoId)
             .loanType(LoanType.DEVELOPMENT_LOAN)
             .guarantorsRequired(2)
+            .guarantorMinSavingsCheckRequired(false)
             .maxRepaymentMonths(12)
             .formSchema("{}")
             .active(true)
@@ -125,8 +151,13 @@ class LoanWorkflowServiceTest {
             UUID memberId = invocation.getArgument(0);
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
         });
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
+                new BigDecimal("166650.00")));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(loanAttachmentService.store(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
 
-        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+        LoanApplication saved = loanWorkflowService.saveDraft(
             saccoId,
             applicantId,
             LoanType.DEVELOPMENT_LOAN,
@@ -135,19 +166,21 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "WORKING CAPITAL"),
             null,
             List.of(guarantorOne, guarantorTwo),
-            Map.of(guarantorOne, new BigDecimal("50000"), guarantorTwo, new BigDecimal("40000")),
             "{\"principalPlusInterest\":120000.00}",
             null,
             null
-        ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must add up exactly to the principal plus interest");
+        );
 
-        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+        assertThat(saved.getSelectedGuarantors()).contains(guarantorOne.toString(), guarantorTwo.toString());
+        assertThat(saved.getSelectedGuarantors()).doesNotContain("amount");
     }
 
     @Test
     void saveDraftRejectsStaffOnlyGuarantorSelection() {
+        // Scenario: staff-only accounts cannot be used as guarantors because they do not have member access.
+        // Given an applicant selects a staff-only account as guarantor
+        // When the applicant saves the draft
+        // Then the draft is rejected before persistence.
         UUID applicantId = UUID.randomUUID();
         UUID staffOnlyGuarantor = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -178,7 +211,6 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "WORKING CAPITAL"),
             null,
             List.of(staffOnlyGuarantor),
-            Map.of(staffOnlyGuarantor, new BigDecimal("120000")),
             "{\"principalPlusInterest\":120000.00}",
             null,
             null
@@ -208,7 +240,113 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
-    void submitCreatesGuarantorRequestsWithApplicantAssignedCommitments() {
+    void searchGuarantorCandidatesUsesProductMinimumSavingsToggle() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        Member guarantor = activeMember(guarantorId, saccoId, "ST01");
+        guarantor.setMemberNo("0101");
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorMinSavingsCheckRequired(true)
+            .formSchema("{}")
+            .active(true)
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "0101"))
+            .thenReturn(Optional.of(guarantor));
+        when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, null, product))
+            .thenReturn(Optional.of("Disabled: savings are below this loan product's guarantor minimum."));
+
+        var result = loanWorkflowService.searchGuarantorCandidates(saccoId, "ST01", applicantId, "0101", LoanType.DEVELOPMENT_LOAN, 0, 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().eligible()).isFalse();
+        assertThat(result.getFirst().disabledReason()).contains("minimum");
+    }
+
+    @Test
+    void searchGuarantorCandidatesUsesStationActiveLoanPolicy() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        Member guarantor = activeMember(guarantorId, saccoId, "ST01");
+        guarantor.setMemberNo("0101");
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorMinSavingsCheckRequired(false)
+            .formSchema("{}")
+            .active(true)
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "0101"))
+            .thenReturn(Optional.of(guarantor));
+        when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, null, product))
+            .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
+
+        var result = loanWorkflowService.searchGuarantorCandidates(saccoId, "ST01", applicantId, "0101", LoanType.DEVELOPMENT_LOAN, 0, 10);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().eligible()).isFalse();
+        assertThat(result.getFirst().disabledReason()).contains("active loans");
+    }
+
+    @Test
+    void saveDraftRejectsGuarantorWithActiveLoanWhenStationPolicyBlocksIt() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+        when(memberRepository.findById(guarantorId)).thenReturn(Optional.of(activeMember(guarantorId, saccoId, "ST01")));
+        when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, new BigDecimal("100000"), product))
+            .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            applicantId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            null,
+            List.of(guarantorId),
+            "{\"principalPlusInterest\":120000.00}",
+            null,
+            null
+        ))
+            .isInstanceOf(LoanWorkflowService.GuarantorValidationException.class)
+            .hasMessageContaining("active loans are not allowed");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
+    void submitCreatesGuarantorRequestsWithoutApplicantAssignedCommitments() {
+        // Scenario: guarantor requests preserve the selected guarantors only.
+        // Given a draft loan with two selected guarantors
+        // When the applicant submits the loan
+        // Then pending guarantor requests are recreated without requested or committed amounts.
         UUID appId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
         UUID guarantorOne = UUID.randomUUID();
@@ -225,7 +363,7 @@ class LoanWorkflowServiceTest {
             .tenorMonths(6)
             .status(LoanStatus.DRAFT)
             .requiredGuarantors(2)
-            .selectedGuarantors("[{\"id\":\"" + guarantorOne + "\",\"amount\":\"60000.00\"},{\"id\":\"" + guarantorTwo + "\",\"amount\":\"60000.00\"}]")
+            .selectedGuarantors("[{\"id\":\"" + guarantorOne + "\"},{\"id\":\"" + guarantorTwo + "\"}]")
             .financialSnapshot("{\"principalPlusInterest\":120000.00}")
             .formData("{}")
             .policySnapshot("{}")
@@ -261,7 +399,7 @@ class LoanWorkflowServiceTest {
         verify(guarantorRequestRepository, times(2)).save(argThat(request ->
             request.getStatus() == GuarantorRequestStatus.PENDING
                 && request.getCommittedAmount() == null
-                && (new BigDecimal("60000.00").compareTo(request.getRequestedAmount()) == 0)
+                && request.getRequestedAmount() == null
         ));
     }
 
@@ -320,7 +458,6 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "Working capital"),
             appId,
             List.of(UUID.randomUUID(), UUID.randomUUID()),
-            Map.of(),
             "{\"balance\":1000}",
             null,
             null
@@ -358,7 +495,6 @@ class LoanWorkflowServiceTest {
             Map.of("purpose", "Working capital"),
             null,
             List.of(),
-            Map.of(),
             "{\"balance\":1000}",
             sourceLoanId,
             null
@@ -373,6 +509,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void loanAdvanceSkipsGuarantorStageOnSubmit() {
+        // Scenario: loan advances are configured without guarantors and should enter staff review immediately.
+        // Given a draft loan advance with zero required guarantors
+        // When the applicant submits it
+        // Then no guarantor request is created and the workflow moves to the first review stage.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -415,6 +555,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void evaluateReadinessRequiresAllConfiguredGuarantorApprovals() {
+        // Scenario: a loan cannot leave the guarantor stage until every configured guarantor approval exists.
+        // Given a loan waiting for three approvals with only two approved guarantor requests
+        // When readiness is evaluated
+        // Then the workflow remains open and no approval event is emitted.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -450,6 +594,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void evaluateReadinessMovesToReadyWhenAllRequiredGuarantorsApproved() {
+        // Scenario: the guarantor stage closes only after the configured approval count is met.
+        // Given a loan waiting for three approvals with all three guarantor requests approved
+        // When readiness is evaluated
+        // Then the loan moves to All Guarantors Approved and emits the handoff event.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -487,6 +635,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void approveGuarantorRequestStoresSignatureAndKeepsStageOpenUntilAllApprovalsExist() {
+        // Scenario: an individual guarantor signature is stored even when the overall guarantor stage remains open.
+        // Given one guarantor approves a loan that still needs another approval
+        // When the approval is recorded
+        // Then the signature is saved but the loan stays Awaiting Guarantors.
         UUID requestId = UUID.randomUUID();
         UUID guarantorId = UUID.randomUUID();
         UUID appId = UUID.randomUUID();
@@ -533,6 +685,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void submitBlocksWhenFreshFinancialDataIsRequiredAndUpstreamIsUnavailable() {
+        // Scenario: products that require fresh upstream financial data must fail closed when the provider is unavailable.
+        // Given a draft loan whose product requires a live financial refresh
+        // When the upstream account service cannot respond
+        // Then submission is blocked and the stale draft is not saved.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -587,6 +743,10 @@ class LoanWorkflowServiceTest {
 
     @Test
     void submitRefreshesFinancialSnapshotFromCurrentProductConfiguration() {
+        // Scenario: submission recalculates financial terms from the current product setup, not the stale draft snapshot.
+        // Given a draft created with an older interest method
+        // When the applicant submits after product settings change
+        // Then the saved snapshot reflects the latest configured financial terms.
         UUID appId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";

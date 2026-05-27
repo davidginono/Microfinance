@@ -32,7 +32,7 @@ public class BoardService {
     }
 
     public List<LoanApplication> assignedPending(UUID boardMemberId, ApprovalWorkflowStage stage) {
-        List<BoardReview> reviews = boardReviewRepository.findByBoardMemberIdAndReviewStageAndDecision(
+        List<BoardReview> reviews = boardReviewRepository.findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(
             boardMemberId, stage, BoardDecision.PENDING);
         List<LoanApplication> apps = new ArrayList<>();
         for (BoardReview review : reviews) {
@@ -50,7 +50,7 @@ public class BoardService {
     }
 
     public List<BoardReview> assignedAll(UUID boardMemberId, ApprovalWorkflowStage stage) {
-        return boardReviewRepository.findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(boardMemberId, stage);
+        return boardReviewRepository.findTop100ByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(boardMemberId, stage);
     }
 
     public BoardReview getMyReview(UUID loanId, UUID boardMemberId) {
@@ -93,18 +93,6 @@ public class BoardService {
                        String comment,
                        String signatureText,
                        OffsetDateTime verifiedAt) {
-        decide(loanId, boardMemberId, stage, decision, comment, signatureText, verifiedAt, Map.of());
-    }
-
-    @Transactional
-    public void decide(UUID loanId,
-                       UUID boardMemberId,
-                       ApprovalWorkflowStage stage,
-                       BoardDecision decision,
-                       String comment,
-                       String signatureText,
-                       OffsetDateTime verifiedAt,
-                       Map<UUID, BigDecimal> guarantorCommitments) {
         if (decision == BoardDecision.PENDING) {
             throw new IllegalArgumentException("Decision must be APPROVED or REJECTED");
         }
@@ -128,10 +116,6 @@ public class BoardService {
         if (decision == BoardDecision.REJECTED && normalizedComment == null) {
             throw new IllegalArgumentException("Add a comment before rejecting this review.");
         }
-        if (decision == BoardDecision.APPROVED) {
-            applyGuarantorCommitmentsIfRequired(app, stage, guarantorCommitments);
-        }
-
         review.setDecision(decision);
         review.setComment(normalizedComment);
         if (decision == BoardDecision.APPROVED) {
@@ -144,32 +128,6 @@ public class BoardService {
         review.setDecidedAt(OffsetDateTime.now());
         boardReviewRepository.save(review);
         evaluateOutcome(app, stage, boardMemberId);
-    }
-
-    private void applyGuarantorCommitmentsIfRequired(LoanApplication app,
-                                                     ApprovalWorkflowStage stage,
-                                                     Map<UUID, BigDecimal> guarantorCommitments) {
-        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType()).orElse(null);
-        if (product == null || !product.isGuarantorCommitmentRequired()
-            || product.getResolvedGuarantorCommitmentStage() != stage) {
-            return;
-        }
-        List<GuarantorRequest> requests = guarantorRequestRepository.findByLoanApplicationId(app.getId()).stream()
-            .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
-            .toList();
-        if (requests.isEmpty()) {
-            throw new IllegalStateException("Approved guarantors are required before verifying commitments.");
-        }
-        for (GuarantorRequest request : requests) {
-            BigDecimal amount = request.getCommittedAmount() == null
-                ? request.getRequestedAmount()
-                : request.getCommittedAmount();
-            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalStateException("Every approved guarantor must have an applicant-assigned commitment amount before review approval.");
-            }
-            request.setCommittedAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
-        }
-        guarantorRequestRepository.saveAll(requests);
     }
 
     @Transactional

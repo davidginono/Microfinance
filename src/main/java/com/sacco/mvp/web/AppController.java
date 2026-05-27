@@ -370,7 +370,7 @@ public class AppController {
                     : Math.max(0, Math.min(100, Math.round((daysLeft * 100.0d) / totalDays)));
 
                 row.put("fullId", app.getId());
-                row.put("loanId", app.getId().toString().substring(0, 8));
+                row.put("loanId", app.getLoanId() == null || app.getLoanId().isBlank() ? "-" : app.getLoanId());
                 row.put("amountLabel", loanPresentationService.formatMoneyDisplay(app.getAmount()));
                 row.put("startDate", resolveRepaymentTimerStartDate(app));
                 row.put("daysLeft", daysLeft);
@@ -728,7 +728,7 @@ public class AppController {
             }
             formValues.put("topUpLoanId", topUpLoanId.toString());
         }
-        return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), Collections.emptyMap(), null, model);
+        return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), null, model);
     }
 
     @GetMapping("/loan-applications/{id}/edit")
@@ -758,7 +758,6 @@ public class AppController {
             app.getLoanType(),
             formValues,
             parseUuidList(app.getSelectedGuarantors()),
-            parseSelectedGuarantorCommitments(app.getSelectedGuarantors()),
             app.getRequiredGuarantors(),
             model
         );
@@ -792,8 +791,6 @@ public class AppController {
         formPayload.remove("financialSnapshotJson");
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
-        formPayload.entrySet().removeIf(entry -> entry.getKey().startsWith("guarantorCommitmentAmount_"));
-        Map<UUID, BigDecimal> guarantorCommitments = parseGuarantorCommitments(params);
 
         try {
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
@@ -817,7 +814,6 @@ public class AppController {
                     formPayload,
                     applicationId,
                     guarantorIds,
-                    guarantorCommitments,
                     financialSnapshotJson,
                     topUpLoanId,
                     attachments
@@ -843,7 +839,7 @@ public class AppController {
             }
 
             LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), loanType,
-                amount, tenorMonths, formPayload, applicationId, guarantorIds, guarantorCommitments,
+                amount, tenorMonths, formPayload, applicationId, guarantorIds,
                 financialSnapshotJson, topUpLoanId, attachments);
 
             ra.addFlashAttribute("message", "Draft saved successfully. You can continue editing.");
@@ -862,7 +858,6 @@ public class AppController {
                 loanType,
                 submittedValues,
                 guarantorIds,
-                guarantorCommitments,
                 requiredGuarantorsOverride,
                 model
             );
@@ -926,11 +921,6 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
-        model.addAttribute("loanFeePaymentSettings", saccoSettingsRepository.findById(app.getSaccoId()).orElse(null));
-        model.addAttribute("loanFeeReceiptUploaded", loanWorkflowService.hasLoanFeeReceipt(app));
-        model.addAttribute("loanFeeReceiptMissingBlocksDisbursement", loanFeeReceiptMissingBlocksDisbursement(app));
-        model.addAttribute("canUploadLoanFeeReceipt", canUploadLoanFeeReceipt(app));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -958,60 +948,6 @@ public class AppController {
             LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FORFEITED, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
-    }
-
-    private boolean loanFeeReceiptMissingBlocksDisbursement(LoanApplication app) {
-        if (app == null || loanWorkflowService.hasLoanFeeReceipt(app)) {
-            return false;
-        }
-        return canUploadLoanFeeReceipt(app);
-    }
-
-    private boolean canUploadLoanFeeReceipt(LoanApplication app) {
-        if (app == null) {
-            return false;
-        }
-        return switch (app.getStatus()) {
-            case ALL_GUARANTORS_APPROVED,
-                 READY_FOR_MANAGER,
-                 MANAGER_ACCEPTED,
-                 AWAITING_LOAN_OFFICER,
-                 LOAN_OFFICER_APPROVED,
-                 AWAITING_BOARD,
-                 BOARD_APPROVED,
-                 AWAITING_ACCOUNTANT,
-                 ACCOUNTANT_APPROVED,
-                 READY_FOR_DISBURSEMENT -> true;
-            default -> false;
-        };
-    }
-
-    @PostMapping("/loan-applications/{id}/fee-insurance-receipt")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
-    public String uploadFeeInsuranceReceipt(@PathVariable UUID id,
-                                            @AuthenticationPrincipal AppUserPrincipal principal,
-                                            @RequestParam(required = false) MultipartFile feeInsuranceReceiptFile,
-                                            RedirectAttributes ra) {
-        try {
-            LoanApplication app = loanWorkflowService.getMine(id, principal.getMemberId());
-            if (!canUploadLoanFeeReceipt(app)) {
-                throw new IllegalStateException("Upload the fees and insurance receipt after all guarantors have approved this application and before disbursement.");
-            }
-            if (feeInsuranceReceiptFile == null || feeInsuranceReceiptFile.isEmpty()) {
-                throw new IllegalArgumentException("Choose the payment receipt file to upload.");
-            }
-            app.setAttachmentsJson(loanAttachmentService.store(
-                app.getId(),
-                List.of(feeInsuranceReceiptFile),
-                app.getAttachmentsJson(),
-                LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT
-            ));
-            loanApplicationRepository.save(app);
-            ra.addFlashAttribute("message", "Fees and insurance payment receipt uploaded.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/app/loan-applications/" + id;
     }
 
     private void addMemberLoanViewDisplayAttributes(Model model, LoanApplication app) {
@@ -1247,7 +1183,7 @@ public class AppController {
     @ResponseBody
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
                                                       @RequestParam(defaultValue = "") String q,
-                                                      @RequestParam(required = false) BigDecimal amount) {
+                                                      @RequestParam(required = false) LoanType loanType) {
         String query = q == null ? "" : q.trim().toUpperCase(Locale.ROOT);
         boolean fourDigitsOrMore = query.matches("\\d{4,20}");
         boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
@@ -1259,7 +1195,7 @@ public class AppController {
                 principal.getStationId(),
                 principal.getMemberId(),
                 query,
-                amount,
+                loanType,
                 0,
                 6)
             .stream()
@@ -1429,13 +1365,6 @@ public class AppController {
                 if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                     throw new IllegalStateException("Request already decided");
                 }
-                LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
-                    .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-                BigDecimal requestedAmount = request.getRequestedAmount();
-                if (requestedAmount == null || requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new IllegalStateException("This guarantee request does not have an assigned commitment amount.");
-                }
-                loanQualificationPolicyService.assertGuarantorCanCommit(application.getSaccoId(), principal.getMemberId(), requestedAmount);
             }
             emailOtpService.issueOtp(
                 member.getEmail(),
@@ -1734,7 +1663,6 @@ public class AppController {
                                        LoanType loanType,
                                        Map<String, String> formValues,
                                        List<UUID> guarantorIds,
-                                       Map<UUID, BigDecimal> selectedGuarantorCommitments,
                                        Integer requiredGuarantorsOverride,
                                        Model model) {
         LoanProductSetting schema = formSchemaService.getSchema(principal.getSaccoId(), loanType);
@@ -1754,10 +1682,7 @@ public class AppController {
         model.addAttribute("requiredGuarantors", requiredGuarantors);
         model.addAttribute("formValues", formValues == null ? Collections.emptyMap() : formValues);
         model.addAttribute("selectedGuarantorLookup", toLookupMap(guarantorIds));
-        Map<UUID, BigDecimal> commitmentValues = selectedGuarantorCommitments == null || selectedGuarantorCommitments.isEmpty()
-            ? parseGuarantorCommitments(formValues)
-            : selectedGuarantorCommitments;
-        model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds, commitmentValues));
+        model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds));
         model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
         model.addAttribute("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
         model.addAttribute("ratioPercentLabel",
@@ -1926,8 +1851,7 @@ public class AppController {
             .orElse("");
     }
 
-    private List<Map<String, String>> selectedGuarantorItems(List<UUID> guarantorIds,
-                                                            Map<UUID, BigDecimal> guarantorCommitments) {
+    private List<Map<String, String>> selectedGuarantorItems(List<UUID> guarantorIds) {
         if (guarantorIds == null || guarantorIds.isEmpty()) {
             return Collections.emptyList();
         }
@@ -1943,8 +1867,6 @@ public class AppController {
             item.put("id", member.getId().toString());
             item.put("memberNo", member.getMemberNo());
             item.put("fullName", member.getFullName());
-            BigDecimal amount = guarantorCommitments == null ? null : guarantorCommitments.get(member.getId());
-            item.put("amount", amount == null ? "" : amount.setScale(2, RoundingMode.HALF_UP).toPlainString());
             items.add(item);
         }
         return items;
@@ -1986,49 +1908,6 @@ public class AppController {
         }
     }
 
-    private Map<UUID, BigDecimal> parseSelectedGuarantorCommitments(String json) {
-        if (json == null || json.isBlank()) {
-            return Collections.emptyMap();
-        }
-        try {
-            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
-            Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-            for (Object item : raw) {
-                if (item instanceof Map<?, ?> map && map.get("id") != null && map.get("amount") != null) {
-                    BigDecimal amount = readBigDecimal(map.get("amount"));
-                    if (amount != null) {
-                        commitments.put(UUID.fromString(String.valueOf(map.get("id"))), amount);
-                    }
-                }
-            }
-            return commitments;
-        } catch (Exception ex) {
-            return Collections.emptyMap();
-        }
-    }
-
-    private Map<UUID, BigDecimal> parseGuarantorCommitments(Map<String, String> params) {
-        if (params == null || params.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            if (!entry.getKey().startsWith("guarantorCommitmentAmount_")) {
-                continue;
-            }
-            BigDecimal amount = readBigDecimal(entry.getValue());
-            if (amount == null) {
-                continue;
-            }
-            try {
-                UUID guarantorId = UUID.fromString(entry.getKey().substring("guarantorCommitmentAmount_".length()));
-                commitments.put(guarantorId, amount);
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-        return commitments;
-    }
-
     private void addGuaranteeContext(List<GuarantorRequest> requests, Model model) {
         Map<UUID, LoanApplication> applicationById = new HashMap<>();
         Set<UUID> applicationIds = new HashSet<>();
@@ -2056,7 +1935,6 @@ public class AppController {
         Map<UUID, String> guaranteeNames = new HashMap<>();
         Map<UUID, LoanType> guaranteeLoanTypes = new HashMap<>();
         Map<UUID, BigDecimal> guaranteeLoanAmounts = new HashMap<>();
-        Map<UUID, String> guaranteeCommitmentAmounts = new HashMap<>();
         for (Map.Entry<UUID, LoanApplication> entry : applicationById.entrySet()) {
             LoanApplication application = entry.getValue();
             guaranteeNames.put(entry.getKey(),
@@ -2064,14 +1942,10 @@ public class AppController {
             guaranteeLoanTypes.put(entry.getKey(), application.getLoanType());
             guaranteeLoanAmounts.put(entry.getKey(), application.getAmount());
         }
-        for (GuarantorRequest request : requests) {
-            guaranteeCommitmentAmounts.put(request.getId(), formatTzs(request.getRequestedAmount()));
-        }
 
         model.addAttribute("guaranteeNames", guaranteeNames);
         model.addAttribute("guaranteeLoanTypes", guaranteeLoanTypes);
         model.addAttribute("guaranteeLoanAmounts", guaranteeLoanAmounts);
-        model.addAttribute("guaranteeCommitmentAmounts", guaranteeCommitmentAmounts);
     }
 
     private void addGuaranteeActionContext(List<GuarantorRequest> requests, Model model) {
@@ -2093,7 +1967,8 @@ public class AppController {
                 : loanQualificationPolicyService.guarantorFailureReason(
                     application.getSaccoId(),
                     request.getGuarantorMemberId(),
-                    request.getRequestedAmount()
+                    request.getRequestedAmount(),
+                    loanProductSettingRepository.findBySaccoIdAndLoanType(application.getSaccoId(), application.getLoanType()).orElse(null)
                 );
             guaranteePolicyEligible.put(request.getId(), policyReason.isEmpty());
             policyReason.ifPresent(reason -> guaranteePolicyReasons.put(request.getId(), reason));

@@ -81,7 +81,7 @@ public class AccountantController {
 
         model.addAttribute("dashboardBreadcrumb", "Accountant Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Accountant Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track the disbursed portfolio and keep an eye on loans waiting for accountant review.");
+        model.addAttribute("dashboardSubtitle", "Track accountant review decisions and keep an eye on loans waiting for accounting action.");
         model.addAttribute("dashboardQueueLabel", "On Review By Accountant");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_ACCOUNTANT));
@@ -94,8 +94,13 @@ public class AccountantController {
         model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
+        model.addAttribute("dashboardChartTitle", "Accountant Review Chart");
+        model.addAttribute("dashboardChartHelp", "An accountant-focused view of loans waiting for review, approved, rejected, and ready for disbursement.");
         model.addAttribute("dashboardStatusChartRows",
-            workflowStatusPresentationService.buildDashboardStatusChartRows(dashboard.statusBreakdown()));
+            workflowStatusPresentationService.buildAccountantDashboardChartRows(
+                dashboard.statusBreakdown(),
+                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+            ));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -261,7 +266,6 @@ public class AccountantController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -371,10 +375,9 @@ public class AccountantController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
                          @RequestParam(required = false) String reasons,
-                         HttpServletRequest request,
                          RedirectAttributes ra) {
         try {
-            managerService.decideAccountant(id, principal.getMemberId(), decision, reasons, parseGuarantorCommitments(request));
+            managerService.decideAccountant(id, principal.getMemberId(), decision, reasons);
             ra.addFlashAttribute("message", decision == ManagerDecision.ACCEPT
                 ? "Accountant approved the loan for disbursement."
                 : "Accountant rejected the loan.");
@@ -382,20 +385,6 @@ public class AccountantController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/accountant/loan-applications/" + id;
-    }
-
-    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
-        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-        request.getParameterMap().forEach((key, values) -> {
-            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
-                return;
-            }
-            try {
-                commitments.put(UUID.fromString(key.substring("guarantorCommitmentAmount_".length())), new BigDecimal(values[0].trim()));
-            } catch (IllegalArgumentException ignored) {
-            }
-        });
-        return commitments;
     }
 
     @GetMapping("/notifications")

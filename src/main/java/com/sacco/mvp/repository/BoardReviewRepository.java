@@ -28,9 +28,15 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
                                                                    ApprovalWorkflowStage reviewStage,
                                                                    BoardDecision decision);
 
+    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(UUID boardMemberId,
+                                                                                              ApprovalWorkflowStage reviewStage,
+                                                                                              BoardDecision decision);
+
     List<BoardReview> findByBoardMemberIdOrderByCreatedAtDesc(UUID boardMemberId);
 
     List<BoardReview> findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
+
+    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
 
     Optional<BoardReview> findByLoanApplicationIdAndBoardMemberId(UUID loanApplicationId, UUID boardMemberId);
 

@@ -28,17 +28,20 @@
         </thead>
         <tbody>
         <c:forEach items="${notifications}" var="n">
-            <tr id="notification-${n.id}" class="${highlightNotificationId eq n.id ? 'bg-amber-50' : (n.unread ? 'bg-sacco-blue/5' : 'bg-white')}">
+            <tr id="notification-${n.id}" data-notification-href="/accountant/notifications/${n.id}/open" class="cursor-pointer ${highlightNotificationId eq n.id ? 'bg-amber-50' : (n.unread ? 'bg-sacco-blue/5' : 'bg-white')}">
                 <td class="px-3 py-3 align-top font-semibold text-slate-800">
-                    <a href="/accountant/notifications/${n.id}/open" class="block hover:text-sacco-blue">
-                        ${n.subject}
+                    <a href="/accountant/notifications/${n.id}/open" class="flex items-start gap-3 hover:text-sacco-blue">
                         <c:if test="${n.unread}">
-                            <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white"><spring:message code="notifications.unread" text="Unread" /></span>
+                            <span class="inline-flex w-16 shrink-0 justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white"><spring:message code="notifications.unread" text="Unread" /></span>
                         </c:if>
+                        <c:if test="${not n.unread}">
+                            <span class="w-16 shrink-0" aria-hidden="true"></span>
+                        </c:if>
+                        <span class="min-w-0">${n.subject}</span>
                     </a>
                 </td>
                 <td class="px-3 py-3 align-top">
-                    <a href="/accountant/notifications/${n.id}/open" class="block max-w-[38rem] leading-relaxed text-slate-800 hover:text-sacco-blue">${n.message}</a>
+                    <div class="max-w-[38rem] leading-relaxed text-slate-800">${n.message}</div>
                 </td>
                 <td class="px-3 py-3 align-top">${n.source}</td>
                 <td class="px-3 py-3 align-top">${n.type}</td>
@@ -51,5 +54,18 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    (() => {
+        document.querySelectorAll("[data-notification-href]").forEach((row) => {
+            row.addEventListener("click", (event) => {
+                if (event.target.closest("a, button, input, select, textarea")) {
+                    return;
+                }
+                window.location.href = row.dataset.notificationHref;
+            });
+        });
+    })();
+</script>
 
 <%@ include file="../fragments/footer.jspf" %>

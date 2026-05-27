@@ -44,6 +44,7 @@ public class AdminService {
     private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
     private static final int MAX_PRODUCT_VERSION_HISTORY = 3;
     private static final int MAX_LOAN_PRODUCTS_VERSION_HISTORY = 3;
+    private static final int MAX_WORKFLOW_COUNT = 15;
     private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");
     private static final DateTimeFormatter PRODUCT_VERSION_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -79,22 +80,20 @@ public class AdminService {
 
     public AdminDashboard dashboard(String saccoId, String stationId, UUID adminId) {
         OffsetDateTime recentWindowStart = OffsetDateTime.now().minusDays(DASHBOARD_RECENT_WINDOW_DAYS);
-        List<Member> members = filterMembersByStation(memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId), stationId);
-        List<LoanApplication> applications = filterApplicationsByStation(loanApplicationRepository.findAll().stream()
-            .filter(app -> saccoId.equals(app.getSaccoId()))
-            .sorted(Comparator.comparing(LoanApplication::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-            .toList(), stationId);
+        String normalizedStationId = normalizeOptional(stationId);
         List<OutboxEvent> failedEvents = outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus.FAILED);
         List<AuditLog> auditEntries = auditLogRepository.findTop100ByOrderByCreatedAtDesc();
         List<AdminIncident> incidents = filterIncidentsByStation(
-            adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId),
-            stationId
+            adminIncidentRepository.findTop50BySaccoIdAndCreatedAtAfterOrderByCreatedAtDesc(saccoId, recentWindowStart),
+            normalizedStationId
         );
 
-        Map<MemberStatus, Long> memberCounts = members.stream()
-            .collect(Collectors.groupingBy(Member::getStatus, () -> new EnumMap<>(MemberStatus.class), Collectors.counting()));
-        Map<LoanStatus, Long> applicationCounts = applications.stream()
-            .collect(Collectors.groupingBy(LoanApplication::getStatus, () -> new EnumMap<>(LoanStatus.class), Collectors.counting()));
+        Map<MemberStatus, Long> memberCounts = new EnumMap<>(MemberStatus.class);
+        memberRepository.countByStatusForScope(saccoId, normalizedStationId)
+            .forEach(row -> memberCounts.put(row.getStatus(), row.getTotal()));
+        Map<LoanStatus, Long> applicationCounts = new EnumMap<>(LoanStatus.class);
+        loanApplicationRepository.countByStatusForScope(saccoId, normalizedStationId)
+            .forEach(row -> applicationCounts.put(row.getStatus(), row.getTotal()));
         Map<OutboxStatus, Long> outboxCounts = new EnumMap<>(OutboxStatus.class);
         outboxCounts.put(OutboxStatus.NEW, outboxEventRepository.countByStatus(OutboxStatus.NEW));
         outboxCounts.put(OutboxStatus.PUBLISHED, outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED));
@@ -120,8 +119,8 @@ public class AdminService {
                 .limit(10)
                 .toList(),
             attachmentStorageReady,
-            members.size(),
-            applications.size()
+            Math.toIntExact(memberRepository.countForScope(saccoId, normalizedStationId)),
+            Math.toIntExact(loanApplicationRepository.countForScope(saccoId, normalizedStationId))
         );
     }
 
@@ -736,6 +735,8 @@ public class AdminService {
             accountantReviewRequired,
             accountantPriority,
             true,
+            false,
+            null,
             productStatus
         );
     }
@@ -771,6 +772,8 @@ public class AdminService {
                                   boolean accountantReviewRequired,
                                   Integer accountantPriority,
                                   boolean disbursementOfficerRequired,
+                                  boolean guarantorMinSavingsCheckRequired,
+                                  BigDecimal guarantorMinimumSavings,
                                   LoanProductStatus productStatus) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
@@ -830,6 +833,8 @@ public class AdminService {
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, accountantPriority, 4));
         product.setDisbursementOfficerRequired(disbursementOfficerRequired);
+        product.setGuarantorMinSavingsCheckRequired(guarantorMinSavingsCheckRequired);
+        product.setGuarantorMinimumSavings(nonNegativeAmount(guarantorMinimumSavings, "Minimum guarantor savings cannot be negative."));
         validateCommitteeConfiguration(saccoId, product.getCommitteeMinimumVotes(), product.getCommitteeApprovalThreshold(), committeeReviewRequired);
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         product.setProductStatus(normalizedStatus);
@@ -892,6 +897,8 @@ public class AdminService {
                                             boolean accountantReviewRequired,
                                             Integer accountantPriority,
                                             boolean disbursementOfficerRequired,
+                                            boolean guarantorMinSavingsCheckRequired,
+                                            BigDecimal guarantorMinimumSavings,
                                             LoanProductStatus productStatus) {
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         Integer normalizedCommitteeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes);
@@ -950,6 +957,8 @@ public class AdminService {
             accountantReviewRequired,
             normalizeStagePriority(accountantReviewRequired, accountantPriority, 4),
             disbursementOfficerRequired,
+            guarantorMinSavingsCheckRequired,
+            nonNegativeAmount(guarantorMinimumSavings, "Minimum guarantor savings cannot be negative."),
             normalizedStatus,
             normalizedStatus == LoanProductStatus.ACTIVE
         );
@@ -968,90 +977,24 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateLoanFeePaymentInstructions(String saccoId,
-                                                 UUID adminId,
-                                                 String paymentMethod,
-                                                 String paymentAccount,
-                                                 String paymentPayee,
-                                                 String paymentInstructions) {
-        SaccoSettings settings = settings(saccoId);
-        Map<String, Object> before = snapshotSettings(settings);
-        settings.setLoanFeePaymentMethod(normalizePaymentMethod(paymentMethod));
-        settings.setLoanFeePaymentAccount(normalizePaymentAccount(paymentAccount));
-        settings.setLoanFeePaymentPayee(normalizePaymentPayee(paymentPayee));
-        settings.setLoanFeePaymentInstructions(normalizePaymentInstructions(paymentInstructions));
-        settings.setUpdatedAt(OffsetDateTime.now());
-        saccoSettingsRepository.save(settings);
-        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_LOAN_FEE_PAYMENT_INSTRUCTIONS", adminId, before, snapshotSettings(settings));
-    }
-
-    private String normalizePaymentMethod(String paymentMethod) {
-        String normalized = normalizeOptional(paymentMethod);
-        if (normalized == null) {
-            throw new IllegalStateException("Payment method is required.");
-        }
-        if (normalized.length() > 120 || !normalized.matches("[A-Za-z &/().,+-]{2,120}")) {
-            throw new IllegalStateException("Enter a valid payment method.");
-        }
-        return normalized;
-    }
-
-    private String normalizePaymentAccount(String paymentAccount) {
-        String normalized = normalizeOptional(paymentAccount);
-        if (normalized == null) {
-            throw new IllegalStateException("Payment number or account is required.");
-        }
-        if (normalized.length() > 40 || !normalized.matches("[A-Za-z0-9 +/().-]{5,40}") || !normalized.matches(".*\\d.*")) {
-            throw new IllegalStateException("Enter a valid payment number or account.");
-        }
-        return normalized;
-    }
-
-    private String normalizePaymentPayee(String paymentPayee) {
-        String normalized = normalizeOptional(paymentPayee);
-        if (normalized == null) {
-            throw new IllegalStateException("Payee name is required.");
-        }
-        if (normalized.length() > 160 || !normalized.matches("[A-Za-z0-9 &/().,'-]{2,160}")) {
-            throw new IllegalStateException("Enter a valid payee name.");
-        }
-        return normalized;
-    }
-
-    private String normalizePaymentInstructions(String paymentInstructions) {
-        String normalized = normalizeOptional(paymentInstructions);
-        if (normalized == null) {
-            return null;
-        }
-        if (normalized.length() > 500) {
-            throw new IllegalStateException("Applicant payment instructions must be 500 characters or fewer.");
-        }
-        return normalized;
-    }
-
-    @Transactional
     public void updateQualificationPolicies(String saccoId,
                                             UUID adminId,
                                             Integer applicantMaxDefaultedLoans,
-                                            BigDecimal applicantMaxActiveLoanAmount,
                                             Integer applicantMaxForfeitedLoans,
                                             Integer applicantForfeitedLookbackDays,
                                             Integer applicantForfeitedWaitDays,
-                                            BigDecimal guarantorMinSavings,
-                                            BigDecimal guarantorMaxActiveLoanAmount,
+                                            boolean guarantorWithActiveLoanAllowed,
                                             BigDecimal guarantorMaxGuaranteedLoanAmount,
                                             Integer guarantorMaxDefaultedLoans) {
         SaccoSettings settings = settings(saccoId);
         Map<String, Object> before = snapshotSettings(settings);
-        settings.setApplicantMaxDefaultedLoans(nonNegative(applicantMaxDefaultedLoans, "Defaulted loan limit cannot be negative."));
-        settings.setApplicantMaxActiveLoanAmount(nonNegativeAmount(applicantMaxActiveLoanAmount, "Active loan amount limit cannot be negative."));
-        settings.setApplicantMaxForfeitedLoans(nonNegative(applicantMaxForfeitedLoans, "Forfeited application limit cannot be negative."));
-        settings.setApplicantForfeitedLookbackDays(nonNegative(applicantForfeitedLookbackDays, "Forfeited restriction days cannot be negative."));
-        settings.setApplicantForfeitedWaitDays(nonNegative(applicantForfeitedWaitDays, "Forfeited application waiting period cannot be negative."));
-        settings.setGuarantorMinSavings(nonNegativeAmount(guarantorMinSavings, "Minimum guarantor savings cannot be negative."));
-        settings.setGuarantorMaxActiveLoanAmount(nonNegativeAmount(guarantorMaxActiveLoanAmount, "Guarantor active loan amount limit cannot be negative."));
-        settings.setGuarantorMaxGuaranteedLoanAmount(nonNegativeWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count cannot be negative.", "Maximum guarantee count must be a whole number."));
-        settings.setGuarantorMaxDefaultedLoans(nonNegative(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit cannot be negative."));
+        settings.setApplicantMaxDefaultedLoans(limitedCount(applicantMaxDefaultedLoans, "Defaulted loan limit", 0));
+        settings.setApplicantMaxForfeitedLoans(limitedCount(applicantMaxForfeitedLoans, "Forfeited application limit", 0));
+        settings.setApplicantForfeitedLookbackDays(limitedCount(applicantForfeitedLookbackDays, "Forfeited restriction days", 0));
+        settings.setApplicantForfeitedWaitDays(limitedCount(applicantForfeitedWaitDays, "Forfeited application waiting period", 0));
+        settings.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
+        settings.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
+        settings.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
         settings.setUpdatedAt(OffsetDateTime.now());
         saccoSettingsRepository.save(settings);
         auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_QUALIFICATION_POLICIES", adminId, before, snapshotSettings(settings));
@@ -1062,12 +1005,10 @@ public class AdminService {
                                                    String stationId,
                                                    UUID adminId,
                                                    Integer applicantMaxDefaultedLoans,
-                                                   BigDecimal applicantMaxActiveLoanAmount,
                                                    Integer applicantMaxForfeitedLoans,
                                                    Integer applicantForfeitedLookbackDays,
                                                    Integer applicantForfeitedWaitDays,
-                                                   BigDecimal guarantorMinSavings,
-                                                   BigDecimal guarantorMaxActiveLoanAmount,
+                                                   boolean guarantorWithActiveLoanAllowed,
                                                    BigDecimal guarantorMaxGuaranteedLoanAmount,
                                                    Integer guarantorMaxDefaultedLoans) {
         String normalizedStationId = normalizeOptional(stationId);
@@ -1082,15 +1023,13 @@ public class AdminService {
                 .createdAt(OffsetDateTime.now())
                 .build());
         Map<String, Object> before = snapshotStationPolicy(policy);
-        policy.setApplicantMaxDefaultedLoans(nonNegative(applicantMaxDefaultedLoans, "Defaulted loan limit cannot be negative."));
-        policy.setApplicantMaxActiveLoanAmount(nonNegativeAmount(applicantMaxActiveLoanAmount, "Active loan amount limit cannot be negative."));
-        policy.setApplicantMaxForfeitedLoans(nonNegative(applicantMaxForfeitedLoans, "Forfeited application limit cannot be negative."));
-        policy.setApplicantForfeitedLookbackDays(nonNegative(applicantForfeitedLookbackDays, "Forfeited restriction days cannot be negative."));
-        policy.setApplicantForfeitedWaitDays(nonNegative(applicantForfeitedWaitDays, "Forfeited application waiting period cannot be negative."));
-        policy.setGuarantorMinSavings(nonNegativeAmount(guarantorMinSavings, "Minimum guarantor savings cannot be negative."));
-        policy.setGuarantorMaxActiveLoanAmount(nonNegativeAmount(guarantorMaxActiveLoanAmount, "Guarantor active loan amount limit cannot be negative."));
-        policy.setGuarantorMaxGuaranteedLoanAmount(nonNegativeWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count cannot be negative.", "Maximum guarantee count must be a whole number."));
-        policy.setGuarantorMaxDefaultedLoans(nonNegative(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit cannot be negative."));
+        policy.setApplicantMaxDefaultedLoans(limitedCount(applicantMaxDefaultedLoans, "Defaulted loan limit", 0));
+        policy.setApplicantMaxForfeitedLoans(limitedCount(applicantMaxForfeitedLoans, "Forfeited application limit", 0));
+        policy.setApplicantForfeitedLookbackDays(limitedCount(applicantForfeitedLookbackDays, "Forfeited restriction days", 0));
+        policy.setApplicantForfeitedWaitDays(limitedCount(applicantForfeitedWaitDays, "Forfeited application waiting period", 0));
+        policy.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
+        policy.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
+        policy.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
         policy.setUpdatedAt(OffsetDateTime.now());
         saccoStationPolicyRepository.save(policy);
         auditService.log("SACCO_STATION_POLICY", policy.getId(), "ADMIN_UPDATE_STATION_QUALIFICATION_POLICIES", adminId, before, snapshotStationPolicy(policy));
@@ -1707,6 +1646,10 @@ public class AdminService {
         LinkedHashSet<UserClaim> normalized = requestedClaims.stream()
             .filter(java.util.Objects::nonNull)
             .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!memberAccess) {
+            normalized.remove(UserClaim.APPLY_LOANS);
+            normalized.remove(UserClaim.APPROVE_GUARANTOR_REQUESTS);
+        }
         if (normalized.contains(UserClaim.DISBURSE_LOAN)) {
             normalized.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
         }
@@ -1866,6 +1809,7 @@ public class AdminService {
             .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess()))
             .status(member.getStatus())
             .membershipLabel(resolveMembershipLabel(member))
+            .memberAccess(member.isMemberAccess())
             .build();
     }
 
@@ -2125,6 +2069,9 @@ public class AdminService {
         if (guarantorsRequired == null || guarantorsRequired < 0) {
             throw new IllegalStateException("Guarantors required cannot be negative.");
         }
+        if (guarantorsRequired > MAX_WORKFLOW_COUNT) {
+            throw new IllegalStateException("Guarantors required must be between 0 and 15.");
+        }
         return guarantorsRequired;
     }
 
@@ -2153,6 +2100,32 @@ public class AdminService {
             throw new IllegalStateException(message);
         }
         return value;
+    }
+
+    private Integer limitedCount(Integer value, String label, int minimum) {
+        if (value == null) {
+            return null;
+        }
+        if (value < minimum || value > MAX_WORKFLOW_COUNT) {
+            throw new IllegalStateException(label + " must be between " + minimum + " and " + MAX_WORKFLOW_COUNT + ".");
+        }
+        return value;
+    }
+
+    private BigDecimal limitedWholeNumber(BigDecimal value, String label, int minimum) {
+        if (value == null) {
+            return null;
+        }
+        BigDecimal whole = nonNegativeWholeNumber(
+            value,
+            label + " cannot be negative.",
+            label + " must be a whole number."
+        );
+        int count = whole.intValue();
+        if (count < minimum || count > MAX_WORKFLOW_COUNT) {
+            throw new IllegalStateException(label + " must be between " + minimum + " and " + MAX_WORKFLOW_COUNT + ".");
+        }
+        return whole;
     }
 
     private BigDecimal nonNegativeAmount(BigDecimal value, String message) {
@@ -2320,6 +2293,9 @@ public class AdminService {
         if (committeeMinimumVotes == null || committeeMinimumVotes <= 0) {
             throw new IllegalStateException("Committee minimum votes must be at least 1 when committee review is required.");
         }
+        if (committeeMinimumVotes > MAX_WORKFLOW_COUNT) {
+            throw new IllegalStateException("Committee minimum votes must be between 1 and 15.");
+        }
         return committeeMinimumVotes;
     }
 
@@ -2331,6 +2307,9 @@ public class AdminService {
         }
         if (committeeApprovalThreshold == null || committeeApprovalThreshold <= 0) {
             throw new IllegalStateException("Committee approval threshold must be at least 1 when committee review is required.");
+        }
+        if (committeeApprovalThreshold > MAX_WORKFLOW_COUNT) {
+            throw new IllegalStateException("Committee approval threshold must be between 1 and 15.");
         }
         if (committeeApprovalThreshold > committeeMinimumVotes) {
             throw new IllegalStateException("Committee approval threshold cannot be greater than committee minimum votes.");
@@ -2388,6 +2367,7 @@ public class AdminService {
         private Set<UserClaim> claims = new LinkedHashSet<>();
         private MemberStatus status;
         private String membershipLabel;
+        private boolean memberAccess;
     }
 
     @lombok.Getter
@@ -2551,6 +2531,8 @@ public class AdminService {
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, snapshot.accountantPriority(), 4));
         product.setDisbursementOfficerRequired(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
+        product.setGuarantorMinSavingsCheckRequired(Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
+        product.setGuarantorMinimumSavings(nonNegativeAmount(snapshot.guarantorMinimumSavings(), "Minimum guarantor savings cannot be negative."));
         LoanProductStatus normalizedStatus = normalizeProductStatus(snapshot.productStatus());
         product.setProductStatus(normalizedStatus);
         product.setActive(normalizedStatus == LoanProductStatus.ACTIVE);
@@ -2587,6 +2569,8 @@ public class AdminService {
         data.put("accountantReviewRequired", !Boolean.FALSE.equals(snapshot.accountantReviewRequired()));
         data.put("accountantPriority", snapshot.accountantPriority());
         data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
+        data.put("guarantorMinSavingsCheckRequired", Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
+        data.put("guarantorMinimumSavings", snapshot.guarantorMinimumSavings());
         data.put("productStatus", snapshot.productStatus());
         data.put("active", product.getActive());
         return data;
@@ -2741,14 +2725,14 @@ public class AdminService {
         data.put("boardReviewRequired", settings.isBoardReviewRequired());
         data.put("approvalFlow", settings.resolvedApprovalFlow().stream().map(Enum::name).toList());
         data.put("applicationFee", settings.getResolvedApplicationFee());
-        data.put("loanFeePaymentMethod", settings.getLoanFeePaymentMethod());
-        data.put("loanFeePaymentAccount", settings.getLoanFeePaymentAccount());
-        data.put("loanFeePaymentPayee", settings.getLoanFeePaymentPayee());
-        data.put("loanFeePaymentInstructions", settings.getLoanFeePaymentInstructions());
         data.put("defaultLanguage", settings.getDefaultLanguage());
+        data.put("applicantMaxDefaultedLoans", settings.getApplicantMaxDefaultedLoans());
         data.put("applicantMaxForfeitedLoans", settings.getApplicantMaxForfeitedLoans());
         data.put("applicantForfeitedLookbackDays", settings.getApplicantForfeitedLookbackDays());
         data.put("applicantForfeitedWaitDays", settings.getApplicantForfeitedWaitDays());
+        data.put("guarantorWithActiveLoanAllowed", settings.getGuarantorWithActiveLoanAllowed());
+        data.put("guarantorMaxGuaranteedLoanAmount", settings.getGuarantorMaxGuaranteedLoanAmount());
+        data.put("guarantorMaxDefaultedLoans", settings.getGuarantorMaxDefaultedLoans());
         return data;
     }
 
@@ -2769,12 +2753,10 @@ public class AdminService {
         data.put("saccoId", policy.getSaccoId());
         data.put("stationId", policy.getStationId());
         data.put("applicantMaxDefaultedLoans", policy.getApplicantMaxDefaultedLoans());
-        data.put("applicantMaxActiveLoanAmount", policy.getApplicantMaxActiveLoanAmount());
         data.put("applicantMaxForfeitedLoans", policy.getApplicantMaxForfeitedLoans());
         data.put("applicantForfeitedLookbackDays", policy.getApplicantForfeitedLookbackDays());
         data.put("applicantForfeitedWaitDays", policy.getApplicantForfeitedWaitDays());
-        data.put("guarantorMinSavings", policy.getGuarantorMinSavings());
-        data.put("guarantorMaxActiveLoanAmount", policy.getGuarantorMaxActiveLoanAmount());
+        data.put("guarantorWithActiveLoanAllowed", policy.getGuarantorWithActiveLoanAllowed());
         data.put("guarantorMaxGuaranteedLoanAmount", policy.getGuarantorMaxGuaranteedLoanAmount());
         data.put("guarantorMaxDefaultedLoans", policy.getGuarantorMaxDefaultedLoans());
         return data;
@@ -3143,6 +3125,8 @@ public class AdminService {
         Boolean accountantReviewRequired,
         Integer accountantPriority,
         Boolean disbursementOfficerRequired,
+        Boolean guarantorMinSavingsCheckRequired,
+        BigDecimal guarantorMinimumSavings,
         LoanProductStatus productStatus
     ) {
         public static LoanProductSnapshot fromProduct(LoanProductSetting product) {
@@ -3175,6 +3159,8 @@ public class AdminService {
                 product.getAccountantReviewRequired(),
                 product.getAccountantPriority(),
                 product.getDisbursementOfficerRequired(),
+                product.getGuarantorMinSavingsCheckRequired(),
+                product.getGuarantorMinimumSavings(),
                 product.getStatus()
             );
         }

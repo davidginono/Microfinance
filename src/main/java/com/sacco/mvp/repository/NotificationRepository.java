@@ -14,6 +14,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
     long countByRecipientMemberId(UUID recipientMemberId);
     long countByRecipientMemberIdAndReadAtIsNull(UUID recipientMemberId);
+    long countByRecipientMemberIdAndReadAtIsNullAndTypeNotIn(UUID recipientMemberId, Collection<String> types);
 
     long countByStatus(com.sacco.mvp.domain.NotificationStatus status);
 

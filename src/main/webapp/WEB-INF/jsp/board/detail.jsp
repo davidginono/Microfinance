@@ -20,12 +20,15 @@
 
 <c:set var="hasBoardSavedSignature" value="${not empty boardSavedSignatureText}" />
 
-<div class="erp-page-header">
-    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-    <c:if test="${not empty reviewPanelSubtitle}">
-        <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
-    </c:if>
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+        <h1 class="erp-page-title">${reviewPanelTitle}</h1>
+        <c:if test="${not empty reviewPanelSubtitle}">
+            <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
+        </c:if>
+    </div>
+    <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
 </div>
 
 <div class="loan-view-hero-summary">
@@ -227,38 +230,6 @@
     </table>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Fees & Insurance Receipt</h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
-        <tr>
-            <th class="px-3 py-2 text-left">File</th>
-            <th class="px-3 py-2 text-left">Size</th>
-            <th class="px-3 py-2 text-left">Uploaded</th>
-            <th class="px-3 py-2 text-left"></th>
-        </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-        <c:forEach items="${feeInsuranceReceiptAttachments}" var="file">
-            <tr>
-                <td class="px-3 py-2">${file.originalName}</td>
-                <td class="px-3 py-2">${file.sizeLabel}</td>
-                <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
-                <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-2">
-                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
-                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
-                    </div>
-                </td>
-            </tr>
-        </c:forEach>
-        <c:if test="${empty feeInsuranceReceiptAttachments}">
-            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No fees or insurance payment receipt uploaded yet.</td></tr>
-        </c:if>
-        </tbody>
-    </table>
-</div>
-
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
@@ -321,7 +292,7 @@
 </div>
 
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantorRequests" text="Guarantor Requests" /></h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
@@ -394,42 +365,6 @@
                 <label class="mb-2 block text-sm font-medium text-slate-700"><spring:message code="review.comment" text="Comment" /></label>
                 <textarea class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" name="comment"></textarea>
             </div>
-            <c:if test="${not empty guarantorRequests}">
-                <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
-                    <p class="erp-widget-title"><spring:message code="review.guarantorCommitments" text="Guarantor Commitments" /></p>
-                    <p class="mt-1 text-sm text-slate-500">Applicant-assigned guarantor commitments. Review only; staff cannot edit these amounts.</p>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2">
-                        <c:forEach items="${guarantorRequests}" var="request">
-                            <c:if test="${request.status eq 'APPROVED'}">
-                                <div class="rounded-md border border-slate-200 bg-white p-3">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Guarantor</p>
-                                    <p class="mt-1 text-sm font-semibold text-sacco-ink">
-                                        <c:choose>
-                                            <c:when test="${not empty guarantorNames[request.guarantorMemberId]}">${guarantorNames[request.guarantorMemberId]}</c:when>
-                                            <c:otherwise>#${fn:substring(request.guarantorMemberId, 0, 8)}</c:otherwise>
-                                        </c:choose>
-                                    </p>
-                                    <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Member No</p>
-                                    <p class="mt-1 text-sm font-semibold text-sacco-ink">
-                                        <c:choose>
-                                            <c:when test="${not empty guarantorMembersById[request.guarantorMemberId] and not empty guarantorMembersById[request.guarantorMemberId].memberNo}">${guarantorMembersById[request.guarantorMemberId].memberNo}</c:when>
-                                            <c:otherwise>-</c:otherwise>
-                                        </c:choose>
-                                    </p>
-                                    <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Committed Amount</p>
-                                    <p class="mt-1 text-lg font-bold text-sacco-ink">
-                                        <c:choose>
-                                            <c:when test="${not empty request.committedAmount}">${request.committedAmount}</c:when>
-                                            <c:otherwise>${request.requestedAmount}</c:otherwise>
-                                        </c:choose>
-                                    </p>
-                                    <p class="mt-1 text-xs text-slate-500">Approved by guarantor</p>
-                                </div>
-                            </c:if>
-                        </c:forEach>
-                    </div>
-                </div>
-            </c:if>
             <c:choose>
                 <c:when test="${reviewApprovalOtpEnabled}">
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
@@ -487,17 +422,9 @@
                 <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit" ${hasBoardSavedSignature ? '' : 'disabled'}>Approve Review</button>
                 <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit" formnovalidate>Reject Review</button>
             </div>
-            <div class="border-t border-slate-200 pt-4 loan-final-action-row">
-                <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary w-full justify-center">Print Loan Application</a>
-            </div>
         </form>
     </c:when>
     <c:otherwise>
-        <div class="loan-view-summary-card mt-4 px-5 py-5">
-            <div class="loan-view-action-cluster">
-                <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Print Loan Application</a>
-            </div>
-        </div>
     </c:otherwise>
 </c:choose>
 

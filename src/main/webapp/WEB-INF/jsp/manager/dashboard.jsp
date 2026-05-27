@@ -69,6 +69,7 @@ if (statusRows != null) {
         totalStatusCount += count;
     }
 }
+request.setAttribute("dashboardChartTotalCount", totalStatusCount);
 
 double chartWidth = 920d;
 double chartHeight = 480d;
@@ -238,6 +239,8 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" var="dashboardDefaultQueueLabel" />
 <spring:message code="manager.dashboard.queueMeta" text="Applications currently waiting for your action." var="dashboardDefaultQueueMeta" />
 <spring:message code="manager.dashboard.queueWaiting" text="Queue waiting" var="dashboardDefaultQueueFooter" />
+<spring:message code="manager.dashboard.statusPieTitle" text="Application Status Pie Chart" var="dashboardDefaultChartTitle" />
+<spring:message code="manager.dashboard.statusPieHelp" text="A clearer view of how applications are spread across each workflow stage." var="dashboardDefaultChartHelp" />
 <c:set var="dashboardBreadcrumbValue" value="${empty dashboardBreadcrumb ? dashboardDefaultBreadcrumb : dashboardBreadcrumb}" />
 <c:set var="dashboardPageTitleValue" value="${empty dashboardPageTitle ? dashboardDefaultTitle : dashboardPageTitle}" />
 <c:set var="dashboardSubtitleValue" value="${empty dashboardSubtitle ? dashboardDefaultSubtitle : dashboardSubtitle}" />
@@ -247,6 +250,8 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? dashboardDefaultQueueFooter : dashboardQueueFooterLabel}" />
 <c:set var="dashboardQueueIconValue" value="${empty dashboardQueueIcon ? 'M' : dashboardQueueIcon}" />
 <c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
+<c:set var="dashboardChartTitleValue" value="${empty dashboardChartTitle ? dashboardDefaultChartTitle : dashboardChartTitle}" />
+<c:set var="dashboardChartHelpValue" value="${empty dashboardChartHelp ? dashboardDefaultChartHelp : dashboardChartHelp}" />
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
@@ -304,13 +309,13 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <section class="erp-panel">
     <div class="erp-panel-header">
         <div>
-            <p class="erp-panel-title"><spring:message code="manager.dashboard.statusPieTitle" text="Application Status Pie Chart" /></p>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.dashboard.statusPieHelp" text="A clearer view of how applications are spread across each workflow stage." /></p>
+            <p class="erp-panel-title">${dashboardChartTitleValue}</p>
+            <p class="mt-1 text-sm text-slate-500">${dashboardChartHelpValue}</p>
         </div>
     </div>
     <div class="erp-panel-body">
         <c:choose>
-            <c:when test="${dashboardTrackedApplicationCount gt 0}">
+            <c:when test="${dashboardChartTotalCount gt 0}">
                 <div id="managerPieWrap" class="relative rounded-md border border-slate-200 bg-white p-4 sm:p-6">
                     <svg id="managerPieChart" viewBox="0 0 920 480" class="manager-pie-chart mx-auto block w-full max-w-[68rem]" role="img" aria-label="Application status pie chart">
                         <rect x="0" y="0" width="920" height="480" rx="16" fill="#ffffff"></rect>

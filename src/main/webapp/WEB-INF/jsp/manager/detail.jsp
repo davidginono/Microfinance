@@ -7,12 +7,15 @@
 <%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
-<div class="erp-page-header">
-    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-    <c:if test="${not empty reviewPanelSubtitle}">
-        <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
-    </c:if>
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+        <h1 class="erp-page-title">${reviewPanelTitle}</h1>
+        <c:if test="${not empty reviewPanelSubtitle}">
+            <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
+        </c:if>
+    </div>
+    <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
 </div>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
@@ -262,38 +265,6 @@
     </table>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Fees & Insurance Receipt</h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
-        <tr>
-            <th class="px-3 py-2 text-left">File</th>
-            <th class="px-3 py-2 text-left">Size</th>
-            <th class="px-3 py-2 text-left">Uploaded</th>
-            <th class="px-3 py-2 text-left"></th>
-        </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-        <c:forEach items="${feeInsuranceReceiptAttachments}" var="file">
-            <tr>
-                <td class="px-3 py-2">${file.originalName}</td>
-                <td class="px-3 py-2">${file.sizeLabel}</td>
-                <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
-                <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-2">
-                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
-                        <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
-                    </div>
-                </td>
-            </tr>
-        </c:forEach>
-        <c:if test="${empty feeInsuranceReceiptAttachments}">
-            <tr><td colspan="4" class="px-3 py-3 text-slate-500">No fees or insurance payment receipt uploaded yet.</td></tr>
-        </c:if>
-        </tbody>
-    </table>
-</div>
-
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
@@ -356,7 +327,7 @@
 </div>
 
 <div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantorRequests" text="Guarantor Requests" /></h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
@@ -496,42 +467,33 @@
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
         <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
-        <c:if test="${not empty guarantorRequests}">
-            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
-                <p class="erp-widget-title">Guarantor Commitments</p>
-                <p class="mt-1 text-sm text-slate-500">Applicant-assigned guarantor commitments. Review only; staff cannot edit these amounts.</p>
-                <div class="mt-3 grid gap-3 md:grid-cols-2">
-                    <c:forEach items="${guarantorRequests}" var="request">
-                        <c:if test="${request.status eq 'APPROVED'}">
-                            <div class="rounded-md border border-slate-200 bg-white p-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Guarantor</p>
-                                <p class="mt-1 text-sm font-semibold text-sacco-ink">
-                                    <c:choose>
-                                        <c:when test="${not empty guarantorNames[request.guarantorMemberId]}">${guarantorNames[request.guarantorMemberId]}</c:when>
-                                        <c:otherwise>#${fn:substring(request.guarantorMemberId, 0, 8)}</c:otherwise>
-                                    </c:choose>
-                                </p>
-                                <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Member No</p>
-                                <p class="mt-1 text-sm font-semibold text-sacco-ink">
-                                    <c:choose>
-                                        <c:when test="${not empty guarantorMembersById[request.guarantorMemberId] and not empty guarantorMembersById[request.guarantorMemberId].memberNo}">${guarantorMembersById[request.guarantorMemberId].memberNo}</c:when>
-                                        <c:otherwise>-</c:otherwise>
-                                    </c:choose>
-                                </p>
-                                <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Committed Amount</p>
-                                <p class="mt-1 text-lg font-bold text-sacco-ink">
-                                    <c:choose>
-                                        <c:when test="${not empty request.committedAmount}">${request.committedAmount}</c:when>
-                                        <c:otherwise>${request.requestedAmount}</c:otherwise>
-                                    </c:choose>
-                                </p>
-                                <p class="mt-1 text-xs text-slate-500">Approved by guarantor</p>
-                            </div>
-                        </c:if>
-                    </c:forEach>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
+                    <p class="mt-2 text-sm text-slate-600">Request a one-time code before submitting your manager decision.</p>
                 </div>
+                <button type="button"
+                        class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
+                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp">
+                    <span class="otp-button-spinner hidden"></span>
+                    <span class="otp-button-label">Send OTP Code</span>
+                </button>
             </div>
-        </c:if>
+            <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+            <div class="mt-3">
+                <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                <input type="text"
+                       name="managerDecisionOtpCode"
+                       inputmode="numeric"
+                       maxlength="6"
+                       autocomplete="one-time-code"
+                       required
+                       class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                       placeholder="123456" />
+                <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before approving or rejecting.</p>
+            </div>
+        </div>
         <div class="flex flex-wrap gap-2">
             <button type="submit" name="decision" value="ACCEPT" class="app-btn btn-primary">${approveActionLabel}</button>
             <button type="submit" name="decision" value="REJECT" class="app-btn btn-reject">${rejectActionLabel}</button>
@@ -625,14 +587,36 @@
                    required />
             <p class="mt-1 text-xs text-slate-500">Attach the receipt, voucher, or signed proof the applicant can later view.</p>
         </div>
-        <c:if test="${empty feeInsuranceReceiptAttachments}">
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                The applicant's fees and insurance payment receipt is required before disbursement.
-            </div>
-        </c:if>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
             <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="Optional disbursement or repayment instructions">${app.disbursementNotes}</textarea>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
+                    <p class="mt-2 text-sm text-slate-600">Request a one-time code before disbursing this loan.</p>
+                </div>
+                <button type="button"
+                        class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
+                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-disbursement-otp">
+                    <span class="otp-button-spinner hidden"></span>
+                    <span class="otp-button-label">Send OTP Code</span>
+                </button>
+            </div>
+            <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+            <div class="mt-3">
+                <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                <input type="text"
+                       name="disbursementOtpCode"
+                       inputmode="numeric"
+                       maxlength="6"
+                       autocomplete="one-time-code"
+                       required
+                       class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                       placeholder="123456" />
+                <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before completing disbursement.</p>
+            </div>
         </div>
         <button type="submit" class="app-btn btn-approve">${disbursementActionLabel}</button>
     </form>
@@ -654,14 +638,67 @@
     </form>
 </c:if>
 
-<div class="erp-form-wrap loan-page-bottom-actions">
-    <div class="loan-view-action-cluster">
-        <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Print Loan Application</a>
-    </div>
-</div>
-
 <script>
     (() => {
+        const csrfToken = "${_csrf.token}";
+
+        function setOtpButtonState(button, state) {
+            const spinner = button.querySelector(".otp-button-spinner");
+            const label = button.querySelector(".otp-button-label");
+            const loading = state === "loading";
+            const sent = state === "sent";
+            button.disabled = loading;
+            spinner?.classList.toggle("hidden", !loading);
+            if (label) {
+                label.textContent = loading ? "Sending..." : (sent ? "OTP Sent" : "Send OTP Code");
+            }
+        }
+
+        function showOtpFeedback(element, type, text) {
+            if (!element) {
+                return;
+            }
+            element.textContent = text;
+            element.classList.remove("hidden", "border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-rose-200", "bg-rose-50", "text-rose-700");
+            element.classList.add(
+                type === "success" ? "border-emerald-200" : "border-rose-200",
+                type === "success" ? "bg-emerald-50" : "bg-rose-50",
+                type === "success" ? "text-emerald-700" : "text-rose-700"
+            );
+        }
+
+        document.querySelectorAll(".staff-otp-request").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const form = button.closest("form");
+                const feedback = form ? form.querySelector(".staff-otp-feedback") : null;
+                const requestUrl = button.dataset.requestUrl;
+                if (!requestUrl) {
+                    showOtpFeedback(feedback, "error", "OTP request is not configured.");
+                    return;
+                }
+                setOtpButtonState(button, "loading");
+                try {
+                    const response = await fetch(requestUrl, {
+                        method: "POST",
+                        headers: {
+                            "X-CSRF-TOKEN": csrfToken,
+                            "Accept": "application/json"
+                        },
+                        credentials: "same-origin"
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.valid) {
+                        throw new Error(payload.message || "Unable to send the OTP code right now.");
+                    }
+                    setOtpButtonState(button, "sent");
+                    showOtpFeedback(feedback, "success", payload.message || "We sent an OTP code to your email.");
+                } catch (error) {
+                    setOtpButtonState(button, "idle");
+                    showOtpFeedback(feedback, "error", error.message || "Unable to send the OTP code right now.");
+                }
+            });
+        });
+
         document.querySelectorAll("form[data-manager-decision-form='true']").forEach((form) => {
             const reasonsField = form.querySelector("textarea[name='reasons']");
             reasonsField?.addEventListener("input", () => {

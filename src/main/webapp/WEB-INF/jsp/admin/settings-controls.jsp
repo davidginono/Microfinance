@@ -29,6 +29,37 @@
         display: grid;
         gap: 1rem;
     }
+    .product-identity-grid {
+        display: grid;
+        gap: 1rem;
+        align-items: end;
+    }
+    .product-identity-grid input:not([type="checkbox"]):not([type="radio"]),
+    .product-identity-grid select {
+        height: 3.5rem;
+    }
+    .savings-ratio-grid {
+        display: grid;
+        gap: 0.75rem;
+        max-width: 34rem;
+    }
+    .savings-fraction-control {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 0.5rem;
+        align-items: end;
+    }
+    .savings-fraction-divider {
+        min-height: 3.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        font-weight: 700;
+    }
+    .settings-checkbox-card {
+        min-height: 3.5rem;
+    }
     .product-builder-form input:not([type="checkbox"]):not([type="radio"]),
     .product-builder-form select {
         width: 100%;
@@ -338,6 +369,15 @@
         .product-builder-grid.two-up {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+        .product-identity-grid {
+            grid-template-columns: minmax(8rem, 0.55fr) minmax(16rem, 1.5fr) minmax(12rem, 0.8fr);
+        }
+        .product-identity-description {
+            grid-column: 1 / -1;
+        }
+        .savings-ratio-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
         .workflow-start-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -489,24 +529,24 @@
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="erp-panel-body grid gap-5">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar settings-action-bar--end">
+            <div class="settings-action-bar justify-between">
+                <p class="max-w-3xl text-sm text-slate-500">These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product.</p>
                 <button type="submit" class="settings-action-button app-btn btn-primary">Save Station Policies</button>
             </div>
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="rounded-md border border-slate-200 bg-white p-4">
                     <p class="erp-widget-title">Loan Applicants</p>
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Max Defaulted Loans
-                            <input name="applicantMaxDefaultedLoans" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantMaxDefaultedLoans}" />
-                        </label>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Max Active Loan Amount
-                            <input name="applicantMaxActiveLoanAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantMaxActiveLoanAmount}" />
+                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <input name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
+                            <span>
+                                <span class="block font-semibold text-slate-900">Block applicants with defaulted loans</span>
+                                <span class="mt-1 block text-xs text-slate-500">If checked, one defaulted loan blocks new applications.</span>
+                            </span>
                         </label>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Forfeited Application Waiting Period (Days)
-                            <input name="applicantForfeitedWaitDays" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantForfeitedWaitDays}" />
+                            <input name="applicantForfeitedWaitDays" type="number" min="0" max="15" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantForfeitedWaitDays}" />
                             <input name="applicantMaxForfeitedLoans" type="hidden" value="${policyApplicantMaxForfeitedLoans}" />
                             <input name="applicantForfeitedLookbackDays" type="hidden" value="${policyApplicantForfeitedLookbackDays}" />
                         </label>
@@ -515,22 +555,24 @@
                 <div class="rounded-md border border-slate-200 bg-white p-4">
                     <p class="erp-widget-title">Guarantors</p>
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Minimum Savings
-                            <input name="guarantorMinSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMinSavings}" />
-                        </label>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Max Active Loan Amount
-                            <input name="guarantorMaxActiveLoanAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxActiveLoanAmount}" />
+                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <input name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
+                            <span>
+                                <span class="block font-semibold text-slate-900">Allow guarantors with active loans</span>
+                                <span class="mt-1 block text-xs text-slate-500">If unchecked, members with active loans cannot guarantee.</span>
+                            </span>
                         </label>
                         <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Max Guarantees
-                            <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" step="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxGuarantees}" />
+                            <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxGuarantees}" />
                         </label>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Max Defaulted Loans
-                            <input name="guarantorMaxDefaultedLoans" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxDefaultedLoans}" />
+                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <input name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
+                            <span>
+                                <span class="block font-semibold text-slate-900">Block guarantors with defaulted loans</span>
+                                <span class="mt-1 block text-xs text-slate-500">If checked, one defaulted loan blocks guarantee approvals.</span>
+                            </span>
                         </label>
                     </div>
                 </div>
@@ -538,54 +580,6 @@
         </form>
     </section>
 
-</c:if>
-
-<c:if test="${settingsSection eq 'payment'}">
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title">Payment Configuration</p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Loan Fees & Insurance Payment</h2>
-            <p class="mt-1 text-sm text-slate-500">These instructions appear to the applicant after guarantors approve the loan.</p>
-        </div>
-        <form action="/admin/settings-controls/loan-fee-payment" method="post" class="erp-panel-body grid gap-4">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Payment Method
-                    <input name="loanFeePaymentMethod" type="text" maxlength="120" minlength="2" required
-                           pattern="[A-Za-z &amp;/().,+-]{2,120}"
-                           title="Enter the payment method name, such as M-Pesa or Bank."
-                           class="mt-1 h-11 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
-                           value="${settings.loanFeePaymentMethod}" placeholder="M-Pesa, Bank, Control Number" />
-                </label>
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Number / Account
-                    <input name="loanFeePaymentAccount" type="text" maxlength="40" minlength="5" required
-                           pattern="[A-Za-z0-9 +/().-]{5,40}"
-                           title="Enter a valid phone, account, or control number."
-                           class="mt-1 h-11 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
-                           value="${settings.loanFeePaymentAccount}" placeholder="Phone, account, or control number" />
-                </label>
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Payee Name
-                    <input name="loanFeePaymentPayee" type="text" maxlength="160" minlength="2" required
-                           pattern="[A-Za-z0-9 &amp;/().,'-]{2,160}"
-                           title="Use a valid SACCO, station, or payee name."
-                           class="mt-1 h-11 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
-                           value="${settings.loanFeePaymentPayee}" placeholder="SACCO / station payee name" />
-                </label>
-                <div class="flex items-end">
-                    <button type="submit" class="app-btn btn-primary h-11 w-full justify-center">Save Payment Details</button>
-                </div>
-            </div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Applicant Instructions
-                <textarea name="loanFeePaymentInstructions" maxlength="500" rows="3"
-                          class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                          placeholder="Tell applicants what to pay and what receipt details to upload.">${settings.loanFeePaymentInstructions}</textarea>
-            </label>
-        </form>
-    </section>
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
@@ -673,10 +667,17 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsPercentage" text="Savings Percentage" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.savingsPercentageHelp" text="Maximum percentage of member savings available for this product." /></p>
+                            <p class="text-sm font-semibold text-sacco-ink">Savings Fraction</p>
+                            <p class="text-sm text-slate-500">Maximum share of member savings available for this product.</p>
                         </div>
-                        <p class="text-base font-semibold text-slate-900"><fmt:formatNumber value="${product.maxLoanSavingsRatio * 100}" minFractionDigits="2" maxFractionDigits="2" />%</p>
+                        <p class="text-base font-semibold text-slate-900">
+                            <c:choose>
+                                <c:when test="${product.maxLoanSavingsRatio gt 0}">
+                                    1 / <fmt:formatNumber value="${1 / product.maxLoanSavingsRatio}" maxFractionDigits="0" />
+                                </c:when>
+                                <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
+                            </c:choose>
+                        </p>
                     </div>
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -704,6 +705,19 @@
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.guarantorsHelp" text="Number of guarantors required before review moves forward." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">${product.guarantorsRequired}</p>
+                    </div>
+
+                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <div>
+                            <p class="text-sm font-semibold text-sacco-ink">Guarantor Savings Check</p>
+                            <p class="text-sm text-slate-500">Controls whether selected guarantors must meet this product's minimum savings.</p>
+                        </div>
+                        <p class="text-base font-semibold text-slate-900">
+                            <c:choose>
+                                <c:when test="${product.guarantorMinSavingsCheckRequired}">Enabled</c:when>
+                                <c:otherwise>Disabled</c:otherwise>
+                            </c:choose>
+                        </p>
                     </div>
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -959,20 +973,15 @@
                             <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
                             <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityCreateHelp" text="Set the member-facing name, display order, and status for this product." /></p>
                         </div>
-                        <div class="product-builder-section-body product-builder-grid two-up">
+                        <div class="product-builder-section-body product-identity-grid">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
                                 <input name="displayOrder" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="5" />
                             </label>
 
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
                                 <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.namePlaceholder" text="e.g. School Fees Booster" />' data-product-name-field />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
-                                <spring:message code="common.description" text="Description" />
-                                <textarea name="productDescription" rows="3" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'></textarea>
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -983,6 +992,11 @@
                                     <option value="SUSPENDED"><spring:message code="status.suspended" text="Suspended" /></option>
                                     <option value="RETIRED"><spring:message code="status.retired" text="Retired" /></option>
                                 </select>
+                            </label>
+
+                            <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="common.description" text="Description" />
+                                <textarea name="productDescription" rows="3" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'></textarea>
                             </label>
                         </div>
                     </section>
@@ -1004,9 +1018,24 @@
                                 <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank for no product cap" />' />
                             </label>
 
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.savingsPercentage" text="Savings Percentage" />
-                                <input name="maxLoanSavingsPercent" type="number" min="0.01" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="33.33" />
+                            <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
+                                <input name="maxLoanSavingsPercent" type="hidden" value="33.33" data-savings-percent />
+                                <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Savings Fraction
+                                    <div class="savings-fraction-control mt-1">
+                                        <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                        <span class="savings-fraction-divider">/</span>
+                                        <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                <input name="freshFinancialDataRequired" type="checkbox" value="true" data-workflow-loaded-financial />
+                                <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data At Submission" /></span>
+                            </label>
+                            <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" />
+                                <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
                             </label>
                         </div>
                     </section>
@@ -1183,29 +1212,29 @@
                                 <div class="workflow-support-grid">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
-                                        <input name="committeeMinimumVotes" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-workflow-committee-votes />
+                                        <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-votes />
                                     </label>
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Committee Approvals Needed" />
-                                        <input name="committeeApprovalThreshold" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-workflow-committee-threshold />
+                                        <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-threshold />
                                     </label>
                                 </div>
                             </div>
 
                             <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.eligibilitySupport" text="Eligibility Support" /></p>
+                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
                                 <div class="workflow-support-grid">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <spring:message code="admin.settings.workflow.guarantorsRequired" text="Guarantors Required" />
-                                        <input name="guarantorsRequired" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-workflow-guarantors />
+                                        <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-guarantors />
                                     </label>
-                                    <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="freshFinancialDataRequired" type="checkbox" value="true" data-workflow-loaded-financial />
-                                        <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data At Submission" /></span>
+                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Minimum Guarantor Savings
+                                        <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
                                     </label>
-                                    <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 md:col-span-2">
-                                        <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" />
-                                        <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
+                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                        <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
+                                        <span>Check guarantor minimum savings before selection</span>
                                     </label>
                                 </div>
                             </div>
@@ -1386,20 +1415,15 @@
                         <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the member-facing name, display order, and status for this product." /></p>
                     </div>
-                    <div class="product-builder-section-body product-builder-grid two-up">
+                    <div class="product-builder-section-body product-identity-grid">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
                             <input name="displayOrder" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedDisplayOrder}" />
                         </label>
 
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
                             <input name="productName" type="text" <c:if test="${product.loanType eq 'CUSTOMIZED_LOAN'}">required</c:if> maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${fn:escapeXml(product.displayName)}" data-product-name-field />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
-                            <spring:message code="common.description" text="Description" />
-                            <textarea name="productDescription" rows="3" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1410,6 +1434,11 @@
                                 <option value="SUSPENDED" ${product.status eq 'SUSPENDED' ? 'selected' : ''}><spring:message code="status.suspended" text="Suspended" /></option>
                                 <option value="RETIRED" ${product.status eq 'RETIRED' ? 'selected' : ''}><spring:message code="status.retired" text="Retired" /></option>
                             </select>
+                        </label>
+
+                        <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="common.description" text="Description" />
+                            <textarea name="productDescription" rows="3" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
                         </label>
                     </div>
                 </section>
@@ -1431,9 +1460,24 @@
                             <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
                         </label>
 
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.savingsPercentage" text="Savings Percentage" />
-                            <input name="maxLoanSavingsPercent" type="number" min="0.01" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxLoanSavingsRatio * 100}" />
+                        <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
+                            <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
+                            <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Savings Fraction
+                                <div class="savings-fraction-control mt-1">
+                                    <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                    <span class="savings-fraction-divider">/</span>
+                                    <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                </div>
+                            </div>
+                        </div>
+                        <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
+                            <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data At Submission" /></span>
+                        </label>
+                        <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
+                            <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
                         </label>
                     </div>
                 </section>
@@ -1590,29 +1634,29 @@
                             <div class="workflow-support-grid">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
-                                    <input name="committeeMinimumVotes" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeMinimumVotes}" data-workflow-committee-votes />
+                                    <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeMinimumVotes}" data-number-range-max="15" data-workflow-committee-votes />
                                 </label>
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Committee Approvals Needed" />
-                                    <input name="committeeApprovalThreshold" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeApprovalThreshold}" data-workflow-committee-threshold />
+                                    <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeApprovalThreshold}" data-number-range-max="15" data-workflow-committee-threshold />
                                 </label>
                             </div>
                         </div>
 
                         <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.eligibilitySupport" text="Eligibility Support" /></p>
+                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
                             <div class="workflow-support-grid">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.guarantorsRequired" text="Guarantors Required" />
-                                    <input name="guarantorsRequired" type="number" min="0" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.guarantorsRequired}" data-workflow-guarantors />
+                                    <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.guarantorsRequired}" data-number-range-max="15" data-workflow-guarantors />
                                 </label>
-                                <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
-                                    <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data At Submission" /></span>
+                                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Minimum Guarantor Savings
+                                    <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedGuarantorMinimumSavings}" />
                                 </label>
-                                <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 md:col-span-2">
-                                    <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
-                                    <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
+                                <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinSavingsCheckRequired ? 'checked' : ''} />
+                                    <span>Check guarantor minimum savings before selection</span>
                                 </label>
                             </div>
                         </div>
@@ -1693,6 +1737,8 @@
 <spring:message code="admin.settings.validation.maxRepaymentMonths" text="Maximum repayment period must be at least 1 month." var="validationMaxRepaymentMonths" />
 <spring:message code="admin.settings.validation.maxRepaymentBelowMin" text="Maximum repayment period cannot be lower than the minimum repayment period." var="validationMaxRepaymentBelowMin" />
 <spring:message code="admin.settings.validation.guarantorsRequired" text="Guarantors required cannot be negative." var="validationGuarantorsRequired" />
+<spring:message code="admin.settings.validation.countRange" text="Enter a number from 0 to 15." var="validationCountRange" />
+<spring:message code="admin.settings.validation.committeeCountRange" text="Enter a number from 1 to 15." var="validationCommitteeCountRange" />
 <spring:message code="admin.settings.validation.noReviewStage" text="Enable at least one review or approval stage before disbursement." var="validationNoReviewStage" />
 <spring:message code="admin.settings.validation.managerPriority" text="Manager priority must be between 1 and 4." var="validationManagerPriority" />
 <spring:message code="admin.settings.validation.loanOfficerPriority" text="Loan Officer priority must be between 1 and 4." var="validationLoanOfficerPriority" />
@@ -1755,6 +1801,8 @@
             validationMaxRepaymentMonths: "${validationMaxRepaymentMonths}",
             validationMaxRepaymentBelowMin: "${validationMaxRepaymentBelowMin}",
             validationGuarantorsRequired: "${validationGuarantorsRequired}",
+            validationCountRange: "${validationCountRange}",
+            validationCommitteeCountRange: "${validationCommitteeCountRange}",
             validationNoReviewStage: "${validationNoReviewStage}",
             validationManagerPriority: "${validationManagerPriority}",
             validationLoanOfficerPriority: "${validationLoanOfficerPriority}",
@@ -1836,6 +1884,48 @@
                     input.value = normalizeMoneyValue(input.value);
                 });
             });
+        });
+
+        function enforceNumericTextLength(input) {
+            if (!input || typeof input.value !== 'string') {
+                return;
+            }
+            const maxLength = Number(input.getAttribute('data-numeric-maxlength') || 15);
+            if (!Number.isFinite(maxLength) || maxLength <= 0 || input.value.length <= maxLength) {
+                return;
+            }
+            input.value = input.value.slice(0, maxLength);
+        }
+
+        function enforceNumberRange(input) {
+            if (!input || input.value === '') {
+                return;
+            }
+            const value = Number(input.value);
+            if (!Number.isFinite(value)) {
+                return;
+            }
+            const minValue = input.hasAttribute('min') ? Number(input.getAttribute('min')) : Number.NaN;
+            const maxValue = Number(input.getAttribute('data-number-range-max') || input.getAttribute('max'));
+            if (Number.isFinite(minValue) && value < minValue) {
+                input.value = String(minValue);
+            } else if (Number.isFinite(maxValue) && value > maxValue) {
+                input.value = String(maxValue);
+            }
+        }
+
+        document.querySelectorAll('input[type="number"], input[inputmode="decimal"], input[data-money-input="true"]').forEach((input) => {
+            input.setAttribute('maxlength', input.getAttribute('maxlength') || '15');
+            input.setAttribute('data-numeric-maxlength', input.getAttribute('data-numeric-maxlength') || '15');
+            enforceNumericTextLength(input);
+            input.addEventListener('input', () => enforceNumericTextLength(input));
+            input.addEventListener('change', () => enforceNumericTextLength(input));
+        });
+
+        document.querySelectorAll('input[data-number-range-max]').forEach((input) => {
+            enforceNumberRange(input);
+            input.addEventListener('input', () => enforceNumberRange(input));
+            input.addEventListener('change', () => enforceNumberRange(input));
         });
 
         function addValidationError(errors, key, message) {
@@ -2019,6 +2109,10 @@
             const workflowStartStageField = form.querySelector('[data-workflow-start-stage-field]');
             const productNameField = form.querySelector('[data-product-name-field]');
             const productCodeField = form.querySelector('[data-product-code-field][data-product-code-generated="true"]');
+            const savingsPercentInput = form.querySelector('[data-savings-percent]');
+            const savingsFractionNumerator = form.querySelector('[data-savings-fraction-numerator]');
+            const savingsFractionDenominator = form.querySelector('[data-savings-fraction-denominator]');
+            let syncingSavingsRatio = false;
 
             if (!committeeToggle || !warningsRoot || !runtimeRoot) {
                 return;
@@ -2091,6 +2185,54 @@
                     return;
                 }
                 productCodeField.value = generateProductCode(productNameField.value);
+            }
+
+            function approximateFraction(ratio) {
+                if (!Number.isFinite(ratio) || ratio <= 0) {
+                    return { numerator: 1, denominator: 1 };
+                }
+                let bestNumerator = 1;
+                let bestDenominator = 1;
+                let bestError = Math.abs(ratio - 1);
+                for (let denominator = 1; denominator <= 100; denominator += 1) {
+                    const numerator = Math.max(1, Math.round(ratio * denominator));
+                    const error = Math.abs(ratio - numerator / denominator);
+                    if (error < bestError) {
+                        bestNumerator = numerator;
+                        bestDenominator = denominator;
+                        bestError = error;
+                    }
+                }
+                return { numerator: bestNumerator, denominator: bestDenominator };
+            }
+
+            function syncSavingsFractionFromPercent() {
+                if (!savingsPercentInput || !savingsFractionNumerator || !savingsFractionDenominator || syncingSavingsRatio) {
+                    return;
+                }
+                const percent = Number(savingsPercentInput.value);
+                if (!Number.isFinite(percent) || percent <= 0) {
+                    return;
+                }
+                syncingSavingsRatio = true;
+                const fraction = approximateFraction(percent / 100);
+                savingsFractionNumerator.value = String(fraction.numerator);
+                savingsFractionDenominator.value = String(fraction.denominator);
+                syncingSavingsRatio = false;
+            }
+
+            function syncSavingsPercentFromFraction() {
+                if (!savingsPercentInput || !savingsFractionNumerator || !savingsFractionDenominator || syncingSavingsRatio) {
+                    return;
+                }
+                const numerator = Number(savingsFractionNumerator.value);
+                const denominator = Number(savingsFractionDenominator.value);
+                if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) {
+                    return;
+                }
+                syncingSavingsRatio = true;
+                savingsPercentInput.value = ((numerator / denominator) * 100).toFixed(2);
+                syncingSavingsRatio = false;
             }
 
             function syncReviewPriorities(source) {
@@ -2194,12 +2336,6 @@
                 if (accountantPriority) {
                     accountantPriority.value = String(accountantPriorityValue);
                     accountantPriority.disabled = !accountantEnabled;
-                }
-                if (committeeVotes) {
-                    committeeVotes.disabled = !committeeEnabled;
-                }
-                if (committeeThreshold) {
-                    committeeThreshold.disabled = !committeeEnabled;
                 }
                 const activePriorityEntries = priorityEntries(
                     managerEnabled,
@@ -2336,8 +2472,8 @@
                 } else if (minRepaymentMonths !== null && !Number.isNaN(minRepaymentMonths) && maxRepaymentMonths < minRepaymentMonths) {
                     addValidationError(errors, 'maxRepaymentMonths', productSettingsText.validationMaxRepaymentBelowMin);
                 }
-                if (guarantorsRequired === null || Number.isNaN(guarantorsRequired) || guarantorsRequired < 0) {
-                    addValidationError(errors, 'guarantorsRequired', productSettingsText.validationGuarantorsRequired);
+                if (guarantorsRequired === null || Number.isNaN(guarantorsRequired) || guarantorsRequired < 0 || guarantorsRequired > 15) {
+                    addValidationError(errors, 'guarantorsRequired', productSettingsText.validationCountRange);
                 }
 
                 if (!managerEnabled && !loanOfficerEnabled && !committeeEnabled && !accountantEnabled) {
@@ -2387,11 +2523,11 @@
                     if (activeBoardMembers <= 0) {
                         addValidationError(errors, 'committeeReviewRequired', productSettingsText.validationAssignCommitteeReviewer);
                     }
-                    if (committeeVotesValue === null || Number.isNaN(committeeVotesValue) || committeeVotesValue < 1) {
-                        addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeMinimumVotes);
+                    if (committeeVotesValue === null || Number.isNaN(committeeVotesValue) || committeeVotesValue < 1 || committeeVotesValue > 15) {
+                        addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeCountRange);
                     }
-                    if (committeeThresholdValue === null || Number.isNaN(committeeThresholdValue) || committeeThresholdValue < 1) {
-                        addValidationError(errors, 'committeeApprovalThreshold', productSettingsText.validationCommitteeApprovalThreshold);
+                    if (committeeThresholdValue === null || Number.isNaN(committeeThresholdValue) || committeeThresholdValue < 1 || committeeThresholdValue > 15) {
+                        addValidationError(errors, 'committeeApprovalThreshold', productSettingsText.validationCommitteeCountRange);
                     }
                     if (!Number.isNaN(committeeVotesValue) && !Number.isNaN(committeeThresholdValue) && committeeThresholdValue > committeeVotesValue) {
                         addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeThresholdAboveVotes);
@@ -2419,12 +2555,29 @@
                 return errors;
             }
 
-            [managerToggle, loanOfficerToggle, committeeToggle, committeeVotes, committeeThreshold, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput]
+            [managerToggle, loanOfficerToggle, committeeToggle, committeeVotes, committeeThreshold, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput]
                 .filter(Boolean)
                 .forEach((field) => {
                     field.addEventListener('change', applyRules);
                     field.addEventListener('input', applyRules);
                 });
+            [savingsFractionNumerator, savingsFractionDenominator]
+                .filter(Boolean)
+                .forEach((field) => {
+                    field.addEventListener('change', () => {
+                        syncSavingsPercentFromFraction();
+                        applyRules();
+                    });
+                    field.addEventListener('input', () => {
+                        syncSavingsPercentFromFraction();
+                        applyRules();
+                    });
+                });
+            if (savingsPercentInput) {
+                savingsPercentInput.addEventListener('change', syncSavingsFractionFromPercent);
+                savingsPercentInput.addEventListener('input', syncSavingsFractionFromPercent);
+                syncSavingsFractionFromPercent();
+            }
 
             [managerStartRadio, loanOfficerStartRadio].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {

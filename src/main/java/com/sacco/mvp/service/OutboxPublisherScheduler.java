@@ -12,6 +12,7 @@ import com.sacco.mvp.repository.NotificationRepository;
 import com.sacco.mvp.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -34,10 +35,13 @@ public class OutboxPublisherScheduler {
     private final NotificationViewService notificationViewService;
     private final NotificationEmailService notificationEmailService;
 
-    @Scheduled(fixedDelay = 2000)
+    @Value("${app.outbox.batch-size:250}")
+    private int batchSize;
+
+    @Scheduled(fixedDelayString = "${app.outbox.fixed-delay-ms:500}")
     @Transactional
     public void publish() {
-        List<OutboxEvent> events = outboxEventRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.NEW);
+        List<OutboxEvent> events = outboxEventRepository.findNextPublishBatch(Math.max(1, batchSize));
         for (OutboxEvent event : events) {
             try {
                 JsonNode payload = objectMapper.readTree(event.getPayload());

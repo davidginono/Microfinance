@@ -520,14 +520,13 @@ public class AdminController {
         model.addAttribute("currentStationPolicy", stationPolicy);
         model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
         model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
-        model.addAttribute("policyApplicantMaxActiveLoanAmount", stationPolicy == null ? settings.getApplicantMaxActiveLoanAmount() : stationPolicy.getApplicantMaxActiveLoanAmount());
         model.addAttribute("policyApplicantMaxForfeitedLoans", stationPolicy == null ? settings.getApplicantMaxForfeitedLoans() : stationPolicy.getApplicantMaxForfeitedLoans());
         model.addAttribute("policyApplicantForfeitedLookbackDays", stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays());
         Integer applicantForfeitedWaitDays = stationPolicy == null ? settings.getApplicantForfeitedWaitDays() : stationPolicy.getApplicantForfeitedWaitDays();
         Integer applicantForfeitedLookbackDays = stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays();
         model.addAttribute("policyApplicantForfeitedWaitDays", applicantForfeitedWaitDays == null ? applicantForfeitedLookbackDays : applicantForfeitedWaitDays);
-        model.addAttribute("policyGuarantorMinSavings", stationPolicy == null ? settings.getGuarantorMinSavings() : stationPolicy.getGuarantorMinSavings());
-        model.addAttribute("policyGuarantorMaxActiveLoanAmount", stationPolicy == null ? settings.getGuarantorMaxActiveLoanAmount() : stationPolicy.getGuarantorMaxActiveLoanAmount());
+        Boolean guarantorWithActiveLoanAllowed = stationPolicy == null ? settings.getGuarantorWithActiveLoanAllowed() : stationPolicy.getGuarantorWithActiveLoanAllowed();
+        model.addAttribute("policyGuarantorWithActiveLoanAllowed", guarantorWithActiveLoanAllowed == null || guarantorWithActiveLoanAllowed);
         model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
         model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
@@ -575,6 +574,8 @@ public class AdminController {
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                     @RequestParam(defaultValue = "1") Integer managerPriority,
                                     @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+                                    @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
+                                    @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                     @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
                                     @RequestParam(required = false) String modalKey,
                                     RedirectAttributes ra) {
@@ -595,7 +596,8 @@ public class AdminController {
                 maxLoanSavingsRatio, insuranceRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
                 resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
-                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, disbursementOfficerRequired, productStatus);
+                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
+                guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -633,6 +635,8 @@ public class AdminController {
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                               @RequestParam(defaultValue = "1") Integer managerPriority,
                                               @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+                                              @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
+                                              @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                               @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
                                               @RequestParam(required = false) String modalKey,
                                               RedirectAttributes ra) {
@@ -675,6 +679,8 @@ public class AdminController {
                 accountantReviewRequired,
                 accountantPriority,
                 disbursementOfficerRequired,
+                guarantorMinSavingsCheckRequired,
+                guarantorMinimumSavings,
                 productStatus
             );
             ra.addFlashAttribute("message", "Customized loan product added.");
@@ -704,30 +710,6 @@ public class AdminController {
         return loanSettingsRedirect(resolvedModalKey);
     }
 
-    @PostMapping("/settings-controls/loan-fee-payment")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
-    public String updateLoanFeePaymentInstructions(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                   @RequestParam(required = false) String loanFeePaymentMethod,
-                                                   @RequestParam(required = false) String loanFeePaymentAccount,
-                                                   @RequestParam(required = false) String loanFeePaymentPayee,
-                                                   @RequestParam(required = false) String loanFeePaymentInstructions,
-                                                   RedirectAttributes ra) {
-        try {
-            adminService.updateLoanFeePaymentInstructions(
-                adminScopeService.currentSaccoId(principal),
-                principal.getMemberId(),
-                loanFeePaymentMethod,
-                loanFeePaymentAccount,
-                loanFeePaymentPayee,
-                loanFeePaymentInstructions
-            );
-            ra.addFlashAttribute("message", "Loan fee payment instructions updated.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/admin/settings-controls?section=payment";
-    }
-
     @PostMapping("/settings-controls/language")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateWorkspaceDefaultLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -750,12 +732,10 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
-                                              @RequestParam(required = false) BigDecimal applicantMaxActiveLoanAmount,
                                               @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
                                               @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
                                               @RequestParam(required = false) Integer applicantForfeitedWaitDays,
-                                              @RequestParam(required = false) BigDecimal guarantorMinSavings,
-                                              @RequestParam(required = false) BigDecimal guarantorMaxActiveLoanAmount,
+                                              @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                               @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                               @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
                                               RedirectAttributes ra) {
@@ -765,12 +745,10 @@ public class AdminController {
                 adminScopeService.currentStationId(principal),
                 principal.getMemberId(),
                 applicantMaxDefaultedLoans,
-                applicantMaxActiveLoanAmount,
                 applicantMaxForfeitedLoans,
                 applicantForfeitedLookbackDays,
                 applicantForfeitedWaitDays,
-                guarantorMinSavings,
-                guarantorMaxActiveLoanAmount,
+                guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
                 guarantorMaxDefaultedLoans
             );
@@ -786,12 +764,10 @@ public class AdminController {
     public String updateStationQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                                      @RequestParam String stationId,
                                                      @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
-                                                     @RequestParam(required = false) BigDecimal applicantMaxActiveLoanAmount,
                                                      @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
                                                      @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
                                                      @RequestParam(required = false) Integer applicantForfeitedWaitDays,
-                                                     @RequestParam(required = false) BigDecimal guarantorMinSavings,
-                                                     @RequestParam(required = false) BigDecimal guarantorMaxActiveLoanAmount,
+                                                     @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                                      @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                                      @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
                                                      RedirectAttributes ra) {
@@ -801,12 +777,10 @@ public class AdminController {
                 stationId,
                 principal.getMemberId(),
                 applicantMaxDefaultedLoans,
-                applicantMaxActiveLoanAmount,
                 applicantMaxForfeitedLoans,
                 applicantForfeitedLookbackDays,
                 applicantForfeitedWaitDays,
-                guarantorMinSavings,
-                guarantorMaxActiveLoanAmount,
+                guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
                 guarantorMaxDefaultedLoans
             );
@@ -861,9 +835,6 @@ public class AdminController {
         if ("guarantor".equalsIgnoreCase(section)) {
             return "guarantor";
         }
-        if ("payment".equalsIgnoreCase(section)) {
-            return "payment";
-        }
         if ("language".equalsIgnoreCase(section)) {
             return "language";
         }
@@ -913,6 +884,10 @@ public class AdminController {
                 fieldErrors.put("maxLoanSavingsPercent", "Savings percentage must be greater than zero.");
             case "Guarantors required cannot be negative." ->
                 fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
+            case "Guarantors required must be between 0 and 15." ->
+                fieldErrors.put("guarantorsRequired", "Guarantors required must be between 0 and 15.");
+            case "Minimum guarantor savings cannot be negative." ->
+                fieldErrors.put("guarantorMinimumSavings", "Minimum guarantor savings cannot be negative.");
             case "Insurance rate cannot be negative." ->
                 fieldErrors.put("insurancePercent", "Insurance percentage cannot be negative.");
             case "Application fee cannot be negative." ->
@@ -953,9 +928,11 @@ public class AdminController {
                  "Maximum repayment period cannot be lower than the minimum repayment period." ->
                 fieldErrors.put("maxRepaymentMonths", message);
             case "Committee minimum votes must be at least 1 when committee review is required.",
+                 "Committee minimum votes must be between 1 and 15.",
                  "Committee minimum votes cannot exceed the number of active board members." ->
                 fieldErrors.put("committeeMinimumVotes", message);
             case "Committee approval threshold must be at least 1 when committee review is required.",
+                 "Committee approval threshold must be between 1 and 15.",
                  "Committee approval threshold cannot exceed the number of active board members." ->
                 fieldErrors.put("committeeApprovalThreshold", message);
             case "Committee approval threshold cannot be greater than committee minimum votes." -> {

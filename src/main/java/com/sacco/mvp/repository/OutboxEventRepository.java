@@ -16,6 +16,16 @@ import java.util.UUID;
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>, JpaSpecificationExecutor<OutboxEvent> {
     List<OutboxEvent> findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus status);
 
+    @Query(value = """
+        select *
+        from outbox_events
+        where status = 'NEW'
+        order by created_at asc
+        limit :limit
+        for update skip locked
+        """, nativeQuery = true)
+    List<OutboxEvent> findNextPublishBatch(@Param("limit") int limit);
+
     List<OutboxEvent> findTop100ByOrderByCreatedAtDesc();
 
     List<OutboxEvent> findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus status);

@@ -117,25 +117,43 @@
     }
     .loan-view-action-cluster {
         width: 100%;
-        display: grid;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
         gap: 0.75rem;
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     }
     .loan-view-action-cluster > * {
         min-width: 0;
+        flex: 0 0 auto;
     }
     .loan-view-action-cluster form {
         margin: 0;
+        display: inline-flex;
     }
     .loan-view-action-cluster .app-btn,
     .loan-view-action-cluster button {
-        width: 100%;
+        width: min(100%, 14rem);
         min-height: 2.85rem;
         padding-inline: 1rem;
         font-size: 0.84rem;
     }
+    .loan-final-action-row {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    .loan-final-action-row > * {
+        flex: 0 0 auto;
+    }
+    .loan-final-action-row form {
+        display: inline-flex;
+        margin: 0;
+    }
     .loan-final-action-row .app-btn,
     .loan-final-action-row button {
+        width: min(100%, 14rem);
         min-height: 3.25rem;
         padding-block: 0.9rem;
         font-size: 0.88rem;

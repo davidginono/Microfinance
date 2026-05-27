@@ -54,6 +54,8 @@ import java.time.format.DateTimeParseException;
 @Service
 @RequiredArgsConstructor
 public class LoanPresentationService {
+    private static final String LEGACY_FEE_INSURANCE_RECEIPT_CATEGORY = "FEE_INSURANCE_RECEIPT";
+
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
     private final LoanAttachmentService loanAttachmentService;
@@ -220,19 +222,13 @@ public class LoanPresentationService {
     public List<Map<String, Object>> parseApplicationAttachments(String json) {
         return parseAttachments(json).stream()
             .filter(item -> !LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
-            .filter(item -> !LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(attachmentCategory(item)))
+            .filter(item -> !LEGACY_FEE_INSURANCE_RECEIPT_CATEGORY.equals(attachmentCategory(item)))
             .toList();
     }
 
     public List<Map<String, Object>> parseDisbursementProofAttachments(String json) {
         return parseAttachments(json).stream()
             .filter(item -> LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
-            .toList();
-    }
-
-    public List<Map<String, Object>> parseFeeInsuranceReceiptAttachments(String json) {
-        return parseAttachments(json).stream()
-            .filter(item -> LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(attachmentCategory(item)))
             .toList();
     }
 
@@ -630,7 +626,6 @@ public class LoanPresentationService {
         }
         appendTable(html, "Application Details", formFields);
         appendTable(html, "SACCO Financial Details", financialFields);
-        appendAttachmentTable(html, "Fees & Insurance Receipt", parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         appendAttachmentTable(html, "Disbursement Proof", parseDisbursementProofAttachments(app.getAttachmentsJson()));
         appendTable(html, "Repayment Summary", parseRepaymentSummary(app.getRepaymentScheduleJson()));
 
@@ -669,7 +664,6 @@ public class LoanPresentationService {
                 applicant,
                 formFields,
                 financialFields,
-                parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()),
                 parseDisbursementProofAttachments(app.getAttachmentsJson()),
                 parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()),
                 parseRepaymentRows(app.getRepaymentScheduleJson()),
@@ -1020,7 +1014,6 @@ public class LoanPresentationService {
         private final Member applicant;
         private final Map<String, Object> formFields;
         private final Map<String, Object> financialFields;
-        private final List<Map<String, Object>> feeInsuranceReceiptAttachments;
         private final List<Map<String, Object>> disbursementProofAttachments;
         private final Map<String, Object> repaymentSummary;
         private final List<Map<String, Object>> repaymentRows;
@@ -1041,7 +1034,6 @@ public class LoanPresentationService {
                                                     Member applicant,
                                                     Map<String, Object> formFields,
                                                     Map<String, Object> financialFields,
-                                                    List<Map<String, Object>> feeInsuranceReceiptAttachments,
                                                     List<Map<String, Object>> disbursementProofAttachments,
                                                     Map<String, Object> repaymentSummary,
                                                     List<Map<String, Object>> repaymentRows,
@@ -1056,7 +1048,6 @@ public class LoanPresentationService {
             this.applicant = applicant;
             this.formFields = formFields == null ? Collections.emptyMap() : formFields;
             this.financialFields = financialFields == null ? Collections.emptyMap() : financialFields;
-            this.feeInsuranceReceiptAttachments = feeInsuranceReceiptAttachments == null ? Collections.emptyList() : feeInsuranceReceiptAttachments;
             this.disbursementProofAttachments = disbursementProofAttachments == null ? Collections.emptyList() : disbursementProofAttachments;
             this.repaymentSummary = repaymentSummary == null ? Collections.emptyMap() : repaymentSummary;
             this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
@@ -1073,7 +1064,6 @@ public class LoanPresentationService {
             drawMetaTable();
             drawSectionTable("Application Details", formFields);
             drawSectionTable("SACCO Financial Details", financialFields);
-            drawAttachmentSection("Fees & Insurance Receipt", feeInsuranceReceiptAttachments);
             drawAttachmentSection("Disbursement Proof", disbursementProofAttachments);
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();

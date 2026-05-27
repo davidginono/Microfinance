@@ -89,10 +89,15 @@
     }
 </style>
 
-<div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
-    <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
+        <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
+        <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
+    </div>
+    <c:if test="${canPrint}">
+        <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
+    </c:if>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
 <c:if test="${app.status eq 'AWAITING_GUARANTORS'}">
@@ -108,12 +113,6 @@
         <spring:message code="loan.view.guarantorsApproved" text="All guarantors have approved this application. You can now submit it for review." />
     </div>
 </c:if>
-<c:if test="${loanFeeReceiptMissingBlocksDisbursement}">
-    <div class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-        <spring:message code="loan.view.feeReceiptMissingBlocksDisbursement" text="You must upload the fees and insurance payment receipt. This loan cannot proceed to disbursement until the receipt is uploaded." />
-    </div>
-</c:if>
-
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="min-w-0">
@@ -299,105 +298,6 @@
         </tbody>
     </table>
 </div>
-<c:set var="loanFeePaymentConfigured" value="${not empty loanFeePaymentSettings and (not empty loanFeePaymentSettings.loanFeePaymentAccount or not empty loanFeePaymentSettings.loanFeePaymentInstructions)}" />
-
-<c:if test="${not empty feeInsuranceReceiptAttachments or app.status ne 'DRAFT'}">
-    <div class="erp-table-wrap overflow-x-auto">
-        <div class="flex flex-wrap items-start justify-between gap-3 px-4 pt-4">
-            <div>
-                <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Fees & Insurance Receipt</h5>
-                <c:if test="${canUploadLoanFeeReceipt and empty feeInsuranceReceiptAttachments}">
-                    <p class="mt-1 text-sm text-slate-600">Upload your fees and insurance payment receipt here. The loan cannot proceed to disbursement until this receipt is uploaded.</p>
-                </c:if>
-            </div>
-            <c:if test="${canUploadLoanFeeReceipt}">
-                <span class="rounded-full px-3 py-1 text-sm font-semibold ${loanFeeReceiptUploaded ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
-                    ${loanFeeReceiptUploaded ? 'Receipt uploaded' : 'Receipt required'}
-                </span>
-            </c:if>
-        </div>
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-            <thead class="bg-slate-50">
-                <tr>
-                    <th class="px-3 py-2 text-left">File</th>
-                    <th class="px-3 py-2 text-left">Size</th>
-                    <th class="px-3 py-2 text-left">Uploaded</th>
-                    <th class="px-3 py-2 text-left"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                <c:forEach items="${feeInsuranceReceiptAttachments}" var="file">
-                    <tr>
-                        <td class="px-3 py-2">${file.originalName}</td>
-                        <td class="px-3 py-2">${file.sizeLabel}</td>
-                        <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
-                        <td class="px-3 py-2">
-                            <div class="flex flex-wrap gap-2">
-                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
-                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
-                            </div>
-                        </td>
-                    </tr>
-                </c:forEach>
-                <c:if test="${empty feeInsuranceReceiptAttachments}">
-                    <tr>
-                        <td colspan="4" class="px-3 py-3 text-slate-500">
-                            <c:choose>
-                                <c:when test="${loanFeeReceiptMissingBlocksDisbursement}">
-                                    You must upload the fees and insurance payment receipt. This loan cannot proceed to disbursement until the receipt is uploaded.
-                                </c:when>
-                                <c:otherwise>
-                                    No fees or insurance payment receipt has been uploaded yet.
-                                </c:otherwise>
-                            </c:choose>
-                        </td>
-                    </tr>
-                </c:if>
-            </tbody>
-        </table>
-        <c:if test="${canUploadLoanFeeReceipt and empty feeInsuranceReceiptAttachments}">
-            <div class="border-t border-slate-200 bg-slate-50 px-4 py-4">
-                <c:if test="${loanFeePaymentConfigured}">
-                    <div class="mb-3 grid gap-3 md:grid-cols-3">
-                        <c:if test="${not empty loanFeePaymentSettings.loanFeePaymentMethod}">
-                            <div class="rounded-md border border-slate-200 bg-white px-3 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Method</p>
-                                <p class="mt-1 font-semibold text-sacco-ink"><c:out value="${loanFeePaymentSettings.loanFeePaymentMethod}" /></p>
-                            </div>
-                        </c:if>
-                        <c:if test="${not empty loanFeePaymentSettings.loanFeePaymentAccount}">
-                            <div class="rounded-md border border-slate-200 bg-white px-3 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Number / Account</p>
-                                <p class="mt-1 font-semibold text-sacco-ink"><c:out value="${loanFeePaymentSettings.loanFeePaymentAccount}" /></p>
-                            </div>
-                        </c:if>
-                        <c:if test="${not empty loanFeePaymentSettings.loanFeePaymentPayee}">
-                            <div class="rounded-md border border-slate-200 bg-white px-3 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Payee</p>
-                                <p class="mt-1 font-semibold text-sacco-ink"><c:out value="${loanFeePaymentSettings.loanFeePaymentPayee}" /></p>
-                            </div>
-                        </c:if>
-                    </div>
-                    <c:if test="${not empty loanFeePaymentSettings.loanFeePaymentInstructions}">
-                        <p class="mb-3 rounded-md border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
-                            <c:out value="${loanFeePaymentSettings.loanFeePaymentInstructions}" />
-                        </p>
-                    </c:if>
-                </c:if>
-                <form action="/app/loan-applications/${app.id}/fee-insurance-receipt" method="post" enctype="multipart/form-data" class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Receipt proof
-                        <input type="file" name="feeInsuranceReceiptFile" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                               class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800" required />
-                    </label>
-                    <button type="submit" class="app-btn btn-primary">Upload Receipt</button>
-                </form>
-            </div>
-        </c:if>
-    </div>
-</c:if>
-
 <c:if test="${app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div id="repayment-plan" class="erp-section">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -650,7 +550,6 @@
                 <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.committedAmount" text="Committed Amount" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
             </tr>
@@ -672,17 +571,6 @@
                         </c:choose>
                     </td>
                     <td class="px-3 py-2">${req.status}</td>
-                    <td class="px-3 py-2">
-                        <c:choose>
-                            <c:when test="${not empty req.committedAmount}">
-                                <fmt:formatNumber value="${req.committedAmount}" minFractionDigits="2" maxFractionDigits="2" />
-                            </c:when>
-                            <c:when test="${req.status eq 'APPROVED' and not empty req.requestedAmount}">
-                                <fmt:formatNumber value="${req.requestedAmount}" minFractionDigits="2" maxFractionDigits="2" />
-                            </c:when>
-                            <c:otherwise><span class="text-slate-400">-</span></c:otherwise>
-                        </c:choose>
-                    </td>
                     <td class="px-3 py-2">
                         <c:choose>
                             <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16),
@@ -748,15 +636,11 @@
     </table>
 </div>
 
-<c:set var="showPrintAction" value="${canPrint}" />
 <c:set var="showEditAction" value="${app.status eq 'DRAFT'}" />
 <c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showPrintAction or showEditAction or showTopUpAction or (showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED') or showDeleteAction or canForfeitApplication}" />
-<spring:message code="loan.confirm.requestManagerRemoval.title" text="Request Manager Removal" var="requestManagerRemovalTitle" />
-<spring:message code="loan.confirm.requestManagerRemoval.message" text="Send a removal request to the manager? If approved, this application will be removed from review." var="requestManagerRemovalMessage" />
-<spring:message code="loan.confirm.requestManagerRemoval.proceed" text="Send Request" var="requestManagerRemovalProceed" />
+<c:set var="showLoanActionCard" value="${showEditAction or showTopUpAction or (showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED' and app.status ne 'READY_FOR_MANAGER') or showDeleteAction or canForfeitApplication}" />
 <spring:message code="loan.confirm.cancelSubmission.title" text="Cancel Submission" var="cancelSubmissionTitle" />
 <spring:message code="loan.confirm.cancelSubmission.message" text="Move this application back to draft so you can keep editing it?" var="cancelSubmissionMessage" />
 <spring:message code="loan.confirm.cancelSubmission.proceed" text="Move to Draft" var="cancelSubmissionProceed" />
@@ -766,11 +650,6 @@
 <c:if test="${showLoanActionCard}">
     <div class="erp-form-wrap loan-page-bottom-actions">
         <div class="loan-view-action-cluster">
-            <c:if test="${showPrintAction}">
-                <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">
-                    <spring:message code="loan.actions.print" text="Print Loan Application" />
-                </a>
-            </c:if>
             <c:if test="${showEditAction}">
                 <a href="/app/loan-applications/${app.id}/edit" class="app-btn btn-neutral">
                     <spring:message code="loan.actions.reEdit" text="Re-edit" />
@@ -781,44 +660,19 @@
                     <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
                 </a>
             </c:if>
-            <c:if test="${showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED'}">
-                <c:choose>
-                    <c:when test="${app.status eq 'READY_FOR_MANAGER'}">
-                        <c:choose>
-                            <c:when test="${not empty pendingManagerStageWithdrawal}">
-                                <button type="button" class="app-btn btn-neutral action-button-disabled" disabled><spring:message code="loan.actions.removalSent" text="Removal Request Sent" /></button>
-                            </c:when>
-                            <c:otherwise>
-                                <form action="/app/loan-applications/${app.id}/cancel"
-                                      method="post"
-                                      data-confirm-title="${requestManagerRemovalTitle}"
-                                      data-confirm-message="${requestManagerRemovalMessage}"
-                                      data-confirm-proceed="${requestManagerRemovalProceed}">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                    <button type="submit"
-                                            class="app-btn btn-neutral ${memberReversalWindowOpen ? '' : 'action-button-disabled'}"
-                                            ${memberReversalWindowOpen ? '' : 'disabled'}>
-                                        <spring:message code="loan.actions.requestManagerRemoval" text="Request Manager Removal" />
-                                    </button>
-                                </form>
-                            </c:otherwise>
-                        </c:choose>
-                    </c:when>
-                    <c:otherwise>
-                        <form action="/app/loan-applications/${app.id}/cancel"
-                              method="post"
-                              data-confirm-title="${cancelSubmissionTitle}"
-                              data-confirm-message="${cancelSubmissionMessage}"
-                              data-confirm-proceed="${cancelSubmissionProceed}">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <button type="submit"
-                                    class="app-btn btn-neutral ${memberReversalWindowOpen ? '' : 'action-button-disabled'}"
-                                    ${memberReversalWindowOpen ? '' : 'disabled'}>
-                                <spring:message code="loan.actions.cancelSubmission" text="Cancel Submission" />
-                            </button>
-                        </form>
-                    </c:otherwise>
-                </c:choose>
+            <c:if test="${showMemberReversalAction and app.status ne 'ALL_GUARANTORS_APPROVED' and app.status ne 'READY_FOR_MANAGER'}">
+                <form action="/app/loan-applications/${app.id}/cancel"
+                      method="post"
+                      data-confirm-title="${cancelSubmissionTitle}"
+                      data-confirm-message="${cancelSubmissionMessage}"
+                      data-confirm-proceed="${cancelSubmissionProceed}">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <button type="submit"
+                            class="app-btn btn-neutral ${memberReversalWindowOpen ? '' : 'action-button-disabled'}"
+                            ${memberReversalWindowOpen ? '' : 'disabled'}>
+                        <spring:message code="loan.actions.cancelSubmission" text="Cancel Submission" />
+                    </button>
+                </form>
             </c:if>
             <c:if test="${showDeleteAction}">
                 <form action="/app/loan-applications/${app.id}/delete"
@@ -920,8 +774,7 @@
             </c:if>
             <button type="submit"
                     form="loan-submit-manager-form"
-                    class="app-btn btn-approve w-full ${showMemberReversalAction ? '' : 'sm:col-span-2'} ${loanFeePaymentConfigured and not loanFeeReceiptUploaded ? 'action-button-disabled' : ''}"
-                    ${loanFeePaymentConfigured and not loanFeeReceiptUploaded ? 'disabled' : ''}>
+                    class="app-btn btn-approve w-full ${showMemberReversalAction ? '' : 'sm:col-span-2'}">
                 <c:out value="${loanFinalSubmitLabel}" />
             </button>
         </div>

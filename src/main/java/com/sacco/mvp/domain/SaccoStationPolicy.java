@@ -38,9 +38,6 @@ public class SaccoStationPolicy {
     @Column(name = "applicant_max_defaulted_loans")
     private Integer applicantMaxDefaultedLoans;
 
-    @Column(name = "applicant_max_active_loan_amount", precision = 18, scale = 2)
-    private BigDecimal applicantMaxActiveLoanAmount;
-
     @Column(name = "applicant_max_forfeited_loans")
     private Integer applicantMaxForfeitedLoans;
 
@@ -50,11 +47,8 @@ public class SaccoStationPolicy {
     @Column(name = "applicant_forfeited_wait_days")
     private Integer applicantForfeitedWaitDays;
 
-    @Column(name = "guarantor_min_savings", precision = 18, scale = 2)
-    private BigDecimal guarantorMinSavings;
-
-    @Column(name = "guarantor_max_active_loan_amount", precision = 18, scale = 2)
-    private BigDecimal guarantorMaxActiveLoanAmount;
+    @Column(name = "guarantor_with_active_loan_allowed")
+    private Boolean guarantorWithActiveLoanAllowed;
 
     @Column(name = "guarantor_max_guaranteed_loan_amount", precision = 18, scale = 2)
     private BigDecimal guarantorMaxGuaranteedLoanAmount;

@@ -83,7 +83,7 @@ public class NotificationViewService {
             senderName,
             senderId,
             incidentId,
-            flattenDetails(payload.get("details")),
+            flattenDetails(notification.getType(), payload.get("details")),
             notification.getStatus().name(),
             notification.getCreatedAt() == null ? "" : notification.getCreatedAt().toString(),
             formatCreatedAt(notification.getCreatedAt()),
@@ -212,7 +212,7 @@ public class NotificationViewService {
         };
     }
 
-    private String flattenDetails(Object value) {
+    private String flattenDetails(String notificationType, Object value) {
         Map<String, Object> details = toMap(value);
         if (details.isEmpty()) {
             return "";
@@ -222,7 +222,7 @@ public class NotificationViewService {
             if (builder.length() > 0) {
                 builder.append(" | ");
             }
-            builder.append(formatDetailLabel(entry.getKey())).append(": ").append(formatDetailValue(entry.getKey(), entry.getValue()));
+            builder.append(formatDetailLabel(notificationType, entry.getKey(), entry.getValue())).append(": ").append(formatDetailValue(entry.getKey(), entry.getValue()));
         }
         return builder.toString();
     }
@@ -237,10 +237,13 @@ public class NotificationViewService {
             .toList();
     }
 
-    private String formatDetailLabel(String key) {
+    private String formatDetailLabel(String notificationType, String key, Object value) {
         return switch (key) {
             case "managerId" -> "Manager";
-            case "loanId" -> "Loan Reference";
+            case "applicationId" -> "Loan Application ID";
+            case "loanId" -> isUuidText(value) && !"FINAL_APPROVED".equals(notificationType) && !"PAID".equals(notificationType) && !"DEFAULTED".equals(notificationType)
+                ? "Loan Application ID"
+                : "Loan ID";
             case "finalDueDate" -> "Final Due Date";
             case "firstRepaymentDate" -> "First Repayment Date";
             case "installmentAmount" -> "Installment Amount";
@@ -249,6 +252,18 @@ public class NotificationViewService {
             case "reasons" -> "Reason";
             default -> humanizeKey(key);
         };
+    }
+
+    private boolean isUuidText(Object value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            UUID.fromString(String.valueOf(value));
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private String formatDetailValue(String key, Object value) {

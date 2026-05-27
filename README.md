@@ -6,9 +6,11 @@ This repository supports a multi-role SACCO workflow covering:
 
 - member registration and login
 - loan product browsing and loan application
-- guarantor approval and reversal windows
-- manager review and board review
-- admin operations, SACCO registry, user/role management, notifications, incidents, and reporting
+- guarantor selection, commitment checks, approval, and reversal windows
+- configurable manager, loan officer, board, accountant, and disbursement review paths
+- member, staff, and admin analytics
+- support conversations, notifications, incidents, audit events, and reporting
+- platform SACCO registry, station access controls, user/role management, and workflow settings
 
 ## Stack
 
@@ -24,9 +26,13 @@ This repository supports a multi-role SACCO workflow covering:
 ## Main Roles
 
 - `MEMBER`
+- `LOAN_OFFICER`
 - `MANAGER`
 - `BOARD`
 - `CHAIRPERSON`
+- `ACCOUNTANT`
+- `DISBURSEMENT_OFFICER`
+- `MINOR_ADMIN`
 - `ADMIN`
 
 Spring Security uses form login, server sessions, and CSRF protection. This is not a JWT-based application.
@@ -39,10 +45,11 @@ Spring Security uses form login, server sessions, and CSRF protection. This is n
 - loan products
 - loan applications
 - guarantee requests
+- guaranteed loans
 - archives
 - reports
 - notifications
-- support / incidents raised to admin
+- support conversations and support archive
 
 ### Manager workspace
 
@@ -52,6 +59,13 @@ Spring Security uses form login, server sessions, and CSRF protection. This is n
 - repayment state updates
 - manager reports and settings
 
+### Loan officer workspace
+
+- loan review queue
+- archive
+- notifications
+- reports
+
 ### Board workspace
 
 - review queue
@@ -59,14 +73,34 @@ Spring Security uses form login, server sessions, and CSRF protection. This is n
 - archive
 - OTP-backed approval flow
 
+### Accountant workspace
+
+- loan payment review queue
+- archive
+- notifications
+- reports
+
+### Disbursement workspace
+
+- disbursement queue
+- archive
+- notifications
+- reports
+
+### Staff workspace
+
+- shared staff analytics
+- staff language/settings page
+
 ### Admin workspace
 
 - SACCO scope selection before entering the dashboard
 - dashboard and database utilization
-- incidents and notifications
+- incidents, support conversations, and notifications
 - users and roles
 - loan products and settings controls
 - SACCO registry
+- station access suspension and restoration
 - outbox monitor
 - event log
 
@@ -78,16 +112,19 @@ The loan workflow is business-sensitive. In broad terms, the application support
 2. member selects guarantors
 3. loan is sent to guarantors
 4. all required guarantors approve
-5. manager reviews the loan
-6. board reviews the loan
-7. approval, rejection, disbursement, repayment, and archival paths continue from there
+5. configured staff review stages run in priority order
+6. board, accountant, and disbursement steps run when required by product settings
+7. approval, rejection, forfeiture, disbursement, repayment, and archival paths continue from there
 
 Important notes:
 
 - a member cannot keep opening parallel in-process loans while another loan is still active in workflow
 - saving a draft requires the required form data and guarantor selection
+- applicant and guarantor qualification policies can be configured globally and per station
+- guarantor commitments can be checked against savings, active loans, guaranteed exposure, and default history
 - approved guarantee requests stay visible in the live table until the reversal window closes, then move to archive
 - board handoff uses the configured required board reviewer count, not a hardcoded full board size
+- disbursement officer involvement is configurable per loan product when claim-based disbursement access is available
 
 ## Local Development
 
@@ -100,7 +137,7 @@ Important notes:
 ### Run locally
 
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Application URL:
@@ -157,6 +194,10 @@ Base defaults in `application.yml` include:
 - datasource URL: `jdbc:postgresql://localhost:5432/sacco`
 - datasource username: `postgres`
 - server port: `8080`
+- schema validation through `spring.jpa.hibernate.ddl-auto=validate`
+- static resource caching and JSP production mode
+
+Development-only behavior lives in `src/main/resources/application-dev.yml`. Use the `dev` profile locally when you want Hibernate schema updates, JSP development mode, devtools restart, and disabled static caching.
 
 ### Demo data seeding
 
@@ -199,22 +240,57 @@ Default compose services:
 - `/app/loan-products`
 - `/app/loan-applications`
 - `/app/guarantee-requests`
+- `/app/guaranteed-loans`
 - `/app/archives`
 - `/app/reports`
 - `/app/notifications`
 - `/app/support`
+- `/app/support/replies`
+- `/app/support/archive`
+
+### Loan Officer
+
+- `/loan-officer/dashboard`
+- `/loan-officer/queue`
+- `/loan-officer/assigned`
+- `/loan-officer/loan-applications/{id}`
+- `/loan-officer/archive`
+- `/loan-officer/notifications`
 
 ### Manager
 
 - `/manager/dashboard`
 - `/manager/loan-applications`
+- `/manager/archive`
 - `/manager/reports`
+- `/manager/settings`
 
 ### Board
 
 - `/board/queue`
 - `/board/assigned`
 - `/board/archive`
+
+### Accountant
+
+- `/accountant/dashboard`
+- `/accountant/loan-applications`
+- `/accountant/archive`
+- `/accountant/reports`
+- `/accountant/notifications`
+
+### Disbursement
+
+- `/disbursement/dashboard`
+- `/disbursement/loan-applications`
+- `/disbursement/archive`
+- `/disbursement/reports`
+- `/disbursement/notifications`
+
+### Staff
+
+- `/staff/analytics`
+- `/staff/settings`
 
 ### Chairperson
 
@@ -226,6 +302,9 @@ Default compose services:
 - `/admin/dashboard`
 - `/admin/messages`
 - `/admin/incidents`
+- `/admin/support`
+- `/admin/support/replies`
+- `/admin/support/archive`
 - `/admin/users`
 - `/admin/settings-controls`
 - `/admin/outbox`
@@ -237,12 +316,18 @@ Default compose services:
 Current route protection is role-based:
 
 - `/app/**` -> `ROLE_MEMBER`
+- `/loan-officer/**` -> `ROLE_LOAN_OFFICER`
 - `/manager/**` -> `ROLE_MANAGER`
 - `/board/**` -> `ROLE_BOARD`
 - `/chairperson/**` -> `ROLE_CHAIRPERSON`
+- `/accountant/**` -> `ROLE_ACCOUNTANT`
+- `/disbursement/**` -> authenticated non-admin users with disbursement queue access claims
+- `/staff/**` -> authenticated non-admin staff in loan officer, manager, accountant, disbursement, or board roles
 - `/admin/**` -> `ROLE_ADMIN`
 
 Additional ownership and workflow checks are enforced in the service layer and authorization helpers.
+
+Station access can also be suspended by platform admins. Suspended station users are blocked during login and existing sessions are redirected back to login with the suspension reason. Platform admins remain able to sign in and restore access.
 
 ## Admin SACCO Scope
 
@@ -253,6 +338,8 @@ Admins now select the SACCO they want to work with before entering the admin das
 - settings controls
 - loan products
 - SACCO-specific workflow configuration
+- station qualification policies
+- station access controls
 
 The selection happens through `/admin/scope/select`, and the chosen scope is stored in session for the current admin workflow.
 
@@ -260,6 +347,8 @@ The selection happens through `/admin/scope/select`, and the chosen scope is sto
 
 - printed loan applications are generated with respect to the SACCO attached to the loan itself
 - printable output is not supposed to depend on whichever SACCO the current viewer happens to have selected
+- uploaded loan attachments are stored under `loan-uploads/`, which is ignored by Git
+- attachment viewing is served through the application so route ownership checks can be enforced
 
 ## Project Structure
 
@@ -278,14 +367,22 @@ The selection happens through `/admin/scope/select`, and the chosen scope is sto
 - `src/main/webapp/WEB-INF/jsp/admin` - admin pages
 - `src/main/webapp/WEB-INF/jsp/manager` - manager pages
 - `src/main/webapp/WEB-INF/jsp/board` - board pages
+- `src/main/webapp/WEB-INF/jsp/accountant` - accountant pages
+- `src/main/webapp/WEB-INF/jsp/disbursement` - disbursement pages
+- `src/main/webapp/WEB-INF/jsp/staff` - shared staff pages
 - `src/main/webapp/WEB-INF/jsp/chairperson` - chairperson pages
+- `src/main/webapp/WEB-INF/jsp/documents` - document and attachment views
 - `src/main/webapp/WEB-INF/jsp/fragments` - shared shell fragments
+
+Loan officer pages currently reuse the board and manager JSP templates with loan-officer-specific model labels and routes.
 
 ## Development Notes
 
 - shared shell styling lives mostly in `header.jspf` and `sidebar.jspf`
 - workflow rules are intentionally enforced in the service layer; avoid changing statuses casually
 - SACCO and role boundaries matter throughout the app
+- station scope is the default tenant boundary for workspace roles
+- `LoanApplication.stationId` is the first-class station reference for loan workflow, reporting, archive, queue, and loan-document visibility paths
 - responsiveness matters for all page changes
 - modals and dropdown overlays should behave correctly above the shared shell
 
@@ -298,7 +395,9 @@ When you touch workflow or UI, these areas are the most useful smoke-checks:
 - guarantee requests and archives
 - manager queue
 - board assigned/queue pages
-- admin dashboard, users, settings, outbox, and events
+- loan officer queue, accountant applications, and disbursement applications
+- staff analytics and settings
+- admin dashboard, users, settings, support, outbox, and events
 - sidebar and top-nav behavior on smaller screens
 
 ## License

@@ -174,3 +174,9 @@ Also check:
 - Assume business logic should remain unchanged unless the user explicitly asks for a workflow change.
 - Assume responsiveness matters for every UI change.
 - Assume user-facing IDs and labels should remain readable and domain-friendly.
+- Assume production changes must preserve a path toward at least 1,000 requests per second:
+  - never add unbounded `findAll()` or SACCO-wide list loading on request paths
+  - prefer tenant/station-scoped `Pageable`, `count`, `exists`, `top`, and aggregate queries
+  - keep loan submit and review transactions short, indexed, and free of avoidable external or file work
+  - avoid hot-row locks where a small allocation block, queue, or async worker preserves correctness
+  - keep outbox/report/notification work batchable and configurable

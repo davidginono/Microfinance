@@ -5,15 +5,18 @@
 
 <style>
     .staff-settings-action-bar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        justify-content: space-between;
+        display: grid;
         gap: 0.75rem;
         border: 1px solid #e2e8f0;
         border-radius: 0.4rem;
         background: #f8fafc;
         padding: 0.75rem;
+    }
+    .staff-settings-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem;
     }
     .staff-settings-action-field {
         flex: 1 1 22rem;
@@ -53,17 +56,19 @@
     <form action="/staff/settings/language" method="post" class="erp-panel-body">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <div class="staff-settings-action-bar">
-            <label class="staff-settings-action-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <spring:message code="staff.settings.language.label" text="Staff Workspace Language" />
-                <select name="language" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                    <option value="en" ${staffSettingsLanguage eq 'en' ? 'selected' : ''}><spring:message code="member.settings.language.english" /></option>
-                    <option value="sw" ${staffSettingsLanguage eq 'sw' ? 'selected' : ''}><spring:message code="member.settings.language.swahili" /></option>
-                </select>
-                <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                    <spring:message code="staff.settings.language.help" text="Translated labels and shared staff navigation will switch immediately after you save." />
-                </span>
-            </label>
-            <button type="submit" class="staff-settings-action-button app-btn btn-primary"><spring:message code="member.settings.language.save" /></button>
+            <div class="staff-settings-action-row">
+                <label class="staff-settings-action-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <spring:message code="staff.settings.language.label" text="Staff Workspace Language" />
+                    <select name="language" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800">
+                        <option value="en" ${staffSettingsLanguage eq 'en' ? 'selected' : ''}><spring:message code="member.settings.language.english" /></option>
+                        <option value="sw" ${staffSettingsLanguage eq 'sw' ? 'selected' : ''}><spring:message code="member.settings.language.swahili" /></option>
+                    </select>
+                </label>
+                <button type="submit" class="staff-settings-action-button app-btn btn-primary"><spring:message code="member.settings.language.save" /></button>
+            </div>
+            <span class="block text-sm font-normal text-slate-500">
+                <spring:message code="staff.settings.language.help" text="Translated labels and shared staff navigation will switch immediately after you save." />
+            </span>
         </div>
     </form>
 </section>

@@ -467,8 +467,8 @@
 <div class="erp-page-header">
     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-            <h1 class="erp-page-title"><spring:message code="staff.analytics.title" text="Loan Analytics" /></h1>
-            <p class="erp-page-subtitle"><spring:message code="staff.analytics.subtitle" text="View loan performance, status breakdown, and risk indicators within a selected period." /></p>
+            <h1 class="erp-page-title">${staffAnalyticsTitle}</h1>
+            <p class="erp-page-subtitle">${staffAnalyticsSubtitle}</p>
         </div>
         <div class="staff-analytics-actions md:justify-end">
             <button type="button" class="app-btn btn-neutral staff-filter-action" onclick="window.print()">
@@ -521,7 +521,12 @@
                 </button>
                 <button type="submit" name="viewAs" value="staff" title="<spring:message code='staff.analytics.staffView' text='Staff View' />" aria-label="<spring:message code='staff.analytics.staffView' text='Staff View' />" class="staff-view-option ${viewAs eq 'staff' ? 'is-active' : ''}">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21a6 6 0 0 0-12 0"/><circle cx="11" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
-                    <span><spring:message code="staff.analytics.staffView" text="Staff View" /></span>
+                    <span>
+                        <c:choose>
+                            <c:when test="${stationWideStaffView}">Station View</c:when>
+                            <c:otherwise><spring:message code="staff.analytics.staffView" text="Staff View" /></c:otherwise>
+                        </c:choose>
+                    </span>
                 </button>
             </div>
         </div>
@@ -582,6 +587,7 @@
                 <h2 class="text-lg font-bold text-sacco-ink">
                     <c:choose>
                         <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberPortfolioSummary" text="Member Portfolio Summary" /></c:when>
+                        <c:when test="${stationWideStaffView}">Station Portfolio Summary</c:when>
                         <c:otherwise><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:otherwise>
                     </c:choose>
                 </h2>
@@ -659,6 +665,7 @@
     <span>
         <c:choose>
             <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberViewHelp" text="You are viewing analytics for loans you applied for as a member." /></c:when>
+            <c:when test="${stationWideStaffView}">You are viewing station-wide loan status for all applicants and members in your station.</c:when>
             <c:otherwise><spring:message code="staff.analytics.staffViewHelp" text="You are viewing analytics for loans you handled, reviewed, approved, rejected, disbursed, or managed." /></c:otherwise>
         </c:choose>
     </span>

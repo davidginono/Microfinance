@@ -73,6 +73,8 @@ public class SaccoConfigurationService {
             true,
             4,
             true,
+            false,
+            BigDecimal.ZERO,
             LoanProductStatus.ACTIVE,
             true,
             now
@@ -107,10 +109,12 @@ public class SaccoConfigurationService {
                                                 Integer committeeMinimumVotes,
                                                 Integer committeeApprovalThreshold,
                                                 boolean accountantReviewRequired,
-                                                Integer accountantPriority,
-                                                boolean disbursementOfficerRequired,
-                                                LoanProductStatus productStatus,
-                                                boolean active) {
+                                              Integer accountantPriority,
+                                              boolean disbursementOfficerRequired,
+                                              boolean guarantorMinSavingsCheckRequired,
+                                              BigDecimal guarantorMinimumSavings,
+                                              LoanProductStatus productStatus,
+                                              boolean active) {
         if (loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
             throw new IllegalStateException("That loan product already exists for this SACCO.");
         }
@@ -145,6 +149,8 @@ public class SaccoConfigurationService {
             accountantReviewRequired,
             accountantPriority,
             disbursementOfficerRequired,
+            guarantorMinSavingsCheckRequired,
+            guarantorMinimumSavings,
             productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus,
             active,
             now
@@ -180,6 +186,8 @@ public class SaccoConfigurationService {
                                               boolean accountantReviewRequired,
                                               Integer accountantPriority,
                                               boolean disbursementOfficerRequired,
+                                              boolean guarantorMinSavingsCheckRequired,
+                                              BigDecimal guarantorMinimumSavings,
                                               LoanProductStatus productStatus,
                                               boolean active,
                                               OffsetDateTime now) {
@@ -214,8 +222,8 @@ public class SaccoConfigurationService {
             .accountantReviewRequired(accountantReviewRequired)
             .accountantPriority(accountantPriority)
             .disbursementOfficerRequired(disbursementOfficerRequired)
-            .guarantorCommitmentRequired(false)
-            .guarantorCommitmentStage(ApprovalWorkflowStage.MANAGER)
+            .guarantorMinSavingsCheckRequired(guarantorMinSavingsCheckRequired)
+            .guarantorMinimumSavings(guarantorMinimumSavings == null ? BigDecimal.ZERO : guarantorMinimumSavings)
             .productStatus(productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus)
             .formSchema(defaultLoanFormSchema())
             .active(active && (productStatus == null || productStatus == LoanProductStatus.ACTIVE))

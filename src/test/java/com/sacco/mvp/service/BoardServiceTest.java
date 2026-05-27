@@ -36,6 +36,10 @@ class BoardServiceTest {
 
     @Test
     void marksBoardApprovedWhenQuorumReached() {
+        // Scenario: board approval advances only after the configured quorum is reached.
+        // Given one more approving board decision satisfies the required reviewer count
+        // When the board member approves with a verified signature
+        // Then the signature is stored and routing advances the loan.
         UUID loanId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -68,8 +72,6 @@ class BoardServiceTest {
         when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
             loanId, boardId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(review));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.EDUCATION_LOAN))
-            .thenReturn(Optional.empty());
         when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
             loanId, ApprovalWorkflowStage.BOARD, BoardDecision.APPROVED)).thenReturn(2L);
         when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
@@ -103,6 +105,10 @@ class BoardServiceTest {
 
     @Test
     void rejectDecisionDoesNotStoreSignature() {
+        // Scenario: rejected board decisions must not retain approval signature metadata.
+        // Given a board member rejects the loan
+        // When the decision is stored
+        // Then any submitted signature text is discarded.
         UUID loanId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
 
@@ -159,6 +165,10 @@ class BoardServiceTest {
 
     @Test
     void loanOfficerApprovalAdvancesToNextConfiguredManagerStage() {
+        // Scenario: customized products may route through a loan officer before manager review.
+        // Given a loan officer approval completes that configured stage
+        // When the decision is recorded
+        // Then workflow routing advances the loan to the next configured stage.
         UUID loanId = UUID.randomUUID();
         UUID loanOfficerId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
@@ -183,8 +193,6 @@ class BoardServiceTest {
         when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
             loanId, loanOfficerId, ApprovalWorkflowStage.LOAN_OFFICER)).thenReturn(Optional.of(review));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.CUSTOMIZED_LOAN))
-            .thenReturn(Optional.empty());
         when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
             loanId, ApprovalWorkflowStage.LOAN_OFFICER, BoardDecision.APPROVED)).thenReturn(1L);
         when(boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
@@ -223,6 +231,10 @@ class BoardServiceTest {
 
     @Test
     void undoDecisionClearsStoredSignature() {
+        // Scenario: board decisions are final in this workflow and cannot be reversed after approval.
+        // Given a loan already marked Board Approved
+        // When the board member tries to undo the decision
+        // Then the service rejects the reversal.
         UUID loanId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
 

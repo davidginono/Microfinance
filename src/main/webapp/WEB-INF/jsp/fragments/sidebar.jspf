@@ -205,9 +205,8 @@
                                 </svg>
                             </button>
                             <div id="adminSettingsPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <a href="/admin/settings-controls?section=loan" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'payment' and param.section ne 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
+                                <a href="/admin/settings-controls?section=loan" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
                                 <a href="/admin/settings-controls?section=guarantor" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
-                                <a href="/admin/settings-controls?section=payment" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'payment' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.paymentSettings" text="Payment Settings" /></a>
                                 <a href="/admin/settings-controls?section=language" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.languagePreference" text="Language Preference" /></a>
                             </div>
                         </div>
@@ -250,15 +249,29 @@
                 <c:set var="hasDisbursementQueueClaim" value="true" />
             </sec:authorize>
             <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showStaffAnalyticsPanel" value="${(showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or pageContext.request.isUserInRole('ROLE_DISBURSEMENT_OFFICER')) and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showStaffMemberDashboard" value="${currentMember ne null and currentMember.memberAccess and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN')}" />
-            <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel or showStaffMemberDashboard}">
-                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings'}" />
-                <c:set var="staffDashboardActive" value="${(showStaffAnalyticsPanel and requestUri eq '/staff/analytics') or (showStaffMemberDashboard and requestUri eq '/app/dashboard')}" />
-                <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
+            <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}">
+                <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.reviewPanels" text="Review Panels" /></p>
                 </div>
-                <c:if test="${showStaffAnalyticsPanel or showStaffMemberDashboard}">
+                <c:set var="showStaffAnalyticsPanel" value="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}" />
+                <c:choose>
+                    <c:when test="${showManagerPanel}">
+                        <c:set var="staffDashboardHref" value="/manager/dashboard" />
+                    </c:when>
+                    <c:when test="${showBoardPanel}">
+                        <c:set var="staffDashboardHref" value="/board/dashboard" />
+                    </c:when>
+                    <c:when test="${showLoanOfficerPanel}">
+                        <c:set var="staffDashboardHref" value="/loan-officer/dashboard" />
+                    </c:when>
+                    <c:when test="${showAccountantPanel}">
+                        <c:set var="staffDashboardHref" value="/accountant/dashboard" />
+                    </c:when>
+                    <c:otherwise>
+                        <c:set var="staffDashboardHref" value="/disbursement/dashboard" />
+                    </c:otherwise>
+                </c:choose>
+                <c:set var="staffDashboardActive" value="${requestUri eq staffDashboardHref or requestUri eq '/staff/analytics'}" />
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="staffDashboardToggle"
@@ -272,19 +285,17 @@
                         </svg>
                     </button>
                     <div id="staffDashboardPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <a href="${staffDashboardHref}" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq staffDashboardHref ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <spring:message code="menu.staffDashboard" text="Staff Dashboard" />
+                        </a>
                         <c:if test="${showStaffAnalyticsPanel}">
                             <a href="/staff/analytics" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/staff/analytics' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                                <spring:message code="menu.myAnalytics" text="My Analytics" />
-                            </a>
-                        </c:if>
-                        <c:if test="${showStaffMemberDashboard}">
-                            <a href="/app/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/dashboard' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                                <spring:message code="menu.memberDashboard" text="Member Dashboard" />
+                                <spring:message code="menu.reports" text="Reports &amp; Analytics" />
                             </a>
                         </c:if>
                     </div>
                 </div>
-                </c:if>
+                <c:set var="staffSettingsActive" value="${requestUri eq '/staff/settings'}" />
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="staffSettingsToggle"
@@ -308,6 +319,9 @@
             </c:if>
             <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
                 <c:set var="managerOfficeActive" value="${fn:startsWith(requestUri, '/manager')}" />
+                <div class="px-3 pb-1 pt-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Manager</p>
+                </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="managerOfficeToggle"
@@ -329,7 +343,10 @@
                 </div>
             </sec:authorize>
             <sec:authorize access="hasRole('BOARD') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_BOARD_QUEUE')">
-                <c:set var="boardOfficeActive" value="${requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || fn:startsWith(requestUri, '/board/loan-applications')}" />
+                <c:set var="boardOfficeActive" value="${requestUri eq '/board/dashboard' || requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || fn:startsWith(requestUri, '/board/loan-applications')}" />
+                <div class="px-3 pb-1 pt-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Board</p>
+                </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="boardOfficeToggle"
@@ -343,6 +360,7 @@
                         </svg>
                     </button>
                     <div id="boardOfficePanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                        <a href="/board/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/dashboard' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">Board Dashboard</a>
                         <a href="/board/queue" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications')) ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardQueue" text="Board Queue" /></a>
                         <a href="/board/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/archive' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardArchive" text="Board Archive" /></a>
                     </div>
@@ -350,6 +368,9 @@
             </sec:authorize>
             <sec:authorize access="hasRole('LOAN_OFFICER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_LOAN_OFFICER_QUEUE')">
                 <c:set var="loanOfficerOfficeActive" value="${fn:startsWith(requestUri, '/loan-officer')}" />
+                <div class="px-3 pb-1 pt-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Loan Officer</p>
+                </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="loanOfficerOfficeToggle"
@@ -371,6 +392,9 @@
             </sec:authorize>
             <sec:authorize access="hasRole('ACCOUNTANT') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_ACCOUNTANT_QUEUE')">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant')}" />
+                <div class="px-3 pb-1 pt-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Accountant</p>
+                </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="accountantOfficeToggle"
@@ -393,6 +417,9 @@
             </sec:authorize>
             <sec:authorize access="!hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
                 <c:set var="disbursementOfficeActive" value="${fn:startsWith(requestUri, '/disbursement')}" />
+                <div class="px-3 pb-1 pt-3">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Disbursement</p>
+                </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
                             id="disbursementOfficeToggle"

@@ -3,12 +3,14 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.domain.SaccoStationPolicy;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -27,7 +29,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +57,42 @@ class LoanQualificationPolicyServiceTest {
             loanAnalyticsService,
             eligibilityService
         );
+    }
+
+    @Test
+    void applicantDefaultedPolicyBlocksWhenAnyDefaultedLoanExists() {
+        UUID applicantId = UUID.randomUUID();
+        givenDefaultedPolicyMember(applicantId);
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .applicantMaxDefaultedLoans(1)
+                .build()));
+        when(loanAnalyticsService.summarizeAllTime(applicantId, STATION_ID))
+            .thenReturn(memberAnalytics(1));
+
+        Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
+
+        assertThat(reason)
+            .hasValue("You cannot apply because your defaulted loan count has reached the station policy limit.");
+    }
+
+    @Test
+    void guarantorDefaultedPolicyBlocksWhenAnyDefaultedLoanExists() {
+        UUID guarantorId = UUID.randomUUID();
+        givenDefaultedPolicyMember(guarantorId);
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .guarantorMaxDefaultedLoans(1)
+                .build()));
+        when(loanAnalyticsService.summarizeAllTime(guarantorId, STATION_ID))
+            .thenReturn(memberAnalytics(1));
+
+        Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
+
+        assertThat(reason)
+            .hasValue("Disabled: defaulted loan count has reached the station guarantor limit.");
     }
 
     @Test
@@ -102,31 +139,113 @@ class LoanQualificationPolicyServiceTest {
     }
 
     @Test
-    void guarantorCommitmentCapacityIgnoresPaidGuaranteedLoans() {
+    void guarantorActiveLoanPolicyBlocksWhenActiveLoansAreNotAllowed() {
         UUID guarantorId = UUID.randomUUID();
-        UUID activeLoanId = UUID.randomUUID();
-        UUID paidLoanId = UUID.randomUUID();
-        givenGuarantorSavingsPolicy(guarantorId, "500000.00");
-        givenApprovedGuaranteesWithCommitments(guarantorId,
-            guarantee(activeLoanId, "300000.00"),
-            guarantee(paidLoanId, "250000.00"));
-        givenLoan(activeLoanId, LoanStatus.FINAL_APPROVED, "300000.00");
-        givenLoan(paidLoanId, LoanStatus.PAID, "250000.00");
+        givenDefaultedPolicyMember(guarantorId);
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .guarantorWithActiveLoanAllowed(false)
+                .build()));
+        when(loanAnalyticsService.activeLoanAmount(guarantorId, STATION_ID))
+            .thenReturn(new BigDecimal("1.00"));
 
-        service.assertGuarantorCanCommit(SACCO_ID, guarantorId, new BigDecimal("200000.00"));
+        Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
+
+        assertThat(reason)
+            .hasValue("Disabled: active loans are not allowed for guarantors under the station policy.");
     }
 
     @Test
-    void guarantorCommitmentCapacityKeepsDefaultedGuaranteedLoansCommitted() {
+    void stationActiveLoanPolicyOverridesSaccoDefaultForGuarantors() {
         UUID guarantorId = UUID.randomUUID();
-        UUID defaultedLoanId = UUID.randomUUID();
-        givenGuarantorSavingsPolicy(guarantorId, "500000.00");
-        givenApprovedGuaranteesWithCommitments(guarantorId, guarantee(defaultedLoanId, "450000.00"));
-        givenLoan(defaultedLoanId, LoanStatus.DEFAULTED, "450000.00");
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .guarantorWithActiveLoanAllowed(true)
+                .build()));
+        when(memberRepository.findById(guarantorId))
+            .thenReturn(Optional.of(Member.builder()
+                .id(guarantorId)
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .memberNo("MEM-ACTIVE")
+                .fullName("Active Loan Guarantor")
+                .memberAccount(true)
+                .status(MemberStatus.ACTIVE)
+                .position(Position.MEMBER)
+                .createdAt(OffsetDateTime.now())
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.of(SaccoStationPolicy.builder()
+                .id(UUID.randomUUID())
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .guarantorWithActiveLoanAllowed(false)
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
+                .build()));
+        when(loanAnalyticsService.activeLoanAmount(guarantorId, STATION_ID))
+            .thenReturn(new BigDecimal("1.00"));
 
-        assertThatThrownBy(() -> service.assertGuarantorCanCommit(SACCO_ID, guarantorId, new BigDecimal("100000.00")))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("This guarantor does not have enough available savings after existing active guarantee commitments are deducted.");
+        Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
+
+        assertThat(reason)
+            .hasValue("Disabled: active loans are not allowed for guarantors under the station policy.");
+    }
+
+    @Test
+    void productMinimumSavingsPolicyBlocksGuarantorForThatProduct() {
+        UUID guarantorId = UUID.randomUUID();
+        givenGuarantorSavingsPolicy(guarantorId, "50000.00");
+
+        Optional<String> reason = service.guarantorFailureReason(
+            SACCO_ID,
+            guarantorId,
+            null,
+            LoanProductSetting.builder()
+                .guarantorMinSavingsCheckRequired(true)
+                .guarantorMinimumSavings(new BigDecimal("100000.00"))
+                .build()
+        );
+
+        assertThat(reason)
+            .hasValue("Disabled: savings are below this loan product's guarantor minimum.");
+    }
+
+    @Test
+    void productMinimumSavingsPolicyIsIgnoredWhenProductCheckIsOff() {
+        UUID guarantorId = UUID.randomUUID();
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .build()));
+        when(memberRepository.findById(guarantorId))
+            .thenReturn(Optional.of(Member.builder()
+                .id(guarantorId)
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .memberNo("MEM-001")
+                .fullName("Test Guarantor")
+                .memberAccount(true)
+                .status(MemberStatus.ACTIVE)
+                .position(Position.MEMBER)
+                .createdAt(OffsetDateTime.now())
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.empty());
+
+        Optional<String> reason = service.guarantorFailureReason(
+            SACCO_ID,
+            guarantorId,
+            null,
+            LoanProductSetting.builder()
+                .guarantorMinSavingsCheckRequired(false)
+                .guarantorMinimumSavings(new BigDecimal("100000.00"))
+                .build()
+        );
+
+        assertThat(reason).isEmpty();
     }
 
     @Test
@@ -202,6 +321,36 @@ class LoanQualificationPolicyServiceTest {
                 .build()));
         when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
             .thenReturn(Optional.empty());
+    }
+
+    private void givenDefaultedPolicyMember(UUID memberId) {
+        when(memberRepository.findById(memberId))
+            .thenReturn(Optional.of(Member.builder()
+                .id(memberId)
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .memberNo("MEM-DEFAULTED")
+                .fullName("Defaulted Member")
+                .memberAccount(true)
+                .status(MemberStatus.ACTIVE)
+                .position(Position.MEMBER)
+                .createdAt(OffsetDateTime.now())
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.empty());
+    }
+
+    private LoanAnalyticsService.MemberLoanAnalytics memberAnalytics(long defaultedLoans) {
+        return new LoanAnalyticsService.MemberLoanAnalytics(
+            defaultedLoans,
+            0,
+            0,
+            0,
+            defaultedLoans,
+            0,
+            0,
+            BigDecimal.ZERO
+        );
     }
 
     private void givenApplicantForfeitedPolicy(UUID applicantId,

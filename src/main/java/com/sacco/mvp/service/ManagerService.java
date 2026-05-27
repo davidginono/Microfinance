@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +28,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ManagerService {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
+    private static final int MAX_QUEUE_ROWS = 100;
     private static final java.util.regex.Pattern LOAN_ID_PATTERN = java.util.regex.Pattern.compile("^[0-9]{4,20}$");
     private final LoanApplicationRepository loanApplicationRepository;
     private final ManagerReviewRepository managerReviewRepository;
@@ -47,10 +49,6 @@ public class ManagerService {
     }
 
     public ManagerDashboard dashboard(String saccoId, String stationId) {
-        List<LoanApplication> loans = filterLoansByApplicantStation(
-            loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId),
-            stationId
-        );
         LocalDate today = LocalDate.now();
         LocalDate currentYearStart = today.withDayOfYear(1);
         LocalDate recentCutoff = today.minusDays(30);
@@ -58,23 +56,23 @@ public class ManagerService {
         for (LoanStatus status : LoanStatus.values()) {
             counts.put(status, 0L);
         }
-        for (LoanApplication loan : loans) {
-            counts.computeIfPresent(loan.getStatus(), (ignored, count) -> count + 1);
-        }
-
-        long totalDisbursed = loans.stream()
-            .filter(this::isDisbursedLoan)
-            .map(this::dashboardDisbursementDate)
-            .filter(java.util.Objects::nonNull)
-            .filter(date -> !date.isBefore(currentYearStart))
-            .count();
-
-        long defaultedLoansCurrentYear = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED)
-            .map(this::dashboardDefaultedDate)
-            .filter(Objects::nonNull)
-            .filter(date -> !date.isBefore(currentYearStart))
-            .count();
+        loanApplicationRepository.countByStatusForScope(saccoId, blankToNull(stationId))
+            .forEach(row -> counts.put(row.getStatus(), row.getTotal()));
+        OffsetDateTime currentYearStartAt = currentYearStart.atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
+        long totalLoans = loanApplicationRepository.countForScope(saccoId, blankToNull(stationId));
+        long totalDisbursed = loanApplicationRepository.countDisbursedInYearForScope(
+            saccoId,
+            blankToNull(stationId),
+            List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            currentYearStart,
+            currentYearStartAt
+        );
+        long defaultedLoansCurrentYear = loanApplicationRepository.countDefaultedInYearForScope(
+            saccoId,
+            blankToNull(stationId),
+            currentYearStart,
+            currentYearStartAt
+        );
 
         List<StatusCount> breakdown = new ArrayList<>();
         for (LoanStatus status : List.of(
@@ -103,20 +101,17 @@ public class ManagerService {
             breakdown.add(new StatusCount(status, counts.getOrDefault(status, 0L)));
         }
 
-        List<LoanApplication> recentDisbursements = loans.stream()
-            .filter(this::isDisbursedLoan)
-            .filter(loan -> {
-                LocalDate effectiveDate = dashboardDisbursementDate(loan);
-                return effectiveDate != null && !effectiveDate.isBefore(recentCutoff);
-            })
-            .sorted(Comparator.comparing(
-                this::dashboardDisbursementDate
-            ).reversed())
-            .limit(5)
-            .toList();
+        List<LoanApplication> recentDisbursements = loanApplicationRepository.findRecentDisbursementsForScope(
+            saccoId,
+            blankToNull(stationId),
+            List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            recentCutoff,
+            recentCutoff.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()),
+            PageRequest.of(0, 5)
+        );
 
         return new ManagerDashboard(
-            loans.size(),
+            totalLoans,
             totalDisbursed,
             counts.getOrDefault(LoanStatus.FINAL_APPROVED, 0L),
             defaultedLoansCurrentYear,
@@ -182,14 +177,17 @@ public class ManagerService {
                                        boolean searchByLoanId,
                                        String stationId) {
         String normalizedSearchTerm = blankToNull(searchTerm);
-        List<LoanApplication> apps = filterLoansByApplicantStation(queue(saccoId, statuses), stationId);
-        if (normalizedSearchTerm == null) {
-            return apps;
-        }
-        String lookup = normalizedSearchTerm.toLowerCase(Locale.ENGLISH);
-        return apps.stream()
-            .filter(app -> matchesQueueSearch(app, lookup, searchByLoanId))
-            .toList();
+        List<LoanStatus> resolvedStatuses = statuses == null || statuses.isEmpty()
+            ? List.of(LoanStatus.READY_FOR_MANAGER)
+            : statuses;
+        return loanApplicationRepository.findQueuePage(
+            saccoId,
+            blankToNull(stationId),
+            resolvedStatuses,
+            normalizedSearchTerm == null ? null : normalizedSearchTerm.toLowerCase(Locale.ENGLISH),
+            searchByLoanId,
+            PageRequest.of(0, MAX_QUEUE_ROWS)
+        ).getContent();
     }
 
     public LoanApplication get(UUID id, String saccoId) {
@@ -227,11 +225,6 @@ public class ManagerService {
 
     @Transactional
     public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons) {
-        decide(loanId, managerId, decision, reasons, Map.of());
-    }
-
-    @Transactional
-    public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons, Map<UUID, BigDecimal> guarantorCommitments) {
         LoanApplication app = getManagedApplication(loanId, managerId);
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
@@ -239,9 +232,6 @@ public class ManagerService {
         String normalizedReasons = normalizeDecisionReasons(reasons);
         if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
             throw new IllegalStateException("Add a reason before rejecting this loan application.");
-        }
-        if (decision == ManagerDecision.ACCEPT) {
-            applyGuarantorCommitmentsIfRequired(app, ApprovalWorkflowStage.MANAGER, guarantorCommitments);
         }
         int requiredGuarantors = app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0);
         if (requiredGuarantors > 0) {
@@ -278,11 +268,6 @@ public class ManagerService {
 
     @Transactional
     public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons) {
-        decideAccountant(loanId, accountantId, decision, reasons, Map.of());
-    }
-
-    @Transactional
-    public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons, Map<UUID, BigDecimal> guarantorCommitments) {
         LoanApplication app = getAccountantApplication(loanId, accountantId);
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
             throw new IllegalStateException("Application is not ready for accountant review");
@@ -290,9 +275,6 @@ public class ManagerService {
         String normalizedReasons = normalizeDecisionReasons(reasons);
         if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
             throw new IllegalStateException("Add a reason before rejecting this loan application.");
-        }
-        if (decision == ManagerDecision.ACCEPT) {
-            applyGuarantorCommitmentsIfRequired(app, ApprovalWorkflowStage.ACCOUNTANT, guarantorCommitments);
         }
         managerReviewRepository.save(ManagerReview.builder()
             .id(UUID.randomUUID())
@@ -315,32 +297,6 @@ public class ManagerService {
         loanApplicationRepository.save(app);
     }
 
-    public void applyGuarantorCommitmentsIfRequired(LoanApplication app,
-                                                    ApprovalWorkflowStage stage,
-                                                    Map<UUID, BigDecimal> guarantorCommitments) {
-        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType()).orElse(null);
-        if (product == null || !product.isGuarantorCommitmentRequired()
-            || product.getResolvedGuarantorCommitmentStage() != stage) {
-            return;
-        }
-        List<GuarantorRequest> requests = guarantorRequestRepository.findByLoanApplicationId(app.getId()).stream()
-            .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
-            .toList();
-        if (requests.isEmpty()) {
-            throw new IllegalStateException("Approved guarantors are required before verifying commitments.");
-        }
-        for (GuarantorRequest request : requests) {
-            BigDecimal amount = request.getCommittedAmount() == null
-                ? request.getRequestedAmount()
-                : request.getCommittedAmount();
-            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalStateException("Every approved guarantor must have an applicant-assigned commitment amount before review approval.");
-            }
-            request.setCommittedAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
-        }
-        guarantorRequestRepository.saveAll(requests);
-    }
-
     private String normalizeDecisionReasons(String reasons) {
         return reasons == null ? "" : reasons.trim();
     }
@@ -360,7 +316,6 @@ public class ManagerService {
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
             throw new IllegalStateException("Application is not ready for disbursement");
         }
-        requireFeeInsuranceReceiptIfConfigured(app);
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
         validateDisbursement(disbursementDate, firstRepaymentDate);
         if (disbursementProofFile == null || disbursementProofFile.isEmpty()) {
@@ -419,6 +374,7 @@ public class ManagerService {
         details.put("firstRepaymentDate", String.valueOf(app.getFirstRepaymentDate()));
         details.put("repaymentFrequency", app.getRepaymentFrequency() == null ? "" : app.getRepaymentFrequency().name());
         details.put("installmentAmount", app.getInstallmentAmount());
+        details.put("applicationId", applicationId.toString());
         details.put("loanId", app.getLoanId());
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
             details);
@@ -520,18 +476,6 @@ public class ManagerService {
         }
         if (firstRepaymentDate.isBefore(disbursementDate)) {
             throw new IllegalArgumentException("First repayment date cannot be before disbursement date");
-        }
-    }
-
-    private void requireFeeInsuranceReceiptIfConfigured(LoanApplication app) {
-        SaccoSettings settings = saccoSettingsRepository.findById(app.getSaccoId()).orElse(null);
-        if (settings == null || !settings.isLoanFeePaymentConfigured()) {
-            return;
-        }
-        boolean hasReceipt = loanAttachmentService.parse(app.getAttachmentsJson()).stream()
-            .anyMatch(item -> LoanAttachmentService.CATEGORY_FEE_INSURANCE_RECEIPT.equals(String.valueOf(item.get("attachmentCategory"))));
-        if (!hasReceipt) {
-            throw new IllegalStateException("The applicant must upload the insurance and application fees payment receipt before disbursement.");
         }
     }
 

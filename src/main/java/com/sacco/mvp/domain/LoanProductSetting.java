@@ -113,12 +113,11 @@ public class LoanProductSetting {
     @Column(name = "disbursement_officer_required")
     private Boolean disbursementOfficerRequired;
 
-    @Column(name = "guarantor_commitment_required")
-    private Boolean guarantorCommitmentRequired;
+    @Column(name = "guarantor_min_savings_check_required")
+    private Boolean guarantorMinSavingsCheckRequired;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "guarantor_commitment_stage", length = 32)
-    private ApprovalWorkflowStage guarantorCommitmentStage;
+    @Column(name = "guarantor_minimum_savings", precision = 18, scale = 2)
+    private BigDecimal guarantorMinimumSavings;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "product_status", length = 32)
@@ -235,12 +234,12 @@ public class LoanProductSetting {
         return disbursementOfficerRequired == null || disbursementOfficerRequired;
     }
 
-    public boolean isGuarantorCommitmentRequired() {
-        return Boolean.TRUE.equals(guarantorCommitmentRequired);
+    public boolean isGuarantorMinSavingsCheckRequired() {
+        return Boolean.TRUE.equals(guarantorMinSavingsCheckRequired);
     }
 
-    public ApprovalWorkflowStage getResolvedGuarantorCommitmentStage() {
-        return guarantorCommitmentStage == null ? ApprovalWorkflowStage.MANAGER : guarantorCommitmentStage;
+    public BigDecimal getResolvedGuarantorMinimumSavings() {
+        return guarantorMinimumSavings == null ? BigDecimal.ZERO : guarantorMinimumSavings;
     }
 
     public LoanProductStatus getStatus() {

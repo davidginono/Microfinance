@@ -1,0 +1,19 @@
+spring:
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+  web:
+    resources:
+      cache:
+        period: 0
+
+server:
+  servlet:
+    jsp:
+      init-parameters:
+        development: true

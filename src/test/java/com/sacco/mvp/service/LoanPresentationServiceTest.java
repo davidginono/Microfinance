@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +40,36 @@ class LoanPresentationServiceTest {
             loanAttachmentService,
             loanProductWorkflowService
         );
+    }
+
+    @Test
+    void parseApplicationAttachmentsHidesLegacyFeeReceiptsAndDisbursementProofs() {
+        String attachmentsJson = "[{}]";
+        org.mockito.Mockito.when(loanAttachmentService.parse(attachmentsJson)).thenReturn(List.of(
+            new LinkedHashMap<>(Map.of(
+                "id", "application-file",
+                "originalName", "application.pdf",
+                "attachmentCategory", "APPLICATION_ATTACHMENT",
+                "size", 1200
+            )),
+            new LinkedHashMap<>(Map.of(
+                "id", "legacy-fee-file",
+                "originalName", "fee-receipt.pdf",
+                "attachmentCategory", "FEE_INSURANCE_RECEIPT",
+                "size", 800
+            )),
+            new LinkedHashMap<>(Map.of(
+                "id", "disbursement-file",
+                "originalName", "disbursement.pdf",
+                "attachmentCategory", "DISBURSEMENT_PROOF",
+                "size", 900
+            ))
+        ));
+
+        List<Map<String, Object>> attachments = loanPresentationService.parseApplicationAttachments(attachmentsJson);
+
+        assertThat(attachments).hasSize(1);
+        assertThat(attachments.getFirst()).containsEntry("id", "application-file");
     }
 
     @Test

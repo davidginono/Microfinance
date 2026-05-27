@@ -3,6 +3,7 @@ package com.sacco.mvp.web;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
+import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
@@ -24,6 +25,7 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.EmailOtpService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,7 +37,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -65,6 +66,7 @@ public class ManagerController {
     private final LoanPaymentSummaryClient loanPaymentSummaryClient;
     private final ManagerReviewRepository managerReviewRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
+    private final EmailOtpService emailOtpService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -83,7 +85,10 @@ public class ManagerController {
         model.addAttribute("dashboardOnReviewByManagerLoans", dashboard.onReviewByManagerLoans());
         model.addAttribute("dashboardQueueValue", dashboard.onReviewByManagerLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
-        model.addAttribute("dashboardStatusChartRows", buildDashboardStatusChartRows(dashboard.statusBreakdown()));
+        model.addAttribute("dashboardChartTitle", "Station Loan Status Chart");
+        model.addAttribute("dashboardChartHelp", "A station-wide view of manager review outcomes and current disbursed loan status.");
+        model.addAttribute("dashboardStatusChartRows",
+            workflowStatusPresentationService.buildManagerDashboardChartRows(dashboard.statusBreakdown()));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
@@ -104,10 +109,6 @@ public class ManagerController {
             .toList());
         model.addAttribute("dashboardRecentDisbursementDays", 30);
         return "manager/dashboard";
-    }
-
-    private List<Map<String, Object>> buildDashboardStatusChartRows(List<ManagerService.StatusCount> statusBreakdown) {
-        return workflowStatusPresentationService.buildDashboardStatusChartRows(statusBreakdown);
     }
 
     @GetMapping("/loan-applications")
@@ -228,7 +229,6 @@ public class ManagerController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("feeInsuranceReceiptAttachments", loanPresentationService.parseFeeInsuranceReceiptAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
@@ -350,39 +350,57 @@ public class ManagerController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
                          @RequestParam(required = false) String reasons,
-                         HttpServletRequest request,
+                         @RequestParam(required = false) String managerDecisionOtpCode,
                          RedirectAttributes ra) {
-        managerService.decide(id, principal.getMemberId(), decision, reasons, parseGuarantorCommitments(request));
-        if (decision == ManagerDecision.ACCEPT) {
-            LoanStatus updatedStatus = managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus();
-            String message = switch (updatedStatus) {
-                case AWAITING_LOAN_OFFICER -> "Manager accepted. Status moved to ON REVIEW BY LOAN OFFICER.";
-                case AWAITING_BOARD -> "Manager accepted. Status moved to ON REVIEW BY BOARD.";
-                case AWAITING_ACCOUNTANT -> "Manager accepted. Status moved to ON REVIEW BY ACCOUNTANT.";
-                case READY_FOR_DISBURSEMENT -> "Manager accepted. Loan is now READY FOR DISBURSEMENT.";
-                default -> "Manager accepted. The application moved to the next configured stage.";
-            };
-            ra.addFlashAttribute("message", message);
-        } else {
-            ra.addFlashAttribute("message", "Manager rejected application.");
+        try {
+            UUID otpTokenId = validateStaffDecisionOtp(principal.getMemberId(), managerDecisionOtpCode);
+            managerService.decide(id, principal.getMemberId(), decision, reasons);
+            emailOtpService.consumeOtpById(otpTokenId);
+            if (decision == ManagerDecision.ACCEPT) {
+                LoanStatus updatedStatus = managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus();
+                String message = switch (updatedStatus) {
+                    case AWAITING_LOAN_OFFICER -> "Manager accepted. Status moved to ON REVIEW BY LOAN OFFICER.";
+                    case AWAITING_BOARD -> "Manager accepted. Status moved to ON REVIEW BY BOARD.";
+                    case AWAITING_ACCOUNTANT -> "Manager accepted. Status moved to ON REVIEW BY ACCOUNTANT.";
+                    case READY_FOR_DISBURSEMENT -> "Manager accepted. Loan is now READY FOR DISBURSEMENT.";
+                    default -> "Manager accepted. The application moved to the next configured stage.";
+                };
+                ra.addFlashAttribute("message", message);
+            } else {
+                ra.addFlashAttribute("message", "Manager rejected application.");
+            }
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/manager/loan-applications/" + id;
     }
 
-    private Map<UUID, BigDecimal> parseGuarantorCommitments(HttpServletRequest request) {
-        Map<UUID, BigDecimal> commitments = new LinkedHashMap<>();
-        request.getParameterMap().forEach((key, values) -> {
-            if (!key.startsWith("guarantorCommitmentAmount_") || values == null || values.length == 0 || values[0].isBlank()) {
-                return;
+    @PostMapping("/loan-applications/{id}/request-decision-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestDecisionOtp(@PathVariable UUID id,
+                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
+        try {
+            if (managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus() != LoanStatus.READY_FOR_MANAGER) {
+                throw new IllegalStateException("This application is no longer waiting for manager review.");
             }
-            try {
-                UUID guarantorId = UUID.fromString(key.substring("guarantorCommitmentAmount_".length()));
-                commitments.put(guarantorId, new BigDecimal(values[0].trim()));
-            } catch (IllegalArgumentException ignored) {
-                // Ignore malformed browser fields; service validation handles missing required commitments.
-            }
-        });
-        return commitments;
+            Member manager = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a manager decision OTP.");
+            emailOtpService.issueOtp(
+                manager.getEmail(),
+                EmailOtpPurpose.BOARD_SIGNATURE,
+                manager.getId(),
+                "Your SACCO LMS manager decision code",
+                "Use this OTP code to confirm your manager decision on the loan application."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "We sent a manager decision code to " + manager.getEmail() + "."
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
     }
 
     @PostMapping("/loan-applications/{id}/undo-decision")
@@ -772,6 +790,20 @@ public class ManagerController {
 
     private String normalizeQueueSearch(String searchId) {
         return searchId == null ? "" : searchId.trim();
+    }
+
+    private UUID validateStaffDecisionOtp(UUID memberId, String otpCode) {
+        Member member = requireMemberWithEmail(memberId, "Add an email address to your member profile before confirming this decision.");
+        return emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
+    }
+
+    private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
+        if (member.getEmail() == null || member.getEmail().isBlank()) {
+            throw new IllegalStateException(missingEmailMessage);
+        }
+        return member;
     }
 
     private List<ManagerReview> latestManagerReviews(UUID managerId) {

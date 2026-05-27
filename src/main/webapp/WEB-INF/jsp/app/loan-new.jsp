@@ -213,26 +213,11 @@
                             class="selected-guarantor-chip inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
                             data-id="${item.id}"
                             data-member-no="${item.memberNo}"
-                            data-full-name="${item.fullName}"
-                            data-amount="${item.amount}">
+                            data-full-name="${item.fullName}">
                         <span>${item.memberNo} - ${item.fullName}</span>
                         <span class="text-slate-400">x</span>
                     </button>
                 </c:forEach>
-            </div>
-            <div id="guarantorCommitmentPanel" class="mt-4 rounded-md border border-slate-200 bg-white p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p class="erp-widget-title">Guarantor Commitment Split</p>
-                        <p class="mt-1 text-sm text-slate-500">Assign each guarantor's share. The total must equal principal plus interest.</p>
-                    </div>
-                    <div class="text-sm text-slate-600">
-                        <div>Required: <span id="commitmentRequiredLabel" class="font-semibold text-sacco-ink">Load loan details</span></div>
-                        <div>Assigned: <span id="commitmentAssignedLabel" class="font-semibold text-sacco-ink">TSh 0.00</span></div>
-                    </div>
-                </div>
-                <div id="guarantorCommitmentRows" class="mt-3 grid gap-3"></div>
-                <p id="guarantorCommitmentHint" class="mt-2 text-sm text-slate-500">Choose guarantors and load loan details to auto-split the commitment amounts.</p>
             </div>
             <div id="selectedGuarantorInputs"></div>
             <c:if test="${not empty guarantorValidationErrorId}">
@@ -877,11 +862,6 @@
             const counter = document.getElementById("guarantorSelectedCount");
             const selectedContainer = document.getElementById("selectedGuarantors");
             const hiddenInputs = document.getElementById("selectedGuarantorInputs");
-            const financialSnapshotInput = document.getElementById("financialSnapshotJson");
-            const commitmentRows = document.getElementById("guarantorCommitmentRows");
-            const commitmentRequiredLabel = document.getElementById("commitmentRequiredLabel");
-            const commitmentAssignedLabel = document.getElementById("commitmentAssignedLabel");
-            const commitmentHint = document.getElementById("guarantorCommitmentHint");
             const validationMarker = document.getElementById("guarantorValidationErrorMarker");
             const serverGuarantorErrorId = validationMarker ? validationMarker.dataset.guarantorId : "";
             const serverGuarantorErrorMessage = validationMarker ? validationMarker.dataset.message : "";
@@ -895,83 +875,6 @@
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
-
-            function parseMoney(value) {
-                const normalized = String(value || "").replace(/,/g, "").trim();
-                if (!normalized) {
-                    return 0;
-                }
-                const parsed = Number(normalized);
-                return Number.isFinite(parsed) ? parsed : 0;
-            }
-
-            function toCents(value) {
-                return Math.round(parseMoney(value) * 100);
-            }
-
-            function fromCents(cents) {
-                return (Number(cents || 0) / 100).toFixed(2);
-            }
-
-            function formatTzs(value) {
-                return "TSh " + Number(parseMoney(value)).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            }
-
-            function requiredCommitmentTotal() {
-                if (!financialSnapshotInput || !financialSnapshotInput.value) {
-                    return 0;
-                }
-                try {
-                    const snapshot = JSON.parse(financialSnapshotInput.value);
-                    return parseMoney(snapshot.principalPlusInterest || snapshot.loanPlusInterest);
-                } catch (ignored) {
-                    return 0;
-                }
-            }
-
-            function assignedCommitmentCents() {
-                return Array.from(selected.values()).reduce(function (sum, item) {
-                    return sum + toCents(item.amount);
-                }, 0);
-            }
-
-            function updateCommitmentSummary() {
-                const requiredTotal = requiredCommitmentTotal();
-                const assignedTotal = fromCents(assignedCommitmentCents());
-                commitmentRequiredLabel.textContent = requiredTotal > 0 ? formatTzs(requiredTotal) : "Load loan details";
-                commitmentAssignedLabel.textContent = formatTzs(assignedTotal);
-                const matches = requiredTotal > 0 && assignedCommitmentCents() === toCents(requiredTotal);
-                commitmentAssignedLabel.classList.toggle("text-emerald-700", matches);
-                commitmentAssignedLabel.classList.toggle("text-rose-700", requiredTotal > 0 && !matches);
-            }
-
-            function autoSplitCommitments() {
-                const requiredCents = toCents(requiredCommitmentTotal());
-                const items = Array.from(selected.values());
-                if (!requiredCents || !items.length) {
-                    updateCommitmentSummary();
-                    return;
-                }
-                const base = Math.floor(requiredCents / items.length);
-                let remainder = requiredCents - (base * items.length);
-                items.forEach(function (item) {
-                    const cents = base + (remainder > 0 ? 1 : 0);
-                    remainder -= remainder > 0 ? 1 : 0;
-                    item.amount = fromCents(cents);
-                });
-            }
-
-            function ensureCommitmentAmounts() {
-                const hasMissingAmount = Array.from(selected.values()).some(function (item) {
-                    return !item.amount || toCents(item.amount) <= 0;
-                });
-                if (hasMissingAmount) {
-                    autoSplitCommitments();
-                }
-            }
 
             function updateCounter() {
                 counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
@@ -988,84 +891,23 @@
                 });
             }
 
-            function renderCommitmentRows() {
-                commitmentRows.innerHTML = "";
-                const requiredTotal = requiredCommitmentTotal();
-                Array.from(selected.values()).forEach(function (item) {
-                    const row = document.createElement("div");
-                    row.className = "grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-[minmax(0,1fr)_220px]";
-                    row.dataset.guarantorId = item.id;
-                    const hasServerError = serverGuarantorErrorId && item.id === serverGuarantorErrorId;
-                    if (hasServerError) {
-                        row.className = "grid gap-3 rounded-md border border-rose-300 bg-rose-50 p-3 ring-2 ring-rose-100 md:grid-cols-[minmax(0,1fr)_220px]";
-                    }
-                    const details = document.createElement("div");
-                    details.innerHTML = "<p class='text-sm font-semibold text-sacco-ink'></p><p class='mt-1 text-xs text-slate-500'></p>";
-                    details.children[0].textContent = item.fullName;
-                    details.children[1].textContent = "Member No: " + item.memberNo;
-                    const amountWrap = document.createElement("label");
-                    amountWrap.className = "block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500";
-                    amountWrap.textContent = "Assigned amount";
-                    const input = document.createElement("input");
-                    input.type = "text";
-                    input.inputMode = "decimal";
-                    input.name = "guarantorCommitmentAmount_" + item.id;
-                    input.value = item.amount || "";
-                    input.placeholder = requiredTotal > 0 ? fromCents(Math.floor(toCents(requiredTotal) / Math.max(selected.size, 1))) : "0.00";
-                    input.className = "mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-sacco-ink focus:border-sacco-blue focus:outline-none";
-                    if (hasServerError) {
-                        input.className = "mt-2 h-11 w-full rounded-md border border-rose-400 bg-white px-3 text-sm font-semibold text-sacco-ink focus:border-rose-500 focus:outline-none";
-                        input.setAttribute("aria-invalid", "true");
-                    }
-                    input.addEventListener("input", function () {
-                        item.amount = input.value.replace(/,/g, "").replace(/[^\d.]/g, "");
-                        updateCommitmentSummary();
-                    });
-                    input.addEventListener("blur", function () {
-                        if (item.amount) {
-                            item.amount = fromCents(toCents(item.amount));
-                            input.value = item.amount;
-                        }
-                        updateCommitmentSummary();
-                    });
-                    amountWrap.appendChild(input);
-                    if (hasServerError && serverGuarantorErrorMessage) {
-                        const error = document.createElement("p");
-                        error.className = "mt-2 text-sm font-medium normal-case tracking-normal text-rose-700";
-                        error.textContent = serverGuarantorErrorMessage;
-                        amountWrap.appendChild(error);
-                    }
-                    row.appendChild(details);
-                    row.appendChild(amountWrap);
-                    commitmentRows.appendChild(row);
-                });
-                if (!selected.size) {
-                    commitmentHint.textContent = "Choose guarantors and load loan details to auto-split the commitment amounts.";
-                } else if (!requiredTotal) {
-                    commitmentHint.textContent = "Load loan details so the system can calculate principal plus interest.";
-                } else {
-                    commitmentHint.textContent = "The assigned amounts must add up exactly to " + formatTzs(requiredTotal) + ".";
-                }
-                updateCommitmentSummary();
-            }
-
             function renderSelected() {
-                ensureCommitmentAmounts();
                 selectedContainer.innerHTML = "";
                 Array.from(selected.values()).forEach(function (item) {
                     const chip = document.createElement("button");
                     chip.type = "button";
-                    chip.className = "inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700";
+                    const hasServerError = serverGuarantorErrorId && item.id === serverGuarantorErrorId;
+                    chip.className = "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium "
+                        + (hasServerError ? "border-rose-300 bg-rose-50 text-rose-800 ring-2 ring-rose-100" : "border-slate-300 bg-white text-slate-700");
+                    chip.dataset.guarantorId = item.id;
                     chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='text-slate-400'>x</span>";
                     chip.addEventListener("click", function () {
                         selected.delete(item.id);
-                        autoSplitCommitments();
                         renderSelected();
                     });
                     selectedContainer.appendChild(chip);
                 });
                 renderHiddenInputs();
-                renderCommitmentRows();
                 updateCounter();
             }
 
@@ -1073,7 +915,7 @@
                 if (serverGuarantorErrorRevealed || !serverGuarantorErrorId) {
                     return;
                 }
-                const row = Array.from(commitmentRows.querySelectorAll("[data-guarantor-id]")).find(function (candidate) {
+                const row = Array.from(selectedContainer.querySelectorAll("[data-guarantor-id]")).find(function (candidate) {
                     return candidate.dataset.guarantorId === serverGuarantorErrorId;
                 });
                 if (!row) {
@@ -1081,14 +923,8 @@
                 }
                 serverGuarantorErrorRevealed = true;
                 row.scrollIntoView({ behavior: "smooth", block: "center" });
-                const input = row.querySelector("input");
-                if (input) {
-                    window.setTimeout(function () {
-                        input.focus({ preventScroll: true });
-                    }, 250);
-                }
                 if (serverGuarantorErrorMessage) {
-                    commitmentHint.textContent = serverGuarantorErrorMessage;
+                    hint.textContent = serverGuarantorErrorMessage;
                 }
             }
 
@@ -1096,8 +932,7 @@
                 selected.set(chip.dataset.id, {
                     id: chip.dataset.id,
                     memberNo: chip.dataset.memberNo,
-                    fullName: chip.dataset.fullName,
-                    amount: chip.dataset.amount || ""
+                    fullName: chip.dataset.fullName
                 });
             });
             renderSelected();
@@ -1136,10 +971,8 @@
                             selected.set(item.id, {
                                 id: item.id,
                                 memberNo: item.memberNo,
-                                fullName: item.fullName,
-                                amount: ""
+                                fullName: item.fullName
                             });
-                            autoSplitCommitments();
                             renderSelected();
                             searchInput.value = "";
                             hint.textContent = msgGuarantorSelected;
@@ -1160,11 +993,7 @@
                     hideDropdown();
                     return;
                 }
-                const loanAmount = document.getElementById("loanAmountInput")?.value || "";
-                const query = new URLSearchParams({ q: term });
-                if (loanAmount) {
-                    query.set("amount", loanAmount);
-                }
+                const query = new URLSearchParams({ q: term, loanType: "${loanType}" });
                 const response = await fetch("/app/guarantors/search?" + query.toString(), {
                     headers: {
                         "X-Requested-With": "XMLHttpRequest"
@@ -1195,11 +1024,6 @@
                 });
             }
 
-            document.addEventListener("loanFinancialSnapshotChanged", function () {
-                autoSplitCommitments();
-                renderSelected();
-            });
-
             form.addEventListener("submit", function (event) {
                 const submitter = event.submitter || document.activeElement;
                 const action = submitter && submitter.dataset ? submitter.dataset.formAction : "";
@@ -1212,28 +1036,6 @@
                     hint.textContent = warning;
                     window.showToast?.("error", warning);
                     return;
-                }
-                const requiredTotalCents = toCents(requiredCommitmentTotal());
-                if (requiredTotalCents <= 0) {
-                    event.preventDefault();
-                    commitmentHint.textContent = "Load loan details before assigning guarantor commitment amounts.";
-                    window.showToast?.("error", commitmentHint.textContent);
-                    return;
-                }
-                const invalid = Array.from(selected.values()).some(function (item) {
-                    const amountCents = toCents(item.amount);
-                    return amountCents <= 0 || amountCents > requiredTotalCents;
-                });
-                if (invalid) {
-                    event.preventDefault();
-                    commitmentHint.textContent = "Each guarantor amount must be greater than zero and not more than the total amount to be returned.";
-                    window.showToast?.("error", commitmentHint.textContent);
-                    return;
-                }
-                if (assignedCommitmentCents() !== requiredTotalCents) {
-                    event.preventDefault();
-                    commitmentHint.textContent = "Guarantor amounts must add up exactly to " + formatTzs(requiredCommitmentTotal()) + ".";
-                    window.showToast?.("error", commitmentHint.textContent);
                 }
             }, true);
 
