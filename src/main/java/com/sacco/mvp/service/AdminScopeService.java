@@ -15,6 +15,7 @@ import java.util.List;
 public class AdminScopeService {
     private static final String SESSION_SACCO_ID = "adminSelectedSaccoId";
     private static final String SESSION_STATION_ID = "adminSelectedStationId";
+    private static final String REQUEST_SCOPE_VIEW = AdminScopeService.class.getName() + ".scopeView";
 
     private final ObjectFactory<HttpServletRequest> requestFactory;
     private final SaccoRegistryService saccoRegistryService;
@@ -23,12 +24,17 @@ public class AdminScopeService {
         if (!isAdminWorkspaceUser(principal)) {
             return null;
         }
+        HttpServletRequest request = requestFactory.getObject();
+        Object cachedScope = request.getAttribute(REQUEST_SCOPE_VIEW);
+        if (cachedScope instanceof AdminScopeView scopeView) {
+            return scopeView;
+        }
         List<SaccoRegistryService.RegisteredSaccoView> options = availableOptions(principal);
         if (options.isEmpty()) {
             return null;
         }
 
-        HttpSession session = requestFactory.getObject().getSession(true);
+        HttpSession session = request.getSession(true);
         String selectedSaccoId = principal.getSaccoId();
         SaccoRegistryService.RegisteredSaccoView selectedSacco = options.stream()
             .filter(option -> option.saccoId().equals(selectedSaccoId))
@@ -46,7 +52,7 @@ public class AdminScopeService {
         session.setAttribute(SESSION_STATION_ID, selectedStationId);
         String currentStationId = selectedStationId;
 
-        return new AdminScopeView(
+        AdminScopeView scopeView = new AdminScopeView(
             selectedSacco.saccoId(),
             selectedSacco.saccoName(),
             selectedStationId,
@@ -57,6 +63,8 @@ public class AdminScopeService {
                 .orElse("Location not set"),
             options
         );
+        request.setAttribute(REQUEST_SCOPE_VIEW, scopeView);
+        return scopeView;
     }
 
     public String currentSaccoId(AppUserPrincipal principal) {
@@ -78,6 +86,7 @@ public class AdminScopeService {
         HttpSession session = requestFactory.getObject().getSession(true);
         session.setAttribute(SESSION_SACCO_ID, resolvedSaccoId);
         session.setAttribute(SESSION_STATION_ID, resolvedStationId);
+        requestFactory.getObject().removeAttribute(REQUEST_SCOPE_VIEW);
     }
 
     public boolean hasExplicitScopeSelection() {
@@ -96,6 +105,7 @@ public class AdminScopeService {
         }
         session.removeAttribute(SESSION_SACCO_ID);
         session.removeAttribute(SESSION_STATION_ID);
+        requestFactory.getObject().removeAttribute(REQUEST_SCOPE_VIEW);
     }
 
     private String attributeAsString(Object value) {

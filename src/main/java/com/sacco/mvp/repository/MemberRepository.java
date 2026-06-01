@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,13 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     interface StatusCountProjection {
         MemberStatus getStatus();
         long getTotal();
+    }
+
+    interface SaccoMemberStatsProjection {
+        String getSaccoId();
+        long getTotalMembers();
+        long getActiveMembers();
+        long getInactiveMembers();
     }
 
     Optional<Member> findByMemberNo(String memberNo);
@@ -43,6 +51,89 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findByStationIdIgnoreCaseOrderByFullNameAsc(String stationId);
 
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
+
+    List<Member> findBySaccoIdIn(Collection<String> saccoIds);
+
+    @Query("""
+        select m.saccoId as saccoId,
+               count(m) as totalMembers,
+               sum(case when m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE then 1 else 0 end) as activeMembers,
+               sum(case when m.status = com.sacco.mvp.domain.MemberStatus.INACTIVE then 1 else 0 end) as inactiveMembers
+        from Member m
+        where m.saccoId in :saccoIds
+        group by m.saccoId
+        """)
+    List<SaccoMemberStatsProjection> summarizeMembersBySacco(@Param("saccoIds") Collection<String> saccoIds);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.position = :position or staffRole = :position)
+        order by m.fullName asc
+        """)
+    List<Member> findActiveRoleMembers(@Param("saccoId") String saccoId,
+                                       @Param("position") Position position);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and lower(m.stationId) = lower(:stationId)
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.position = :position or staffRole = :position)
+        order by m.fullName asc
+        """)
+    List<Member> findActiveRoleMembersInStation(@Param("saccoId") String saccoId,
+                                                @Param("stationId") String stationId,
+                                                @Param("position") Position position);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.position in :positions or staffRole in :positions)
+        order by m.fullName asc
+        """)
+    List<Member> findActiveMembersWithAnyRole(@Param("saccoId") String saccoId,
+                                              @Param("positions") Collection<Position> positions);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and lower(m.stationId) = lower(:stationId)
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.position in :positions or staffRole in :positions)
+        order by m.fullName asc
+        """)
+    List<Member> findActiveMembersWithAnyRoleInStation(@Param("saccoId") String saccoId,
+                                                       @Param("stationId") String stationId,
+                                                       @Param("positions") Collection<Position> positions);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (m.position = :position or staffRole = :position)
+        order by m.fullName asc
+        """)
+    List<Member> findActiveGlobalRoleMembers(@Param("position") Position position);
+
+    @Query("""
+        select distinct m
+        from Member m
+        left join m.staffRoles staffRole
+        where m.position = :position or staffRole = :position
+        """)
+    List<Member> findAllWithRole(@Param("position") Position position);
 
     boolean existsBySaccoIdAndPosition(String saccoId, Position position);
 

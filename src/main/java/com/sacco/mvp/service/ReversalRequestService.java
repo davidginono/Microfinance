@@ -96,7 +96,8 @@ public class ReversalRequestService {
             .createdAt(OffsetDateTime.now())
             .build());
 
-        List<RoleDirectoryService.RoleAccountRef> managers = roleDirectoryService.activeByRole(app.getSaccoId(), Position.MANAGER);
+        List<RoleDirectoryService.RoleAccountRef> managers = roleDirectoryService
+            .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.MANAGER);
         for (RoleDirectoryService.RoleAccountRef manager : managers) {
             outboxService.enqueue(
                 "REVERSAL_REQUEST",

@@ -56,6 +56,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -168,6 +170,17 @@ class AdminServiceTest {
         );
     }
 
+    private void stubActiveRoleDirectory(String saccoId, List<Member> activeMembers) {
+        lenient().when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE))
+            .thenReturn(activeMembers);
+        lenient().when(memberRepository.findActiveRoleMembers(eq(saccoId), any())).thenAnswer(invocation -> {
+            Position position = invocation.getArgument(1);
+            return activeMembers.stream()
+                .filter(member -> member.getStaffRolesResolved().contains(position))
+                .toList();
+        });
+    }
+
     @Test
     void platformSupportIncidentsExcludeSystemAlerts() {
         AdminIncident supportIncident = AdminIncident.builder()
@@ -193,7 +206,8 @@ class AdminServiceTest {
             .createdAt(OffsetDateTime.now().minusMinutes(1))
             .updatedAt(OffsetDateTime.now().minusMinutes(1))
             .build();
-        when(adminIncidentRepository.findAll()).thenReturn(List.of(systemAlert, supportIncident));
+        when(adminIncidentRepository.findRecentForReview(any(), any(), any(), any()))
+            .thenReturn(List.of(systemAlert, supportIncident));
 
         List<AdminIncident> incidents = adminService.platformSupportIncidents(null, null, null, null);
 
@@ -236,8 +250,8 @@ class AdminServiceTest {
         AtomicReference<AdminIncident> savedIncident = new AtomicReference<>();
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc("SACCO-01", MemberStatus.ACTIVE))
-            .thenReturn(List.of(sameStationAdmin, otherStationAdmin));
+        when(memberRepository.findActiveMembersWithAnyRoleInStation(eq("SACCO-01"), eq("AR704"), any()))
+            .thenReturn(List.of(sameStationAdmin));
         when(adminIncidentRepository.save(any(AdminIncident.class))).thenAnswer(invocation -> {
             AdminIncident incident = invocation.getArgument(0);
             savedIncident.set(incident);
@@ -975,7 +989,7 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_GROWTH", productId)).thenReturn(false);
         when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc("SACCO-01", MemberStatus.ACTIVE)).thenReturn(List.of(
+        stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")
@@ -1084,7 +1098,7 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_LOAN", productId)).thenReturn(false);
         when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc("SACCO-01", MemberStatus.ACTIVE)).thenReturn(List.of(
+        stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")
@@ -1168,7 +1182,7 @@ class AdminServiceTest {
 
     @Test
     void createCustomizedLoanProductRejectsDuplicateManagerAndLoanOfficerPriorities() {
-        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc("SACCO-01", MemberStatus.ACTIVE)).thenReturn(List.of(
+        stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
                 .saccoId("SACCO-01")

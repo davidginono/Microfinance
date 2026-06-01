@@ -761,6 +761,16 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowApplicationNumber}</p>
                                 </div>
                                 <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="reports.loanProduct" text="Loan Product" /></p>
+                                    <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowProductName}</p>
+                                </div>
+                                <c:if test="${not empty currentWorkflowApplicantReason}">
+                                    <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="loan.purpose" text="Loan Purpose" /></p>
+                                        <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowApplicantReason}</p>
+                                    </div>
+                                </c:if>
+                                <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
                                     <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Amount</p>
                                     <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowAmountLabel}</p>
                                 </div>
@@ -1011,6 +1021,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                 <div>
                                                     <p class="erp-widget-title"><spring:message code="dashboard.repaymentTimer.label" /></p>
                                                     <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="dashboard.loanId.prefix" /> ${loanRow.loanId}</h3>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-600"><spring:message code="reports.loanProduct" text="Loan Product" />: ${loanRow.loanProductName}</p>
+                                                    <c:if test="${not empty loanRow.applicantReason}">
+                                                        <p class="mt-1 text-sm font-semibold text-slate-600"><spring:message code="loan.purpose" text="Loan Purpose" />: ${loanRow.applicantReason}</p>
+                                                    </c:if>
                                                 </div>
                                                 <div class="flex flex-wrap items-center justify-end gap-2">
                                                     <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">

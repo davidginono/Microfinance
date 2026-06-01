@@ -13,7 +13,9 @@ import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.web.view.CurrentUserView;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -23,12 +25,15 @@ import java.util.Collections;
 @ControllerAdvice
 @RequiredArgsConstructor
 public class CurrentUserModelAdvice {
+    private static final String REQUEST_ACTIVE_SACCO_BRAND = CurrentUserModelAdvice.class.getName() + ".activeSaccoBrand";
+
     private final NotificationInboxService notificationInboxService;
     private final AdminScopeService adminScopeService;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final ObjectMapper objectMapper;
+    private final ObjectFactory<HttpServletRequest> requestFactory;
 
     @ModelAttribute("currentMember")
     public CurrentUserView currentMember(@AuthenticationPrincipal AppUserPrincipal principal) {
@@ -202,6 +207,11 @@ public class CurrentUserModelAdvice {
         if (isPlatformAdminIdentity(principal)) {
             return null;
         }
+        HttpServletRequest request = requestFactory.getObject();
+        Object cachedBrand = request.getAttribute(REQUEST_ACTIVE_SACCO_BRAND);
+        if (cachedBrand instanceof ActiveSaccoBrand activeSaccoBrand) {
+            return activeSaccoBrand;
+        }
 
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
         if (scope != null && scope.getSaccoId() != null) {
@@ -211,7 +221,9 @@ public class CurrentUserModelAdvice {
             String saccoName = registeredSacco != null && registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank()
                 ? registeredSacco.getSaccoName()
                 : scope.getSaccoName();
-            return buildBrand(scope.getSaccoId(), saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
+            ActiveSaccoBrand brand = buildBrand(scope.getSaccoId(), saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
+            request.setAttribute(REQUEST_ACTIVE_SACCO_BRAND, brand);
+            return brand;
         }
 
         String saccoId = principal.getSaccoId();
@@ -224,7 +236,9 @@ public class CurrentUserModelAdvice {
                 .map(SaccoSettings::getExternalSaccoName)
                 .filter(name -> name != null && !name.isBlank()))
             .orElse(saccoId);
-        return buildBrand(saccoId, saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
+        ActiveSaccoBrand brand = buildBrand(saccoId, saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
+        request.setAttribute(REQUEST_ACTIVE_SACCO_BRAND, brand);
+        return brand;
     }
 
     private ActiveSaccoBrand buildBrand(String saccoId, String saccoName, java.time.OffsetDateTime updatedAt) {

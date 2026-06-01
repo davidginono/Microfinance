@@ -323,7 +323,7 @@ public class AdminService {
     public List<MinorAdminAccessView> minorAdmins() {
         Comparator<String> textComparator = Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER);
         OffsetDateTime now = OffsetDateTime.now();
-        return memberRepository.findAll().stream()
+        return memberRepository.findAllWithRole(Position.MINOR_ADMIN).stream()
             .filter(member -> member.getStaffRolesResolved().contains(Position.MINOR_ADMIN))
             .sorted(Comparator.comparing(Member::getSaccoId, textComparator)
                 .thenComparing(Member::getStationId, textComparator)
@@ -1088,7 +1088,7 @@ public class AdminService {
     }
 
     public List<NotificationViewService.NotificationView> adminMessages(UUID adminId) {
-        return notificationViewService.toViews(notificationRepository.findByRecipientMemberIdOrderByCreatedAtDesc(adminId)).stream()
+        return notificationViewService.toViews(notificationRepository.findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(adminId, "SUPPORT_MESSAGE")).stream()
             .filter(view -> "SUPPORT_MESSAGE".equals(view.getType()) && view.getIncidentId() != null)
             .toList();
     }
@@ -1133,15 +1133,18 @@ public class AdminService {
                                          String stationId,
                                          IncidentStatus status,
                                          IncidentSeverity severity) {
-        List<AdminIncident> base = normalizeOptional(saccoId) == null
-            ? adminIncidentRepository.findAll().stream()
-                .sorted(Comparator.comparing(AdminIncident::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList()
-            : adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
-        return filterIncidentsByStation(base, stationId).stream()
-            .filter(item -> status == null || item.getStatus() == status)
-            .filter(item -> severity == null || item.getSeverity() == severity)
-            .toList();
+        // findRecentForReview already applies the saccoId/status/severity filters
+        // (with null-safe matching) and caps the result at the most recent 250
+        // rows, so an empty result genuinely means no matching incidents. The
+        // previous findAll() fallback re-applied the same filters and could only
+        // ever yield the same empty list, so it has been removed.
+        List<AdminIncident> base = adminIncidentRepository.findRecentForReview(
+            normalizeOptional(saccoId),
+            status,
+            severity,
+            PageRequest.of(0, 250)
+        );
+        return filterIncidentsByStation(base, stationId);
     }
 
     public List<AdminIncident> platformSupportIncidents(String saccoId,
@@ -1221,8 +1224,7 @@ public class AdminService {
         if (incident == null || adminId == null) {
             return;
         }
-        notificationRepository.findByTypeOrderByCreatedAtDesc("SUPPORT_MESSAGE").stream()
-            .filter(notification -> adminId.equals(notification.getRecipientMemberId()))
+        notificationRepository.findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(adminId, "SUPPORT_MESSAGE").stream()
             .filter(notification -> incident.getId().equals(notificationIncidentId(notification)))
             .filter(notification -> notification.getReadAt() == null)
             .forEach(notification -> {
@@ -1546,27 +1548,33 @@ public class AdminService {
     }
 
     public ReportData reports(String saccoId, String statusFilter, String loanTypeFilter, String dateFrom, String dateTo) {
-        List<LoanApplication> applications = loanApplicationRepository.findAll().stream()
-            .filter(app -> saccoId.equals(app.getSaccoId()))
-            .filter(app -> statusFilter == null || statusFilter.isBlank() || app.getStatus().name().equals(statusFilter))
-            .filter(app -> loanTypeFilter == null || loanTypeFilter.isBlank() || app.getLoanType().name().equals(loanTypeFilter))
-            .filter(app -> dateFrom == null || dateFrom.isBlank() || (app.getCreatedAt() != null && !app.getCreatedAt().toLocalDate().isBefore(java.time.LocalDate.parse(dateFrom))))
-            .filter(app -> dateTo == null || dateTo.isBlank() || (app.getCreatedAt() != null && !app.getCreatedAt().toLocalDate().isAfter(java.time.LocalDate.parse(dateTo))))
-            .toList();
+        DateRange range = resolveDateRange(dateFrom, dateTo);
+        LoanStatus statusEnum = parseEnumFilter(statusFilter, LoanStatus.class);
+        LoanType loanTypeEnum = parseEnumFilter(loanTypeFilter, LoanType.class);
 
-        Map<String, Long> byStatus = applications.stream()
-            .collect(Collectors.groupingBy(app -> app.getStatus().name(), LinkedHashMap::new, Collectors.counting()));
-        Map<String, Long> byType = applications.stream()
-            .collect(Collectors.groupingBy(app -> app.getLoanType().name(), LinkedHashMap::new, Collectors.counting()));
-        long pendingGuarantorRequests = guarantorRequestRepository.findAll().stream()
-            .filter(req -> applications.stream().anyMatch(app -> app.getId().equals(req.getLoanApplicationId())))
-            .filter(req -> req.getStatus() == GuarantorRequestStatus.PENDING)
-            .count();
-        long rejectedByManager = applications.stream().filter(app -> app.getStatus() == LoanStatus.MANAGER_REJECTED).count();
-        long approvedFinal = applications.stream().filter(app -> app.getStatus() == LoanStatus.FINAL_APPROVED).count();
-        long managerDecisionCount = managerReviewRepository.findAllByOrderByCreatedAtDesc().stream()
-            .filter(review -> applications.stream().anyMatch(app -> app.getId().equals(review.getLoanApplicationId())))
-            .count();
+        // A non-blank filter that does not match any known enum value can never
+        // match a row, so short-circuit to an empty report instead of querying.
+        boolean impossibleFilter = (normalizeOptional(statusFilter) != null && statusEnum == null)
+            || (normalizeOptional(loanTypeFilter) != null && loanTypeEnum == null);
+
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        Map<String, Long> byType = new LinkedHashMap<>();
+        long pendingGuarantorRequests = 0;
+        long managerDecisionCount = 0;
+        if (!impossibleFilter) {
+            loanApplicationRepository.reportStatusCounts(saccoId, statusEnum, loanTypeEnum, range.start(), range.endExclusive())
+                .forEach(projection -> byStatus.put(projection.getStatus().name(), projection.getTotal()));
+            loanApplicationRepository.reportTypeCounts(saccoId, statusEnum, loanTypeEnum, range.start(), range.endExclusive())
+                .forEach(projection -> byType.put(projection.getLoanType().name(), projection.getTotal()));
+            pendingGuarantorRequests = guarantorRequestRepository.countPendingForReport(
+                saccoId, statusEnum, loanTypeEnum, range.start(), range.endExclusive());
+            managerDecisionCount = managerReviewRepository.countDecisionsForReport(
+                saccoId, statusEnum, loanTypeEnum, range.start(), range.endExclusive());
+        }
+
+        long rejectedByManager = byStatus.getOrDefault(LoanStatus.MANAGER_REJECTED.name(), 0L);
+        long approvedFinal = byStatus.getOrDefault(LoanStatus.FINAL_APPROVED.name(), 0L);
+        long totalApplications = byStatus.values().stream().mapToLong(Long::longValue).sum();
 
         return new ReportData(
             byStatus,
@@ -1581,8 +1589,20 @@ public class AdminService {
             loanTypeFilter == null ? "" : loanTypeFilter,
             dateFrom == null ? "" : dateFrom,
             dateTo == null ? "" : dateTo,
-            applications.size()
+            (int) totalApplications
         );
+    }
+
+    private <E extends Enum<E>> E parseEnumFilter(String raw, Class<E> type) {
+        String normalized = normalizeOptional(raw);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(type, normalized);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private void createNotification(UUID recipientId, String type, String source, String subject, String message,

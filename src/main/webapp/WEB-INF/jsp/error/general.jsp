@@ -34,25 +34,12 @@
         .error-topbar {
             display: flex;
             align-items: center;
-            gap: 0.9rem;
             padding: 1rem 1.15rem;
             border: 1px solid rgba(255,255,255,0.34);
             border-radius: 1rem;
             background: linear-gradient(180deg, #19c6d8 0%, var(--accent) 100%);
             color: #fff;
             box-shadow: 0 16px 42px -28px rgba(15, 23, 42, 0.38);
-        }
-        .error-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 3rem;
-            height: 3rem;
-            border-radius: 0.9rem;
-            background: rgba(255,255,255,0.96);
-            color: #1f2937;
-            font-weight: 800;
-            letter-spacing: 0.14em;
         }
         .error-brand-title {
             margin: 0;
@@ -143,10 +130,8 @@
 </head>
 <body>
 <c:set var="errorSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'SACCO Loan Management'}" />
-<c:set var="errorSaccoLogoText" value="${not empty activeSaccoLogoText ? activeSaccoLogoText : 'SC'}" />
 <div class="error-shell">
     <div class="error-topbar">
-        <div class="error-badge">${errorSaccoLogoText}</div>
         <div>
             <p class="error-brand-title">${errorSaccoName}</p>
             <p class="error-brand-subtitle">Loan Management System</p>

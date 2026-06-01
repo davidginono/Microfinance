@@ -76,9 +76,10 @@ public class WorkflowRoutingService {
         boardReviewRepository.deleteByLoanApplicationIdAndReviewStage(app.getId(), stage);
         boardReviewRepository.flush();
         if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
-            RoleDirectoryService.RoleAccountRef loanOfficer = roleDirectoryService.activeByRole(app.getSaccoId(), Position.LOAN_OFFICER).stream()
+            RoleDirectoryService.RoleAccountRef loanOfficer = roleDirectoryService
+                .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.LOAN_OFFICER).stream()
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No active loan officer is configured for this SACCO."));
+                .orElseThrow(() -> new IllegalStateException("No active loan officer is configured for this station."));
             boardReviewRepository.save(BoardReview.builder()
                 .id(UUID.randomUUID())
                 .loanApplicationId(app.getId())
@@ -91,7 +92,8 @@ public class WorkflowRoutingService {
         }
 
         int requiredBoardReviewers = Math.max(workflow.committeeMinimumVotes(), 1);
-        java.util.List<RoleDirectoryService.RoleAccountRef> boardMembers = roleDirectoryService.activeByRole(app.getSaccoId(), Position.BOARD);
+        java.util.List<RoleDirectoryService.RoleAccountRef> boardMembers = roleDirectoryService
+            .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.BOARD);
         if (boardMembers.size() < requiredBoardReviewers) {
             throw new IllegalStateException("Not enough board members for the configured committee review requirement.");
         }

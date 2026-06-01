@@ -22,6 +22,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findTop5ByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
     List<Notification> findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(UUID recipientMemberId);
     List<Notification> findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
+    List<Notification> findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
 
     List<Notification> findByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
     List<Notification> findByTypeOrderByCreatedAtDesc(String type);

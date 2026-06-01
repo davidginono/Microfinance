@@ -106,7 +106,8 @@ public class AppController {
             .findFirst()
             .orElse(null);
         Set<UUID> dismissedActiveLoanChartIds = dismissedActiveLoanChartIds(principal.getMemberId());
-        List<Map<String, Object>> activeLoanChartRows = buildActiveLoanChartRows(activeLoans, dismissedActiveLoanChartIds);
+        Map<LoanType, String> loanProductNames = loanProductNames(principal.getSaccoId());
+        List<Map<String, Object>> activeLoanChartRows = buildActiveLoanChartRows(activeLoans, dismissedActiveLoanChartIds, loanProductNames);
         Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
 
         model.addAttribute("myApplications", currentApplications);
@@ -132,6 +133,14 @@ public class AppController {
             currentWorkflowApplication == null
                 ? "-"
                 : loanPresentationService.formatMoneyDisplay(currentWorkflowApplication.getAmount()));
+        model.addAttribute("currentWorkflowProductName",
+            currentWorkflowApplication == null
+                ? "-"
+                : loanProductName(currentWorkflowApplication.getLoanType(), loanProductNames));
+        model.addAttribute("currentWorkflowApplicantReason",
+            currentWorkflowApplication == null
+                ? ""
+                : applicantReason(currentWorkflowApplication));
         model.addAttribute("currentWorkflowStatusLabel",
             currentWorkflowApplication == null
                 ? ""
@@ -348,7 +357,8 @@ public class AppController {
     }
 
     private List<Map<String, Object>> buildActiveLoanChartRows(List<LoanApplication> activeLoans,
-                                                               Set<UUID> dismissedChartIds) {
+                                                               Set<UUID> dismissedChartIds,
+                                                               Map<LoanType, String> loanProductNames) {
         LocalDate today = LocalDate.now();
         return activeLoans.stream()
             .sorted(Comparator.comparing(LoanApplication::getFinalDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
@@ -371,6 +381,8 @@ public class AppController {
 
                 row.put("fullId", app.getId());
                 row.put("loanId", app.getLoanId() == null || app.getLoanId().isBlank() ? "-" : app.getLoanId());
+                row.put("loanProductName", loanProductName(app.getLoanType(), loanProductNames));
+                row.put("applicantReason", applicantReason(app));
                 row.put("amountLabel", loanPresentationService.formatMoneyDisplay(app.getAmount()));
                 row.put("startDate", resolveRepaymentTimerStartDate(app));
                 row.put("daysLeft", daysLeft);
@@ -393,6 +405,40 @@ public class AppController {
                 return row;
             })
             .toList();
+    }
+
+    private Map<LoanType, String> loanProductNames(String saccoId) {
+        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+            .collect(Collectors.toMap(
+                LoanProductSetting::getLoanType,
+                LoanProductSetting::getDisplayName,
+                (first, ignored) -> first,
+                LinkedHashMap::new
+            ));
+    }
+
+    private String loanProductName(LoanType loanType, Map<LoanType, String> loanProductNames) {
+        if (loanType == null) {
+            return "-";
+        }
+        String configuredName = loanProductNames.get(loanType);
+        if (configuredName != null && !configuredName.isBlank()) {
+            return configuredName;
+        }
+        return loanType.getDisplayLabel();
+    }
+
+    private String applicantReason(LoanApplication app) {
+        if (app == null || app.getFormData() == null || app.getFormData().isBlank()) {
+            return "";
+        }
+        try {
+            Map<String, Object> formData = objectMapper.readValue(app.getFormData(), new TypeReference<>() {});
+            Object purpose = formData.get("purpose");
+            return purpose == null ? "" : String.valueOf(purpose).trim();
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     private LocalDate resolveRepaymentTimerStartDate(LoanApplication app) {

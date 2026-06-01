@@ -31,8 +31,22 @@ public class SaccoRegistryService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoConfigurationService saccoConfigurationService;
     private final SaccoLogoStorageService saccoLogoStorageService;
+    private volatile List<RegisteredSaccoView> registeredSaccoCache;
 
     public List<RegisteredSaccoView> listRegisteredSaccos() {
+        List<RegisteredSaccoView> cached = registeredSaccoCache;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (registeredSaccoCache == null) {
+                registeredSaccoCache = loadRegisteredSaccos();
+            }
+            return registeredSaccoCache;
+        }
+    }
+
+    private List<RegisteredSaccoView> loadRegisteredSaccos() {
         return registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
             .map(sacco -> {
                 List<SaccoStation> stations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
@@ -48,6 +62,10 @@ public class SaccoRegistryService {
                 );
             })
             .toList();
+    }
+
+    private void invalidateRegisteredSaccoCache() {
+        registeredSaccoCache = null;
     }
 
     private SaccoAccessStatus aggregateStationAccess(List<SaccoStation> stations) {
@@ -109,6 +127,7 @@ public class SaccoRegistryService {
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, now, false);
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
         saccoConfigurationService.ensureDefaultLoanProducts(normalizedSaccoId);
+        invalidateRegisteredSaccoCache();
     }
 
     @Transactional
@@ -143,6 +162,7 @@ public class SaccoRegistryService {
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, OffsetDateTime.now(), true);
         updateStationAddressLocations(normalizedSaccoId, stationAddressLocations, OffsetDateTime.now());
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
+        invalidateRegisteredSaccoCache();
     }
 
     @Transactional
@@ -160,6 +180,7 @@ public class SaccoRegistryService {
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalStateException("SACCO not found."));
         upsertSacco(normalizedSaccoId, sacco.getSaccoName(), stationIds, OffsetDateTime.now(), true);
+        invalidateRegisteredSaccoCache();
     }
 
     @Transactional
@@ -194,6 +215,7 @@ public class SaccoRegistryService {
         station.setAddressLocation(normalizedAddressLocation);
         station.setUpdatedAt(OffsetDateTime.now());
         saccoStationRepository.save(station);
+        invalidateRegisteredSaccoCache();
     }
 
     private void upsertSacco(String saccoId,

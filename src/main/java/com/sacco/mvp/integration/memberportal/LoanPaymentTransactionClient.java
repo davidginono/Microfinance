@@ -3,6 +3,7 @@ package com.sacco.mvp.integration.memberportal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -10,6 +11,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
@@ -24,6 +26,12 @@ public class LoanPaymentTransactionClient {
 
     @Value("${external.memberportal.base-url:https://api.foresightfin.app}")
     private String baseUrl;
+
+    @Value("${external.memberportal.connect-timeout:3s}")
+    private Duration connectTimeout;
+
+    @Value("${external.memberportal.read-timeout:8s}")
+    private Duration readTimeout;
 
     public LoanPaymentTransactionClient(RestClient.Builder restClientBuilder) {
         this.restClientBuilder = restClientBuilder;
@@ -64,6 +72,16 @@ public class LoanPaymentTransactionClient {
     }
 
     private RestClient client() {
-        return restClientBuilder.baseUrl(baseUrl).build();
+        return restClientBuilder
+            .requestFactory(requestFactory())
+            .baseUrl(baseUrl)
+            .build();
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
+        return requestFactory;
     }
 }

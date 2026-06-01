@@ -66,7 +66,7 @@ class WorkflowRoutingServiceTest {
                 4
             )
         );
-        when(roleDirectoryService.activeByRole("SACCO-1", Position.LOAN_OFFICER)).thenReturn(List.of(
+        when(roleDirectoryService.activeByRoleInStation("SACCO-1", null, Position.LOAN_OFFICER)).thenReturn(List.of(
             RoleDirectoryService.RoleAccountRef.builder()
                 .id(loanOfficerId)
                 .saccoId("SACCO-1")

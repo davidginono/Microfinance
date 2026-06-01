@@ -8,5 +8,6 @@ RUN mvn -q -DskipTests clean package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/sacco-loan-mvp-1.0.0.jar app.jar
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=25 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

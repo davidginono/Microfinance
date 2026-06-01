@@ -22,44 +22,51 @@ public class RoleDirectoryService {
     private final MemberRepository memberRepository;
 
     public List<RoleAccountRef> activeByRole(String saccoId, Position position) {
-        List<RoleAccountRef> refs = new ArrayList<>();
-        memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
-            .filter(member -> member.getStaffRolesResolved().contains(position))
-            .forEach(member -> refs.add(fromMember(member)));
-        return deduplicateAndSort(refs);
+        if (saccoId == null || saccoId.isBlank() || position == null) {
+            return List.of();
+        }
+        // findActiveRoleMembers already returns every active member in the SACCO
+        // whose primary position or staff role matches, so no in-memory fallback
+        // (which loaded the whole SACCO member list on a request path) is needed.
+        return toRoleRefs(memberRepository.findActiveRoleMembers(saccoId, position));
+    }
+
+    public List<RoleAccountRef> activeByRoleInStation(String saccoId, String stationId, Position position) {
+        if (saccoId == null || saccoId.isBlank() || position == null) {
+            return List.of();
+        }
+        if (stationId == null || stationId.isBlank()) {
+            // Legacy records without a first-class station reference fall back to
+            // SACCO scope so loan routing never silently loses its only candidate.
+            return activeByRole(saccoId, position);
+        }
+        return toRoleRefs(memberRepository.findActiveRoleMembersInStation(saccoId, stationId.trim(), position));
     }
 
     public List<RoleAccountRef> activeByAnyRole(String saccoId, java.util.Collection<Position> positions) {
-        if (positions == null || positions.isEmpty()) {
+        if (saccoId == null || saccoId.isBlank() || positions == null || positions.isEmpty()) {
             return List.of();
         }
-        List<RoleAccountRef> refs = new ArrayList<>();
-        memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
-            .filter(member -> member.getStaffRolesResolved().stream().anyMatch(positions::contains))
-            .forEach(member -> refs.add(fromMember(member)));
-        return deduplicateAndSort(refs);
+        return toRoleRefs(memberRepository.findActiveMembersWithAnyRole(saccoId, positions));
     }
 
     public List<RoleAccountRef> activeByAnyRoleInStation(String saccoId, String stationId, java.util.Collection<Position> positions) {
-        if (positions == null || positions.isEmpty() || stationId == null || stationId.isBlank()) {
+        if (saccoId == null || saccoId.isBlank() || positions == null || positions.isEmpty() || stationId == null || stationId.isBlank()) {
             return List.of();
         }
         String normalizedStationId = stationId.trim();
-        List<RoleAccountRef> refs = new ArrayList<>();
-        memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
-            .filter(member -> normalizedStationId.equalsIgnoreCase(member.getStationId() == null ? "" : member.getStationId().trim()))
-            .filter(member -> member.getStaffRolesResolved().stream().anyMatch(positions::contains))
-            .forEach(member -> refs.add(fromMember(member)));
-        return deduplicateAndSort(refs);
+        return toRoleRefs(memberRepository.findActiveMembersWithAnyRoleInStation(saccoId, normalizedStationId, positions));
     }
 
     public List<RoleAccountRef> activeGlobalByRole(Position position) {
-        List<RoleAccountRef> refs = new ArrayList<>();
-        memberRepository.findAll().stream()
-            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-            .filter(member -> member.getStaffRolesResolved().contains(position))
-            .forEach(member -> refs.add(fromMember(member)));
-        return deduplicateAndSort(refs);
+        if (position == null) {
+            return List.of();
+        }
+        // findActiveGlobalRoleMembers already returns every active member whose
+        // primary position or staff role matches, so the prior findAll() fallback
+        // was redundant (it could only reproduce the same set) and loaded the whole
+        // members table on a request path.
+        return toRoleRefs(memberRepository.findActiveGlobalRoleMembers(position));
     }
 
     public boolean hasActiveRoleInSacco(UUID memberId, String saccoId, Position position) {
@@ -79,6 +86,14 @@ public class RoleDirectoryService {
         return uniqueRefs.values().stream()
             .sorted(Comparator.comparing(RoleAccountRef::getFullName, String.CASE_INSENSITIVE_ORDER))
             .toList();
+    }
+
+    private List<RoleAccountRef> toRoleRefs(List<Member> members) {
+        List<RoleAccountRef> refs = new ArrayList<>();
+        members.stream()
+            .map(this::fromMember)
+            .forEach(refs::add);
+        return deduplicateAndSort(refs);
     }
 
     private RoleAccountRef fromMember(Member member) {

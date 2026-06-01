@@ -27,7 +27,6 @@
             <div>
                 <p class="erp-stat-label"><spring:message code="admin.dashboard.applications" text="Applications" /></p>
                 <p class="erp-stat-value">${dashboard.totalApplications}</p>
-                <p class="erp-stat-meta"><spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" />: ${dashboard.onReviewByManagerCount} | <spring:message code="role.committee" text="Board" />: ${dashboard.awaitingBoardCount}</p>
             </div>
             <span class="erp-stat-icon">A</span>
         </div>
