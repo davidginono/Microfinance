@@ -180,6 +180,14 @@ public class ManagerService {
         List<LoanStatus> resolvedStatuses = statuses == null || statuses.isEmpty()
             ? List.of(LoanStatus.READY_FOR_MANAGER)
             : statuses;
+        if (normalizedSearchTerm == null) {
+            return loanApplicationRepository.findQueuePageForScope(
+                saccoId,
+                blankToNull(stationId),
+                resolvedStatuses,
+                PageRequest.of(0, MAX_QUEUE_ROWS)
+            ).getContent();
+        }
         return loanApplicationRepository.findQueuePage(
             saccoId,
             blankToNull(stationId),
@@ -308,6 +316,7 @@ public class ManagerService {
                              LocalDate firstRepaymentDate,
                              RepaymentFrequency repaymentFrequency,
                              BigDecimal installmentAmount,
+                             BigDecimal disbursementAmount,
                              String loanId,
                              String disbursementReference,
                              String disbursementNotes,
@@ -318,6 +327,7 @@ public class ManagerService {
         }
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
         validateDisbursement(disbursementDate, firstRepaymentDate);
+        BigDecimal effectiveDisbursementAmount = validateDisbursementAmount(disbursementAmount);
         if (disbursementProofFile == null || disbursementProofFile.isEmpty()) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
         }
@@ -332,6 +342,7 @@ public class ManagerService {
             && loanApplicationRepository.existsBySaccoIdAndLoanId(app.getSaccoId(), normalisedLoanId)) {
             throw new IllegalArgumentException("Loan ID is already used in this SACCO");
         }
+        app.setAmount(effectiveDisbursementAmount);
         RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
             app,
             disbursementDate,
@@ -374,6 +385,7 @@ public class ManagerService {
         details.put("firstRepaymentDate", String.valueOf(app.getFirstRepaymentDate()));
         details.put("repaymentFrequency", app.getRepaymentFrequency() == null ? "" : app.getRepaymentFrequency().name());
         details.put("installmentAmount", app.getInstallmentAmount());
+        details.put("disbursementAmount", app.getAmount());
         details.put("applicationId", applicationId.toString());
         details.put("loanId", app.getLoanId());
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
@@ -477,6 +489,16 @@ public class ManagerService {
         if (firstRepaymentDate.isBefore(disbursementDate)) {
             throw new IllegalArgumentException("First repayment date cannot be before disbursement date");
         }
+    }
+
+    private BigDecimal validateDisbursementAmount(BigDecimal disbursementAmount) {
+        if (disbursementAmount == null) {
+            throw new IllegalArgumentException("Disbursement amount is required to disburse this loan");
+        }
+        if (disbursementAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Disbursement amount must be greater than zero");
+        }
+        return disbursementAmount.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private boolean matchesQueueSearch(LoanApplication app, String lookup, boolean searchByLoanId) {

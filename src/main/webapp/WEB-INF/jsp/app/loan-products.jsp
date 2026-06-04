@@ -80,7 +80,12 @@
                     </ul>
                 </div>
                 <div id="productsEligibilityCard" class="app-modal-section">
-                    <p class="font-semibold text-slate-800"><spring:message code="products.eligibilityResult.title" /></p>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="font-semibold text-slate-800"><spring:message code="products.eligibilityResult.title" /></p>
+                        <span id="productsEligibilityStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <spring:message code="products.eligibilityResult.notChecked" text="Not checked" />
+                        </span>
+                    </div>
                     <div class="mt-2 space-y-1 text-sm text-slate-600">
                         <p id="productsEligibilityMessage"><spring:message code="products.eligibilityResult.message" /></p>
                         <p><strong><spring:message code="products.eligibilityResult.savings" />:</strong> <span id="productsSavingsLabel">-</span></p>
@@ -112,6 +117,28 @@
                     </thead>
                     <tbody id="productsFinancialBody"></tbody>
                 </table>
+            </div>
+            <div id="productsRepaymentScheduleCard" class="hidden app-modal-section">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p class="font-semibold text-slate-800">Estimated Repayment Schedule</p>
+                        <p class="mt-1 text-sm text-slate-500">Monthly amount, principal, and interest based on the amount and tenure entered.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                    <table class="erp-table">
+                        <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Amount to Pay</th>
+                            <th>Principal</th>
+                            <th>Interest</th>
+                            <th>Balance After Payment</th>
+                        </tr>
+                        </thead>
+                        <tbody id="productsRepaymentScheduleBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
         </div>
@@ -246,7 +273,10 @@
         const loading = document.getElementById("productsFinancialLoading");
         const card = document.getElementById("productsFinancialCard");
         const body = document.getElementById("productsFinancialBody");
+        const scheduleCard = document.getElementById("productsRepaymentScheduleCard");
+        const scheduleBody = document.getElementById("productsRepaymentScheduleBody");
         const eligibilityMessage = document.getElementById("productsEligibilityMessage");
+        const eligibilityStatus = document.getElementById("productsEligibilityStatus");
         const savingsLabel = document.getElementById("productsSavingsLabel");
         const ratioLabel = document.getElementById("productsRatioLabel");
         const maxAllowedLabel = document.getElementById("productsMaxAllowedLabel");
@@ -258,6 +288,9 @@
         const msgUnableLoadCalculator = "<spring:message code='products.js.unableLoadCalculator' />";
         const msgWithinEligibility = "<spring:message code='products.js.withinEligibility' />";
         const msgAboveEligibility = "<spring:message code='products.js.aboveEligibility' />";
+        const msgEligibleStatus = "<spring:message code='products.js.eligibleStatus' text='Eligible' />";
+        const msgNotEligibleStatus = "<spring:message code='products.js.notEligibleStatus' text='Not eligible' />";
+        const msgNotCheckedStatus = "<spring:message code='products.eligibilityResult.notChecked' text='Not checked' />";
         const msgLoaded = "<spring:message code='products.js.loaded' />";
         const msgFailedLoad = "<spring:message code='products.js.failedLoad' />";
 
@@ -323,17 +356,42 @@
         function clearPreview() {
             card.classList.add("hidden");
             body.innerHTML = "";
+            scheduleCard.classList.add("hidden");
+            scheduleBody.innerHTML = "";
             eligibilityMessage.textContent = msgLoadPrompt;
+            updateEligibilityStatus(null);
             savingsLabel.textContent = "-";
             ratioLabel.textContent = "-";
             maxAllowedLabel.textContent = "-";
             feedback.classList.add("hidden");
         }
 
+        function updateEligibilityStatus(eligible) {
+            if (!eligibilityStatus) {
+                return;
+            }
+            eligibilityStatus.className = "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide";
+            if (eligible === true) {
+                eligibilityStatus.textContent = msgEligibleStatus;
+                eligibilityStatus.classList.add("bg-emerald-100", "text-emerald-700");
+                return;
+            }
+            if (eligible === false) {
+                eligibilityStatus.textContent = msgNotEligibleStatus;
+                eligibilityStatus.classList.add("bg-rose-100", "text-rose-700");
+                return;
+            }
+            eligibilityStatus.textContent = msgNotCheckedStatus;
+            eligibilityStatus.classList.add("bg-slate-100", "text-slate-600");
+        }
+
         [loanTypeInput, tenorInput].forEach(function (input) {
             input.addEventListener("change", clearPreview);
         });
-        amountDisplayInput.addEventListener("input", syncAmountInput);
+        amountDisplayInput.addEventListener("input", function () {
+            syncAmountInput();
+            clearPreview();
+        });
         amountDisplayInput.addEventListener("change", function () {
             syncAmountInput();
             clearPreview();
@@ -393,6 +451,23 @@
                     body.appendChild(row);
                 });
                 card.classList.remove("hidden");
+                scheduleBody.innerHTML = "";
+                (payload.repaymentSchedule || []).forEach(function (item) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = ""
+                        + "<td class='px-3 py-2 font-medium text-slate-700'></td>"
+                        + "<td class='px-3 py-2'></td>"
+                        + "<td class='px-3 py-2'></td>"
+                        + "<td class='px-3 py-2'></td>"
+                        + "<td class='px-3 py-2'></td>";
+                    row.children[0].textContent = item.month || "-";
+                    row.children[1].textContent = item.installment || "-";
+                    row.children[2].textContent = item.principal || "-";
+                    row.children[3].textContent = item.interest || "-";
+                    row.children[4].textContent = item.outstandingBalance || "-";
+                    scheduleBody.appendChild(row);
+                });
+                scheduleCard.classList.toggle("hidden", scheduleBody.children.length === 0);
 
                 const eligibility = payload.eligibility || {};
                 savingsLabel.textContent = eligibility.savingsLabel || "-";
@@ -401,6 +476,7 @@
                 eligibilityMessage.textContent = eligibility.eligible
                     ? msgWithinEligibility
                     : msgAboveEligibility;
+                updateEligibilityStatus(eligibility.eligible === true ? true : eligibility.eligible === false ? false : null);
 
                 showFeedback("success", payload.message || msgLoaded);
             } catch (error) {

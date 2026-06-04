@@ -39,23 +39,25 @@ public class LoanProductWorkflowService {
         boolean disbursementOfficerRequired = product.isDisbursementOfficerRequired();
         int managerPriority = product.getResolvedManagerPriority();
         int loanOfficerPriority = product.getResolvedLoanOfficerPriority();
-        ApprovalWorkflowStage startStage = resolveStartStage(
-            product.getResolvedWorkflowStartStage(),
-            managerReviewRequired,
-            managerPriority,
-            loanOfficerReviewRequired,
-            loanOfficerPriority
-        );
         int committeePriority = product.getResolvedCommitteePriority();
         int accountantPriority = product.getResolvedAccountantPriority();
         if (committeeReviewRequired && accountantReviewRequired && committeePriority == accountantPriority) {
             accountantPriority = committeePriority == 3 ? 4 : 3;
         }
+        List<ApprovalWorkflowStage> stages = orderedStages(
+            managerReviewRequired,
+            managerPriority,
+            loanOfficerReviewRequired,
+            loanOfficerPriority,
+            committeeReviewRequired,
+            committeePriority,
+            accountantReviewRequired,
+            accountantPriority
+        );
 
         return new WorkflowDefinition(
-            orderedStages(managerReviewRequired, managerPriority, loanOfficerReviewRequired, loanOfficerPriority, committeeReviewRequired,
-                committeePriority, accountantReviewRequired, accountantPriority),
-            startStage,
+            stages,
+            firstWorkflowStage(stages),
             managerReviewRequired,
             managerPriority,
             loanOfficerReviewRequired,
@@ -130,16 +132,9 @@ public class LoanProductWorkflowService {
             int managerPriority = intValue(data.get("managerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 2 : 1);
             boolean loanOfficerReviewRequired = booleanValue(data.get("loanOfficerReviewRequired"));
             int loanOfficerPriority = intValue(data.get("loanOfficerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2);
-            ApprovalWorkflowStage startStage = resolveStartStage(
-                snapshotStartStage,
-                managerReviewRequired,
-                managerPriority,
-                loanOfficerReviewRequired,
-                loanOfficerPriority
-            );
             return new WorkflowDefinition(
                 List.copyOf(stages),
-                startStage,
+                firstWorkflowStage(stages),
                 managerReviewRequired,
                 managerPriority,
                 loanOfficerReviewRequired,
@@ -208,25 +203,11 @@ public class LoanProductWorkflowService {
             .toList();
     }
 
-    private ApprovalWorkflowStage resolveStartStage(ApprovalWorkflowStage startStage,
-                                                    boolean managerReviewRequired,
-                                                    int managerPriority,
-                                                    boolean loanOfficerReviewRequired,
-                                                    int loanOfficerPriority) {
-        if (!managerReviewRequired && loanOfficerReviewRequired) {
-            return ApprovalWorkflowStage.LOAN_OFFICER;
-        }
-        if (!loanOfficerReviewRequired) {
+    private ApprovalWorkflowStage firstWorkflowStage(List<ApprovalWorkflowStage> stages) {
+        if (stages == null || stages.isEmpty()) {
             return ApprovalWorkflowStage.MANAGER;
         }
-        if (managerReviewRequired && loanOfficerPriority != managerPriority) {
-            return loanOfficerPriority < managerPriority
-                ? ApprovalWorkflowStage.LOAN_OFFICER
-                : ApprovalWorkflowStage.MANAGER;
-        }
-        return startStage == ApprovalWorkflowStage.LOAN_OFFICER
-            ? ApprovalWorkflowStage.LOAN_OFFICER
-            : ApprovalWorkflowStage.MANAGER;
+        return stages.getFirst();
     }
 
     private boolean booleanValue(Object value) {

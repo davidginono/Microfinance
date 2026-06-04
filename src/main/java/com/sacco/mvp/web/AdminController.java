@@ -537,6 +537,7 @@ public class AdminController {
         model.addAttribute("approvalFlowStageLabels", settings.resolvedApprovalFlow().stream()
             .map(ApprovalWorkflowStage::getDisplayLabel)
             .toList());
+        model.addAttribute("notificationDeliveryPreferences", adminService.notificationDeliveryPreferences(saccoId));
         model.addAttribute("settingsSection", normalizeSettingsSection(section));
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
@@ -728,6 +729,34 @@ public class AdminController {
         return "redirect:/admin/settings-controls?section=language";
     }
 
+    @PostMapping("/settings-controls/notifications")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateNotificationDeliveryPreferences(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                        @RequestParam(defaultValue = "false") boolean loanStatusEmail,
+                                                        @RequestParam(defaultValue = "false") boolean loanStatusSms,
+                                                        @RequestParam(defaultValue = "false") boolean guaranteeRequestEmail,
+                                                        @RequestParam(defaultValue = "false") boolean guaranteeRequestSms,
+                                                        @RequestParam(defaultValue = "false") boolean repaymentReminderEmail,
+                                                        @RequestParam(defaultValue = "false") boolean repaymentReminderSms,
+                                                        RedirectAttributes ra) {
+        try {
+            adminService.updateNotificationDeliveryPreferences(
+                adminScopeService.currentSaccoId(principal),
+                principal.getMemberId(),
+                loanStatusEmail,
+                loanStatusSms,
+                guaranteeRequestEmail,
+                guaranteeRequestSms,
+                repaymentReminderEmail,
+                repaymentReminderSms
+            );
+            ra.addFlashAttribute("message", "Notification delivery settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=notifications";
+    }
+
     @PostMapping("/settings-controls/qualification-policies")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -838,6 +867,9 @@ public class AdminController {
         if ("language".equalsIgnoreCase(section)) {
             return "language";
         }
+        if ("notifications".equalsIgnoreCase(section)) {
+            return "notifications";
+        }
         return "loan";
     }
 
@@ -881,7 +913,7 @@ public class AdminController {
                  "Maximum amount cannot be lower than the minimum amount." ->
                 fieldErrors.put("maximumAmount", message);
             case "Savings ratio must be greater than zero." ->
-                fieldErrors.put("maxLoanSavingsPercent", "Savings percentage must be greater than zero.");
+                fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple must be greater than zero.");
             case "Guarantors required cannot be negative." ->
                 fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
             case "Guarantors required must be between 0 and 15." ->
@@ -914,13 +946,29 @@ public class AdminController {
                 fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer.");
                 fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer.");
             }
-            case "Stage priority must be 3 or 4." -> {
-                fieldErrors.put("committeePriority", "Committee priority must be 3 or 4.");
-                fieldErrors.put("accountantPriority", "Accountant priority must be 3 or 4.");
+            case "Stage priority must be between 1 and 4." -> {
+                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 4.");
+                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 4.");
             }
             case "Committee and Accountant cannot share the same priority slot." -> {
                 fieldErrors.put("committeePriority", "Committee and Accountant cannot share the same priority slot.");
                 fieldErrors.put("accountantPriority", "Committee and Accountant cannot share the same priority slot.");
+            }
+            case "Manager and Committee cannot share the same priority slot." -> {
+                fieldErrors.put("managerPriority", "Manager and Committee cannot share the same priority slot.");
+                fieldErrors.put("committeePriority", "Manager and Committee cannot share the same priority slot.");
+            }
+            case "Manager and Accountant cannot share the same priority slot." -> {
+                fieldErrors.put("managerPriority", "Manager and Accountant cannot share the same priority slot.");
+                fieldErrors.put("accountantPriority", "Manager and Accountant cannot share the same priority slot.");
+            }
+            case "Loan Officer and Committee cannot share the same priority slot." -> {
+                fieldErrors.put("loanOfficerPriority", "Loan Officer and Committee cannot share the same priority slot.");
+                fieldErrors.put("committeePriority", "Loan Officer and Committee cannot share the same priority slot.");
+            }
+            case "Loan Officer and Accountant cannot share the same priority slot." -> {
+                fieldErrors.put("loanOfficerPriority", "Loan Officer and Accountant cannot share the same priority slot.");
+                fieldErrors.put("accountantPriority", "Loan Officer and Accountant cannot share the same priority slot.");
             }
             case "Minimum repayment period must be at least 1 month." ->
                 fieldErrors.put("minRepaymentMonths", "Minimum repayment period must be at least 1 month.");
@@ -941,6 +989,10 @@ public class AdminController {
             }
             case "No active board members are configured for this SACCO yet." ->
                 fieldErrors.put("committeeReviewRequired", "Assign at least one active committee reviewer before using this stage.");
+            case "Add at least one active Disbursement Officer before requiring that workflow role." ->
+                fieldErrors.put("disbursementOfficerRequired", "Assign at least one active Disbursement Officer before requiring this role.");
+            case "Grant disbursement queue and release claims to at least one active staff user before removing the Disbursement Officer requirement." ->
+                fieldErrors.put("disbursementOfficerRequired", "Grant both disbursement claims to at least one active staff user before removing this role requirement.");
             default -> {
             }
         }

@@ -48,7 +48,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     List<Member> findBySaccoIdOrderByFullNameAsc(String saccoId);
 
-    List<Member> findByStationIdIgnoreCaseOrderByFullNameAsc(String stationId);
+    List<Member> findBySaccoIdAndStationIdIgnoreCaseOrderByFullNameAsc(String saccoId, String stationId);
 
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
 

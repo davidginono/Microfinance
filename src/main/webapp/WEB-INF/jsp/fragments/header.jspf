@@ -952,23 +952,21 @@
         </div>
 
         <div class="erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
-            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
-                <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
-                    <div class="hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
-                        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-50/85"><spring:message code="header.currentStation" text="Current Station" /></p>
-                            <p class="truncate text-xs font-semibold text-white">${adminScope.stationId}</p>
-                            <p class="truncate text-[10px] font-medium text-cyan-50/85">${adminScope.stationAddressLocation}</p>
-                        </div>
+            <c:if test="${not empty headerStation}">
+                <div class="hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
+                    <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-50/85"><spring:message code="header.currentStation" text="Current Station" /></p>
+                        <p class="truncate text-xs font-semibold text-white">${headerStation.stationId}</p>
+                        <p class="truncate text-[10px] font-medium text-cyan-50/85">${headerStation.stationAddressLocation}</p>
                     </div>
-                    <div class="flex min-[520px]:hidden items-center rounded-md border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
-                        ${adminScope.stationId}
-                    </div>
-                </c:if>
-            </sec:authorize>
+                </div>
+                <div class="flex min-[520px]:hidden items-center rounded-md border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                    ${headerStation.stationId}
+                </div>
+            </c:if>
             <div class="relative">
                 <button id="notificationToggle" type="button" class="erp-icon-btn" aria-label="<spring:message code='notifications.title' text='Notifications' />">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

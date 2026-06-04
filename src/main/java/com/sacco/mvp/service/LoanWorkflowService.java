@@ -25,11 +25,19 @@ import java.util.*;
 @RequiredArgsConstructor
 public class LoanWorkflowService {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
-    private static final List<LoanStatus> REVIEW_ONWARD_LOCK_STATUSES = List.of(
+    private static final List<LoanStatus> APPLICATION_IN_PROGRESS_LOCK_STATUSES = List.of(
+        LoanStatus.DRAFT,
+        LoanStatus.SUBMITTED,
+        LoanStatus.AWAITING_GUARANTORS,
+        LoanStatus.ALL_GUARANTORS_APPROVED,
         LoanStatus.READY_FOR_MANAGER,
+        LoanStatus.MANAGER_ACCEPTED,
         LoanStatus.AWAITING_LOAN_OFFICER,
+        LoanStatus.LOAN_OFFICER_APPROVED,
         LoanStatus.AWAITING_BOARD,
+        LoanStatus.BOARD_APPROVED,
         LoanStatus.AWAITING_ACCOUNTANT,
+        LoanStatus.ACCOUNTANT_APPROVED,
         LoanStatus.READY_FOR_DISBURSEMENT
     );
     private static final List<LoanStatus> ACTIVE_LOAN_LOCK_STATUSES = List.of(
@@ -92,8 +100,15 @@ public class LoanWorkflowService {
     }
 
     public Optional<LoanApplication> findApplicationInProgress(UUID memberId) {
-        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, REVIEW_ONWARD_LOCK_STATUSES)
+        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES)
             .stream()
+            .findFirst();
+    }
+
+    private Optional<LoanApplication> findBlockingApplicationInProgress(UUID memberId, UUID allowedApplicationId) {
+        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES)
+            .stream()
+            .filter(application -> allowedApplicationId == null || !Objects.equals(application.getId(), allowedApplicationId))
             .findFirst();
     }
 
@@ -104,6 +119,10 @@ public class LoanWorkflowService {
     }
 
     public void assertCanApplyForProduct(String saccoId, UUID memberId, LoanProductSetting product) {
+        assertCanApplyForProduct(saccoId, memberId, product, null);
+    }
+
+    public void assertCanApplyForProduct(String saccoId, UUID memberId, LoanProductSetting product, UUID allowedApplicationId) {
         if (product == null) {
             throw new IllegalArgumentException("Loan product not found");
         }
@@ -114,6 +133,13 @@ public class LoanWorkflowService {
             throw new IllegalStateException("This loan product is not currently available for new applications.");
         }
         loanQualificationPolicyService.assertApplicantEligible(saccoId, memberId);
+        findBlockingApplicationInProgress(memberId, allowedApplicationId)
+            .ifPresent(application -> {
+                throw new IllegalStateException(
+                    "You already have ongoing loan application " + loanReference(application)
+                        + " (" + humanizeApplicationLockStatus(application.getStatus()) + "). Continue or complete it before applying again."
+                );
+            });
         findActiveDisbursedLoan(memberId).ifPresent(activeLoan -> {
             if (!product.isApplicationWithActiveLoanAllowed()) {
                 throw new IllegalStateException(
@@ -172,9 +198,10 @@ public class LoanWorkflowService {
             ? coalesceStationId(existingDraft.getStationId(), resolveMemberStationId(applicantId))
             : requireMemberStationId(applicantId);
         LoanProductSetting product = formSchemaService.getSchema(saccoId, loanType);
-        assertCanApplyForProduct(saccoId, applicantId, product);
+        assertCanApplyForProduct(saccoId, applicantId, product, existingDraft == null ? null : existingDraft.getId());
         validateRequestedAmount(product, amount);
         validateRepaymentPeriod(product, tenorMonths);
+        requireLoadedFinancialDataForDraft(product, financialSnapshotJson);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
         appendLoanPurpose(formData, requestParams.get("purpose"));
@@ -188,7 +215,7 @@ public class LoanWorkflowService {
             product
         );
 
-        EligibilityService.EligibilityResult eligibility = eligibilityService.check(saccoId, applicantId, loanType, amount);
+        EligibilityService.EligibilityResult eligibility = checkApplicantSavingsEligibility(saccoId, applicantId, loanType, amount);
         String snapshot = eligibilityService.policySnapshotJson(
             eligibility,
             product.getGuarantorsRequired(),
@@ -281,11 +308,8 @@ public class LoanWorkflowService {
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
 
-        EligibilityService.EligibilityResult result = eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(),
-            app.getLoanType(), app.getAmount());
-        if (!result.eligible()) {
-            throw new IllegalStateException("Amount exceeds eligibility cap");
-        }
+        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(
+            app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount());
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
             result,
             app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
@@ -331,7 +355,7 @@ public class LoanWorkflowService {
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
-        EligibilityService.EligibilityResult result = eligibilityService.check(
+        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(
             app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount()
         );
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
@@ -346,14 +370,15 @@ public class LoanWorkflowService {
         return loanApplicationRepository.save(app);
     }
 
-    private void assertApplicantCanAdvanceToManagerReview(UUID applicantId) {
-        findApplicationInProgress(applicantId).ifPresent(existing -> {
-            throw new IllegalStateException(
-                "You already have loan application " + existing.getId().toString().substring(0, 8)
-                    + " on review (" + humanizeApplicationLockStatus(existing.getStatus())
-                    + "). Wait until it is disbursed before sending another application forward."
-            );
-        });
+    private void assertApplicantCanAdvanceToManagerReview(UUID applicantId, UUID currentApplicationId) {
+        findBlockingApplicationInProgress(applicantId, currentApplicationId)
+            .ifPresent(existing -> {
+                throw new IllegalStateException(
+                    "You already have loan application " + existing.getId().toString().substring(0, 8)
+                        + " on review (" + humanizeApplicationLockStatus(existing.getStatus())
+                        + "). Wait until it is disbursed before sending another application forward."
+                );
+            });
     }
 
     private String humanizeApplicationLockStatus(LoanStatus status) {
@@ -915,6 +940,31 @@ public class LoanWorkflowService {
         }
     }
 
+    private EligibilityService.EligibilityResult checkApplicantSavingsEligibility(String saccoId,
+                                                                                  UUID applicantId,
+                                                                                  LoanType loanType,
+                                                                                  BigDecimal amount) {
+        EligibilityService.EligibilityResult result = eligibilityService.check(saccoId, applicantId, loanType, amount);
+        if (!result.eligible()) {
+            throw new IllegalStateException(
+                "Loan amount exceeds the applicant savings limit for this product. Requested "
+                    + formatAmount(amount)
+                    + ", maximum allowed "
+                    + formatAmount(result.maxAllowed())
+                    + " based on savings "
+                    + formatAmount(result.savings())
+                    + " at "
+                    + result.ratio().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                    + " x of savings."
+            );
+        }
+        return result;
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        return amount == null ? "0.00" : amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+
     private void validateRepaymentPeriod(LoanProductSetting product, Integer tenorMonths) {
         if (tenorMonths == null || tenorMonths <= 0) {
             throw new IllegalArgumentException("Repayment period must be at least 1 month");
@@ -930,8 +980,17 @@ public class LoanWorkflowService {
         }
     }
 
+    private void requireLoadedFinancialDataForDraft(LoanProductSetting product, String financialSnapshotJson) {
+        if (product == null || !product.isFreshFinancialDataRequired()) {
+            return;
+        }
+        if (financialSnapshotJson == null || financialSnapshotJson.isBlank()) {
+            throw new IllegalStateException("Load loan details before saving this draft. This loan product requires loaded financial data.");
+        }
+    }
+
     private void moveIntoConfiguredReviewStage(LoanApplication app, UUID actorMemberId) {
-        assertApplicantCanAdvanceToManagerReview(app.getApplicantMemberId());
+        assertApplicantCanAdvanceToManagerReview(app.getApplicantMemberId(), app.getId());
         workflowRoutingService.moveToFirstReviewStage(app, actorMemberId);
         app.setUpdatedAt(OffsetDateTime.now());
     }

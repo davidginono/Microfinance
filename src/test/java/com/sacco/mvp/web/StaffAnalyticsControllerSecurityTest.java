@@ -20,6 +20,7 @@ import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -208,6 +209,7 @@ class StaffAnalyticsControllerSecurityTest {
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }
         @Bean AdminScopeService adminScopeService() { return Mockito.mock(AdminScopeService.class); }
         @Bean StaffMfaService staffMfaService() { return Mockito.mock(StaffMfaService.class); }
+        @Bean UserClaimService userClaimService() { return Mockito.mock(UserClaimService.class); }
         @Bean AppUserDetailsService appUserDetailsService() { return Mockito.mock(AppUserDetailsService.class); }
         @Bean LoanApplicationRepository loanApplicationRepository() { return Mockito.mock(LoanApplicationRepository.class); }
         @Bean LoanProductSettingRepository loanProductSettingRepository() { return Mockito.mock(LoanProductSettingRepository.class); }

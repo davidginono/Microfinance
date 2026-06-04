@@ -63,12 +63,25 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
               )
               and (
                 cast(:stationId as text) is null
-                or actor_member.station_id = cast(:stationId as text)
-                or entity_member.station_id = cast(:stationId as text)
-                or entity_loan.station_id = cast(:stationId as text)
-                or loan_applicant.station_id = cast(:stationId as text)
-                or cast(al.before_state as text) ilike concat('%', cast(:stationId as text), '%')
-                or cast(al.after_state as text) ilike concat('%', cast(:stationId as text), '%')
+                or (
+                  cast(:saccoId as text) is not null
+                  and (
+                    (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
+                    or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
+                    or (entity_loan.sacco_id = cast(:saccoId as text) and entity_loan.station_id = cast(:stationId as text))
+                    or (loan_applicant.sacco_id = cast(:saccoId as text) and loan_applicant.station_id = cast(:stationId as text))
+                    or (
+                      (
+                        cast(al.before_state as text) ilike concat('%', cast(:saccoId as text), '%')
+                        or cast(al.after_state as text) ilike concat('%', cast(:saccoId as text), '%')
+                      )
+                      and (
+                        cast(al.before_state as text) ilike concat('%', cast(:stationId as text), '%')
+                        or cast(al.after_state as text) ilike concat('%', cast(:stationId as text), '%')
+                      )
+                    )
+                  )
+                )
               )
             order by al.created_at desc
             """,
@@ -93,12 +106,25 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
               )
               and (
                 cast(:stationId as text) is null
-                or actor_member.station_id = cast(:stationId as text)
-                or entity_member.station_id = cast(:stationId as text)
-                or entity_loan.station_id = cast(:stationId as text)
-                or loan_applicant.station_id = cast(:stationId as text)
-                or cast(al.before_state as text) ilike concat('%', cast(:stationId as text), '%')
-                or cast(al.after_state as text) ilike concat('%', cast(:stationId as text), '%')
+                or (
+                  cast(:saccoId as text) is not null
+                  and (
+                    (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
+                    or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
+                    or (entity_loan.sacco_id = cast(:saccoId as text) and entity_loan.station_id = cast(:stationId as text))
+                    or (loan_applicant.sacco_id = cast(:saccoId as text) and loan_applicant.station_id = cast(:stationId as text))
+                    or (
+                      (
+                        cast(al.before_state as text) ilike concat('%', cast(:saccoId as text), '%')
+                        or cast(al.after_state as text) ilike concat('%', cast(:saccoId as text), '%')
+                      )
+                      and (
+                        cast(al.before_state as text) ilike concat('%', cast(:stationId as text), '%')
+                        or cast(al.after_state as text) ilike concat('%', cast(:stationId as text), '%')
+                      )
+                    )
+                  )
+                )
               )
             """,
         nativeQuery = true

@@ -9,6 +9,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.AdminScopeService;
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -49,22 +51,23 @@ public class AuthController {
     private final SaccoRegistryService saccoRegistryService;
     private final AdminScopeService adminScopeService;
     private final ObjectMapper objectMapper;
+    private final PasswordEncoder passwordEncoder;
+
+    @org.springframework.beans.factory.annotation.Value("${app.auth.google-sso.enabled:false}")
+    private boolean googleSsoEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.security.oauth2.client.registration.google.client-id:}")
+    private String googleClientId;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.security.oauth2.client.registration.google.client-secret:}")
+    private String googleClientSecret;
 
     @GetMapping("/")
     public String root(@org.springframework.security.core.annotation.AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {
             return "redirect:/login";
         }
-        return switch (principal.getPosition()) {
-            case ADMIN -> "redirect:/admin/dashboard";
-            case MINOR_ADMIN -> "redirect:/admin/dashboard";
-            case LOAN_OFFICER -> "redirect:/loan-officer/queue";
-            case MANAGER -> "redirect:/manager/loan-applications?status=READY_FOR_MANAGER";
-            case ACCOUNTANT -> "redirect:/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
-            case DISBURSEMENT_OFFICER -> "redirect:/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
-            case BOARD -> "redirect:/board/queue";
-            case MEMBER -> "redirect:/app/dashboard";
-        };
+        return "redirect:" + WorkspaceLanding.authenticatedDefault(principal);
     }
 
     @GetMapping("/login")
@@ -77,6 +80,7 @@ public class AuthController {
                 session.removeAttribute("loginErrorMessage");
             }
         }
+        model.addAttribute("googleSsoEnabled", isGoogleSsoConfigured());
         return "login";
     }
 
@@ -97,6 +101,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
                 "message", bindingResult.getAllErrors().getFirst().getDefaultMessage()
+            ));
+        }
+        String passwordError = passwordValidationMessage(form.getPassword(), form.getConfirmPassword());
+        if (passwordError != null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", passwordError
             ));
         }
 
@@ -139,6 +150,12 @@ public class AuthController {
             populateRegistrationOptions(model);
             return "register-member";
         }
+        String passwordError = passwordValidationMessage(form.getPassword(), form.getConfirmPassword());
+        if (passwordError != null) {
+            bindingResult.rejectValue("password", "registration.password.invalid", passwordError);
+            populateRegistrationOptions(model);
+            return "register-member";
+        }
 
         try {
             if (form.getOtpCode() == null || form.getOtpCode().isBlank()) {
@@ -154,6 +171,86 @@ public class AuthController {
             bindingResult.reject("registration.failed", ex.getMessage());
             populateRegistrationOptions(model);
             return "register-member";
+        }
+    }
+
+    @PostMapping("/login/password-reset/request-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestPasswordResetOtp(@RequestParam String username,
+                                                                       @RequestParam String accountType) {
+        String normalizedUsername = normalizeMemberNo(username);
+        if (normalizedUsername.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+        }
+        try {
+            Member member = findPasswordResetAccount(normalizedUsername, accountType);
+            String registeredEmail = normalizeEmail(member.getEmail());
+            if (registeredEmail.isBlank()) {
+                throw new IllegalStateException("No registered email is available for this account.");
+            }
+            emailOtpService.issueOtp(
+                registeredEmail,
+                EmailOtpPurpose.PASSWORD_RESET,
+                member.getId(),
+                "Your SACCO password reset code",
+                "Use this OTP code to reset your SACCO Loan MVP password."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "We sent a password reset code to your registered email."
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/login/password-reset/verify-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyPasswordResetOtp(@RequestParam String username,
+                                                                      @RequestParam String accountType,
+                                                                      @RequestParam String otpCode) {
+        String normalizedUsername = normalizeMemberNo(username);
+        if (normalizedUsername.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+        }
+        try {
+            Member member = findPasswordResetAccount(normalizedUsername, accountType);
+            emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.PASSWORD_RESET, member.getId(), otpCode);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "Code verified. Enter your new password."
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/login/password-reset/save")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> savePasswordReset(@RequestParam String username,
+                                                                 @RequestParam String accountType,
+                                                                 @RequestParam String otpCode,
+                                                                 @RequestParam String password,
+                                                                 @RequestParam String confirmPassword) {
+        String normalizedUsername = normalizeMemberNo(username);
+        String passwordError = passwordValidationMessage(password, confirmPassword);
+        if (normalizedUsername.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your member number."));
+        }
+        if (passwordError != null) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", passwordError));
+        }
+        try {
+            Member member = findPasswordResetAccount(normalizedUsername, accountType);
+            emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.PASSWORD_RESET, member.getId(), otpCode);
+            member.setPasswordHash(passwordEncoder.encode(password));
+            memberRepository.save(member);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "Password updated. You can now sign in with your new password."
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
         }
     }
 
@@ -224,7 +321,7 @@ public class AuthController {
             signInMember(member, request);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "redirectUrl", defaultLanding(member)
+                "redirectUrl", WorkspaceLanding.memberDashboard()
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -306,7 +403,7 @@ public class AuthController {
             ), request);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "redirectUrl", defaultLanding(user)
+                "redirectUrl", WorkspaceLanding.staffDashboard(user)
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -364,21 +461,53 @@ public class AuthController {
         return "This station workspace has been suspended: " + reason.trim();
     }
 
-    private String defaultLanding(Member member) {
-        return switch (Position.primaryRole(member.getStaffRolesResolved(), member.isMemberAccess())) {
-            case ADMIN -> "/admin/dashboard";
-            case MINOR_ADMIN -> "/admin/dashboard";
-            case LOAN_OFFICER -> "/loan-officer/queue";
-            case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
-            case ACCOUNTANT -> "/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
-            case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
-            case BOARD -> "/board/queue";
-            case MEMBER -> "/app/dashboard";
-        };
-    }
-
     private String normalizeEmail(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private String normalizeMemberNo(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
+    }
+
+    private boolean isGoogleSsoConfigured() {
+        return googleSsoEnabled
+            && googleClientId != null
+            && !googleClientId.isBlank()
+            && googleClientSecret != null
+            && !googleClientSecret.isBlank();
+    }
+
+    private String passwordValidationMessage(String password, String confirmPassword) {
+        if (password == null || password.isBlank()) {
+            return "Enter your password.";
+        }
+        if (password.length() < 8) {
+            return "Password must be at least 8 characters.";
+        }
+        if (confirmPassword == null || confirmPassword.isBlank()) {
+            return "Confirm your password.";
+        }
+        if (!password.equals(confirmPassword)) {
+            return "Passwords do not match.";
+        }
+        return null;
+    }
+
+    private Member findPasswordResetAccount(String normalizedUsername, String accountType) {
+        String normalizedType = accountType == null ? "" : accountType.trim().toLowerCase();
+        Member member = memberRepository.findByMemberNo(normalizedUsername)
+            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .orElseThrow(() -> new IllegalStateException("No active account was found for that member number."));
+        if ("staff".equals(normalizedType)) {
+            if (member.getStaffRolesResolved().isEmpty()) {
+                throw new IllegalStateException("No active staff account was found for that member number.");
+            }
+            return member;
+        }
+        if (!member.isMemberAccess()) {
+            throw new IllegalStateException("No active member account was found for that member number.");
+        }
+        return member;
     }
 
     private void populateRegistrationOptions(Model model) {

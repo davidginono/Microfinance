@@ -69,6 +69,7 @@ class RepaymentScheduleServiceTest {
         );
 
         Map<String, Object> summary = repaymentScheduleService.parseSummary(result.scheduleJson());
+        assertThat(new BigDecimal(String.valueOf(summary.get("disbursedPrincipal"))).compareTo(new BigDecimal("120000.00"))).isZero();
         assertThat(summary.get("interestMethod")).isEqualTo("REDUCING_BALANCE");
         assertThat(new BigDecimal(String.valueOf(summary.get("interestRate"))).compareTo(new BigDecimal("0.1200"))).isZero();
         assertThat(repaymentScheduleService.parseRows(result.scheduleJson()).getFirst().get("interestComponent"))

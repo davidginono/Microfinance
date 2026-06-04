@@ -83,6 +83,7 @@ class AdminServiceTest {
     @Mock private AdminIncidentRepository adminIncidentRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
+    @Mock private NotificationDeliveryPreferenceService notificationDeliveryPreferenceService;
 
     private AdminService adminService;
     private AtomicInteger issuedInvitationCount;
@@ -122,6 +123,7 @@ class AdminServiceTest {
         MinorAdminInvitationService minorAdminInvitationService = new MinorAdminInvitationService(
             null,
             memberRepository,
+            null,
             null,
             null
         ) {
@@ -166,6 +168,7 @@ class AdminServiceTest {
             saccoConfigurationService,
             saccoRegistryService,
             minorAdminInvitationService,
+            notificationDeliveryPreferenceService,
             objectMapper
         );
     }
@@ -653,7 +656,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void updateUserAllowsStationScopedLegacyMemberAndRescopesThemToCurrentSacco() {
+    void updateUserRejectsStationScopedLegacyMemberFromAnotherSacco() {
         UUID accountId = UUID.randomUUID();
         Member member = Member.builder()
             .id(accountId)
@@ -678,14 +681,7 @@ class AdminServiceTest {
             .build();
 
         when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
-        when(memberRepository.findTopBySaccoIdAndPositionOrderByRankDesc("TAHA SACCOS", Position.MANAGER)).thenReturn(Optional.empty());
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userSettingsRepository.findById(accountId)).thenReturn(Optional.of(settings));
-        when(userSettingsRepository.save(any(UserSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(savingsAccountRepository.findByMemberId(accountId)).thenReturn(Optional.empty());
-        when(savingsAccountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        adminService.updateUser(
+        assertThatThrownBy(() -> adminService.updateUser(
             "TAHA SACCOS",
             "AR704",
             UUID.randomUUID(),
@@ -693,13 +689,13 @@ class AdminServiceTest {
             accountId,
             List.of(Position.MANAGER),
             MemberStatus.ACTIVE
-        );
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Member not found in this SACCO");
 
-        assertThat(member.getSaccoId()).isEqualTo("TAHA SACCOS");
+        assertThat(member.getSaccoId()).isEqualTo("SACCO-ARUSHA-001");
         assertThat(member.getStationId()).isEqualTo("AR704");
-        assertThat(member.getPosition()).isEqualTo(Position.MANAGER);
-        assertThat(member.getStaffRoles()).containsExactly(Position.MANAGER);
-        verify(memberRepository).save(member);
+        verify(memberRepository, never()).save(member);
     }
 
     @Test

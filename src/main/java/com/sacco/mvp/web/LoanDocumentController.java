@@ -6,9 +6,11 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
+import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
@@ -44,6 +46,7 @@ public class LoanDocumentController {
     private final MemberRepository memberRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
+    private final ManagerReviewRepository managerReviewRepository;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final LoanPresentationService loanPresentationService;
@@ -72,9 +75,14 @@ public class LoanDocumentController {
             .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(loanId);
         List<BoardReview> boardReviews = boardReviewRepository.findByLoanApplicationId(loanId);
+        List<ManagerReview> staffReviews = managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
         Map<UUID, String> guarantorNames = new LinkedHashMap<>();
         for (Member member : memberRepository.findAllById(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
             guarantorNames.put(member.getId(), member.getFullName());
+        }
+        Map<UUID, Member> staffReviewers = new LinkedHashMap<>();
+        for (Member member : memberRepository.findAllById(staffReviews.stream().map(ManagerReview::getManagerMemberId).toList())) {
+            staffReviewers.put(member.getId(), member);
         }
         Map<UUID, Member> boardMembers = new LinkedHashMap<>();
         for (Member member : memberRepository.findAllById(boardReviews.stream().map(BoardReview::getBoardMemberId).toList())) {
@@ -86,9 +94,11 @@ public class LoanDocumentController {
             resolvePrintableSaccoName(app.getSaccoId()),
             applicant,
             loanPresentationService.parseFormFields(app.getFormData()),
-            loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()),
+            loanPresentationService.parseFinancialFields(app),
             guarantorRequests,
             guarantorNames,
+            staffReviews,
+            staffReviewers,
             boardReviews,
             boardMembers,
             loanPresentationService.latestManagerReason(loanId)

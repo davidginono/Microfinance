@@ -263,7 +263,7 @@ public class AccountantController {
         model.addAttribute("applicant", applicant);
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
-        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
+        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",

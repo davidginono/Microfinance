@@ -46,14 +46,14 @@ public class LoanQualificationPolicyService {
         }
         String stationId = resolveMemberStationId(memberId);
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
-        LoanAnalyticsService.MemberLoanAnalytics analytics = loanAnalyticsService.summarizeAllTime(memberId, stationId);
+        LoanAnalyticsService.MemberLoanAnalytics analytics = loanAnalyticsService.summarizeAllTime(memberId, saccoId, stationId);
         Integer maxDefaulted = positive(policy.applicantMaxDefaultedLoans());
         if (maxDefaulted != null && analytics.defaultedLoans() >= maxDefaulted) {
             return Optional.of("You cannot apply because your defaulted loan count has reached the station policy limit.");
         }
         Integer waitDays = positive(applicantForfeitedWaitDays(policy));
         if (waitDays != null) {
-            Optional<ForfeitedApplicationRestriction> restriction = forfeitedApplicationRestriction(memberId, stationId, waitDays);
+            Optional<ForfeitedApplicationRestriction> restriction = forfeitedApplicationRestriction(saccoId, memberId, stationId, waitDays);
             if (restriction.isPresent()) {
                 return Optional.of(formatForfeitedApplicationRestriction(restriction.get()));
             }
@@ -96,15 +96,22 @@ public class LoanQualificationPolicyService {
         BigDecimal minSavings = product == null || !product.isGuarantorMinSavingsCheckRequired()
             ? null
             : positive(product.getGuarantorMinimumSavings());
-        if (minSavings != null && eligibilityService.resolveSavings(guarantorMemberId).compareTo(minSavings) < 0) {
-            return Optional.of("Disabled: savings are below this loan product's guarantor minimum.");
+        if (minSavings != null) {
+            BigDecimal savings = eligibilityService.resolveSavings(guarantorMemberId);
+            if (savings.compareTo(minSavings) < 0) {
+                return Optional.of("Disabled: guarantor savings are "
+                    + formatAmount(savings)
+                    + ", below the required minimum of "
+                    + formatAmount(minSavings)
+                    + " for this loan product.");
+            }
         }
         if (!policy.guarantorWithActiveLoanAllowed()
-            && nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, stationId)).compareTo(BigDecimal.ZERO) > 0) {
+            && nullToZero(loanAnalyticsService.activeLoanAmount(guarantorMemberId, saccoId, stationId)).compareTo(BigDecimal.ZERO) > 0) {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }
         Integer maxDefaulted = positive(policy.guarantorMaxDefaultedLoans());
-        if (maxDefaulted != null && loanAnalyticsService.summarizeAllTime(guarantorMemberId, stationId).defaultedLoans() >= maxDefaulted) {
+        if (maxDefaulted != null && loanAnalyticsService.summarizeAllTime(guarantorMemberId, saccoId, stationId).defaultedLoans() >= maxDefaulted) {
             return Optional.of("Disabled: defaulted loan count has reached the station guarantor limit.");
         }
         Integer maxGuarantees = positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount());
@@ -187,14 +194,15 @@ public class LoanQualificationPolicyService {
         return firstNonNull(policy.applicantForfeitedWaitDays(), policy.applicantForfeitedLookbackDays());
     }
 
-    private Optional<ForfeitedApplicationRestriction> forfeitedApplicationRestriction(UUID memberId,
+    private Optional<ForfeitedApplicationRestriction> forfeitedApplicationRestriction(String saccoId,
+                                                                                      UUID memberId,
                                                                                       String stationId,
                                                                                       int waitDays) {
         LocalDate today = LocalDate.now();
         return loanApplicationRepository
             .findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(memberId, LoanStatus.FORFEITED)
             .stream()
-            .filter(app -> matchesStation(app, stationId))
+            .filter(app -> matchesScope(app, saccoId, stationId))
             .map(this::forfeitedApplicationDate)
             .map(date -> date.plusDays(waitDays))
             .filter(releaseDate -> releaseDate.isAfter(today))
@@ -264,6 +272,10 @@ public class LoanQualificationPolicyService {
 
     private BigDecimal nullToZero(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private String formatAmount(BigDecimal value) {
+        return value == null ? "0.00" : value.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 
     private Integer positiveGuaranteeCount(BigDecimal value) {

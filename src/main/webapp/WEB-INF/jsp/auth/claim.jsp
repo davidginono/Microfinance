@@ -28,7 +28,7 @@
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCO Minor Admin Activation</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900" style="font-family:'Sora',ui-sans-serif,system-ui;">Activate your staff account</h1>
-            <p class="mt-1 text-sm text-slate-500">Only the inbox on file can complete this activation. No password is needed &mdash; you will receive a one-time code at your email.</p>
+            <p class="mt-1 text-sm text-slate-500">Only the inbox on file can complete this activation. Request a one-time code, then create your password.</p>
         </div>
 
         <c:if test="${not empty claimMessage}">
@@ -67,6 +67,20 @@
                         <input name="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" required
                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest text-slate-800"
                                placeholder="6-digit code" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Password
+                        <input name="password" type="password" autocomplete="new-password" minlength="8" required
+                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+                               placeholder="At least 8 characters" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Confirm password
+                        <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required
+                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+                               placeholder="Re-enter password" />
                     </label>
 
                     <button type="submit" class="w-full rounded-lg bg-[#3F9C4B] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#357f3f]">Activate account</button>

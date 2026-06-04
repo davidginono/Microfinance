@@ -75,7 +75,20 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         from LoanApplication l
         where l.saccoId = :saccoId
           and l.status in :statuses
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        order by l.createdAt asc
+        """)
+    Page<LoanApplication> findQueuePageForScope(@Param("saccoId") String saccoId,
+                                                @Param("stationId") String stationId,
+                                                @Param("statuses") Collection<LoanStatus> statuses,
+                                                Pageable pageable);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and l.status in :statuses
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and (
             :searchTerm is null
             or (:searchByLoanId = true and lower(coalesce(l.loanId, '')) like concat('%', :searchTerm, '%'))
@@ -94,7 +107,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l.status as status, count(l) as total
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         group by l.status
         """)
     List<StatusCountProjection> countByStatusForScope(@Param("saccoId") String saccoId,
@@ -104,7 +117,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select count(l)
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         """)
     long countForScope(@Param("saccoId") String saccoId, @Param("stationId") String stationId);
 
@@ -112,7 +125,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select count(l)
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and l.status in :statuses
           and (
             l.disbursementDate >= :yearStartDate
@@ -129,7 +142,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select count(l)
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED
           and (
             l.updatedAt >= :yearStartAt
@@ -146,7 +159,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:stationId is null or lower(l.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and l.status in :statuses
           and (
             l.disbursementDate >= :recentCutoff

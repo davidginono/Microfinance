@@ -729,6 +729,7 @@
                         "loanType": "${loanType}",
                         "amount": amountInput.value,
                         "tenorMonths": tenorInput.value,
+                        "applicationId": "${formValues['applicationId']}",
                         "topUpLoanId": topUpLoanIdInput ? topUpLoanIdInput.value : ""
                     })
                 });

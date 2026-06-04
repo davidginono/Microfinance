@@ -197,6 +197,11 @@
         .auth-login-meta .text-slate-500 {
             display: none;
         }
+        .forgot-password-dialog {
+            width: min(100%, 34rem);
+            max-height: calc(100vh - 3rem);
+            overflow-y: auto;
+        }
         @media (max-width: 640px) {
             .auth-heading {
                 font-size: 1.85rem;
@@ -269,50 +274,40 @@
                                     <label class="mb-2 block auth-section-label">Password</label>
                                     <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <span class="text-slate-500">Having trouble with your password?</span>
+                                    <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="member">Forgot password?</button>
+                                </div>
                                 <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in</button>
                             </form>
                         </div>
 
                         <div class="auth-or-divider">or</div>
 
-                        <div id="memberLoginError" data-auto-scroll-message="true" class="hidden rounded-2xl border border-sacco-brown/20 bg-[#f7efe9] px-4 py-3 text-sm font-medium text-sacco-brown"></div>
-                        <div id="memberLoginSuccess" data-auto-scroll-message="true" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
-                        <form id="memberLoginForm" class="auth-mode-card space-y-4">
-                            <input type="hidden" id="memberLoginCsrfName" value="${_csrf.parameterName}" />
-                            <input type="hidden" id="memberLoginCsrfToken" value="${_csrf.token}" />
+                        <div class="auth-mode-card space-y-4">
                             <div>
-                                <p class="auth-mode-title">One-Time Pin Code</p>
+                                <p class="auth-mode-title">Google SSO</p>
                             </div>
-                            <div>
-                                <label class="mb-2 block auth-section-label">Email</label>
-                                <input id="memberLoginEmail" name="email" type="email" autocomplete="email" class="auth-input w-full px-4 py-3.5 text-slate-900" required />
-                            </div>
-                            <div id="memberOtpBlock" class="hidden">
-                                <label class="mb-2 block auth-section-label">OTP Code</label>
-                                <input id="memberLoginOtpCode" name="otpCode" inputmode="numeric" maxlength="6" class="auth-input w-full px-4 py-3.5 tracking-[0.3em] text-slate-900" />
-                                <div id="memberOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                                    <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
-                                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                                    </svg>
-                                    <span data-otp-text>Checking code...</span>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <button id="memberRequestOtpButton" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button">
-                                    <span class="otp-button-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
-                                    <span class="otp-button-label">Send Sign-In Code</span>
-                                </button>
-                                <button id="memberVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Log in</button>
-                            </div>
-                        </form>
+                            <c:choose>
+                                <c:when test="${googleSsoEnabled}">
+                                    <a href="/oauth2/authorization/google" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold">
+                                        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-700">G</span>
+                                        Continue with Google
+                                    </a>
+                                </c:when>
+                                <c:otherwise>
+                                    <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
+                                        Google SSO not configured
+                                    </button>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
                     </div>
 
                     <div data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5">
                         <div class="auth-mode-card space-y-4">
                             <div>
                                 <p class="auth-mode-title">Member Number &amp; Password</p>
-                                <p class="mt-1 text-xs text-slate-500">Admins and minor admins can sign in here using their staff member number and password.</p>
                             </div>
                             <form action="/login" method="post" class="space-y-4">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -325,44 +320,34 @@
                                     <label class="mb-2 block auth-section-label">Password</label>
                                     <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <span class="text-slate-500">Having trouble with your password?</span>
+                                    <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="staff">Forgot password?</button>
+                                </div>
                                 <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in as Staff</button>
                             </form>
                         </div>
 
                         <div class="auth-or-divider">or</div>
 
-                        <div id="staffLoginError" data-auto-scroll-message="true" class="hidden rounded-2xl border border-sacco-brown/20 bg-[#f7efe9] px-4 py-3 text-sm font-medium text-sacco-brown"></div>
-                        <div id="staffLoginSuccess" data-auto-scroll-message="true" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
-                        <form id="staffLoginForm" class="auth-mode-card space-y-4">
-                            <input type="hidden" id="staffLoginCsrfName" value="${_csrf.parameterName}" />
-                            <input type="hidden" id="staffLoginCsrfToken" value="${_csrf.token}" />
+                        <div class="auth-mode-card space-y-4">
                             <div>
-                                <p class="auth-mode-title">Email Sign-In Code</p>
-                                <p class="mt-1 text-xs text-slate-500">Staff sign in with a one-time code sent to their registered email.</p>
+                                <p class="auth-mode-title">Google SSO</p>
                             </div>
-                            <div>
-                                <label class="mb-2 block auth-section-label">Email</label>
-                                <input id="staffLoginEmail" type="email" name="email" class="auth-input w-full px-4 py-3.5 text-slate-900" required />
-                            </div>
-                            <div id="staffOtpBlock" class="hidden">
-                                <label class="mb-2 block auth-section-label">OTP Code</label>
-                                <input id="staffLoginOtpCode" name="otpCode" inputmode="numeric" maxlength="6" class="auth-input w-full px-4 py-3.5 tracking-[0.3em] text-slate-900" />
-                                <div id="staffOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                                    <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
-                                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                                    </svg>
-                                    <span data-otp-text>Checking code...</span>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <button id="staffRequestOtpButton" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button">
-                                    <span class="otp-button-spinner hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#16b7c8]"></span>
-                                    <span class="otp-button-label">Send Sign-In Code</span>
-                                </button>
-                                <button id="staffVerifyOtpButton" class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" type="button" disabled>Verify Code &amp; Log in</button>
-                            </div>
-                        </form>
+                            <c:choose>
+                                <c:when test="${googleSsoEnabled}">
+                                    <a href="/oauth2/authorization/google" class="auth-secondary-btn inline-flex w-full items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold">
+                                        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-700">G</span>
+                                        Continue with Google
+                                    </a>
+                                </c:when>
+                                <c:otherwise>
+                                    <button type="button" class="auth-secondary-btn inline-flex w-full cursor-not-allowed items-center justify-center gap-3 px-4 py-3.5 text-sm font-semibold opacity-70" disabled>
+                                        Google SSO not configured
+                                    </button>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
                     </div>
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
@@ -371,6 +356,47 @@
                     </div>
                     </div>
         </div>
+    </div>
+</div>
+<div id="forgotPasswordModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 px-4 py-8">
+    <div class="forgot-password-dialog rounded-xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">Reset password</h2>
+                <p id="forgotPasswordSubtitle" class="mt-1 text-sm text-slate-500">Enter your member number. The code goes to the email saved on your account.</p>
+            </div>
+            <button type="button" class="rounded-md px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-forgot-password-close aria-label="Close modal">&times;</button>
+        </div>
+        <form id="forgotPasswordForm" class="space-y-4 px-5 py-5">
+            <input type="hidden" id="forgotPasswordCsrfName" value="${_csrf.parameterName}" />
+            <input type="hidden" id="forgotPasswordCsrfToken" value="${_csrf.token}" />
+            <input type="hidden" id="forgotPasswordAccountType" value="member" />
+            <div id="forgotPasswordError" class="hidden rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"></div>
+            <div id="forgotPasswordSuccess" class="hidden rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"></div>
+            <div>
+                <label id="forgotPasswordUsernameLabel" class="mb-1.5 block auth-section-label">Member Number</label>
+                <input id="forgotPasswordUsername" autocomplete="username" required class="auth-input w-full px-4 py-3 text-slate-900" />
+                <p class="mt-2 text-xs text-slate-500">We will send the OTP to the registered email for this account.</p>
+            </div>
+            <div id="forgotPasswordOtpBlock" class="hidden">
+                <label class="mb-1.5 block auth-section-label">OTP Code</label>
+                <input id="forgotPasswordOtp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" class="auth-input w-full px-4 py-3 tracking-[0.3em] text-slate-900" />
+            </div>
+            <div id="forgotPasswordNewPasswordBlock" class="hidden space-y-4">
+                <div>
+                    <label class="mb-1.5 block auth-section-label">New Password</label>
+                    <input id="forgotPasswordNewPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" />
+                </div>
+                <div>
+                    <label class="mb-1.5 block auth-section-label">Confirm Password</label>
+                    <input id="forgotPasswordConfirmPassword" type="password" autocomplete="new-password" minlength="8" class="auth-input w-full px-4 py-3 text-slate-900" />
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
+                <button type="button" class="auth-secondary-btn px-4 py-2.5 text-sm font-semibold" data-forgot-password-close>Cancel</button>
+                <button id="forgotPasswordAction" type="button" class="auth-primary-btn px-4 py-2.5 text-sm font-semibold">Send OTP Code</button>
+            </div>
+        </form>
     </div>
 </div>
 <script>
@@ -785,6 +811,170 @@
             verifyUrl: '/login/staff/verify-otp',
             defaultRedirectUrl: '/login'
         });
+
+        function bindForgotPassword() {
+            const modal = document.getElementById('forgotPasswordModal');
+            const accountTypeInput = document.getElementById('forgotPasswordAccountType');
+            const subtitle = document.getElementById('forgotPasswordSubtitle');
+            const usernameInput = document.getElementById('forgotPasswordUsername');
+            const usernameLabel = document.getElementById('forgotPasswordUsernameLabel');
+            const otpBlock = document.getElementById('forgotPasswordOtpBlock');
+            const otpInput = document.getElementById('forgotPasswordOtp');
+            const newPasswordBlock = document.getElementById('forgotPasswordNewPasswordBlock');
+            const passwordInput = document.getElementById('forgotPasswordNewPassword');
+            const confirmPasswordInput = document.getElementById('forgotPasswordConfirmPassword');
+            const actionButton = document.getElementById('forgotPasswordAction');
+            const errorBox = document.getElementById('forgotPasswordError');
+            const successBox = document.getElementById('forgotPasswordSuccess');
+            const csrfName = document.getElementById('forgotPasswordCsrfName')?.value;
+            const csrfToken = document.getElementById('forgotPasswordCsrfToken')?.value;
+            if (!modal || !accountTypeInput || !usernameInput || !otpBlock || !otpInput || !newPasswordBlock || !passwordInput || !confirmPasswordInput || !actionButton || !csrfName || !csrfToken) {
+                return;
+            }
+
+            let step = 'request';
+            let busy = false;
+
+            const setError = (message) => {
+                successBox?.classList.add('hidden');
+                if (errorBox) {
+                    errorBox.textContent = message || '';
+                    errorBox.classList.toggle('hidden', !message);
+                }
+            };
+            const setSuccess = (message) => {
+                errorBox?.classList.add('hidden');
+                if (successBox) {
+                    successBox.textContent = message || '';
+                    successBox.classList.toggle('hidden', !message);
+                }
+            };
+            const setStep = (nextStep) => {
+                step = nextStep;
+                otpBlock.classList.toggle('hidden', step === 'request');
+                newPasswordBlock.classList.toggle('hidden', step !== 'save');
+                actionButton.textContent = step === 'request' ? 'Send OTP Code' : (step === 'verify' ? 'Verify Code' : 'Save Password');
+            };
+            const open = (accountType) => {
+                accountTypeInput.value = accountType === 'staff' ? 'staff' : 'member';
+                const loginUsername = accountTypeInput.value === 'staff'
+                    ? document.querySelector('[data-login-tab="staff"] input[name="username"]')?.value
+                    : document.querySelector('[data-login-tab="member"] input[name="username"]')?.value;
+                usernameInput.value = (loginUsername || '').trim();
+                if (usernameLabel) {
+                    usernameLabel.textContent = accountTypeInput.value === 'staff' ? 'Staff Member Number' : 'Member Number';
+                }
+                if (subtitle) {
+                    subtitle.textContent = accountTypeInput.value === 'staff'
+                        ? 'Enter your staff member number. The code goes to the email saved on your account.'
+                        : 'Enter your member number. The code goes to the email saved on your account.';
+                }
+                otpInput.value = '';
+                passwordInput.value = '';
+                confirmPasswordInput.value = '';
+                setError('');
+                setSuccess('');
+                setStep('request');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                window.setTimeout(() => usernameInput.focus(), 50);
+            };
+            const close = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            };
+            const post = async (url, extra) => {
+                const body = new URLSearchParams();
+                body.set('username', usernameInput.value);
+                body.set('accountType', accountTypeInput.value);
+                body.set(csrfName, csrfToken);
+                Object.entries(extra || {}).forEach(([key, value]) => body.set(key, value));
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    body
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload.valid !== true) {
+                    throw new Error(payload.message || 'Unable to complete password reset right now.');
+                }
+                return payload;
+            };
+
+            document.querySelectorAll('[data-forgot-password-open]').forEach((button) => {
+                button.addEventListener('click', () => open(button.getAttribute('data-forgot-password-open')));
+            });
+            document.querySelectorAll('[data-forgot-password-close]').forEach((button) => {
+                button.addEventListener('click', close);
+            });
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    close();
+                }
+            });
+
+            actionButton.addEventListener('click', async () => {
+                if (busy) {
+                    return;
+                }
+                if (!usernameInput.reportValidity()) {
+                    return;
+                }
+                if (step !== 'request') {
+                    otpInput.value = (otpInput.value || '').replace(/\D/g, '').slice(0, 6);
+                    if (!/^\d{6}$/.test(otpInput.value)) {
+                        otpInput.reportValidity();
+                        otpInput.focus();
+                        setError('Enter the 6-digit OTP code sent to your email.');
+                        return;
+                    }
+                }
+                if (step === 'save') {
+                    if (!passwordInput.reportValidity() || !confirmPasswordInput.reportValidity()) {
+                        return;
+                    }
+                    if (passwordInput.value !== confirmPasswordInput.value) {
+                        setError('Passwords do not match.');
+                        confirmPasswordInput.focus();
+                        return;
+                    }
+                }
+
+                busy = true;
+                actionButton.disabled = true;
+                try {
+                    const payload = step === 'request'
+                        ? await post('/login/password-reset/request-otp')
+                        : step === 'verify'
+                            ? await post('/login/password-reset/verify-otp', { otpCode: otpInput.value })
+                            : await post('/login/password-reset/save', {
+                                otpCode: otpInput.value,
+                                password: passwordInput.value,
+                                confirmPassword: confirmPasswordInput.value
+                            });
+                    setSuccess(payload.message || 'Done.');
+                    if (step === 'request') {
+                        setStep('verify');
+                        otpInput.focus();
+                    } else if (step === 'verify') {
+                        setStep('save');
+                        passwordInput.focus();
+                    } else {
+                        window.setTimeout(close, 900);
+                    }
+                } catch (error) {
+                    setError(error.message);
+                } finally {
+                    busy = false;
+                    actionButton.disabled = false;
+                }
+            });
+        }
+
+        bindForgotPassword();
     })();
 </script>
 </body>

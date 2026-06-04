@@ -73,6 +73,30 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void parseFinancialFieldsUsesReleasedPrincipalFromLoanRecord() {
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .amount(new BigDecimal("125000.00"))
+            .financialSnapshot("""
+                {
+                  "applicationFee": 15000.00,
+                  "insuranceFee": 2250.00,
+                  "principalAmount": 150000.00,
+                  "interestAmount": 12000.00,
+                  "principalPlusInterest": 162000.00,
+                  "monthlyRepaymentAmount": 27000.00
+                }
+                """)
+            .build();
+
+        Map<String, Object> fields = loanPresentationService.parseFinancialFields(app);
+
+        assertThat(fields)
+            .containsEntry("Principal (TZS)", "TSh 125,000.00")
+            .containsEntry("Principal + Interest (TZS)", "TSh 137,000.00");
+    }
+
+    @Test
     void buildProgressItemsUsesConfiguredWorkflowPriorityOrder() {
         LoanApplication app = LoanApplication.builder()
             .id(UUID.randomUUID())

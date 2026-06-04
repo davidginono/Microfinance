@@ -11,5 +11,9 @@ import java.util.UUID;
 public interface EmailOtpTokenRepository extends JpaRepository<EmailOtpToken, UUID> {
     List<EmailOtpToken> findByEmailIgnoreCaseAndPurposeAndConsumedAtIsNull(String email, EmailOtpPurpose purpose);
 
+    List<EmailOtpToken> findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(String email, EmailOtpPurpose purpose, UUID memberId);
+
     Optional<EmailOtpToken> findTopByEmailIgnoreCaseAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(String email, EmailOtpPurpose purpose);
+
+    Optional<EmailOtpToken> findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc(String email, EmailOtpPurpose purpose, UUID memberId);
 }

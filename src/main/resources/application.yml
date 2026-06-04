@@ -38,6 +38,14 @@ spring:
           auth: ${SPRING_MAIL_SMTP_AUTH:true}
           starttls:
             enable: ${SPRING_MAIL_SMTP_STARTTLS:true}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: openid,email,profile
 
 server:
   port: 8080
@@ -80,12 +88,25 @@ app:
     sync-enabled: true
     sync-cron: "0 0 10 1 * *"
     sync-zone: "Africa/Nairobi"
+  sms:
+    enabled: ${APP_SMS_ENABLED:false}
+    connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APP_SMS_READ_TIMEOUT:8s}
+    benter:
+      base-url: ${APP_SMS_BENTER_BASE_URL:https://api.onfonmedia.co.ke}
+      send-path: ${APP_SMS_BENTER_SEND_PATH:/v1/sms/SendBulkSMS}
+      client-id: ${APP_SMS_BENTER_CLIENT_ID:}
+      api-key: ${APP_SMS_BENTER_API_KEY:}
+      access-key: ${APP_SMS_BENTER_ACCESS_KEY:}
+      sender-id: ${APP_SMS_BENTER_SENDER_ID:INFO}
   retention:
     cleanup-enabled: true
     cleanup-cron: "0 30 2 * * *"
     audit-log-days: 70
     outbox-days: 70
   auth:
+    google-sso:
+      enabled: ${APP_AUTH_GOOGLE_SSO_ENABLED:false}
     otp:
       ttl-minutes: 10
     invitation:

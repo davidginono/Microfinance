@@ -68,7 +68,7 @@ class LoanQualificationPolicyServiceTest {
                 .saccoId(SACCO_ID)
                 .applicantMaxDefaultedLoans(1)
                 .build()));
-        when(loanAnalyticsService.summarizeAllTime(applicantId, STATION_ID))
+        when(loanAnalyticsService.summarizeAllTime(applicantId, SACCO_ID, STATION_ID))
             .thenReturn(memberAnalytics(1));
 
         Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
@@ -86,7 +86,7 @@ class LoanQualificationPolicyServiceTest {
                 .saccoId(SACCO_ID)
                 .guarantorMaxDefaultedLoans(1)
                 .build()));
-        when(loanAnalyticsService.summarizeAllTime(guarantorId, STATION_ID))
+        when(loanAnalyticsService.summarizeAllTime(guarantorId, SACCO_ID, STATION_ID))
             .thenReturn(memberAnalytics(1));
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
@@ -147,7 +147,7 @@ class LoanQualificationPolicyServiceTest {
                 .saccoId(SACCO_ID)
                 .guarantorWithActiveLoanAllowed(false)
                 .build()));
-        when(loanAnalyticsService.activeLoanAmount(guarantorId, STATION_ID))
+        when(loanAnalyticsService.activeLoanAmount(guarantorId, SACCO_ID, STATION_ID))
             .thenReturn(new BigDecimal("1.00"));
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
@@ -185,7 +185,7 @@ class LoanQualificationPolicyServiceTest {
                 .createdAt(OffsetDateTime.now())
                 .updatedAt(OffsetDateTime.now())
                 .build()));
-        when(loanAnalyticsService.activeLoanAmount(guarantorId, STATION_ID))
+        when(loanAnalyticsService.activeLoanAmount(guarantorId, SACCO_ID, STATION_ID))
             .thenReturn(new BigDecimal("1.00"));
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
@@ -210,7 +210,7 @@ class LoanQualificationPolicyServiceTest {
         );
 
         assertThat(reason)
-            .hasValue("Disabled: savings are below this loan product's guarantor minimum.");
+            .hasValue("Disabled: guarantor savings are 50000.00, below the required minimum of 100000.00 for this loan product.");
     }
 
     @Test
@@ -379,7 +379,7 @@ class LoanQualificationPolicyServiceTest {
                 .build()));
         when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
             .thenReturn(Optional.empty());
-        when(loanAnalyticsService.summarizeAllTime(applicantId, STATION_ID))
+        when(loanAnalyticsService.summarizeAllTime(applicantId, SACCO_ID, STATION_ID))
             .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(
                 0,
                 0,

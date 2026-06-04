@@ -10,6 +10,7 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
+import com.sacco.mvp.integration.memberportal.LoanPaymentLookupException;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
@@ -19,6 +20,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanPaymentTransactionSyncService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -68,6 +70,7 @@ public class DisbursementController {
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
+    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
 
@@ -258,7 +261,7 @@ public class DisbursementController {
         model.addAttribute("applicant", applicant);
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
-        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
+        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
@@ -312,11 +315,13 @@ public class DisbursementController {
         model.addAttribute("rejectActionLabel", "Reject");
         model.addAttribute("showReviewDecisionForm", false);
         model.addAttribute("showManagerReversalRequests", false);
-        model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT);
+        boolean canDisburseLoan = principal.getClaims().contains("DISBURSE_LOAN");
+        model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
+        model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
         model.addAttribute("disbursementNotesLabel", "Disbursement Notes");
         model.addAttribute("disbursementActionLabel", "Disburse Loan");
         model.addAttribute("showUndoForm", false);
-        model.addAttribute("allowPaymentSync", false);
+        model.addAttribute("allowPaymentSync", true);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";
     }
@@ -371,6 +376,7 @@ public class DisbursementController {
                            @AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disbursementDate,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate firstRepaymentDate,
+                           @RequestParam(required = false) BigDecimal disbursementAmount,
                            @RequestParam(required = false) String loanId,
                            @RequestParam(required = false) String disbursementReference,
                            @RequestParam(required = false) String disbursementNotes,
@@ -386,6 +392,7 @@ public class DisbursementController {
                 firstRepaymentDate,
                 null,
                 null,
+                disbursementAmount,
                 loanId,
                 disbursementReference,
                 disbursementNotes,
@@ -393,6 +400,55 @@ public class DisbursementController {
             );
             emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", "Loan disbursed successfully.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/disbursement/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/sync-payments")
+    public String syncPayments(@PathVariable UUID id,
+                               @AuthenticationPrincipal AppUserPrincipal principal,
+                               @RequestParam(name = "monthsBack", defaultValue = "12") int monthsBack,
+                               RedirectAttributes ra) {
+        try {
+            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (app.getLoanId() == null || app.getLoanId().isBlank()) {
+                throw new IllegalStateException("This loan has not been disbursed yet.");
+            }
+            int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+            ra.addFlashAttribute("message",
+                inserted == 0
+                    ? "Payment transactions refreshed; nothing new."
+                    : "Payment transactions refreshed; " + inserted + " new record(s) added.");
+        } catch (LoanPaymentLookupException ex) {
+            ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/disbursement/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/recheck-defaulted-payment")
+    public String recheckDefaultedPayment(@PathVariable UUID id,
+                                          @AuthenticationPrincipal AppUserPrincipal principal,
+                                          @RequestParam(name = "monthsBack", defaultValue = "24") int monthsBack,
+                                          RedirectAttributes ra) {
+        try {
+            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (app.getStatus() != LoanStatus.DEFAULTED) {
+                throw new IllegalStateException("Only defaulted loans can be rechecked with this action.");
+            }
+            if (app.getLoanId() == null || app.getLoanId().isBlank()) {
+                throw new IllegalStateException("This defaulted loan does not have a loan ID to verify.");
+            }
+            int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+            ra.addFlashAttribute("message",
+                inserted == 0
+                    ? "Payment status rechecked. The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."
+                    : "Payment status rechecked with " + inserted + " new record(s). The loan is still marked as " + app.getStatus().name().replace('_', ' ') + ".");
+        } catch (LoanPaymentLookupException ex) {
+            ra.addFlashAttribute("error", "Payment status could not be verified: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -420,6 +476,30 @@ public class DisbursementController {
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", "We sent a disbursement code to " + officer.getEmail() + "."
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/{id}/verify-disbursement-otp")
+    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyDisbursementOtp(@PathVariable UUID id,
+                                                                     @AuthenticationPrincipal AppUserPrincipal principal,
+                                                                     @RequestParam String otpCode) {
+        try {
+            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
+                throw new IllegalStateException("This loan is no longer ready for disbursement.");
+            }
+            validateDisbursementOtp(principal.getMemberId(), otpCode);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "OTP code verified."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(

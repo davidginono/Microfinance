@@ -43,19 +43,64 @@
         gap: 0.75rem;
         max-width: 34rem;
     }
-    .savings-fraction-control {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-        gap: 0.5rem;
-        align-items: end;
+    .savings-ratio-mode-toggle {
+        display: inline-flex;
+        width: fit-content;
+        overflow: hidden;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        background: #ffffff;
     }
+    .savings-ratio-mode-toggle button {
+        min-height: 2.4rem;
+        border: 0;
+        background: transparent;
+        padding: 0 0.9rem;
+        color: #475569;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .savings-ratio-mode-toggle button.is-active {
+        background: #e0f2fe;
+        color: #075985;
+        box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.12);
+    }
+    .savings-multiplier-control {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .savings-multiplier-control input {
+        flex: 0 1 10rem;
+    }
+    .savings-fraction-control {
+        display: inline-grid;
+        width: fit-content;
+        grid-template-columns: 6.5rem auto 6.5rem;
+        gap: 0.35rem;
+        align-items: center;
+    }
+    .savings-fraction-control input {
+        min-height: 3rem !important;
+        padding-inline: 0.75rem;
+    }
+    .savings-multiplier-control.hidden,
+    .savings-fraction-control.hidden {
+        display: none !important;
+    }
+    .savings-multiplier-label,
     .savings-fraction-divider {
-        min-height: 3.5rem;
+        min-height: 3rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         color: #64748b;
         font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
     }
     .settings-checkbox-card {
         min-height: 3.5rem;
@@ -103,9 +148,23 @@
     .settings-action-bar--end {
         justify-content: flex-end;
     }
+    .settings-action-bar--split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+    .settings-action-bar--split .settings-action-button {
+        justify-self: end;
+    }
     @media (max-width: 639px) {
+        .settings-action-bar--split {
+            grid-template-columns: 1fr;
+        }
         .settings-action-button {
             flex-basis: 100%;
+        }
+        .settings-action-bar--split .settings-action-button {
+            justify-self: start;
         }
     }
     .workflow-stage-list {
@@ -442,6 +501,67 @@
     </section>
 </c:if>
 
+<c:if test="${settingsSection eq 'notifications'}">
+    <section class="erp-panel overflow-hidden">
+        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <p class="erp-widget-title">Notification Settings</p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Member Notification Channels</h2>
+            <p class="mt-1 text-sm text-slate-500">Choose how this SACCO sends member alerts.</p>
+        </div>
+        <form action="/admin/settings-controls/notifications" method="post" class="erp-panel-body grid gap-4">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Notification</th>
+                        <th class="px-4 py-3 text-left">Email</th>
+                        <th class="px-4 py-3 text-left">SMS</th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                    <c:forEach items="${notificationDeliveryPreferences}" var="preference">
+                        <c:choose>
+                            <c:when test="${preference.key eq 'LOAN_STATUS'}">
+                                <c:set var="emailField" value="loanStatusEmail" />
+                                <c:set var="smsField" value="loanStatusSms" />
+                            </c:when>
+                            <c:when test="${preference.key eq 'GUARANTEE_REQUEST'}">
+                                <c:set var="emailField" value="guaranteeRequestEmail" />
+                                <c:set var="smsField" value="guaranteeRequestSms" />
+                            </c:when>
+                            <c:otherwise>
+                                <c:set var="emailField" value="repaymentReminderEmail" />
+                                <c:set var="smsField" value="repaymentReminderSms" />
+                            </c:otherwise>
+                        </c:choose>
+                        <tr>
+                            <td class="px-4 py-3 font-semibold text-slate-900">${preference.label}</td>
+                            <td class="px-4 py-3">
+                                <label class="inline-flex items-center gap-2 font-medium text-slate-700">
+                                    <input name="${emailField}" type="checkbox" value="true" ${preference.emailEnabled ? 'checked' : ''} />
+                                    <span>on/off</span>
+                                </label>
+                            </td>
+                            <td class="px-4 py-3">
+                                <label class="inline-flex items-center gap-2 font-medium text-slate-700">
+                                    <input name="${smsField}" type="checkbox" value="true" ${preference.smsEnabled ? 'checked' : ''} />
+                                    <span>on/off</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+            <div class="settings-action-bar settings-action-bar--split">
+                <p class="settings-action-note text-sm text-slate-500">SMS sends only when Benter Group is configured and the member has a phone number.</p>
+                <button type="submit" class="settings-action-button app-btn btn-primary">Save notification settings</button>
+            </div>
+        </form>
+    </section>
+</c:if>
+
 <c:if test="${settingsSection eq 'board'}">
     <div class="erp-panel mb-4">
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
@@ -465,7 +585,7 @@
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">Require Board / Credit Committee Review</span>
+                        <span class="block font-semibold text-slate-900">Require Credit Committee Review</span>
                         <span class="mt-1 block text-slate-500">Adds the committee stage before Accountant review for SACCOs that need group approval.</span>
                     </span>
                 </label>
@@ -481,7 +601,7 @@
                            class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                            value="${settings.boardQuorum}" />
                     <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                        Used only when Board / Credit Committee review is enabled.
+                        Used only when Credit Committee review is enabled.
                     </span>
                 </label>
 
@@ -495,7 +615,7 @@
                             </c:if>
                         </c:forEach>
                     </div>
-                    <p class="mt-3 text-xs text-slate-500">Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Board / Credit Committee to Accountant to Disbursement.</p>
+                    <p class="mt-3 text-xs text-slate-500">Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Credit Committee to Accountant to Disbursement.</p>
                 </div>
             </div>
 
@@ -529,9 +649,9 @@
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="erp-panel-body grid gap-5">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar justify-between">
-                <p class="max-w-3xl text-sm text-slate-500">These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product.</p>
-                <button type="submit" class="settings-action-button app-btn btn-primary">Save Station Policies</button>
+            <div class="settings-action-bar settings-action-bar--split">
+                <p class="settings-action-note max-w-3xl text-sm text-slate-500">These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product.</p>
+                <button type="submit" class="settings-action-button app-btn btn-primary">Save configuration</button>
             </div>
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="rounded-md border border-slate-200 bg-white p-4">
@@ -667,13 +787,13 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink">Savings Fraction</p>
-                            <p class="text-sm text-slate-500">Maximum share of member savings available for this product.</p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" /></p>
+                            <p class="text-sm text-slate-500">Maximum loan multiple allowed against member savings.</p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
                                 <c:when test="${product.maxLoanSavingsRatio gt 0}">
-                                    1 / <fmt:formatNumber value="${1 / product.maxLoanSavingsRatio}" maxFractionDigits="0" />
+                                    Loan can be up to <fmt:formatNumber value="${product.maxLoanSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" />
                                 </c:when>
                                 <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
                             </c:choose>
@@ -778,7 +898,7 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Committee Rules" /></p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Minimum votes assigned and approval threshold used for committee decisions." /></p>
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
@@ -952,6 +1072,7 @@
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <input type="hidden" name="modalKey" value="create-product" />
                     <input type="hidden" name="productCode" value="" data-product-code-field data-product-code-generated="true" />
+                    <input type="hidden" name="workflowStartStage" value="MANAGER" data-workflow-start-stage-field />
 
                     <c:if test="${openProductModalKey eq 'create-product' and not empty message}">
                         <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
@@ -1019,13 +1140,21 @@
                             </label>
 
                             <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                                <input name="maxLoanSavingsPercent" type="hidden" value="33.33" data-savings-percent />
+                                <input name="maxLoanSavingsPercent" type="hidden" value="300.00" data-savings-percent />
                                 <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Savings Fraction
-                                    <div class="savings-fraction-control mt-1">
-                                        <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                    <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                    <div class="savings-ratio-mode-toggle mt-2" data-savings-ratio-mode-toggle>
+                                        <button type="button" class="is-active" data-savings-ratio-mode="multiple"><spring:message code="admin.settings.loanProducts.savingsMultipleMode" text="Multiple" /></button>
+                                        <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
+                                    </div>
+                                    <div class="savings-multiplier-control mt-1">
+                                        <input type="number" min="0.01" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan savings multiplier" data-savings-multiplier />
+                                        <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                    </div>
+                                    <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
+                                        <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
                                         <span class="savings-fraction-divider">/</span>
-                                        <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                        <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
                                     </div>
                                 </div>
                             </div>
@@ -1089,26 +1218,6 @@
                             </div>
 
                             <div class="workflow-subsection mt-4">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.startStage" text="Start Stage" /></p>
-                                <div class="workflow-start-grid" data-field-group="workflowStartStage">
-                                    <label class="workflow-start-option">
-                                        <input type="radio" name="workflowStartStage" value="MANAGER" checked data-workflow-start-radio="manager" />
-                                        <span>
-                                            <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.workflow.managerFirst" text="Manager First" /></span>
-                                            <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.workflow.managerFirstHelp" text="Use this when the manager should lead the first review step." /></span>
-                                        </span>
-                                    </label>
-                                    <label class="workflow-start-option">
-                                        <input type="radio" name="workflowStartStage" value="LOAN_OFFICER" data-workflow-start-radio="loanOfficer" />
-                                        <span>
-                                            <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.workflow.loanOfficerFirst" text="Loan Officer First" /></span>
-                                            <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.workflow.loanOfficerFirstHelp" text="Use this when the loan officer should review before the manager." /></span>
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
                                 <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></p>
                                 <div class="workflow-table">
                                     <div class="workflow-table-head">
@@ -1157,9 +1266,9 @@
                                         </div>
                                     </div>
                                     <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Committee" /></div>
+                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
                                         <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" checked data-workflow-committee aria-label="Committee required" /></label>
+                                            <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${settings.boardReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
                                         </div>
                                         <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                             <select name="committeePriority" class="workflow-priority-select" data-workflow-committee-priority>
@@ -1208,14 +1317,14 @@
                             </div>
 
                             <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Committee Rules" /></p>
+                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
                                 <div class="workflow-support-grid">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
                                         <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-votes />
                                     </label>
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Committee Approvals Needed" />
+                                        <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Minimum Committee Approvals" />
                                         <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-threshold />
                                     </label>
                                 </div>
@@ -1463,11 +1572,19 @@
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
                             <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
                             <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Savings Fraction
-                                <div class="savings-fraction-control mt-1">
-                                    <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                <div class="savings-ratio-mode-toggle mt-2" data-savings-ratio-mode-toggle>
+                                    <button type="button" class="is-active" data-savings-ratio-mode="multiple"><spring:message code="admin.settings.loanProducts.savingsMultipleMode" text="Multiple" /></button>
+                                    <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
+                                </div>
+                                <div class="savings-multiplier-control mt-1">
+                                    <input type="number" min="0.01" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
+                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                </div>
+                                <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
+                                    <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
                                     <span class="savings-fraction-divider">/</span>
-                                    <input type="number" min="1" step="1" class="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                    <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
                                 </div>
                             </div>
                         </div>
@@ -1579,7 +1696,7 @@
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
-                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Committee" /></div>
+                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
                                         <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${product.committeeReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
                                     </div>
@@ -1630,14 +1747,14 @@
                         </div>
 
                         <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Committee Rules" /></p>
+                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
                             <div class="workflow-support-grid">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
                                     <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeMinimumVotes}" data-number-range-max="15" data-workflow-committee-votes />
                                 </label>
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Committee Approvals Needed" />
+                                    <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Minimum Committee Approvals" />
                                     <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeApprovalThreshold}" data-number-range-max="15" data-workflow-committee-threshold />
                                 </label>
                             </div>
@@ -1720,7 +1837,7 @@
 <spring:message code="admin.settings.workflow.runtime.disbursementRelease" text="Disbursement Release" var="runtimeDisbursementRelease" />
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
-<spring:message code="role.committee" text="Committee" var="runtimeCommittee" />
+<spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement Officer" var="runtimeDisbursementOfficer" />
 <spring:message code="admin.settings.validation.displayOrder" text="Display order must be 1 or higher." var="validationDisplayOrder" />
@@ -1730,7 +1847,7 @@
 <spring:message code="admin.settings.validation.minimumAmount" text="Minimum amount cannot be negative." var="validationMinimumAmount" />
 <spring:message code="admin.settings.validation.maximumAmountPositive" text="Maximum amount must be greater than zero." var="validationMaximumAmountPositive" />
 <spring:message code="admin.settings.validation.maximumBelowMinimum" text="Maximum amount cannot be lower than the minimum amount." var="validationMaximumBelowMinimum" />
-<spring:message code="admin.settings.validation.savingsPercent" text="Savings percentage must be greater than zero." var="validationSavingsPercent" />
+<spring:message code="admin.settings.validation.savingsPercent" text="Loan savings multiple must be greater than zero." var="validationSavingsPercent" />
 <spring:message code="admin.settings.validation.insurancePercent" text="Insurance percentage cannot be negative." var="validationInsurancePercent" />
 <spring:message code="admin.settings.validation.annualInterestPercent" text="Annual interest percentage cannot be negative." var="validationAnnualInterestPercent" />
 <spring:message code="admin.settings.validation.minRepaymentMonths" text="Minimum repayment period must be at least 1 month." var="validationMinRepaymentMonths" />
@@ -2110,8 +2227,13 @@
             const productNameField = form.querySelector('[data-product-name-field]');
             const productCodeField = form.querySelector('[data-product-code-field][data-product-code-generated="true"]');
             const savingsPercentInput = form.querySelector('[data-savings-percent]');
+            const savingsMultiplierInput = form.querySelector('[data-savings-multiplier]');
             const savingsFractionNumerator = form.querySelector('[data-savings-fraction-numerator]');
             const savingsFractionDenominator = form.querySelector('[data-savings-fraction-denominator]');
+            const savingsMultiplierControl = form.querySelector('.savings-multiplier-control');
+            const savingsFractionControl = form.querySelector('[data-savings-fraction-control]');
+            const savingsModeToggle = form.querySelector('[data-savings-ratio-mode-toggle]');
+            let savingsRatioMode = 'multiple';
             let syncingSavingsRatio = false;
 
             if (!committeeToggle || !warningsRoot || !runtimeRoot) {
@@ -2194,8 +2316,8 @@
                 let bestNumerator = 1;
                 let bestDenominator = 1;
                 let bestError = Math.abs(ratio - 1);
-                for (let denominator = 1; denominator <= 100; denominator += 1) {
-                    const numerator = Math.max(1, Math.round(ratio * denominator));
+                for (let denominator = 1; denominator <= 9; denominator += 1) {
+                    const numerator = Math.max(1, Math.min(9, Math.round(ratio * denominator)));
                     const error = Math.abs(ratio - numerator / denominator);
                     if (error < bestError) {
                         bestNumerator = numerator;
@@ -2206,8 +2328,20 @@
                 return { numerator: bestNumerator, denominator: bestDenominator };
             }
 
-            function syncSavingsFractionFromPercent() {
-                if (!savingsPercentInput || !savingsFractionNumerator || !savingsFractionDenominator || syncingSavingsRatio) {
+            function renderSavingsRatioMode() {
+                if (savingsMultiplierControl) {
+                    savingsMultiplierControl.classList.toggle('hidden', savingsRatioMode !== 'multiple');
+                }
+                if (savingsFractionControl) {
+                    savingsFractionControl.classList.toggle('hidden', savingsRatioMode !== 'fraction');
+                }
+                savingsModeToggle?.querySelectorAll('[data-savings-ratio-mode]').forEach((button) => {
+                    button.classList.toggle('is-active', button.dataset.savingsRatioMode === savingsRatioMode);
+                });
+            }
+
+            function syncSavingsMultiplierFromPercent() {
+                if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
                 }
                 const percent = Number(savingsPercentInput.value);
@@ -2215,23 +2349,65 @@
                     return;
                 }
                 syncingSavingsRatio = true;
-                const fraction = approximateFraction(percent / 100);
-                savingsFractionNumerator.value = String(fraction.numerator);
-                savingsFractionDenominator.value = String(fraction.denominator);
+                savingsMultiplierInput.value = (percent / 100).toFixed(2);
+                if (savingsFractionNumerator && savingsFractionDenominator) {
+                    const fraction = approximateFraction(percent / 100);
+                    savingsFractionNumerator.value = String(fraction.numerator);
+                    savingsFractionDenominator.value = String(fraction.denominator);
+                }
                 syncingSavingsRatio = false;
+            }
+
+            function syncSavingsPercentFromMultiplier() {
+                if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
+                    return;
+                }
+                const multiplier = Number(savingsMultiplierInput.value);
+                if (!Number.isFinite(multiplier) || multiplier <= 0) {
+                    return;
+                }
+                syncingSavingsRatio = true;
+                savingsPercentInput.value = (multiplier * 100).toFixed(2);
+                if (savingsFractionNumerator && savingsFractionDenominator) {
+                    const fraction = approximateFraction(multiplier);
+                    savingsFractionNumerator.value = String(fraction.numerator);
+                    savingsFractionDenominator.value = String(fraction.denominator);
+                }
+                syncingSavingsRatio = false;
+            }
+
+            function clampSavingsFractionField(field) {
+                if (!field) {
+                    return null;
+                }
+                const rawDigits = String(field.value || '').replace(/\D/g, '');
+                const digit = rawDigits ? Number(rawDigits.charAt(0)) : null;
+                const clamped = digit == null || !Number.isFinite(digit)
+                    ? null
+                    : Math.max(1, Math.min(9, digit));
+                if (clamped == null) {
+                    field.value = '';
+                    return null;
+                }
+                field.value = String(clamped);
+                return clamped;
             }
 
             function syncSavingsPercentFromFraction() {
                 if (!savingsPercentInput || !savingsFractionNumerator || !savingsFractionDenominator || syncingSavingsRatio) {
                     return;
                 }
-                const numerator = Number(savingsFractionNumerator.value);
-                const denominator = Number(savingsFractionDenominator.value);
+                const numerator = clampSavingsFractionField(savingsFractionNumerator);
+                const denominator = clampSavingsFractionField(savingsFractionDenominator);
                 if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) {
                     return;
                 }
+                const ratio = numerator / denominator;
                 syncingSavingsRatio = true;
-                savingsPercentInput.value = ((numerator / denominator) * 100).toFixed(2);
+                savingsPercentInput.value = (ratio * 100).toFixed(2);
+                if (savingsMultiplierInput) {
+                    savingsMultiplierInput.value = ratio.toFixed(2);
+                }
                 syncingSavingsRatio = false;
             }
 
@@ -2561,6 +2737,18 @@
                     field.addEventListener('change', applyRules);
                     field.addEventListener('input', applyRules);
                 });
+            [savingsMultiplierInput]
+                .filter(Boolean)
+                .forEach((field) => {
+                    field.addEventListener('change', () => {
+                        syncSavingsPercentFromMultiplier();
+                        applyRules();
+                    });
+                    field.addEventListener('input', () => {
+                        syncSavingsPercentFromMultiplier();
+                        applyRules();
+                    });
+                });
             [savingsFractionNumerator, savingsFractionDenominator]
                 .filter(Boolean)
                 .forEach((field) => {
@@ -2573,11 +2761,29 @@
                         applyRules();
                     });
                 });
+            savingsModeToggle?.querySelectorAll('[data-savings-ratio-mode]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const nextMode = button.dataset.savingsRatioMode === 'fraction' ? 'fraction' : 'multiple';
+                    if (nextMode === savingsRatioMode) {
+                        return;
+                    }
+                    if (savingsRatioMode === 'fraction') {
+                        syncSavingsPercentFromFraction();
+                    } else {
+                        syncSavingsPercentFromMultiplier();
+                    }
+                    savingsRatioMode = nextMode;
+                    syncSavingsMultiplierFromPercent();
+                    renderSavingsRatioMode();
+                    applyRules();
+                });
+            });
             if (savingsPercentInput) {
-                savingsPercentInput.addEventListener('change', syncSavingsFractionFromPercent);
-                savingsPercentInput.addEventListener('input', syncSavingsFractionFromPercent);
-                syncSavingsFractionFromPercent();
+                savingsPercentInput.addEventListener('change', syncSavingsMultiplierFromPercent);
+                savingsPercentInput.addEventListener('input', syncSavingsMultiplierFromPercent);
+                syncSavingsMultiplierFromPercent();
             }
+            renderSavingsRatioMode();
 
             [managerStartRadio, loanOfficerStartRadio].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {

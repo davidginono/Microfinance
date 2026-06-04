@@ -33,7 +33,7 @@ public class EmailOtpService {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndConsumedAtIsNull(normalizedEmail, purpose)
+            activeTokens(normalizedEmail, purpose, memberId)
                 .forEach(token -> token.setConsumedAt(now));
 
             String code = generateCode();
@@ -66,13 +66,24 @@ public class EmailOtpService {
 
     @Transactional
     public void consumeOtp(String email, EmailOtpPurpose purpose, String code) {
-        EmailOtpToken token = requireValidOtp(email, purpose, code);
+        EmailOtpToken token = requireValidOtp(email, purpose, null, code);
+        token.setConsumedAt(OffsetDateTime.now());
+    }
+
+    @Transactional
+    public void consumeOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
+        EmailOtpToken token = requireValidOtp(email, purpose, memberId, code);
         token.setConsumedAt(OffsetDateTime.now());
     }
 
     @Transactional(readOnly = true)
     public UUID validateOtp(String email, EmailOtpPurpose purpose, String code) {
-        return requireValidOtp(email, purpose, code).getId();
+        return requireValidOtp(email, purpose, null, code).getId();
+    }
+
+    @Transactional(readOnly = true)
+    public UUID validateOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
+        return requireValidOtp(email, purpose, memberId, code).getId();
     }
 
     @Transactional
@@ -82,11 +93,10 @@ public class EmailOtpService {
         token.setConsumedAt(OffsetDateTime.now());
     }
 
-    private EmailOtpToken requireValidOtp(String email, EmailOtpPurpose purpose, String code) {
+    private EmailOtpToken requireValidOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
         String normalizedEmail = normalizeEmail(email);
         String normalizedCode = code == null ? "" : code.trim();
-        EmailOtpToken token = emailOtpTokenRepository
-            .findTopByEmailIgnoreCaseAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedEmail, purpose)
+        EmailOtpToken token = latestToken(normalizedEmail, purpose, memberId)
             .orElseThrow(() -> new IllegalStateException("No active OTP code was found. Request a new code."));
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -97,6 +107,20 @@ public class EmailOtpService {
             throw new IllegalStateException("The OTP code is invalid.");
         }
         return token;
+    }
+
+    private java.util.List<EmailOtpToken> activeTokens(String normalizedEmail, EmailOtpPurpose purpose, UUID memberId) {
+        if (memberId == null) {
+            return emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndConsumedAtIsNull(normalizedEmail, purpose);
+        }
+        return emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(normalizedEmail, purpose, memberId);
+    }
+
+    private java.util.Optional<EmailOtpToken> latestToken(String normalizedEmail, EmailOtpPurpose purpose, UUID memberId) {
+        if (memberId == null) {
+            return emailOtpTokenRepository.findTopByEmailIgnoreCaseAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedEmail, purpose);
+        }
+        return emailOtpTokenRepository.findTopByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNullOrderByCreatedAtDesc(normalizedEmail, purpose, memberId);
     }
 
     private String generateCode() {

@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -42,6 +43,7 @@ class AuthControllerSaccoAccessTest {
     @Mock private UserClaimService userClaimService;
     @Mock private SaccoRegistryService saccoRegistryService;
     @Mock private AdminScopeService adminScopeService;
+    @Mock private PasswordEncoder passwordEncoder;
 
     @Test
     void memberOtpRequestIsBlockedWhenSaccoIsSuspended() {
@@ -108,7 +110,8 @@ class AuthControllerSaccoAccessTest {
             userClaimService,
             saccoRegistryService,
             adminScopeService,
-            new ObjectMapper()
+            new ObjectMapper(),
+            passwordEncoder
         );
     }
 

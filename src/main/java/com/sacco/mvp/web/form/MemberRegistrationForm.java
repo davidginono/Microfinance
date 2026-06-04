@@ -3,6 +3,7 @@ package com.sacco.mvp.web.form;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -34,6 +35,13 @@ public class MemberRegistrationForm {
         message = "Enter your signature like James M Juma."
     )
     private String signatureText;
+
+    @NotBlank(message = "Enter your password.")
+    @Size(min = 8, message = "Password must be at least 8 characters.")
+    private String password;
+
+    @NotBlank(message = "Confirm your password.")
+    private String confirmPassword;
 
     private String otpCode;
 }

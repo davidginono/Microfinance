@@ -271,6 +271,32 @@
                     </div>
                     </div>
 
+                    <div class="auth-form-card space-y-4">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <spring:bind path="registrationForm.password">
+                                    <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Password</label>
+                                </spring:bind>
+                                <form:password path="password"
+                                               autocomplete="new-password"
+                                               minlength="8"
+                                               cssClass="registration-field" />
+                                <form:errors path="password" cssClass="mt-1 block text-xs text-rose-600" />
+                            </div>
+                            <div>
+                                <spring:bind path="registrationForm.confirmPassword">
+                                    <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Confirm Password</label>
+                                </spring:bind>
+                                <form:password path="confirmPassword"
+                                               autocomplete="new-password"
+                                               minlength="8"
+                                               cssClass="registration-field" />
+                                <form:errors path="confirmPassword" cssClass="mt-1 block text-xs text-rose-600" />
+                            </div>
+                        </div>
+                        <p class="registration-note text-sm">Use at least 8 characters. This password will be saved after your details and OTP are verified.</p>
+                    </div>
+
                     <div class="auth-form-card">
                         <spring:bind path="registrationForm.signatureText">
                             <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Signature</label>

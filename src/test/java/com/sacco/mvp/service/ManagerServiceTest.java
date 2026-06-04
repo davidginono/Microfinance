@@ -2,10 +2,12 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
@@ -17,13 +19,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,6 +75,78 @@ class ManagerServiceTest {
 
         verify(managerReviewRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(loanApplicationRepository, never()).save(org.mockito.ArgumentMatchers.any(LoanApplication.class));
+    }
+
+    @Test
+    void disburseLoanUsesOverrideAmountAsReleasedPrincipal() {
+        UUID loanId = UUID.randomUUID();
+        UUID officerId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.EMERGENCY_LOAN)
+            .amount(new BigDecimal("150000.00"))
+            .tenorMonths(6)
+            .status(LoanStatus.READY_FOR_DISBURSEMENT)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Member officer = Member.builder()
+            .id(officerId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .status(MemberStatus.ACTIVE)
+            .build();
+        MockMultipartFile proof = new MockMultipartFile(
+            "disbursementProofFile",
+            "proof.pdf",
+            "application/pdf",
+            "proof".getBytes()
+        );
+
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(loanApplicationRepository.existsBySaccoIdAndLoanId("SACCO-A", "12345")).thenReturn(false);
+        when(repaymentScheduleService.buildSchedule(
+            eq(app),
+            eq(LocalDate.of(2026, 6, 3)),
+            eq(LocalDate.of(2026, 7, 3)),
+            eq(RepaymentFrequency.MONTHLY),
+            eq(null),
+            eq(null),
+            eq("Release notes")
+        )).thenAnswer(invocation -> {
+            org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("125000.00");
+            return new RepaymentScheduleService.ScheduleResult(
+                "{\"disbursedPrincipal\":125000.00,\"schedule\":[]}",
+                LocalDate.of(2026, 12, 3),
+                new BigDecimal("20833.33"),
+                6
+            );
+        });
+        when(loanAttachmentService.store(eq(loanId), any(), eq(null), eq(LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF)))
+            .thenReturn("[]");
+
+        managerService.disburseLoan(
+            loanId,
+            officerId,
+            LocalDate.of(2026, 6, 3),
+            LocalDate.of(2026, 7, 3),
+            null,
+            null,
+            new BigDecimal("125000"),
+            "12345",
+            null,
+            "Release notes",
+            proof
+        );
+
+        org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("125000.00");
+        org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.FINAL_APPROVED);
+        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).contains("125000.00");
+        verify(loanApplicationRepository).save(app);
     }
 
 }

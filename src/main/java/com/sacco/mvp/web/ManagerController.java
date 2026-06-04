@@ -226,7 +226,7 @@ public class ManagerController {
         model.addAttribute("applicant", applicant);
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
-        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
+        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
@@ -394,6 +394,28 @@ public class ManagerController {
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", "We sent a manager decision code to " + manager.getEmail() + "."
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/{id}/verify-decision-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyDecisionOtp(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal,
+                                                                 @RequestParam String otpCode) {
+        try {
+            if (managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus() != LoanStatus.READY_FOR_MANAGER) {
+                throw new IllegalStateException("This application is no longer waiting for manager review.");
+            }
+            validateStaffDecisionOtp(principal.getMemberId(), otpCode);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "OTP code verified."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -743,11 +765,6 @@ public class ManagerController {
                 "On Review By Board",
                 List.of(LoanStatus.AWAITING_BOARD)
             );
-            case "REVIEWED_READY" -> new QueueFilter(
-                "REVIEWED_READY",
-                "Reviewed & Ready for Disbursement",
-                List.of(LoanStatus.BOARD_APPROVED, LoanStatus.MANAGER_ACCEPTED)
-            );
             case "DISBURSED" -> new QueueFilter(
                 "DISBURSED",
                 "Disbursed Loans",
@@ -771,7 +788,6 @@ public class ManagerController {
         return switch (status) {
             case READY_FOR_MANAGER -> "READY_FOR_MANAGER";
             case AWAITING_BOARD -> "AWAITING_BOARD";
-            case BOARD_APPROVED, MANAGER_ACCEPTED -> "REVIEWED_READY";
             case FINAL_APPROVED, DEFAULTED, PAID -> "DISBURSED";
             default -> "READY_FOR_MANAGER";
         };

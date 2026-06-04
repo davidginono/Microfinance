@@ -258,17 +258,19 @@
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${availableClaims}" var="claim">
                             <c:set var="memberOnlyClaimDisabled" value="${(claim eq 'APPLY_LOANS' or claim eq 'APPROVE_GUARANTOR_REQUESTS') and not user.memberAccess}" />
-                            <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
+                            <label class="flex items-start gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
                                 <input type="checkbox"
                                        name="claims"
                                        value="${claim}"
                                        ${user.claims.contains(claim) ? 'checked' : ''}
                                        ${memberOnlyClaimDisabled ? 'disabled' : ''}
-                                       class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span>${claim}</span>
-                                <c:if test="${memberOnlyClaimDisabled}">
-                                    <span class="ml-auto text-xs font-normal text-slate-400">Members only</span>
-                                </c:if>
+                                       class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                <span class="min-w-0 flex-1 leading-5">
+                                    <span class="[overflow-wrap:anywhere]">${claim}</span>
+                                    <c:if test="${memberOnlyClaimDisabled}">
+                                        <span class="ml-2 inline-flex whitespace-nowrap text-xs font-normal text-slate-400">Members only</span>
+                                    </c:if>
+                                </span>
                             </label>
                         </c:forEach>
                     </div>
@@ -329,10 +331,65 @@
             });
         }
 
+        const defaultClaimsByRole = {
+            "MANAGER": ["REVIEW_MANAGER_QUEUE"],
+            "ACCOUNTANT": ["REVIEW_ACCOUNTANT_QUEUE"],
+            "DISBURSEMENT_OFFICER": ["ACCESS_DISBURSEMENT_QUEUE", "DISBURSE_LOAN"],
+            "BOARD": ["REVIEW_BOARD_QUEUE"],
+            "LOAN_OFFICER": ["REVIEW_LOAN_OFFICER_QUEUE"],
+            "ADMIN": ["ACCESS_ADMIN_SETTINGS", "ACCESS_OUTBOX_MONITOR"],
+            "MINOR_ADMIN": ["ACCESS_ADMIN_SETTINGS", "ACCESS_OUTBOX_MONITOR"]
+        };
+
+        function claimInput(form, claim) {
+            return form.querySelector('input[name="claims"][value="' + claim + '"]');
+        }
+
+        function checkClaim(form, claim) {
+            const input = claimInput(form, claim);
+            if (input && !input.disabled) {
+                input.checked = true;
+            }
+        }
+
+        function uncheckClaim(form, claim) {
+            const input = claimInput(form, claim);
+            if (input && !input.disabled) {
+                input.checked = false;
+            }
+        }
+
+        function checkedRolesForForm(form) {
+            return Array.from(form.querySelectorAll('[data-staff-role-checkbox]:checked')).map((input) => input.value);
+        }
+
+        function otherCheckedRoleNeedsClaim(form, uncheckedRole, claim) {
+            return checkedRolesForForm(form)
+                .filter((role) => role !== uncheckedRole)
+                .some((role) => (defaultClaimsByRole[role] || []).includes(claim));
+        }
+
+        function applyDefaultClaimsForRole(roleCheckbox) {
+            const form = roleCheckbox.closest('form');
+            if (!form) {
+                return;
+            }
+            (defaultClaimsByRole[roleCheckbox.value] || []).forEach((claim) => {
+                if (roleCheckbox.checked) {
+                    checkClaim(form, claim);
+                } else if (!otherCheckedRoleNeedsClaim(form, roleCheckbox.value, claim)) {
+                    uncheckClaim(form, claim);
+                }
+            });
+        }
+
         const initializedRoleGroups = new Set();
         document.querySelectorAll('[data-staff-role-checkbox]').forEach((checkbox) => {
             const groupKey = checkbox.getAttribute('data-staff-role-checkbox');
-            checkbox.addEventListener('change', () => syncAdminOnlyRoleGroup(groupKey));
+            checkbox.addEventListener('change', () => {
+                syncAdminOnlyRoleGroup(groupKey);
+                applyDefaultClaimsForRole(checkbox);
+            });
             if (!initializedRoleGroups.has(groupKey)) {
                 initializedRoleGroups.add(groupKey);
                 syncAdminOnlyRoleGroup(groupKey);
@@ -340,19 +397,28 @@
         });
 
         document.querySelectorAll('form').forEach((form) => {
-            const disburseLoan = form.querySelector('input[name="claims"][value="DISBURSE_LOAN"]');
-            const accessQueue = form.querySelector('input[name="claims"][value="ACCESS_DISBURSEMENT_QUEUE"]');
+            const disburseLoan = claimInput(form, 'DISBURSE_LOAN');
+            const accessQueue = claimInput(form, 'ACCESS_DISBURSEMENT_QUEUE');
             if (!disburseLoan || !accessQueue) {
                 return;
             }
-            function syncDisbursementClaims() {
-                if (disburseLoan.checked) {
+            function setDisbursementPair(checked) {
+                if (!accessQueue.disabled) {
+                    accessQueue.checked = checked;
+                }
+                if (!disburseLoan.disabled) {
+                    disburseLoan.checked = checked;
+                }
+            }
+            function ensureDisbursementSubmitPair() {
+                if (disburseLoan.checked && !accessQueue.disabled) {
                     accessQueue.checked = true;
                 }
             }
-            disburseLoan.addEventListener('change', syncDisbursementClaims);
-            form.addEventListener('submit', syncDisbursementClaims);
-            syncDisbursementClaims();
+            disburseLoan.addEventListener('change', () => setDisbursementPair(disburseLoan.checked));
+            accessQueue.addEventListener('change', () => setDisbursementPair(accessQueue.checked));
+            form.addEventListener('submit', ensureDisbursementSubmitPair);
+            ensureDisbursementSubmitPair();
         });
 
         function closeAllUserModals() {

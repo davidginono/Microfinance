@@ -66,6 +66,16 @@ public class LoanPresentationService {
     }
 
     public Map<String, Object> parseFinancialFields(String json) {
+        return parseFinancialFields(json, null);
+    }
+
+    public Map<String, Object> parseFinancialFields(LoanApplication app) {
+        return app == null
+            ? Collections.emptyMap()
+            : parseFinancialFields(app.getFinancialSnapshot(), app.getAmount());
+    }
+
+    public Map<String, Object> parseFinancialFields(String json, BigDecimal effectivePrincipal) {
         if (json == null || json.isBlank()) {
             return Collections.emptyMap();
         }
@@ -74,9 +84,10 @@ public class LoanPresentationService {
             Map<String, Object> display = new LinkedHashMap<>();
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
-            putMoney(display, "Principal (TZS)", resolvePrincipalAmount(raw));
+            BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
+            putMoney(display, "Principal (TZS)", principalAmount);
             addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
-            BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw);
+            BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
                 display.put("Principal + Interest (TZS)", formatMoney(principalPlusInterest));
             }
@@ -105,11 +116,17 @@ public class LoanPresentationService {
     }
 
     private BigDecimal resolvePrincipalPlusInterest(Map<String, Object> raw) {
+        BigDecimal principalAmount = resolvePrincipalAmount(raw);
+        return resolvePrincipalPlusInterest(raw, principalAmount);
+    }
+
+    private BigDecimal resolvePrincipalPlusInterest(Map<String, Object> raw, BigDecimal principalAmount) {
+        BigDecimal snapshotPrincipal = resolvePrincipalAmount(raw);
         BigDecimal principalPlusInterest = readBigDecimal(raw.get("principalPlusInterest"));
-        if (principalPlusInterest != null) {
+        if (principalPlusInterest != null
+            && (principalAmount == null || snapshotPrincipal == null || principalAmount.compareTo(snapshotPrincipal) == 0)) {
             return principalPlusInterest;
         }
-        BigDecimal principalAmount = resolvePrincipalAmount(raw);
         BigDecimal interestAmount = readBigDecimal(raw.get("interestAmount"));
         if (principalAmount == null || interestAmount == null) {
             return null;
@@ -254,6 +271,7 @@ public class LoanPresentationService {
             putValue(display, "Repayment Frequency", humanizeValue(raw.get("repaymentFrequency")));
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putMoney(display, "Disbursed Principal", raw.get("disbursedPrincipal"));
             putMoney(display, "Installment Amount", raw.get("installmentAmount"));
             putValue(display, "Installments", raw.get("installments"));
             putValue(display, "Disbursement Reference", raw.get("disbursementReference"));
@@ -599,6 +617,8 @@ public class LoanPresentationService {
                                      Map<String, Object> financialFields,
                                      List<GuarantorRequest> guarantorRequests,
                                      Map<UUID, String> guarantorNames,
+                                     List<ManagerReview> staffReviews,
+                                     Map<UUID, Member> staffReviewers,
                                      List<BoardReview> boardReviews,
                                      Map<UUID, Member> boardMembers,
                                      String managerReason) {
@@ -640,6 +660,7 @@ public class LoanPresentationService {
         }
 
         appendGuarantorSummary(html, guarantorRequests, guarantorNames);
+        appendStaffReviewSummary(html, staffReviews, staffReviewers);
         appendBoardCommitteeSummary(html, boardReviews, boardMembers);
         appendApplicantSignature(html, app, applicant);
         html.append("</body></html>");
@@ -653,6 +674,8 @@ public class LoanPresentationService {
                                     Map<String, Object> financialFields,
                                     List<GuarantorRequest> guarantorRequests,
                                     Map<UUID, String> guarantorNames,
+                                    List<ManagerReview> staffReviews,
+                                    Map<UUID, Member> staffReviewers,
                                     List<BoardReview> boardReviews,
                                     Map<UUID, Member> boardMembers,
                                     String managerReason) {
@@ -669,6 +692,8 @@ public class LoanPresentationService {
                 parseRepaymentRows(app.getRepaymentScheduleJson()),
                 guarantorRequests,
                 guarantorNames,
+                staffReviews,
+                staffReviewers,
                 boardReviews,
                 boardMembers,
                 managerReason
@@ -738,6 +763,43 @@ public class LoanPresentationService {
                 html.append("</td><td>")
                     .append(esc(formatTimestamp(request.getGuarantorSignatureVerifiedAt())))
                     .append("</td></tr>");
+            }
+        }
+        html.append("</tbody></table>");
+    }
+
+    private void appendStaffReviewSummary(StringBuilder html,
+                                          List<ManagerReview> staffReviews,
+                                          Map<UUID, Member> staffReviewers) {
+        html.append("<h2>Staff Review Decisions</h2>");
+        html.append("<table><thead><tr><th>Stage</th><th>Reviewer</th><th>Member Number</th><th>Decision</th><th>Notes</th><th>Decision Date</th><th>Signature</th></tr></thead><tbody>");
+        if (staffReviews == null || staffReviews.isEmpty()) {
+            html.append("<tr><td colspan=\"7\">No staff review decisions available.</td></tr>");
+        } else {
+            for (ManagerReview review : staffReviews) {
+                Member reviewer = staffReviewers == null ? null : staffReviewers.get(review.getManagerMemberId());
+                String signatureText = reviewer == null ? null : reviewer.getSignatureText();
+                html.append("<tr><td>")
+                    .append(esc(review.getReviewStage() == null ? "-" : review.getReviewStage().getDisplayLabel()))
+                    .append("</td><td>")
+                    .append(esc(reviewer == null ? shortId(review.getManagerMemberId()) : reviewer.getFullName()))
+                    .append("</td><td>")
+                    .append(esc(reviewer == null ? "-" : reviewer.getMemberNo()))
+                    .append("</td><td>")
+                    .append(esc(humanizeValue(review.getDecision())))
+                    .append("</td><td>")
+                    .append(esc(review.getReasons() == null || review.getReasons().isBlank() ? "-" : review.getReasons()))
+                    .append("</td><td>")
+                    .append(esc(formatTimestamp(review.getCreatedAt())))
+                    .append("</td><td>");
+                if (signatureText != null && !signatureText.isBlank()) {
+                    html.append("<div class=\"signature-text\" style=\"font-size:34px;\">")
+                        .append(esc(signatureText))
+                        .append("</div>");
+                } else {
+                    html.append("-");
+                }
+                html.append("</td></tr>");
             }
         }
         html.append("</tbody></table>");
@@ -1019,6 +1081,8 @@ public class LoanPresentationService {
         private final List<Map<String, Object>> repaymentRows;
         private final List<GuarantorRequest> guarantorRequests;
         private final Map<UUID, String> guarantorNames;
+        private final List<ManagerReview> staffReviews;
+        private final Map<UUID, Member> staffReviewers;
         private final List<BoardReview> boardReviews;
         private final Map<UUID, Member> boardMembers;
         private final String managerReason;
@@ -1039,6 +1103,8 @@ public class LoanPresentationService {
                                                     List<Map<String, Object>> repaymentRows,
                                                     List<GuarantorRequest> guarantorRequests,
                                                     Map<UUID, String> guarantorNames,
+                                                    List<ManagerReview> staffReviews,
+                                                    Map<UUID, Member> staffReviewers,
                                                     List<BoardReview> boardReviews,
                                                     Map<UUID, Member> boardMembers,
                                                     String managerReason) {
@@ -1053,6 +1119,8 @@ public class LoanPresentationService {
             this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
             this.guarantorRequests = guarantorRequests == null ? Collections.emptyList() : guarantorRequests;
             this.guarantorNames = guarantorNames == null ? Collections.emptyMap() : guarantorNames;
+            this.staffReviews = staffReviews == null ? Collections.emptyList() : staffReviews;
+            this.staffReviewers = staffReviewers == null ? Collections.emptyMap() : staffReviewers;
             this.boardReviews = boardReviews == null ? Collections.emptyList() : boardReviews;
             this.boardMembers = boardMembers == null ? Collections.emptyMap() : boardMembers;
             this.managerReason = managerReason;
@@ -1068,6 +1136,7 @@ public class LoanPresentationService {
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();
             drawGuarantorSection();
+            drawStaffReviewSection();
             drawBoardSection();
             drawApplicantSignatureSection();
             closePage();
@@ -1286,6 +1355,35 @@ public class LoanPresentationService {
                 }
             }
             drawTable(new String[]{"Guarantor", "Status", "Signature", "Verified At"}, new float[]{140f, 84f, 180f, contentWidth() - 404f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+        }
+
+        private void drawStaffReviewSection() throws IOException {
+            drawSectionHeading("Staff Review Decisions");
+            List<String[]> rows = new ArrayList<>();
+            if (staffReviews.isEmpty()) {
+                rows.add(new String[]{"-", "-", "-", "-", "No staff review decisions available.", "-", "-"});
+            } else {
+                for (ManagerReview review : staffReviews) {
+                    Member reviewer = staffReviewers.get(review.getManagerMemberId());
+                    rows.add(new String[]{
+                        sanitizePdfText(review.getReviewStage() == null ? "-" : review.getReviewStage().getDisplayLabel()),
+                        sanitizePdfText(reviewer == null ? shortId(review.getManagerMemberId()) : reviewer.getFullName()),
+                        sanitizePdfText(reviewer == null ? "-" : reviewer.getMemberNo()),
+                        humanizeValue(review.getDecision()),
+                        sanitizePdfText(review.getReasons()),
+                        sanitizePdfText(formatTimestamp(review.getCreatedAt())),
+                        sanitizePdfText(reviewer == null ? "-" : reviewer.getSignatureText())
+                    });
+                }
+            }
+            drawTable(
+                new String[]{"Stage", "Reviewer", "Member No", "Decision", "Notes", "Date", "Signature"},
+                new float[]{72f, 98f, 56f, 56f, 122f, 68f, contentWidth() - 472f},
+                rows,
+                SMALL_SIZE,
+                SMALL_SIZE,
+                10f
+            );
         }
 
         private void drawBoardSection() throws IOException {

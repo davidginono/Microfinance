@@ -65,7 +65,7 @@ public class MemberRegistrationService {
             .status(MemberStatus.ACTIVE)
             .position(Position.MEMBER)
             .rank(nextMemberRank(sacco.getSaccoId()))
-            .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+            .passwordHash(passwordEncoder.encode(form.getPassword()))
             .createdAt(now)
             .profileLastSyncedAt(now)
             .build();

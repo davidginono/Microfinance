@@ -246,6 +246,7 @@ public class NotificationViewService {
                 : "Loan ID";
             case "finalDueDate" -> "Final Due Date";
             case "firstRepaymentDate" -> "First Repayment Date";
+            case "disbursementAmount" -> "Disbursed Principal";
             case "installmentAmount" -> "Installment Amount";
             case "repaymentFrequency" -> "Repayment Frequency";
             case "incidentId" -> "Incident";
@@ -274,7 +275,7 @@ public class NotificationViewService {
         return switch (key) {
             case "managerId", "senderId", "boardMemberId", "recipientMemberId" -> resolveMemberLabel(text);
             case "loanId", "incidentId" -> shortenUuid(text);
-            case "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
+            case "disbursementAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
             case "repaymentFrequency" -> humanizeKey(text);
             default -> text;
         };

@@ -75,10 +75,6 @@
                class="erp-filter-tab ${currentFilterKey eq 'AWAITING_BOARD' ? 'is-active' : ''}">
                 <spring:message code="loan.status.AWAITING_BOARD" text="On Review By Board" />
             </a>
-            <a href="/manager/loan-applications?filter=REVIEWED_READY"
-               class="erp-filter-tab ${currentFilterKey eq 'REVIEWED_READY' ? 'is-active' : ''}">
-                <spring:message code="manager.queue.reviewedReady" text="Reviewed & Ready for Disbursement" />
-            </a>
             <a href="/manager/loan-applications?filter=DISBURSED"
                class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
                 <spring:message code="manager.queue.disbursedLoans" text="Disbursed Loans" />

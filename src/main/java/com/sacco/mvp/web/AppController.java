@@ -752,8 +752,8 @@ public class AppController {
             ra.addFlashAttribute(
                 "error",
                 "You already have loan application " + app.getId().toString().substring(0, 8)
-                    + " on review (" + dashboardStatusLabel(app.getStatus())
-                    + "). Continue it until it is disbursed before applying again."
+                    + " in progress (" + dashboardStatusLabel(app.getStatus())
+                    + "). Continue or complete it before applying again."
             );
             return "redirect:/app/loan-applications/" + app.getId();
         }
@@ -958,13 +958,10 @@ public class AppController {
             ? app.getUpdatedAt()
             : app.getSubmittedAt();
         model.addAttribute("memberReversalWindowOpen", isWithinReversalWindow(memberReversalReferenceAt));
-        model.addAttribute("draftSelectedGuarantors",
-            memberRepository.findAllById(parseUuidList(app.getSelectedGuarantors())).stream()
-                .map(member -> member.getMemberNo() + " - " + member.getFullName())
-                .toList());
+        model.addAttribute("draftSelectedGuarantors", selectedGuarantorItems(parseUuidList(app.getSelectedGuarantors())));
         model.addAttribute("managerReason",
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "");
-        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app.getFinancialSnapshot()));
+        model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
@@ -1263,11 +1260,12 @@ public class AppController {
                                                                 @RequestParam LoanType loanType,
                                                                 @RequestParam BigDecimal amount,
                                                                 @RequestParam Integer tenorMonths,
+                                                                @RequestParam(required = false) UUID applicationId,
                                                                 @RequestParam(required = false) UUID topUpLoanId) {
         try {
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
             LoanProductSetting product = formSchemaService.getSchema(principal.getSaccoId(), loanType);
-            loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product);
+            loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product, applicationId);
             Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
                 principal.getSaccoId(), principal.getMemberId(), loanType, amount, tenorMonths, topUpLoanId);
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
@@ -1282,6 +1280,7 @@ public class AppController {
             }
             response.put("principalPlusInterest", principalPlusInterest == null ? "" : principalPlusInterest.setScale(2, RoundingMode.HALF_UP).toPlainString());
             response.put("principalPlusInterestLabel", principalPlusInterest == null ? "" : formatTzs(principalPlusInterest));
+            response.put("repaymentSchedule", previewRepaymentSchedule(amount, tenorMonths, snapshot));
             Map<String, Object> eligibilityMap = new LinkedHashMap<>();
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
@@ -1781,6 +1780,89 @@ public class AppController {
         }
         BigDecimal half = maxAllowed.multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.DOWN);
         return half.compareTo(BigDecimal.ZERO) > 0 ? half : maxAllowed.setScale(2, RoundingMode.DOWN);
+    }
+
+    private List<Map<String, String>> previewRepaymentSchedule(BigDecimal amount,
+                                                               Integer tenorMonths,
+                                                               Map<String, Object> snapshot) {
+        BigDecimal principal = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
+        int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
+        BigDecimal annualRate = Optional.ofNullable(readBigDecimal(snapshot.get("interestRate")))
+            .orElse(BigDecimal.ZERO);
+        InterestMethod interestMethod = InterestMethod.FLAT_RATE;
+        Object rawMethod = snapshot.get("interestMethod");
+        if (rawMethod != null) {
+            try {
+                interestMethod = InterestMethod.valueOf(String.valueOf(rawMethod));
+            } catch (IllegalArgumentException ignored) {
+                interestMethod = InterestMethod.FLAT_RATE;
+            }
+        }
+
+        List<Map<String, String>> rows = new ArrayList<>();
+        BigDecimal runningPrincipal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal runningInterest = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remainingPrincipal = principal;
+        BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
+        BigDecimal flatTotalInterest = principal.multiply(annualRate)
+            .multiply(BigDecimal.valueOf(months))
+            .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+        BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+        BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+        BigDecimal reducingInstallment = reducingInstallment(principal, monthlyRate, months);
+
+        for (int month = 1; month <= months; month++) {
+            BigDecimal principalComponent;
+            BigDecimal interestComponent;
+            BigDecimal installmentAmount;
+            if (interestMethod == InterestMethod.REDUCING_BALANCE) {
+                interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
+                principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                if (principalComponent.compareTo(BigDecimal.ZERO) < 0) {
+                    principalComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+                if (month == months) {
+                    principalComponent = principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP);
+                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                } else {
+                    installmentAmount = reducingInstallment;
+                }
+            } else {
+                principalComponent = month == months
+                    ? principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
+                    : flatPrincipalBase;
+                interestComponent = month == months
+                    ? flatTotalInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
+                    : flatInterestBase;
+                installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+            }
+
+            runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
+            runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+            remainingPrincipal = principal.subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("month", "Month " + month);
+            row.put("installment", formatTzs(installmentAmount));
+            row.put("principal", formatTzs(principalComponent));
+            row.put("interest", formatTzs(interestComponent));
+            row.put("outstandingBalance", formatTzs(remainingPrincipal));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private BigDecimal reducingInstallment(BigDecimal principal, BigDecimal monthlyRate, int months) {
+        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        if (monthlyRate == null || monthlyRate.compareTo(BigDecimal.ZERO) <= 0) {
+            return principal.divide(BigDecimal.valueOf(Math.max(months, 1)), 2, RoundingMode.HALF_UP);
+        }
+        double rate = monthlyRate.doubleValue();
+        double factor = 1d - Math.pow(1d + rate, -Math.max(months, 1));
+        return BigDecimal.valueOf(principal.doubleValue() * rate / factor)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private String formatTzs(BigDecimal amount) {

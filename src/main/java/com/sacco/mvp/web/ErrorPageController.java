@@ -15,17 +15,16 @@ public class ErrorPageController implements ErrorController {
     public String error(HttpServletRequest request, Model model) {
         Integer statusCode = (Integer) request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
         String requestUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
-        Throwable exception = (Throwable) request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
-        return renderError(model, statusCode, requestUri, exception == null ? null : exception.getMessage());
+        return renderError(model, statusCode, requestUri);
     }
 
     @GetMapping("/error/403")
     public String forbidden(HttpServletRequest request, Model model) {
         String requestUri = request.getHeader("Referer");
-        return renderError(model, 403, requestUri, "You do not have permission to open that page directly.");
+        return renderError(model, 403, requestUri);
     }
 
-    private String renderError(Model model, Integer statusCode, String requestUri, String rawMessage) {
+    private String renderError(Model model, Integer statusCode, String requestUri) {
         HttpStatus status = HttpStatus.resolve(statusCode == null ? 500 : statusCode);
         if (status == null) {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -34,7 +33,7 @@ public class ErrorPageController implements ErrorController {
         model.addAttribute("errorStatus", status.value());
         model.addAttribute("errorTitle", resolveTitle(status));
         model.addAttribute("errorSummary", resolveSummary(status));
-        model.addAttribute("errorMessage", resolveMessage(status, rawMessage));
+        model.addAttribute("errorMessage", resolveMessage(status));
         model.addAttribute("errorPath", requestUri == null || requestUri.isBlank() ? "" : requestUri);
         return "error/general";
     }
@@ -57,16 +56,13 @@ public class ErrorPageController implements ErrorController {
         };
     }
 
-    private String resolveMessage(HttpStatus status, String rawMessage) {
+    private String resolveMessage(HttpStatus status) {
         if (status == HttpStatus.FORBIDDEN) {
             return "Use the available navigation controls inside the application, or sign in again if your session has changed.";
         }
         if (status == HttpStatus.NOT_FOUND) {
             return "Check the address or return to a known page from the navigation menu.";
         }
-        if (rawMessage == null || rawMessage.isBlank()) {
-            return "Try again, or return to the previous page.";
-        }
-        return rawMessage;
+        return "Try again, or return to the previous page. If the problem continues, contact support.";
     }
 }

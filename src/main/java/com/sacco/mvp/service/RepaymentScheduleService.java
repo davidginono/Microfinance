@@ -114,6 +114,7 @@ public class RepaymentScheduleService {
             : LocalDate.parse(String.valueOf(rows.get(rows.size() - 1).get("dueDate")));
 
         Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("disbursedPrincipal", app.getAmount());
         summary.put("disbursementDate", disbursementDate.toString());
         summary.put("firstRepaymentDate", firstRepaymentDate.toString());
         summary.put("finalDueDate", finalDueDate.toString());

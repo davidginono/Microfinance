@@ -65,7 +65,7 @@
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value">${app.amount}</div>
+                    <div class="loan-stat-value" data-disbursement-loan-amount-display>${app.amount}</div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
@@ -475,7 +475,8 @@
                 </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
-                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp">
+                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp"
+                        data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-decision-otp">
                     <span class="otp-button-spinner hidden"></span>
                     <span class="otp-button-label">Send OTP Code</span>
                 </button>
@@ -492,6 +493,13 @@
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
                 <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before approving or rejecting.</p>
+                <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span data-otp-text>Enter the code to verify it.</span>
+                </div>
             </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -523,6 +531,14 @@
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn btn-reject">Decline Removal</button>
             </form>
+        </div>
+    </div>
+</c:if>
+
+<c:if test="${showDisbursementPermissionMessage}">
+    <div class="erp-form-wrap">
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            This loan is ready for disbursement, but your account does not have the Disburse Loan claim. Ask the admin to update your role claims, then sign in again.
         </div>
     </div>
 </c:if>
@@ -559,6 +575,34 @@
                 <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
             </div>
             <div>
+                <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Amount <span class="text-rose-600">*</span></label>
+                <input type="text"
+                       id="disbursementAmountInput"
+                       name="disbursementAmount"
+                       value="${app.amount}"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       required
+                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       placeholder="TSh 100,000.00" />
+                <p class="mt-1 text-xs text-slate-500">This amount becomes the final disbursed principal and repayment basis.</p>
+            </div>
+            <div class="md:col-span-2">
+                <div class="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Requested Amount</span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-requested-amount>${app.amount}</span>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Loaded Disbursement Amount</span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-preview-amount>${app.amount}</span>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-600">The loan details and repayment schedule will use the loaded disbursement amount when this loan is released.</p>
+                </div>
+            </div>
+            <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
                 <input type="text" name="loanId" value="${app.loanId}"
                        pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
@@ -566,10 +610,6 @@
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        placeholder="SACCO loan-book number (digits only)" />
                 <p class="mt-1 text-xs text-slate-500">Entered at disbursement. 4-20 digits, unique within this SACCO.</p>
-            </div>
-            <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Reference</label>
-                <input type="text" name="disbursementReference" value="${app.disbursementReference}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="Receipt, voucher, or transfer reference" />
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700">Tenor Guidance</label>
@@ -599,7 +639,8 @@
                 </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
-                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-disbursement-otp">
+                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-disbursement-otp"
+                        data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-disbursement-otp">
                     <span class="otp-button-spinner hidden"></span>
                     <span class="otp-button-label">Send OTP Code</span>
                 </button>
@@ -616,6 +657,13 @@
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
                 <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before completing disbursement.</p>
+                <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span data-otp-text>Enter the code to verify it.</span>
+                </div>
             </div>
         </div>
         <button type="submit" class="app-btn btn-approve">${disbursementActionLabel}</button>
@@ -667,15 +715,238 @@
             );
         }
 
+        function formatDisbursementAmount(value) {
+            const amount = Number(normalizeDisbursementAmount(value));
+            if (!Number.isFinite(amount) || amount <= 0) {
+                return "-";
+            }
+            return "TSh " + new Intl.NumberFormat("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(amount);
+        }
+
+        function normalizeDisbursementAmount(value) {
+            return String(value || "").replace(/[^0-9.]/g, "");
+        }
+
+        const disbursementAmountInput = document.getElementById("disbursementAmountInput");
+        const disbursementAmountDisplay = document.querySelector("[data-disbursement-loan-amount-display]");
+        const disbursementRequestedAmount = document.querySelector("[data-disbursement-requested-amount]");
+        const disbursementPreviewAmount = document.querySelector("[data-disbursement-preview-amount]");
+        function refreshDisbursementAmountPreview() {
+            if (!disbursementAmountInput) {
+                return;
+            }
+            const label = formatDisbursementAmount(disbursementAmountInput.value);
+            if (disbursementAmountDisplay) {
+                disbursementAmountDisplay.textContent = label;
+            }
+            if (disbursementPreviewAmount) {
+                disbursementPreviewAmount.textContent = label;
+            }
+        }
+        if (disbursementRequestedAmount) {
+            disbursementRequestedAmount.textContent = formatDisbursementAmount(disbursementRequestedAmount.textContent);
+        }
+        disbursementAmountInput?.addEventListener("input", refreshDisbursementAmountPreview);
+        disbursementAmountInput?.addEventListener("focus", () => {
+            disbursementAmountInput.value = normalizeDisbursementAmount(disbursementAmountInput.value);
+        });
+        disbursementAmountInput?.addEventListener("blur", () => {
+            disbursementAmountInput.value = formatDisbursementAmount(disbursementAmountInput.value);
+            refreshDisbursementAmountPreview();
+        });
+        disbursementAmountInput?.form?.addEventListener("submit", () => {
+            disbursementAmountInput.value = normalizeDisbursementAmount(disbursementAmountInput.value);
+        });
+        refreshDisbursementAmountPreview();
+        if (disbursementAmountInput) {
+            disbursementAmountInput.value = formatDisbursementAmount(disbursementAmountInput.value);
+        }
+
+        function bindStaffOtpLiveStatus(input, statusBox, proceedButtons, verifyUrl) {
+            if (!input || !statusBox || !verifyUrl) {
+                return {
+                    markRequested: () => {},
+                    reset: () => {},
+                    isVerified: () => true
+                };
+            }
+
+            const spinner = statusBox.querySelector("[data-otp-spinner]");
+            const tick = statusBox.querySelector("[data-otp-tick]");
+            const text = statusBox.querySelector("[data-otp-text]");
+            let requested = false;
+            let verified = false;
+            let verifyTimer;
+            let verifyRun = 0;
+
+            function setProceedEnabled(enabled) {
+                proceedButtons.forEach((button) => {
+                    button.disabled = !enabled;
+                    button.classList.toggle("action-button-disabled", !enabled);
+                });
+            }
+
+            function setStatus(state, message) {
+                statusBox.classList.remove(
+                    "hidden", "border-slate-200", "bg-white", "text-slate-600",
+                    "border-emerald-200", "bg-emerald-50", "text-emerald-700",
+                    "border-rose-200", "bg-rose-50", "text-rose-700"
+                );
+                statusBox.classList.add("flex");
+                spinner?.classList.toggle("hidden", state !== "checking");
+                tick?.classList.toggle("hidden", state !== "valid");
+                if (tick && state === "valid") {
+                    tick.classList.remove("otp-checkmark-pop");
+                    void tick.offsetWidth;
+                    tick.classList.add("otp-checkmark-pop");
+                }
+                if (text) {
+                    text.textContent = message;
+                }
+                if (state === "valid") {
+                    statusBox.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                } else if (state === "invalid") {
+                    statusBox.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
+                } else {
+                    statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
+                }
+            }
+
+            function resetStatus() {
+                window.clearTimeout(verifyTimer);
+                verifyRun += 1;
+                requested = false;
+                verified = false;
+                input.value = "";
+                input.setCustomValidity("");
+                statusBox.classList.add("hidden");
+                statusBox.classList.remove("flex");
+                setProceedEnabled(false);
+            }
+
+            async function verifyCode(code, runId) {
+                setStatus("checking", "Checking code...");
+                try {
+                    const body = new URLSearchParams();
+                    body.set("otpCode", code);
+                    const response = await fetch(verifyUrl, {
+                        method: "POST",
+                        headers: {
+                            "X-CSRF-TOKEN": csrfToken,
+                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                            "Accept": "application/json"
+                        },
+                        body,
+                        credentials: "same-origin"
+                    });
+                    const contentType = response.headers.get("content-type") || "";
+                    if (!contentType.includes("application/json")) {
+                        if (response.status === 403) {
+                            throw new Error("Your account is missing permission to verify this OTP.");
+                        }
+                        if (response.status === 401 || response.redirected) {
+                            throw new Error("Your session has expired. Sign in again before verifying the OTP code.");
+                        }
+                        throw new Error("Unable to verify the OTP code right now.");
+                    }
+                    const payload = await response.json();
+                    if (runId !== verifyRun) {
+                        return;
+                    }
+                    if (!response.ok || !payload.valid) {
+                        throw new Error(payload.message || "The OTP code is not valid.");
+                    }
+                    verified = true;
+                    input.setCustomValidity("");
+                    setProceedEnabled(true);
+                    setStatus("valid", payload.message || "OTP code verified.");
+                } catch (error) {
+                    if (runId !== verifyRun) {
+                        return;
+                    }
+                    verified = false;
+                    setProceedEnabled(false);
+                    input.setCustomValidity(error.message || "The OTP code is not valid.");
+                    setStatus("invalid", error.message || "The OTP code is not valid.");
+                }
+            }
+
+            input.addEventListener("input", () => {
+                const code = input.value.replace(/\D/g, "").slice(0, 6);
+                if (input.value !== code) {
+                    input.value = code;
+                }
+                window.clearTimeout(verifyTimer);
+                verifyRun += 1;
+                verified = false;
+                setProceedEnabled(false);
+                input.setCustomValidity("");
+                if (!requested) {
+                    statusBox.classList.add("hidden");
+                    statusBox.classList.remove("flex");
+                    return;
+                }
+                if (code.length < 6) {
+                    setStatus("idle", "Enter all 6 digits to verify the code.");
+                    return;
+                }
+                const runId = verifyRun;
+                verifyTimer = window.setTimeout(() => verifyCode(code, runId), 250);
+            });
+
+            input.form?.addEventListener("submit", (event) => {
+                if (!verified) {
+                    event.preventDefault();
+                    input.setCustomValidity(requested ? "Verify the OTP code before continuing." : "Request and verify an OTP code before continuing.");
+                    input.reportValidity();
+                }
+            });
+
+            setProceedEnabled(false);
+
+            return {
+                markRequested: () => {
+                    requested = true;
+                    verified = false;
+                    setProceedEnabled(false);
+                    input.setCustomValidity("");
+                    setStatus("idle", "Enter the 6-digit code to verify it.");
+                    input.focus();
+                },
+                reset: resetStatus,
+                isVerified: () => verified
+            };
+        }
+
+        const otpBindings = new WeakMap();
+        function otpBindingFor(button) {
+            if (otpBindings.has(button)) {
+                return otpBindings.get(button);
+            }
+            const form = button.closest("form");
+            const input = form ? form.querySelector("input[name='managerDecisionOtpCode'], input[name='disbursementOtpCode']") : null;
+            const statusBox = form ? form.querySelector(".staff-otp-live-status") : null;
+            const proceedButtons = form ? Array.from(form.querySelectorAll("button[type='submit']")) : [];
+            const binding = bindStaffOtpLiveStatus(input, statusBox, proceedButtons, button.dataset.verifyUrl);
+            otpBindings.set(button, binding);
+            return binding;
+        }
+
         document.querySelectorAll(".staff-otp-request").forEach((button) => {
+            otpBindingFor(button);
             button.addEventListener("click", async () => {
                 const form = button.closest("form");
                 const feedback = form ? form.querySelector(".staff-otp-feedback") : null;
+                const otpUi = otpBindingFor(button);
                 const requestUrl = button.dataset.requestUrl;
                 if (!requestUrl) {
                     showOtpFeedback(feedback, "error", "OTP request is not configured.");
                     return;
                 }
+                otpUi.reset();
                 setOtpButtonState(button, "loading");
                 try {
                     const response = await fetch(requestUrl, {
@@ -686,12 +957,23 @@
                         },
                         credentials: "same-origin"
                     });
+                    const contentType = response.headers.get("content-type") || "";
+                    if (!contentType.includes("application/json")) {
+                        if (response.status === 403) {
+                            throw new Error("Your account is missing permission to request this OTP. Ask the admin to enable the Disburse Loan claim, then sign in again.");
+                        }
+                        if (response.status === 401 || response.redirected) {
+                            throw new Error("Your session has expired. Sign in again before requesting the OTP code.");
+                        }
+                        throw new Error("Unable to send the OTP code right now.");
+                    }
                     const payload = await response.json();
                     if (!response.ok || !payload.valid) {
                         throw new Error(payload.message || "Unable to send the OTP code right now.");
                     }
                     setOtpButtonState(button, "sent");
                     showOtpFeedback(feedback, "success", payload.message || "We sent an OTP code to your email.");
+                    otpUi.markRequested();
                 } catch (error) {
                     setOtpButtonState(button, "idle");
                     showOtpFeedback(feedback, "error", error.message || "Unable to send the OTP code right now.");

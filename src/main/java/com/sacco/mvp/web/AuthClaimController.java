@@ -60,12 +60,20 @@ public class AuthClaimController {
     @PostMapping("/verify")
     public String verify(@RequestParam("token") String token,
                          @RequestParam("otpCode") String otpCode,
+                         @RequestParam("password") String password,
+                         @RequestParam("confirmPassword") String confirmPassword,
                          RedirectAttributes ra) {
         try {
-            Member member = invitationService.claimInvitation(token, otpCode);
+            if (password == null || password.length() < 8) {
+                throw new IllegalStateException("Password must be at least 8 characters.");
+            }
+            if (!password.equals(confirmPassword)) {
+                throw new IllegalStateException("Passwords do not match.");
+            }
+            Member member = invitationService.claimInvitation(token, otpCode, password);
             log.info("Staff account activated memberNo={}", member.getMemberNo());
             ra.addFlashAttribute("loginMessage",
-                "Your account is now active. Sign in using your email to receive a one-time code.");
+                "Your account is now active. Sign in using your staff member number and password or request an email code.");
             return "redirect:/login?claimed";
         } catch (IllegalStateException ex) {
             ra.addFlashAttribute("claimError", ex.getMessage());

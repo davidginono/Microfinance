@@ -8,6 +8,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.MinorAdminInvitationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class MinorAdminInvitationService {
     private final MemberRepository memberRepository;
     private final EmailOtpService emailOtpService;
     private final NotificationEmailService notificationEmailService;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.auth.invitation.ttl-hours:72}")
     private int invitationTtlHours;
@@ -94,17 +96,21 @@ public class MinorAdminInvitationService {
     }
 
     @Transactional
-    public Member claimInvitation(String rawToken, String otpCode) {
+    public Member claimInvitation(String rawToken, String otpCode, String password) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
         if (member.getStatus() != MemberStatus.INVITED) {
             throw new IllegalStateException("This account has already been activated.");
         }
+        if (password == null || password.length() < 8) {
+            throw new IllegalStateException("Password must be at least 8 characters.");
+        }
         emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.CLAIM_ACCOUNT, otpCode);
 
         OffsetDateTime now = OffsetDateTime.now();
         member.setStatus(MemberStatus.ACTIVE);
+        member.setPasswordHash(passwordEncoder.encode(password));
         memberRepository.save(member);
 
         invitation.setClaimedAt(now);
@@ -161,10 +167,9 @@ public class MinorAdminInvitationService {
         String link = buildClaimUrl(rawToken);
         String body = "Hello " + member.getFullName() + "," + System.lineSeparator() + System.lineSeparator()
             + "A Super Admin has registered a staff account for you on SACCO " + member.getSaccoId() + "." + System.lineSeparator()
-            + "To activate your account, open the link below within " + ttlHours + " hours and click the activation button:" + System.lineSeparator()
+            + "To activate your account, open the link below within " + ttlHours + " hours, request a one-time code, and create your password:" + System.lineSeparator()
             + link + System.lineSeparator() + System.lineSeparator()
-            + "No password is required. You will receive a one-time code at this email address to confirm your identity," + System.lineSeparator()
-            + "and from then on you will sign in using an email sign-in code (no password)." + System.lineSeparator() + System.lineSeparator()
+            + "After activation, you can sign in with your staff member number and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()
             + "If you did not expect this invitation, please ignore this email.";
         notificationEmailService.sendDirectEmail(
             member.getEmail(),

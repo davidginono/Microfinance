@@ -2,6 +2,7 @@
 <%@ page import="java.util.*" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
@@ -252,6 +253,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
 <c:set var="dashboardChartTitleValue" value="${empty dashboardChartTitle ? dashboardDefaultChartTitle : dashboardChartTitle}" />
 <c:set var="dashboardChartHelpValue" value="${empty dashboardChartHelp ? dashboardDefaultChartHelp : dashboardChartHelp}" />
+<fmt:formatNumber value="${dashboardDisbursementYear}" groupingUsed="false" var="dashboardDisbursementYearLabel" />
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
@@ -265,11 +267,11 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label"><spring:message code="manager.dashboard.totalDisbursed" text="Total Loans Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardTotalDisbursedLoans}</p>
-                <p class="erp-stat-meta"><spring:message code="manager.dashboard.disbursedIn" arguments="${dashboardDisbursementYear}" text="Disbursed in this year." /></p>
+                <p class="erp-stat-meta"><spring:message code="manager.dashboard.disbursedIn" arguments="${dashboardDisbursementYearLabel}" text="Disbursed in this year." /></p>
             </div>
             <span class="erp-stat-icon">D</span>
         </div>
-        <div class="erp-stat-footer"><span>${dashboardDisbursementYear}</span><span>${dashboardTotalDisbursedLoans}</span></div>
+        <div class="erp-stat-footer"><span>${dashboardDisbursementYearLabel}</span><span>${dashboardTotalDisbursedLoans}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-blue">
         <div class="erp-stat-main">
@@ -298,7 +300,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label"><spring:message code="archive.defaultedLoans" text="Defaulted Loans" /></p>
                 <p class="erp-stat-value">${dashboardDefaultedLoans}</p>
-                <p class="erp-stat-meta"><spring:message code="manager.dashboard.defaultedIn" arguments="${dashboardDisbursementYear}" text="Defaulted in this year." /></p>
+                <p class="erp-stat-meta"><spring:message code="manager.dashboard.defaultedIn" arguments="${dashboardDisbursementYearLabel}" text="Defaulted in this year." /></p>
             </div>
             <span class="erp-stat-icon">F</span>
         </div>

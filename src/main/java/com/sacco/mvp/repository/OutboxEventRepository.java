@@ -82,10 +82,18 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
               )
               and (
                 cast(:stationId as text) is null
-                or la.station_id = cast(:stationId as text)
-                or applicant.station_id = cast(:stationId as text)
-                or entity_member.station_id = cast(:stationId as text)
-                or cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+                or (
+                  cast(:saccoId as text) is not null
+                  and (
+                    (la.sacco_id = cast(:saccoId as text) and la.station_id = cast(:stationId as text))
+                    or (applicant.sacco_id = cast(:saccoId as text) and applicant.station_id = cast(:stationId as text))
+                    or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
+                    or (
+                      cast(oe.payload as text) ilike concat('%', cast(:saccoId as text), '%')
+                      and cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+                    )
+                  )
+                )
               )
             order by oe.created_at desc
             """,
@@ -108,10 +116,18 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
               )
               and (
                 cast(:stationId as text) is null
-                or la.station_id = cast(:stationId as text)
-                or applicant.station_id = cast(:stationId as text)
-                or entity_member.station_id = cast(:stationId as text)
-                or cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+                or (
+                  cast(:saccoId as text) is not null
+                  and (
+                    (la.sacco_id = cast(:saccoId as text) and la.station_id = cast(:stationId as text))
+                    or (applicant.sacco_id = cast(:saccoId as text) and applicant.station_id = cast(:stationId as text))
+                    or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
+                    or (
+                      cast(oe.payload as text) ilike concat('%', cast(:saccoId as text), '%')
+                      and cast(oe.payload as text) ilike concat('%', cast(:stationId as text), '%')
+                    )
+                  )
+                )
               )
             """,
         nativeQuery = true

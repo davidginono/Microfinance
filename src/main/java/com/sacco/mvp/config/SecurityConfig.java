@@ -9,20 +9,25 @@ import com.sacco.mvp.security.AppUserDetailsService;
 import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
+import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.UserClaimService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -39,6 +44,15 @@ public class SecurityConfig {
     @Value("${app.auth.local-dev-minor-admin-password-login-enabled:false}")
     private boolean localDevMinorAdminPasswordLoginEnabled;
 
+    @Value("${app.auth.google-sso.enabled:false}")
+    private boolean googleSsoEnabled;
+
+    @Value("${spring.security.oauth2.client.registration.google.client-id:}")
+    private String googleClientId;
+
+    @Value("${spring.security.oauth2.client.registration.google.client-secret:}")
+    private String googleClientSecret;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    MemberRepository memberRepository,
@@ -46,11 +60,12 @@ public class SecurityConfig {
                                                    AdminScopeService adminScopeService,
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
-                                                   StaffMfaService staffMfaService) throws Exception {
+                                                   StaffMfaService staffMfaService,
+                                                   UserClaimService userClaimService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/register/**", "/auth/claim/**", "/css/**", "/error", "/error/**").permitAll()
+                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/error", "/error/**").permitAll()
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MINOR_ADMIN")
                 .requestMatchers("/loan-officer/**").hasRole("LOAN_OFFICER")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
@@ -112,20 +127,13 @@ public class SecurityConfig {
                     response.sendRedirect(redirectTarget);
                 })
                 .successHandler((request, response, authentication) -> {
-                    boolean isSuperAdmin = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-                    boolean isMinorAdmin = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_MINOR_ADMIN".equals(a.getAuthority()));
-                    boolean isManager = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_MANAGER".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));
-                    boolean isLoanOfficer = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_LOAN_OFFICER".equals(a.getAuthority()));
-                    boolean isAccountant = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_ACCOUNTANT".equals(a.getAuthority()));
-                    boolean isDisbursementOfficer = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_DISBURSEMENT_OFFICER".equals(a.getAuthority()));
-                    boolean isBoard = authentication.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_BOARD".equals(a.getAuthority()));
+                    AppUserPrincipal principal = authentication.getPrincipal() instanceof AppUserPrincipal appUser
+                        ? appUser
+                        : null;
+                    String loginType = request.getParameter("loginType");
+                    boolean staffPasswordLogin = "staff-password".equals(loginType);
+                    boolean isSuperAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.ADMIN);
+                    boolean isMinorAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN);
 
                     // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
                     // present an email OTP before the authenticated SecurityContext is
@@ -133,9 +141,9 @@ public class SecurityConfig {
                     // Super admins now bypass this challenge; only MINOR_ADMIN can still
                     // be routed through staff MFA when the local dev bypass is off.
                     boolean requireStaffMfa = isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled;
-                    if (requireStaffMfa) {
-                        if (authentication.getPrincipal() instanceof AppUserPrincipal principal) {
-                            String landing = isSuperAdmin ? "/admin/dashboard" : "/admin/dashboard";
+                    if (staffPasswordLogin && requireStaffMfa) {
+                        if (principal != null) {
+                            String landing = WorkspaceLanding.staffDashboard(principal);
                             try {
                                 staffMfaService.startChallenge(principal, landing, request);
                             } catch (IllegalStateException ex) {
@@ -163,42 +171,86 @@ public class SecurityConfig {
                         }
                     }
 
+                    if (!staffPasswordLogin && principal != null && principal.isMemberAccess()) {
+                        response.sendRedirect(WorkspaceLanding.memberDashboard());
+                        return;
+                    }
                     if (isSuperAdmin) {
                         adminScopeService.clearScope();
-                        response.sendRedirect("/admin/dashboard");
+                        response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
                     }
-                    if (isMinorAdmin) {
-                        response.sendRedirect("/admin/dashboard");
+                    if (principal != null && (staffPasswordLogin || !principal.getStaffRoles().isEmpty())) {
+                        response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
                     }
-                    if (isLoanOfficer) {
-                        response.sendRedirect("/loan-officer/queue");
-                        return;
-                    }
-                    if (isManager) {
-                        response.sendRedirect("/manager/dashboard");
-                        return;
-                    }
-                    if (isAccountant) {
-                        response.sendRedirect("/accountant/loan-applications?filter=AWAITING_ACCOUNTANT");
-                        return;
-                    }
-                    if (isDisbursementOfficer) {
-                        response.sendRedirect("/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT");
-                        return;
-                    }
-                    if (isBoard) {
-                        response.sendRedirect("/board/queue");
-                        return;
-                    }
-                    response.sendRedirect("/app/dashboard");
+                    response.sendRedirect(WorkspaceLanding.memberDashboard());
                 })
                 .permitAll())
             .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
             .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
             .csrf(Customizer.withDefaults())
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class);
+
+        if (isGoogleSsoConfigured()) {
+            http.oauth2Login(oauth -> oauth
+                .loginPage("/login")
+                .successHandler((request, response, authentication) -> {
+                    OAuth2User oauthUser = authentication.getPrincipal() instanceof OAuth2User user ? user : null;
+                    String email = oauthUser == null ? "" : String.valueOf(oauthUser.getAttribute("email")).trim().toLowerCase();
+                    if (email.isBlank() || "null".equals(email)) {
+                        request.getSession(true).setAttribute("loginErrorMessage", "Google did not return a verified email address.");
+                        response.sendRedirect("/login?error");
+                        return;
+                    }
+
+                    var ssoMember = memberRepository.findByEmailIgnoreCase(email)
+                        .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+                        .filter(member -> member.isMemberAccess() || !member.getStaffRolesResolved().isEmpty())
+                        .orElse(null);
+                    if (ssoMember == null) {
+                        request.getSession(true).setAttribute("loginErrorMessage", "No active SACCO account is linked to that Google email.");
+                        response.sendRedirect("/login?error");
+                        return;
+                    }
+                    if (!ssoMember.getStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)
+                        && ssoMember.getSaccoId() != null
+                        && !ssoMember.getSaccoId().isBlank()
+                        && ssoMember.getStationId() != null
+                        && !ssoMember.getStationId().isBlank()) {
+                        String blockedMessage = saccoStationRepository.findBySaccoIdAndStationId(ssoMember.getSaccoId(), ssoMember.getStationId())
+                            .filter(SaccoStation::isAccessSuspended)
+                            .map(this::suspendedMessage)
+                            .orElse(null);
+                        if (blockedMessage != null) {
+                            request.getSession(true).setAttribute("loginErrorMessage", blockedMessage);
+                            response.sendRedirect("/login?error");
+                            return;
+                        }
+                    }
+
+                    AppUserPrincipal principal = new AppUserPrincipal(
+                        ssoMember,
+                        userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getStaffRolesResolved(), ssoMember.isMemberAccess())
+                    );
+
+                    UsernamePasswordAuthenticationToken localAuth =
+                        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                    SecurityContext context = SecurityContextHolder.createEmptyContext();
+                    context.setAuthentication(localAuth);
+                    SecurityContextHolder.setContext(context);
+                    request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+
+                    if (principal.hasRole(com.sacco.mvp.domain.Position.ADMIN)) {
+                        adminScopeService.clearScope();
+                    }
+                    response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
+                })
+                .failureHandler((request, response, exception) -> {
+                    request.getSession(true).setAttribute("loginErrorMessage", "Google sign-in could not be completed.");
+                    response.sendRedirect("/login?error");
+                }));
+        }
 
         return http.build();
     }
@@ -261,5 +313,21 @@ public class SecurityConfig {
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
+    }
+
+    private String suspendedMessage(SaccoStation station) {
+        String reason = station.getAccessRestrictionReason();
+        if (reason == null || reason.isBlank()) {
+            return "This station workspace has been suspended. Contact the platform administrator.";
+        }
+        return "This station workspace has been suspended: " + reason.trim();
+    }
+
+    private boolean isGoogleSsoConfigured() {
+        return googleSsoEnabled
+            && googleClientId != null
+            && !googleClientId.isBlank()
+            && googleClientSecret != null
+            && !googleClientSecret.isBlank();
     }
 }

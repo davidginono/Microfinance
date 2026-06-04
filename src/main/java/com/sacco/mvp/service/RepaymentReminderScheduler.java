@@ -29,7 +29,7 @@ public class RepaymentReminderScheduler {
     private final LoanApplicationRepository loanApplicationRepository;
     private final NotificationRepository notificationRepository;
     private final RepaymentScheduleService repaymentScheduleService;
-    private final NotificationEmailService notificationEmailService;
+    private final NotificationDeliveryService notificationDeliveryService;
     private final NotificationViewService notificationViewService;
     private final ObjectMapper objectMapper;
 
@@ -69,7 +69,7 @@ public class RepaymentReminderScheduler {
                     .sentAt(OffsetDateTime.now())
                     .build());
                 NotificationViewService.NotificationView view = notificationViewService.toView(notification);
-                notificationEmailService.sendNotificationEmail(loan.getApplicantMemberId(), view.getSubject(), view.getMessage());
+                notificationDeliveryService.deliver(loan.getSaccoId(), loan.getApplicantMemberId(), "REPAYMENT_REMINDER", view.getSubject(), view.getMessage());
             } catch (Exception ex) {
                 log.warn("Unable to create repayment reminder for loan {}: {}", loan.getId(), ex.getMessage());
             }

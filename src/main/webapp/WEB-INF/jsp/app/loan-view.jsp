@@ -201,67 +201,57 @@
     </c:if>
 </div>
 
-<c:if test="${app.status eq 'DRAFT'}">
-    <div class="erp-section mt-4">
-        <div class="space-y-4">
+<c:if test="${app.status eq 'DRAFT' and app.requiredGuarantors le 0}">
+    <div class="mt-4">
+        <div class="space-y-3">
             <form action="/app/loan-applications/${app.id}/submit" method="post" class="space-y-3">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <c:if test="${app.requiredGuarantors le 0}">
-                    <div class="rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
-                        <p>
-                            <strong><spring:message code="loan.declaration.title" text="Applicant Declaration:" /></strong>
-                            <c:choose>
-                                <c:when test="${not empty currentMember and not empty currentMember.fullName}">
-                                    <spring:message code="loan.declaration.draft" arguments="${currentMember.fullName},${declarationSaccoName}" text="I, {0}, guarantee that I shall make the loan repayments as decided by the loan approval committee and in case of default, I accept to pay loan penalty as specified by the {1} by laws. I also accept to adhere to all terms and conditions as stipulated on the attached loan contract." />
-                                </c:when>
-                                <c:otherwise>
-                                    <spring:message code="loan.declaration.applicantFallback" text="the applicant" var="applicantFallback" />
-                                    <spring:message code="loan.declaration.draft" arguments="${applicantFallback},${declarationSaccoName}" text="I, {0}, guarantee that I shall make the loan repayments as decided by the loan approval committee and in case of default, I accept to pay loan penalty as specified by the {1} by laws. I also accept to adhere to all terms and conditions as stipulated on the attached loan contract." />
-                                </c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-                    <label class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
-                        <input type="checkbox" name="termsAccepted" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                        <span>I accept the terms and conditions for this loan application.</span>
-                    </label>
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.verification" text="OTP Verification" /></div>
-                                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeSend" text="Request a one-time code before sending this application." /></p>
-                                </div>
-                                <button type="button" class="app-btn btn-primary otp-request-button signature-otp-request inline-flex items-center justify-center gap-2">
-                                    <span class="otp-button-spinner hidden"></span>
-                                    <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
-                                </button>
-                            </div>
-                            <div data-auto-scroll-message="true" class="signature-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
-                            <div class="mt-3">
-                                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
-                                <input type="text" name="applicantSignatureOtpCode"
-                                       inputmode="numeric" maxlength="6" autocomplete="one-time-code"
-                                       class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                                       placeholder="123456" />
-                                <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                                    <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                                    </svg>
-                                    <span data-otp-text><spring:message code="loan.otp.checking" text="Checking code..." /></span>
-                                </div>
-                            </div>
+                <div class="rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
+                    <p>
+                        <strong><spring:message code="loan.declaration.title" text="Applicant Declaration:" /></strong>
+                        <c:choose>
+                            <c:when test="${not empty currentMember and not empty currentMember.fullName}">
+                                <spring:message code="loan.declaration.draft" arguments="${currentMember.fullName},${declarationSaccoName}" text="I, {0}, guarantee that I shall make the loan repayments as decided by the loan approval committee and in case of default, I accept to pay loan penalty as specified by the {1} by laws. I also accept to adhere to all terms and conditions as stipulated on the attached loan contract." />
+                            </c:when>
+                            <c:otherwise>
+                                <spring:message code="loan.declaration.applicantFallback" text="the applicant" var="applicantFallback" />
+                                <spring:message code="loan.declaration.draft" arguments="${applicantFallback},${declarationSaccoName}" text="I, {0}, guarantee that I shall make the loan repayments as decided by the loan approval committee and in case of default, I accept to pay loan penalty as specified by the {1} by laws. I also accept to adhere to all terms and conditions as stipulated on the attached loan contract." />
+                            </c:otherwise>
+                        </c:choose>
+                    </p>
+                </div>
+                <label class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                    <input type="checkbox" name="termsAccepted" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                    <span>I accept the terms and conditions for this loan application.</span>
+                </label>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.verification" text="OTP Verification" /></div>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeSend" text="Request a one-time code before sending this application." /></p>
                         </div>
-                </c:if>
-                <c:choose>
-                    <c:when test="${app.requiredGuarantors gt 0}">
-                        <button type="submit" class="app-btn btn-approve"><spring:message code="loan.actions.sendToGuarantors" text="Send to Guarantors" /></button>
-                        <p class="text-sm text-slate-500"><spring:message code="loan.actions.submitAfterGuarantors" text="The Submit button will appear after all required guarantors have approved." /></p>
-                    </c:when>
-                    <c:otherwise>
-                        <button type="submit" class="app-btn btn-approve"><spring:message code="loan.actions.submit" text="Submit" /></button>
-                    </c:otherwise>
-                </c:choose>
+                        <button type="button" class="app-btn btn-primary otp-request-button signature-otp-request inline-flex items-center justify-center gap-2">
+                            <span class="otp-button-spinner hidden"></span>
+                            <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
+                        </button>
+                    </div>
+                    <div data-auto-scroll-message="true" class="signature-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                    <div class="mt-3">
+                        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
+                        <input type="text" name="applicantSignatureOtpCode"
+                               inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                               class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                               placeholder="123456" />
+                        <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                            <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span data-otp-text><spring:message code="loan.otp.checking" text="Checking code..." /></span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="app-btn btn-approve"><spring:message code="loan.actions.submit" text="Submit" /></button>
             </form>
         </div>
     </div>
@@ -544,41 +534,41 @@
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
         <spring:message code="loan.guarantors" />
     </h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
             <tr>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
+                <th class="w-1/4 px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
+                <th class="w-1/6 px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                <th class="w-1/5 px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
+                <th class="w-1/6 px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
+                <th class="w-1/4 px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
             <c:forEach items="${guarantorRequests}" var="req">
                 <tr>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 align-top">
                         <c:choose>
                             <c:when test="${not empty guarantorNames[req.guarantorMemberId]}">
                                 ${guarantorNames[req.guarantorMemberId]}</c:when>
                             <c:otherwise>#${fn:substring(req.guarantorMemberId, 0, 8)}</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 align-top">
                         <c:choose>
                             <c:when test="${not empty guarantorMembersById[req.guarantorMemberId] and not empty guarantorMembersById[req.guarantorMemberId].memberNo}">${guarantorMembersById[req.guarantorMemberId].memberNo}</c:when>
                             <c:otherwise>-</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-3 py-2">${req.status}</td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 align-top">${req.status}</td>
+                    <td class="px-3 py-2 align-top">
                         <c:choose>
                             <c:when test="${not empty req.decidedAt}">${fn:replace(fn:substring(req.decidedAt, 0, 16),
                                 'T', ' ')}</c:when>
                             <c:otherwise>${fn:replace(fn:substring(req.createdAt, 0, 16), 'T', ' ')}</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 align-top">
                         <c:set var="pendingUndo" value="${pendingGuarantorUndoRequests[req.id]}" />
                         <c:choose>
                             <c:when test="${not empty pendingUndo}">
@@ -616,18 +606,17 @@
                     <c:when test="${not empty draftSelectedGuarantors}">
                         <c:forEach items="${draftSelectedGuarantors}" var="draftGuarantor">
                             <tr>
-                                <td class="px-3 py-2">${draftGuarantor}</td>
-                                <td class="px-3 py-2">-</td>
-                                <td class="px-3 py-2"><spring:message code="loan.guarantor.selectedInDraft" text="SELECTED IN DRAFT" /></td>
-                                <td class="px-3 py-2">-</td>
-                                <td class="px-3 py-2">-</td>
-                                <td class="px-3 py-2">-</td>
+                                <td class="px-3 py-2 align-top">${draftGuarantor.fullName}</td>
+                                <td class="px-3 py-2 align-top">${draftGuarantor.memberNo}</td>
+                                <td class="px-3 py-2 align-top"><spring:message code="loan.guarantor.selectedInDraft" text="SELECTED IN DRAFT" /></td>
+                                <td class="px-3 py-2 align-top">-</td>
+                                <td class="px-3 py-2 align-top">-</td>
                             </tr>
                         </c:forEach>
                     </c:when>
                     <c:otherwise>
                         <tr>
-                            <td colspan="6" class="px-3 py-3 text-slate-500"><spring:message code="loan.guarantor.empty" text="No guarantors selected yet." /></td>
+                            <td colspan="5" class="px-3 py-3 text-slate-500"><spring:message code="loan.guarantor.empty" text="No guarantors selected yet." /></td>
                         </tr>
                     </c:otherwise>
                 </c:choose>

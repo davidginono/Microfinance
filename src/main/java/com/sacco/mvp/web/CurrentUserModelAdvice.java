@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
+import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -31,6 +32,7 @@ public class CurrentUserModelAdvice {
     private final AdminScopeService adminScopeService;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
+    private final SaccoStationRepository saccoStationRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final ObjectMapper objectMapper;
     private final ObjectFactory<HttpServletRequest> requestFactory;
@@ -147,6 +149,27 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("adminScope")
     public AdminScopeService.AdminScopeView adminScope(@AuthenticationPrincipal AppUserPrincipal principal) {
         return adminScopeService.currentScope(principal);
+    }
+
+    @ModelAttribute("headerStation")
+    public HeaderStationView headerStation(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null || isPlatformAdminIdentity(principal)) {
+            return null;
+        }
+        AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
+        if (scope != null && scope.getStationId() != null && !scope.getStationId().isBlank()) {
+            return new HeaderStationView(scope.getStationId(), scope.getStationAddressLocation());
+        }
+        String stationId = principal.getStationId();
+        if (stationId == null || stationId.isBlank()) {
+            return null;
+        }
+        String addressLocation = saccoStationRepository.findBySaccoIdAndStationId(principal.getSaccoId(), stationId)
+            .map(station -> station.getAddressLocation() == null || station.getAddressLocation().isBlank()
+                ? "Location not set"
+                : station.getAddressLocation().trim())
+            .orElse("Location not set");
+        return new HeaderStationView(stationId.trim(), addressLocation);
     }
 
     @ModelAttribute("isPlatformAdminIdentity")
@@ -278,6 +301,13 @@ public class CurrentUserModelAdvice {
 
     private boolean isPlatformAdminIdentity(AppUserPrincipal principal) {
         return principal != null && principal.hasRole(Position.ADMIN);
+    }
+
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class HeaderStationView {
+        private String stationId;
+        private String stationAddressLocation;
     }
 
     private record ActiveSaccoBrand(String id, String name, String logoText, String logoUrl) {}

@@ -1,6 +1,7 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.StaffMfaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -69,7 +70,7 @@ public class StaffMfaController {
             AppUserPrincipal principal = staffMfaService.completeChallenge(otpCode.trim(), request);
             String redirectUrl = landing != null && !landing.isBlank()
                 ? landing
-                : defaultLanding(principal);
+                : WorkspaceLanding.staffDashboard(principal);
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("valid", true);
             payload.put("redirectUrl", redirectUrl);
@@ -86,18 +87,6 @@ public class StaffMfaController {
     public String cancel(HttpServletRequest request) {
         staffMfaService.clear(request);
         return "redirect:/login";
-    }
-
-    private String defaultLanding(AppUserPrincipal principal) {
-        return switch (principal.getPosition()) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case LOAN_OFFICER -> "/loan-officer/queue";
-            case MANAGER -> "/manager/loan-applications?status=READY_FOR_MANAGER";
-            case ACCOUNTANT -> "/accountant/loan-applications?filter=AWAITING_ACCOUNTANT";
-            case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT";
-            case BOARD -> "/board/queue";
-            case MEMBER -> "/app/dashboard";
-        };
     }
 
     private String maskEmail(String email) {

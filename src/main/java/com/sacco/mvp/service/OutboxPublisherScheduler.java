@@ -2,12 +2,10 @@ package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.OutboxEvent;
 import com.sacco.mvp.domain.OutboxStatus;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import com.sacco.mvp.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +27,10 @@ import java.util.UUID;
 public class OutboxPublisherScheduler {
     private final OutboxEventRepository outboxEventRepository;
     private final NotificationRepository notificationRepository;
-    private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
     private final NotificationViewService notificationViewService;
-    private final NotificationEmailService notificationEmailService;
+    private final NotificationDeliveryService notificationDeliveryService;
 
     @Value("${app.outbox.batch-size:250}")
     private int batchSize;
@@ -56,10 +53,8 @@ public class OutboxPublisherScheduler {
                     .createdAt(OffsetDateTime.now())
                     .sentAt(OffsetDateTime.now())
                     .build());
-                if (memberRepository.findById(recipientId).map(Member::getEmail).filter(email -> !email.isBlank()).isPresent()) {
-                    NotificationViewService.NotificationView view = notificationViewService.toView(notification);
-                    notificationEmailService.sendNotificationEmail(recipientId, view.getSubject(), view.getMessage());
-                }
+                NotificationViewService.NotificationView view = notificationViewService.toView(notification);
+                notificationDeliveryService.deliver(null, recipientId, event.getEventType(), view.getSubject(), view.getMessage());
 
                 event.setStatus(OutboxStatus.PUBLISHED);
                 event.setPublishedAt(OffsetDateTime.now());

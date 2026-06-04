@@ -72,6 +72,7 @@ public class AdminService {
     private final SaccoConfigurationService saccoConfigurationService;
     private final SaccoRegistryService saccoRegistryService;
     private final MinorAdminInvitationService minorAdminInvitationService;
+    private final NotificationDeliveryPreferenceService notificationDeliveryPreferenceService;
     private final ObjectMapper objectMapper;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
@@ -398,7 +399,7 @@ public class AdminService {
         if (normalizedStationId != null && !sameStation) {
             throw new IllegalArgumentException("Member not found in this station.");
         }
-        if (!sameSacco && normalizedStationId == null) {
+        if (!sameSacco) {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
         boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
@@ -419,12 +420,6 @@ public class AdminService {
 
         Map<String, Object> before = snapshotMember(member);
         Position previousPosition = member.getPosition();
-        if (!sameSacco && sameStation) {
-            // Some legacy station users are still attached to an older SACCO id even though
-            // the current workspace already manages that station. Re-scope them when an
-            // admin updates their access so the saved role aligns with the visible slice.
-            member.setSaccoId(saccoId);
-        }
         if (normalizedStationId != null) {
             member.setStationId(normalizedStationId);
         }
@@ -518,6 +513,33 @@ public class AdminService {
     public SaccoSettings settings(String saccoId) {
         return saccoSettingsRepository.findById(saccoId)
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings not found"));
+    }
+
+    public List<NotificationDeliveryPreferenceService.NotificationDeliveryPreferenceView> notificationDeliveryPreferences(String saccoId) {
+        return notificationDeliveryPreferenceService.views(saccoId);
+    }
+
+    @Transactional
+    public void updateNotificationDeliveryPreferences(String saccoId,
+                                                      UUID adminId,
+                                                      boolean loanStatusEmail,
+                                                      boolean loanStatusSms,
+                                                      boolean guaranteeRequestEmail,
+                                                      boolean guaranteeRequestSms,
+                                                      boolean repaymentReminderEmail,
+                                                      boolean repaymentReminderSms) {
+        SaccoSettings settings = settings(saccoId);
+        Map<String, Object> before = snapshotSettings(settings);
+        notificationDeliveryPreferenceService.update(
+            saccoId,
+            loanStatusEmail,
+            loanStatusSms,
+            guaranteeRequestEmail,
+            guaranteeRequestSms,
+            repaymentReminderEmail,
+            repaymentReminderSms
+        );
+        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_NOTIFICATION_DELIVERY", adminId, before, snapshotSettings(settings(saccoId)));
     }
 
     @Transactional
@@ -1660,12 +1682,12 @@ public class AdminService {
         if (Position.containsAdminRole(staffRoles)) {
             return new ArrayList<>(defaults);
         }
-        if (requestedClaims == null) {
-            return new ArrayList<>();
+        LinkedHashSet<UserClaim> normalized = new LinkedHashSet<>(defaults);
+        if (requestedClaims != null) {
+            requestedClaims.stream()
+                .filter(java.util.Objects::nonNull)
+                .forEach(normalized::add);
         }
-        LinkedHashSet<UserClaim> normalized = requestedClaims.stream()
-            .filter(java.util.Objects::nonNull)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
         if (!memberAccess) {
             normalized.remove(UserClaim.APPLY_LOANS);
             normalized.remove(UserClaim.APPROVE_GUARANTOR_REQUESTS);
@@ -1721,14 +1743,11 @@ public class AdminService {
         }
 
         List<Member> stationMembers = filterMembersByStation(saccoMembers, normalizedStationId);
-        List<Member> stationWideMatches = memberRepository.findByStationIdIgnoreCaseOrderByFullNameAsc(normalizedStationId);
+        List<Member> stationWideMatches = memberRepository.findBySaccoIdAndStationIdIgnoreCaseOrderByFullNameAsc(saccoId, normalizedStationId);
         if (stationWideMatches.isEmpty()) {
             return stationMembers;
         }
 
-        // Historical user records can remain attached to an earlier SACCO id while the
-        // active workspace is already operating on the selected station. Merge the
-        // current station slice so Minor Admins still see the users they manage there.
         Map<UUID, Member> mergedById = new LinkedHashMap<>();
         stationMembers.forEach(member -> mergedById.put(member.getId(), member));
         stationWideMatches.forEach(member -> mergedById.putIfAbsent(member.getId(), member));

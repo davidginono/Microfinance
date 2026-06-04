@@ -167,7 +167,7 @@ public class LoanAnalyticsService {
                                                                     LocalDate toDate,
                                                                     LoanStatus loanStatus) {
         return productPerformance(saccoId, memberLoans(memberId, fromDate, toDate, null, loanStatus).stream()
-            .filter(app -> matchesStation(app, stationId))
+            .filter(app -> matchesScope(app, saccoId, stationId))
             .toList());
     }
 
@@ -265,9 +265,13 @@ public class LoanAnalyticsService {
     }
 
     public MemberLoanAnalytics summarizeAllTime(UUID memberId, String stationId) {
+        return summarizeAllTime(memberId, null, stationId);
+    }
+
+    public MemberLoanAnalytics summarizeAllTime(UUID memberId, String saccoId, String stationId) {
         return summarize(loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId)
             .stream()
-            .filter(app -> matchesStation(app, stationId))
+            .filter(app -> matchesScope(app, saccoId, stationId))
             .toList());
     }
 
@@ -276,12 +280,16 @@ public class LoanAnalyticsService {
     }
 
     public BigDecimal activeLoanAmount(UUID memberId, String stationId) {
+        return activeLoanAmount(memberId, null, stationId);
+    }
+
+    public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
         return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
                 memberId,
                 List.copyOf(ACTIVE_STATUSES)
             )
             .stream()
-            .filter(app -> matchesStation(app, stationId))
+            .filter(app -> matchesScope(app, saccoId, stationId))
             .map(LoanApplication::getAmount)
             .filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -292,10 +300,14 @@ public class LoanAnalyticsService {
     }
 
     public int forfeitedLoanCountSince(UUID memberId, String stationId, int lookbackDays) {
+        return forfeitedLoanCountSince(memberId, null, stationId, lookbackDays);
+    }
+
+    public int forfeitedLoanCountSince(UUID memberId, String saccoId, String stationId, int lookbackDays) {
         LocalDate fromDate = LocalDate.now().minusDays(Math.max(lookbackDays, 0));
         return (int) loanApplicationRepository.findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(memberId, LoanStatus.FORFEITED)
             .stream()
-            .filter(app -> matchesStation(app, stationId))
+            .filter(app -> matchesScope(app, saccoId, stationId))
             .filter(app -> withinRange(app.getUpdatedAt() == null ? app.getCreatedAt() : app.getUpdatedAt(), fromDate, null))
             .count();
     }
@@ -305,6 +317,16 @@ public class LoanAnalyticsService {
             return true;
         }
         return app != null && app.getStationId() != null && stationId.trim().equalsIgnoreCase(app.getStationId());
+    }
+
+    private boolean matchesScope(LoanApplication app, String saccoId, String stationId) {
+        if (app == null) {
+            return false;
+        }
+        if (saccoId != null && !saccoId.isBlank() && !saccoId.equalsIgnoreCase(app.getSaccoId())) {
+            return false;
+        }
+        return matchesStation(app, stationId);
     }
 
     private List<LoanApplication> memberLoans(UUID memberId,
