@@ -52,6 +52,23 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
 
+    @Query("""
+        select m
+        from Member m
+        where m.saccoId = :saccoId
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+          and m.id <> :applicantId
+          and (m.memberAccount = true or (m.memberAccount is null and m.position = com.sacco.mvp.domain.Position.MEMBER))
+          and lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
+        order by m.fullName asc
+        """)
+    Page<Member> findGuarantorCandidatesByName(@Param("saccoId") String saccoId,
+                                               @Param("stationId") String stationId,
+                                               @Param("applicantId") UUID applicantId,
+                                               @Param("query") String query,
+                                               Pageable pageable);
+
     List<Member> findBySaccoIdIn(Collection<String> saccoIds);
 
     @Query("""

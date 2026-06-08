@@ -162,9 +162,21 @@
         </div>
         <div id="financialFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
         <div id="financialLoading" class="mt-3 hidden erp-section text-sm text-slate-600">
-            <div class="flex items-center gap-3">
-                <span class="inline-flex h-3 w-3 animate-pulse rounded-full bg-sacco-blue"></span>
-                <spring:message code="newloan.loanDetails.loading" />
+            <span class="sr-only"><spring:message code="newloan.loanDetails.loading" /></span>
+            <div class="skeleton-table" aria-hidden="true">
+                <span class="skeleton skeleton-title"></span>
+                <div class="skeleton-table-row">
+                    <span class="skeleton skeleton-text"></span>
+                    <span class="skeleton skeleton-text"></span>
+                </div>
+                <div class="skeleton-table-row">
+                    <span class="skeleton skeleton-text"></span>
+                    <span class="skeleton skeleton-text"></span>
+                </div>
+                <div class="skeleton-table-row">
+                    <span class="skeleton skeleton-text"></span>
+                    <span class="skeleton skeleton-text" style="width: 72%;"></span>
+                </div>
             </div>
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotDisplay}'>hidden </c:if>mt-4 erp-table-wrap overflow-x-auto">
@@ -199,12 +211,19 @@
                 </span>
             </div>
 
-            <div class="relative flex gap-2">
+            <div class="relative flex flex-col gap-2 sm:flex-row sm:items-center ">
+                <select id="guarantorSearchMode"
+                        class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none">
+                    <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
+                    <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
+                </select>
                 <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
-                       class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none" />
-                <button id="guarantorSearchButton" type="button" class="app-btn btn-primary shrink-0"><spring:message code="common.search" /></button>
-                <div id="guarantorDropdown" class="absolute left-0 right-0 z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
+                       class="w-full sm:flex-1 rounded-lg border border-slate-300 bg-white px-3 py-3.5 text-sm focus:border-sacco-blue focus:outline-none" />
+                <button id="guarantorSearchButton" type="button" class="shrink-0 rounded-md bg-white border-slate-300 px-5 py-3.5 text-sm font-semibold text-gray hover:bg-sacco-blue/90"><spring:message code="common.search" /></button>
+                <div id="guarantorDropdown" class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
             </div>
+
+           
             <p id="guarantorHint" class="mt-2 text-sm text-slate-500"><spring:message code="newloan.guarantors.hint" /></p>
 
             <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
@@ -856,6 +875,7 @@
         (function () {
             const form = document.getElementById("loanApplicationForm");
             const required = Number("${requiredGuarantors}");
+            const searchMode = document.getElementById("guarantorSearchMode");
             const searchInput = document.getElementById("guarantorSearch");
             const searchButton = document.getElementById("guarantorSearchButton");
             const dropdown = document.getElementById("guarantorDropdown");
@@ -873,9 +893,14 @@
             const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' />";
             const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
             const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
+            const msgEnterGuarantorName = "<spring:message code='newloan.js.enterGuarantorName' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
+            const numberPlaceholder = "<spring:message code='newloan.guarantors.placeholder' />";
+            const namePlaceholder = "<spring:message code='newloan.guarantors.namePlaceholder' />";
+            const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
+            const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
 
             function updateCounter() {
                 counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
@@ -986,15 +1011,26 @@
             }
 
             async function runSearch() {
-                const term = searchInput.value.trim().toUpperCase();
-                const validFourDigitsOrMore = /^\d{4,20}$/.test(term);
-                const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(term) && /\d/.test(term);
-                if (!validFourDigitsOrMore && !validFullMemberNo) {
-                    hint.textContent = msgEnterMemberNumber;
-                    hideDropdown();
-                    return;
+                const mode = searchMode.value === "name" ? "name" : "number";
+                let term = searchInput.value.trim();
+                if (mode === "name") {
+                    term = term.toLowerCase();
+                    if (term.length < 2) {
+                        hint.textContent = msgEnterGuarantorName;
+                        hideDropdown();
+                        return;
+                    }
+                } else {
+                    term = term.toUpperCase();
+                    const validFourDigitsOrMore = /^\d{4,20}$/.test(term);
+                    const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(term) && /\d/.test(term);
+                    if (!validFourDigitsOrMore && !validFullMemberNo) {
+                        hint.textContent = msgEnterMemberNumber;
+                        hideDropdown();
+                        return;
+                    }
                 }
-                const query = new URLSearchParams({ q: term, loanType: "${loanType}" });
+                const query = new URLSearchParams({ q: term, searchBy: mode, loanType: "${loanType}" });
                 const response = await fetch("/app/guarantors/search?" + query.toString(), {
                     headers: {
                         "X-Requested-With": "XMLHttpRequest"
@@ -1011,6 +1047,15 @@
                     hint.textContent = msgUnableSearchGuarantors;
                     hideDropdown();
                 });
+            });
+
+            searchMode.addEventListener("change", function () {
+                const mode = searchMode.value === "name" ? "name" : "number";
+                searchInput.value = "";
+                searchInput.placeholder = mode === "name" ? namePlaceholder : numberPlaceholder;
+                hint.textContent = mode === "name" ? nameHint : numberHint;
+                hideDropdown();
+                searchInput.focus();
             });
 
             const draftButton = document.querySelector("button[type='submit'][data-form-action='SAVE_DRAFT']");

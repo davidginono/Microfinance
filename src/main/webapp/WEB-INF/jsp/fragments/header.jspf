@@ -612,6 +612,134 @@
             border-radius: 0.4rem;
             padding: 0.9rem 1rem;
         }
+        .skeleton {
+            opacity: 0.72;
+            animation: skeleton-loading 1s linear infinite alternate;
+        }
+        .skeleton-text,
+        .skeleton-title,
+        .skeleton-block,
+        .skeleton-pill {
+            display: block;
+            background-color: hsl(200, 20%, 78%);
+        }
+        .skeleton-text {
+            width: 100%;
+            height: 0.5rem;
+            margin-bottom: 0.35rem;
+            border-radius: 0.125rem;
+        }
+        .skeleton-title {
+            width: 62%;
+            height: 0.85rem;
+            margin-bottom: 0.55rem;
+            border-radius: 0.18rem;
+        }
+        .skeleton-block {
+            width: 100%;
+            min-height: 4.5rem;
+            border-radius: 0.35rem;
+        }
+        .skeleton-pill {
+            display: inline-block;
+            width: 5rem;
+            height: 0.8rem;
+            margin-left: 0.35rem;
+            vertical-align: middle;
+            border-radius: 999px;
+        }
+        .skeleton-table {
+            display: grid;
+            gap: 0.55rem;
+        }
+        .skeleton-table-row {
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 1fr);
+        }
+        .page-submit-preloader {
+            position: fixed;
+            inset: 0;
+            z-index: 120;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(241, 245, 249, 0.10);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .page-submit-preloader.is-active {
+            display: flex;
+        }
+        .page-submit-preloader__panel {
+            display: grid;
+            place-items: center;
+            gap: 0.85rem;
+            color: #334155;
+        }
+        .page-submit-preloader__spinner {
+            position: relative;
+            width: 5.5rem;
+            height: 5.5rem;
+        }
+        .page-submit-preloader__ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            border: 0.18rem solid transparent;
+            animation: page-submit-preloader-spin 1.15s linear infinite;
+        }
+        .page-submit-preloader__ring:nth-child(1) {
+            border-top-color: #2f8fe8;
+            border-left-color: #2f8fe8;
+        }
+        .page-submit-preloader__ring:nth-child(2) {
+            inset: 0.62rem;
+            border-top-color: #facc15;
+            border-right-color: #facc15;
+            animation-duration: 1.35s;
+            animation-direction: reverse;
+        }
+        .page-submit-preloader__ring:nth-child(3) {
+            inset: 1.18rem;
+            border-bottom-color: #f97316;
+            border-left-color: #fbcfe8;
+            animation-duration: 1.55s;
+        }
+        .page-submit-preloader__text {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        @media (max-width: 639px) {
+            .skeleton-table-row {
+                grid-template-columns: minmax(0, 1fr);
+            }
+            .page-submit-preloader__spinner {
+                width: 4.6rem;
+                height: 4.6rem;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .skeleton,
+            .page-submit-preloader__ring {
+                animation: none;
+            }
+        }
+        @keyframes skeleton-loading {
+            0% {
+                background-color: hsl(200, 20%, 72%);
+            }
+            100% {
+                background-color: hsl(200, 20%, 94%);
+            }
+        }
+        @keyframes page-submit-preloader-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
         .erp-toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -1114,6 +1242,16 @@
     </div>
 </div>
 <div id="appToastContainer" class="pointer-events-none fixed right-4 top-[calc(var(--shell-nav-height)+0.75rem)] z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-[calc(var(--shell-nav-height)+1rem)]"></div>
+<div id="pageSubmitPreloader" class="page-submit-preloader" aria-hidden="true">
+    <div class="page-submit-preloader__panel" role="status" aria-live="polite">
+        <div class="page-submit-preloader__spinner" aria-hidden="true">
+            <span class="page-submit-preloader__ring"></span>
+            <span class="page-submit-preloader__ring"></span>
+            <span class="page-submit-preloader__ring"></span>
+        </div>
+        <span class="page-submit-preloader__text"><spring:message code="common.processing" text="Processing..." /></span>
+    </div>
+</div>
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/45 lg:hidden"></div>
 <div class="relative min-h-screen" style="padding-top: var(--shell-nav-height); overflow-x: clip;">
@@ -1122,9 +1260,11 @@
     (function () {
         const shellTopNav = document.getElementById('shellTopNav');
         const toastContainer = document.getElementById('appToastContainer');
+        const pageSubmitPreloader = document.getElementById('pageSubmitPreloader');
         const pageTitleRail = document.getElementById('shellPageTitleRail');
         const pageTitleRailText = document.getElementById('shellPageTitleRailText');
         let titleRailTicking = false;
+        let pageSubmitPreloaderActive = false;
         const syncShellNavHeight = function () {
             if (!shellTopNav) {
                 return;
@@ -1219,6 +1359,59 @@
             }
             return { dismiss: dismiss, element: toast };
         };
+
+        const hidePageSubmitPreloader = function () {
+            pageSubmitPreloaderActive = false;
+            document.documentElement.classList.remove('page-submit-preloader-active');
+            document.body.removeAttribute('aria-busy');
+            if (pageSubmitPreloader) {
+                pageSubmitPreloader.classList.remove('is-active');
+                pageSubmitPreloader.setAttribute('aria-hidden', 'true');
+            }
+        };
+
+        const showPageSubmitPreloader = function (form) {
+            if (!pageSubmitPreloader || pageSubmitPreloaderActive) {
+                return;
+            }
+            pageSubmitPreloaderActive = true;
+            document.body.setAttribute('aria-busy', 'true');
+            pageSubmitPreloader.classList.add('is-active');
+            pageSubmitPreloader.setAttribute('aria-hidden', 'false');
+            if (form) {
+                form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (control) {
+                    control.disabled = true;
+                    control.setAttribute('aria-disabled', 'true');
+                    control.classList.add('opacity-60', 'cursor-not-allowed');
+                });
+            }
+        };
+
+        document.addEventListener('submit', function (event) {
+            const form = event.target instanceof HTMLFormElement ? event.target : null;
+            if (!form || event.defaultPrevented) {
+                return;
+            }
+            if (form.matches('[data-no-page-preloader="true"], [data-page-preloader="false"]')) {
+                return;
+            }
+            if (form.method && form.method.toLowerCase() === 'dialog') {
+                return;
+            }
+            if (form.target && form.target !== '_self') {
+                return;
+            }
+            if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                return;
+            }
+            window.setTimeout(function () {
+                if (!event.defaultPrevented) {
+                    showPageSubmitPreloader(form);
+                }
+            }, 0);
+        });
+
+        window.addEventListener('pageshow', hidePageSubmitPreloader);
 
         window.scrollToFeedback = function (element) {
             if (!element || !element.textContent || !element.textContent.trim()) {

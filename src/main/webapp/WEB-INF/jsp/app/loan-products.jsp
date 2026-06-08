@@ -102,9 +102,21 @@
 
             <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
             <div id="productsFinancialLoading" class="hidden app-modal-section text-sm text-slate-600">
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex h-3 w-3 animate-pulse rounded-full bg-sacco-blue"></span>
-                    <spring:message code="products.loadingCalculator" />
+                <span class="sr-only"><spring:message code="products.loadingCalculator" /></span>
+                <div class="skeleton-table" aria-hidden="true">
+                    <span class="skeleton skeleton-title"></span>
+                    <div class="skeleton-table-row">
+                        <span class="skeleton skeleton-text"></span>
+                        <span class="skeleton skeleton-text"></span>
+                    </div>
+                    <div class="skeleton-table-row">
+                        <span class="skeleton skeleton-text"></span>
+                        <span class="skeleton skeleton-text"></span>
+                    </div>
+                    <div class="skeleton-table-row">
+                        <span class="skeleton skeleton-text"></span>
+                        <span class="skeleton skeleton-text" style="width: 72%;"></span>
+                    </div>
                 </div>
             </div>
             <div id="productsFinancialCard" class="hidden erp-table-wrap overflow-x-auto">

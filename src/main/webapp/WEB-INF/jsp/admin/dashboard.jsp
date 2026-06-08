@@ -81,15 +81,15 @@
                 <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.dashboard.databaseUtilizationHelp" text="Real-time PostgreSQL storage and connection usage sampled every 15 seconds." /></p>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.size" text="Size" />: <span id="dbUtilizationSize">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.connections" text="Connections" />: <span id="dbUtilizationConnections">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.usage" text="Usage" />: <span id="dbUtilizationPercent">-</span></span>
-                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.updated" text="Updated" />: <span id="dbUtilizationUpdated">-</span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.size" text="Size" />: <span id="dbUtilizationSize" class="skeleton skeleton-pill" aria-hidden="true"></span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.connections" text="Connections" />: <span id="dbUtilizationConnections" class="skeleton skeleton-pill" aria-hidden="true"></span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.usage" text="Usage" />: <span id="dbUtilizationPercent" class="skeleton skeleton-pill" aria-hidden="true"></span></span>
+                <span class="rounded-sm border border-slate-200 bg-white px-3 py-2 text-slate-700"><spring:message code="admin.dashboard.updated" text="Updated" />: <span id="dbUtilizationUpdated" class="skeleton skeleton-pill" aria-hidden="true"></span></span>
             </div>
         </div>
     </div>
     <div class="erp-panel-body">
-        <div class="overflow-hidden rounded border border-slate-200 bg-slate-50 p-3">
+        <div id="dbUtilizationChartShell" class="skeleton overflow-hidden rounded border border-slate-200 bg-slate-50 p-3">
             <canvas id="dbUtilizationChart" class="block w-full" height="340"></canvas>
         </div>
     </div>
@@ -191,6 +191,15 @@
         const connectionEl = document.getElementById('dbUtilizationConnections');
         const percentEl = document.getElementById('dbUtilizationPercent');
         const updatedEl = document.getElementById('dbUtilizationUpdated');
+        const chartShell = document.getElementById('dbUtilizationChartShell');
+
+        function clearSkeleton(el) {
+            if (!el) {
+                return;
+            }
+            el.classList.remove('skeleton', 'skeleton-pill');
+            el.removeAttribute('aria-hidden');
+        }
 
         function drawChart(payload) {
             const history = payload && payload.history ? payload.history : [];
@@ -337,6 +346,8 @@
             ctx.fillText('Connection Utilization (%)', padding.left + 198, 20);
 
             if (latest) {
+                [sizeEl, connectionEl, percentEl, updatedEl].forEach(clearSkeleton);
+                chartShell?.classList.remove('skeleton');
                 sizeEl.textContent = latest.sizeMb.toFixed(2) + ' MB';
                 connectionEl.textContent = latest.activeConnections + ' / ' + latest.maxConnections;
                 percentEl.textContent = latest.utilizationPercent.toFixed(2) + '%';

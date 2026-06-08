@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.List;
@@ -187,6 +188,45 @@ public class BoardController {
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
+        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
+            .collect(Collectors.toMap(
+                LoanApplication::getId,
+                this::storedActiveLoanPaymentSummary,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
+            .map(loan -> {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", loan.getId().toString());
+                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
+                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
+                row.put("loanTypeLabel", loanTypeLabel(loan.getLoanType()));
+                row.put("amount", formatMoney(loan.getAmount()));
+                row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
+                row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
+                row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
+                row.put("outstandingBalance", activeLoanSummaries.getOrDefault(
+                    loan.getId(),
+                    LoanPresentationService.LoanPaymentSummaryView.empty()
+                ).totalOutstandingLabel());
+                row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
+                    ? "Standard schedule"
+                    : humanizeEnum(loan.getRepaymentFrequency().name()));
+                row.put("countdown", loanPresentationService.countdownLabel(loan.getFinalDueDate()));
+                row.put("isTopUpSource", String.valueOf(
+                    app.getTopUpSourceLoanId() != null && app.getTopUpSourceLoanId().equals(loan.getId())));
+                return row;
+            })
+            .toList());
+        model.addAttribute("activeApplicantLoanCount", activeApplicantLoans.size());
+        model.addAttribute("activeApplicantLoanTotalAmount", formatMoney(
+            activeApplicantLoans.stream()
+                .map(LoanApplication::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
@@ -245,6 +285,28 @@ public class BoardController {
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
+    @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
+    @ResponseBody
+    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
+                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
+        boardService.getMyReview(id, principal.getMemberId());
+        LoanApplication app = loanApplicationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        List<Map<String, String>> rows = activeApplicantLoans.stream()
+            .map(loan -> {
+                LoanPresentationService.LoanPaymentSummaryView summary = storedActiveLoanPaymentSummary(loan);
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", loan.getId().toString());
+                row.put("outstandingBalance", summary.totalOutstandingLabel());
+                return row;
+            })
+            .toList();
+        return ResponseEntity.ok(Map.of("rows", rows));
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")
@@ -489,6 +551,30 @@ public class BoardController {
                 .replace('_', ' ')
                 .trim();
         };
+    }
+
+    private String loanTypeLabel(com.sacco.mvp.domain.LoanType loanType) {
+        if (loanType == null) {
+            return "-";
+        }
+        return loanType.getDisplayLabel();
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        if (amount == null) {
+            return "-";
+        }
+        java.text.DecimalFormat format = new java.text.DecimalFormat(
+            "#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US));
+        return "TSh " + format.format(amount);
+    }
+
+    private String humanizeEnum(String value) {
+        return value == null ? "-" : value.replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(LoanApplication loan) {
+        return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
     }
 
     private Member requireMemberWithSavedSignature(UUID memberId) {

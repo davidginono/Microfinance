@@ -19,6 +19,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -237,6 +239,29 @@ class LoanWorkflowServiceTest {
         var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "0101", 0, 10);
 
         assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    void searchGuarantorsFindsCandidatesByLowercaseName() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        Member guarantor = activeMember(guarantorId, saccoId, "ST01");
+        guarantor.setFullName("ALEX JUMAPILI");
+        guarantor.setMemberNo("0100");
+
+        when(memberRepository.findGuarantorCandidatesByName(
+            eq(saccoId),
+            eq("ST01"),
+            eq(applicantId),
+            eq("alex"),
+            eq(PageRequest.of(0, 10))
+        )).thenReturn(new PageImpl<>(List.of(guarantor), PageRequest.of(0, 10), 1));
+
+        var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "ALEX", "name", 0, 10);
+
+        assertThat(result.getContent()).containsExactly(guarantor);
+        verify(memberRepository, never()).findBySaccoIdAndStatusAndMemberNoIgnoreCase(anyString(), any(), anyString());
     }
 
     @Test

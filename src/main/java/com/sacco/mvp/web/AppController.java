@@ -1226,11 +1226,24 @@ public class AppController {
     @ResponseBody
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
                                                       @RequestParam(defaultValue = "") String q,
+                                                      @RequestParam(required = false) String searchBy,
                                                       @RequestParam(required = false) LoanType loanType) {
-        String query = q == null ? "" : q.trim().toUpperCase(Locale.ROOT);
-        boolean fourDigitsOrMore = query.matches("\\d{4,20}");
-        boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
-        if (!fourDigitsOrMore && !fullMemberNo) {
+        String mode = resolveGuarantorSearchMode(searchBy, q);
+        String query = q == null ? "" : q.trim();
+        if ("name".equals(mode)) {
+            query = query.toLowerCase(Locale.ROOT);
+            if (query.length() < 2) {
+                return Collections.emptyList();
+            }
+        } else {
+            query = query.toUpperCase(Locale.ROOT);
+            boolean fourDigitsOrMore = query.matches("\\d{4,20}");
+            boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
+            if (!fourDigitsOrMore && !fullMemberNo) {
+                return Collections.emptyList();
+            }
+        }
+        if (query.isBlank()) {
             return Collections.emptyList();
         }
         return loanWorkflowService.searchGuarantorCandidates(
@@ -1238,6 +1251,7 @@ public class AppController {
                 principal.getStationId(),
                 principal.getMemberId(),
                 query,
+                mode,
                 loanType,
                 0,
                 6)
@@ -1252,6 +1266,19 @@ public class AppController {
                 return row;
             })
             .toList();
+    }
+
+    private String resolveGuarantorSearchMode(String searchBy, String q) {
+        if ("name".equalsIgnoreCase(searchBy)) {
+            return "name";
+        }
+        if ("number".equalsIgnoreCase(searchBy)) {
+            return "number";
+        }
+        String query = q == null ? "" : q.trim();
+        boolean containsLetter = query.chars().anyMatch(Character::isLetter);
+        boolean containsDigit = query.chars().anyMatch(Character::isDigit);
+        return containsLetter && !containsDigit ? "name" : "number";
     }
 
     @PostMapping("/loan-applications/financial-preview")

@@ -411,12 +411,30 @@ public class LoanWorkflowService {
     }
 
     public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, int page, int size) {
+        return searchGuarantors(saccoId, stationId, applicantId, q, "number", page, size);
+    }
+
+    public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, String searchBy, int page, int size) {
         String query = q == null ? "" : q.trim();
         if (query.isBlank()) {
             return Page.empty(PageRequest.of(page, size));
         }
 
         String normalizedStationId = normalizeOptional(stationId);
+        if ("name".equalsIgnoreCase(searchBy)) {
+            String lowercaseQuery = query.toLowerCase(Locale.ROOT);
+            if (lowercaseQuery.length() < 2) {
+                return Page.empty(PageRequest.of(page, size));
+            }
+            return memberRepository.findGuarantorCandidatesByName(
+                saccoId,
+                normalizedStationId,
+                applicantId,
+                lowercaseQuery,
+                PageRequest.of(page, size)
+            );
+        }
+
         Optional<Member> exactMemberNo = memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(
             saccoId, MemberStatus.ACTIVE, query);
         if (exactMemberNo.isPresent()
@@ -452,8 +470,19 @@ public class LoanWorkflowService {
                                                               LoanType loanType,
                                                               int page,
                                                               int size) {
+        return searchGuarantorCandidates(saccoId, stationId, applicantId, q, "number", loanType, page, size);
+    }
+
+    public List<GuarantorCandidate> searchGuarantorCandidates(String saccoId,
+                                                              String stationId,
+                                                              UUID applicantId,
+                                                              String q,
+                                                              String searchBy,
+                                                              LoanType loanType,
+                                                              int page,
+                                                              int size) {
         LoanProductSetting product = loanType == null ? null : formSchemaService.getSchema(saccoId, loanType);
-        return searchGuarantors(saccoId, stationId, applicantId, q, page, size).getContent().stream()
+        return searchGuarantors(saccoId, stationId, applicantId, q, searchBy, page, size).getContent().stream()
             .map(member -> {
                 String reason = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReason(saccoId, member.getId(), null, product))
                     .orElse(Optional.empty())
