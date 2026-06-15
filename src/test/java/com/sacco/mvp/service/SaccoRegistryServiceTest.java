@@ -41,7 +41,7 @@ class SaccoRegistryServiceTest {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
         SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
-        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
 
         SaccoRegistryService service = new SaccoRegistryService(
             registeredSaccoRepository,
@@ -106,7 +106,7 @@ class SaccoRegistryServiceTest {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
         SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
-        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
 
         SaccoRegistryService service = new SaccoRegistryService(
             registeredSaccoRepository,
@@ -158,7 +158,7 @@ class SaccoRegistryServiceTest {
 
         service.updateSacco("SACCO-1", "Example Sacco", "STN001", logoFile);
 
-        org.junit.jupiter.api.Assertions.assertTrue(saccoLogoStorageService.hasLogo("SACCO-1"));
+        verify(saccoLogoStorageService).store("SACCO-1", logoFile);
     }
 
     @Test
@@ -166,7 +166,7 @@ class SaccoRegistryServiceTest {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
         SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
-        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
 
         SaccoRegistryService service = new SaccoRegistryService(
             registeredSaccoRepository,
@@ -229,7 +229,7 @@ class SaccoRegistryServiceTest {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
         SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
-        SaccoLogoStorageService saccoLogoStorageService = new SaccoLogoStorageService(tempDir.resolve("logos"));
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
 
         SaccoRegistryService service = new SaccoRegistryService(
             registeredSaccoRepository,

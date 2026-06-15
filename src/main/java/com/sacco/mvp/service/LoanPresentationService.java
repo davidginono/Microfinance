@@ -30,9 +30,9 @@ import org.springframework.web.util.HtmlUtils;
 import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -85,11 +85,11 @@ public class LoanPresentationService {
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
-            putMoney(display, "Principal (TZS)", principalAmount);
+            putMoney(display, "Loan Amount (TZS)", principalAmount);
             addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
-                display.put("Principal + Interest (TZS)", formatMoney(principalPlusInterest));
+                display.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
             }
             addFinancialRow(display, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
             return display;
@@ -281,6 +281,33 @@ public class LoanPresentationService {
                 display.put("Paid At", formatTimestamp(paidAt));
             }
             return display;
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    public Map<String, Object> repaymentSummaryForReview(LoanApplication app) {
+        if (app == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> stored = parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt());
+        if (!stored.isEmpty()) {
+            return stored;
+        }
+        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            Map<String, Object> estimated = new LinkedHashMap<>();
+            putMoney(estimated, "Loan Amount", app.getAmount());
+            putValue(estimated, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
+            putValue(estimated, "Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putValue(estimated, "Repayment Tenor", app.getTenorMonths() == null ? null : app.getTenorMonths() + " months");
+            putMoney(estimated, "Estimated Installment", raw.get("monthlyRepaymentAmount"));
+            putMoney(estimated, "Total Interest", raw.get("interestAmount"));
+            putMoney(estimated, "Total Repayment", resolvePrincipalPlusInterest(raw, app.getAmount()));
+            return estimated;
         } catch (Exception ex) {
             return Collections.emptyMap();
         }
@@ -1247,24 +1274,23 @@ public class LoanPresentationService {
 
         private void drawAttachmentResource(String displayName, LoanAttachmentService.AttachmentResource resource) throws IOException {
             String contentType = resource.getContentType() == null ? "" : resource.getContentType().toLowerCase(Locale.ROOT);
-            Path path = resource.getPath();
             if (contentType.startsWith("image/")) {
-                BufferedImage image = ImageIO.read(path.toFile());
+                BufferedImage image = ImageIO.read(new ByteArrayInputStream(resource.getContent()));
                 if (image != null) {
                     drawAttachmentImage(displayName, image);
                     return;
                 }
             }
             if ("application/pdf".equals(contentType) || displayName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-                drawAttachmentPdf(displayName, path);
+                drawAttachmentPdf(displayName, resource.getContent());
                 return;
             }
             drawParagraph(displayName + " is attached. Preview is available from the application detail page.", regular, META_SIZE, MUTED_COLOR);
             y -= 4f;
         }
 
-        private void drawAttachmentPdf(String displayName, Path path) throws IOException {
-            try (PDDocument source = Loader.loadPDF(path.toFile())) {
+        private void drawAttachmentPdf(String displayName, byte[] content) throws IOException {
+            try (PDDocument source = Loader.loadPDF(content)) {
                 PDFRenderer pdfRenderer = new PDFRenderer(source);
                 for (int pageIndex = 0; pageIndex < source.getNumberOfPages(); pageIndex++) {
                     BufferedImage pageImage = pdfRenderer.renderImageWithDPI(pageIndex, 120);

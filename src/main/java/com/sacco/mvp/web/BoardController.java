@@ -10,6 +10,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.BoardService;
@@ -58,6 +59,7 @@ public class BoardController {
     private final ManagerService managerService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
+    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -188,6 +190,12 @@ public class BoardController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        model.addAttribute("repaymentSummary", loanPresentationService.repaymentSummaryForReview(app));
+        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
+            app.getRepaymentScheduleJson(),
+            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
+            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
+        model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
@@ -332,7 +340,7 @@ public class BoardController {
                 boardMember.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 boardMember.getId(),
-                "Your SACCO MVP board approval code",
+                "Your Loan Application Portal board approval code",
                 "Use this OTP code to confirm your signature and approve the assigned board review.",
                 app.getSaccoId(),
                 app.getStationId(),

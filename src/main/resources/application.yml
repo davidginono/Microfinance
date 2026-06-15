@@ -86,6 +86,10 @@ app:
     fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:500}
   application-numbers:
     block-size: ${APP_APPLICATION_NUMBERS_BLOCK_SIZE:100}
+  upload-migration:
+    enabled: ${APP_UPLOAD_MIGRATION_ENABLED:false}
+    loan-root: ${APP_UPLOAD_MIGRATION_LOAN_ROOT:loan-uploads/applications}
+    logo-root: ${APP_UPLOAD_MIGRATION_LOGO_ROOT:branding/sacco-logos}
   loan-payments:
     sync-enabled: true
     sync-cron: "0 0 10 1 * *"

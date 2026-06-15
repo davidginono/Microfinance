@@ -306,6 +306,8 @@
     </table>
 </div>
 
+<%@ include file="../fragments/staff-repayment-summary.jspf" %>
+
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>

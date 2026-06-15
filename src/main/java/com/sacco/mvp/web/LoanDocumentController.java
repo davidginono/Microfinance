@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -141,7 +140,7 @@ public class LoanDocumentController {
         return ResponseEntity.ok()
             .contentType(mediaType)
             .header(HttpHeaders.CONTENT_DISPOSITION, (inline ? "inline" : "attachment") + "; filename=\"" + resource.getOriginalName() + "\"")
-            .body(Files.readAllBytes(resource.getPath()));
+            .body(resource.getContent());
     }
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}/view")

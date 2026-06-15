@@ -175,6 +175,7 @@ It also optionally imports a local override file from the repository root:
 That file is ignored by Git and is the recommended place for local-only secrets such as:
 
 - `SPRING_DATASOURCE_PASSWORD`
+- `APP_UPLOAD_MIGRATION_ENABLED`
 - `SPRING_MAIL_USERNAME`
 - `SPRING_MAIL_PASSWORD`
 
@@ -187,6 +188,10 @@ spring:
   mail:
     username: your-mail-username
     password: your-mail-password
+
+Legacy filesystem uploads can be imported once after applying `V40__store_uploads_in_postgresql.sql` by starting the
+application with `APP_UPLOAD_MIGRATION_ENABLED=true`. The runner verifies database size and SHA-256 before deleting each
+source file, retains failures for retry, and becomes a no-op after a fully successful run.
 ```
 
 Base defaults in `application.yml` include:

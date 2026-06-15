@@ -92,8 +92,35 @@ class LoanPresentationServiceTest {
         Map<String, Object> fields = loanPresentationService.parseFinancialFields(app);
 
         assertThat(fields)
-            .containsEntry("Principal (TZS)", "TSh 125,000.00")
-            .containsEntry("Principal + Interest (TZS)", "TSh 137,000.00");
+            .containsEntry("Loan Amount (TZS)", "TSh 125,000.00")
+            .containsEntry("Loan Amount + Interest (TZS)", "TSh 137,000.00");
+    }
+
+    @Test
+    void repaymentSummaryForReviewEstimatesWithoutInventingDates() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("125000.00"))
+            .tenorMonths(6)
+            .financialSnapshot("""
+                {
+                  "interestMethod": "FLAT_RATE",
+                  "interestRate": 0.12,
+                  "interestAmount": 7500.00,
+                  "monthlyRepaymentAmount": 22083.33,
+                  "principalPlusInterest": 132500.00
+                }
+                """)
+            .build();
+
+        Map<String, Object> summary = loanPresentationService.repaymentSummaryForReview(app);
+
+        assertThat(summary)
+            .containsEntry("Loan Amount", "TSh 125,000.00")
+            .containsEntry("Repayment Tenor", "6 months")
+            .containsEntry("Estimated Installment", "TSh 22,083.33")
+            .containsEntry("Total Interest", "TSh 7,500.00")
+            .containsEntry("Total Repayment", "TSh 132,500.00")
+            .doesNotContainKeys("Disbursement Date", "First Repayment Date", "Final Due Date");
     }
 
     @Test

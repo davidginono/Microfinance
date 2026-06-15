@@ -219,7 +219,7 @@
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">Log in to Loan Management System</h1>
+                <h1 class="auth-heading">Log in to Loan Application Portal</h1>
             </div>
         </div>
         <div class="mb-5">

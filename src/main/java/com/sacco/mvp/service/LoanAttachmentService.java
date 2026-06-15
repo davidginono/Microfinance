@@ -3,7 +3,7 @@ package com.sacco.mvp.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
+import com.sacco.mvp.domain.StoredUpload;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,10 +11,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,22 +26,7 @@ public class LoanAttachmentService {
 
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
-    private final Path rootPath = Paths.get("loan-uploads", "applications");
-
-    @PostConstruct
-    void init() {
-        try {
-            Files.createDirectories(rootPath);
-        } catch (IOException e) {
-            adminAlertService.alertAllAdmins(
-                "Attachment Storage",
-                "Attachment storage initialization failed",
-                "The attachment storage directory could not be initialized.",
-                Map.of("path", rootPath.toString(), "error", e.getMessage() == null ? "Initialization error" : e.getMessage())
-            );
-            throw new IllegalStateException("Failed to initialize attachment storage", e);
-        }
-    }
+    private final StoredUploadStorageService storedUploadStorageService;
 
     public String store(UUID loanId, List<MultipartFile> files, String existingJson) {
         return store(loanId, files, existingJson, CATEGORY_APPLICATION_ATTACHMENT);
@@ -58,9 +39,7 @@ public class LoanAttachmentService {
         }
 
         String normalizedCategory = normalizeCategory(attachmentCategory);
-        Path loanFolder = rootPath.resolve(loanId.toString());
         try {
-            Files.createDirectories(loanFolder);
             for (MultipartFile file : files) {
                 if (file == null || file.isEmpty()) {
                     continue;
@@ -71,8 +50,15 @@ public class LoanAttachmentService {
                 String storedName = extension == null || extension.isBlank()
                     ? attachmentId
                     : attachmentId + "." + extension;
-                Path target = loanFolder.resolve(storedName);
-                Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                storedUploadStorageService.store(
+                    UUID.fromString(attachmentId),
+                    StoredUploadStorageService.OWNER_LOAN_APPLICATION,
+                    loanId.toString(),
+                    normalizedCategory,
+                    cleanedName,
+                    file.getContentType(),
+                    file.getBytes()
+                );
 
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", attachmentId);
@@ -120,46 +106,20 @@ public class LoanAttachmentService {
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
 
-        String storedName = String.valueOf(match.get("storedName"));
-        Path filePath = rootPath.resolve(loanId.toString()).resolve(storedName);
-        if (!Files.exists(filePath)) {
-            throw new IllegalArgumentException("Attachment file is missing");
-        }
+        StoredUpload upload = storedUploadStorageService.load(
+            UUID.fromString(attachmentId),
+            StoredUploadStorageService.OWNER_LOAN_APPLICATION,
+            loanId.toString()
+        );
         return new AttachmentResource(
-            filePath,
+            upload.getContent(),
             String.valueOf(match.get("originalName")),
-            String.valueOf(match.getOrDefault("contentType", "application/octet-stream"))
+            upload.getContentType()
         );
     }
 
     public void deleteAll(UUID loanId) {
-        Path loanFolder = rootPath.resolve(loanId.toString());
-        if (!Files.exists(loanFolder)) {
-            return;
-        }
-        try (var stream = Files.walk(loanFolder)) {
-            stream.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException e) {
-                    adminAlertService.alertAllAdmins(
-                        "Attachment Storage",
-                        "Attachment cleanup failed",
-                        "Attachment files could not be deleted during cleanup.",
-                        Map.of("loanId", loanId.toString(), "path", path.toString(), "error", e.getMessage() == null ? "Delete error" : e.getMessage())
-                    );
-                    throw new IllegalStateException("Failed to delete attachment files", e);
-                }
-            });
-        } catch (IOException e) {
-            adminAlertService.alertAllAdmins(
-                "Attachment Storage",
-                "Attachment directory cleanup failed",
-                "The application attachment directory could not be removed.",
-                Map.of("loanId", loanId.toString(), "error", e.getMessage() == null ? "Directory delete error" : e.getMessage())
-            );
-            throw new IllegalStateException("Failed to remove attachment directory", e);
-        }
+        storedUploadStorageService.deleteOwner(StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString());
     }
 
     private String writeJson(List<Map<String, Object>> attachments) {
@@ -172,12 +132,12 @@ public class LoanAttachmentService {
 
     @Getter
     public static class AttachmentResource {
-        private final Path path;
+        private final byte[] content;
         private final String originalName;
         private final String contentType;
 
-        public AttachmentResource(Path path, String originalName, String contentType) {
-            this.path = path;
+        public AttachmentResource(byte[] content, String originalName, String contentType) {
+            this.content = content;
             this.originalName = originalName;
             this.contentType = contentType;
         }
