@@ -30,6 +30,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     interface SaccoLoanStatsProjection {
         String getSaccoId();
         long getActiveLoanCount();
+        long getPaidLoanCount();
+        long getOverdueLoanCount();
         java.math.BigDecimal getTotalDisbursedPrincipal();
         java.math.BigDecimal getPaidPrincipal();
         java.math.BigDecimal getActiveExposure();
@@ -38,15 +40,67 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     List<LoanApplication> findByApplicantMemberIdOrderByCreatedAtDesc(UUID applicantMemberId);
 
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and l.status in :statuses
+          and (:loanIdQuery is null or lower(coalesce(l.loanId, '')) like concat('%', :loanIdQuery, '%'))
+        order by l.updatedAt desc, l.createdAt desc
+        """)
+    Page<LoanApplication> findMemberArchivePage(@Param("applicantMemberId") UUID applicantMemberId,
+                                                @Param("statuses") Collection<LoanStatus> statuses,
+                                                @Param("loanIdQuery") String loanIdQuery,
+                                                Pageable pageable);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (:createdFrom is null or l.createdAt >= :createdFrom)
+          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (:loanType is null or l.loanType = :loanType)
+          and (:status is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<LoanApplication> findMemberLoansForAnalytics(@Param("applicantMemberId") UUID applicantMemberId,
+                                                      @Param("createdFrom") OffsetDateTime createdFrom,
+                                                      @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                      @Param("loanType") LoanType loanType,
+                                                      @Param("status") LoanStatus status);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (:createdFrom is null or l.createdAt >= :createdFrom)
+          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (:loanType is null or l.loanType = :loanType)
+          and (:status is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<LoanApplication> findScopeLoansForAnalytics(@Param("saccoId") String saccoId,
+                                                     @Param("stationId") String stationId,
+                                                     @Param("createdFrom") OffsetDateTime createdFrom,
+                                                     @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                     @Param("loanType") LoanType loanType,
+                                                     @Param("status") LoanStatus status);
+
     List<LoanApplication> findBySaccoIdOrderByCreatedAtDesc(String saccoId);
     List<LoanApplication> findBySaccoIdIn(Collection<String> saccoIds);
     List<LoanApplication> findBySaccoIdAndStatusOrderByCreatedAtAsc(String saccoId, LoanStatus status);
     List<LoanApplication> findBySaccoIdAndStatusInOrderByCreatedAtAsc(String saccoId, List<LoanStatus> statuses);
     List<LoanApplication> findByStatusAndFinalDueDateIsNotNull(LoanStatus status);
-    List<LoanApplication> findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(UUID applicantMemberId, LoanStatus status);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
-    List<LoanApplication> findByTopUpSourceLoanIdIn(Collection<UUID> topUpSourceLoanIds);
-
+    Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
+        UUID applicantMemberId,
+        Collection<LoanStatus> statuses
+    );
+    Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(
+        UUID applicantMemberId,
+        Collection<LoanStatus> statuses
+    );
     Optional<LoanApplication> findByIdAndApplicantMemberId(UUID id, UUID applicantMemberId);
 
     boolean existsBySaccoIdAndLoanId(String saccoId, String loanId);
@@ -60,6 +114,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     @Query("""
         select l.saccoId as saccoId,
                sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
+               sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then 1 else 0 end) as paidLoanCount,
+               sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then 1 else 0 end) as overdueLoanCount,
                coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
                coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then l.amount else 0 end), 0) as paidPrincipal,
                coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
@@ -69,6 +125,34 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         group by l.saccoId
         """)
     List<SaccoLoanStatsProjection> summarizeLoansBySacco(@Param("saccoIds") Collection<String> saccoIds);
+
+    @Query("""
+        select l.saccoId as saccoId,
+               sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
+               sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then 1 else 0 end) as paidLoanCount,
+               sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then 1 else 0 end) as overdueLoanCount,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
+               coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then l.amount else 0 end), 0) as paidPrincipal,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
+               coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then l.amount else 0 end), 0) as overduePrincipal
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        group by l.saccoId
+        """)
+    Optional<SaccoLoanStatsProjection> summarizeLoansForScope(@Param("saccoId") String saccoId,
+                                                              @Param("stationId") String stationId);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        order by l.updatedAt desc
+        """)
+    List<LoanApplication> findRecentForScope(@Param("saccoId") String saccoId,
+                                             @Param("stationId") String stationId,
+                                             Pageable pageable);
 
     @Query("""
         select l
@@ -112,6 +196,53 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         """)
     List<StatusCountProjection> countByStatusForScope(@Param("saccoId") String saccoId,
                                                       @Param("stationId") String stationId);
+
+    @Query("""
+        select l.status as status, count(l) as total
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+        group by l.status
+        """)
+    List<StatusCountProjection> countByStatusForApplicant(@Param("applicantMemberId") UUID applicantMemberId);
+
+    @Query("""
+        select l.status as status, count(l) as total
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        group by l.status
+        """)
+    List<StatusCountProjection> countByStatusForApplicantScope(@Param("applicantMemberId") UUID applicantMemberId,
+                                                               @Param("saccoId") String saccoId,
+                                                               @Param("stationId") String stationId);
+
+    @Query("""
+        select coalesce(sum(l.amount), 0)
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and l.status in :statuses
+          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        """)
+    java.math.BigDecimal sumAmountForApplicantScopeAndStatuses(@Param("applicantMemberId") UUID applicantMemberId,
+                                                               @Param("saccoId") String saccoId,
+                                                               @Param("stationId") String stationId,
+                                                               @Param("statuses") Collection<LoanStatus> statuses);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and l.status = com.sacco.mvp.domain.LoanStatus.FORFEITED
+          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        order by coalesce(l.updatedAt, l.createdAt) desc
+        """)
+    List<LoanApplication> findLatestForfeitedForScope(@Param("applicantMemberId") UUID applicantMemberId,
+                                                      @Param("saccoId") String saccoId,
+                                                      @Param("stationId") String stationId,
+                                                      Pageable pageable);
 
     @Query("""
         select count(l)

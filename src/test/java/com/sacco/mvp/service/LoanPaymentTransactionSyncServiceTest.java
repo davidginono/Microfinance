@@ -139,6 +139,8 @@ class LoanPaymentTransactionSyncServiceTest {
             eq(loanApplicationId),
             eq("PAID"),
             eq(memberId),
+            eq("SACCO-1"),
+            eq("ST-1"),
             argThat((Map<String, Object> details) -> "SYNC".equals(details.get("source"))));
     }
 
@@ -285,6 +287,8 @@ class LoanPaymentTransactionSyncServiceTest {
             eq(loanApplicationId),
             eq("DEFAULTED"),
             eq(memberId),
+            eq("SACCO-1"),
+            eq("ST-1"),
             argThat((Map<String, Object> details) -> "SYNC".equals(details.get("source"))));
     }
 
@@ -348,6 +352,8 @@ class LoanPaymentTransactionSyncServiceTest {
             eq(loanApplicationId),
             eq("PAID"),
             eq(memberId),
+            eq("SACCO-1"),
+            eq("ST-1"),
             argThat((Map<String, Object> details) -> "SYNC".equals(details.get("source"))));
     }
 

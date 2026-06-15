@@ -83,7 +83,6 @@ class AdminServiceTest {
     @Mock private AdminIncidentRepository adminIncidentRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
-    @Mock private NotificationDeliveryPreferenceService notificationDeliveryPreferenceService;
 
     private AdminService adminService;
     private AtomicInteger issuedInvitationCount;
@@ -117,12 +116,13 @@ class AdminServiceTest {
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            saccoConfigurationService,
-            null
+            null,
+            org.mockito.Mockito.mock(SmsUnitTransactionService.class)
         );
         MinorAdminInvitationService minorAdminInvitationService = new MinorAdminInvitationService(
             null,
             memberRepository,
+            null,
             null,
             null,
             null
@@ -168,7 +168,6 @@ class AdminServiceTest {
             saccoConfigurationService,
             saccoRegistryService,
             minorAdminInvitationService,
-            notificationDeliveryPreferenceService,
             objectMapper
         );
     }
@@ -261,8 +260,6 @@ class AdminServiceTest {
             return incident;
         });
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc("SACCO-01"))
-            .thenAnswer(invocation -> List.of(savedIncident.get()));
 
         adminService.submitSupport("SACCO-01", memberId, "Help", "I need support");
 
@@ -302,8 +299,8 @@ class AdminServiceTest {
             .build();
         when(adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(memberId))
             .thenReturn(List.of(incident));
-        when(notificationRepository.findByTypeOrderByCreatedAtDesc("SUPPORT_MESSAGE"))
-            .thenReturn(List.of(notification));
+        when(notificationRepository.findReadSupportIncidentIds(Set.of(incidentId)))
+            .thenReturn(List.of(incidentId));
 
         List<AdminService.SupportArchiveView> archive = adminService.memberSupportArchive(memberId);
 
@@ -363,6 +360,30 @@ class AdminServiceTest {
 
         verify(memberRepository).existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN);
         verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void createUserRejectsEmailAlreadyUsedByAnyAccount() {
+        when(memberRepository.findByMemberNo("MGR001")).thenReturn(Optional.empty());
+        when(memberRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> adminService.createUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            "MGR001",
+            "Mary Manager",
+            " Existing@Example.com ",
+            null,
+            List.of(Position.MANAGER)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("That email address is already in use.");
+
+        verify(memberRepository).existsByEmailIgnoreCase("existing@example.com");
+        verify(memberRepository, never()).save(any(Member.class));
+        assertThat(issuedInvitationCount.get()).isZero();
     }
 
     @Test
@@ -646,7 +667,7 @@ class AdminServiceTest {
             "MINOR002",
             "Minor Admin Two",
             "minor2@example.com",
-            null
+            "255712345679"
         );
 
         assertThat(member.getStationId()).isEqualTo("ST-2");
@@ -922,7 +943,7 @@ class AdminServiceTest {
             "MINOR001",
             "Minor Admin",
             "minor@example.com",
-            null
+            "255712345678"
         );
 
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
@@ -975,7 +996,6 @@ class AdminServiceTest {
             .updatedAt(OffsetDateTime.now().minusDays(1))
             .build();
         when(loanProductSettingRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(loanProductSettingRepository.existsBySaccoId("SACCO-01")).thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc("SACCO-01")).thenReturn(List.of(product));
         when(loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(productId)).thenReturn(Optional.empty());
         when(loanProductVersionRepository.save(any(LoanProductVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -1084,7 +1104,6 @@ class AdminServiceTest {
             .build();
 
         when(loanProductSettingRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(loanProductSettingRepository.existsBySaccoId("SACCO-01")).thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc("SACCO-01")).thenReturn(List.of(product));
         when(loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(productId)).thenReturn(Optional.empty());
         when(loanProductVersionRepository.save(any(LoanProductVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));

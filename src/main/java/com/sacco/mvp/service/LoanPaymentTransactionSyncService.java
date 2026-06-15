@@ -185,6 +185,7 @@ public class LoanPaymentTransactionSyncService {
             loan.setUpdatedAt(fetchedAt);
             loanApplicationRepository.save(loan);
             outboxService.enqueue("LOAN", loan.getId(), "PAID", loan.getApplicantMemberId(),
+                loan.getSaccoId(), loan.getStationId(),
                 Map.of(
                     "source", "SYNC",
                     "loanId", Objects.toString(loan.getLoanId(), ""),
@@ -199,6 +200,7 @@ public class LoanPaymentTransactionSyncService {
             loan.setUpdatedAt(fetchedAt);
             loanApplicationRepository.save(loan);
             outboxService.enqueue("LOAN", loan.getId(), "DEFAULTED", loan.getApplicantMemberId(),
+                loan.getSaccoId(), loan.getStationId(),
                 Map.of(
                     "source", "SYNC",
                     "loanId", Objects.toString(loan.getLoanId(), ""),

@@ -152,7 +152,8 @@
     </div>
 
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-        <div class="space-y-3">
+        <div class="space-y-3"
+             data-live-account-status-url="${pageContext.request.contextPath}/app/loan-applications/${app.id}/applicant-financial-status">
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
@@ -164,18 +165,17 @@
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
-                    <div class="loan-stat-value">${applicantExternalAccountStatus.savingsLabel}</div>
+                    <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
-                    <div class="loan-stat-value">${applicantExternalAccountStatus.sharesLabel}</div>
+                    <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
-            <c:if test="${not applicantExternalAccountStatus.available}">
-                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    ${applicantExternalAccountStatus.statusMessage}
-                </div>
-            </c:if>
+            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                 data-live-account-status-box>
+                ${applicantExternalAccountStatus.statusMessage}
+            </div>
         </div>
 
         <div class="mt-6 loan-simple-progress">
@@ -1173,4 +1173,5 @@
     })();
 </script>
 
+<%@ include file="../fragments/live-account-status-hydration.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

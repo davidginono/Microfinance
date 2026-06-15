@@ -42,6 +42,27 @@ public class NotificationViewService {
             .toList();
     }
 
+    public List<HeaderNotificationView> toHeaderViewsForPosition(List<Notification> notifications, Collection<Position> positions) {
+        if (notifications == null) {
+            return Collections.emptyList();
+        }
+        return notifications.stream()
+            .filter(notification -> isVisibleToPosition(notification.getType(), positions))
+            .map(this::toHeaderView)
+            .toList();
+    }
+
+    public List<HeaderNotificationView> toIncidentHeaderViews(List<Notification> notifications) {
+        if (notifications == null) {
+            return Collections.emptyList();
+        }
+        return notifications.stream()
+            .filter(notification -> "SUPPORT_MESSAGE".equals(notification.getType()))
+            .map(this::toHeaderView)
+            .filter(view -> view.incidentId() != null)
+            .toList();
+    }
+
     public boolean isVisibleToPosition(String type, Collection<Position> positions) {
         if (positions == null || positions.isEmpty()) {
             return false;
@@ -88,6 +109,31 @@ public class NotificationViewService {
             notification.getCreatedAt() == null ? "" : notification.getCreatedAt().toString(),
             formatCreatedAt(notification.getCreatedAt()),
             notification.getReadAt() == null
+        );
+    }
+
+    private HeaderNotificationView toHeaderView(Notification notification) {
+        Map<String, Object> payload = parse(notification.getPayload());
+        String subject = stringValue(payload.get("subject"));
+        String message = stringValue(payload.get("message"));
+        String source = stringValue(payload.get("source"));
+        String senderName = stringValue(payload.get("senderName"));
+        if (subject.isBlank()) {
+            subject = humanizeType(notification.getType());
+        }
+        if (message.isBlank()) {
+            message = fallbackMessage(notification.getType(), payload);
+        }
+        if (source.isBlank()) {
+            source = senderName.isBlank() ? "System" : senderName;
+        }
+        return new HeaderNotificationView(
+            notification.getId(),
+            subject,
+            message,
+            source,
+            parseIncidentId(payload.get("details")),
+            formatCreatedAt(notification.getCreatedAt())
         );
     }
 
@@ -408,5 +454,15 @@ public class NotificationViewService {
         public boolean isUnread() {
             return unread;
         }
+    }
+
+    public record HeaderNotificationView(
+        UUID id,
+        String subject,
+        String message,
+        String source,
+        UUID incidentId,
+        String createdAtLabel
+    ) {
     }
 }

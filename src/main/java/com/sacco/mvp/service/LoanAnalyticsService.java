@@ -260,56 +260,28 @@ public class LoanAnalyticsService {
         );
     }
 
-    public MemberLoanAnalytics summarizeAllTime(UUID memberId) {
-        return summarize(loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId));
-    }
-
-    public MemberLoanAnalytics summarizeAllTime(UUID memberId, String stationId) {
-        return summarizeAllTime(memberId, null, stationId);
-    }
-
     public MemberLoanAnalytics summarizeAllTime(UUID memberId, String saccoId, String stationId) {
-        return summarize(loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId)
-            .stream()
-            .filter(app -> matchesScope(app, saccoId, stationId))
-            .toList());
-    }
-
-    public BigDecimal activeLoanAmount(UUID memberId) {
-        return activeLoanAmount(memberId, null);
-    }
-
-    public BigDecimal activeLoanAmount(UUID memberId, String stationId) {
-        return activeLoanAmount(memberId, null, stationId);
+        Map<LoanStatus, Long> counts = new java.util.EnumMap<>(LoanStatus.class);
+        loanApplicationRepository.countByStatusForApplicantScope(memberId, saccoId, stationId)
+            .forEach(row -> counts.put(row.getStatus(), row.getTotal()));
+        long defaulted = counts.getOrDefault(LoanStatus.DEFAULTED, 0L);
+        long active = ACTIVE_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
+        long paid = counts.getOrDefault(LoanStatus.PAID, 0L);
+        long forfeited = counts.getOrDefault(LoanStatus.FORFEITED, 0L);
+        long applied = counts.entrySet().stream()
+            .filter(entry -> entry.getKey() != LoanStatus.DRAFT)
+            .mapToLong(Map.Entry::getValue)
+            .sum();
+        long disbursed = DISBURSED_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
+        long rejected = REJECTED_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
+        BigDecimal activeAmount = loanApplicationRepository.sumAmountForApplicantScopeAndStatuses(
+            memberId, saccoId, stationId, ACTIVE_STATUSES);
+        return new MemberLoanAnalytics(defaulted, active, paid, forfeited, applied, disbursed, rejected, activeAmount);
     }
 
     public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
-        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
-                memberId,
-                List.copyOf(ACTIVE_STATUSES)
-            )
-            .stream()
-            .filter(app -> matchesScope(app, saccoId, stationId))
-            .map(LoanApplication::getAmount)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    public int forfeitedLoanCountSince(UUID memberId, int lookbackDays) {
-        return forfeitedLoanCountSince(memberId, null, lookbackDays);
-    }
-
-    public int forfeitedLoanCountSince(UUID memberId, String stationId, int lookbackDays) {
-        return forfeitedLoanCountSince(memberId, null, stationId, lookbackDays);
-    }
-
-    public int forfeitedLoanCountSince(UUID memberId, String saccoId, String stationId, int lookbackDays) {
-        LocalDate fromDate = LocalDate.now().minusDays(Math.max(lookbackDays, 0));
-        return (int) loanApplicationRepository.findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(memberId, LoanStatus.FORFEITED)
-            .stream()
-            .filter(app -> matchesScope(app, saccoId, stationId))
-            .filter(app -> withinRange(app.getUpdatedAt() == null ? app.getCreatedAt() : app.getUpdatedAt(), fromDate, null))
-            .count();
+        return loanApplicationRepository.sumAmountForApplicantScopeAndStatuses(
+            memberId, saccoId, stationId, ACTIVE_STATUSES);
     }
 
     private boolean matchesStation(LoanApplication app, String stationId) {
@@ -334,12 +306,15 @@ public class LoanAnalyticsService {
                                               LocalDate toDate,
                                               LoanType loanType,
                                               LoanStatus loanStatus) {
-        return loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId)
-            .stream()
-            .filter(app -> withinRange(app.getCreatedAt(), fromDate, toDate))
-            .filter(app -> loanType == null || app.getLoanType() == loanType)
-            .filter(app -> loanStatus == null || app.getStatus() == loanStatus)
-            .toList();
+        OffsetDateTime createdFrom = fromDate == null ? null : fromDate.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime createdToExclusive = toDate == null ? null : toDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        return loanApplicationRepository.findMemberLoansForAnalytics(
+            memberId,
+            createdFrom,
+            createdToExclusive,
+            loanType,
+            loanStatus
+        );
     }
 
     private List<LoanApplication> stationLoans(String saccoId,
@@ -351,13 +326,14 @@ public class LoanAnalyticsService {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
-        return loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId)
-            .stream()
-            .filter(app -> matchesStation(app, stationId))
-            .filter(app -> withinRange(app.getCreatedAt(), fromDate, toDate))
-            .filter(app -> loanType == null || app.getLoanType() == loanType)
-            .filter(app -> loanStatus == null || app.getStatus() == loanStatus)
-            .toList();
+        return loanApplicationRepository.findScopeLoansForAnalytics(
+            saccoId,
+            stationId,
+            startOfDay(fromDate),
+            dayAfter(toDate),
+            loanType,
+            loanStatus
+        );
     }
 
     private List<LoanApplication> staffLoans(AppUserPrincipal principal,
@@ -381,19 +357,19 @@ public class LoanAnalyticsService {
         }
         Map<UUID, LoanApplication> loanMap = new LinkedHashMap<>();
         List<ReviewRef> reviewRefs = new ArrayList<>();
+        OffsetDateTime createdFrom = startOfDay(fromDate);
+        OffsetDateTime createdToExclusive = dayAfter(toDate);
         for (ApprovalWorkflowStage stage : managerStagesFor(principal)) {
-            managerReviewRepository.findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(principal.getMemberId(), stage)
+            managerReviewRepository.findForAnalytics(principal.getMemberId(), stage, createdFrom, createdToExclusive)
                 .stream()
-                .filter(review -> withinRange(review.getCreatedAt(), fromDate, toDate))
                 .forEach(review -> reviewRefs.add(new ReviewRef(review.getLoanApplicationId(), review.getCreatedAt(),
                     review.getDecision() == ManagerDecision.ACCEPT,
                     review.getDecision() == ManagerDecision.REJECT,
                     stage == ApprovalWorkflowStage.DISBURSEMENT_OFFICER)));
         }
         for (ApprovalWorkflowStage stage : boardStagesFor(principal)) {
-            boardReviewRepository.findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(principal.getMemberId(), stage)
+            boardReviewRepository.findForAnalytics(principal.getMemberId(), stage, createdFrom, createdToExclusive)
                 .stream()
-                .filter(review -> withinRange(resolveBoardReviewDate(review), fromDate, toDate))
                 .forEach(review -> reviewRefs.add(new ReviewRef(review.getLoanApplicationId(), resolveBoardReviewDate(review),
                     review.getDecision() == BoardDecision.APPROVED,
                     review.getDecision() == BoardDecision.REJECTED,
@@ -622,6 +598,14 @@ public class LoanAnalyticsService {
         OffsetDateTime from = fromDate == null ? null : fromDate.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime to = toDate == null ? null : toDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
         return (from == null || !value.isBefore(from)) && (to == null || value.isBefore(to));
+    }
+
+    private OffsetDateTime startOfDay(LocalDate value) {
+        return value == null ? null : value.atStartOfDay().atOffset(ZoneOffset.UTC);
+    }
+
+    private OffsetDateTime dayAfter(LocalDate value) {
+        return value == null ? null : value.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
     }
 
     public record MemberLoanAnalytics(

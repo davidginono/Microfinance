@@ -118,4 +118,28 @@
     </table>
 </div>
 
+<c:if test="${archivePage.totalPages gt 1}">
+    <div class="mt-4 flex items-center justify-between gap-3">
+        <span class="text-sm text-slate-500">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
+        <div class="flex gap-2">
+            <c:if test="${not archivePage.first}">
+                <c:url var="archivePreviousUrl" value="/disbursement/archive">
+                    <c:param name="filter" value="${currentFilterKey}" />
+                    <c:param name="searchId" value="${queueSearchValue}" />
+                    <c:param name="page" value="${archivePage.number - 1}" />
+                </c:url>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}">Previous</a>
+            </c:if>
+            <c:if test="${not archivePage.last}">
+                <c:url var="archiveNextUrl" value="/disbursement/archive">
+                    <c:param name="filter" value="${currentFilterKey}" />
+                    <c:param name="searchId" value="${queueSearchValue}" />
+                    <c:param name="page" value="${archivePage.number + 1}" />
+                </c:url>
+                <a class="app-btn btn-primary" href="${archiveNextUrl}">Next</a>
+            </c:if>
+        </div>
+    </div>
+</c:if>
+
 <%@ include file="../fragments/footer.jspf" %>

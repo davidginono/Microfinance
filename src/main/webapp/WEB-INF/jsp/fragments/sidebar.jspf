@@ -51,8 +51,11 @@
                             </svg>
                         </button>
                         <div id="memberSettingsPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                            <a href="/app/settings" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${memberSettingsActive ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <a href="/app/settings" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${memberSettingsActive and param.section ne 'payment-details' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 <spring:message code="menu.settings.language" text="Language & Preferences" />
+                            </a>
+                            <a href="/app/settings?section=payment-details#payment-details" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${memberSettingsActive and param.section eq 'payment-details' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                                <spring:message code="menu.settings.paymentDetails" text="Financial Details for Disbursement Deposit" />
                             </a>
                         </div>
                     </div>
@@ -165,6 +168,10 @@
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
                             Outbox Monitor
                         </a>
+                        <a href="/admin/sms-usage" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H9.5L5 18v-4a2 2 0 01-2-2V4zm3 2v1.5h8V6H6zm0 3v1.5h6V9H6z"/></svg></span>
+                            SMS Usage
+                        </a>
                         <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
                             Event Log
@@ -205,15 +212,19 @@
                                 </svg>
                             </button>
                             <div id="adminSettingsPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <a href="/admin/settings-controls?section=loan" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' and param.section ne 'notifications' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
+                                <a href="/admin/settings-controls?section=loan" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' and param.section ne 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
                                 <a href="/admin/settings-controls?section=guarantor" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
-                                <a href="/admin/settings-controls?section=notifications" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'notifications' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">Notification Channels</a>
+                                <a href="/admin/settings-controls?section=otp" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">OTP Delivery</a>
                                 <a href="/admin/settings-controls?section=language" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.languagePreference" text="Language Preference" /></a>
                             </div>
                         </div>
                         <a href="/admin/outbox" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
                             <spring:message code="menu.admin.outboxMonitor" text="Outbox Monitor" />
+                        </a>
+                        <a href="/admin/sms-usage" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H9.5L5 18v-4a2 2 0 01-2-2V4zm3 2v1.5h8V6H6zm0 3v1.5h6V9H6z"/></svg></span>
+                            SMS Usage
                         </a>
                         <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>

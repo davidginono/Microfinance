@@ -8,7 +8,6 @@ import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,7 +71,6 @@ public class AdminService {
     private final SaccoConfigurationService saccoConfigurationService;
     private final SaccoRegistryService saccoRegistryService;
     private final MinorAdminInvitationService minorAdminInvitationService;
-    private final NotificationDeliveryPreferenceService notificationDeliveryPreferenceService;
     private final ObjectMapper objectMapper;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
@@ -145,16 +143,7 @@ public class AdminService {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? DEFAULT_USER_PAGE_SIZE : Math.min(size, MAX_USER_PAGE_SIZE);
-        if (stationId != null && !stationId.isBlank()) {
-            List<UserAccessView> filtered = scopedUserAccessMembers(saccoId, stationId).stream()
-                .filter(member -> matchesUserDirectoryQuery(member, normalizedQuery))
-                .map(this::toUserAccessView)
-                .toList();
-            int fromIndex = Math.min(safePage * safeSize, filtered.size());
-            int toIndex = Math.min(fromIndex + safeSize, filtered.size());
-            return new PageImpl<>(filtered.subList(fromIndex, toIndex), PageRequest.of(safePage, safeSize), filtered.size());
-        }
-        return memberRepository.findUserAccessPage(saccoId, normalizedQuery, PageRequest.of(safePage, safeSize))
+        return memberRepository.findUserAccessPage(saccoId, normalizeOptional(stationId), normalizedQuery, PageRequest.of(safePage, safeSize))
             .map(this::toUserAccessView);
     }
 
@@ -292,7 +281,10 @@ public class AdminService {
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
-        String normalizedPhone = normalizeOptional(phone);
+        String normalizedPhone = normalizeAdminPhone(phone);
+        if (normalizedPhone == null) {
+            throw new IllegalStateException("Enter the Minor Admin phone number.");
+        }
 
         if (memberRepository.existsByMemberNoIgnoreCaseAndIdNot(normalizedMemberNo, accountId)) {
             throw new IllegalStateException("That user ID is already in use.");
@@ -311,6 +303,9 @@ public class AdminService {
         member.setMemberNo(normalizedMemberNo);
         member.setFullName(normalizedFullName);
         member.setEmail(normalizedEmail);
+        if (!java.util.Objects.equals(member.getPhone(), normalizedPhone)) {
+            member.setPhoneVerifiedAt(member.getStatus() == MemberStatus.ACTIVE ? OffsetDateTime.now() : null);
+        }
         member.setPhone(normalizedPhone);
         member.setPosition(Position.MINOR_ADMIN);
         member.setStaffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)));
@@ -337,6 +332,7 @@ public class AdminService {
                     member.getFullName(),
                     member.getEmail(),
                     member.getPhone(),
+                    member.getPhoneVerifiedAt() != null,
                     member.getSaccoId(),
                     member.getStationId(),
                     member.getStatus(),
@@ -440,7 +436,6 @@ public class AdminService {
     }
 
     public List<LoanProductSetting> loanProducts(String saccoId) {
-        saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
         return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
@@ -513,33 +508,6 @@ public class AdminService {
     public SaccoSettings settings(String saccoId) {
         return saccoSettingsRepository.findById(saccoId)
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings not found"));
-    }
-
-    public List<NotificationDeliveryPreferenceService.NotificationDeliveryPreferenceView> notificationDeliveryPreferences(String saccoId) {
-        return notificationDeliveryPreferenceService.views(saccoId);
-    }
-
-    @Transactional
-    public void updateNotificationDeliveryPreferences(String saccoId,
-                                                      UUID adminId,
-                                                      boolean loanStatusEmail,
-                                                      boolean loanStatusSms,
-                                                      boolean guaranteeRequestEmail,
-                                                      boolean guaranteeRequestSms,
-                                                      boolean repaymentReminderEmail,
-                                                      boolean repaymentReminderSms) {
-        SaccoSettings settings = settings(saccoId);
-        Map<String, Object> before = snapshotSettings(settings);
-        notificationDeliveryPreferenceService.update(
-            saccoId,
-            loanStatusEmail,
-            loanStatusSms,
-            guaranteeRequestEmail,
-            guaranteeRequestSms,
-            repaymentReminderEmail,
-            repaymentReminderSms
-        );
-        auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_NOTIFICATION_DELIVERY", adminId, before, snapshotSettings(settings(saccoId)));
     }
 
     @Transactional
@@ -1182,20 +1150,20 @@ public class AdminService {
         if (reporterId == null) {
             return List.of();
         }
-        return adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
+        List<AdminIncident> incidents = adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
             .filter(this::isPlatformSupportIncident)
-            .map(this::toSupportArchiveView)
             .toList();
+        return toSupportArchiveViews(incidents);
     }
 
     public List<SupportArchiveView> memberSupportArchive(UUID reporterId) {
         if (reporterId == null) {
             return List.of();
         }
-        return adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
+        List<AdminIncident> incidents = adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
             .filter(this::isMemberSupportIncident)
-            .map(this::toSupportArchiveView)
             .toList();
+        return toSupportArchiveViews(incidents);
     }
 
     public AdminIncident incident(String saccoId, UUID incidentId) {
@@ -1793,31 +1761,22 @@ public class AdminService {
             && "Member Support".equals(incident.getSource());
     }
 
-    private SupportArchiveView toSupportArchiveView(AdminIncident incident) {
-        boolean readBySuperAdmin = incidentReadByRecipient(incident);
-        return new SupportArchiveView(
-            incident.getId(),
-            incident.getSubject(),
-            incident.getMessage(),
-            incident.getStatus(),
-            incident.getCreatedAt(),
-            readBySuperAdmin
-        );
-    }
-
-    private boolean incidentReadByRecipient(AdminIncident incident) {
-        if (incident == null) {
-            return false;
+    private List<SupportArchiveView> toSupportArchiveViews(List<AdminIncident> incidents) {
+        if (incidents == null || incidents.isEmpty()) {
+            return List.of();
         }
-        if (incident.getRelatedNotificationId() != null
-            && notificationRepository.findById(incident.getRelatedNotificationId())
-                .map(notification -> notification.getReadAt() != null)
-                .orElse(false)) {
-            return true;
-        }
-        return notificationRepository.findByTypeOrderByCreatedAtDesc("SUPPORT_MESSAGE").stream()
-            .filter(notification -> incident.getId().equals(notificationIncidentId(notification)))
-            .anyMatch(notification -> notification.getReadAt() != null);
+        Set<UUID> incidentIds = incidents.stream().map(AdminIncident::getId).collect(Collectors.toSet());
+        Set<UUID> readIncidentIds = new java.util.HashSet<>(notificationRepository.findReadSupportIncidentIds(incidentIds));
+        return incidents.stream()
+            .map(incident -> new SupportArchiveView(
+                incident.getId(),
+                incident.getSubject(),
+                incident.getMessage(),
+                incident.getStatus(),
+                incident.getCreatedAt(),
+                readIncidentIds.contains(incident.getId())
+            ))
+            .toList();
     }
 
     private UUID notificationIncidentId(Notification notification) {
@@ -1892,7 +1851,10 @@ public class AdminService {
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
-        String normalizedPhone = normalizeOptional(phone);
+        String normalizedPhone = normalizeAdminPhone(phone);
+        if (staffRoles.contains(Position.MINOR_ADMIN) && normalizedPhone == null) {
+            throw new IllegalStateException("Enter the Minor Admin phone number.");
+        }
 
         if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {
             throw new IllegalStateException("That user ID is already in use.");
@@ -1985,6 +1947,14 @@ public class AdminService {
         }
         String normalized = value.trim().replaceAll("\\s+", " ");
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizeAdminPhone(String value) {
+        String normalized = TanzaniaPhoneNumber.normalizeOptional(value);
+        if (value != null && !value.isBlank() && normalized == null) {
+            throw new IllegalStateException("Enter a valid phone number in the format 255XXXXXXXXX.");
+        }
+        return normalized;
     }
 
     private String limitText(String value, int maxLength) {
@@ -2417,6 +2387,7 @@ public class AdminService {
         private String fullName;
         private String email;
         private String phone;
+        private boolean phoneVerified;
         private String saccoId;
         private String stationId;
         private MemberStatus status;

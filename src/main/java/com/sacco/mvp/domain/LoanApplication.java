@@ -73,6 +73,10 @@ public class LoanApplication {
     private String financialSnapshot;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payment_details_snapshot", columnDefinition = "jsonb")
+    private String paymentDetailsSnapshot;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "attachments_json", columnDefinition = "jsonb")
     private String attachmentsJson;
 

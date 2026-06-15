@@ -2,7 +2,9 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.EmailOtpToken;
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.EmailOtpTokenRepository;
+import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,13 +25,43 @@ public class EmailOtpService {
 
     private final EmailOtpTokenRepository emailOtpTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationEmailService notificationEmailService;
+    private final MemberRepository memberRepository;
+    private final StationOtpDeliveryService stationOtpDeliveryService;
 
     @Value("${app.auth.otp.ttl-minutes:10}")
     private int otpTtlMinutes;
 
     @Transactional
-    public void issueOtp(String email, EmailOtpPurpose purpose, UUID memberId, String subject, String introMessage) {
+    public StationOtpDeliveryService.DeliveryReceipt issueOtp(String email,
+                                                              EmailOtpPurpose purpose,
+                                                              UUID memberId,
+                                                              String subject,
+                                                              String introMessage) {
+        Member member = memberId == null ? null : memberRepository.findById(memberId).orElse(null);
+        if (member == null || purpose == EmailOtpPurpose.CLAIM_ACCOUNT || purpose == EmailOtpPurpose.CLAIM_PHONE) {
+            return issueOtp(email, purpose, memberId, subject, introMessage, null, null, null);
+        }
+        return issueOtp(
+            email,
+            purpose,
+            memberId,
+            subject,
+            introMessage,
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getPhone()
+        );
+    }
+
+    @Transactional
+    public StationOtpDeliveryService.DeliveryReceipt issueOtp(String email,
+                                                              EmailOtpPurpose purpose,
+                                                              UUID memberId,
+                                                              String subject,
+                                                              String introMessage,
+                                                              String saccoId,
+                                                              String stationId,
+                                                              String phone) {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = OffsetDateTime.now();
         try {
@@ -48,14 +80,19 @@ public class EmailOtpService {
                 .build();
             emailOtpTokenRepository.save(token);
 
-            notificationEmailService.sendDirectEmail(
+            StationOtpDeliveryService.DeliveryReceipt receipt = stationOtpDeliveryService.deliver(
+                saccoId,
+                stationId,
                 normalizedEmail,
+                phone,
+                purpose,
                 subject,
-                introMessage + System.lineSeparator() + System.lineSeparator()
-                    + "Your OTP code is: " + code + System.lineSeparator()
-                    + "This code expires in " + Math.max(1, otpTtlMinutes) + " minutes."
+                introMessage,
+                code,
+                Math.max(1, otpTtlMinutes)
             );
             log.info("Issued {} OTP for {}", purpose, normalizedEmail);
+            return receipt;
         } catch (DataAccessException ex) {
             log.error("Unable to issue {} OTP for {} due to a data access problem", purpose, normalizedEmail, ex);
             throw new IllegalStateException(

@@ -27,7 +27,6 @@ public class FinancialDetailsService {
     private static final BigDecimal APPLICATION_FEE = new BigDecimal("15000.00");
     private static final BigDecimal DEFAULT_INSURANCE_RATE = new BigDecimal("0.0150");
     private static final BigDecimal DEFAULT_INTEREST_RATE = new BigDecimal("0.1000");
-    private static final BigDecimal CHAPCHAP_EXTENDED_INTEREST_RATE = new BigDecimal("0.1200");
 
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
@@ -47,7 +46,7 @@ public class FinancialDetailsService {
         BigDecimal applicationFee = saccoSettingsRepository.findById(saccoId)
             .map(SaccoSettings::getResolvedApplicationFee)
             .orElse(APPLICATION_FEE);
-        BigDecimal interestRate = effectiveInterestRate(product, loanType, safeTenor);
+        BigDecimal interestRate = product.getInterestRate() == null ? DEFAULT_INTEREST_RATE : product.getInterestRate();
 
         BigDecimal insuranceFee = safeAmount.multiply(insuranceRate)
             .setScale(2, RoundingMode.HALF_UP);
@@ -142,13 +141,6 @@ public class FinancialDetailsService {
                 "Total months to repay cannot exceed " + product.getMaxRepaymentMonths() + " month(s) configured for this loan product."
             );
         }
-    }
-
-    private BigDecimal effectiveInterestRate(LoanProductSetting product, LoanType loanType, int tenorMonths) {
-        if (loanType == LoanType.LOAN_ADVANCE) {
-            return tenorMonths <= 1 ? BigDecimal.ZERO : CHAPCHAP_EXTENDED_INTEREST_RATE;
-        }
-        return product.getInterestRate() == null ? DEFAULT_INTEREST_RATE : product.getInterestRate();
     }
 
     private AmortizationResult amortize(BigDecimal principal,

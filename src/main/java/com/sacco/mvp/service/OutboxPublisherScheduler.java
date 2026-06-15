@@ -43,6 +43,8 @@ public class OutboxPublisherScheduler {
             try {
                 JsonNode payload = objectMapper.readTree(event.getPayload());
                 UUID recipientId = UUID.fromString(payload.get("recipientId").asText());
+                String saccoId = textOrNull(payload, "saccoId");
+                String stationId = textOrNull(payload, "stationId");
 
                 Notification notification = notificationRepository.save(Notification.builder()
                     .id(UUID.randomUUID())
@@ -54,7 +56,15 @@ public class OutboxPublisherScheduler {
                     .sentAt(OffsetDateTime.now())
                     .build());
                 NotificationViewService.NotificationView view = notificationViewService.toView(notification);
-                notificationDeliveryService.deliver(null, recipientId, event.getEventType(), view.getSubject(), view.getMessage());
+                notificationDeliveryService.deliver(
+                    saccoId,
+                    stationId,
+                    notification.getId(),
+                    recipientId,
+                    event.getEventType(),
+                    view.getSubject(),
+                    view.getMessage()
+                );
 
                 event.setStatus(OutboxStatus.PUBLISHED);
                 event.setPublishedAt(OffsetDateTime.now());
@@ -77,5 +87,10 @@ public class OutboxPublisherScheduler {
                 );
             }
         }
+    }
+
+    private String textOrNull(JsonNode payload, String field) {
+        JsonNode value = payload == null ? null : payload.get(field);
+        return value == null || value.isNull() || value.asText().isBlank() ? null : value.asText();
     }
 }

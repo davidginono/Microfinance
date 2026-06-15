@@ -501,62 +501,41 @@
     </section>
 </c:if>
 
-<c:if test="${settingsSection eq 'notifications'}">
+<c:if test="${settingsSection eq 'otp'}">
     <section class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title">Notification Settings</p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Member Notification Channels</h2>
-            <p class="mt-1 text-sm text-slate-500">Choose how this SACCO sends member alerts.</p>
+            <p class="erp-widget-title">Authentication</p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Station OTP Delivery</h2>
+            <p class="mt-1 text-sm text-slate-500">Choose how this station sends authentication and workflow confirmation codes.</p>
         </div>
-        <form action="/admin/settings-controls/notifications" method="post" class="erp-panel-body grid gap-4">
+        <form action="/admin/settings-controls/otp-delivery" method="post" class="erp-panel-body">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <tr>
-                        <th class="px-4 py-3 text-left">Notification</th>
-                        <th class="px-4 py-3 text-left">Email</th>
-                        <th class="px-4 py-3 text-left">SMS</th>
-                    </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200 text-slate-700">
-                    <c:forEach items="${notificationDeliveryPreferences}" var="preference">
-                        <c:choose>
-                            <c:when test="${preference.key eq 'LOAN_STATUS'}">
-                                <c:set var="emailField" value="loanStatusEmail" />
-                                <c:set var="smsField" value="loanStatusSms" />
-                            </c:when>
-                            <c:when test="${preference.key eq 'GUARANTEE_REQUEST'}">
-                                <c:set var="emailField" value="guaranteeRequestEmail" />
-                                <c:set var="smsField" value="guaranteeRequestSms" />
-                            </c:when>
-                            <c:otherwise>
-                                <c:set var="emailField" value="repaymentReminderEmail" />
-                                <c:set var="smsField" value="repaymentReminderSms" />
-                            </c:otherwise>
-                        </c:choose>
-                        <tr>
-                            <td class="px-4 py-3 font-semibold text-slate-900">${preference.label}</td>
-                            <td class="px-4 py-3">
-                                <label class="inline-flex items-center gap-2 font-medium text-slate-700">
-                                    <input name="${emailField}" type="checkbox" value="true" ${preference.emailEnabled ? 'checked' : ''} />
-                                    <span>on/off</span>
-                                </label>
-                            </td>
-                            <td class="px-4 py-3">
-                                <label class="inline-flex items-center gap-2 font-medium text-slate-700">
-                                    <input name="${smsField}" type="checkbox" value="true" ${preference.smsEnabled ? 'checked' : ''} />
-                                    <span>on/off</span>
-                                </label>
-                            </td>
-                        </tr>
-                    </c:forEach>
-                    </tbody>
-                </table>
+            <div class="grid gap-3 lg:grid-cols-3">
+                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
+                    <span>
+                        <span class="block font-semibold text-slate-900">Email</span>
+                        <span class="mt-1 block text-xs text-slate-500">Always send OTP codes to the account email.</span>
+                    </span>
+                </label>
+                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
+                    <span>
+                        <span class="block font-semibold text-slate-900">SMS only</span>
+                        <span class="mt-1 block text-xs text-slate-500">Use normal station SMS units. OTP requests stop when units are depleted.</span>
+                    </span>
+                </label>
+                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
+                    <span>
+                        <span class="block font-semibold text-slate-900">SMS with email fallback</span>
+                        <span class="mt-1 block text-xs text-slate-500">Try SMS first, then use email when SMS cannot be sent.</span>
+                    </span>
+                </label>
             </div>
-            <div class="settings-action-bar settings-action-bar--split">
-                <p class="settings-action-note text-sm text-slate-500">SMS sends only when Benter Group is configured and the member has a phone number.</p>
-                <button type="submit" class="settings-action-button app-btn btn-primary">Save notification settings</button>
+            <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
+                <p class="text-sm text-slate-500">The three reserved SMS alert units are never used for OTP codes.</p>
+                <button type="submit" class="app-btn btn-primary">Save OTP Delivery</button>
             </div>
         </form>
     </section>
@@ -585,7 +564,7 @@
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">Require Credit Committee Review</span>
+                        <span class="block font-semibold text-slate-900">Require Board Committee Review</span>
                         <span class="mt-1 block text-slate-500">Adds the committee stage before Accountant review for SACCOs that need group approval.</span>
                     </span>
                 </label>
@@ -601,7 +580,7 @@
                            class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                            value="${settings.boardQuorum}" />
                     <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                        Used only when Credit Committee review is enabled.
+                        Used only when Board Committee review is enabled.
                     </span>
                 </label>
 
@@ -615,7 +594,7 @@
                             </c:if>
                         </c:forEach>
                     </div>
-                    <p class="mt-3 text-xs text-slate-500">Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Credit Committee to Accountant to Disbursement.</p>
+                    <p class="mt-3 text-xs text-slate-500">Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Board Committee to Accountant to Disbursement.</p>
                 </div>
             </div>
 
@@ -898,7 +877,7 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Minimum votes assigned and approval threshold used for committee decisions." /></p>
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
@@ -1130,12 +1109,12 @@
                         </div>
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Amount" />
+                                <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
                                 <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Amount" />
+                                <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
                                 <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank for no product cap" />' />
                             </label>
 
@@ -1266,7 +1245,7 @@
                                         </div>
                                     </div>
                                     <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
+                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Board Committee" /></div>
                                         <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
                                             <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${settings.boardReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
                                         </div>
@@ -1317,7 +1296,7 @@
                             </div>
 
                             <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
+                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
                                 <div class="workflow-support-grid">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
@@ -1560,12 +1539,12 @@
                     </div>
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Amount" />
+                            <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
                             <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Amount" />
+                            <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
                             <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
                         </label>
 
@@ -1696,7 +1675,7 @@
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
-                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
+                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Board Committee" /></div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
                                         <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${product.committeeReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
                                     </div>
@@ -1747,7 +1726,7 @@
                         </div>
 
                         <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
+                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
                             <div class="workflow-support-grid">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
@@ -1837,7 +1816,7 @@
 <spring:message code="admin.settings.workflow.runtime.disbursementRelease" text="Disbursement Release" var="runtimeDisbursementRelease" />
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
-<spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
+<spring:message code="role.committee" text="Board Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
 <spring:message code="role.disbursementOfficer" text="Disbursement Officer" var="runtimeDisbursementOfficer" />
 <spring:message code="admin.settings.validation.displayOrder" text="Display order must be 1 or higher." var="validationDisplayOrder" />

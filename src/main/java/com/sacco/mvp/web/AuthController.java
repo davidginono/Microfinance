@@ -118,12 +118,15 @@ public class AuthController {
                 verified.email(),
                 form.getPhone()
             );
-            emailOtpService.issueOtp(
+            var delivery = emailOtpService.issueOtp(
                 verified.email(),
                 EmailOtpPurpose.REGISTRATION,
                 null,
                 "Your SACCO MVP registration code",
-                "We verified your member details. Use the OTP code below to complete your registration."
+                "We verified your member details. Use the OTP code below to complete your registration.",
+                verified.saccoId(),
+                verified.stationId(),
+                form.getPhone()
             );
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("valid", true);
@@ -131,7 +134,7 @@ public class AuthController {
             response.put("fullName", verified.fullName());
             response.put("saccoId", verified.saccoId());
             response.put("stationId", verified.stationId());
-            response.put("message", "We sent an OTP code to " + verified.email() + ".");
+            response.put("message", deliveryMessage(delivery, "We sent an OTP code using the station delivery policy."));
             return ResponseEntity.ok(response);
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -159,7 +162,7 @@ public class AuthController {
 
         try {
             if (form.getOtpCode() == null || form.getOtpCode().isBlank()) {
-                bindingResult.rejectValue("otpCode", "registration.otp.required", "Enter the OTP code sent to your email.");
+                bindingResult.rejectValue("otpCode", "registration.otp.required", "Enter the OTP code that was sent to you.");
                 populateRegistrationOptions(model);
                 return "register-member";
             }
@@ -188,7 +191,7 @@ public class AuthController {
             if (registeredEmail.isBlank()) {
                 throw new IllegalStateException("No registered email is available for this account.");
             }
-            emailOtpService.issueOtp(
+            var delivery = emailOtpService.issueOtp(
                 registeredEmail,
                 EmailOtpPurpose.PASSWORD_RESET,
                 member.getId(),
@@ -197,7 +200,7 @@ public class AuthController {
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a password reset code to your registered email."
+                "message", deliveryMessage(delivery, "We sent a password reset code using the station delivery policy.")
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
@@ -286,17 +289,21 @@ public class AuthController {
             ));
         }
 
-        emailOtpService.issueOtp(
-            normalizedEmail,
-            EmailOtpPurpose.LOGIN,
-            member.getId(),
-            "Your SACCO MVP sign-in code",
-            "Use this OTP code to sign in to the SACCO Loan MVP."
-        );
-        return ResponseEntity.ok(Map.of(
-            "valid", true,
-            "message", "We sent a sign-in code to " + normalizedEmail + "."
-        ));
+        try {
+            var delivery = emailOtpService.issueOtp(
+                normalizedEmail,
+                EmailOtpPurpose.LOGIN,
+                member.getId(),
+                "Your SACCO MVP sign-in code",
+                "Use this OTP code to sign in to the SACCO Loan MVP."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
+        }
     }
 
     @PostMapping("/login/member/verify-otp")
@@ -362,17 +369,21 @@ public class AuthController {
             ));
         }
 
-        emailOtpService.issueOtp(
-            normalizedEmail,
-            EmailOtpPurpose.STAFF_LOGIN,
-            user.getId(),
-            "Your SACCO MVP staff sign-in code",
-            "Use this OTP code to sign in to the SACCO Loan MVP staff workspace."
-        );
-        return ResponseEntity.ok(Map.of(
-            "valid", true,
-            "message", "We sent a sign-in code to " + normalizedEmail + "."
-        ));
+        try {
+            var delivery = emailOtpService.issueOtp(
+                normalizedEmail,
+                EmailOtpPurpose.STAFF_LOGIN,
+                user.getId(),
+                "Your SACCO MVP staff sign-in code",
+                "Use this OTP code to sign in to the SACCO Loan MVP staff workspace."
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
+        }
     }
 
     @PostMapping("/login/staff/verify-otp")
@@ -420,6 +431,13 @@ public class AuthController {
             userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess())
         );
         signInPrincipal(principal, request);
+    }
+
+    private String deliveryMessage(com.sacco.mvp.service.StationOtpDeliveryService.DeliveryReceipt delivery,
+                                   String fallback) {
+        return delivery == null || delivery.userMessage() == null || delivery.userMessage().isBlank()
+            ? fallback
+            : delivery.userMessage();
     }
 
     private void signInPrincipal(AppUserPrincipal principal, HttpServletRequest request) {

@@ -84,6 +84,14 @@ class WorkflowRoutingServiceTest {
         verify(boardReviewRepository).save(captor.capture());
         assertThat(captor.getValue().getReviewStage()).isEqualTo(ApprovalWorkflowStage.LOAN_OFFICER);
         assertThat(captor.getValue().getDecision()).isEqualTo(BoardDecision.PENDING);
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("LOAN_OFFICER_REVIEW_ASSIGNED"), eq(actorId), any());
+        verify(outboxService).enqueue(
+            eq("LOAN"),
+            eq(appId),
+            eq("LOAN_OFFICER_REVIEW_ASSIGNED"),
+            eq(actorId),
+            eq("SACCO-1"),
+            eq((String) null),
+            any()
+        );
     }
 }

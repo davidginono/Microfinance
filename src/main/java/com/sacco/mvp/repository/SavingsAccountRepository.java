@@ -30,4 +30,17 @@ public interface SavingsAccountRepository extends JpaRepository<SavingsAccount, 
         nativeQuery = true
     )
     List<SaccoSavingsProjection> summarizeSavingsBySacco(@org.springframework.data.repository.query.Param("saccoIds") Collection<String> saccoIds);
+
+    @org.springframework.data.jpa.repository.Query(
+        value = """
+            select coalesce(sum(a.available_balance), 0)
+            from accounts_savings a
+            join members m on m.id = a.member_id
+            where m.sacco_id = :saccoId
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+            """,
+        nativeQuery = true
+    )
+    java.math.BigDecimal sumSavingsForScope(@org.springframework.data.repository.query.Param("saccoId") String saccoId,
+                                            @org.springframework.data.repository.query.Param("stationId") String stationId);
 }

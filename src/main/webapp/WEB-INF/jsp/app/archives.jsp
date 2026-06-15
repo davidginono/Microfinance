@@ -177,6 +177,37 @@
     </c:otherwise>
 </c:choose>
 
+<c:if test="${archivePage.totalPages gt 1}">
+    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Archive pages">
+        <c:choose>
+            <c:when test="${not archivePage.first}">
+                <c:url var="archivePreviousUrl" value="/app/archives">
+                    <c:param name="section" value="${archiveSection}" />
+                    <c:param name="page" value="${archivePage.number - 1}" />
+                    <c:param name="loanArchiveQuery" value="${loanArchiveQuery}" />
+                    <c:param name="loanArchiveFilter" value="${loanArchiveFilter}" />
+                    <c:param name="guarantorArchiveQuery" value="${guarantorArchiveQuery}" />
+                    <c:param name="guarantorArchiveFilter" value="${guarantorArchiveFilter}" />
+                </c:url>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}">Previous</a>
+            </c:when>
+            <c:otherwise><span></span></c:otherwise>
+        </c:choose>
+        <span class="text-sm font-semibold text-slate-600">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
+        <c:if test="${not archivePage.last}">
+            <c:url var="archiveNextUrl" value="/app/archives">
+                <c:param name="section" value="${archiveSection}" />
+                <c:param name="page" value="${archivePage.number + 1}" />
+                <c:param name="loanArchiveQuery" value="${loanArchiveQuery}" />
+                <c:param name="loanArchiveFilter" value="${loanArchiveFilter}" />
+                <c:param name="guarantorArchiveQuery" value="${guarantorArchiveQuery}" />
+                <c:param name="guarantorArchiveFilter" value="${guarantorArchiveFilter}" />
+            </c:url>
+            <a class="app-btn btn-neutral" href="${archiveNextUrl}">Next</a>
+        </c:if>
+    </nav>
+</c:if>
+
 <script>
     (() => {
         document.querySelectorAll("form[data-confirm-title]").forEach((form) => {

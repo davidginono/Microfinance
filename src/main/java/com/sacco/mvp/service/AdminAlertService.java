@@ -42,10 +42,10 @@ public class AdminAlertService {
         notifyAdmins(admins, "SYSTEM_ALERT", source, subject, message, IncidentSeverity.HIGH, saccoId, null, details);
     }
 
-    private void notifyAdmins(List<RoleDirectoryService.RoleAccountRef> admins, String type, String source, String subject, String message,
-                              IncidentSeverity severity, String saccoId, UUID reportedByMemberId, Map<String, Object> details) {
+    private AdminIncident notifyAdmins(List<RoleDirectoryService.RoleAccountRef> admins, String type, String source, String subject, String message,
+                                       IncidentSeverity severity, String saccoId, UUID reportedByMemberId, Map<String, Object> details) {
         if (admins == null || admins.isEmpty()) {
-            return;
+            return null;
         }
         AdminIncident incident = openIncident(saccoId, reportedByMemberId, type, source, subject, message, severity, details);
         Map<String, Object> enrichedDetails = new LinkedHashMap<>();
@@ -74,6 +74,7 @@ public class AdminAlertService {
                 log.error("Failed to write admin alert {} for admin {}", subject, admin.getIdentifier(), ex);
             }
         }
+        return incident;
     }
 
     public AdminIncident openSupportIncident(String saccoId, UUID memberId, String source, String subject, String message,
@@ -88,21 +89,13 @@ public class AdminAlertService {
     public AdminIncident openSupportIncidentForAdmins(List<RoleDirectoryService.RoleAccountRef> admins, String saccoId, UUID memberId,
                                                       String source, String subject, String message, IncidentSeverity severity,
                                                       Map<String, Object> details) {
-        notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
-        return adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId).stream()
-            .filter(item -> subject.equals(item.getSubject()) && message.equals(item.getMessage()))
-            .findFirst()
-            .orElse(null);
+        return notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
     }
 
     public AdminIncident openPlatformSupportIncident(String saccoId, UUID memberId, String source, String subject, String message,
                                                      IncidentSeverity severity, Map<String, Object> details) {
         List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeGlobalByRole(Position.ADMIN);
-        notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
-        return adminIncidentRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId).stream()
-            .filter(item -> subject.equals(item.getSubject()) && message.equals(item.getMessage()))
-            .findFirst()
-            .orElse(null);
+        return notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
     }
 
     public AdminIncident openIncident(String saccoId, UUID reportedByMemberId, String category, String source,

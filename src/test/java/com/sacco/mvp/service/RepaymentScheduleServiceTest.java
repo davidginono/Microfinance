@@ -113,6 +113,43 @@ class RepaymentScheduleServiceTest {
         )).compareTo(new BigDecimal("0.00"))).isPositive();
     }
 
+    @Test
+    void oneMonthLoanAdvanceUsesStoredConfiguredRate() {
+        LoanApplication app = baseApplication("""
+            {"interestMethod":"FLAT_RATE","interestRate":0.0750}
+            """);
+        app.setLoanType(LoanType.LOAN_ADVANCE);
+        app.setTenorMonths(1);
+        LoanProductSetting currentProduct = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .loanType(LoanType.LOAN_ADVANCE)
+            .interestMethod(InterestMethod.REDUCING_BALANCE)
+            .interestRate(new BigDecimal("0.1500"))
+            .active(true)
+            .build();
+
+        when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-1", LoanType.LOAN_ADVANCE))
+            .thenReturn(Optional.of(currentProduct));
+
+        RepaymentScheduleService.ScheduleResult result = repaymentScheduleService.buildSchedule(
+            app,
+            LocalDate.of(2026, 5, 1),
+            LocalDate.of(2026, 6, 1),
+            RepaymentFrequency.MONTHLY,
+            null,
+            null,
+            null
+        );
+
+        Map<String, Object> summary = repaymentScheduleService.parseSummary(result.scheduleJson());
+        assertThat(summary.get("interestMethod")).isEqualTo("FLAT_RATE");
+        assertThat(new BigDecimal(String.valueOf(summary.get("interestRate"))).compareTo(new BigDecimal("0.0750"))).isZero();
+        assertThat(new BigDecimal(String.valueOf(
+            repaymentScheduleService.parseRows(result.scheduleJson()).getFirst().get("interestComponent")
+        )).compareTo(BigDecimal.ZERO)).isPositive();
+    }
+
     private LoanApplication baseApplication(String financialSnapshot) {
         return LoanApplication.builder()
             .id(UUID.randomUUID())

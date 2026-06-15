@@ -14,10 +14,17 @@ import java.util.UUID;
 public class NotificationDeliveryService {
     private final MemberRepository memberRepository;
     private final NotificationEmailService notificationEmailService;
-    private final NotificationDeliveryPreferenceService preferenceService;
     private final SmsGateway smsGateway;
+    private final SmsUnitTransactionService smsUnitTransactionService;
+    private final SmsUsageAlertService smsUsageAlertService;
 
-    public void deliver(String saccoId, UUID recipientId, String eventType, String subject, String message) {
+    public void deliver(String saccoId,
+                        String stationId,
+                        UUID notificationId,
+                        UUID recipientId,
+                        String eventType,
+                        String subject,
+                        String message) {
         if (recipientId == null) {
             return;
         }
@@ -25,15 +32,34 @@ public class NotificationDeliveryService {
         if (recipient == null) {
             return;
         }
-        String resolvedSaccoId = saccoId == null || saccoId.isBlank() ? recipient.getSaccoId() : saccoId;
-        if (preferenceService.emailEnabled(resolvedSaccoId, eventType)) {
-            notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+        notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+        SmsUnitTransactionService.ReservationResult reservation =
+            smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
+        if (reservation.alertStatus() != null) {
+            smsUsageAlertService.alertStatus(saccoId, stationId, reservation.alertStatus(), reservation.availableUnits());
         }
-        if (preferenceService.smsEnabled(resolvedSaccoId, eventType)) {
-            SmsSendResult result = smsGateway.send(recipient.getPhone(), smsMessage(subject, message));
-            if (!result.sent()) {
-                log.info("SMS notification skipped for member {} and event {}: {}", recipientId, eventType, result.message());
+        if (!reservation.reserved()) {
+            if (reservation.invalidScope()) {
+                smsUsageAlertService.alertInvalidScope(saccoId, stationId, eventType, reservation.reason());
             }
+            log.info("SMS notification blocked for member {} and event {}: {}", recipientId, eventType, reservation.reason());
+            return;
+        }
+
+        SmsSendResult result;
+        try {
+            result = smsGateway.send(recipient.getPhone(), smsMessage(subject, message));
+        } catch (RuntimeException ex) {
+            result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
+            log.warn("SMS gateway call ended unexpectedly for member {} and event {}", recipientId, eventType, ex);
+        }
+        SmsUnitTransactionService.CompletionResult completion =
+            smsUnitTransactionService.complete(reservation.accountId(), reservation.ledgerId(), result);
+        if (completion.alertStatus() != null) {
+            smsUsageAlertService.alertStatus(saccoId, stationId, completion.alertStatus(), completion.availableUnits());
+        }
+        if (!result.sent()) {
+            log.info("SMS notification outcome for member {} and event {}: {}", recipientId, eventType, result.message());
         }
     }
 

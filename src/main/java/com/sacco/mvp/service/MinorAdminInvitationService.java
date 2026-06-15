@@ -33,6 +33,7 @@ public class MinorAdminInvitationService {
     private final MinorAdminInvitationRepository invitationRepository;
     private final MemberRepository memberRepository;
     private final EmailOtpService emailOtpService;
+    private final PhoneOtpService phoneOtpService;
     private final NotificationEmailService notificationEmailService;
     private final PasswordEncoder passwordEncoder;
 
@@ -85,6 +86,9 @@ public class MinorAdminInvitationService {
     public void requestOtp(String rawToken) {
         ClaimContext ctx = loadClaimContext(rawToken);
         Member member = ctx.member();
+        if (TanzaniaPhoneNumber.normalizeOptional(member.getPhone()) == null) {
+            throw new IllegalStateException("A valid phone number is required before this account can be activated.");
+        }
         emailOtpService.issueOtp(
             member.getEmail(),
             EmailOtpPurpose.CLAIM_ACCOUNT,
@@ -93,10 +97,11 @@ public class MinorAdminInvitationService {
             "Use the code below to complete the activation of your Minor Admin account for "
                 + member.getSaccoId() + "."
         );
+        phoneOtpService.issueClaimOtp(member.getPhone(), member.getId());
     }
 
     @Transactional
-    public Member claimInvitation(String rawToken, String otpCode, String password) {
+    public Member claimInvitation(String rawToken, String otpCode, String phoneOtpCode, String password) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
@@ -107,9 +112,11 @@ public class MinorAdminInvitationService {
             throw new IllegalStateException("Password must be at least 8 characters.");
         }
         emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.CLAIM_ACCOUNT, otpCode);
+        phoneOtpService.consumeClaimOtp(member.getPhone(), member.getId(), phoneOtpCode);
 
         OffsetDateTime now = OffsetDateTime.now();
         member.setStatus(MemberStatus.ACTIVE);
+        member.setPhoneVerifiedAt(now);
         member.setPasswordHash(passwordEncoder.encode(password));
         memberRepository.save(member);
 

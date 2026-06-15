@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
-import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +23,6 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class RepaymentScheduleService {
-    private static final BigDecimal CHAPCHAP_EXTENDED_INTEREST_RATE = new BigDecimal("0.1200");
-
     private final ObjectMapper objectMapper;
     private final LoanProductSettingRepository loanProductSettingRepository;
 
@@ -223,11 +220,6 @@ public class RepaymentScheduleService {
     }
 
     private BigDecimal resolveAnnualInterestRate(LoanApplication app, LoanProductSetting product) {
-        LoanType loanType = app.getLoanType();
-        int tenorMonths = app.getTenorMonths();
-        if (loanType == LoanType.LOAN_ADVANCE) {
-            return tenorMonths <= 1 ? BigDecimal.ZERO : CHAPCHAP_EXTENDED_INTEREST_RATE;
-        }
         Map<String, Object> snapshot = parseSummary(app.getFinancialSnapshot());
         Object snapshotRate = snapshot.get("interestRate");
         if (snapshotRate instanceof Number number) {

@@ -57,7 +57,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         from Member m
         where m.saccoId = :saccoId
           and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
-          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
           and m.id <> :applicantId
           and (m.memberAccount = true or (m.memberAccount is null and m.position = com.sacco.mvp.domain.Position.MEMBER))
           and lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
@@ -68,6 +68,36 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                                @Param("applicantId") UUID applicantId,
                                                @Param("query") String query,
                                                Pageable pageable);
+
+    @Query(
+        value = """
+            select m.*
+            from members m
+            where m.sacco_id = :saccoId
+              and m.status = 'ACTIVE'
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and m.id <> :applicantId
+              and (m.member_account = true or (m.member_account is null and m.position = 'MEMBER'))
+              and regexp_replace(coalesce(m.member_no, ''), '[^0-9]', '', 'g') like concat('%', :digits)
+            order by m.full_name asc
+            """,
+        countQuery = """
+            select count(*)
+            from members m
+            where m.sacco_id = :saccoId
+              and m.status = 'ACTIVE'
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and m.id <> :applicantId
+              and (m.member_account = true or (m.member_account is null and m.position = 'MEMBER'))
+              and regexp_replace(coalesce(m.member_no, ''), '[^0-9]', '', 'g') like concat('%', :digits)
+            """,
+        nativeQuery = true
+    )
+    Page<Member> findGuarantorCandidatesByNumberSuffix(@Param("saccoId") String saccoId,
+                                                       @Param("stationId") String stationId,
+                                                       @Param("applicantId") UUID applicantId,
+                                                       @Param("digits") String digits,
+                                                       Pageable pageable);
 
     List<Member> findBySaccoIdIn(Collection<String> saccoIds);
 
@@ -164,6 +194,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         select m
         from Member m
         where m.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
           and (
             :query = ''
             or lower(coalesce(m.email, '')) like concat('%', :query, '%')
@@ -171,6 +202,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
           )
         """)
     Page<Member> findUserAccessPage(@Param("saccoId") String saccoId,
+                                    @Param("stationId") String stationId,
                                     @Param("query") String query,
                                     Pageable pageable);
 
@@ -178,7 +210,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         select m.status as status, count(m) as total
         from Member m
         where m.saccoId = :saccoId
-          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
         group by m.status
         """)
     List<StatusCountProjection> countByStatusForScope(@Param("saccoId") String saccoId,
@@ -188,7 +220,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         select count(m)
         from Member m
         where m.saccoId = :saccoId
-          and (:stationId is null or lower(m.stationId) = lower(:stationId))
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
         """)
     long countForScope(@Param("saccoId") String saccoId, @Param("stationId") String stationId);
 }

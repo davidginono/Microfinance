@@ -103,6 +103,8 @@ public class RoleDirectoryService {
             .identifier(member.getMemberNo())
             .fullName(member.getFullName())
             .email(member.getEmail())
+            .phone(member.getPhone())
+            .phoneVerifiedAt(member.getPhoneVerifiedAt())
             .stationId(member.getStationId())
             .memberBased(true)
             .build();
@@ -116,6 +118,8 @@ public class RoleDirectoryService {
         String identifier;
         String fullName;
         String email;
+        String phone;
+        java.time.OffsetDateTime phoneVerifiedAt;
         String stationId;
         boolean memberBased;
     }

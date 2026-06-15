@@ -188,7 +188,7 @@
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Phone
-                <input name="phone" type="tel" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
             </label>
 
             <div class="md:col-span-2">

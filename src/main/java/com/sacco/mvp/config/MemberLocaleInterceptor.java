@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.UserSettings;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.web.WebRequestClassifier;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -16,15 +17,20 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.support.RequestContextUtils;
 
 import java.util.Locale;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class MemberLocaleInterceptor implements HandlerInterceptor {
+    private static final String USER_LOCALE_SESSION_PREFIX = MemberLocaleInterceptor.class.getName() + ".USER_LOCALE.";
     private final UserSettingsRepository userSettingsRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (WebRequestClassifier.isJsonRequest(request)) {
+            return true;
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof AppUserPrincipal principal)) {
             return true;
@@ -63,18 +69,33 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
                 .orElse(Locale.ENGLISH);
         }
         if (path.startsWith(appPrefix) && principal.hasRole(Position.MEMBER)) {
-            return userSettingsRepository.findById(principal.getMemberId())
-                .map(UserSettings::getLanguage)
-                .map(this::resolveLocale)
-                .orElse(Locale.ENGLISH);
+            return resolveUserLocale(request, principal.getMemberId());
         }
         if (staffPath && !principal.hasRole(Position.ADMIN) && !principal.hasRole(Position.MINOR_ADMIN)) {
-            return userSettingsRepository.findById(principal.getMemberId())
-                .map(UserSettings::getLanguage)
-                .map(this::resolveLocale)
-                .orElse(Locale.ENGLISH);
+            return resolveUserLocale(request, principal.getMemberId());
         }
         return null;
+    }
+
+    public void cacheUserLocale(HttpServletRequest request, UUID memberId, String language) {
+        request.getSession().setAttribute(userLocaleSessionKey(memberId), resolveLocale(language));
+    }
+
+    private Locale resolveUserLocale(HttpServletRequest request, UUID memberId) {
+        Object cachedLocale = request.getSession().getAttribute(userLocaleSessionKey(memberId));
+        if (cachedLocale instanceof Locale locale) {
+            return locale;
+        }
+        Locale locale = userSettingsRepository.findById(memberId)
+            .map(UserSettings::getLanguage)
+            .map(this::resolveLocale)
+            .orElse(Locale.ENGLISH);
+        request.getSession().setAttribute(userLocaleSessionKey(memberId), locale);
+        return locale;
+    }
+
+    private String userLocaleSessionKey(UUID memberId) {
+        return USER_LOCALE_SESSION_PREFIX + memberId;
     }
 
     private Locale resolveLocale(String language) {

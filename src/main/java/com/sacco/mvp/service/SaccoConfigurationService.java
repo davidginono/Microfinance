@@ -26,62 +26,6 @@ public class SaccoConfigurationService {
     private final LoanProductSettingRepository loanProductSettingRepository;
 
     @Transactional
-    public void ensureDefaultLoanProducts(String saccoId) {
-        if (saccoId == null || saccoId.isBlank() || loanProductSettingRepository.existsBySaccoId(saccoId)) {
-            return;
-        }
-
-        OffsetDateTime now = OffsetDateTime.now();
-        seedDefaultProduct(saccoId, LoanType.LOAN_ADVANCE, 0, 3, now);
-        seedDefaultProduct(saccoId, LoanType.EDUCATION_LOAN, 3, 12, now);
-        seedDefaultProduct(saccoId, LoanType.EMERGENCY_LOAN, 3, 12, now);
-        seedDefaultProduct(saccoId, LoanType.DEVELOPMENT_LOAN, 3, 12, now);
-    }
-
-    private void seedDefaultProduct(String saccoId,
-                                    LoanType loanType,
-                                    int guarantorsRequired,
-                                    int maxRepaymentMonths,
-                                    OffsetDateTime now) {
-        loanProductSettingRepository.save(newLoanProduct(
-            saccoId,
-            loanType,
-            loanType.defaultProductCode(),
-            null,
-            loanType.defaultDescription(),
-            loanType.getDisplayOrder(),
-            DEFAULT_MINIMUM_AMOUNT,
-            null,
-            guarantorsRequired,
-            DEFAULT_RATIO,
-            DEFAULT_INSURANCE_RATE,
-            DEFAULT_INTEREST_RATE,
-            InterestMethod.FLAT_RATE,
-            DEFAULT_MIN_REPAYMENT_MONTHS,
-            maxRepaymentMonths,
-            false,
-            false,
-            true,
-            null,
-            ApprovalWorkflowStage.MANAGER,
-            1,
-            2,
-            true,
-            3,
-            2,
-            2,
-            true,
-            4,
-            true,
-            false,
-            BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,
-            true,
-            now
-        ));
-    }
-
-    @Transactional
     public LoanProductSetting createLoanProduct(String saccoId,
                                                 LoanType loanType,
                                                 String productCode,

@@ -52,7 +52,9 @@ class LoanAnalyticsServiceTest {
             loanProductSettingRepository
         );
 
-        when(managerReviewRepository.findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(staffId, ApprovalWorkflowStage.MANAGER))
+        when(managerReviewRepository.findForAnalytics(
+            any(), any(), any(), any()
+        ))
             .thenReturn(List.of(
                 review(paidLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(2)),
                 review(defaultedLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(1)),

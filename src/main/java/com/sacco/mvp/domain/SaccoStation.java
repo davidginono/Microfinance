@@ -43,6 +43,11 @@ public class SaccoStation {
     private boolean active;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "otp_delivery_channel", nullable = false)
+    @Builder.Default
+    private OtpDeliveryChannel otpDeliveryChannel = OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "access_status")
     @Builder.Default
     private SaccoAccessStatus accessStatus = SaccoAccessStatus.ACTIVE;
@@ -71,5 +76,9 @@ public class SaccoStation {
 
     public boolean isAccessSuspended() {
         return getResolvedAccessStatus() == SaccoAccessStatus.SUSPENDED;
+    }
+
+    public OtpDeliveryChannel getResolvedOtpDeliveryChannel() {
+        return otpDeliveryChannel == null ? OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK : otpDeliveryChannel;
     }
 }

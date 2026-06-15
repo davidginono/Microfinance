@@ -18,6 +18,7 @@ public class MemberRegistrationForm {
     private String email;
 
     @NotBlank(message = "Enter your phone number.")
+    @Pattern(regexp = "^255[0-9]{9}$", message = "Enter your phone number in the format 255XXXXXXXXX.")
     private String phone;
 
     @NotBlank(message = "Enter your full names.")

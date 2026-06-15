@@ -29,8 +29,8 @@ public class SaccoRegistryService {
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoStationRepository saccoStationRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
-    private final SaccoConfigurationService saccoConfigurationService;
     private final SaccoLogoStorageService saccoLogoStorageService;
+    private final SmsUnitTransactionService smsUnitTransactionService;
     private volatile List<RegisteredSaccoView> registeredSaccoCache;
 
     public List<RegisteredSaccoView> listRegisteredSaccos() {
@@ -126,7 +126,6 @@ public class SaccoRegistryService {
         OffsetDateTime now = OffsetDateTime.now();
         upsertSacco(normalizedSaccoId, normalizedSaccoName, stationIds, now, false);
         saccoLogoStorageService.store(normalizedSaccoId, logoFile);
-        saccoConfigurationService.ensureDefaultLoanProducts(normalizedSaccoId);
         invalidateRegisteredSaccoCache();
     }
 
@@ -253,6 +252,7 @@ public class SaccoRegistryService {
 
         for (String stationId : stationIds) {
             if (existingByStationId.containsKey(stationId)) {
+                smsUnitTransactionService.ensureAccount(saccoId, stationId);
                 continue;
             }
             SaccoStation station = SaccoStation.builder()
@@ -264,6 +264,7 @@ public class SaccoRegistryService {
             station.setActive(true);
             station.setUpdatedAt(now);
             saccoStationRepository.save(station);
+            smsUnitTransactionService.ensureAccount(saccoId, stationId);
         }
 
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId)

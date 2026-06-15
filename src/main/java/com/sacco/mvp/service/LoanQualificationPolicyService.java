@@ -1,7 +1,5 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.GuarantorRequest;
-import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
@@ -14,6 +12,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -139,30 +138,11 @@ public class LoanQualificationPolicyService {
     }
 
     private BigDecimal guaranteedActiveAmount(String saccoId, UUID guarantorMemberId, String stationId) {
-        return guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(
-                guarantorMemberId,
-                GuarantorRequestStatus.APPROVED
-            )
-            .stream()
-            .map(request -> loanApplicationRepository.findById(request.getLoanApplicationId())
-                .filter(app -> matchesScope(app, saccoId, stationId))
-                .filter(this::isActiveGuaranteeLoan)
-                .map(LoanApplication::getAmount)
-                .orElse(null))
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return guarantorRequestRepository.sumActiveGuaranteedAmount(guarantorMemberId, saccoId, stationId);
     }
 
     private long activeGuaranteeCount(String saccoId, UUID guarantorMemberId, String stationId) {
-        return guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(
-                guarantorMemberId,
-                GuarantorRequestStatus.APPROVED
-            )
-            .stream()
-            .map(request -> loanApplicationRepository.findById(request.getLoanApplicationId()).orElse(null))
-            .filter(app -> matchesScope(app, saccoId, stationId))
-            .filter(this::isActiveGuaranteeLoan)
-            .count();
+        return guarantorRequestRepository.countActiveGuarantees(guarantorMemberId, saccoId, stationId);
     }
 
     private ResolvedQualificationPolicy resolvePolicy(SaccoSettings settings, String stationId) {
@@ -200,9 +180,8 @@ public class LoanQualificationPolicyService {
                                                                                       int waitDays) {
         LocalDate today = LocalDate.now();
         return loanApplicationRepository
-            .findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(memberId, LoanStatus.FORFEITED)
+            .findLatestForfeitedForScope(memberId, saccoId, stationId, PageRequest.of(0, 1))
             .stream()
-            .filter(app -> matchesScope(app, saccoId, stationId))
             .map(this::forfeitedApplicationDate)
             .map(date -> date.plusDays(waitDays))
             .filter(releaseDate -> releaseDate.isAfter(today))
@@ -231,35 +210,8 @@ public class LoanQualificationPolicyService {
             .orElse(null);
     }
 
-    private boolean matchesStation(LoanApplication app, String stationId) {
-        if (stationId == null || stationId.isBlank()) {
-            return true;
-        }
-        return app != null && app.getStationId() != null && stationId.equalsIgnoreCase(app.getStationId());
-    }
-
-    private boolean matchesScope(LoanApplication app, String saccoId, String stationId) {
-        if (app == null) {
-            return false;
-        }
-        if (saccoId != null && !saccoId.isBlank() && !saccoId.equalsIgnoreCase(app.getSaccoId())) {
-            return false;
-        }
-        return matchesStation(app, stationId);
-    }
-
     private <T> T firstNonNull(T primary, T fallback) {
         return primary == null ? fallback : primary;
-    }
-
-    private boolean isActiveGuaranteeLoan(LoanApplication app) {
-        return app.getStatus() == com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER
-            || app.getStatus() == com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER;
     }
 
     private Integer positive(Integer value) {

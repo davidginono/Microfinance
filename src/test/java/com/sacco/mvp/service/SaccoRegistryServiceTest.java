@@ -47,8 +47,8 @@ class SaccoRegistryServiceTest {
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            null,
-            saccoLogoStorageService
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -112,8 +112,8 @@ class SaccoRegistryServiceTest {
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            null,
-            saccoLogoStorageService
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -172,8 +172,8 @@ class SaccoRegistryServiceTest {
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            null,
-            saccoLogoStorageService
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -235,8 +235,8 @@ class SaccoRegistryServiceTest {
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
-            null,
-            saccoLogoStorageService
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();

@@ -1,7 +1,5 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.GuarantorRequest;
-import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
@@ -21,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -98,12 +97,8 @@ class LoanQualificationPolicyServiceTest {
     @Test
     void guarantorLimitBlocksWhenActiveGuaranteeCountHasReachedTheLimit() {
         UUID guarantorId = UUID.randomUUID();
-        UUID firstLoanId = UUID.randomUUID();
-        UUID secondLoanId = UUID.randomUUID();
         givenPolicy(guarantorId, "2");
-        givenApprovedGuarantees(guarantorId, firstLoanId, secondLoanId);
-        givenLoan(firstLoanId, LoanStatus.FINAL_APPROVED, "9000000.00");
-        givenLoan(secondLoanId, LoanStatus.READY_FOR_DISBURSEMENT, "500000.00");
+        when(guarantorRequestRepository.countActiveGuarantees(guarantorId, SACCO_ID, STATION_ID)).thenReturn(2L);
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
 
@@ -114,10 +109,8 @@ class LoanQualificationPolicyServiceTest {
     @Test
     void guarantorLimitBlocksApprovalWhenPendingGuaranteeWouldExceedTheCountLimit() {
         UUID guarantorId = UUID.randomUUID();
-        UUID existingLoanId = UUID.randomUUID();
         givenPolicy(guarantorId, "1");
-        givenApprovedGuarantees(guarantorId, existingLoanId);
-        givenLoan(existingLoanId, LoanStatus.FINAL_APPROVED, "250000.00");
+        when(guarantorRequestRepository.countActiveGuarantees(guarantorId, SACCO_ID, STATION_ID)).thenReturn(1L);
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId, new BigDecimal("10000.00"));
 
@@ -128,10 +121,8 @@ class LoanQualificationPolicyServiceTest {
     @Test
     void guarantorLimitDoesNotBlockByGuaranteedLoanAmountAnymore() {
         UUID guarantorId = UUID.randomUUID();
-        UUID existingLoanId = UUID.randomUUID();
         givenPolicy(guarantorId, "2");
-        givenApprovedGuarantees(guarantorId, existingLoanId);
-        givenLoan(existingLoanId, LoanStatus.FINAL_APPROVED, "9000000.00");
+        when(guarantorRequestRepository.countActiveGuarantees(guarantorId, SACCO_ID, STATION_ID)).thenReturn(1L);
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
 
@@ -416,7 +407,8 @@ class LoanQualificationPolicyServiceTest {
     }
 
     private void givenForfeitedApplications(UUID applicantId, OffsetDateTime... dates) {
-        List<LoanApplication> applications = java.util.Arrays.stream(dates)
+        LoanApplication latest = java.util.Arrays.stream(dates)
+            .max(OffsetDateTime::compareTo)
             .map(date -> LoanApplication.builder()
                 .id(UUID.randomUUID())
                 .saccoId(SACCO_ID)
@@ -433,70 +425,10 @@ class LoanQualificationPolicyServiceTest {
                 .updatedAt(date)
                 .version(0)
                 .build())
-            .toList();
-        when(loanApplicationRepository.findByApplicantMemberIdAndStatusOrderByCreatedAtDesc(applicantId, LoanStatus.FORFEITED))
-            .thenReturn(applications);
+            .orElseThrow();
+        when(loanApplicationRepository.findLatestForfeitedForScope(
+            applicantId, SACCO_ID, STATION_ID, PageRequest.of(0, 1)
+        )).thenReturn(List.of(latest));
     }
 
-    private void givenApprovedGuarantees(UUID guarantorId, UUID... loanIds) {
-        List<GuarantorRequest> requests = java.util.Arrays.stream(loanIds)
-            .map(loanId -> GuarantorRequest.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(loanId)
-                .guarantorMemberId(guarantorId)
-                .status(GuarantorRequestStatus.APPROVED)
-                .createdAt(OffsetDateTime.now())
-                .version(0)
-                .build())
-            .toList();
-        when(guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(
-            guarantorId,
-            GuarantorRequestStatus.APPROVED
-        )).thenReturn(requests);
-    }
-
-    private void givenApprovedGuaranteesWithCommitments(UUID guarantorId, GuaranteeFixture... guarantees) {
-        List<GuarantorRequest> requests = java.util.Arrays.stream(guarantees)
-            .map(guarantee -> GuarantorRequest.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(guarantee.loanId())
-                .guarantorMemberId(guarantorId)
-                .status(GuarantorRequestStatus.APPROVED)
-                .committedAmount(new BigDecimal(guarantee.committedAmount()))
-                .createdAt(OffsetDateTime.now())
-                .version(0)
-                .build())
-            .toList();
-        when(guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(
-            guarantorId,
-            GuarantorRequestStatus.APPROVED
-        )).thenReturn(requests);
-    }
-
-    private GuaranteeFixture guarantee(UUID loanId, String committedAmount) {
-        return new GuaranteeFixture(loanId, committedAmount);
-    }
-
-    private void givenLoan(UUID loanId, LoanStatus status, String amount) {
-        when(loanApplicationRepository.findById(loanId))
-            .thenReturn(Optional.of(LoanApplication.builder()
-                .id(loanId)
-                .saccoId(SACCO_ID)
-                .stationId(STATION_ID)
-                .applicantMemberId(UUID.randomUUID())
-                .loanType(LoanType.LOAN_ADVANCE)
-                .amount(new BigDecimal(amount))
-                .tenorMonths(12)
-                .status(status)
-                .formData("{}")
-                .requiredGuarantors(1)
-                .policySnapshot("{}")
-                .createdAt(OffsetDateTime.now())
-                .updatedAt(OffsetDateTime.now())
-                .version(0)
-                .build()));
-    }
-
-    private record GuaranteeFixture(UUID loanId, String committedAmount) {
-    }
 }

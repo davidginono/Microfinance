@@ -235,16 +235,7 @@ public class MemberRegistrationService {
     }
 
     private String normalizePhone(String value) {
-        String normalized = normalizeSpaces(value);
-        if (normalized.isBlank()) {
-            throw new IllegalStateException("Enter your phone number.");
-        }
-        boolean hasPlus = normalized.startsWith("+");
-        String digitsOnly = normalized.replaceAll("[^0-9]", "");
-        if (digitsOnly.length() < 7) {
-            throw new IllegalStateException("Enter a valid phone number.");
-        }
-        return hasPlus ? "+" + digitsOnly : digitsOnly;
+        return TanzaniaPhoneNumber.normalizeRequired(value);
     }
 
     private String normalizeSaccoId(String value) {

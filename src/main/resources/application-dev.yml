@@ -5,8 +5,12 @@ spring:
     livereload:
       enabled: true
   jpa:
+    generate-ddl: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+  sql:
+    init:
+      mode: never
   web:
     resources:
       cache:

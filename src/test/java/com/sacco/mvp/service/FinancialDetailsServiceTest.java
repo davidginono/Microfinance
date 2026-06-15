@@ -86,4 +86,38 @@ class FinancialDetailsServiceTest {
         assertThat(snapshot.get("applicationFee")).isEqualTo(new BigDecimal("25000.00"));
         assertThat(snapshot.get("totalDeductions")).isEqualTo(new BigDecimal("26500.00"));
     }
+
+    @Test
+    void oneMonthLoanAdvanceUsesConfiguredInterestTerms() {
+        String saccoId = "SACCO-1";
+        UUID memberId = UUID.randomUUID();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.LOAN_ADVANCE)
+            .minimumAmount(BigDecimal.ZERO)
+            .maximumAmount(new BigDecimal("5000000.00"))
+            .guarantorsRequired(0)
+            .insuranceRate(BigDecimal.ZERO)
+            .interestRate(new BigDecimal("0.0750"))
+            .interestMethod(InterestMethod.FLAT_RATE)
+            .minRepaymentMonths(1)
+            .maxRepaymentMonths(3)
+            .active(true)
+            .build();
+
+        when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, LoanType.LOAN_ADVANCE))
+            .thenReturn(Optional.of(product));
+        when(saccoSettingsRepository.findById(saccoId)).thenReturn(Optional.of(
+            SaccoSettings.builder().saccoId(saccoId).applicationFee(BigDecimal.ZERO).build()
+        ));
+
+        Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
+            saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("100000.00"), 1, null
+        );
+
+        assertThat(snapshot.get("interestRate")).isEqualTo(new BigDecimal("0.0750"));
+        assertThat(snapshot.get("interestMethod")).isEqualTo("FLAT_RATE");
+        assertThat(snapshot.get("interestAmount")).isEqualTo(new BigDecimal("7500.00"));
+    }
 }

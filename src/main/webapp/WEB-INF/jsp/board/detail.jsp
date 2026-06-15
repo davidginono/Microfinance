@@ -149,6 +149,8 @@
     </div>
 </div>
 
+<%@ include file="../fragments/applicant-payment-details.jspf" %>
+
 <div class="loan-view-summary-card px-5 py-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>

@@ -19,6 +19,7 @@ import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.SavingsAccountRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -103,35 +104,39 @@ public class PlatformAdminService {
             throw new IllegalArgumentException("Station not found for this SACCO.");
         }
 
-        List<Member> members = memberRepository.findBySaccoIdOrderByFullNameAsc(normalizedSaccoId).stream()
-            .filter(member -> normalizedStationId == null || normalizedStationId.equalsIgnoreCase(member.getStationId()))
-            .toList();
-        Map<UUID, Member> membersById = members.stream().collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
-        List<LoanApplication> loans = loanApplicationRepository.findBySaccoIdOrderByCreatedAtDesc(normalizedSaccoId).stream()
-            .filter(loan -> normalizedStationId == null || normalizedStationId.equalsIgnoreCase(loan.getStationId()))
-            .toList();
-        Set<UUID> memberIds = membersById.keySet();
-        Set<UUID> loanIds = loans.stream().map(LoanApplication::getId).collect(Collectors.toSet());
+        Map<com.sacco.mvp.domain.MemberStatus, Long> memberStatusCounts = memberRepository
+            .countByStatusForScope(normalizedSaccoId, normalizedStationId).stream()
+            .collect(Collectors.toMap(MemberRepository.StatusCountProjection::getStatus,
+                MemberRepository.StatusCountProjection::getTotal));
+        MemberStats memberStats = new MemberStats(
+            memberStatusCounts.values().stream().mapToLong(Long::longValue).sum(),
+            memberStatusCounts.getOrDefault(com.sacco.mvp.domain.MemberStatus.ACTIVE, 0L),
+            memberStatusCounts.getOrDefault(com.sacco.mvp.domain.MemberStatus.INACTIVE, 0L)
+        );
+        LoanStats loanStats = loanApplicationRepository.summarizeLoansForScope(normalizedSaccoId, normalizedStationId)
+            .map(this::toLoanStats)
+            .orElse(LoanStats.empty());
+        List<LoanApplication> recentLoanEntities = loanApplicationRepository.findRecentForScope(
+            normalizedSaccoId, normalizedStationId, PageRequest.of(0, 10));
+        Map<UUID, Member> recentApplicantsById = memberRepository.findAllById(recentLoanEntities.stream()
+                .map(LoanApplication::getApplicantMemberId)
+                .collect(Collectors.toSet())).stream()
+            .collect(Collectors.toMap(Member::getId, member -> member));
         SaccoSettings settings = saccoSettingsRepository.findById(normalizedSaccoId).orElse(null);
         SaccoSummary summary = buildSummary(
             sacco,
             normalizedStationId == null ? stationOptions : List.of(normalizedStationId),
-            members,
-            loans,
-            savingsTotalForMembers(memberIds),
+            memberStats,
+            loanStats,
+            safeAmount(savingsAccountRepository.sumSavingsForScope(normalizedSaccoId, normalizedStationId)),
             settings,
             resolveStationAccess(activeStations, normalizedStationId)
         );
 
-        long paidLoanCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
-        long overdueLoanCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
-
-        List<LoanItem> recentLoans = loans.stream()
-            .sorted(Comparator.comparing(LoanApplication::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .limit(10)
+        List<LoanItem> recentLoans = recentLoanEntities.stream()
             .map(loan -> new LoanItem(
                 loan.getId(),
-                resolveApplicantName(loan.getApplicantMemberId(), membersById),
+                resolveApplicantName(loan.getApplicantMemberId(), recentApplicantsById),
                 loan.getStatus(),
                 safeAmount(loan.getAmount()),
                 loan.getUpdatedAt(),
@@ -139,9 +144,9 @@ public class PlatformAdminService {
             ))
             .toList();
 
-        List<AuditItem> relatedAudit = auditLogRepository.findTop100ByOrderByCreatedAtDesc().stream()
-            .filter(entry -> isRelatedToSacco(entry, normalizedSaccoId, memberIds, loanIds))
-            .limit(12)
+        List<AuditItem> relatedAudit = auditLogRepository.searchEventLogViewScoped(
+                null, null, null, normalizedSaccoId, normalizedStationId, PageRequest.of(0, 12))
+            .getContent().stream()
             .map(this::toAuditItem)
             .toList();
 
@@ -150,8 +155,8 @@ public class PlatformAdminService {
             summary,
             recentLoans,
             relatedAudit,
-            paidLoanCount,
-            overdueLoanCount,
+            loanStats.paidLoanCount(),
+            loanStats.overdueLoanCount(),
             stationOptions,
             normalizedStationId
         );
@@ -163,7 +168,7 @@ public class PlatformAdminService {
         }
         String normalized = section.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
-            case "overview", "loans", "members", "financials", "audit" -> normalized;
+            case "overview", "loans", "members", "financials", "sms", "audit" -> normalized;
             default -> "overview";
         };
     }
@@ -191,6 +196,8 @@ public class PlatformAdminService {
                 LoanApplicationRepository.SaccoLoanStatsProjection::getSaccoId,
                 row -> new LoanStats(
                     row.getActiveLoanCount(),
+                    row.getPaidLoanCount(),
+                    row.getOverdueLoanCount(),
                     safeAmount(row.getTotalDisbursedPrincipal()),
                     safeAmount(row.getPaidPrincipal()),
                     safeAmount(row.getActiveExposure()),
@@ -211,8 +218,11 @@ public class PlatformAdminService {
         Map<String, SaccoSummary> summaryById = new LinkedHashMap<>();
         Map<String, SaccoSettings> settingsBySacco = saccoSettingsRepository.findAllById(saccoIds).stream()
             .collect(Collectors.toMap(SaccoSettings::getSaccoId, settings -> settings, (left, right) -> left, LinkedHashMap::new));
+        Map<String, List<SaccoStation>> stationsBySacco = saccoStationRepository
+            .findBySaccoIdInAndActiveTrueOrderBySaccoIdAscStationIdAsc(saccoIds).stream()
+            .collect(Collectors.groupingBy(SaccoStation::getSaccoId, LinkedHashMap::new, Collectors.toList()));
         for (RegisteredSacco sacco : registeredSaccos) {
-            List<SaccoStation> activeStations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
+            List<SaccoStation> activeStations = stationsBySacco.getOrDefault(sacco.getSaccoId(), List.of());
             List<String> stationIds = activeStations.stream()
                 .map(station -> station.getStationId())
                 .toList();
@@ -263,66 +273,6 @@ public class PlatformAdminService {
             memberStats.activeMembers(),
             memberStats.inactiveMembers(),
             Math.toIntExact(loanStats.activeLoanCount()),
-            totalDisbursed,
-            totalSavings,
-            activeExposure,
-            repaymentPercent,
-            defaultPercent,
-            liquidityRatio,
-            statusMeta.label(),
-            statusMeta.tone(),
-            statusMeta.note(),
-            totalDisbursed.signum() == 0,
-            stationAccess.accessStatus(),
-            stationAccess.paymentDueDate(),
-            stationAccess.accessSuspendedAt(),
-            stationAccess.accessRestrictionReason(),
-            settings == null ? "en" : settings.getDefaultLanguage()
-        );
-    }
-
-    private SaccoSummary buildSummary(RegisteredSacco sacco,
-                                      List<String> stationIds,
-                                      List<Member> members,
-                                      List<LoanApplication> loans,
-                                      BigDecimal totalSavings,
-                                      SaccoSettings settings,
-                                      StationAccessSnapshot stationAccess) {
-        List<LoanApplication> disbursedLoans = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED
-                || loan.getStatus() == LoanStatus.DEFAULTED
-                || loan.getStatus() == LoanStatus.PAID)
-            .toList();
-        BigDecimal totalDisbursed = sumLoanAmounts(disbursedLoans);
-        BigDecimal paidPrincipal = sumLoanAmounts(loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).toList());
-        BigDecimal activeExposure = sumLoanAmounts(loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED || loan.getStatus() == LoanStatus.DEFAULTED)
-            .toList());
-        BigDecimal overduePrincipal = sumLoanAmounts(loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED)
-            .toList());
-
-        BigDecimal repaymentPercent = totalDisbursed.signum() == 0 ? null : ratioAsPercent(paidPrincipal, totalDisbursed);
-        BigDecimal defaultPercent = totalDisbursed.signum() == 0 ? null : ratioAsPercent(overduePrincipal, totalDisbursed);
-        BigDecimal liquidityRatio = (totalDisbursed.signum() == 0 || activeExposure.signum() == 0) ? null : ratio(totalSavings, activeExposure);
-
-        StatusMeta statusMeta = resolveStatus(totalDisbursed, defaultPercent, liquidityRatio);
-        long activeMembers = members.stream().filter(member -> member.getStatus() == com.sacco.mvp.domain.MemberStatus.ACTIVE).count();
-        long inactiveMembers = members.stream().filter(member -> member.getStatus() == com.sacco.mvp.domain.MemberStatus.INACTIVE).count();
-        int activeLoanCount = (int) loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED || loan.getStatus() == LoanStatus.DEFAULTED)
-            .count();
-
-        return new SaccoSummary(
-            sacco.getSaccoId(),
-            sacco.getSaccoName(),
-            stationIds,
-            saccoLogoStorageService.hasLogo(sacco.getSaccoId()),
-            saccoLogoStorageService.publicLogoUrl(sacco.getSaccoId(), sacco.getUpdatedAt()),
-            members.size(),
-            activeMembers,
-            inactiveMembers,
-            activeLoanCount,
             totalDisbursed,
             totalSavings,
             activeExposure,
@@ -408,37 +358,6 @@ public class PlatformAdminService {
         );
     }
 
-    private boolean isRelatedToSacco(AuditLog entry, String saccoId, Set<UUID> memberIds, Set<UUID> loanIds) {
-        if (entry == null) {
-            return false;
-        }
-        if (entry.getActorMemberId() != null && memberIds.contains(entry.getActorMemberId())) {
-            return true;
-        }
-        if (entry.getEntityId() != null && (memberIds.contains(entry.getEntityId()) || loanIds.contains(entry.getEntityId()))) {
-            return true;
-        }
-        return containsIgnoreCase(entry.getBeforeState(), saccoId)
-            || containsIgnoreCase(entry.getAfterState(), saccoId);
-    }
-
-    private boolean containsIgnoreCase(String value, String fragment) {
-        if (value == null || value.isBlank() || fragment == null || fragment.isBlank()) {
-            return false;
-        }
-        return value.toLowerCase(Locale.ROOT).contains(fragment.toLowerCase(Locale.ROOT));
-    }
-
-    private BigDecimal savingsTotalForMembers(Set<UUID> memberIds) {
-        if (memberIds == null || memberIds.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        return savingsAccountRepository.findByMemberIdIn(memberIds).stream()
-            .map(SavingsAccount::getAvailableBalance)
-            .map(PlatformAdminService::safeAmount)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
     private String resolveApplicantName(UUID applicantMemberId, Map<UUID, Member> membersById) {
         Member applicant = membersById.get(applicantMemberId);
         return applicant == null ? "Member " + shortId(applicantMemberId) : applicant.getFullName();
@@ -478,6 +397,18 @@ public class PlatformAdminService {
             .map(LoanApplication::getAmount)
             .map(PlatformAdminService::safeAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private LoanStats toLoanStats(LoanApplicationRepository.SaccoLoanStatsProjection row) {
+        return new LoanStats(
+            row.getActiveLoanCount(),
+            row.getPaidLoanCount(),
+            row.getOverdueLoanCount(),
+            safeAmount(row.getTotalDisbursedPrincipal()),
+            safeAmount(row.getPaidPrincipal()),
+            safeAmount(row.getActiveExposure()),
+            safeAmount(row.getOverduePrincipal())
+        );
     }
 
     private static BigDecimal safeAmount(BigDecimal amount) {
@@ -986,13 +917,15 @@ public class PlatformAdminService {
 
     private record LoanStats(
         long activeLoanCount,
+        long paidLoanCount,
+        long overdueLoanCount,
         BigDecimal totalDisbursedPrincipal,
         BigDecimal paidPrincipal,
         BigDecimal activeExposure,
         BigDecimal overduePrincipal
     ) {
         static LoanStats empty() {
-            return new LoanStats(0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            return new LoanStats(0, 0, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         }
     }
 

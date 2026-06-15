@@ -1,8 +1,10 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.config.MemberLocaleInterceptor;
 import com.sacco.mvp.domain.UserSettings;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +25,7 @@ import java.util.Locale;
 @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
 public class StaffSettingsController {
     private final UserSettingsRepository userSettingsRepository;
+    private final MemberLocaleInterceptor memberLocaleInterceptor;
 
     @GetMapping
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -39,6 +42,7 @@ public class StaffSettingsController {
     @PostMapping("/language")
     public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam String language,
+                                 HttpServletRequest request,
                                  RedirectAttributes ra) {
         OffsetDateTime now = OffsetDateTime.now();
         UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
@@ -57,6 +61,7 @@ public class StaffSettingsController {
         }
         settings.setUpdatedAt(now);
         userSettingsRepository.save(settings);
+        memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), settings.getLanguage());
         ra.addFlashAttribute("message", "Language preference updated.");
         return "redirect:/staff/settings";
     }

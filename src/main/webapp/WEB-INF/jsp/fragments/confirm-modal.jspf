@@ -43,6 +43,9 @@
             }
 
             const body = document.body;
+            if (modal.parentElement !== body) {
+                body.appendChild(modal);
+            }
             const title = document.getElementById("appConfirmTitle");
             const eyebrow = document.getElementById("appConfirmEyebrow");
             const message = document.getElementById("appConfirmMessage");

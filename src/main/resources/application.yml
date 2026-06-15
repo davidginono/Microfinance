@@ -1,10 +1,13 @@
 spring:
   config:
     import: optional:file:./application-local.yml
+  sql:
+    init:
+      mode: never
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sacco}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost/sacco}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    password: ${SPRING_DATASOURCE_PASSWORD:qwerty1!}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:30}
       minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
@@ -12,8 +15,9 @@ spring:
       idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:600000}
       max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:1800000}
   jpa:
+    generate-ddl: false
     hibernate:
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: false
@@ -48,7 +52,7 @@ spring:
             scope: openid,email,profile
 
 server:
-  port: ${PORT:${SERVER_PORT:8080}}
+  port: 8080
   shutdown: graceful
   compression:
     enabled: ${SERVER_COMPRESSION_ENABLED:true}
@@ -76,8 +80,6 @@ logging:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
-  seed:
-    demo-data-enabled: ${APP_SEED_DEMO_DATA_ENABLED:false}
   outbox:
     scheduler-enabled: true
     batch-size: ${APP_OUTBOX_BATCH_SIZE:250}
@@ -97,7 +99,6 @@ app:
       send-path: ${APP_SMS_BENTER_SEND_PATH:/v1/sms/SendBulkSMS}
       client-id: ${APP_SMS_BENTER_CLIENT_ID:}
       api-key: ${APP_SMS_BENTER_API_KEY:}
-      access-key: ${APP_SMS_BENTER_ACCESS_KEY:}
       sender-id: ${APP_SMS_BENTER_SENDER_ID:INFO}
   retention:
     cleanup-enabled: true

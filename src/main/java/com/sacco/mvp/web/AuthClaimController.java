@@ -2,6 +2,7 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.service.MinorAdminInvitationService;
+import com.sacco.mvp.service.TanzaniaPhoneNumber;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -36,6 +37,7 @@ public class AuthClaimController {
             model.addAttribute("memberSaccoId", member.getSaccoId());
             model.addAttribute("memberStationId", member.getStationId());
             model.addAttribute("maskedEmail", maskEmail(member.getEmail()));
+            model.addAttribute("maskedPhone", maskPhone(member.getPhone()));
             model.addAttribute("invitationExpiresAt", ctx.invitation().getExpiresAt());
         } catch (IllegalStateException ex) {
             model.addAttribute("claimError", ex.getMessage());
@@ -50,7 +52,7 @@ public class AuthClaimController {
                              RedirectAttributes ra) {
         try {
             invitationService.requestOtp(token);
-            ra.addFlashAttribute("claimMessage", "A one-time code was sent to the email on file.");
+            ra.addFlashAttribute("claimMessage", "Verification codes were sent to the email and phone number on file.");
         } catch (IllegalStateException ex) {
             ra.addFlashAttribute("claimError", ex.getMessage());
         }
@@ -60,6 +62,7 @@ public class AuthClaimController {
     @PostMapping("/verify")
     public String verify(@RequestParam("token") String token,
                          @RequestParam("otpCode") String otpCode,
+                         @RequestParam("phoneOtpCode") String phoneOtpCode,
                          @RequestParam("password") String password,
                          @RequestParam("confirmPassword") String confirmPassword,
                          RedirectAttributes ra) {
@@ -70,7 +73,7 @@ public class AuthClaimController {
             if (!password.equals(confirmPassword)) {
                 throw new IllegalStateException("Passwords do not match.");
             }
-            Member member = invitationService.claimInvitation(token, otpCode, password);
+            Member member = invitationService.claimInvitation(token, otpCode, phoneOtpCode, password);
             log.info("Staff account activated memberNo={}", member.getMemberNo());
             ra.addFlashAttribute("loginMessage",
                 "Your account is now active. Sign in using your staff member number and password or request an email code.");
@@ -95,5 +98,13 @@ public class AuthClaimController {
             ? local.substring(0, 1)
             : local.substring(0, 2);
         return visible + "***" + domain;
+    }
+
+    private String maskPhone(String phone) {
+        String normalized = TanzaniaPhoneNumber.normalizeOptional(phone);
+        if (normalized == null) {
+            return "";
+        }
+        return normalized.substring(0, 5) + "****" + normalized.substring(normalized.length() - 3);
     }
 }

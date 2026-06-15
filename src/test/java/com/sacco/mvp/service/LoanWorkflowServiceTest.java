@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
@@ -63,9 +64,112 @@ class LoanWorkflowServiceTest {
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
     @Mock private WorkflowRoutingService workflowRoutingService;
     @Mock private LoanQualificationPolicyService loanQualificationPolicyService;
+    @Mock private PaymentDetailsService paymentDetailsService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
+
+    @Test
+    void memberDashboardUsesFocusedAggregateAndCurrentLoanQueries() {
+        UUID memberId = UUID.randomUUID();
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicantMemberId(memberId)
+            .status(LoanStatus.FINAL_APPROVED)
+            .build();
+        LoanApplication currentLoan = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicantMemberId(memberId)
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        LoanApplicationRepository.StatusCountProjection currentCount = mock(LoanApplicationRepository.StatusCountProjection.class);
+        LoanApplicationRepository.StatusCountProjection paidCount = mock(LoanApplicationRepository.StatusCountProjection.class);
+        when(currentCount.getStatus()).thenReturn(LoanStatus.READY_FOR_MANAGER);
+        when(currentCount.getTotal()).thenReturn(2L);
+        when(paidCount.getStatus()).thenReturn(LoanStatus.PAID);
+        when(paidCount.getTotal()).thenReturn(3L);
+        when(loanApplicationRepository.countByStatusForApplicant(memberId)).thenReturn(List.of(currentCount, paidCount));
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(List.of(activeLoan));
+        when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(Optional.of(currentLoan));
+        when(guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId)).thenReturn(4L);
+
+        LoanWorkflowService.MemberDashboardData dashboard = loanWorkflowService.memberDashboard(memberId);
+
+        assertThat(dashboard.statusCounts())
+            .containsEntry(LoanStatus.READY_FOR_MANAGER, 2L)
+            .containsEntry(LoanStatus.PAID, 3L);
+        assertThat(dashboard.activeLoans()).containsExactly(activeLoan);
+        assertThat(dashboard.latestCurrentApplication()).isEqualTo(currentLoan);
+        assertThat(dashboard.pendingGuaranteeCount()).isEqualTo(4L);
+        verify(loanApplicationRepository, never()).findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
+        verify(guarantorRequestRepository, never()).findByGuarantorMemberIdOrderByCreatedAtDesc(memberId);
+    }
+
+    @Test
+    void memberApplicationListLoadsOnlyCurrentApplicationsAndAggregatesArchiveCount() {
+        UUID memberId = UUID.randomUUID();
+        LoanApplication currentLoan = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicantMemberId(memberId)
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        LoanApplicationRepository.StatusCountProjection currentCount = mock(LoanApplicationRepository.StatusCountProjection.class);
+        LoanApplicationRepository.StatusCountProjection paidCount = mock(LoanApplicationRepository.StatusCountProjection.class);
+        LoanApplicationRepository.StatusCountProjection rejectedCount = mock(LoanApplicationRepository.StatusCountProjection.class);
+        when(currentCount.getStatus()).thenReturn(LoanStatus.READY_FOR_MANAGER);
+        when(paidCount.getStatus()).thenReturn(LoanStatus.PAID);
+        when(paidCount.getTotal()).thenReturn(3L);
+        when(rejectedCount.getStatus()).thenReturn(LoanStatus.FINAL_REJECTED);
+        when(rejectedCount.getTotal()).thenReturn(2L);
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(List.of(currentLoan));
+        when(loanApplicationRepository.countByStatusForApplicant(memberId))
+            .thenReturn(List.of(currentCount, paidCount, rejectedCount));
+
+        LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(memberId);
+
+        assertThat(applications.currentApplications()).containsExactly(currentLoan);
+        assertThat(applications.archiveCount()).isEqualTo(5L);
+        verify(loanApplicationRepository, never()).findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
+    }
+
+    @Test
+    void latestMemberLoanLookupsUseBoundedRepositoryQueries() {
+        UUID memberId = UUID.randomUUID();
+        LoanApplication currentLoan = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .status(LoanStatus.FINAL_APPROVED)
+            .build();
+        when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(Optional.of(currentLoan), Optional.of(activeLoan));
+
+        assertThat(loanWorkflowService.findApplicationInProgress(memberId)).contains(currentLoan);
+        assertThat(loanWorkflowService.findActiveDisbursedLoan(memberId)).contains(activeLoan);
+
+        verify(loanApplicationRepository, times(2))
+            .findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any());
+    }
+
+    @Test
+    void guarantorWorkspaceListsUseFocusedRepositoryQueries() {
+        UUID memberId = UUID.randomUUID();
+        GuarantorRequest request = GuarantorRequest.builder().id(UUID.randomUUID()).build();
+        when(guarantorRequestRepository.findActiveVisibleByGuarantorMemberId(eq(memberId), any()))
+            .thenReturn(List.of(request));
+        when(guarantorRequestRepository.findActiveGuaranteedLoansByGuarantorMemberId(memberId))
+            .thenReturn(List.of(request));
+
+        assertThat(loanWorkflowService.myActiveGuarantorRequests(memberId)).containsExactly(request);
+        assertThat(loanWorkflowService.myActiveGuaranteedLoans(memberId)).containsExactly(request);
+
+        verify(guarantorRequestRepository, never()).findByGuarantorMemberIdOrderByCreatedAtDesc(memberId);
+    }
 
     @Test
     void submitToManagerDoesNotRequireLegacyFeeReceipt() {
@@ -233,8 +337,9 @@ class LoanWorkflowServiceTest {
 
         when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "0101"))
             .thenReturn(Optional.of(staffOnly));
-        when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE))
-            .thenReturn(List.of(staffOnly));
+        when(memberRepository.findGuarantorCandidatesByNumberSuffix(
+            eq(saccoId), eq("ST01"), eq(applicantId), eq("0101"), eq(PageRequest.of(0, 10))
+        )).thenReturn(Page.empty(PageRequest.of(0, 10)));
 
         var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "0101", 0, 10);
 
@@ -565,6 +670,8 @@ class LoanWorkflowServiceTest {
                 new BigDecimal("2999.70")));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.LOAN_ADVANCE, new BigDecimal("1000"), 3, null))
             .thenReturn(Map.of("interestMethod", "FLAT_RATE", "interestRate", BigDecimal.ZERO));
+        when(paymentDetailsService.snapshotJsonForMember(memberId))
+            .thenReturn("{\"available\":true,\"provider\":\"M-Pesa\",\"accountIdentifier\":\"255700000001\"}");
         doAnswer(invocation -> {
             LoanApplication target = invocation.getArgument(0);
             target.setStatus(LoanStatus.READY_FOR_MANAGER);
@@ -575,6 +682,7 @@ class LoanWorkflowServiceTest {
         LoanApplication submitted = loanWorkflowService.submit(appId, memberId);
 
         assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
+        assertThat(submitted.getPaymentDetailsSnapshot()).contains("255700000001");
         verify(guarantorRequestRepository, never()).save(any());
     }
 
@@ -655,7 +763,15 @@ class LoanWorkflowServiceTest {
 
         assertThat(app.getStatus()).isEqualTo(LoanStatus.ALL_GUARANTORS_APPROVED);
         verify(loanApplicationRepository).save(app);
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("LOAN_GUARANTORS_APPROVED"), eq(memberId), any());
+        verify(outboxService).enqueue(
+            eq("LOAN"),
+            eq(appId),
+            eq("LOAN_GUARANTORS_APPROVED"),
+            eq(memberId),
+            eq(saccoId),
+            eq((String) null),
+            any()
+        );
     }
 
     @Test

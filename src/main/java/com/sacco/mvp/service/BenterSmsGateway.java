@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,10 +12,10 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -38,9 +39,6 @@ public class BenterSmsGateway implements SmsGateway {
     @Value("${app.sms.benter.api-key:}")
     private String apiKey;
 
-    @Value("${app.sms.benter.access-key:}")
-    private String accessKey;
-
     @Value("${app.sms.benter.sender-id:INFO}")
     private String senderId;
 
@@ -52,15 +50,12 @@ public class BenterSmsGateway implements SmsGateway {
 
     @Override
     public SmsSendResult send(String phoneNumber, String message) {
-        String normalizedPhone = normalizePhone(phoneNumber);
+        String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(phoneNumber);
         if (!enabled) {
             return SmsSendResult.skipped("SMS is disabled");
         }
         if (clientId.isBlank() || apiKey.isBlank()) {
             return SmsSendResult.skipped("Benter Group credentials are not configured");
-        }
-        if (resolvedAccessKey().isBlank()) {
-            return SmsSendResult.skipped("Benter Group access key is not configured");
         }
         if (senderId.isBlank()) {
             return SmsSendResult.skipped("Benter Group sender ID is not configured");
@@ -72,33 +67,32 @@ public class BenterSmsGateway implements SmsGateway {
             return SmsSendResult.skipped("SMS message is empty");
         }
 
-        Map<String, Object> payload = Map.of(
-            "SenderId", senderId,
-            "IsUnicode", false,
-            "IsFlash", false,
-            "MessageParameters", List.of(Map.of(
-                "Number", normalizedPhone,
-                "Text", trimMessage(message)
-            )),
-            "ApiKey", apiKey,
-            "ClientId", clientId
+        BenterSendRequest payload = new BenterSendRequest(
+            senderId,
+            List.of(new BenterMessage(normalizedPhone, trimMessage(message))),
+            apiKey,
+            clientId
         );
 
         try {
+            String jsonBody = objectMapper.writeValueAsString(payload);
             String response = client().post()
                 .uri(sendPath)
-                .header("AccessKey", resolvedAccessKey())
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .body(payload)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .body(jsonBody)
                 .retrieve()
                 .body(String.class);
             return resultFromResponse(response);
         } catch (RestClientResponseException ex) {
             log.warn("Benter Group SMS failed with status {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return SmsSendResult.skipped("Benter Group SMS failed with status " + ex.getStatusCode());
+            return SmsSendResult.rejected("Benter Group SMS failed with status " + ex.getStatusCode());
+        } catch (ResourceAccessException ex) {
+            log.warn("Benter Group SMS acceptance is unknown: {}", ex.getMessage());
+            return SmsSendResult.acceptanceUnknown("Benter Group SMS acceptance is unknown");
         } catch (Exception ex) {
             log.warn("Benter Group SMS failed: {}", ex.getMessage());
-            return SmsSendResult.skipped("Benter Group SMS failed");
+            return SmsSendResult.acceptanceUnknown("Benter Group SMS acceptance is unknown");
         }
     }
 
@@ -116,43 +110,46 @@ public class BenterSmsGateway implements SmsGateway {
         return requestFactory;
     }
 
-    private String resolvedAccessKey() {
-        return accessKey.isBlank() ? apiKey : accessKey;
-    }
-
     private SmsSendResult resultFromResponse(String response) throws Exception {
         if (response == null || response.isBlank()) {
-            return SmsSendResult.skipped("Benter Group SMS returned an empty response");
+            return SmsSendResult.acceptanceUnknown("Benter Group SMS returned an empty response");
         }
         JsonNode root = objectMapper.readTree(response);
         String errorCode = root.path("ErrorCode").asText();
         if (!"0".equals(errorCode) && !"000".equals(errorCode)) {
             String errorDescription = root.path("ErrorDescription").asText("Unknown Benter Group SMS error");
-            return SmsSendResult.skipped("Benter Group SMS failed: " + errorDescription);
+            return SmsSendResult.rejected("Benter Group SMS failed: " + errorDescription);
         }
         JsonNode firstMessage = root.path("Data").isArray() && root.path("Data").size() > 0
             ? root.path("Data").get(0)
             : null;
-        String messageId = firstMessage == null ? response : firstMessage.path("MessageId").asText(response);
+        if (firstMessage == null) {
+            return SmsSendResult.acceptanceUnknown("Benter Group SMS returned no message result");
+        }
+        if (firstMessage.path("MessageErrorCode").asInt(-1) != 0) {
+            String description = firstMessage.path("MessageErrorDescription").asText("Unknown Benter Group SMS message error");
+            return SmsSendResult.rejected("Benter Group SMS failed: " + description);
+        }
+        String messageId = firstMessage.path("MessageId").asText(response);
         return SmsSendResult.sent(messageId);
-    }
-
-    private String normalizePhone(String phoneNumber) {
-        if (phoneNumber == null || phoneNumber.isBlank()) {
-            return null;
-        }
-        String digits = phoneNumber.replaceAll("[^0-9+]", "");
-        if (digits.startsWith("+")) {
-            digits = digits.substring(1);
-        }
-        if (digits.startsWith("0") && digits.length() == 10) {
-            return "255" + digits.substring(1);
-        }
-        return digits.isBlank() ? null : digits;
     }
 
     private String trimMessage(String message) {
         String trimmed = message.trim();
         return trimmed.length() <= 320 ? trimmed : trimmed.substring(0, 317) + "...";
+    }
+
+    private record BenterSendRequest(
+        @JsonProperty("SenderId") String senderId,
+        @JsonProperty("MessageParameters") List<BenterMessage> messageParameters,
+        @JsonProperty("ApiKey") String apiKey,
+        @JsonProperty("ClientId") String clientId
+    ) {
+    }
+
+    private record BenterMessage(
+        @JsonProperty("Number") String number,
+        @JsonProperty("Text") String text
+    ) {
     }
 }

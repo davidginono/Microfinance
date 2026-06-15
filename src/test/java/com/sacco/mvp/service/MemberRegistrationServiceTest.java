@@ -23,6 +23,36 @@ import static org.mockito.Mockito.when;
 class MemberRegistrationServiceTest {
 
     @Test
+    void ensureLocalUniquenessRejectsEmailAlreadyUsedByAnyAccount() {
+        MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
+        MemberRegistrationService service = new MemberRegistrationService(
+            memberRepository,
+            Mockito.mock(RegisteredSaccoRepository.class),
+            Mockito.mock(SaccoStationRepository.class),
+            Mockito.mock(SaccoSettingsRepository.class),
+            Mockito.mock(SavingsAccountRepository.class),
+            Mockito.mock(UserSettingsRepository.class),
+            Mockito.mock(PasswordEncoder.class),
+            null
+        );
+
+        when(memberRepository.findByMemberNo("000001")).thenReturn(Optional.empty());
+        when(memberRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.ensureLocalUniqueness(
+            "000001",
+            "existing@example.com",
+            "255700000001"
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("That email address is already registered in the MVP system.");
+
+        verify(memberRepository).existsByEmailIgnoreCase("existing@example.com");
+        verify(memberRepository, never()).existsByPhone(org.mockito.ArgumentMatchers.anyString());
+        verify(memberRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void verifyExternalMemberRejectsInactiveStation() {
         MemberRepository memberRepository = Mockito.mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);

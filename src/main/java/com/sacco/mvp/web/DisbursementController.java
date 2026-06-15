@@ -24,6 +24,7 @@ import com.sacco.mvp.service.LoanPaymentTransactionSyncService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -73,6 +74,7 @@ public class DisbursementController {
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
+    private final PaymentDetailsService paymentDetailsService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -154,25 +156,36 @@ public class DisbursementController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String filter,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
         String normalizedSearchId = normalizeQueueSearch(searchId);
-        List<ManagerReview> latestReviews = latestDisbursementReviews(principal.getMemberId());
+        List<String> statuses = currentFilter.status() == null
+            ? List.of(LoanStatus.DRAFT.name())
+            : List.of(currentFilter.status().name());
+        org.springframework.data.domain.Page<ManagerReview> archivePage = managerReviewRepository.findLatestArchivePage(
+            principal.getMemberId(),
+            ApprovalWorkflowStage.DISBURSEMENT_OFFICER.name(),
+            principal.getSaccoId(),
+            principal.getStationId(),
+            false,
+            ManagerDecision.ACCEPT.name(),
+            currentFilter.status() != null,
+            statuses,
+            normalizedSearchId,
+            true,
+            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
+        );
+        List<ManagerReview> latestReviews = archivePage.getContent();
         Map<UUID, LoanApplication> loanMap = loadLoansById(latestReviews.stream()
             .map(ManagerReview::getLoanApplicationId)
             .toList());
         List<ArchiveEntry> entries = latestReviews.stream()
             .map(review -> {
                 LoanApplication loan = loanMap.get(review.getLoanApplicationId());
-                return loan == null
-                    || !principal.getSaccoId().equals(loan.getSaccoId())
-                    || !managerService.matchesApplicantStation(loan, principal.getStationId())
-                    ? null
-                    : new ArchiveEntry(review, loan);
+                return loan == null ? null : new ArchiveEntry(review, loan);
             })
             .filter(Objects::nonNull)
-            .filter(entry -> currentFilter.matches(entry.loan()))
-            .filter(entry -> matchesArchiveSearch(entry.loan(), normalizedSearchId))
             .toList();
         Map<UUID, String> applicantNames = loadApplicantNames(entries.stream()
             .map(entry -> entry.loan().getApplicantMemberId())
@@ -194,6 +207,7 @@ public class DisbursementController {
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
+        model.addAttribute("archivePage", archivePage);
         return "disbursement/archive";
     }
 
@@ -259,7 +273,8 @@ public class DisbursementController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
-        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
+        model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
@@ -471,11 +486,14 @@ public class DisbursementController {
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 officer.getId(),
                 "Your SACCO LMS disbursement code",
-                "Use this OTP code to confirm the loan disbursement action."
+                "Use this OTP code to confirm the loan disbursement action.",
+                app.getSaccoId(),
+                app.getStationId(),
+                officer.getPhone()
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a disbursement code to " + officer.getEmail() + "."
+                "message", "We sent a disbursement code using the station OTP delivery policy."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -682,17 +700,6 @@ public class DisbursementController {
 
     private String normalizeQueueSearch(String searchId) {
         return searchId == null ? "" : searchId.trim();
-    }
-
-    private List<ManagerReview> latestDisbursementReviews(UUID disbursementOfficerId) {
-        Map<UUID, ManagerReview> latestByLoan = new LinkedHashMap<>();
-        for (ManagerReview review : managerReviewRepository.findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(
-            disbursementOfficerId, ApprovalWorkflowStage.DISBURSEMENT_OFFICER)) {
-            latestByLoan.putIfAbsent(review.getLoanApplicationId(), review);
-        }
-        return latestByLoan.values().stream()
-            .sorted(Comparator.comparing(ManagerReview::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
     }
 
     private Map<UUID, LoanApplication> loadLoansById(List<UUID> loanIds) {

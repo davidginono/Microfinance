@@ -1,0 +1,81 @@
+package com.sacco.mvp.service;
+
+import com.sacco.mvp.domain.PlatformSmsSettings;
+import com.sacco.mvp.domain.SmsUnitStatus;
+import com.sacco.mvp.domain.SmsUsageLedger;
+import com.sacco.mvp.domain.StationSmsAccount;
+import com.sacco.mvp.repository.SmsUsageLedgerRepository;
+import com.sacco.mvp.repository.StationSmsAccountRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class SmsUsageManagementService {
+    private final SmsUnitTransactionService transactionService;
+    private final SmsUsageAlertService alertService;
+    private final StationSmsAccountRepository accountRepository;
+    private final SmsUsageLedgerRepository ledgerRepository;
+
+    public Page<StationSmsAccount> accounts(String saccoId, String stationId, SmsUnitStatus status, Pageable pageable) {
+        String normalizedSaccoId = blankToNull(saccoId);
+        String normalizedStationId = blankToNull(stationId);
+        Specification<StationSmsAccount> filters = Specification.allOf();
+        if (normalizedSaccoId != null) {
+            filters = filters.and((root, query, builder) -> builder.equal(root.get("saccoId"), normalizedSaccoId));
+        }
+        if (normalizedStationId != null) {
+            filters = filters.and((root, query, builder) -> builder.equal(root.get("stationId"), normalizedStationId));
+        }
+        if (status != null) {
+            filters = filters.and((root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+        Pageable orderedPage = PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            Sort.by("saccoId").ascending().and(Sort.by("stationId").ascending())
+        );
+        return accountRepository.findAll(filters, orderedPage);
+    }
+
+    public StationSmsAccount account(String saccoId, String stationId) {
+        return transactionService.ensureAccount(saccoId, stationId);
+    }
+
+    public StationSmsAccount account(UUID accountId) {
+        return accountRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("SMS unit account not found."));
+    }
+
+    public Page<SmsUsageLedger> history(String saccoId, String stationId, Pageable pageable) {
+        return ledgerRepository.findBySaccoIdAndStationIdOrderByCreatedAtDesc(saccoId, stationId, pageable);
+    }
+
+    public Page<SmsUsageLedger> history(UUID accountId, Pageable pageable) {
+        return ledgerRepository.findByAccountIdOrderByCreatedAtDesc(accountId, pageable);
+    }
+
+    public PlatformSmsSettings settings() {
+        return transactionService.settings();
+    }
+
+    public void allocate(String saccoId, String stationId, long units, UUID actorMemberId, String note) {
+        transactionService.allocate(saccoId, stationId, units, actorMemberId, note);
+    }
+
+    public void updateThresholds(int lowPercent, int criticalPercent, UUID actorMemberId) {
+        transactionService.updateThresholds(lowPercent, criticalPercent, actorMemberId)
+            .forEach(alert -> alertService.alertStatus(alert.saccoId(), alert.stationId(), alert.status(), alert.availableUnits()));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

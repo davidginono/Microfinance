@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
@@ -22,6 +23,7 @@ import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
@@ -67,6 +69,7 @@ public class ManagerController {
     private final ManagerReviewRepository managerReviewRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
+    private final PaymentDetailsService paymentDetailsService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -146,16 +149,31 @@ public class ManagerController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String filter,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
         String normalizedSearchId = normalizeQueueSearch(searchId);
         boolean loanIdSearch = currentFilter.usesLoanId();
-        List<ManagerReview> latestReviews = latestManagerReviews(principal.getMemberId());
+        List<String> statuses = currentFilter.statuses().isEmpty()
+            ? List.of(LoanStatus.DRAFT.name())
+            : currentFilter.statuses().stream().map(Enum::name).toList();
+        org.springframework.data.domain.Page<ManagerReview> archivePage = managerReviewRepository.findLatestArchivePage(
+            principal.getMemberId(),
+            ApprovalWorkflowStage.MANAGER.name(),
+            principal.getSaccoId(),
+            principal.getStationId(),
+            currentFilter.decision() != null,
+            currentFilter.decision() == null ? ManagerDecision.ACCEPT.name() : currentFilter.decision().name(),
+            !currentFilter.statuses().isEmpty(),
+            statuses,
+            normalizedSearchId,
+            loanIdSearch,
+            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
+        );
+        List<ManagerReview> latestReviews = archivePage.getContent();
         Map<UUID, com.sacco.mvp.domain.LoanApplication> loanMap = loanApplicationRepository.findAllById(
                 latestReviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
             .stream()
-            .filter(loan -> principal.getSaccoId().equals(loan.getSaccoId()))
-            .filter(loan -> managerService.matchesApplicantStation(loan, principal.getStationId()))
             .collect(Collectors.toMap(
                 com.sacco.mvp.domain.LoanApplication::getId,
                 loan -> loan,
@@ -168,8 +186,6 @@ public class ManagerController {
                 return loan == null ? null : new ArchiveEntry(review, loan, dashboardStatusLabel(loan.getStatus()));
             })
             .filter(Objects::nonNull)
-            .filter(entry -> currentFilter.matches(entry.review(), entry.loan()))
-            .filter(entry -> matchesManagerArchiveSearch(entry.loan(), normalizedSearchId, loanIdSearch))
             .toList();
         Map<UUID, String> applicantNames = memberRepository.findAllById(
                 archiveEntries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
@@ -195,6 +211,7 @@ public class ManagerController {
         model.addAttribute("queueSearchValue", normalizedSearchId);
         model.addAttribute("archiveSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
         model.addAttribute("archiveSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
+        model.addAttribute("archivePage", archivePage);
         return "manager/archive";
     }
 
@@ -224,7 +241,8 @@ public class ManagerController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
-        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
+        model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
@@ -380,7 +398,8 @@ public class ManagerController {
     public ResponseEntity<Map<String, Object>> requestDecisionOtp(@PathVariable UUID id,
                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
         try {
-            if (managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus() != LoanStatus.READY_FOR_MANAGER) {
+            LoanApplication application = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+            if (application.getStatus() != LoanStatus.READY_FOR_MANAGER) {
                 throw new IllegalStateException("This application is no longer waiting for manager review.");
             }
             Member manager = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a manager decision OTP.");
@@ -389,11 +408,14 @@ public class ManagerController {
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 manager.getId(),
                 "Your SACCO LMS manager decision code",
-                "Use this OTP code to confirm your manager decision on the loan application."
+                "Use this OTP code to confirm your manager decision on the loan application.",
+                application.getSaccoId(),
+                application.getStationId(),
+                manager.getPhone()
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a manager decision code to " + manager.getEmail() + "."
+                "message", "We sent a manager decision code using the station OTP delivery policy."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -820,29 +842,6 @@ public class ManagerController {
             throw new IllegalStateException(missingEmailMessage);
         }
         return member;
-    }
-
-    private List<ManagerReview> latestManagerReviews(UUID managerId) {
-        Map<UUID, ManagerReview> latestByLoan = new LinkedHashMap<>();
-        for (ManagerReview review : managerReviewRepository.findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(
-            managerId, ApprovalWorkflowStage.MANAGER)) {
-            latestByLoan.putIfAbsent(review.getLoanApplicationId(), review);
-        }
-        return latestByLoan.values().stream()
-            .sorted(Comparator.comparing(ManagerReview::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
-    }
-
-    private boolean matchesManagerArchiveSearch(com.sacco.mvp.domain.LoanApplication app, String searchId, boolean loanIdSearch) {
-        if (searchId == null || searchId.isBlank()) {
-            return true;
-        }
-        if (loanIdSearch) {
-            String loanId = app.getLoanId();
-            return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(searchId.toLowerCase(Locale.ENGLISH));
-        }
-        Long applicationNumber = app.getApplicationNumber();
-        return applicationNumber != null && String.valueOf(applicationNumber).contains(searchId);
     }
 
     private record QueueFilter(String key, String label, List<LoanStatus> statuses) {}

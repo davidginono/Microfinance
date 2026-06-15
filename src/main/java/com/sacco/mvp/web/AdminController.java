@@ -6,7 +6,9 @@ import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
+import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -16,6 +18,8 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.SaccoRegistryService;
+import com.sacco.mvp.service.SmsUsageManagementService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.web.form.MinorAdminRegistrationForm;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -54,6 +58,8 @@ public class AdminController {
     private final PlatformAdminService platformAdminService;
     private final DatabaseUtilizationService databaseUtilizationService;
     private final NotificationInboxService notificationInboxService;
+    private final SmsUsageManagementService smsUsageManagementService;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
@@ -80,6 +86,104 @@ public class AdminController {
             principal.getMemberId()
         ));
         return "admin/dashboard";
+    }
+
+    @GetMapping("/sms-usage")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    public String smsUsage(@AuthenticationPrincipal AppUserPrincipal principal,
+                           @RequestParam(required = false) String saccoId,
+                           @RequestParam(required = false) String stationId,
+                           @RequestParam(required = false) SmsUnitStatus status,
+                           @RequestParam(required = false) UUID accountId,
+                           @RequestParam(defaultValue = "0") int page,
+                           @RequestParam(defaultValue = "0") int historyPage,
+                           Model model) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        int safePage = Math.max(0, page);
+        int safeHistoryPage = Math.max(0, historyPage);
+        model.addAttribute("superAdmin", superAdmin);
+        model.addAttribute("smsStatuses", SmsUnitStatus.values());
+        model.addAttribute("smsSettings", smsUsageManagementService.settings());
+
+        if (superAdmin) {
+            var registeredSaccos = saccoRegistryService.listRegisteredSaccos();
+            String selectedSaccoId = normalizeTextParam(saccoId);
+            String selectedStationId = normalizeTextParam(stationId);
+            String requestedSaccoId = selectedSaccoId;
+            var selectedSacco = registeredSaccos.stream()
+                .filter(sacco -> sacco.getSaccoId().equals(requestedSaccoId))
+                .findFirst()
+                .orElse(null);
+            if (selectedSacco == null) {
+                selectedSaccoId = "";
+                selectedStationId = "";
+            } else if (!selectedSacco.getStationIds().contains(selectedStationId)) {
+                selectedStationId = "";
+            }
+            var accounts = smsUsageManagementService.accounts(
+                selectedSaccoId.isBlank() ? null : selectedSaccoId,
+                selectedStationId.isBlank() ? null : selectedStationId,
+                status,
+                PageRequest.of(safePage, 25)
+            );
+            var selectedAccount = accountId == null ? null : smsUsageManagementService.account(accountId);
+            model.addAttribute("accounts", accounts);
+            model.addAttribute("selectedAccount", selectedAccount);
+            model.addAttribute("selectedOtpDeliveryChannel", selectedAccount == null ? null
+                : stationOtpSettingsService.channel(selectedAccount.getSaccoId(), selectedAccount.getStationId()));
+            model.addAttribute("usageHistory", selectedAccount == null
+                ? Page.empty(PageRequest.of(safeHistoryPage, 25))
+                : smsUsageManagementService.history(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
+            model.addAttribute("registeredSaccos", registeredSaccos);
+            model.addAttribute("selectedSaccoId", selectedSaccoId);
+            model.addAttribute("selectedStationId", selectedStationId);
+            model.addAttribute("selectedSmsStatus", status == null ? "" : status.name());
+        } else {
+            String scopedSaccoId = adminScopeService.currentSaccoId(principal);
+            String scopedStationId = adminScopeService.currentStationId(principal);
+            var selectedAccount = smsUsageManagementService.account(scopedSaccoId, scopedStationId);
+            model.addAttribute("selectedAccount", selectedAccount);
+            model.addAttribute("selectedOtpDeliveryChannel", stationOtpSettingsService.channel(scopedSaccoId, scopedStationId));
+            model.addAttribute("usageHistory", smsUsageManagementService.history(
+                scopedSaccoId,
+                scopedStationId,
+                PageRequest.of(safeHistoryPage, 25)
+            ));
+        }
+        return "admin/sms-usage";
+    }
+
+    @PostMapping("/sms-usage/allocations")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String allocateSmsUnits(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @RequestParam String saccoId,
+                                   @RequestParam String stationId,
+                                   @RequestParam long units,
+                                   @RequestParam String note,
+                                   RedirectAttributes ra) {
+        try {
+            smsUsageManagementService.allocate(saccoId, stationId, units, principal.getMemberId(), note);
+            ra.addFlashAttribute("message", units + " SMS unit(s) added to " + saccoId + " / " + stationId + ".");
+        } catch (IllegalArgumentException | IllegalStateException | ArithmeticException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/sms-usage?saccoId=" + UriUtils.encode(saccoId, StandardCharsets.UTF_8)
+            + "&stationId=" + UriUtils.encode(stationId, StandardCharsets.UTF_8);
+    }
+
+    @PostMapping("/sms-usage/thresholds")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String updateSmsThresholds(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam int lowPercent,
+                                      @RequestParam int criticalPercent,
+                                      RedirectAttributes ra) {
+        try {
+            smsUsageManagementService.updateThresholds(lowPercent, criticalPercent, principal.getMemberId());
+            ra.addFlashAttribute("message", "SMS usage warning thresholds updated.");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/sms-usage";
     }
 
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -517,6 +621,11 @@ public class AdminController {
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
         model.addAttribute("settings", settings);
+        model.addAttribute(
+            "stationOtpDeliveryChannel",
+            stationOtpSettingsService.channel(saccoId, adminScopeService.currentStationId(principal))
+        );
+        model.addAttribute("otpDeliveryChannels", OtpDeliveryChannel.values());
         model.addAttribute("currentStationPolicy", stationPolicy);
         model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
         model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
@@ -537,7 +646,6 @@ public class AdminController {
         model.addAttribute("approvalFlowStageLabels", settings.resolvedApprovalFlow().stream()
             .map(ApprovalWorkflowStage::getDisplayLabel)
             .toList());
-        model.addAttribute("notificationDeliveryPreferences", adminService.notificationDeliveryPreferences(saccoId));
         model.addAttribute("settingsSection", normalizeSettingsSection(section));
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
@@ -729,32 +837,23 @@ public class AdminController {
         return "redirect:/admin/settings-controls?section=language";
     }
 
-    @PostMapping("/settings-controls/notifications")
+    @PostMapping("/settings-controls/otp-delivery")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
-    public String updateNotificationDeliveryPreferences(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                        @RequestParam(defaultValue = "false") boolean loanStatusEmail,
-                                                        @RequestParam(defaultValue = "false") boolean loanStatusSms,
-                                                        @RequestParam(defaultValue = "false") boolean guaranteeRequestEmail,
-                                                        @RequestParam(defaultValue = "false") boolean guaranteeRequestSms,
-                                                        @RequestParam(defaultValue = "false") boolean repaymentReminderEmail,
-                                                        @RequestParam(defaultValue = "false") boolean repaymentReminderSms,
-                                                        RedirectAttributes ra) {
+    public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
+                                    @RequestParam OtpDeliveryChannel otpDeliveryChannel,
+                                    RedirectAttributes ra) {
         try {
-            adminService.updateNotificationDeliveryPreferences(
+            stationOtpSettingsService.update(
                 adminScopeService.currentSaccoId(principal),
-                principal.getMemberId(),
-                loanStatusEmail,
-                loanStatusSms,
-                guaranteeRequestEmail,
-                guaranteeRequestSms,
-                repaymentReminderEmail,
-                repaymentReminderSms
+                adminScopeService.currentStationId(principal),
+                otpDeliveryChannel,
+                principal.getMemberId()
             );
-            ra.addFlashAttribute("message", "Notification delivery settings updated.");
+            ra.addFlashAttribute("message", "OTP delivery setting updated for this station.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/admin/settings-controls?section=notifications";
+        return "redirect:/admin/settings-controls?section=otp";
     }
 
     @PostMapping("/settings-controls/qualification-policies")
@@ -867,8 +966,8 @@ public class AdminController {
         if ("language".equalsIgnoreCase(section)) {
             return "language";
         }
-        if ("notifications".equalsIgnoreCase(section)) {
-            return "notifications";
+        if ("otp".equalsIgnoreCase(section)) {
+            return "otp";
         }
         return "loan";
     }
@@ -1160,10 +1259,36 @@ public class AdminController {
     public String saccoDetail(@PathVariable String saccoId,
                               @RequestParam(required = false) String section,
                               @RequestParam(required = false) String stationId,
+                              @RequestParam(defaultValue = "0") int smsPage,
+                              @RequestParam(defaultValue = "0") int smsHistoryPage,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               Model model) {
-        model.addAttribute("selectedSection", platformAdminService.normalizeSection(section));
-        model.addAttribute("saccoDetail", platformAdminService.saccoDetail(saccoId, stationId));
+        String selectedSection = platformAdminService.normalizeSection(section);
+        var saccoDetail = platformAdminService.saccoDetail(saccoId, stationId);
+        model.addAttribute("selectedSection", selectedSection);
+        model.addAttribute("saccoDetail", saccoDetail);
+        if ("sms".equals(selectedSection)) {
+            int safeSmsPage = Math.max(0, smsPage);
+            int safeSmsHistoryPage = Math.max(0, smsHistoryPage);
+            if (saccoDetail.isStationScoped()) {
+                var smsAccount = smsUsageManagementService.account(
+                    saccoDetail.getSaccoId(),
+                    saccoDetail.getSelectedStationId()
+                );
+                model.addAttribute("smsAccount", smsAccount);
+                model.addAttribute("smsHistory", smsUsageManagementService.history(
+                    smsAccount.getId(),
+                    PageRequest.of(safeSmsHistoryPage, 25)
+                ));
+            } else {
+                model.addAttribute("smsAccounts", smsUsageManagementService.accounts(
+                    saccoDetail.getSaccoId(),
+                    null,
+                    null,
+                    PageRequest.of(safeSmsPage, 25)
+                ));
+            }
+        }
         return "admin/sacco-detail";
     }
 

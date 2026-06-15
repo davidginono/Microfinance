@@ -27,6 +27,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
     List<Notification> findByTypeOrderByCreatedAtDesc(String type);
 
+    @Query(
+        value = """
+            select distinct cast(n.payload -> 'details' ->> 'incidentId' as uuid)
+            from notifications n
+            where n.type = 'SUPPORT_MESSAGE'
+              and n.read_at is not null
+              and cast(n.payload -> 'details' ->> 'incidentId' as uuid) in (:incidentIds)
+            """,
+        nativeQuery = true
+    )
+    List<UUID> findReadSupportIncidentIds(@Param("incidentIds") Collection<UUID> incidentIds);
+
     @Modifying
     @Query("update Notification n set n.readAt = CURRENT_TIMESTAMP where n.recipientMemberId = :memberId and n.readAt is null")
     int markAllAsReadForMember(@Param("memberId") UUID memberId);

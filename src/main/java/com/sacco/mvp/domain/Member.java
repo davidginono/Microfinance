@@ -36,6 +36,10 @@ public class Member {
     private String fullName;
 
     private String phone;
+
+    @Column(name = "phone_verified_at")
+    private OffsetDateTime phoneVerifiedAt;
+
     private String email;
 
     @Column(name = "signature_text")
@@ -87,4 +91,3 @@ public class Member {
         return roles;
     }
 }
-

@@ -70,12 +70,12 @@ public class LoanWorkflowService {
     private final FinancialDetailsService financialDetailsService;
     private final ObjectMapper objectMapper;
     private final ForesightDirectoryService foresightDirectoryService;
-    private final SaccoConfigurationService saccoConfigurationService;
     private final ApplicationNumberService applicationNumberService;
     private final RoleDirectoryService roleDirectoryService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final WorkflowRoutingService workflowRoutingService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
+    private final PaymentDetailsService paymentDetailsService;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -84,14 +84,33 @@ public class LoanWorkflowService {
                 .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
                 .toList();
         }
-        saccoConfigurationService.ensureDefaultLoanProducts(saccoId);
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
-            .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
-            .toList();
+        return List.of();
     }
 
-    public List<LoanApplication> myApplications(UUID memberId) {
-        return loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
+    public MemberDashboardData memberDashboard(UUID memberId) {
+        Map<LoanStatus, Long> statusCounts = new EnumMap<>(LoanStatus.class);
+        loanApplicationRepository.countByStatusForApplicant(memberId)
+            .forEach(row -> statusCounts.put(row.getStatus(), row.getTotal()));
+        List<LoanApplication> activeLoans = loanApplicationRepository
+            .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, ACTIVE_LOAN_LOCK_STATUSES);
+        LoanApplication latestCurrentApplication = loanApplicationRepository
+            .findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(
+                memberId,
+                APPLICATION_IN_PROGRESS_LOCK_STATUSES
+            )
+            .orElse(null);
+        long pendingGuaranteeCount = guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId);
+        return new MemberDashboardData(statusCounts, activeLoans, latestCurrentApplication, pendingGuaranteeCount);
+    }
+
+    public MemberApplicationListData memberApplicationList(UUID memberId) {
+        List<LoanApplication> currentApplications = loanApplicationRepository
+            .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES);
+        long archiveCount = loanApplicationRepository.countByStatusForApplicant(memberId).stream()
+            .filter(row -> !APPLICATION_IN_PROGRESS_LOCK_STATUSES.contains(row.getStatus()))
+            .mapToLong(LoanApplicationRepository.StatusCountProjection::getTotal)
+            .sum();
+        return new MemberApplicationListData(currentApplications, archiveCount);
     }
 
     public LoanApplication getMine(UUID appId, UUID memberId) {
@@ -100,9 +119,10 @@ public class LoanWorkflowService {
     }
 
     public Optional<LoanApplication> findApplicationInProgress(UUID memberId) {
-        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES)
-            .stream()
-            .findFirst();
+        return loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
+            memberId,
+            APPLICATION_IN_PROGRESS_LOCK_STATUSES
+        );
     }
 
     private Optional<LoanApplication> findBlockingApplicationInProgress(UUID memberId, UUID allowedApplicationId) {
@@ -113,9 +133,10 @@ public class LoanWorkflowService {
     }
 
     public Optional<LoanApplication> findActiveDisbursedLoan(UUID memberId) {
-        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, ACTIVE_LOAN_LOCK_STATUSES)
-            .stream()
-            .findFirst();
+        return loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
+            memberId,
+            ACTIVE_LOAN_LOCK_STATUSES
+        );
     }
 
     public void assertCanApplyForProduct(String saccoId, UUID memberId, LoanProductSetting product) {
@@ -319,6 +340,7 @@ public class LoanWorkflowService {
         ));
 
         app.setSubmittedAt(OffsetDateTime.now());
+        capturePaymentDetailsIfMissing(app);
 
         if (app.getRequiredGuarantors() == 0) {
             moveIntoConfiguredReviewStage(app, memberId);
@@ -366,8 +388,15 @@ public class LoanWorkflowService {
             )
         ));
 
+        capturePaymentDetailsIfMissing(app);
         moveIntoConfiguredReviewStage(app, memberId);
         return loanApplicationRepository.save(app);
+    }
+
+    private void capturePaymentDetailsIfMissing(LoanApplication app) {
+        if (app.getPaymentDetailsSnapshot() == null || app.getPaymentDetailsSnapshot().isBlank()) {
+            app.setPaymentDetailsSnapshot(paymentDetailsService.snapshotJsonForMember(app.getApplicantMemberId()));
+        }
     }
 
     private void assertApplicantCanAdvanceToManagerReview(UUID applicantId, UUID currentApplicationId) {
@@ -448,19 +477,13 @@ public class LoanWorkflowService {
             return Page.empty(PageRequest.of(page, size));
         }
 
-        List<Member> matches = memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
-            .filter(member -> !member.getId().equals(applicantId))
-            .filter(Member::isMemberAccess)
-            .filter(member -> matchesStation(member, normalizedStationId))
-            .filter(member -> {
-                String memberNo = member.getMemberNo() == null ? "" : member.getMemberNo();
-                String digits = memberNo.replaceAll("\\D", "");
-                return !digits.isBlank() && digits.endsWith(query);
-            })
-            .limit(size)
-            .toList();
-
-        return new PageImpl<>(matches, PageRequest.of(page, size), matches.size());
+        return memberRepository.findGuarantorCandidatesByNumberSuffix(
+            saccoId,
+            normalizedStationId,
+            applicantId,
+            query,
+            PageRequest.of(page, size)
+        );
     }
 
     public List<GuarantorCandidate> searchGuarantorCandidates(String saccoId,
@@ -525,13 +548,15 @@ public class LoanWorkflowService {
         throw new IllegalStateException("Guarantor selection is locked after the application is submitted.");
     }
 
-    public List<GuarantorRequest> myPendingGuarantorRequests(UUID memberId) {
-        return guarantorRequestRepository.findByGuarantorMemberIdAndStatusOrderByCreatedAtDesc(memberId,
-            GuarantorRequestStatus.PENDING);
+    public List<GuarantorRequest> myActiveGuarantorRequests(UUID memberId) {
+        return guarantorRequestRepository.findActiveVisibleByGuarantorMemberId(
+            memberId,
+            OffsetDateTime.now().minusHours(REVERSAL_WINDOW_HOURS)
+        );
     }
 
-    public List<GuarantorRequest> myGuarantorRequests(UUID memberId) {
-        return guarantorRequestRepository.findByGuarantorMemberIdOrderByCreatedAtDesc(memberId);
+    public List<GuarantorRequest> myActiveGuaranteedLoans(UUID memberId) {
+        return guarantorRequestRepository.findActiveGuaranteedLoansByGuarantorMemberId(memberId);
     }
 
     @Transactional
@@ -643,6 +668,7 @@ public class LoanWorkflowService {
         app.setUpdatedAt(OffsetDateTime.now());
         loanApplicationRepository.save(app);
         outboxService.enqueue("LOAN", appId, "LOAN_FORFEITED", app.getApplicantMemberId(),
+            app.getSaccoId(), app.getStationId(),
             Map.of("loanId", app.getId().toString()));
     }
 
@@ -692,6 +718,7 @@ public class LoanWorkflowService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", app.getId(), "LOAN_GUARANTORS_APPROVED", app.getApplicantMemberId(),
+                app.getSaccoId(), app.getStationId(),
                 Map.of("loanId", app.getId().toString()));
             return;
         }
@@ -936,6 +963,7 @@ public class LoanWorkflowService {
             guarantorRequestRepository.save(request);
 
             outboxService.enqueue("GUARANTOR_REQUEST", app.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
+                app.getSaccoId(), app.getStationId(),
                 Map.of("loanId", app.getId().toString()));
         }
     }
@@ -1134,6 +1162,20 @@ public class LoanWorkflowService {
             return app.getApplicationNumber().toString();
         }
         return app.getId().toString().substring(0, 8);
+    }
+
+    public record MemberDashboardData(
+        Map<LoanStatus, Long> statusCounts,
+        List<LoanApplication> activeLoans,
+        LoanApplication latestCurrentApplication,
+        long pendingGuaranteeCount
+    ) {
+    }
+
+    public record MemberApplicationListData(
+        List<LoanApplication> currentApplications,
+        long archiveCount
+    ) {
     }
 
     public record GuarantorCandidate(

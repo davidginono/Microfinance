@@ -73,6 +73,25 @@ public class NotificationInboxService {
             .toList();
     }
 
+    public List<NotificationViewService.HeaderNotificationView> unreadHeaderViews(UUID memberId, Collection<Position> positions) {
+        if (memberId == null || positions == null || positions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return notificationViewService.toHeaderViewsForPosition(
+            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId),
+            positions
+        );
+    }
+
+    public List<NotificationViewService.HeaderNotificationView> unreadIncidentHeaderViews(UUID memberId) {
+        if (memberId == null) {
+            return Collections.emptyList();
+        }
+        return notificationViewService.toIncidentHeaderViews(
+            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId)
+        );
+    }
+
     public List<NotificationViewService.NotificationView> allViews(UUID memberId, Collection<Position> positions) {
         if (memberId == null || positions == null || positions.isEmpty()) {
             return Collections.emptyList();

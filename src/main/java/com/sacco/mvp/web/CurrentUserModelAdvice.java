@@ -8,8 +8,6 @@ import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
-import com.sacco.mvp.service.NotificationInboxService;
-import com.sacco.mvp.service.NotificationViewService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.web.view.CurrentUserView;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,14 +19,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
-import java.util.Collections;
-
 @ControllerAdvice
 @RequiredArgsConstructor
 public class CurrentUserModelAdvice {
     private static final String REQUEST_ACTIVE_SACCO_BRAND = CurrentUserModelAdvice.class.getName() + ".activeSaccoBrand";
 
-    private final NotificationInboxService notificationInboxService;
     private final AdminScopeService adminScopeService;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
@@ -51,109 +46,17 @@ public class CurrentUserModelAdvice {
             .build();
     }
 
-    @ModelAttribute("notificationCount")
-    public long notificationCount(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null) {
-            return 0;
-        }
-        if (isPlatformAdminIdentity(principal)) {
-            return notificationInboxService.unreadIncidentCount(principal.getMemberId());
-        }
-        if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
-        }
-        return notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
-    }
-
-    @ModelAttribute("headerNotifications")
-    public java.util.List<NotificationViewService.NotificationView> headerNotifications(
-        @AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null) {
-            return Collections.emptyList();
-        }
-        if (isPlatformAdminIdentity(principal)) {
-            return notificationInboxService.unreadIncidentViews(principal.getMemberId());
-        }
-        if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
-        }
-        return notificationInboxService.unreadViews(principal.getMemberId(), principal.getGrantedPositions());
-    }
-
-    @ModelAttribute("notificationTargetUrl")
-    public String notificationTargetUrl(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null) {
-            return "/login";
-        }
-        if (isPlatformAdminIdentity(principal)) {
-            return "/admin/incidents";
-        }
-        if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return "/admin/support/replies";
-        }
-        return switch (principal.getPosition()) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case MANAGER -> "/manager/notifications";
-            case ACCOUNTANT -> "/accountant/notifications";
-            case DISBURSEMENT_OFFICER -> "/disbursement/notifications";
-            case BOARD -> "/board/notifications";
-            case LOAN_OFFICER -> "/loan-officer/notifications";
-            case MEMBER -> "/app/notifications";
-        };
-    }
-
-    @ModelAttribute("notificationPanelSubtitle")
-    public String notificationPanelSubtitle(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isPlatformAdminIdentity(principal)) {
-            return "Latest SACCO support incidents requiring platform attention";
-        }
-        if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
-            return "Latest member support incidents requiring admin attention";
-        }
-        return "Latest updates from the loan workflow";
-    }
-
-    @ModelAttribute("notificationPanelEmptyState")
-    public String notificationPanelEmptyState(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isPlatformAdminIdentity(principal)) {
-            return "No SACCO support incidents yet.";
-        }
-        if (principal != null && principal.getPosition() != null && principal.getPosition().isAdminRole()) {
-            return "No member support incidents yet.";
-        }
-        return "No notifications yet.";
-    }
-
-    @ModelAttribute("notificationOpenBaseUrl")
-    public String notificationOpenBaseUrl(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null) {
-            return "/login";
-        }
-        if (isPlatformAdminIdentity(principal)) {
-            return "/admin/notifications/";
-        }
-        if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return "/admin/notifications/";
-        }
-        return switch (principal.getPosition()) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case MANAGER -> "/manager/notifications/";
-            case ACCOUNTANT -> "/accountant/notifications/";
-            case DISBURSEMENT_OFFICER -> "/disbursement/notifications/";
-            case BOARD -> "/board/notifications/";
-            case LOAN_OFFICER -> "/loan-officer/notifications/";
-            case MEMBER -> "/app/notifications/";
-        };
-    }
-
     @ModelAttribute("adminScope")
     public AdminScopeService.AdminScopeView adminScope(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (isJsonRequest()) {
+            return null;
+        }
         return adminScopeService.currentScope(principal);
     }
 
     @ModelAttribute("headerStation")
     public HeaderStationView headerStation(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null || isPlatformAdminIdentity(principal)) {
+        if (principal == null || isPlatformAdminIdentity(principal) || isJsonRequest()) {
             return null;
         }
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
@@ -189,6 +92,9 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("adminScopeOptionsJson")
     public String adminScopeOptionsJson(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (isJsonRequest()) {
+            return "[]";
+        }
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
         if (scope == null) {
             return "[]";
@@ -202,6 +108,9 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoName")
     public String activeSaccoName(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (isJsonRequest()) {
+            return null;
+        }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
         return brand == null ? null : brand.name();
     }
@@ -213,12 +122,18 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoLogoText")
     public String activeSaccoLogoText(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (isJsonRequest()) {
+            return "LM";
+        }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
         return brand == null ? "LM" : brand.logoText();
     }
 
     @ModelAttribute("activeSaccoLogoUrl")
     public String activeSaccoLogoUrl(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (isJsonRequest()) {
+            return null;
+        }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
         return brand == null ? null : brand.logoUrl();
     }
@@ -301,6 +216,10 @@ public class CurrentUserModelAdvice {
 
     private boolean isPlatformAdminIdentity(AppUserPrincipal principal) {
         return principal != null && principal.hasRole(Position.ADMIN);
+    }
+
+    private boolean isJsonRequest() {
+        return WebRequestClassifier.isJsonRequest(requestFactory.getObject());
     }
 
     @lombok.Getter

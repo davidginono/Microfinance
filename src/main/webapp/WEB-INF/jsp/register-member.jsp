@@ -254,9 +254,13 @@
                         <form:input path="phone"
                                     type="tel"
                                     autocomplete="tel"
-                                    inputmode="tel"
+                                    inputmode="numeric"
+                                    pattern="255[0-9]{9}"
+                                    minlength="12"
+                                    maxlength="12"
+                                    required="required"
                                     cssClass="registration-field"
-                                    placeholder="+255712345678" />
+                                    placeholder="255712345678" />
                         <form:errors path="phone" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
 

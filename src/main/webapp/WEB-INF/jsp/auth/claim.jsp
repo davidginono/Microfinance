@@ -28,7 +28,7 @@
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCO Minor Admin Activation</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900" style="font-family:'Sora',ui-sans-serif,system-ui;">Activate your staff account</h1>
-            <p class="mt-1 text-sm text-slate-500">Only the inbox on file can complete this activation. Request a one-time code, then create your password.</p>
+            <p class="mt-1 text-sm text-slate-500">Verify the email and phone number on file, then create your password.</p>
         </div>
 
         <c:if test="${not empty claimMessage}">
@@ -49,13 +49,13 @@
                 <div class="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <p><span class="font-semibold">${memberFullName}</span></p>
                     <p class="text-xs text-slate-500">SACCO ${memberSaccoId}<c:if test="${not empty memberStationId}"> &middot; Station ${memberStationId}</c:if></p>
-                    <p class="mt-2 text-xs text-slate-500">We will send a one-time code to <span class="font-semibold text-slate-700">${maskedEmail}</span>.</p>
+                    <p class="mt-2 text-xs text-slate-500">Codes will be sent to <span class="font-semibold text-slate-700">${maskedEmail}</span> and <span class="font-semibold text-slate-700">${maskedPhone}</span>.</p>
                 </div>
 
                 <form action="/auth/claim/request-otp" method="post" class="mb-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <input type="hidden" name="token" value="${claimToken}" />
-                    <button type="submit" class="w-full rounded-lg bg-[#2F348D] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#262a73]">Send activation code</button>
+                    <button type="submit" class="w-full rounded-lg bg-[#2F348D] px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#262a73]">Send verification codes</button>
                 </form>
 
                 <form action="/auth/claim/verify" method="post" class="space-y-4">
@@ -67,6 +67,13 @@
                         <input name="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" required
                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest text-slate-800"
                                placeholder="6-digit code" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Phone verification code
+                        <input name="phoneOtpCode" type="text" inputmode="numeric" autocomplete="one-time-code" required
+                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest text-slate-800"
+                               placeholder="6-digit SMS code" />
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -22,11 +22,23 @@ public class OutboxService {
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
 
+    /**
+     * Legacy events remain publishable for in-app/email delivery, but their
+     * missing station scope intentionally prevents SMS unit consumption.
+     */
     public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
+                        Map<String, Object> details) {
+        enqueue(aggregateType, aggregateId, eventType, recipientId, null, null, details);
+    }
+
+    public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
+                        String saccoId, String stationId,
                         Map<String, Object> details) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("recipientId", recipientId);
         payload.put("eventType", eventType);
+        payload.put("saccoId", saccoId);
+        payload.put("stationId", stationId);
         payload.put("details", details);
 
         try {

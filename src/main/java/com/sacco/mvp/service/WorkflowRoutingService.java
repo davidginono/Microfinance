@@ -46,6 +46,7 @@ public class WorkflowRoutingService {
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
         outboxService.enqueue("LOAN", app.getId(), approvalFlowService.reviewAssignedEventType(firstStage), actorMemberId,
+            app.getSaccoId(), app.getStationId(),
             Map.of("loanId", app.getId().toString()));
         return nextStatus;
     }
@@ -66,6 +67,7 @@ public class WorkflowRoutingService {
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
         outboxService.enqueue("LOAN", app.getId(), approvalFlowService.reviewAssignedEventType(nextStage), actorMemberId,
+            app.getSaccoId(), app.getStationId(),
             Map.of("loanId", app.getId().toString()));
         return nextStatus;
     }

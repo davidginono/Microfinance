@@ -645,7 +645,7 @@ public class LoanPresentationService {
             html.append("<div class=\"note\"><strong>Manager Reason:</strong> ").append(esc(managerReason)).append("</div>");
         }
         appendTable(html, "Application Details", formFields);
-        appendTable(html, "SACCO Financial Details", financialFields);
+        appendTable(html, "Financial Details", financialFields);
         appendAttachmentTable(html, "Disbursement Proof", parseDisbursementProofAttachments(app.getAttachmentsJson()));
         appendTable(html, "Repayment Summary", parseRepaymentSummary(app.getRepaymentScheduleJson()));
 
@@ -1131,7 +1131,7 @@ public class LoanPresentationService {
             drawHeader();
             drawMetaTable();
             drawSectionTable("Application Details", formFields);
-            drawSectionTable("SACCO Financial Details", financialFields);
+            drawSectionTable("Financial Details", financialFields);
             drawAttachmentSection("Disbursement Proof", disbursementProofAttachments);
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();

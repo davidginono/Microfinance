@@ -62,6 +62,8 @@ public class ReversalRequestService {
             reversalRequest.getId(),
             "GUARANTOR_UNDO_REQUESTED",
             app.getApplicantMemberId(),
+            app.getSaccoId(),
+            app.getStationId(),
             Map.of(
                 "loanId", app.getId().toString(),
                 "guarantorRequestId", guarantorRequestId.toString(),
@@ -104,6 +106,8 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_REQUESTED",
                 manager.getId(),
+                app.getSaccoId(),
+                app.getStationId(),
                 Map.of(
                     "loanId", loanApplicationId.toString(),
                     "reversalRequestId", reversalRequest.getId().toString()
@@ -125,6 +129,8 @@ public class ReversalRequestService {
         if (!applicantMemberId.equals(reversalRequest.getApproverMemberId())) {
             throw new IllegalArgumentException("Only the applicant can decide this guarantor removal request.");
         }
+        LoanApplication app = loanApplicationRepository.findById(reversalRequest.getLoanApplicationId())
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
 
         if (approve) {
             loanWorkflowService.removeGuarantorFromLoan(reversalRequest.getGuarantorRequestId(), reversalRequest.getRequesterMemberId());
@@ -134,6 +140,8 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "GUARANTOR_UNDO_APPROVED",
                 reversalRequest.getRequesterMemberId(),
+                app.getSaccoId(),
+                app.getStationId(),
                 Map.of(
                     "loanId", reversalRequest.getLoanApplicationId().toString(),
                     "reversalRequestId", reversalRequest.getId().toString()
@@ -146,6 +154,8 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "GUARANTOR_UNDO_REJECTED",
                 reversalRequest.getRequesterMemberId(),
+                app.getSaccoId(),
+                app.getStationId(),
                 Map.of(
                     "loanId", reversalRequest.getLoanApplicationId().toString(),
                     "reversalRequestId", reversalRequest.getId().toString()
@@ -185,6 +195,8 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_APPROVED",
                 reversalRequest.getRequesterMemberId(),
+                app.getSaccoId(),
+                app.getStationId(),
                 Map.of(
                     "reversalRequestId", reversalRequest.getId().toString()
                 )
@@ -196,6 +208,8 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_REJECTED",
                 reversalRequest.getRequesterMemberId(),
+                app.getSaccoId(),
+                app.getStationId(),
                 Map.of(
                     "loanId", reversalRequest.getLoanApplicationId().toString(),
                     "reversalRequestId", reversalRequest.getId().toString()

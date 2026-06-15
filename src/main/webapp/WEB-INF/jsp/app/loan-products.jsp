@@ -134,7 +134,7 @@
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <p class="font-semibold text-slate-800">Estimated Repayment Schedule</p>
-                        <p class="mt-1 text-sm text-slate-500">Monthly amount, principal, and interest based on the amount and tenure entered.</p>
+                        <p class="mt-1 text-sm text-slate-500">Monthly amount, loan amount, and interest based on the amount and tenure entered.</p>
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-slate-200">
@@ -143,7 +143,7 @@
                         <tr>
                             <th>Month</th>
                             <th>Amount to Pay</th>
-                            <th>Principal</th>
+                            <th>Loan Amount</th>
                             <th>Interest</th>
                             <th>Balance After Payment</th>
                         </tr>
@@ -226,10 +226,7 @@
                 </td>
                 <td>${p.guarantorsRequired}</td>
                 <td>
-                    <c:choose>
-                        <c:when test="${p.loanType eq 'LOAN_ADVANCE'}"><spring:message code="products.interest.loanAdvance" /></c:when>
-                        <c:otherwise><fmt:formatNumber value="${p.interestRate * 100}" minFractionDigits="0" maxFractionDigits="2" />%</c:otherwise>
-                    </c:choose>
+                    <fmt:formatNumber value="${p.interestRate * 100}" minFractionDigits="0" maxFractionDigits="2" />%
                 </td>
                 <td>
                     <c:choose>
@@ -449,16 +446,18 @@
                     })
                 });
 
+                const payload = await response.json().catch(function () {
+                    return {};
+                });
                 if (!response.ok) {
-                    throw new Error(msgUnableLoadCalculator);
+                    throw new Error(payload.message || msgUnableLoadCalculator);
                 }
 
-                const payload = await response.json();
                 body.innerHTML = "";
                 Object.entries(payload.fields || {}).forEach(function (entry) {
                     const row = document.createElement("tr");
                     row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
-                    row.children[0].textContent = entry[0];
+                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
                     row.children[1].textContent = entry[1];
                     body.appendChild(row);
                 });

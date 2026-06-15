@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -60,7 +61,7 @@
         </div>
 
         <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div class="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(32rem,2fr)] lg:items-start">
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Station Access</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -76,7 +77,7 @@
                         <p class="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-600">Suspended ${saccoDetail.summary.accessSuspendedAtLabel}</p>
                     </c:if>
                 </div>
-                <div class="flex flex-col gap-2 sm:min-w-[24rem] lg:max-w-[36rem]">
+                <div class="flex min-w-0 flex-col gap-2">
                     <c:choose>
                         <c:when test="${not saccoDetail.stationScoped}">
                             <div class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
@@ -91,21 +92,26 @@
                             </form>
                         </c:when>
                         <c:otherwise>
-                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend" method="post" class="flex flex-col gap-3">
+                            <form action="/admin/saccos/${saccoDetail.saccoId}/access/suspend"
+                                  method="post"
+                                  data-confirm-eyebrow="Confirm Suspension"
+                                  data-confirm-title="Suspend Station Access"
+                                  data-confirm-message="Suspend access for station ${saccoDetail.selectedStationId}? Users at this station will lose workspace access until it is restored."
+                                  data-confirm-proceed="Suspend Access">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
-                                <div class="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
-                                    <label class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                <div class="relative flex flex-row items-center gap-2 flex-wrap">
+                                    <label class="block min-w-[12rem] flex-[1_1_16rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                         Reason
                                         <input name="reason" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" placeholder="Suspension reason" />
                                     </label>
-                                    <label class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                    <label class="block min-w-[11rem] flex-[0_1_12rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                         Payment Due
                                         <input name="paymentDueDate" type="date" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" />
                                     </label>
-                                </div>
-                                <div class="flex flex-wrap justify-end gap-2">
-                                    <button type="submit" class="app-btn btn-reject justify-center px-5 sm:min-w-[12rem]" style="height:3rem;min-height:3rem;">Suspend Access</button>
+                                    <div class="flex shrink-0 items-center pt-5">
+                                        <button type="submit" class="app-btn btn-reject min-w-[12rem] justify-center px-5" style="height:3rem;min-height:3rem;">Suspend Access</button>
+                                    </div>
                                 </div>
                             </form>
                         </c:otherwise>
@@ -145,6 +151,7 @@
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=loans${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'loans' ? 'is-active' : ''}">Loans</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'members' ? 'is-active' : ''}">Members</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=financials${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'financials' ? 'is-active' : ''}">Financials</a>
+    <a href="/admin/saccos/${saccoDetail.saccoId}?section=sms${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'sms' ? 'is-active' : ''}">SMS Units</a>
     <a href="/admin/saccos/${saccoDetail.saccoId}?section=audit${stationTabQuery}" class="erp-filter-tab ${selectedSection eq 'audit' ? 'is-active' : ''}">Audit</a>
 </div>
 
@@ -252,6 +259,130 @@
             </div>
         </section>
     </c:when>
+    <c:when test="${selectedSection eq 'sms'}">
+        <c:choose>
+            <c:when test="${saccoDetail.stationScoped}">
+                <section class="erp-panel mt-4">
+                    <div class="erp-panel-header">
+                        <div>
+                            <p class="erp-panel-title">SMS Units: ${saccoDetail.selectedStationId}</p>
+                            <p class="mt-1 text-sm text-slate-500">Current station balance and usage status.</p>
+                        </div>
+                        <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}&stationId=${saccoDetail.selectedStationId}" class="app-btn btn-neutral">Manage SMS Units</a>
+                    </div>
+                    <div class="erp-panel-body">
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Available Units</p>
+                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.availableUnits}" /></p>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Alert Reserve</p>
+                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.alertReservedUnits}" /> / 3</p>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Warning Baseline</p>
+                                <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.warningBaseline}" /></p>
+                            </div>
+                            <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">SMS Status</p>
+                                <p class="mt-3">
+                                    <span class="rounded-md border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${smsAccount.status}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="erp-panel mt-4">
+                    <div class="erp-panel-header">
+                        <p class="erp-panel-title">Recent SMS Usage</p>
+                    </div>
+                    <div class="erp-panel-body overflow-x-auto">
+                        <table class="erp-table min-w-[760px]">
+                            <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Outcome</th>
+                                <th>Unit Change</th>
+                                <th>Provider Reference</th>
+                                <th>Note</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <c:forEach items="${smsHistory.content}" var="entry">
+                                <tr>
+                                    <td class="whitespace-nowrap">${entry.createdAt}</td>
+                                    <td>${empty entry.eventType ? '-' : entry.eventType}</td>
+                                    <td class="font-semibold text-slate-900">${entry.outcome}</td>
+                                    <td>${entry.unitChange}</td>
+                                    <td>${empty entry.providerReference ? '-' : entry.providerReference}</td>
+                                    <td>${empty entry.note ? '-' : entry.note}</td>
+                                </tr>
+                            </c:forEach>
+                            <c:if test="${empty smsHistory.content}">
+                                <tr><td colspan="6" class="text-slate-500">No SMS usage has been recorded for this station.</td></tr>
+                            </c:if>
+                            </tbody>
+                        </table>
+                        <c:if test="${smsHistory.totalPages gt 1}">
+                            <div class="mt-4 flex justify-end gap-2">
+                                <c:if test="${not smsHistory.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number - 1}">Previous</a></c:if>
+                                <c:if test="${not smsHistory.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number + 1}">Next</a></c:if>
+                            </div>
+                        </c:if>
+                    </div>
+                </section>
+            </c:when>
+            <c:otherwise>
+                <section class="erp-panel mt-4">
+                    <div class="erp-panel-header">
+                        <div>
+                            <p class="erp-panel-title">Station SMS Balances</p>
+                            <p class="mt-1 text-sm text-slate-500">Select a station above to view its usage history.</p>
+                        </div>
+                        <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}" class="app-btn btn-neutral">Manage SMS Units</a>
+                    </div>
+                    <div class="erp-panel-body overflow-x-auto">
+                        <table class="erp-table min-w-[680px]">
+                            <thead>
+                            <tr>
+                                <th>Station</th>
+                                <th>Available Units</th>
+                                <th>Alert Reserve</th>
+                                <th>Warning Baseline</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <c:forEach items="${smsAccounts.content}" var="account">
+                                <tr>
+                                    <td class="font-semibold text-slate-900">${account.stationId}</td>
+                                    <td><fmt:formatNumber value="${account.availableUnits}" /></td>
+                                    <td><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
+                                    <td><fmt:formatNumber value="${account.warningBaseline}" /></td>
+                                    <td><span class="rounded-md border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
+                                    <td class="text-right"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${account.stationId}" class="app-btn btn-neutral">View Details</a></td>
+                                </tr>
+                            </c:forEach>
+                            <c:if test="${empty smsAccounts.content}">
+                                <tr><td colspan="6" class="text-slate-500">No station SMS accounts were found for this SACCO.</td></tr>
+                            </c:if>
+                            </tbody>
+                        </table>
+                        <c:if test="${smsAccounts.totalPages gt 1}">
+                            <div class="mt-4 flex justify-end gap-2">
+                                <c:if test="${not smsAccounts.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number - 1}">Previous</a></c:if>
+                                <c:if test="${not smsAccounts.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number + 1}">Next</a></c:if>
+                            </div>
+                        </c:if>
+                    </div>
+                </section>
+            </c:otherwise>
+        </c:choose>
+    </c:when>
     <c:when test="${selectedSection eq 'audit'}">
         <section class="erp-panel mt-4">
             <div class="erp-panel-header">
@@ -307,4 +438,5 @@
     </c:otherwise>
 </c:choose>
 
+<%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

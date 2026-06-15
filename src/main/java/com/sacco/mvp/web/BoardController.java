@@ -18,6 +18,7 @@ import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +57,7 @@ public class BoardController {
     private final NotificationInboxService notificationInboxService;
     private final ManagerService managerService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
+    private final PaymentDetailsService paymentDetailsService;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -179,7 +181,8 @@ public class BoardController {
             .collect(Collectors.toMap(Member::getId, member -> member));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
-        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.resolve(applicant));
+        model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("myReview", myReview);
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
@@ -330,11 +333,14 @@ public class BoardController {
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 boardMember.getId(),
                 "Your SACCO MVP board approval code",
-                "Use this OTP code to confirm your signature and approve the assigned board review."
+                "Use this OTP code to confirm your signature and approve the assigned board review.",
+                app.getSaccoId(),
+                app.getStationId(),
+                boardMember.getPhone()
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a board approval code to " + boardMember.getEmail() + "."
+                "message", "We sent a board approval code using the station OTP delivery policy."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(

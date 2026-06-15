@@ -74,7 +74,7 @@
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Phone
-                    <input name="phone" type="tel" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3">
@@ -124,7 +124,17 @@
                                 <div class="text-xs text-slate-500">${minorAdmin.loginId}</div>
                             </td>
                             <td class="align-top whitespace-nowrap">${minorAdmin.email}</td>
-                            <td class="align-top whitespace-nowrap">${empty minorAdmin.phone ? 'Not set' : minorAdmin.phone}</td>
+                            <td class="align-top whitespace-nowrap">
+                                <div>${empty minorAdmin.phone ? 'Not set' : minorAdmin.phone}</div>
+                                <c:choose>
+                                    <c:when test="${minorAdmin.phoneVerified}">
+                                        <div class="mt-1 text-[11px] font-semibold text-emerald-700">Ready for SMS alerts</div>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <div class="mt-1 text-[11px] font-semibold text-amber-700">Phone verification required</div>
+                                    </c:otherwise>
+                                </c:choose>
+                            </td>
                             <td class="align-top whitespace-nowrap">${minorAdmin.saccoId}</td>
                             <td class="align-top whitespace-nowrap">${empty minorAdmin.stationId ? 'Not set' : minorAdmin.stationId}</td>
                             <td class="align-top whitespace-nowrap">
@@ -252,7 +262,7 @@
 
                     <label class="block text-sm font-semibold text-slate-700">
                         Phone
-                        <input name="phone" type="tel" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.phone}" />
+                        <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.phone}" />
                     </label>
 
                     <div class="app-modal-actions">
