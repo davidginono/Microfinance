@@ -765,7 +765,7 @@
                 Object.entries(payload.fields || {}).forEach(function (entry) {
                     const row = document.createElement("tr");
                     row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
-                    row.children[0].textContent = entry[0];
+                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
                     row.children[1].textContent = entry[1];
                     financialBody.appendChild(row);
                 });

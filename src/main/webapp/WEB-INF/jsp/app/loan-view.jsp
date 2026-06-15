@@ -96,7 +96,7 @@
         <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
     </div>
     <c:if test="${canPrint}">
-        <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
+        <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
     </c:if>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
@@ -1174,4 +1174,5 @@
 </script>
 
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<%@ include file="../fragments/loan-export-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

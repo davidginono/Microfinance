@@ -196,7 +196,7 @@ public class AuthController {
                 EmailOtpPurpose.PASSWORD_RESET,
                 member.getId(),
                 "Your SACCO password reset code",
-                "Use this OTP code to reset your SACCO Loan MVP password."
+                "Use this OTP code to reset your Loan Application Portal password."
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -295,7 +295,7 @@ public class AuthController {
                 EmailOtpPurpose.LOGIN,
                 member.getId(),
                 "Your SACCO MVP sign-in code",
-                "Use this OTP code to sign in to the SACCO Loan MVP."
+                "Use this OTP code to sign in to the Loan Application Portal."
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -375,7 +375,7 @@ public class AuthController {
                 EmailOtpPurpose.STAFF_LOGIN,
                 user.getId(),
                 "Your SACCO MVP staff sign-in code",
-                "Use this OTP code to sign in to the SACCO Loan MVP staff workspace."
+                "Use this OTP code to sign in to the Loan Application Portal staff workspace."
             );
             return ResponseEntity.ok(Map.of(
                 "valid", true,

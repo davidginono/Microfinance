@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,7 +54,9 @@ public class LoanDocumentController {
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
-    public ResponseEntity<byte[]> downloadPrintable(@PathVariable UUID loanId) {
+    public ResponseEntity<byte[]> downloadPrintable(@PathVariable UUID loanId,
+                                                    @RequestParam(name = "signatureMode", defaultValue = "signed") String signatureMode) {
+        boolean includeRecordedSignatures = !"unsigned".equalsIgnoreCase(signatureMode);
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
@@ -101,12 +102,14 @@ public class LoanDocumentController {
             staffReviewers,
             boardReviews,
             boardMembers,
-            loanPresentationService.latestManagerReason(loanId)
+            loanPresentationService.latestManagerReason(loanId),
+            includeRecordedSignatures
         );
 
+        String modeLabel = includeRecordedSignatures ? "signed" : "physical-signature";
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + ".pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + "-" + modeLabel + ".pdf")
             .body(pdf);
     }
 
@@ -141,7 +144,7 @@ public class LoanDocumentController {
         return ResponseEntity.ok()
             .contentType(mediaType)
             .header(HttpHeaders.CONTENT_DISPOSITION, (inline ? "inline" : "attachment") + "; filename=\"" + resource.getOriginalName() + "\"")
-            .body(Files.readAllBytes(resource.getPath()));
+            .body(resource.getContent());
     }
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}/view")

@@ -24,10 +24,10 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
         from ManagerReview r, LoanApplication l
         where r.loanApplicationId = l.id
           and l.saccoId = :saccoId
-          and (:status is null or l.status = :status)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (cast(:status as string) is null or l.status = :status)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
         """)
     long countDecisionsForReport(@Param("saccoId") String saccoId,
                                  @Param("status") LoanStatus status,
@@ -62,8 +62,8 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
         from ManagerReview r
         where r.managerMemberId = :managerMemberId
           and r.reviewStage = :reviewStage
-          and (:createdFrom is null or r.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or r.createdAt < :createdToExclusive)
+          and (cast(:createdFrom as timestamp) is null or r.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or r.createdAt < :createdToExclusive)
         order by r.createdAt desc
         """)
     List<ManagerReview> findForAnalytics(@Param("managerMemberId") UUID managerMemberId,

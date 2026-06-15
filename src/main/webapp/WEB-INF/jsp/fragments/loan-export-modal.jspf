@@ -1,0 +1,91 @@
+<%@ include file="./modal-shell.jspf" %>
+<style>
+    .loan-export-option {
+        border-width: 1px;
+        cursor: pointer;
+        transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+    .loan-export-option:hover,
+    .loan-export-option:focus-visible {
+        background: #ecfeff;
+        border-color: #0891b2;
+        box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.16);
+        outline: none;
+        transform: translateY(-1px);
+    }
+    .loan-export-option:hover .loan-export-option-title,
+    .loan-export-option:focus-visible .loan-export-option-title {
+        color: #0e7490;
+    }
+</style>
+<div id="loanExportModal" class="app-modal-overlay" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="loanExportModalTitle">
+        <div class="app-modal-header">
+            <div>
+                <p class="erp-widget-title">Export Loan Application</p>
+                <h2 id="loanExportModalTitle" class="erp-panel-title">Choose document type</h2>
+            </div>
+            <button type="button" class="app-modal-close" data-loan-export-close aria-label="Close export options">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="app-modal-body space-y-3">
+            <a href="#" data-loan-export-signed class="loan-export-option app-modal-section block">
+                <span class="loan-export-option-title block font-semibold text-slate-900">Signed system copy</span>
+                <span class="mt-1 block text-sm text-slate-500">Includes signatures already recorded in the approval workflow.</span>
+            </a>
+            <a href="#" data-loan-export-unsigned class="loan-export-option app-modal-section block">
+                <span class="loan-export-option-title block font-semibold text-slate-900">Physical signature copy</span>
+                <span class="mt-1 block text-sm text-slate-500">Leaves staff signature spaces empty for signing on paper.</span>
+            </a>
+            <div class="app-modal-actions">
+                <button type="button" class="app-btn btn-neutral" data-loan-export-close>Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const modal = document.getElementById("loanExportModal");
+        if (!modal || modal.dataset.bound === "true") {
+            return;
+        }
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        const signedLink = modal.querySelector("[data-loan-export-signed]");
+        const unsignedLink = modal.querySelector("[data-loan-export-unsigned]");
+
+        function closeModal() {
+            modal.classList.remove("is-open");
+            modal.setAttribute("aria-hidden", "true");
+        }
+
+        document.querySelectorAll("[data-loan-export-url]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const baseUrl = button.dataset.loanExportUrl;
+                signedLink.href = baseUrl + "?signatureMode=signed";
+                unsignedLink.href = baseUrl + "?signatureMode=unsigned";
+                modal.classList.add("is-open");
+                modal.setAttribute("aria-hidden", "false");
+                signedLink.focus();
+            });
+        });
+        [signedLink, unsignedLink].forEach((link) => link.addEventListener("click", closeModal));
+
+        modal.querySelectorAll("[data-loan-export-close]").forEach((button) => button.addEventListener("click", closeModal));
+        modal.addEventListener("click", (event) => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modal.classList.contains("is-open")) {
+                closeModal();
+            }
+        });
+        modal.dataset.bound = "true";
+    })();
+</script>

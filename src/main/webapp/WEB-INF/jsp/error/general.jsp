@@ -129,12 +129,12 @@
     </style>
 </head>
 <body>
-<c:set var="errorSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'SACCO Loan Management'}" />
+<c:set var="errorSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'Loan Application Portal'}" />
 <div class="error-shell">
     <div class="error-topbar">
         <div>
             <p class="error-brand-title">${errorSaccoName}</p>
-            <p class="error-brand-subtitle">Loan Management System</p>
+            <p class="error-brand-subtitle">Loan Application Portal</p>
         </div>
     </div>
 

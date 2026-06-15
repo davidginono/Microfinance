@@ -32,7 +32,7 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -85,11 +85,11 @@ public class LoanPresentationService {
             addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
-            putMoney(display, "Principal (TZS)", principalAmount);
+            putMoney(display, "Loan Amount (TZS)", principalAmount);
             addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
-                display.put("Principal + Interest (TZS)", formatMoney(principalPlusInterest));
+                display.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
             }
             addFinancialRow(display, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
             return display;
@@ -284,6 +284,39 @@ public class LoanPresentationService {
         } catch (Exception ex) {
             return Collections.emptyMap();
         }
+    }
+
+    public Map<String, Object> reviewRepaymentSummary(LoanApplication app) {
+        if (app == null) {
+            return Collections.emptyMap();
+        }
+        if (app.getRepaymentScheduleJson() != null && !app.getRepaymentScheduleJson().isBlank()) {
+            return parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt());
+        }
+        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            Map<String, Object> display = new LinkedHashMap<>();
+            putMoney(display, "Loan Amount", app.getAmount());
+            putValue(display, "Repayment Period", app.getTenorMonths() == null ? null : app.getTenorMonths() + " month(s)");
+            putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
+            putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putMoney(display, "Estimated Installment", raw.get("monthlyRepaymentAmount"));
+            putMoney(display, "Total Interest", raw.get("interestAmount"));
+            putMoney(display, "Estimated Total Repayment", raw.get("principalPlusInterest"));
+            return display;
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    public boolean isEstimatedReviewRepaymentSummary(LoanApplication app) {
+        return app != null
+            && (app.getRepaymentScheduleJson() == null || app.getRepaymentScheduleJson().isBlank())
+            && app.getFinancialSnapshot() != null
+            && !app.getFinancialSnapshot().isBlank();
     }
 
     public LoanPaymentSummaryView parseLoanPaymentSummaryView(String json) {
@@ -678,7 +711,8 @@ public class LoanPresentationService {
                                     Map<UUID, Member> staffReviewers,
                                     List<BoardReview> boardReviews,
                                     Map<UUID, Member> boardMembers,
-                                    String managerReason) {
+                                    String managerReason,
+                                    boolean includeRecordedSignatures) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PrintableLoanApplicationPdfRenderer renderer = new PrintableLoanApplicationPdfRenderer(
                 document,
@@ -696,7 +730,7 @@ public class LoanPresentationService {
                 staffReviewers,
                 boardReviews,
                 boardMembers,
-                managerReason
+                includeRecordedSignatures
             );
             renderer.render();
             document.save(output);
@@ -1026,6 +1060,11 @@ public class LoanPresentationService {
         return text.replace('\r', ' ').trim();
     }
 
+    private static String sanitizePdfLineText(String text) {
+        String sanitized = sanitizePdfText(text).replaceAll("\\p{Cntrl}+", " ").trim();
+        return sanitized.isEmpty() ? "-" : sanitized;
+    }
+
     private String blankToDash(Object value) {
         if (value == null) {
             return "-";
@@ -1069,6 +1108,9 @@ public class LoanPresentationService {
         private static final Color BORDER_COLOR = new Color(225, 232, 238);
         private static final Color HEADER_FILL = new Color(246, 248, 251);
         private static final Color RULE_COLOR = new Color(60, 79, 97);
+        private static final Color BRAND_NAVY = new Color(41, 52, 127);
+        private static final Color BRAND_GREEN = new Color(61, 139, 61);
+        private static final Color BRAND_BROWN = new Color(141, 67, 29);
 
         private final PDDocument document;
         private final LoanApplication app;
@@ -1085,9 +1127,11 @@ public class LoanPresentationService {
         private final Map<UUID, Member> staffReviewers;
         private final List<BoardReview> boardReviews;
         private final Map<UUID, Member> boardMembers;
-        private final String managerReason;
+        private final boolean includeRecordedSignatures;
+        private final LoanProductWorkflowService.WorkflowDefinition workflowDefinition;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        private final PDType1Font signatureFont = new PDType1Font(Standard14Fonts.FontName.TIMES_ITALIC);
         private PDPage page;
         private PDPageContentStream stream;
         private float y;
@@ -1107,7 +1151,7 @@ public class LoanPresentationService {
                                                     Map<UUID, Member> staffReviewers,
                                                     List<BoardReview> boardReviews,
                                                     Map<UUID, Member> boardMembers,
-                                                    String managerReason) {
+                                                    boolean includeRecordedSignatures) {
             this.document = document;
             this.app = app;
             this.saccoName = saccoName;
@@ -1123,22 +1167,24 @@ public class LoanPresentationService {
             this.staffReviewers = staffReviewers == null ? Collections.emptyMap() : staffReviewers;
             this.boardReviews = boardReviews == null ? Collections.emptyList() : boardReviews;
             this.boardMembers = boardMembers == null ? Collections.emptyMap() : boardMembers;
-            this.managerReason = managerReason;
+            this.includeRecordedSignatures = includeRecordedSignatures;
+            this.workflowDefinition = loanProductWorkflowService.resolveForApplication(app);
         }
 
         private void render() throws IOException {
             startNewPage();
             drawHeader();
-            drawMetaTable();
+            drawApplicationSummary();
+            drawRecordedInformationOverview();
+            drawSectionStrip("Supporting Application Details", "System-record detail");
             drawSectionTable("Application Details", formFields);
             drawSectionTable("Financial Details", financialFields);
             drawAttachmentSection("Disbursement Proof", disbursementProofAttachments);
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();
             drawGuarantorSection();
-            drawStaffReviewSection();
-            drawBoardSection();
             drawApplicantSignatureSection();
+            drawConfiguredReviewSignOffSection();
             closePage();
         }
 
@@ -1168,26 +1214,187 @@ public class LoanPresentationService {
         }
 
         private void drawHeader() throws IOException {
-            ensureSpace(56f);
-            writeText("Loan Application", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
-            writeRightAligned("Generated: " + LocalDate.now(), page.getMediaBox().getWidth() - MARGIN, y + 1f, regular, META_SIZE, MUTED_COLOR);
-            y -= 19f;
+            ensureSpace(116f);
+            float pageWidth = page.getMediaBox().getWidth();
+            float headerTop = y;
+            stream.setNonStrokingColor(BRAND_BROWN);
+            stream.addRect(0f, headerTop - 7f, pageWidth, 7f);
+            stream.fill();
+            stream.setNonStrokingColor(BRAND_NAVY);
+            stream.addRect(0f, headerTop - 17f, pageWidth * 0.61f, 5f);
+            stream.fill();
+
+            drawLogo(MARGIN, headerTop - 83f, 66f);
             String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
-            writeText(saccoLabel, MARGIN, y, bold, META_SIZE + 0.5f, MUTED_COLOR);
-            y -= 16f;
-            drawRule();
-            y -= 14f;
+            writeText(saccoLabel.toUpperCase(Locale.ROOT), MARGIN + 82f, headerTop - 42f, bold, 15f, TEXT_COLOR);
+            writeText("Official loan workflow document", MARGIN + 82f, headerTop - 59f, regular, META_SIZE, MUTED_COLOR);
+            writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, headerTop - 42f, regular, META_SIZE, MUTED_COLOR);
+
+            stream.setNonStrokingColor(BRAND_NAVY);
+            stream.addRect(0f, headerTop - 94f, pageWidth, 4f);
+            stream.fill();
+            stream.setNonStrokingColor(BRAND_GREEN);
+            stream.addRect(0f, headerTop - 100f, pageWidth, 2f);
+            stream.fill();
+
+            y = headerTop - 124f;
+            writeText("Loan Application Review Copy", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
+            String copyLabel = includeRecordedSignatures ? "Signed staff record copy" : "Physical signature copy";
+            writeRightAligned(copyLabel, pageWidth - MARGIN, y + 1f, bold, META_SIZE, BRAND_GREEN);
+            y -= 18f;
+            writeText("Prepared from the system record for formal review and filing", MARGIN, y, regular, META_SIZE, MUTED_COLOR);
+            y -= 20f;
         }
 
-        private void drawMetaTable() throws IOException {
+        private void drawLogo(float x, float bottomY, float size) throws IOException {
+            try (InputStream input = LoanPresentationService.class.getResourceAsStream("/static/images/iaa-saccos-logo.png")) {
+                if (input == null) {
+                    return;
+                }
+                BufferedImage logo = ImageIO.read(input);
+                if (logo == null) {
+                    return;
+                }
+                PDImageXObject logoImage = LosslessFactory.createFromImage(document, logo);
+                stream.drawImage(logoImage, x, bottomY, size, size);
+            }
+        }
+
+        private long completedReviewCount() {
+            return staffReviews.stream()
+                .filter(review -> review.getReviewStage() != null)
+                .map(ManagerReview::getReviewStage)
+                .distinct()
+                .count()
+                + (boardReviews.isEmpty() ? 0 : 1);
+        }
+
+        private void drawApplicationSummary() throws IOException {
+            drawSectionStrip("Application Summary", completedReviewCount() + " staff reviews complete");
             List<String[]> rows = new ArrayList<>();
-            rows.add(new String[]{"Loan Application ID", app.getApplicationNumber() == null ? "-" : app.getApplicationNumber().toString()});
-            rows.add(new String[]{"Loan ID", sanitizePdfText(app.getLoanId())});
-            rows.add(new String[]{"Applicant", sanitizePdfText(applicant.getFullName()) + " (" + sanitizePdfText(applicant.getMemberNo()) + ")"});
-            rows.add(new String[]{"Loan Type", sanitizePdfText(String.valueOf(app.getLoanType()))});
-            rows.add(new String[]{"Amount", formatMoney(app.getAmount())});
-            rows.add(new String[]{"Status", humanizeValue(app.getStatus())});
-            drawTable(new String[]{"Field", "Value"}, new float[]{contentWidth() * 0.36f, contentWidth() * 0.64f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+            rows.add(new String[]{"Application Reference", app.getApplicationNumber() == null ? "-" : app.getApplicationNumber().toString(), "Loan Reference", sanitizePdfText(app.getLoanId())});
+            rows.add(new String[]{"Applicant", sanitizePdfText(applicant.getFullName()), "Member Number", sanitizePdfText(applicant.getMemberNo())});
+            rows.add(new String[]{"Requested Facility", humanizeValue(app.getLoanType()), "Requested Amount", formatMoney(app.getAmount())});
+            rows.add(new String[]{"Current State", humanizeValue(app.getStatus()), "Submitted", sanitizePdfText(formatTimestamp(app.getSubmittedAt()))});
+            drawRowsWithoutHeader(
+                new float[]{contentWidth() * 0.20f, contentWidth() * 0.30f, contentWidth() * 0.20f, contentWidth() * 0.30f},
+                rows,
+                BODY_SIZE,
+                14f,
+                5f,
+                2f
+            );
+        }
+
+        private void drawRowsWithoutHeader(float[] widths,
+                                           List<String[]> rows,
+                                           float bodyFontSize,
+                                           float gapAfter,
+                                           float cellPaddingY,
+                                           float extraLineGap) throws IOException {
+            for (String[] row : rows) {
+                float rowHeight = measureRowHeight(row, widths, regular, bodyFontSize, cellPaddingY, extraLineGap);
+                if (y - rowHeight < (BOTTOM_MARGIN + FOOTER_GAP)) {
+                    startNewPage();
+                }
+                drawRow(row, widths, regular, bodyFontSize, false, cellPaddingY, extraLineGap);
+            }
+            y -= gapAfter;
+        }
+
+        private void drawRecordedInformationOverview() throws IOException {
+            drawSectionStrip("Recorded Information", "Key details not repeated in the summary");
+            List<String[]> cards = List.of(
+                new String[]{
+                    "MEMBER RECORD",
+                    "Membership status: " + humanizedOrDash(applicant.getStatus()),
+                    "Station: " + sanitizePdfText(app.getStationId()),
+                    "Contact: " + applicantContact()
+                },
+                new String[]{
+                    "FACILITY TERMS",
+                    "Repayment period: " + valueOrDash(app.getTenorMonths(), " months"),
+                    "Required guarantors: " + valueOrDash(app.getRequiredGuarantors(), ""),
+                    "Submitted: " + sanitizePdfText(formatTimestamp(app.getSubmittedAt()))
+                },
+                new String[]{
+                    "REPAYMENT ARRANGEMENT",
+                    "Frequency: " + humanizedOrDash(app.getRepaymentFrequency()),
+                    "Installment: " + formatNullableMoney(app.getInstallmentAmount()),
+                    "First repayment: " + sanitizePdfText(String.valueOf(app.getFirstRepaymentDate()))
+                },
+                new String[]{
+                    "SUPPORTING RECORDS",
+                    "Guarantor confirmations: " + completedGuarantorCount() + " of " + guarantorRequests.size(),
+                    "Disbursement proofs: " + disbursementProofAttachments.size(),
+                    "Completed staff reviews: " + completedReviewCount()
+                }
+            );
+            float gap = 10f;
+            float cardWidth = (contentWidth() - gap) / 2f;
+            float cardHeight = 68f;
+            for (int i = 0; i < cards.size(); i++) {
+                if (i % 2 == 0) {
+                    ensureSpace(cardHeight + 8f);
+                }
+                float x = MARGIN + ((i % 2) * (cardWidth + gap));
+                drawInformationCard(x, y, cardWidth, cardHeight, cards.get(i));
+                if (i % 2 == 1) {
+                    y -= cardHeight + 8f;
+                }
+            }
+            y -= 4f;
+        }
+
+        private void drawInformationCard(float x, float topY, float width, float height, String[] details) throws IOException {
+            stream.setNonStrokingColor(Color.WHITE);
+            stream.addRect(x, topY - height, width, height);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.addRect(x, topY - height, width, height);
+            stream.stroke();
+            writeText(details[0], x + 10f, topY - 17f, bold, SMALL_SIZE + 0.4f, TEXT_COLOR);
+            float textY = topY - 34f;
+            for (int i = 1; i < details.length; i++) {
+                String line = wrapText(details[i], regular, SMALL_SIZE, width - 20f).getFirst();
+                writeText(line, x + 10f, textY, regular, SMALL_SIZE, MUTED_COLOR);
+                textY -= SMALL_SIZE + 3f;
+            }
+        }
+
+        private String applicantContact() {
+            if (applicant.getPhone() != null && !applicant.getPhone().isBlank()) {
+                return sanitizePdfText(applicant.getPhone());
+            }
+            return sanitizePdfText(applicant.getEmail());
+        }
+
+        private String valueOrDash(Object value, String suffix) {
+            return value == null ? "-" : sanitizePdfText(String.valueOf(value)) + suffix;
+        }
+
+        private String humanizedOrDash(Object value) {
+            String humanized = humanizeValue(value);
+            return humanized.isBlank() ? "-" : humanized;
+        }
+
+        private long completedGuarantorCount() {
+            return guarantorRequests.stream()
+                .filter(request -> request.getGuarantorSignatureVerifiedAt() != null)
+                .count();
+        }
+
+        private void drawSectionStrip(String title, String helper) throws IOException {
+            ensureSpace(31f);
+            stream.setNonStrokingColor(HEADER_FILL);
+            stream.addRect(MARGIN, y - 24f, contentWidth(), 24f);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.addRect(MARGIN, y - 24f, contentWidth(), 24f);
+            stream.stroke();
+            writeText(title, MARGIN + 9f, y - 16f, bold, SECTION_SIZE, TEXT_COLOR);
+            writeRightAligned(helper, page.getMediaBox().getWidth() - MARGIN - 9f, y - 16f, regular, SMALL_SIZE, MUTED_COLOR);
+            y -= 34f;
         }
 
         private void drawSectionTable(String title, Map<String, Object> rowsMap) throws IOException {
@@ -1247,24 +1454,23 @@ public class LoanPresentationService {
 
         private void drawAttachmentResource(String displayName, LoanAttachmentService.AttachmentResource resource) throws IOException {
             String contentType = resource.getContentType() == null ? "" : resource.getContentType().toLowerCase(Locale.ROOT);
-            Path path = resource.getPath();
             if (contentType.startsWith("image/")) {
-                BufferedImage image = ImageIO.read(path.toFile());
+                BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(resource.getContent()));
                 if (image != null) {
                     drawAttachmentImage(displayName, image);
                     return;
                 }
             }
             if ("application/pdf".equals(contentType) || displayName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-                drawAttachmentPdf(displayName, path);
+                drawAttachmentPdf(displayName, resource.getContent());
                 return;
             }
             drawParagraph(displayName + " is attached. Preview is available from the application detail page.", regular, META_SIZE, MUTED_COLOR);
             y -= 4f;
         }
 
-        private void drawAttachmentPdf(String displayName, Path path) throws IOException {
-            try (PDDocument source = Loader.loadPDF(path.toFile())) {
+        private void drawAttachmentPdf(String displayName, byte[] content) throws IOException {
+            try (PDDocument source = Loader.loadPDF(content)) {
                 PDFRenderer pdfRenderer = new PDFRenderer(source);
                 for (int pageIndex = 0; pageIndex < source.getNumberOfPages(); pageIndex++) {
                     BufferedImage pageImage = pdfRenderer.renderImageWithDPI(pageIndex, 120);
@@ -1357,77 +1563,156 @@ public class LoanPresentationService {
             drawTable(new String[]{"Guarantor", "Status", "Signature", "Verified At"}, new float[]{140f, 84f, 180f, contentWidth() - 404f}, rows, BODY_SIZE, BODY_SIZE, 14f);
         }
 
-        private void drawStaffReviewSection() throws IOException {
-            drawSectionHeading("Staff Review Decisions");
-            List<String[]> rows = new ArrayList<>();
-            if (staffReviews.isEmpty()) {
-                rows.add(new String[]{"-", "-", "-", "-", "No staff review decisions available.", "-", "-"});
-            } else {
-                for (ManagerReview review : staffReviews) {
-                    Member reviewer = staffReviewers.get(review.getManagerMemberId());
-                    rows.add(new String[]{
-                        sanitizePdfText(review.getReviewStage() == null ? "-" : review.getReviewStage().getDisplayLabel()),
-                        sanitizePdfText(reviewer == null ? shortId(review.getManagerMemberId()) : reviewer.getFullName()),
-                        sanitizePdfText(reviewer == null ? "-" : reviewer.getMemberNo()),
-                        humanizeValue(review.getDecision()),
-                        sanitizePdfText(review.getReasons()),
-                        sanitizePdfText(formatTimestamp(review.getCreatedAt())),
-                        sanitizePdfText(reviewer == null ? "-" : reviewer.getSignatureText())
-                    });
+        private void drawConfiguredReviewSignOffSection() throws IOException {
+            ensureSpace(156f);
+            drawSectionStrip("Official Staff Review and Sign-off", includeRecordedSignatures ? "Recorded signatures included" : "Physical signatures required");
+            List<ApprovalWorkflowStage> stages = configuredReviewStages();
+            if (stages.isEmpty()) {
+                drawParagraph("No approval review roles are configured for this application.", regular, META_SIZE, MUTED_COLOR);
+                y -= 6f;
+                return;
+            }
+            for (ApprovalWorkflowStage stage : stages) {
+                if (stage == ApprovalWorkflowStage.BOARD) {
+                    drawBoardSignOffPanel();
+                } else {
+                    drawStaffSignOffPanel(stage);
                 }
             }
-            drawTable(
-                new String[]{"Stage", "Reviewer", "Member No", "Decision", "Notes", "Date", "Signature"},
-                new float[]{72f, 98f, 56f, 56f, 122f, 68f, contentWidth() - 472f},
-                rows,
-                SMALL_SIZE,
-                SMALL_SIZE,
-                10f
+        }
+
+        private List<ApprovalWorkflowStage> configuredReviewStages() {
+            if (workflowDefinition == null || workflowDefinition.stages() == null) {
+                return List.of();
+            }
+            return workflowDefinition.stages().stream()
+                .filter(stage -> stage != ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+                .toList();
+        }
+
+        private void drawStaffSignOffPanel(ApprovalWorkflowStage stage) throws IOException {
+            ManagerReview review = latestStaffReview(stage);
+            Member reviewer = review == null ? null : staffReviewers.get(review.getManagerMemberId());
+            drawRoleSignOffCard(
+                stage.getDisplayLabel(),
+                review == null ? "PENDING REVIEW" : "REVIEW COMPLETED",
+                review == null ? "________________________________" : reviewerLabel(review, reviewer),
+                review == null ? "________________________________" : sanitizePdfText(review.getReasons()),
+                review == null ? "-" : humanizeValue(review.getDecision()),
+                review == null ? "________________________________" : staffSignature(reviewer),
+                review == null ? "________________________________" : sanitizePdfText(formatTimestamp(review.getCreatedAt())),
+                stage == ApprovalWorkflowStage.ACCOUNTANT ? BRAND_GREEN : BRAND_NAVY
             );
         }
 
-        private void drawBoardSection() throws IOException {
-            drawSectionHeading("Board Committee Assessors");
-            List<String[]> rows = new ArrayList<>();
+        private void drawRoleSignOffCard(String role,
+                                         String status,
+                                         String reviewer,
+                                         String note,
+                                         String decision,
+                                         String signature,
+                                         String signedAt,
+                                         Color accent) throws IOException {
+            float height = 112f;
+            ensureSpace(height + 10f);
+            float topY = y;
+            stream.setNonStrokingColor(Color.WHITE);
+            stream.addRect(MARGIN, topY - height, contentWidth(), height);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.addRect(MARGIN, topY - height, contentWidth(), height);
+            stream.stroke();
+            stream.setNonStrokingColor(accent);
+            stream.addRect(MARGIN, topY - height, 5f, height);
+            stream.fill();
+
+            writeText(role.toUpperCase(Locale.ROOT), MARGIN + 16f, topY - 22f, bold, SECTION_SIZE + 1f, TEXT_COLOR);
+            writeRightAligned(status, page.getMediaBox().getWidth() - MARGIN - 12f, topY - 21f, bold, SMALL_SIZE, BRAND_GREEN);
+            writeText("Reviewer", MARGIN + 16f, topY - 48f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(reviewer, MARGIN + 84f, topY - 48f, bold, BODY_SIZE, TEXT_COLOR);
+            writeText("Decision", MARGIN + 16f, topY - 67f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(decision, MARGIN + 84f, topY - 67f, regular, BODY_SIZE, TEXT_COLOR);
+            writeText("Review note", MARGIN + 16f, topY - 86f, regular, SMALL_SIZE, MUTED_COLOR);
+            String safeNote = wrapText(note, regular, BODY_SIZE, contentWidth() * 0.42f).getFirst();
+            writeText(safeNote, MARGIN + 84f, topY - 86f, regular, BODY_SIZE, TEXT_COLOR);
+
+            float signatureX = MARGIN + contentWidth() * 0.62f;
+            String signatureText = includeRecordedSignatures ? signature : "________________________________";
+            boolean recordedSignature = hasRecordedSignature(signatureText);
+            writeText(
+                signatureText,
+                signatureX,
+                topY - 58f,
+                recordedSignature ? signatureFont : regular,
+                recordedSignature ? BODY_SIZE + 3f : BODY_SIZE + 1f,
+                TEXT_COLOR
+            );
+            stream.setStrokingColor(MUTED_COLOR);
+            stream.moveTo(signatureX, topY - 64f);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN - 14f, topY - 64f);
+            stream.stroke();
+            writeText(includeRecordedSignatures ? "Authorized signature" : "Physical signature", signatureX, topY - 78f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText("Signed: " + (includeRecordedSignatures ? signedAt : "________________"), signatureX, topY - 95f, regular, SMALL_SIZE, MUTED_COLOR);
+            y -= height + 10f;
+        }
+
+        private void drawBoardSignOffPanel() throws IOException {
             if (boardReviews.isEmpty()) {
-                rows.add(new String[]{"-", "-", "-", "No board assessor details available.", "-"});
-            } else {
-                for (BoardReview review : boardReviews) {
-                    Member boardMember = boardMembers.get(review.getBoardMemberId());
-                    String assessor = boardMember == null ? shortId(review.getBoardMemberId()) : boardMember.getFullName();
-                    rows.add(new String[]{
-                        sanitizePdfText(assessor),
-                        sanitizePdfText(boardMember == null ? "-" : boardMember.getMemberNo()),
-                        humanizeValue(review.getDecision()),
-                        sanitizePdfText(review.getComment()),
-                        boardSignOffText(review)
-                    });
+                drawRoleSignOffCard(
+                    ApprovalWorkflowStage.BOARD.getDisplayLabel(),
+                    "PENDING REVIEW",
+                    "________________________________",
+                    "________________________________",
+                    "-",
+                    "________________________________",
+                    "________________________________",
+                    BRAND_NAVY
+                );
+                return;
+            }
+            for (BoardReview review : boardReviews) {
+                Member boardMember = boardMembers.get(review.getBoardMemberId());
+                drawRoleSignOffCard(
+                    ApprovalWorkflowStage.BOARD.getDisplayLabel(),
+                    "REVIEW RECORDED",
+                    boardMember == null ? shortId(review.getBoardMemberId()) : sanitizePdfText(boardMember.getFullName()),
+                    sanitizePdfText(review.getComment()),
+                    humanizeValue(review.getDecision()),
+                    boardSignOffText(review),
+                    sanitizePdfText(formatTimestamp(review.getDecidedAt())),
+                    BRAND_NAVY
+                );
+            }
+        }
+
+        private ManagerReview latestStaffReview(ApprovalWorkflowStage stage) {
+            ManagerReview latest = null;
+            for (ManagerReview review : staffReviews) {
+                if (review.getReviewStage() == stage) {
+                    latest = review;
                 }
             }
-            drawTable(
-                new String[]{"Assessor", "Member No", "Decision", "Comment", "Sign-off"},
-                new float[]{118f, 62f, 70f, 154f, contentWidth() - 404f},
-                rows,
-                SMALL_SIZE,
-                SMALL_SIZE,
-                10f
-            );
+            return latest;
+        }
+
+        private String reviewerLabel(ManagerReview review, Member reviewer) {
+            if (reviewer == null) {
+                return shortId(review.getManagerMemberId());
+            }
+            String memberNo = sanitizePdfText(reviewer.getMemberNo());
+            return sanitizePdfText(reviewer.getFullName()) + ("-".equals(memberNo) ? "" : " (" + memberNo + ")");
+        }
+
+        private String staffSignature(Member reviewer) {
+            if (reviewer == null || reviewer.getSignatureText() == null || reviewer.getSignatureText().isBlank()) {
+                return "________________________________";
+            }
+            return sanitizePdfText(reviewer.getSignatureText());
         }
 
         private String boardSignOffText(BoardReview review) {
             String signature = sanitizePdfText(review.getBoardSignatureText());
-            String verifiedAt = sanitizePdfText(formatTimestamp(review.getBoardSignatureVerifiedAt()));
-            String decidedAt = sanitizePdfText(formatTimestamp(review.getDecidedAt()));
-            List<String> parts = new ArrayList<>();
-            if (!signature.equals("-")) {
-                parts.add(signature);
-            }
-            if (!verifiedAt.equals("-")) {
-                parts.add("Verified: " + verifiedAt);
-            } else if (!decidedAt.equals("-")) {
-                parts.add("Decided: " + decidedAt);
-            }
-            return parts.isEmpty() ? "-" : String.join("\n", parts);
+            return "-".equals(signature) ? "________________________________" : signature;
         }
 
         private void drawApplicantSignatureSection() throws IOException {
@@ -1435,22 +1720,75 @@ public class LoanPresentationService {
             if ((signatureText == null || signatureText.isBlank()) && applicant.getSignatureText() != null && !applicant.getSignatureText().isBlank()) {
                 signatureText = applicant.getSignatureText();
             }
-            if ((signatureText == null || signatureText.isBlank())
-                && app.getApplicantSignatureVerifiedAt() == null
-                && (managerReason == null || managerReason.isBlank())) {
-                return;
-            }
-            drawSectionHeading("Applicant Signature");
-            List<String[]> rows = new ArrayList<>();
-            if (signatureText != null && !signatureText.isBlank()) {
-                rows.add(new String[]{"Signature Text", sanitizePdfText(signatureText)});
-            }
-            rows.add(new String[]{"Member Number", sanitizePdfText(applicant.getMemberNo())});
-            rows.add(new String[]{"Verified At", sanitizePdfText(formatTimestamp(app.getApplicantSignatureVerifiedAt()))});
-            if (managerReason != null && !managerReason.isBlank()) {
-                rows.add(new String[]{"Manager Reason", sanitizePdfText(managerReason)});
-            }
-            drawTable(new String[]{"Field", "Details"}, new float[]{contentWidth() * 0.28f, contentWidth() * 0.72f}, rows, BODY_SIZE, BODY_SIZE, 10f);
+            ensureSpace(156f);
+            drawSectionStrip("Applicant Declaration and Signature", includeRecordedSignatures ? "Recorded applicant signature" : "Physical signature required");
+            drawApplicantSignOffCard(signatureText);
+        }
+
+        private void drawApplicantSignOffCard(String signatureText) throws IOException {
+            float height = 112f;
+            ensureSpace(height + 10f);
+            float topY = y;
+            stream.setNonStrokingColor(Color.WHITE);
+            stream.addRect(MARGIN, topY - height, contentWidth(), height);
+            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.addRect(MARGIN, topY - height, contentWidth(), height);
+            stream.stroke();
+            stream.setNonStrokingColor(BRAND_BROWN);
+            stream.addRect(MARGIN, topY - height, 5f, height);
+            stream.fill();
+
+            writeText("APPLICANT", MARGIN + 16f, topY - 22f, bold, SECTION_SIZE + 1f, TEXT_COLOR);
+            writeRightAligned(
+                includeRecordedSignatures && signatureText != null && !signatureText.isBlank() ? "SIGNATURE RECORDED" : "SIGNATURE REQUIRED",
+                page.getMediaBox().getWidth() - MARGIN - 12f,
+                topY - 21f,
+                bold,
+                SMALL_SIZE,
+                BRAND_GREEN
+            );
+            writeText("Applicant", MARGIN + 16f, topY - 50f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(sanitizePdfText(applicant.getFullName()), MARGIN + 84f, topY - 50f, bold, BODY_SIZE, TEXT_COLOR);
+            writeText("Member number", MARGIN + 16f, topY - 70f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(sanitizePdfText(applicant.getMemberNo()), MARGIN + 84f, topY - 70f, regular, BODY_SIZE, TEXT_COLOR);
+            writeText("Declaration", MARGIN + 16f, topY - 90f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText("Application details confirmed", MARGIN + 84f, topY - 90f, regular, BODY_SIZE, TEXT_COLOR);
+
+            float signatureX = MARGIN + contentWidth() * 0.62f;
+            String displayedSignature = includeRecordedSignatures && signatureText != null && !signatureText.isBlank()
+                ? sanitizePdfText(signatureText)
+                : "________________________________";
+            boolean recordedSignature = hasRecordedSignature(displayedSignature);
+            writeText(
+                displayedSignature,
+                signatureX,
+                topY - 58f,
+                recordedSignature ? signatureFont : regular,
+                recordedSignature ? BODY_SIZE + 3f : BODY_SIZE + 1f,
+                TEXT_COLOR
+            );
+            stream.setStrokingColor(MUTED_COLOR);
+            stream.moveTo(signatureX, topY - 64f);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN - 14f, topY - 64f);
+            stream.stroke();
+            writeText(includeRecordedSignatures ? "Applicant signature" : "Physical signature", signatureX, topY - 78f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(
+                "Signed: " + (includeRecordedSignatures ? sanitizePdfText(formatTimestamp(app.getApplicantSignatureVerifiedAt())) : "________________"),
+                signatureX,
+                topY - 95f,
+                regular,
+                SMALL_SIZE,
+                MUTED_COLOR
+            );
+            y -= height + 10f;
+        }
+
+        private boolean hasRecordedSignature(String signatureText) {
+            return includeRecordedSignatures
+                && signatureText != null
+                && !signatureText.isBlank()
+                && signatureText.chars().anyMatch(character -> character != '_');
         }
 
         private void drawSectionHeading(String text) throws IOException {
@@ -1661,7 +1999,7 @@ public class LoanPresentationService {
             stream.setNonStrokingColor(color);
             stream.setFont(font, fontSize);
             stream.newLineAtOffset(x, baselineY);
-            stream.showText(sanitizePdfText(text));
+            stream.showText(sanitizePdfLineText(text));
             stream.endText();
         }
 
@@ -1671,8 +2009,18 @@ public class LoanPresentationService {
                                        PDType1Font font,
                                        float fontSize,
                                        Color color) throws IOException {
-            float width = stringWidth(sanitizePdfText(text), font, fontSize);
+            float width = stringWidth(sanitizePdfLineText(text), font, fontSize);
             writeText(text, rightX - width, baselineY, font, fontSize, color);
+        }
+
+        private void writeCentered(String text,
+                                   float centerX,
+                                   float baselineY,
+                                   PDType1Font font,
+                                   float fontSize,
+                                   Color color) throws IOException {
+            float width = stringWidth(sanitizePdfLineText(text), font, fontSize);
+            writeText(text, centerX - (width / 2f), baselineY, font, fontSize, color);
         }
 
         private float contentWidth() {

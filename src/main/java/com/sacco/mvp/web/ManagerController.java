@@ -247,8 +247,8 @@ public class ManagerController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("repaymentSummary",
-            loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
+        model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
+        model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
             app.getRepaymentScheduleJson(),
             loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),

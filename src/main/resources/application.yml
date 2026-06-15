@@ -80,6 +80,8 @@ logging:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
+  uploads:
+    legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
   outbox:
     scheduler-enabled: true
     batch-size: ${APP_OUTBOX_BATCH_SIZE:250}

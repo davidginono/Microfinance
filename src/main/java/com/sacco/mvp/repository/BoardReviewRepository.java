@@ -52,8 +52,8 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
         from BoardReview r
         where r.boardMemberId = :boardMemberId
           and r.reviewStage = :reviewStage
-          and (:createdFrom is null or coalesce(r.decidedAt, r.createdAt) >= :createdFrom)
-          and (:createdToExclusive is null or coalesce(r.decidedAt, r.createdAt) < :createdToExclusive)
+          and (cast(:createdFrom as timestamp) is null or coalesce(r.decidedAt, r.createdAt) >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or coalesce(r.decidedAt, r.createdAt) < :createdToExclusive)
         order by coalesce(r.decidedAt, r.createdAt) desc
         """)
     List<BoardReview> findForAnalytics(@Param("boardMemberId") UUID boardMemberId,

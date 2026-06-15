@@ -24,10 +24,10 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
         where g.loanApplicationId = l.id
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.PENDING
           and l.saccoId = :saccoId
-          and (:status is null or l.status = :status)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (cast(:status as string) is null or l.status = :status)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
         """)
     long countPendingForReport(@Param("saccoId") String saccoId,
                                @Param("status") LoanStatus status,
@@ -134,8 +134,8 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
               )
             )
           )
-          and (:status is null or g.status = :status)
-          and (:loanIdQuery is null or lower(cast(g.loanApplicationId as string)) like concat('%', :loanIdQuery, '%'))
+          and (cast(:status as string) is null or g.status = :status)
+          and (cast(:loanIdQuery as string) is null or lower(cast(g.loanApplicationId as string)) like concat('%', cast(:loanIdQuery as string), '%'))
         order by coalesce(g.decidedAt, g.createdAt) desc
         """)
     Page<GuarantorRequest> findArchivePageByGuarantorMemberId(@Param("guarantorMemberId") UUID guarantorMemberId,
@@ -159,7 +159,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER
           )
-          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         """)
     java.math.BigDecimal sumActiveGuaranteedAmount(@Param("guarantorMemberId") UUID guarantorMemberId,
@@ -176,7 +176,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED
           )
-          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         """)
     long countActiveGuarantees(@Param("guarantorMemberId") UUID guarantorMemberId,

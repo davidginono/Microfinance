@@ -45,7 +45,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
           and l.status in :statuses
-          and (:loanIdQuery is null or lower(coalesce(l.loanId, '')) like concat('%', :loanIdQuery, '%'))
+          and (cast(:loanIdQuery as string) is null or lower(coalesce(l.loanId, '')) like concat('%', cast(:loanIdQuery as string), '%'))
         order by l.updatedAt desc, l.createdAt desc
         """)
     Page<LoanApplication> findMemberArchivePage(@Param("applicantMemberId") UUID applicantMemberId,
@@ -57,10 +57,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:status is null or l.status = :status)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
         order by l.createdAt desc
         """)
     List<LoanApplication> findMemberLoansForAnalytics(@Param("applicantMemberId") UUID applicantMemberId,
@@ -74,10 +74,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         from LoanApplication l
         where l.saccoId = :saccoId
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:status is null or l.status = :status)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
         order by l.createdAt desc
         """)
     List<LoanApplication> findScopeLoansForAnalytics(@Param("saccoId") String saccoId,
@@ -174,9 +174,9 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
           and l.status in :statuses
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and (
-            :searchTerm is null
-            or (:searchByLoanId = true and lower(coalesce(l.loanId, '')) like concat('%', :searchTerm, '%'))
-            or (:searchByLoanId = false and str(l.applicationNumber) like concat('%', :searchTerm, '%'))
+            cast(:searchTerm as string) is null
+            or (:searchByLoanId = true and lower(coalesce(l.loanId, '')) like concat('%', cast(:searchTerm as string), '%'))
+            or (:searchByLoanId = false and str(l.applicationNumber) like concat('%', cast(:searchTerm as string), '%'))
           )
         order by l.createdAt asc
         """)
@@ -209,7 +209,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l.status as status, count(l) as total
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
-          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         group by l.status
         """)
@@ -222,7 +222,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
           and l.status in :statuses
-          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         """)
     java.math.BigDecimal sumAmountForApplicantScopeAndStatuses(@Param("applicantMemberId") UUID applicantMemberId,
@@ -235,7 +235,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
           and l.status = com.sacco.mvp.domain.LoanStatus.FORFEITED
-          and (:saccoId is null or l.saccoId = :saccoId)
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         order by coalesce(l.updatedAt, l.createdAt) desc
         """)
@@ -309,10 +309,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l.status as status, count(l) as total
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:status is null or l.status = :status)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (cast(:status as string) is null or l.status = :status)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
         group by l.status
         """)
     List<StatusCountProjection> reportStatusCounts(@Param("saccoId") String saccoId,
@@ -325,10 +325,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l.loanType as loanType, count(l) as total
         from LoanApplication l
         where l.saccoId = :saccoId
-          and (:status is null or l.status = :status)
-          and (:loanType is null or l.loanType = :loanType)
-          and (:createdFrom is null or l.createdAt >= :createdFrom)
-          and (:createdToExclusive is null or l.createdAt < :createdToExclusive)
+          and (cast(:status as string) is null or l.status = :status)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
         group by l.loanType
         """)
     List<LoanTypeCountProjection> reportTypeCounts(@Param("saccoId") String saccoId,

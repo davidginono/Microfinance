@@ -737,7 +737,6 @@ public class LoanReportService {
         }
         Map<UUID, List<GuarantorRequest>> guarantorsByLoan = new LinkedHashMap<>();
         Map<UUID, List<BoardReview>> boardReviewsByLoan = new LinkedHashMap<>();
-        Map<UUID, ManagerReview> latestManagerReviewByLoan = new LinkedHashMap<>();
         Set<UUID> memberIds = new java.util.LinkedHashSet<>();
 
         for (LoanApplication loan : loans) {
@@ -752,12 +751,6 @@ public class LoanReportService {
             boardReviews.stream()
                 .map(BoardReview::getBoardMemberId)
                 .forEach(memberIds::add);
-
-            managerReviewRepository.findFirstByLoanApplicationIdOrderByCreatedAtDesc(loan.getId())
-                .ifPresent(review -> {
-                    latestManagerReviewByLoan.put(loan.getId(), review);
-                    memberIds.add(review.getManagerMemberId());
-                });
         }
 
         Map<UUID, Member> memberMap = memberRepository.findAllById(memberIds).stream()
@@ -769,7 +762,6 @@ public class LoanReportService {
                 loan,
                 guarantorsByLoan.getOrDefault(loan.getId(), List.of()),
                 boardReviewsByLoan.getOrDefault(loan.getId(), List.of()),
-                latestManagerReviewByLoan.get(loan.getId()),
                 memberMap
             ))
             .toList();
@@ -779,7 +771,6 @@ public class LoanReportService {
                                                    LoanApplication loan,
                                                    List<GuarantorRequest> guarantorRequests,
                                                    List<BoardReview> boardReviews,
-                                                   ManagerReview managerReview,
                                                    Map<UUID, Member> memberMap) {
         Map<String, Object> financialSnapshot = parseJsonMap(loan.getFinancialSnapshot());
         String applicationFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("applicationFee")));
@@ -801,7 +792,7 @@ public class LoanReportService {
             totalDeductionsLabel,
             deductionSummary,
             formatGuarantorDetails(guarantorRequests, memberMap),
-            formatApprovalSummary(managerReview, boardReviews, memberMap),
+            formatApprovalSummary(boardReviews, memberMap),
             formatDate(loan.getDisbursementDate()),
             formatDate(loan.getFinalDueDate()),
             formatMemberLoanStatus(loan),
@@ -881,21 +872,10 @@ public class LoanReportService {
         };
     }
 
-    private String formatApprovalSummary(ManagerReview managerReview,
-                                         List<BoardReview> boardReviews,
+    private String formatApprovalSummary(List<BoardReview> boardReviews,
                                          Map<UUID, Member> memberMap) {
-        List<String> parts = new ArrayList<>();
-        if (managerReview != null) {
-            Member manager = memberMap.get(managerReview.getManagerMemberId());
-            String managerName = manager == null ? "Manager" : manager.getFullName();
-            String summary = managerName + ": " + (managerReview.getDecision() == ManagerDecision.ACCEPT ? "Accepted" : "Rejected");
-            if (managerReview.getReasons() != null && !managerReview.getReasons().isBlank()) {
-                summary += " (" + managerReview.getReasons().trim() + ")";
-            }
-            parts.add(summary);
-        }
         if (boardReviews != null && !boardReviews.isEmpty()) {
-            String boardSummary = boardReviews.stream()
+            return boardReviews.stream()
                 .map(review -> {
                     Member boardMember = memberMap.get(review.getBoardMemberId());
                     String boardName = boardMember == null ? "Board Member" : boardMember.getFullName();
@@ -910,12 +890,8 @@ public class LoanReportService {
                     return boardName + ": " + status + note;
                 })
                 .collect(Collectors.joining("; "));
-            parts.add("Committee: " + boardSummary);
         }
-        if (parts.isEmpty()) {
-            return "No approval decision details available";
-        }
-        return String.join(" | ", parts);
+        return "No board committee decision details available";
     }
 
     private String formatMemberLoanStatus(LoanApplication loan) {
@@ -986,6 +962,11 @@ public class LoanReportService {
             return "-";
         }
         return text.replace('\r', ' ').trim();
+    }
+
+    private static String sanitizePdfLineText(String text) {
+        String sanitized = sanitizePdfText(text).replaceAll("\\p{Cntrl}+", " ").trim();
+        return sanitized.isEmpty() ? "-" : sanitized;
     }
 
     public record LoanSummary(
@@ -1631,7 +1612,7 @@ public class LoanReportService {
             stream.setNonStrokingColor(color);
             stream.setFont(font, fontSize);
             stream.newLineAtOffset(x, baselineY);
-            stream.showText(sanitizePdfText(text));
+            stream.showText(sanitizePdfLineText(text));
             stream.endText();
         }
 
@@ -1641,7 +1622,7 @@ public class LoanReportService {
                                        PDType1Font font,
                                        float fontSize,
                                        Color color) throws IOException {
-            float width = stringWidth(sanitizePdfText(text), font, fontSize);
+            float width = stringWidth(sanitizePdfLineText(text), font, fontSize);
             writeText(text, rightX - width, baselineY, font, fontSize, color);
         }
 

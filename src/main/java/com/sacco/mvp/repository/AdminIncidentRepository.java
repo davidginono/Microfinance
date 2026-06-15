@@ -22,9 +22,9 @@ public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UU
     @Query("""
         select i
         from AdminIncident i
-        where (:saccoId is null or i.saccoId = :saccoId)
-          and (:status is null or i.status = :status)
-          and (:severity is null or i.severity = :severity)
+        where (cast(:saccoId as string) is null or i.saccoId = :saccoId)
+          and (cast(:status as string) is null or i.status = :status)
+          and (cast(:severity as string) is null or i.severity = :severity)
         order by i.createdAt desc
         """)
     List<AdminIncident> findRecentForReview(@Param("saccoId") String saccoId,

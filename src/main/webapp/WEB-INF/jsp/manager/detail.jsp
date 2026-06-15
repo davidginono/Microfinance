@@ -15,7 +15,7 @@
             <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
         </c:if>
     </div>
-    <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
+    <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
 </div>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
@@ -390,79 +390,7 @@
     </table>
 </div>
 
-<c:if test="${not empty repaymentSummary}">
-    <div class="erp-section">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></h5>
-            <c:if test="${not empty repaymentCountdown}">
-                <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">${repaymentCountdown}</span>
-            </c:if>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <c:forEach items="${repaymentSummary}" var="entry">
-                <div class="erp-section-muted">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">${entry.key}</div>
-                    <div class="mt-2 text-sm font-semibold text-slate-800">${entry.value}</div>
-                </div>
-            </c:forEach>
-        </div>
-        <c:if test="${not empty repaymentRows}">
-            <c:if test="${allowPaymentSync and not empty app.loanId}">
-                <div class="mt-4 flex flex-wrap items-center justify-end gap-2">
-                    <c:if test="${app.status eq 'DEFAULTED'}">
-                        <form action="${reviewBasePath}/loan-applications/${app.id}/recheck-defaulted-payment"
-                              method="post"
-                              data-confirm-title="Recheck Defaulted Loan"
-                              data-confirm-message="Verify this defaulted loan against the payment system now? If the outstanding balance is zero, the status will change to PAID and guarantor capacity will be released."
-                              data-confirm-proceed="Recheck Loan">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <button type="submit" class="app-btn btn-primary">Recheck Defaulted Loan</button>
-                        </form>
-                    </c:if>
-                    <form action="${reviewBasePath}/loan-applications/${app.id}/sync-payments" method="post">
-                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                        <button type="submit" class="app-btn btn-neutral"><spring:message code="loan.repayment.refresh" text="Refresh Payments" /></button>
-                    </form>
-                </div>
-            </c:if>
-            <div class="mt-3 erp-table-wrap overflow-x-auto">
-                <table class="erp-table">
-                    <thead>
-                    <tr>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
-                    </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                    <c:forEach items="${repaymentRows}" var="row">
-                        <tr>
-                            <td class="px-3 py-2">${row.installment}</td>
-                            <td class="px-3 py-2">${row.dueDate}</td>
-                            <td class="px-3 py-2">
-                                <div>${row.amount}</div>
-                                <c:if test="${not empty row.scheduledBreakdown}">
-                                    <div class="mt-1 text-xs text-slate-500">${row.scheduledBreakdown}</div>
-                                </c:if>
-                            </td>
-                            <td class="px-3 py-2">${row.outstandingBalance}</td>
-                            <td class="px-3 py-2">${row.principalPaid}</td>
-                            <td class="px-3 py-2">${row.interestPaid}</td>
-                            <td class="px-3 py-2">${row.totalPaid}</td>
-                            <td class="px-3 py-2">${row.paymentDate}</td>
-                        </tr>
-                    </c:forEach>
-                    </tbody>
-                </table>
-            </div>
-        </c:if>
-    </div>
-</c:if>
+<%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${showReviewDecisionForm}">
     <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3" data-manager-decision-form="true">
@@ -1019,6 +947,7 @@
 <%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<%@ include file="../fragments/loan-export-modal.jspf" %>
 <script>
     (() => {
         const url = "${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/active-loans/outstanding-balances";

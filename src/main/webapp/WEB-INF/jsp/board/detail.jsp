@@ -28,7 +28,7 @@
             <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
         </c:if>
     </div>
-    <a href="/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</a>
+    <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
 </div>
 
 <div class="loan-view-hero-summary">
@@ -305,6 +305,8 @@
         </tbody>
     </table>
 </div>
+
+<%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap overflow-x-auto">
@@ -724,6 +726,7 @@
 
 <%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<%@ include file="../fragments/loan-export-modal.jspf" %>
 <script>
     (() => {
         const url = "${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/active-loans/outstanding-balances";
