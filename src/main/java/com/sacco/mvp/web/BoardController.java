@@ -190,16 +190,13 @@ public class BoardController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
-        model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
-        model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
-        model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("repaymentSummary", loanPresentationService.repaymentSummaryForReview(app));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
-            app.getRepaymentScheduleJson(),
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
+            app,
             loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
             loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
+        model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
+        model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
