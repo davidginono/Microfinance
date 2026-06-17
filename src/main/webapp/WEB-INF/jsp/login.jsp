@@ -7,7 +7,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><spring:message code="app.title" /></title>
-    <link rel="icon" type="image/png" href="<c:url value='/images/iaa-saccos-logo.png' />" />
+    <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <style>
         @keyframes otp-pop {
@@ -211,29 +211,15 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="<c:url value='/css/login.css?v=8' />" />
 </head>
 <body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
 <div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
-<div class="login-page-wrap relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
-    <div class="auth-frame login-card relative w-full overflow-hidden">
-        <aside class="login-welcome-panel" aria-label="IAA SACCOS welcome">
-            <div class="login-brand-block">
-                <img class="login-logo" src="<c:url value='/images/iaa-saccos-logo.png' />" alt="IAA SACCOS Ltd." />
-                <div class="login-welcome-copy">
-                    <h2>Welcome Back!</h2>
-                    <p>Access your account to manage loan<br class="hidden xl:block" /> applications, repayments and more.</p>
-                </div>
-            </div>
-            <div class="login-wave login-wave-white"></div>
-            <div class="login-wave login-wave-green"></div>
-            <div class="login-wave login-wave-blue"></div>
-        </aside>
-        <main class="login-form-panel">
+<div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
+    <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">Log in to Loan Application Portal</h1>
+                <h1 class="auth-heading">Log in to Loan Management System</h1>
             </div>
         </div>
         <div class="mb-5">
@@ -369,7 +355,7 @@
                         <a href="/register/member" class="auth-signup-link"><spring:message code="login.registerMember" /></a>
                     </div>
                     </div>
-        </main>
+        </div>
     </div>
 </div>
 <div id="forgotPasswordModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 px-4 py-8">
