@@ -343,9 +343,16 @@
                 <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
                 <p class="text-sm text-slate-500"><spring:message code="newloan.attachments.helper" /></p>
             </div>
-            <c:if test="${product.applicantAttachmentRequired}">
-                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Required</span>
-            </c:if>
+            <span class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${product.applicantAttachmentRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
+                <c:choose>
+                    <c:when test="${product.applicantAttachmentRequired}">
+                        <spring:message code="common.required" text="Required" />
+                    </c:when>
+                    <c:otherwise>
+                        <spring:message code="common.optional" text="Optional" />
+                    </c:otherwise>
+                </c:choose>
+            </span>
         </div>
         <label class="attachment-dropzone" data-attachment-dropzone>
             <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />

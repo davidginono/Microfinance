@@ -551,12 +551,18 @@
             </div>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700">
-                Disbursement Proof
-                <c:choose>
-                    <c:when test="${disbursementProofRequired}"><span class="text-rose-600">*</span></c:when>
-                    <c:otherwise><span class="text-slate-500">(optional)</span></c:otherwise>
-                </c:choose>
+            <label class="mb-1 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                <span>Disbursement Proof</span>
+                <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${disbursementProofRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
+                    <c:choose>
+                        <c:when test="${disbursementProofRequired}">
+                            <spring:message code="common.required" text="Required" />
+                        </c:when>
+                        <c:otherwise>
+                            <spring:message code="common.optional" text="Optional" />
+                        </c:otherwise>
+                    </c:choose>
+                </span>
             </label>
             <label class="attachment-dropzone" data-attachment-dropzone>
                 <input type="file"
