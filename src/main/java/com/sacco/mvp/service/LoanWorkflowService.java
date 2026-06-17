@@ -230,12 +230,15 @@ public class LoanWorkflowService {
             ? null
             : loanApplicationRepository.findByIdAndApplicantMemberId(existingId, applicantId)
                 .map(existing -> {
-                    if (existing.getStatus() != LoanStatus.DRAFT) {
-                        throw new IllegalStateException("Only DRAFT applications can be edited.");
+                    if (existing.getStatus() != LoanStatus.DRAFT
+                        && existing.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
+                        throw new IllegalStateException("Only DRAFT applications or applications approved by all guarantors can be edited.");
                     }
                     return existing;
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Loan draft not found"));
+        boolean reEditingAfterGuarantorApproval = existingDraft != null
+            && existingDraft.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED;
         String applicantStationId = existingDraft != null
             ? coalesceStationId(existingDraft.getStationId(), resolveMemberStationId(applicantId))
             : requireMemberStationId(applicantId);
@@ -295,8 +298,27 @@ public class LoanWorkflowService {
         application.setApplicantSignatureVerifiedAt(null);
         application.setUpdatedAt(OffsetDateTime.now());
         LoanApplication saved = loanApplicationRepository.save(application);
+        if (reEditingAfterGuarantorApproval) {
+            expireGuarantorApprovalsForApplicantEdit(saved.getId());
+        }
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
         return loanApplicationRepository.save(saved);
+    }
+
+    private void expireGuarantorApprovalsForApplicantEdit(UUID appId) {
+        List<GuarantorRequest> requests = guarantorRequestRepository.findByLoanApplicationId(appId);
+        if (requests.isEmpty()) {
+            return;
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        for (GuarantorRequest request : requests) {
+            request.setStatus(GuarantorRequestStatus.EXPIRED);
+            request.setDecisionReason("Applicant reopened application for editing");
+            request.setDecidedAt(now);
+            request.setGuarantorSignatureText(null);
+            request.setGuarantorSignatureVerifiedAt(null);
+        }
+        guarantorRequestRepository.saveAll(requests);
     }
 
     private void validateApplicantAttachmentRequirement(LoanProductSetting product,
