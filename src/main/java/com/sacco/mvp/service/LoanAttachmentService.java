@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.StoredUpload;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class LoanAttachmentService {
 
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
-    private final StoredUploadService storedUploadService;
+    private final StoredUploadStorageService storedUploadStorageService;
 
     public String store(UUID loanId, List<MultipartFile> files, String existingJson) {
         return store(loanId, files, existingJson, CATEGORY_APPLICATION_ATTACHMENT);
@@ -45,21 +46,25 @@ public class LoanAttachmentService {
                 }
                 String attachmentId = UUID.randomUUID().toString();
                 String cleanedName = StringUtils.cleanPath(file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename());
-                String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
-                storedUploadService.store(
+                String extension = StringUtils.getFilenameExtension(cleanedName);
+                String storedName = extension == null || extension.isBlank()
+                    ? attachmentId
+                    : attachmentId + "." + extension;
+                storedUploadStorageService.store(
                     UUID.fromString(attachmentId),
-                    StoredUploadService.OWNER_LOAN_APPLICATION,
+                    StoredUploadStorageService.OWNER_LOAN_APPLICATION,
                     loanId.toString(),
                     normalizedCategory,
                     cleanedName,
-                    contentType,
+                    file.getContentType(),
                     file.getBytes()
                 );
 
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", attachmentId);
                 item.put("originalName", cleanedName);
-                item.put("contentType", contentType);
+                item.put("storedName", storedName);
+                item.put("contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType());
                 item.put("size", file.getSize());
                 item.put("uploadedAt", OffsetDateTime.now().toString());
                 item.put("attachmentCategory", normalizedCategory);
@@ -101,20 +106,20 @@ public class LoanAttachmentService {
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
 
-        StoredUploadService.StoredUploadResource resource = storedUploadService.load(
+        StoredUpload upload = storedUploadStorageService.load(
             UUID.fromString(attachmentId),
-            StoredUploadService.OWNER_LOAN_APPLICATION,
+            StoredUploadStorageService.OWNER_LOAN_APPLICATION,
             loanId.toString()
         );
         return new AttachmentResource(
-            resource.content(),
-            String.valueOf(match.getOrDefault("originalName", resource.originalName())),
-            String.valueOf(match.getOrDefault("contentType", resource.contentType()))
+            upload.getContent(),
+            String.valueOf(match.get("originalName")),
+            upload.getContentType()
         );
     }
 
     public void deleteAll(UUID loanId) {
-        storedUploadService.deleteOwner(StoredUploadService.OWNER_LOAN_APPLICATION, loanId.toString());
+        storedUploadStorageService.deleteOwner(StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString());
     }
 
     private String writeJson(List<Map<String, Object>> attachments) {

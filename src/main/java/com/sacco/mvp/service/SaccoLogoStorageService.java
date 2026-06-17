@@ -1,5 +1,6 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.StoredUpload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -26,23 +27,23 @@ public class SaccoLogoStorageService {
     private static final int MAX_WIDTH = 1024;
     private static final int MAX_HEIGHT = 1024;
 
-    private final StoredUploadService storedUploadService;
+    private final StoredUploadStorageService storedUploadStorageService;
 
     public void store(String saccoId, MultipartFile logoFile) {
         if (logoFile == null || logoFile.isEmpty()) {
             return;
         }
 
-        String extension = resolveAllowedExtension(logoFile);
+        resolveAllowedExtension(logoFile);
         validateSize(logoFile);
         byte[] bytes = readBytes(logoFile);
         validateImageDimensions(bytes);
-        storedUploadService.replaceSingle(
-            StoredUploadService.OWNER_SACCO,
+        storedUploadStorageService.replaceCategory(
+            StoredUploadStorageService.OWNER_SACCO,
             requireSaccoId(saccoId),
-            StoredUploadService.CATEGORY_SACCO_LOGO,
-            "logo." + extension,
-            "png".equals(extension) ? MediaType.IMAGE_PNG_VALUE : MediaType.IMAGE_JPEG_VALUE,
+            StoredUploadStorageService.CATEGORY_SACCO_LOGO,
+            StringUtils.cleanPath(logoFile.getOriginalFilename() == null ? "logo" : logoFile.getOriginalFilename()),
+            logoFile.getContentType(),
             bytes
         );
     }
@@ -50,10 +51,10 @@ public class SaccoLogoStorageService {
     public boolean hasLogo(String saccoId) {
         return saccoId != null
             && !saccoId.isBlank()
-            && storedUploadService.exists(
-                StoredUploadService.OWNER_SACCO,
+            && storedUploadStorageService.exists(
+                StoredUploadStorageService.OWNER_SACCO,
                 saccoId.trim(),
-                StoredUploadService.CATEGORY_SACCO_LOGO
+                StoredUploadStorageService.CATEGORY_SACCO_LOGO
             );
     }
 
@@ -71,12 +72,12 @@ public class SaccoLogoStorageService {
     }
 
     public LogoResource load(String saccoId) {
-        StoredUploadService.StoredUploadResource resource = storedUploadService.loadSingle(
-            StoredUploadService.OWNER_SACCO,
+        StoredUpload upload = storedUploadStorageService.loadLatest(
+            StoredUploadStorageService.OWNER_SACCO,
             requireSaccoId(saccoId),
-            StoredUploadService.CATEGORY_SACCO_LOGO
+            StoredUploadStorageService.CATEGORY_SACCO_LOGO
         );
-        return new LogoResource(resource.content(), MediaType.parseMediaType(resource.contentType()));
+        return new LogoResource(upload.getContent(), MediaType.parseMediaType(upload.getContentType()));
     }
 
     private String resolveAllowedExtension(MultipartFile logoFile) {

@@ -72,7 +72,7 @@ public class StaffMfaService {
             email,
             EmailOtpPurpose.STAFF_LOGIN_MFA,
             member.getId(),
-            "Your SACCO MVP admin sign-in verification code",
+            "Your Loan Application Portal admin sign-in verification code",
             "We received an admin sign-in attempt for this account. Enter the verification code below to finish signing in. "
                 + "If you did not initiate this sign-in, ignore this message and change your password immediately."
         );
@@ -126,7 +126,7 @@ public class StaffMfaService {
             email,
             EmailOtpPurpose.STAFF_LOGIN_MFA,
             member.getId(),
-            "Your SACCO MVP admin sign-in verification code",
+            "Your Loan Application Portal admin sign-in verification code",
             "We received an admin sign-in attempt for this account. Enter the verification code below to finish signing in."
         );
     }

@@ -1,5 +1,6 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.StoredUpload;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -7,11 +8,9 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -22,35 +21,38 @@ class SaccoLogoStorageServiceTest {
 
     @Test
     void storesValidPngLogoInDatabaseStorage() throws IOException {
-        StoredUploadService uploads = mock(StoredUploadService.class);
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        SaccoLogoStorageService service = new SaccoLogoStorageService(storage);
         byte[] content = pngBytes(128, 128);
-        SaccoLogoStorageService service = new SaccoLogoStorageService(uploads);
-        when(uploads.exists(
-            StoredUploadService.OWNER_SACCO, "SACCO-ARUSHA-001", StoredUploadService.CATEGORY_SACCO_LOGO
-        )).thenReturn(true);
-        when(uploads.loadSingle(
-            StoredUploadService.OWNER_SACCO, "SACCO-ARUSHA-001", StoredUploadService.CATEGORY_SACCO_LOGO
-        )).thenReturn(new StoredUploadService.StoredUploadResource(
-            UUID.randomUUID(), "logo.png", "image/png", content.length, "hash", content
-        ));
 
-        service.store("SACCO-ARUSHA-001", new MockMultipartFile("logoFile", "logo.png", "image/png", content));
+        service.store("SACCO-ARUSHA-001", new MockMultipartFile(
+            "logoFile", "logo.png", "image/png", content));
 
-        verify(uploads).replaceSingle(
-            eq(StoredUploadService.OWNER_SACCO),
+        verify(storage).replaceCategory(
+            eq(StoredUploadStorageService.OWNER_SACCO),
             eq("SACCO-ARUSHA-001"),
-            eq(StoredUploadService.CATEGORY_SACCO_LOGO),
+            eq(StoredUploadStorageService.CATEGORY_SACCO_LOGO),
             eq("logo.png"),
             eq("image/png"),
             any(byte[].class)
         );
-        assertTrue(service.hasLogo("SACCO-ARUSHA-001"));
+    }
+
+    @Test
+    void loadsLogoBytesFromDatabaseStorage() {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        when(storage.loadLatest(any(), any(), any())).thenReturn(StoredUpload.builder()
+            .content(new byte[]{1, 2, 3})
+            .contentType("image/png")
+            .build());
+        SaccoLogoStorageService service = new SaccoLogoStorageService(storage);
+
         assertEquals("image/png", service.load("SACCO-ARUSHA-001").contentType().toString());
     }
 
     @Test
     void rejectsLogoOutsideAllowedResolutionRange() throws IOException {
-        SaccoLogoStorageService service = new SaccoLogoStorageService(mock(StoredUploadService.class));
+        SaccoLogoStorageService service = new SaccoLogoStorageService(mock(StoredUploadStorageService.class));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.store(
             "SACCO-ARUSHA-001",

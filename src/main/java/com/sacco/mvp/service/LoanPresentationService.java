@@ -31,6 +31,7 @@ import org.springframework.web.util.HtmlUtils;
 import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -338,6 +339,10 @@ public class LoanPresentationService {
         } catch (Exception ex) {
             return Collections.emptyMap();
         }
+    }
+
+    public Map<String, Object> repaymentSummaryForReview(LoanApplication app) {
+        return reviewRepaymentSummary(app);
     }
 
     public boolean isEstimatedReviewRepaymentSummary(LoanApplication app) {
@@ -1651,7 +1656,7 @@ public class LoanPresentationService {
         private void drawAttachmentResource(String displayName, LoanAttachmentService.AttachmentResource resource) throws IOException {
             String contentType = resource.getContentType() == null ? "" : resource.getContentType().toLowerCase(Locale.ROOT);
             if (contentType.startsWith("image/")) {
-                BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(resource.getContent()));
+                BufferedImage image = ImageIO.read(new ByteArrayInputStream(resource.getContent()));
                 if (image != null) {
                     drawAttachmentImage(displayName, image);
                     return;

@@ -1,9 +1,7 @@
 package com.sacco.mvp.domain;
 
-import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -19,35 +17,34 @@ import java.util.UUID;
 @Table(name = "stored_uploads")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class StoredUpload {
     @Id
     private UUID id;
 
-    @Column(name = "owner_type", nullable = false, length = 40)
+    @Column(name = "owner_type", nullable = false, length = 60)
     private String ownerType;
 
-    @Column(name = "owner_id", nullable = false, length = 160)
+    @Column(name = "owner_id", nullable = false, length = 255)
     private String ownerId;
 
     @Column(nullable = false, length = 80)
     private String category;
 
-    @Column(name = "original_name", nullable = false)
+    @Column(name = "original_name", nullable = false, length = 500)
     private String originalName;
 
-    @Column(name = "content_type", nullable = false, length = 160)
+    @Column(name = "content_type", nullable = false, length = 255)
     private String contentType;
 
     @Column(name = "size_bytes", nullable = false)
     private long sizeBytes;
 
-    @Column(nullable = false, length = 64)
-    private String sha256;
+    @Column(name = "sha256", nullable = false, length = 64)
+    private String sha256Checksum;
 
-    @Basic(fetch = FetchType.LAZY)
     @Column(nullable = false, columnDefinition = "bytea")
     private byte[] content;
 

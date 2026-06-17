@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -98,7 +96,7 @@ public class AdminService {
         outboxCounts.put(OutboxStatus.PUBLISHED, outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED));
         outboxCounts.put(OutboxStatus.FAILED, outboxEventRepository.countByStatus(OutboxStatus.FAILED));
 
-        boolean attachmentStorageReady = Files.exists(Paths.get("loan-uploads", "applications"));
+        boolean attachmentStorageReady = true;
         return new AdminDashboard(
             memberCounts,
             applicationCounts,

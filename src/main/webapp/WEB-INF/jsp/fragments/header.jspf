@@ -50,7 +50,7 @@
                     </p>
                     <p class="hidden text-[11px] font-semibold uppercase tracking-[0.17em] text-cyan-50/90 md:block">
                         <c:choose>
-                            <c:when test="${not empty activeSaccoId}">${activeSaccoId} &middot; <spring:message code="app.title" /></c:when>
+                            <c:when test="${not empty activeSaccoId}">${activeSaccoId} &middot; Loan Application Portal</c:when>
                             <c:otherwise><spring:message code="app.title" /></c:otherwise>
                         </c:choose>
                     </p>

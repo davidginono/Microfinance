@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.sacco.mvp.domain.StoredUpload;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -15,57 +16,38 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LoanAttachmentServiceTest {
+
     @Test
     void storesMetadataAndBinaryContentInDatabaseStorage() {
-        StoredUploadService uploads = mock(StoredUploadService.class);
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
         LoanAttachmentService service = new LoanAttachmentService(
-            JsonMapper.builder().findAndAddModules().build(),
-            mock(AdminAlertService.class),
-            uploads
-        );
+            JsonMapper.builder().findAndAddModules().build(), mock(AdminAlertService.class), storage);
         UUID loanId = UUID.randomUUID();
-        byte[] content = "application attachment".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        String metadata = service.store(
-            loanId,
-            List.of(new MockMultipartFile("attachments", "support.pdf", "application/pdf", content)),
-            "[]"
-        );
+        String json = service.store(loanId, List.of(
+            new MockMultipartFile("attachments", "statement.pdf", "application/pdf", new byte[]{1, 2, 3})
+        ), null);
 
-        assertThat(service.parse(metadata).getFirst())
-            .containsEntry("originalName", "support.pdf")
-            .containsEntry("attachmentCategory", LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT);
-        verify(uploads).store(
-            any(UUID.class),
-            eq(StoredUploadService.OWNER_LOAN_APPLICATION),
-            eq(loanId.toString()),
-            eq(LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT),
-            eq("support.pdf"),
-            eq("application/pdf"),
-            eq(content)
-        );
+        assertThat(json).contains("statement.pdf").contains("APPLICATION_ATTACHMENT");
+        verify(storage).store(any(UUID.class), eq(StoredUploadStorageService.OWNER_LOAN_APPLICATION),
+            eq(loanId.toString()), eq(LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT),
+            eq("statement.pdf"), eq("application/pdf"), any(byte[].class));
     }
 
     @Test
-    void loadsBinaryContentUsingAttachmentMetadataId() {
-        StoredUploadService uploads = mock(StoredUploadService.class);
-        LoanAttachmentService service = new LoanAttachmentService(
-            JsonMapper.builder().findAndAddModules().build(),
-            mock(AdminAlertService.class),
-            uploads
-        );
+    void loadsBinaryContentUsingAuthorizedMetadataId() {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
         UUID loanId = UUID.randomUUID();
         UUID attachmentId = UUID.randomUUID();
-        byte[] content = "receipt".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        when(uploads.load(attachmentId, StoredUploadService.OWNER_LOAN_APPLICATION, loanId.toString()))
-            .thenReturn(new StoredUploadService.StoredUploadResource(
-                attachmentId, "receipt.pdf", "application/pdf", content.length, "hash", content
-            ));
-        String metadata = "[{\"id\":\"" + attachmentId + "\",\"originalName\":\"receipt.pdf\",\"contentType\":\"application/pdf\"}]";
+        when(storage.load(attachmentId, StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString()))
+            .thenReturn(StoredUpload.builder().content(new byte[]{9, 8}).contentType("application/pdf").build());
+        LoanAttachmentService service = new LoanAttachmentService(
+            JsonMapper.builder().findAndAddModules().build(), mock(AdminAlertService.class), storage);
+        String json = "[{\"id\":\"" + attachmentId + "\",\"originalName\":\"proof.pdf\",\"storedName\":\"proof.pdf\"}]";
 
-        LoanAttachmentService.AttachmentResource resource = service.load(loanId, attachmentId.toString(), metadata);
+        LoanAttachmentService.AttachmentResource resource = service.load(loanId, attachmentId.toString(), json);
 
-        assertThat(resource.getContent()).isEqualTo(content);
-        assertThat(resource.getOriginalName()).isEqualTo("receipt.pdf");
+        assertThat(resource.getContent()).containsExactly(9, 8);
+        assertThat(resource.getOriginalName()).isEqualTo("proof.pdf");
     }
 }
