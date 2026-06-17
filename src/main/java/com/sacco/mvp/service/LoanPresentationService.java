@@ -34,7 +34,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -1415,48 +1414,26 @@ public class LoanPresentationService {
         }
 
         private void drawHeader() throws IOException {
-            ensureSpace(116f);
+            ensureSpace(96f);
             float pageWidth = page.getMediaBox().getWidth();
             float headerTop = page.getMediaBox().getHeight();
-            stream.setNonStrokingColor(BRAND_BROWN);
-            stream.addRect(0f, headerTop - 7f, pageWidth, 7f);
-            stream.fill();
-            stream.setNonStrokingColor(BRAND_NAVY);
-            stream.addRect(0f, headerTop - 17f, pageWidth * 0.61f, 5f);
-            stream.fill();
 
-            drawLogo(MARGIN, headerTop - 83f, 66f);
             String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
-            writeText(saccoLabel.toUpperCase(Locale.ROOT), MARGIN + 82f, headerTop - 42f, bold, 15f, TEXT_COLOR);
-            writeText("Official loan workflow document", MARGIN + 82f, headerTop - 59f, regular, META_SIZE, MUTED_COLOR);
+            writeText(saccoLabel.toUpperCase(Locale.ROOT), MARGIN, headerTop - 42f, bold, 15f, TEXT_COLOR);
+            writeText("Official loan workflow document", MARGIN, headerTop - 59f, regular, META_SIZE, MUTED_COLOR);
             writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, headerTop - 42f, regular, META_SIZE, MUTED_COLOR);
 
-            stream.setNonStrokingColor(BRAND_NAVY);
-            stream.addRect(0f, headerTop - 94f, pageWidth, 4f);
-            stream.fill();
-            stream.setNonStrokingColor(BRAND_GREEN);
-            stream.addRect(0f, headerTop - 100f, pageWidth, 2f);
-            stream.fill();
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.setLineWidth(0.8f);
+            stream.moveTo(MARGIN, headerTop - 78f);
+            stream.lineTo(pageWidth - MARGIN, headerTop - 78f);
+            stream.stroke();
 
-            y = headerTop - 124f;
+            y = headerTop - 102f;
             writeText("Loan Application", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
             y -= 18f;
             writeText("Prepared from the system record for formal review and filing", MARGIN, y, regular, META_SIZE, MUTED_COLOR);
             y -= 20f;
-        }
-
-        private void drawLogo(float x, float bottomY, float size) throws IOException {
-            try (InputStream input = LoanPresentationService.class.getResourceAsStream("/static/images/iaa-saccos-logo.png")) {
-                if (input == null) {
-                    return;
-                }
-                BufferedImage logo = ImageIO.read(input);
-                if (logo == null) {
-                    return;
-                }
-                PDImageXObject logoImage = LosslessFactory.createFromImage(document, logo);
-                stream.drawImage(logoImage, x, bottomY, size, size);
-            }
         }
 
         private long completedReviewCount() {
