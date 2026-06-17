@@ -925,8 +925,8 @@ public class AppController {
                             Model model,
                             RedirectAttributes ra) {
         LoanApplication app = loanWorkflowService.getMine(id, principal.getMemberId());
-        if (app.getStatus() != LoanStatus.DRAFT) {
-            ra.addFlashAttribute("error", "Only draft applications can be edited.");
+        if (app.getStatus() != LoanStatus.DRAFT && app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
+            ra.addFlashAttribute("error", "Only draft applications or applications approved by all guarantors can be edited.");
             return "redirect:/app/loan-applications/" + id;
         }
 
