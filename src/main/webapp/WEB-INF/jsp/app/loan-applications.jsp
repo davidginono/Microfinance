@@ -53,7 +53,7 @@
                     <td class="px-3 py-2">
                         <spring:message code="loan.status.${app.status}" text="${app.status}" />
                         <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
-                            <div class="mt-1 text-xs font-semibold text-emerald-700">Awaiting your acknowledgement</div>
+                            <div class="mt-1 text-xs font-semibold text-emerald-700"><spring:message code="loan.disbursement.awaitingAcknowledgement" text="Awaiting your acknowledgement" /></div>
                         </c:if>
                     </td>
                     <td class="px-3 py-2">
@@ -72,7 +72,7 @@
                             <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
                                 <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                    <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+                                    <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
                                 </form>
                             </c:if>
                         </div>

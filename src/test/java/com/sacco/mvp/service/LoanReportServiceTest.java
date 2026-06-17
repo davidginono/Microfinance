@@ -4,22 +4,37 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.RegisteredSaccoRepository;
+import com.sacco.mvp.repository.SaccoStationRepository;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,10 +47,14 @@ import static org.mockito.Mockito.when;
 class LoanReportServiceTest {
 
     @Mock private LoanApplicationRepository loanApplicationRepository;
+    @Mock private LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
+    @Mock private LoanAnalyticsService loanAnalyticsService;
+    @Mock private RegisteredSaccoRepository registeredSaccoRepository;
+    @Mock private SaccoStationRepository saccoStationRepository;
 
     private LoanReportService loanReportService;
 
@@ -43,11 +62,15 @@ class LoanReportServiceTest {
     void setUp() {
         loanReportService = new LoanReportService(
             loanApplicationRepository,
+            loanPaymentTransactionRepository,
             memberRepository,
             guarantorRequestRepository,
             boardReviewRepository,
             managerReviewRepository,
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),
+            loanAnalyticsService,
+            registeredSaccoRepository,
+            saccoStationRepository
         );
     }
 
@@ -95,5 +118,164 @@ class LoanReportServiceTest {
             .isEqualTo("Board Member Name: Approved")
             .doesNotContain("Applicant Name");
         verifyNoInteractions(managerReviewRepository);
+    }
+
+    @Test
+    void memberAnalyticsExcelUsesFormalWorkbookSheets() throws Exception {
+        byte[] workbookBytes = loanReportService.buildMemberAnalyticsExcel(exportReport(LoanReportService.ReportKind.MEMBER));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            assertThat(workbook.getSheet("Summary")).isNotNull();
+            assertThat(workbook.getSheet("Status Analysis")).isNotNull();
+            assertThat(workbook.getSheet("Product Performance")).isNotNull();
+            assertThat(workbook.getSheet("Trends")).isNotNull();
+            assertThat(workbook.getSheet("Financial Summary")).isNotNull();
+            assertThat(workbook.getSheet("Activity Log")).isNotNull();
+            assertThat(sheetContains(workbook, "Summary", "17 Jun 2025 - 17 Jun 2026")).isTrue();
+            assertThat(sheetContains(workbook, "Product Performance", "15,000.00")).isTrue();
+        }
+    }
+
+    @Test
+    void stationAnalyticsPdfUsesTwoPageFormalTemplate() throws Exception {
+        byte[] pdf = loanReportService.buildStationAnalyticsPdf(exportReport(LoanReportService.ReportKind.STATION));
+
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(document.getNumberOfPages()).isEqualTo(2);
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("3. LOAN STATUS SUMMARY");
+            assertThat(text).doesNotContain("4. LOAN STATUS OVERVIEW");
+            assertThat(text).contains("4. LOAN PRODUCT PERFORMANCE");
+            assertThat(text).contains("7. LOAN PRODUCT FINANCIAL BREAKDOWN");
+        }
+    }
+
+    @Test
+    void stationAnalyticsExcelIncludesProductFinancialBreakdown() throws Exception {
+        byte[] workbookBytes = loanReportService.buildStationAnalyticsExcel(exportReport(LoanReportService.ReportKind.STATION));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            assertThat(sheetContains(workbook, "Summary", "LOAN PRODUCT FINANCIAL BREAKDOWN")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "Total Interest Paid")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "Total Interest Unpaid Yet")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "15,000.00")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "13,000.00")).isTrue();
+            assertThat(sheetContains(workbook, "Product Performance", "772,000.00")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "Customized Loan Product")).isFalse();
+        }
+    }
+
+    @Test
+    void memberActiveLoanDetailsUseFilteredTransactionInterestAndOutstandingInterest() {
+        UUID memberId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        LoanApplication loan = LoanApplication.builder()
+            .id(loanId)
+            .applicantMemberId(memberId)
+            .loanType(LoanType.LOAN_ADVANCE)
+            .loanId("LN-1001")
+            .amount(new BigDecimal("800000.00"))
+            .status(LoanStatus.FINAL_APPROVED)
+            .createdAt(OffsetDateTime.parse("2026-06-17T10:00:00Z"))
+            .financialSnapshot("""
+                {"interestAmount":28000.00}
+                """)
+            .loanPaymentSummaryJson("""
+                {"totalOutstanding":772000.00,"outstandingInterest":13000.00}
+                """)
+            .build();
+        LoanPaymentTransaction transaction = LoanPaymentTransaction.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .saccoId("IAA")
+            .externalLoanId("1001")
+            .receiptDate(LocalDate.of(2026, 6, 17))
+            .principalPaid(new BigDecimal("28000.00"))
+            .interestPaid(new BigDecimal("15000.00"))
+            .totalPaid(new BigDecimal("43000.00"))
+            .fetchedAt(OffsetDateTime.parse("2026-06-17T10:05:00Z"))
+            .build();
+
+        when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
+            .thenReturn(List.of(loan));
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of(transaction));
+
+        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
+            memberId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.getFirst().loanId()).isEqualTo("LN-1001");
+        assertThat(rows.getFirst().loanProduct()).isEqualTo("Loan Advance (Mkopo wa Chapchap)");
+        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("28,000.00");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("28,000.00");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("15,000.00");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("13,000.00");
+    }
+
+    @Test
+    void memberAnalyticsPdfUsesTwoPageFormalTemplate() throws Exception {
+        byte[] pdf = loanReportService.buildMemberAnalyticsPdf(exportReport(LoanReportService.ReportKind.MEMBER));
+
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(document.getNumberOfPages()).isEqualTo(2);
+        }
+    }
+
+    private LoanReportService.AnalyticsExportReport exportReport(LoanReportService.ReportKind kind) {
+        LoanAnalyticsService.MemberLoanAnalytics analytics = new LoanAnalyticsService.MemberLoanAnalytics(
+            0, 4, 0, 0, 5, 4, 0, new BigDecimal("772000.00"));
+        Map<String, LoanAnalyticsService.MetricDelta> deltas = new LinkedHashMap<>();
+        for (String key : List.of("applied", "active", "disbursed", "paid", "defaulted", "forfeited", "rejected")) {
+            deltas.put(key, new LoanAnalyticsService.MetricDelta(key, key.equals("applied") ? new BigDecimal("100.00") : BigDecimal.ZERO, false));
+        }
+        Member member = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("David Wankyo")
+            .memberNo("1145")
+            .stationId("AR704")
+            .build();
+        return new LoanReportService.AnalyticsExportReport(
+            kind,
+            "IAA SACCOS LTD",
+            kind == LoanReportService.ReportKind.MEMBER ? "MEMBER LOAN REPORT" : "STATION LOAN STATUS REPORT",
+            "AR704",
+            "Arusha Central Branch",
+            LocalDate.of(2025, 6, 17),
+            LocalDate.of(2026, 6, 17),
+            LocalDate.of(2026, 6, 17),
+            "Alex Jumapili",
+            kind == LoanReportService.ReportKind.MEMBER ? "Member" : "Manager",
+            "All Products",
+            kind == LoanReportService.ReportKind.MEMBER ? member : null,
+            analytics,
+            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
+            deltas,
+            new LoanAnalyticsService.StaffPortfolioSummary(5, 4, 0, 4, 0, BigDecimal.ZERO, "Low"),
+            List.of(new LoanReportService.ProductPerformanceRow("Loan Advance", 5, 5, 4, 0, 0, 0, new BigDecimal("15000.00"))),
+            List.of(new LoanReportService.ProductFinancialBreakdownRow("Loan Advance", new BigDecimal("15000.00"), new BigDecimal("13000.00"), new BigDecimal("28000.00"), new BigDecimal("772000.00"))),
+            List.of(new LoanAnalyticsService.MetricTrendSeries("Applied", "#000000", List.of(
+                Map.of("x", 1748736000000L, "y", 0L),
+                Map.of("x", 1780272000000L, "y", 5L)
+            ))),
+            List.of(new LoanReportService.ActivityRow("17 Jun 2026", "Application Submitted", "Loan Advance", "772,000.00", "Applied")),
+            List.of(new LoanReportService.ActiveLoanDetailRow("LN-1001", "Loan Advance", "800,000.00", "772,000.00", "28,000.00", "28,000.00", "15,000.00", "13,000.00")),
+            new LoanReportService.FinancialSummary(new BigDecimal("772000.00"), new BigDecimal("772000.00"), BigDecimal.ZERO, new BigDecimal("772000.00"), BigDecimal.ZERO),
+            List.of("Total loan applications increased by 100%.", "No defaults recorded during the reporting period."),
+            "This report summarizes the loan performance and status within the selected period."
+        );
+    }
+
+    private boolean sheetContains(XSSFWorkbook workbook, String sheetName, String expected) {
+        var sheet = workbook.getSheet(sheetName);
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                if (cell.getCellType() == org.apache.poi.ss.usermodel.CellType.STRING
+                    && expected.equals(cell.getStringCellValue())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

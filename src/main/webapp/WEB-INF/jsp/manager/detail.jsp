@@ -16,7 +16,7 @@
             <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
         </c:if>
     </div>
-    <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
+    <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
 </div>
 <c:if test="${app.status eq 'AWAITING_BOARD'}">
     <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -75,7 +75,7 @@
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
-                    <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
+                    <div class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></div>
                 </div>
                 <div class="loan-view-summary-card px-4 py-4">
                     <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
@@ -133,36 +133,36 @@
                 <div class="applicant-info-value">${applicant.memberNo}</div>
             </div>
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Email</div>
+                <div class="applicant-info-label"><spring:message code="register.member.email" text="Email" /></div>
                 <div class="applicant-info-value">
                     <c:choose>
                         <c:when test="${not empty applicant.email}">${applicant.email}</c:when>
-                        <c:otherwise>Not provided</c:otherwise>
+                        <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
                     </c:choose>
                 </div>
             </div>
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Phone</div>
+                <div class="applicant-info-label"><spring:message code="register.member.phone" text="Phone" /></div>
                 <div class="applicant-info-value">
                     <c:choose>
                         <c:when test="${not empty applicant.phone}">${applicant.phone}</c:when>
-                        <c:otherwise>Not provided</c:otherwise>
+                        <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
                     </c:choose>
                 </div>
             </div>
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Station ID</div>
+                <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Station" /></div>
                 <div class="applicant-info-value">
                     <c:choose>
                         <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
-                        <c:otherwise>Not available</c:otherwise>
+                        <c:otherwise><spring:message code="common.notAvailable" text="Not available" /></c:otherwise>
                     </c:choose>
                 </div>
             </div>
             <div class="applicant-info-card">
-                <div class="applicant-info-label">Quick Context</div>
+                <div class="applicant-info-label"><spring:message code="review.quickContext" text="Quick Context" /></div>
                 <div class="applicant-info-value">
-                    ${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)
+                    <spring:message code="review.quickContextCounts" arguments="${fn:length(attachments)},${fn:length(guarantorRequests)}" text="${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)" />
                 </div>
             </div>
         </div>
@@ -179,10 +179,10 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                ${activeApplicantLoanCount} active loan<c:if test="${activeApplicantLoanCount ne 1}">s</c:if>
+                <spring:message code="review.activeLoanCount" arguments="${activeApplicantLoanCount}" text="${activeApplicantLoanCount} active loan(s)" />
             </span>
             <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">
-                Total exposure ${activeApplicantLoanTotalAmount}
+                <spring:message code="review.totalExposure" arguments="${activeApplicantLoanTotalAmount}" text="Total exposure ${activeApplicantLoanTotalAmount}" />
             </span>
         </div>
     </div>
@@ -262,7 +262,7 @@
             </tr>
         </c:forEach>
         <c:if test="${empty financialFields}">
-            <tr><td colspan="2" class="px-3 py-3 text-slate-500">No official financial details loaded yet.</td></tr>
+            <tr><td colspan="2" class="px-3 py-3 text-slate-500"><spring:message code="loan.view.noFinancialDetails" text="Financial details have not been loaded for this application yet." /></td></tr>
         </c:if>
         </tbody>
     </table>
@@ -270,13 +270,13 @@
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap mt-5 overflow-x-auto">
-        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
+        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
             <tr>
-                <th class="px-3 py-2 text-left">File</th>
-                <th class="px-3 py-2 text-left">Size</th>
-                <th class="px-3 py-2 text-left">Uploaded</th>
+                <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
+                <th class="px-3 py-2 text-left"><spring:message code="common.size" text="Size" /></th>
+                <th class="px-3 py-2 text-left"><spring:message code="common.uploaded" text="Uploaded" /></th>
                 <th class="px-3 py-2 text-left"></th>
             </tr>
             </thead>
@@ -288,14 +288,14 @@
                     <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
                     <td class="px-3 py-2">
                         <div class="flex flex-wrap gap-2">
-                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral">View</a>
-                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary">Download</a>
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral"><spring:message code="common.view" text="View" /></a>
+                            <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary"><spring:message code="common.download" text="Download" /></a>
                         </div>
                     </td>
                 </tr>
             </c:forEach>
             <c:if test="${empty disbursementProofAttachments}">
-                <tr><td colspan="4" class="px-3 py-3 text-slate-500">No disbursement proof uploaded yet.</td></tr>
+                <tr><td colspan="4" class="px-3 py-3 text-slate-500"><spring:message code="loan.disbursementProof.empty" text="No disbursement proof uploaded yet." /></td></tr>
             </c:if>
             </tbody>
         </table>
@@ -303,13 +303,13 @@
 </c:if>
 
 <div class="erp-table-wrap mt-5 overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
+    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
-            <th class="px-3 py-2 text-left">File</th>
-            <th class="px-3 py-2 text-left">Size</th>
-            <th class="px-3 py-2 text-left">Uploaded</th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.size" text="Size" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.uploaded" text="Uploaded" /></th>
             <th class="px-3 py-2 text-left"></th>
         </tr>
         </thead>
@@ -401,30 +401,30 @@
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                    <p class="mt-2 text-sm text-slate-600">Request a one-time code before submitting your manager decision.</p>
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
+                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your manager decision." /></p>
                 </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
                         data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp"
                         data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-decision-otp">
                     <span class="otp-button-spinner hidden"></span>
-                    <span class="otp-button-label">Send OTP Code</span>
+                    <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                 </button>
             </div>
             <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
             <div class="mt-3">
-                <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                 <input type="text"
                        name="managerDecisionOtpCode"
                        inputmode="numeric"
                        maxlength="6"
                        autocomplete="one-time-code"
-                       data-otp-hidden="true" data-otp-label="Decision OTP code"
+                       data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.decisionCode' text='Decision OTP code' />"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
-                <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before approving or rejecting.</p>
+                <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.decisionCodeHelp" text="Enter the 6-digit code sent to your email before approving or rejecting." /></p>
                 <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                     <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                     <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -589,41 +589,41 @@
         </div>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
-            <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="Optional disbursement or repayment instructions">${app.disbursementNotes}</textarea>
+            <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${app.disbursementNotes}</textarea>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">OTP Verification</div>
-                    <p class="mt-2 text-sm text-slate-600">Request a one-time code before disbursing this loan.</p>
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
+                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.disbursement.otpHelp" text="Request a one-time code before disbursing this loan." /></p>
                 </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
                         data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-disbursement-otp"
                         data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-disbursement-otp">
                     <span class="otp-button-spinner hidden"></span>
-                    <span class="otp-button-label">Send OTP Code</span>
+                    <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                 </button>
             </div>
             <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
             <div class="mt-3">
-                <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                 <input type="text"
                        name="disbursementOtpCode"
                        inputmode="numeric"
                        maxlength="6"
                        autocomplete="one-time-code"
-                       data-otp-hidden="true" data-otp-label="Disbursement OTP code"
+                       data-otp-hidden="true" data-otp-label="<spring:message code='loan.disbursement.otpCode' text='Disbursement OTP code' />"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
-                <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before completing disbursement.</p>
+                <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.disbursement.codeHelp" text="Enter the 6-digit code sent to your email before completing disbursement." /></p>
                 <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                     <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                     <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
-                    <span data-otp-text>Enter the code to verify it.</span>
+                    <span data-otp-text><spring:message code="loan.otp.enterCodeToVerify" text="Enter the code to verify it." /></span>
                 </div>
             </div>
         </div>
@@ -636,8 +636,8 @@
           method="post"
           class="erp-form-wrap mt-5"
           data-confirm-title='<spring:message code="review.reverseManagerAction" text="Reverse Manager Action" />'
-          data-confirm-message="Return this rejected application to the manager queue for another review?"
-          data-confirm-proceed="Return to Queue">
+          data-confirm-message="<spring:message code='review.confirm.returnToQueueMessage' text='Return this rejected application to the manager queue for another review?' />"
+          data-confirm-proceed="<spring:message code='review.confirm.returnToQueue' text='Return to Queue' />">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <button type="submit"
                 class="app-btn btn-neutral ${managerUndoWindowOpen ? '' : 'action-button-disabled'}"
@@ -650,6 +650,33 @@
 <script>
     (() => {
         const csrfToken = "${_csrf.token}";
+        const otpMessages = {
+            send: "<spring:message code='loan.otp.sendCode' text='Send OTP Code' javaScriptEscape='true' />",
+            sending: "<spring:message code='loan.otp.sending' text='Sending...' javaScriptEscape='true' />",
+            sent: "<spring:message code='loan.otp.sent' text='OTP Sent' javaScriptEscape='true' />",
+            checking: "<spring:message code='loan.otp.checking' text='Checking code...' javaScriptEscape='true' />",
+            verified: "<spring:message code='loan.otp.codeVerified' text='OTP code verified.' javaScriptEscape='true' />",
+            invalid: "<spring:message code='loan.otp.invalid' text='The OTP code is invalid.' javaScriptEscape='true' />",
+            enterDigits: "<spring:message code='loan.otp.enterAllDigits' text='Enter all 6 digits to verify the code.' javaScriptEscape='true' />",
+            verifyBeforeContinue: "<spring:message code='loan.otp.verifyBeforeContinue' text='Verify the OTP code before continuing.' javaScriptEscape='true' />",
+            requestAndVerify: "<spring:message code='loan.otp.requestAndVerifyBeforeContinue' text='Request and verify an OTP code before continuing.' javaScriptEscape='true' />",
+            enterCode: "<spring:message code='loan.otp.enterSixDigitCode' text='Enter the 6-digit code to verify it.' javaScriptEscape='true' />",
+            requestNotConfigured: "<spring:message code='loan.otp.requestNotConfigured' text='OTP request is not configured.' javaScriptEscape='true' />",
+            unableToSend: "<spring:message code='loan.otp.unableToSend' text='Unable to send the OTP code right now.' javaScriptEscape='true' />",
+            missingPermission: "<spring:message code='loan.otp.missingPermission' text='Your account is missing permission to request this OTP. Ask the admin to enable the Disburse Loan claim, then sign in again.' javaScriptEscape='true' />",
+            sessionExpired: "<spring:message code='loan.otp.sessionExpired' text='Your session has expired. Sign in again before requesting the OTP code.' javaScriptEscape='true' />",
+            sentToEmail: "<spring:message code='loan.otp.sentToEmail' text='We sent an OTP code to your email.' javaScriptEscape='true' />"
+        };
+        const confirmMessages = {
+            approvalEyebrow: "<spring:message code='review.confirm.approvalEyebrow' text='Confirm Approval' javaScriptEscape='true' />",
+            approvalTitle: "<spring:message code='review.confirm.managerApprovalTitle' text='Approve Loan Review' javaScriptEscape='true' />",
+            approvalMessage: "<spring:message code='review.confirm.managerApprovalMessage' text='Approve this loan application review? Your decision will be recorded and the application will move to the next configured workflow step.' javaScriptEscape='true' />",
+            approvalProceed: "<spring:message code='review.approveReview' text='Approve Review' javaScriptEscape='true' />",
+            rejectionEyebrow: "<spring:message code='review.confirm.rejectionEyebrow' text='Confirm Rejection' javaScriptEscape='true' />",
+            rejectionTitle: "<spring:message code='review.confirm.managerRejectionTitle' text='Reject Loan Review' javaScriptEscape='true' />",
+            rejectionMessage: "<spring:message code='review.confirm.managerRejectionMessage' text='Reject this loan application? The applicant will see the rejection and the application will leave this review queue.' javaScriptEscape='true' />",
+            rejectionProceed: "<spring:message code='review.rejectReview' text='Reject Review' javaScriptEscape='true' />"
+        };
 
         function setOtpButtonState(button, state) {
             const spinner = button.querySelector(".otp-button-spinner");
@@ -659,7 +686,7 @@
             button.disabled = loading;
             spinner?.classList.toggle("hidden", !loading);
             if (label) {
-                label.textContent = loading ? "Sending..." : (sent ? "OTP Sent" : "Send OTP Code");
+                label.textContent = loading ? otpMessages.sending : (sent ? otpMessages.sent : otpMessages.send);
             }
         }
 
@@ -847,7 +874,7 @@
             }
 
             async function verifyCode(code, runId) {
-                setStatus("checking", "Checking code...");
+                setStatus("checking", otpMessages.checking);
                 try {
                     const body = new URLSearchParams();
                     body.set("otpCode", code);
@@ -881,15 +908,15 @@
                     verified = true;
                     input.setCustomValidity("");
                     setProceedEnabled(true);
-                    setStatus("valid", payload.message || "OTP code verified.");
+                    setStatus("valid", payload.message || otpMessages.verified);
                 } catch (error) {
                     if (runId !== verifyRun) {
                         return;
                     }
                     verified = false;
                     setProceedEnabled(false);
-                    input.setCustomValidity(error.message || "The OTP code is not valid.");
-                    setStatus("invalid", error.message || "The OTP code is not valid.");
+                    input.setCustomValidity(error.message || otpMessages.invalid);
+                    setStatus("invalid", error.message || otpMessages.invalid);
                 }
             }
 
@@ -909,7 +936,7 @@
                     return;
                 }
                 if (code.length < 6) {
-                    setStatus("idle", "Enter all 6 digits to verify the code.");
+                    setStatus("idle", otpMessages.enterDigits);
                     return;
                 }
                 const runId = verifyRun;
@@ -919,7 +946,7 @@
             input.form?.addEventListener("submit", (event) => {
                 if (!verified) {
                     event.preventDefault();
-                    input.setCustomValidity(requested ? "Verify the OTP code before continuing." : "Request and verify an OTP code before continuing.");
+                    input.setCustomValidity(requested ? otpMessages.verifyBeforeContinue : otpMessages.requestAndVerify);
                     input.reportValidity();
                 }
             });
@@ -932,7 +959,7 @@
                     verified = false;
                     setProceedEnabled(false);
                     input.setCustomValidity("");
-                    setStatus("idle", "Enter the 6-digit code to verify it.");
+                    setStatus("idle", otpMessages.enterCode);
                     window.SaccosOtp?.focusBoxes(input);
                 },
                 reset: resetStatus,
@@ -962,7 +989,7 @@
                 const otpUi = otpBindingFor(button);
                 const requestUrl = button.dataset.requestUrl;
                 if (!requestUrl) {
-                    showOtpFeedback(feedback, "error", "OTP request is not configured.");
+                    showOtpFeedback(feedback, "error", otpMessages.requestNotConfigured);
                     return;
                 }
                 otpUi.reset();
@@ -979,24 +1006,24 @@
                     const contentType = response.headers.get("content-type") || "";
                     if (!contentType.includes("application/json")) {
                         if (response.status === 403) {
-                            throw new Error("Your account is missing permission to request this OTP. Ask the admin to enable the Disburse Loan claim, then sign in again.");
+                            throw new Error(otpMessages.missingPermission);
                         }
                         if (response.status === 401 || response.redirected) {
-                            throw new Error("Your session has expired. Sign in again before requesting the OTP code.");
+                            throw new Error(otpMessages.sessionExpired);
                         }
-                        throw new Error("Unable to send the OTP code right now.");
+                        throw new Error(otpMessages.unableToSend);
                     }
                     const payload = await response.json();
                     if (!response.ok || !payload.valid) {
-                        throw new Error(payload.message || "Unable to send the OTP code right now.");
+                        throw new Error(payload.message || otpMessages.unableToSend);
                     }
                     setOtpButtonState(button, "sent");
-                    window.SaccosOtp?.startCooldown(button, payload, { idle: "Send OTP Code" });
-                    showOtpFeedback(feedback, "success", payload.message || "We sent an OTP code to your email.");
+                    window.SaccosOtp?.startCooldown(button, payload, { idle: otpMessages.send });
+                    showOtpFeedback(feedback, "success", payload.message || otpMessages.sentToEmail);
                     otpUi.markRequested();
                 } catch (error) {
                     setOtpButtonState(button, "idle");
-                    showOtpFeedback(feedback, "error", error.message || "Unable to send the OTP code right now.");
+                    showOtpFeedback(feedback, "error", error.message || otpMessages.unableToSend);
                 }
             });
         });
@@ -1017,17 +1044,17 @@
                         reasonsField.focus();
                         return;
                     }
-                    form.dataset.confirmEyebrow = "Confirm Rejection";
-                    form.dataset.confirmTitle = "Reject Loan Review";
-                    form.dataset.confirmMessage = "Reject this loan application? The applicant will see the rejection and the application will leave this review queue.";
-                    form.dataset.confirmProceed = "Reject Review";
+                    form.dataset.confirmEyebrow = confirmMessages.rejectionEyebrow;
+                    form.dataset.confirmTitle = confirmMessages.rejectionTitle;
+                    form.dataset.confirmMessage = confirmMessages.rejectionMessage;
+                    form.dataset.confirmProceed = confirmMessages.rejectionProceed;
                     return;
                 }
                 if (decision === "ACCEPT") {
-                    form.dataset.confirmEyebrow = "Confirm Approval";
-                    form.dataset.confirmTitle = "Approve Loan Review";
-                    form.dataset.confirmMessage = "Approve this loan application review? Your decision will be recorded and the application will move to the next configured workflow step.";
-                    form.dataset.confirmProceed = "Approve Review";
+                    form.dataset.confirmEyebrow = confirmMessages.approvalEyebrow;
+                    form.dataset.confirmTitle = confirmMessages.approvalTitle;
+                    form.dataset.confirmMessage = confirmMessages.approvalMessage;
+                    form.dataset.confirmProceed = confirmMessages.approvalProceed;
                 }
             });
         });

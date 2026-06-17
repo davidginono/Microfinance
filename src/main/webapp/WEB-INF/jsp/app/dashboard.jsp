@@ -758,13 +758,13 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
         <section class="erp-panel min-w-0">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Current Loan Application</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
             </div>
             <div class="erp-panel-body min-w-0">
                 <div class="erp-toolbar">
                     <div>
-                        <p class="erp-widget-title">Workflow Progress</p>
-                        <h2 class="erp-widget-heading">Track The Status Of Your Current Loan</h2>
+                        <p class="erp-widget-title"><spring:message code="dashboard.workflowProgress" text="Workflow Progress" /></p>
+                        <h2 class="erp-widget-heading"><spring:message code="dashboard.trackCurrentLoan" text="Track The Status Of Your Current Loan" /></h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
                         ${currentApplicationCount} current record(s)
@@ -776,7 +776,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <div class="mt-4 min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-4 sm:p-5">
                             <div class="member-dashboard-flow-summary-grid">
                                 <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Loan Application ID</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="loan.applicationId" text="Loan Application ID" /></p>
                                     <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowApplicationNumber}</p>
                                 </div>
                                 <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
@@ -790,11 +790,11 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     </div>
                                 </c:if>
                                 <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Amount</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="common.amount" text="Amount" /></p>
                                     <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowAmountLabel}</p>
                                 </div>
                                 <div class="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Current Status</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400"><spring:message code="review.currentStatus" text="Current Status" /></p>
                                     <p class="mt-2 text-sm font-semibold text-sacco-ink">${currentWorkflowStatusLabel}</p>
                                 </div>
                             </div>
@@ -805,11 +805,11 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                             </c:if>
                             <c:if test="${not empty currentWorkflowApplication and currentWorkflowApplication.status eq 'FINAL_APPROVED' and empty currentWorkflowApplication.applicantDisbursementAcknowledgedAt}">
                                 <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                                    <span>This loan is Final Approved and Disbursed.</span>
+                                    <span><spring:message code="loan.disbursement.readyAck" text="This loan is Final Approved and Disbursed." /></span>
                                     <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${currentWorkflowApplication.id}/acknowledge-disbursement" class="m-0">
                                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                         <input type="hidden" name="returnTo" value="dashboard" />
-                                        <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+                                        <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
                                     </form>
                                 </div>
                             </c:if>
@@ -1019,7 +1019,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
         <section class="erp-panel min-w-0 xl:self-start">
             <div class="erp-panel-header">
-                <p class="erp-panel-title">Active Loans</p>
+                <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
             </div>
             <div class="erp-panel-body min-w-0">
                 <div class="erp-toolbar gap-3">
@@ -1063,7 +1063,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                 </div>
                                                 <div class="flex flex-wrap items-center justify-end gap-2">
                                                     <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${loanRow.repaymentStateClasses}">
-                                                        <c:if test="${loanRow.repaymentStateLabel eq 'Paid'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
+                                                        <c:if test="${loanRow.repaymentStateCode eq 'PAID'}">&#10003;&nbsp;</c:if>${loanRow.repaymentStateLabel}
                                                     </span>
                                                     <a href="${pageContext.request.contextPath}/app/loan-applications/${loanRow.fullId}#repayment-plan"
                                                        class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">

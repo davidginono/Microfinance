@@ -81,6 +81,14 @@ public class LoanAnalyticsService {
         return summarize(staffLoans(principal, fromDate, toDate, loanType, loanStatus));
     }
 
+    public List<LoanApplication> loansForStaffAnalytics(AppUserPrincipal principal,
+                                                        LocalDate fromDate,
+                                                        LocalDate toDate,
+                                                        LoanType loanType,
+                                                        LoanStatus loanStatus) {
+        return staffLoans(principal, fromDate, toDate, loanType, loanStatus);
+    }
+
     public MemberLoanAnalytics forStation(String saccoId,
                                           String stationId,
                                           LocalDate fromDate,
@@ -166,7 +174,17 @@ public class LoanAnalyticsService {
                                                                     LocalDate fromDate,
                                                                     LocalDate toDate,
                                                                     LoanStatus loanStatus) {
-        return productPerformance(saccoId, memberLoans(memberId, fromDate, toDate, null, loanStatus).stream()
+        return productPerformanceForMember(saccoId, stationId, memberId, fromDate, toDate, null, loanStatus);
+    }
+
+    public List<LoanProductPerformance> productPerformanceForMember(String saccoId,
+                                                                    String stationId,
+                                                                    UUID memberId,
+                                                                    LocalDate fromDate,
+                                                                    LocalDate toDate,
+                                                                    LoanType loanType,
+                                                                    LoanStatus loanStatus) {
+        return productPerformance(saccoId, memberLoans(memberId, fromDate, toDate, loanType, loanStatus).stream()
             .filter(app -> matchesScope(app, saccoId, stationId))
             .toList());
     }
@@ -175,8 +193,16 @@ public class LoanAnalyticsService {
                                                                    LocalDate fromDate,
                                                                    LocalDate toDate,
                                                                    LoanStatus loanStatus) {
+        return productPerformanceForStaff(principal, fromDate, toDate, null, loanStatus);
+    }
+
+    public List<LoanProductPerformance> productPerformanceForStaff(AppUserPrincipal principal,
+                                                                   LocalDate fromDate,
+                                                                   LocalDate toDate,
+                                                                   LoanType loanType,
+                                                                   LoanStatus loanStatus) {
         return productPerformance(principal == null ? null : principal.getSaccoId(),
-            staffLoans(principal, fromDate, toDate, null, loanStatus));
+            staffLoans(principal, fromDate, toDate, loanType, loanStatus));
     }
 
     public List<LoanProductPerformance> productPerformanceForStation(String saccoId,
@@ -184,7 +210,16 @@ public class LoanAnalyticsService {
                                                                      LocalDate fromDate,
                                                                      LocalDate toDate,
                                                                      LoanStatus loanStatus) {
-        return productPerformance(saccoId, stationLoans(saccoId, stationId, fromDate, toDate, null, loanStatus));
+        return productPerformanceForStation(saccoId, stationId, fromDate, toDate, null, loanStatus);
+    }
+
+    public List<LoanProductPerformance> productPerformanceForStation(String saccoId,
+                                                                     String stationId,
+                                                                     LocalDate fromDate,
+                                                                     LocalDate toDate,
+                                                                     LoanType loanType,
+                                                                     LoanStatus loanStatus) {
+        return productPerformance(saccoId, stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus));
     }
 
     public List<MetricDelta> metricDeltas(MemberLoanAnalytics current, MemberLoanAnalytics previous) {
@@ -441,6 +476,7 @@ public class LoanAnalyticsService {
                 .toList();
         }
         return productRefs.stream()
+            .filter(product -> product.loanType() != LoanType.CUSTOMIZED_LOAN)
             .map(product -> {
                 List<LoanApplication> typedLoans = loans.stream()
                     .filter(app -> app.getLoanType() == product.loanType())

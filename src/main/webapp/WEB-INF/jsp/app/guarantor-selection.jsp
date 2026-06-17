@@ -1,12 +1,13 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / Guarantor Selection</p>
+    <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Member Workspace / Guarantor Selection" /></p>
     <h1 class="erp-page-title"><spring:message code="guarantor.select" /> (${app.requiredGuarantors})</h1>
-    <p class="erp-page-subtitle">Search privately and store the exact guarantor selection required for this application.</p>
+    <p class="erp-page-subtitle"><spring:message code="guarantor.selection.subtitle" text="Search privately and store the exact guarantor selection required for this application." /></p>
 </div>
 <form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap space-y-4">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -14,20 +15,20 @@
     <div class="erp-section-muted">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <p class="erp-panel-title">Private Guarantor Search</p>
-                <p class="text-sm text-slate-500">Type to search. Only a small suggestion list is shown.</p>
+                <p class="erp-panel-title"><spring:message code="guarantor.selection.privateSearch" text="Private Guarantor Search" /></p>
+                <p class="text-sm text-slate-500"><spring:message code="guarantor.selection.searchHelp" text="Type to search. Only a small suggestion list is shown." /></p>
             </div>
             <span id="guarantorSelectedCount" class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">
-                0 selected / ${app.requiredGuarantors}
+                0 <spring:message code="newloan.js.selectedSuffix" text="selected" /> / ${app.requiredGuarantors}
             </span>
         </div>
 
         <div class="relative">
-            <input id="guarantorSearch" type="text" autocomplete="off" placeholder="Search by member number or name"
+            <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='guarantor.selection.searchPlaceholder' text='Search by member number or name' />"
                    class="w-full border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none" />
             <div id="guarantorDropdown" class="absolute left-0 right-0 z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
         </div>
-        <p id="guarantorHint" class="mt-2 text-sm text-slate-500">Type at least 2 characters to search.</p>
+        <p id="guarantorHint" class="mt-2 text-sm text-slate-500"><spring:message code="guarantor.selection.typeTwo" text="Type at least 2 characters to search." /></p>
 
         <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
             <c:forEach items="${selectedGuarantorItems}" var="item">
@@ -44,7 +45,7 @@
         <div id="selectedGuarantorInputs"></div>
     </div>
 
-    <button type="submit" class="app-btn btn-primary">Save Guarantors</button>
+    <button type="submit" class="app-btn btn-primary"><spring:message code="guarantor.selection.save" text="Save Guarantors" /></button>
 </form>
 
 <script>
@@ -57,10 +58,16 @@
         const selectedContainer = document.getElementById("selectedGuarantors");
         const hiddenInputs = document.getElementById("selectedGuarantorInputs");
         const selected = new Map();
+        const msgSelectedSuffix = "<spring:message code='newloan.js.selectedSuffix' text='selected' />";
+        const msgTypeTwo = "<spring:message code='guarantor.selection.typeTwo' text='Type at least 2 characters to search.' />";
+        const msgNoMatches = "<spring:message code='newloan.js.noMatches' text='No matching members found.' />";
+        const msgOnlySelectGuarantors = "<spring:message code='newloan.js.onlySelectGuarantors' text='You can only select {0} guarantors.' />";
+        const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' text='Guarantor selected.' />";
+        const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' text='matching member(s) found.' />";
         let debounceHandle;
 
         function updateCounter() {
-            counter.textContent = selected.size + " selected / " + required;
+            counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
         }
 
         function renderHiddenInputs() {
@@ -110,7 +117,7 @@
             if (!items.length) {
                 const empty = document.createElement("div");
                 empty.className = "px-4 py-3 text-sm text-slate-500";
-                empty.textContent = "No matching members found.";
+                empty.textContent = msgNoMatches;
                 dropdown.appendChild(empty);
             } else {
                 items.forEach(function (item) {
@@ -120,14 +127,14 @@
                     row.textContent = item.memberNo + " - " + item.fullName;
                     row.addEventListener("click", function () {
                         if (selected.size >= required) {
-                            hint.textContent = "You can only select " + required + " guarantors.";
+                            hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
                             hideDropdown();
                             return;
                         }
                         selected.set(item.id, item);
                         renderSelected();
                         searchInput.value = "";
-                        hint.textContent = "Guarantor selected.";
+                        hint.textContent = msgGuarantorSelected;
                         hideDropdown();
                     });
                     dropdown.appendChild(row);
@@ -140,7 +147,7 @@
             clearTimeout(debounceHandle);
             const term = this.value.trim();
             if (term.length < 2) {
-                hint.textContent = "Type at least 2 characters to search.";
+                hint.textContent = msgTypeTwo;
                 hideDropdown();
                 return;
             }
@@ -152,7 +159,7 @@
                 });
                 const data = response.ok ? await response.json() : [];
                 const filtered = data.filter(function (item) { return !selected.has(item.id); });
-                hint.textContent = filtered.length + " matching member(s) found.";
+                hint.textContent = filtered.length + " " + msgMatchingMembers;
                 showResults(filtered);
             }, 250);
         });

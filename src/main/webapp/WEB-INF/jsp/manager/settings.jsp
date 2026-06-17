@@ -18,8 +18,8 @@
     <input type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2" name="boardQuorum" value="${settings.boardQuorum}" />
     <label class="block text-sm font-medium text-slate-700"><spring:message code="settings.defaultLanguage" text="Default Language" /></label>
     <select name="defaultLanguage" class="w-full rounded-lg border border-slate-300 px-3 py-2">
-        <option value="en" ${settings.defaultLanguage == 'en' ? 'selected' : ''}>English</option>
-        <option value="sw" ${settings.defaultLanguage == 'sw' ? 'selected' : ''}>Kiswahili</option>
+        <option value="en" ${settings.defaultLanguage == 'en' ? 'selected' : ''}><spring:message code="language.english" text="English" /></option>
+        <option value="sw" ${settings.defaultLanguage == 'sw' ? 'selected' : ''}><spring:message code="language.swahili" text="Kiswahili" /></option>
     </select>
     <button class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
 </form>

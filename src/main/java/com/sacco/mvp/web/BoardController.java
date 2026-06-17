@@ -21,6 +21,8 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -58,6 +60,7 @@ public class BoardController {
     private final ManagerService managerService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
+    private final MessageSource messageSource;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -472,16 +475,20 @@ public class BoardController {
 
     private void applyBoardUi(Model model) {
         model.addAttribute("reviewBasePath", "/board");
-        model.addAttribute("reviewRoleLabel", "Board");
-        model.addAttribute("reviewRoleLabelLower", "board");
-        model.addAttribute("reviewPanelBreadcrumb", "Board Panel / Review Detail");
-        model.addAttribute("reviewPanelTitle", "Board Review Detail");
-        model.addAttribute("reviewPanelSubtitle", "Review the loan package and record the board decision.");
-        model.addAttribute("reviewDecisionLabel", "Board Decision");
-        model.addAttribute("reviewAssessorTitle", "Committee Assessors");
-        model.addAttribute("reviewAssessorDescription", "All board members assigned to this application and the decisions recorded so far.");
+        model.addAttribute("reviewRoleLabel", message("review.board.role"));
+        model.addAttribute("reviewRoleLabelLower", message("review.board.roleLower"));
+        model.addAttribute("reviewPanelBreadcrumb", message("review.board.breadcrumb"));
+        model.addAttribute("reviewPanelTitle", message("review.board.title"));
+        model.addAttribute("reviewPanelSubtitle", message("review.board.subtitle"));
+        model.addAttribute("reviewDecisionLabel", message("review.board.decision"));
+        model.addAttribute("reviewAssessorTitle", message("review.board.assessors"));
+        model.addAttribute("reviewAssessorDescription", message("review.board.assessorsHelp"));
         model.addAttribute("reviewApprovalOtpEnabled", true);
         model.addAttribute("reviewAwaitingStatus", "AWAITING_BOARD");
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {

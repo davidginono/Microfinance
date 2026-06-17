@@ -1,3 +1,4 @@
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="./modal-shell.jspf" %>
 <style>
     .loan-export-option {
@@ -22,10 +23,10 @@
     <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="loanExportModalTitle">
         <div class="app-modal-header">
             <div>
-                <p class="erp-widget-title">Export Loan Application</p>
-                <h2 id="loanExportModalTitle" class="erp-panel-title">Choose document type</h2>
+                <p class="erp-widget-title"><spring:message code="loan.export.title" text="Export Loan Application" /></p>
+                <h2 id="loanExportModalTitle" class="erp-panel-title"><spring:message code="loan.export.chooseType" text="Choose document type" /></h2>
             </div>
-            <button type="button" class="app-modal-close" data-loan-export-close aria-label="Close export options">
+            <button type="button" class="app-modal-close" data-loan-export-close aria-label="<spring:message code='loan.export.close' text='Close export options' />">
                 <svg viewBox="0 0 20 20" aria-hidden="true">
                     <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                 </svg>
@@ -33,15 +34,15 @@
         </div>
         <div class="app-modal-body space-y-3">
             <a href="#" data-loan-export-signed class="loan-export-option app-modal-section block">
-                <span class="loan-export-option-title block font-semibold text-slate-900">System Signed</span>
-                <span class="mt-1 block text-sm text-slate-500">Includes signatures already recorded in the approval workflow.</span>
+                <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.systemSigned" text="System Signed" /></span>
+                <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.systemSignedHelp" text="Includes signatures already recorded in the approval workflow." /></span>
             </a>
             <a href="#" data-loan-export-unsigned class="loan-export-option app-modal-section block">
-                <span class="loan-export-option-title block font-semibold text-slate-900">Physically Signed (with empty signature slots)</span>
-                <span class="mt-1 block text-sm text-slate-500">Leaves staff signature spaces empty for signing on paper.</span>
+                <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.physicalSigned" text="Physically Signed (with empty signature slots)" /></span>
+                <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.physicalSignedHelp" text="Leaves staff signature spaces empty for signing on paper." /></span>
             </a>
             <div class="app-modal-actions">
-                <button type="button" class="app-btn btn-neutral" data-loan-export-close>Cancel</button>
+                <button type="button" class="app-btn btn-neutral" data-loan-export-close><spring:message code="common.cancel" text="Cancel" /></button>
             </div>
         </div>
     </div>

@@ -504,9 +504,9 @@
 <c:if test="${settingsSection eq 'otp'}">
     <section class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title">Authentication</p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Station OTP Delivery</h2>
-            <p class="mt-1 text-sm text-slate-500">Choose how this station sends authentication and workflow confirmation codes.</p>
+            <p class="erp-widget-title"><spring:message code="admin.settings.otp.eyebrow" text="Authentication" /></p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.otp.title" text="Station OTP Delivery" /></h2>
+            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.otp.subtitle" text="Choose how this station sends authentication and workflow confirmation codes." /></p>
         </div>
         <form action="/admin/settings-controls/otp-delivery" method="post" class="erp-panel-body">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -514,28 +514,28 @@
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">Email</span>
-                        <span class="mt-1 block text-xs text-slate-500">Always send OTP codes to the account email.</span>
+                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.email" text="Email" /></span>
+                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.emailHelp" text="Always send OTP codes to the account email." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">SMS only</span>
-                        <span class="mt-1 block text-xs text-slate-500">Use normal station SMS units. OTP requests stop when units are depleted.</span>
+                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsOnly" text="SMS only" /></span>
+                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsOnlyHelp" text="Use normal station SMS units. OTP requests stop when units are depleted." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">SMS with email fallback</span>
-                        <span class="mt-1 block text-xs text-slate-500">Try SMS first, then use email when SMS cannot be sent.</span>
+                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsFallback" text="SMS with email fallback" /></span>
+                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsFallbackHelp" text="Try SMS first, then use email when SMS cannot be sent." /></span>
                     </span>
                 </label>
             </div>
             <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
-                <p class="text-sm text-slate-500">The three reserved SMS alert units are never used for OTP codes.</p>
-                <button type="submit" class="app-btn btn-primary">Save OTP Delivery</button>
+                <p class="text-sm text-slate-500"><spring:message code="admin.settings.otp.reserveNotice" text="The three reserved SMS alert units are never used for OTP codes." /></p>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Delivery" /></button>
             </div>
         </form>
     </section>
@@ -545,9 +545,9 @@
     <div class="erp-panel mb-4">
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <p class="erp-widget-title">Approval Flow</p>
-                <h2 class="mt-1 text-xl font-bold text-sacco-ink">Tenant Approval Configuration</h2>
-                <p class="mt-1 text-sm text-slate-500">Product workflows decide the review path. Final release remains manual and claim-protected.</p>
+                <p class="erp-widget-title"><spring:message code="admin.settings.approvalFlow.eyebrow" text="Approval Flow" /></p>
+                <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.approvalFlow.title" text="Tenant Approval Configuration" /></h2>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.approvalFlow.subtitle" text="Product workflows decide the review path. Final release remains manual and claim-protected." /></p>
             </div>
         </div>
         <form action="/admin/settings-controls/review-rules" method="post" class="erp-panel-body grid gap-4">
@@ -557,15 +557,15 @@
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="loanOfficerReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.loanOfficerReviewRequired ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">Require Loan Officer Review</span>
-                        <span class="mt-1 block text-slate-500">Adds a single assigned Loan Officer stage between Manager and Board or Accountant.</span>
+                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.loanOfficerRequired" text="Require Loan Officer Review" /></span>
+                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Adds a single assigned Loan Officer stage between Manager and Board or Accountant." /></span>
                     </span>
                 </label>
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
                     <span>
-                        <span class="block font-semibold text-slate-900">Require Board Committee Review</span>
-                        <span class="mt-1 block text-slate-500">Adds the committee stage before Accountant review for SACCOs that need group approval.</span>
+                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.boardRequired" text="Require Board Committee Review" /></span>
+                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.boardHelp" text="Adds the committee stage before Accountant review for SACCOs that need group approval." /></span>
                     </span>
                 </label>
             </div>
@@ -585,7 +585,7 @@
                 </label>
 
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Resolved Flow</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.approvalFlow.resolved" text="Resolved Flow" /></p>
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <c:forEach items="${approvalFlowStageLabels}" var="stage" varStatus="status">
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-800 ring-1 ring-slate-200">${stage}</span>
@@ -594,7 +594,7 @@
                             </c:if>
                         </c:forEach>
                     </div>
-                    <p class="mt-3 text-xs text-slate-500">Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Board Committee to Accountant to Disbursement.</p>
+                    <p class="mt-3 text-xs text-slate-500"><spring:message code="admin.settings.approvalFlow.examples" text="Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Board Committee to Accountant to Disbursement." /></p>
                 </div>
             </div>
 
@@ -614,7 +614,7 @@
             </div>
 
             <div class="app-modal-actions !justify-start md:justify-end">
-                <button type="submit" class="app-btn btn-primary">Save</button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
             </div>
         </form>
     </div>
@@ -623,24 +623,24 @@
 <c:if test="${settingsSection eq 'guarantor'}">
     <section class="erp-panel overflow-hidden mb-4">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title">Qualification Policies</p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink">Applicant And Guarantor Controls</h2>
+            <p class="erp-widget-title"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
+            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.qualification.title" text="Applicant And Guarantor Controls" /></h2>
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="erp-panel-body grid gap-5">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div class="settings-action-bar settings-action-bar--split">
-                <p class="settings-action-note max-w-3xl text-sm text-slate-500">These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product.</p>
-                <button type="submit" class="settings-action-button app-btn btn-primary">Save configuration</button>
+                <p class="settings-action-note max-w-3xl text-sm text-slate-500"><spring:message code="admin.settings.qualification.subtitle" text="These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
+                <button type="submit" class="settings-action-button app-btn btn-primary"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
             </div>
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title">Loan Applicants</p>
+                    <p class="erp-widget-title"><spring:message code="admin.settings.loanApplicants" text="Loan Applicants" /></p>
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
                         <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span>
-                                <span class="block font-semibold text-slate-900">Block applicants with defaulted loans</span>
-                                <span class="mt-1 block text-xs text-slate-500">If checked, one defaulted loan blocks new applications.</span>
+                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
+                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
                             </span>
                         </label>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -652,13 +652,13 @@
                     </div>
                 </div>
                 <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title">Guarantors</p>
+                    <p class="erp-widget-title"><spring:message code="loan.guarantors" text="Guarantors" /></p>
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
                         <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
                             <span>
-                                <span class="block font-semibold text-slate-900">Allow guarantors with active loans</span>
-                                <span class="mt-1 block text-xs text-slate-500">If unchecked, members with active loans cannot guarantee.</span>
+                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
+                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, members with active loans cannot guarantee." /></span>
                             </span>
                         </label>
                         <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
@@ -669,8 +669,8 @@
                         <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span>
-                                <span class="block font-semibold text-slate-900">Block guarantors with defaulted loans</span>
-                                <span class="mt-1 block text-xs text-slate-500">If checked, one defaulted loan blocks guarantee approvals.</span>
+                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
+                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
                             </span>
                         </label>
                     </div>
@@ -767,7 +767,7 @@
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" /></p>
-                            <p class="text-sm text-slate-500">Maximum loan multiple allowed against member savings.</p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.maximumLoanMultipleHelp" text="Maximum loan multiple allowed against member savings." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
@@ -808,13 +808,13 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink">Guarantor Savings Check</p>
-                            <p class="text-sm text-slate-500">Controls whether selected guarantors must meet this product's minimum savings.</p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.guarantorSavingsCheck" text="Guarantor Savings Check" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.guarantorSavingsCheckHelp" text="Controls whether selected guarantors must meet this product's minimum savings." /></p>
                         </div>
                         <p class="text-base font-semibold text-slate-900">
                             <c:choose>
-                                <c:when test="${product.guarantorMinSavingsCheckRequired}">Enabled</c:when>
-                                <c:otherwise>Disabled</c:otherwise>
+                                <c:when test="${product.guarantorMinSavingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when>
+                                <c:otherwise><spring:message code="common.disabled" text="Disabled" /></c:otherwise>
                             </c:choose>
                         </p>
                     </div>
@@ -854,13 +854,13 @@
                             <span class="block text-sm font-semibold text-emerald-700" style="order: ${productManagerEnabled ? product.resolvedManagerPriority : 6};">
                                 <c:choose>
                                     <c:when test="${productManagerEnabled}">P${product.resolvedManagerPriority} Manager</c:when>
-                                    <c:otherwise>Manager Skipped</c:otherwise>
+                                    <c:otherwise><spring:message code="admin.settings.managerSkipped" text="Manager Skipped" /></c:otherwise>
                                 </c:choose>
                             </span>
                             <span class="mt-1 block text-sm font-semibold ${(productLoanOfficerEnabled or productManagerEnabled) ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${productLoanOfficerEnabled ? product.resolvedLoanOfficerPriority : 6};">
                                 <c:choose>
                                     <c:when test="${productLoanOfficerEnabled}">P${product.resolvedLoanOfficerPriority} Loan Officer</c:when>
-                                    <c:otherwise>Loan Officer Skipped</c:otherwise>
+                                    <c:otherwise><spring:message code="admin.settings.loanOfficerSkipped" text="Loan Officer Skipped" /></c:otherwise>
                                 </c:choose>
                             </span>
                             <span class="mt-1 block text-sm font-semibold ${product.committeeReviewRequired ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.committeeReviewRequired ? product.resolvedCommitteePriority : 6};">
@@ -877,8 +877,8 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink">Disbursement Proof</p>
-                            <p class="text-sm text-slate-500">Controls whether a proof attachment is required before releasing this product.</p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.disbursementProofHelp" text="Controls whether a proof attachment is required before releasing this product." /></p>
                         </div>
                         <p class="text-right text-base font-semibold ${product.disbursementProofRequired != false ? 'text-emerald-700' : 'text-slate-600'}">
                             ${product.disbursementProofRequired != false ? 'Required' : 'Optional'}
@@ -887,8 +887,8 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
-                            <p class="text-sm font-semibold text-sacco-ink">Applicant Attachments</p>
-                            <p class="text-sm text-slate-500">Controls whether members must upload a supporting attachment while applying.</p>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.applicantAttachments" text="Applicant Attachments" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.applicantAttachmentsHelp" text="Controls whether members must upload a supporting attachment while applying." /></p>
                         </div>
                         <p class="text-right text-base font-semibold ${product.applicantAttachmentRequired ? 'text-emerald-700' : 'text-slate-600'}">
                             ${product.applicantAttachmentRequired ? 'Required' : 'Optional'}
@@ -920,9 +920,9 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-widget-title">Loan Controls</p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Edit Application Fee</h2>
-                        <p class="mt-1 text-sm text-slate-500">This fee is deducted from every loan application in this SACCO.</p>
+                        <p class="erp-widget-title"><spring:message code="admin.settings.loanControls" text="Loan Controls" /></p>
+                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.editApplicationFee" text="Edit Application Fee" /></h2>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.applicationFeeHelp" text="This fee is deducted from every loan application in this SACCO." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="application-fee" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -968,7 +968,7 @@
                                 data-product-modal-close="application-fee">
                             Cancel
                         </button>
-                        <button type="submit" class="app-btn btn-primary">Save</button>
+                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
                     </div>
                 </form>
             </div>
@@ -983,9 +983,9 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-widget-title">Loan Products Versions</p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Portfolio Snapshots</h2>
-                        <p class="mt-1 text-sm text-slate-500">Each entry stores the full loan products configuration set for this SACCO at that moment.</p>
+                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProductVersions" text="Loan Products Versions" /></p>
+                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.portfolioSnapshots" text="Portfolio Snapshots" /></h2>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.portfolioSnapshotsHelp" text="Each entry stores the full loan products configuration set for this SACCO at that moment." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="loan-products-versions" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -999,12 +999,12 @@
                         <table class="min-w-full divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <tr>
-                                <th class="px-4 py-3">Version</th>
-                                <th class="px-4 py-3">Saved</th>
-                                <th class="px-4 py-3">Saved By</th>
-                                <th class="px-4 py-3">Application Fee</th>
-                                <th class="px-4 py-3">Products</th>
-                                <th class="px-4 py-3">Product Names</th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.applicationFee" text="Application Fee" /></th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.products" text="Products" /></th>
+                                <th class="px-4 py-3"><spring:message code="admin.settings.productNames" text="Product Names" /></th>
                             </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
@@ -1045,9 +1045,9 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-widget-title">Add Loan Product</p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Loan Product</h2>
-                        <p class="mt-1 text-sm text-slate-500">Set the loan name, approval path, and lending limits for this SACCO.</p>
+                        <p class="erp-widget-title"><spring:message code="admin.settings.addLoanProduct" text="Add Loan Product" /></p>
+                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.createLoanProduct" text="Create Loan Product" /></h2>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.createLoanProductHelp" text="Set the loan name, approval path, and lending limits for this SACCO." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="create-product" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1330,11 +1330,11 @@
                             </div>
 
                             <div class="workflow-subsection">
-                                <p class="workflow-subsection-title">Applicant</p>
+                                <p class="workflow-subsection-title"><spring:message code="common.applicant" text="Applicant" /></p>
                                 <div class="workflow-support-grid">
                                     <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                         <input name="applicantAttachmentRequired" type="checkbox" value="true" />
-                                        <span>Require applicant attachment while applying</span>
+                                        <span><spring:message code="admin.settings.requireApplicantAttachment" text="Require applicant attachment while applying" /></span>
                                     </label>
                                     <input type="hidden" name="applicantAttachmentRequired" value="false" />
                                 </div>
@@ -1345,7 +1345,7 @@
                                 <div class="workflow-support-grid">
                                     <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                         <input name="disbursementProofRequired" type="checkbox" value="true" checked />
-                                        <span>Require proof attachment before disbursement</span>
+                                        <span><spring:message code="admin.settings.requireProofBeforeDisbursement" text="Require proof attachment before disbursement" /></span>
                                     </label>
                                     <input type="hidden" name="disbursementProofRequired" value="false" />
                                 </div>
@@ -1364,7 +1364,7 @@
                                     </label>
                                     <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                         <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
-                                        <span>Check guarantor minimum savings before selection</span>
+                                        <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
                                     </label>
                                 </div>
                             </div>
@@ -1411,9 +1411,9 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-widget-title">Product Versions</p>
+                        <p class="erp-widget-title"><spring:message code="admin.settings.productVersions" text="Product Versions" /></p>
                         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
-                        <p class="mt-1 text-sm text-slate-500">Preserved configuration snapshots for this product. The most recent three versions are shown.</p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.productVersionsHelp" text="Preserved configuration snapshots for this product. The most recent three versions are shown." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="versions-${product.id}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1435,15 +1435,15 @@
                                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <tr>
-                                            <th class="px-4 py-3">Version</th>
-                                            <th class="px-4 py-3">Saved</th>
-                                            <th class="px-4 py-3">Saved By</th>
-                                            <th class="px-4 py-3">Amount Range</th>
-                                            <th class="px-4 py-3">Tenure</th>
-                                            <th class="px-4 py-3">Interest</th>
-                                            <th class="px-4 py-3">Workflow</th>
-                                            <th class="px-4 py-3">Status</th>
-                                            <th class="px-4 py-3 text-right">Action</th>
+                                            <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
+                                            <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
+                                            <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
+                                            <th class="px-4 py-3"><spring:message code="admin.settings.amountRange" text="Amount Range" /></th>
+                                            <th class="px-4 py-3"><spring:message code="products.table.tenure" text="Tenure" /></th>
+                                            <th class="px-4 py-3"><spring:message code="repayment.interest" text="Interest" /></th>
+                                            <th class="px-4 py-3"><spring:message code="admin.settings.workflow" text="Workflow" /></th>
+                                            <th class="px-4 py-3"><spring:message code="common.status" text="Status" /></th>
+                                            <th class="px-4 py-3 text-right"><spring:message code="common.action" text="Action" /></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
@@ -1467,7 +1467,7 @@
                                                 <td class="px-4 py-3 align-top text-right">
                                                     <form action="/admin/settings-controls/${product.id}/versions/${version.id}/rollback" method="post" class="inline">
                                                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                        <button type="submit" class="app-btn btn-primary">Rollback</button>
+                                                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.rollback" text="Rollback" /></button>
                                                     </form>
                                                 </td>
                                             </tr>
@@ -1786,7 +1786,7 @@
                             <div class="workflow-support-grid">
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="applicantAttachmentRequired" type="checkbox" value="true" ${product.applicantAttachmentRequired ? 'checked' : ''} />
-                                    <span>Require applicant attachment while applying</span>
+                                    <span><spring:message code="admin.settings.requireApplicantAttachment" text="Require applicant attachment while applying" /></span>
                                 </label>
                                 <input type="hidden" name="applicantAttachmentRequired" value="false" />
                             </div>
@@ -1797,7 +1797,7 @@
                             <div class="workflow-support-grid">
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="disbursementProofRequired" type="checkbox" value="true" ${product.disbursementProofRequired != false ? 'checked' : ''} />
-                                    <span>Require proof attachment before disbursement</span>
+                                    <span><spring:message code="admin.settings.requireProofBeforeDisbursement" text="Require proof attachment before disbursement" /></span>
                                 </label>
                                 <input type="hidden" name="disbursementProofRequired" value="false" />
                             </div>
@@ -1816,7 +1816,7 @@
                                 </label>
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" ${product.guarantorMinSavingsCheckRequired ? 'checked' : ''} />
-                                    <span>Check guarantor minimum savings before selection</span>
+                                    <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
                                 </label>
                             </div>
                         </div>

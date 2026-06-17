@@ -114,7 +114,7 @@
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                        <tr><th class="px-4 py-3">SACCO</th><th class="px-4 py-3">Station</th><th class="px-4 py-3">Available</th><th class="px-4 py-3">Alert Reserve</th><th class="px-4 py-3">Baseline</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
+                        <tr><th class="px-4 py-3">SACCO</th><th class="px-4 py-3">Station</th><th class="px-4 py-3">Available</th><th class="px-4 py-3">Alert Reserve</th><th class="px-4 py-3">Baseline</th><th class="px-4 py-3">Depleted Alerts Sent</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
                         <c:forEach items="${accounts.content}" var="account">
@@ -124,11 +124,12 @@
                                 <td class="px-4 py-3"><fmt:formatNumber value="${account.availableUnits}" /></td>
                                 <td class="px-4 py-3"><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
                                 <td class="px-4 py-3"><fmt:formatNumber value="${account.warningBaseline}" /></td>
+                                <td class="px-4 py-3"><fmt:formatNumber value="${account.depletedAlertSmsSentCount}" /></td>
                                 <td class="px-4 py-3"><span class="rounded-md border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
                                 <td class="px-4 py-3 text-right"><a class="app-btn btn-neutral" href="/admin/sms-usage?accountId=${account.id}">View History</a></td>
                             </tr>
                         </c:forEach>
-                        <c:if test="${empty accounts.content}"><tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No station SMS accounts match the filters.</td></tr></c:if>
+                        <c:if test="${empty accounts.content}"><tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No station SMS accounts match the filters.</td></tr></c:if>
                         </tbody>
                     </table>
                 </div>
@@ -153,6 +154,7 @@
         <section class="erp-stat-grid">
             <div class="erp-stat-card erp-stat-blue"><div class="erp-stat-main"><div><p class="erp-stat-label">Available Units</p><p class="erp-stat-value">${selectedAccount.availableUnits}</p><p class="erp-stat-meta">${selectedAccount.saccoId} / ${selectedAccount.stationId}</p></div><span class="erp-stat-icon">U</span></div></div>
             <div class="erp-stat-card erp-stat-amber"><div class="erp-stat-main"><div><p class="erp-stat-label">Alert Reserve</p><p class="erp-stat-value">${selectedAccount.alertReservedUnits} / 3</p><p class="erp-stat-meta">Reserved for LOW, CRITICAL, and DEPLETED alerts</p></div><span class="erp-stat-icon">A</span></div></div>
+            <div class="erp-stat-card erp-stat-blue"><div class="erp-stat-main"><div><p class="erp-stat-label">Depleted Alerts Sent</p><p class="erp-stat-value">${selectedAccount.depletedAlertSmsSentCount}</p><p class="erp-stat-meta">SMS alerts sent to verified Minor Admins</p></div><span class="erp-stat-icon">D</span></div></div>
             <div class="erp-stat-card ${selectedAccount.status eq 'DEPLETED' ? 'erp-stat-red' : selectedAccount.status eq 'HEALTHY' ? 'erp-stat-green' : 'erp-stat-amber'}"><div class="erp-stat-main"><div><p class="erp-stat-label">SMS Status</p><p class="erp-stat-value text-2xl">${selectedAccount.status}</p><p class="erp-stat-meta">Warning baseline: ${selectedAccount.warningBaseline}</p></div><span class="erp-stat-icon">S</span></div></div>
         </section>
     </c:otherwise>
@@ -175,20 +177,26 @@
 
 <section class="erp-panel mt-5">
     <div class="erp-panel-header">
-        <div><p class="erp-panel-title">Usage History<c:if test="${not empty selectedAccount}">: ${selectedAccount.saccoId} / ${selectedAccount.stationId}</c:if></p></div>
+        <div>
+            <p class="erp-panel-title">Usage History<c:if test="${not empty selectedAccount}">: ${selectedAccount.saccoId} / ${selectedAccount.stationId}</c:if></p>
+            <p class="mt-1 text-sm text-slate-500">Showing ${usageHistory.numberOfElements} of ${usageHistory.totalElements} history rows. Repeated depleted blocks are grouped by day.</p>
+        </div>
     </div>
     <div class="erp-panel-body overflow-x-auto">
+        <div class="max-h-[32rem] overflow-auto">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
-            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Time</th><th class="px-4 py-3">Event</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3">Unit Change</th><th class="px-4 py-3">Provider Reference</th><th class="px-4 py-3">Note</th></tr></thead>
+            <thead class="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">First Seen</th><th class="px-4 py-3">Last Seen</th><th class="px-4 py-3">Event</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3">Count</th><th class="px-4 py-3">Unit Change</th><th class="px-4 py-3">Provider Reference</th><th class="px-4 py-3">Note</th></tr></thead>
             <tbody class="divide-y divide-slate-100 bg-white">
             <c:forEach items="${usageHistory.content}" var="entry">
-                <tr><td class="whitespace-nowrap px-4 py-3">${entry.createdAt}</td><td class="px-4 py-3">${empty entry.eventType ? '-' : entry.eventType}</td><td class="px-4 py-3 font-semibold">${entry.outcome}</td><td class="px-4 py-3">${entry.unitChange}</td><td class="px-4 py-3">${empty entry.providerReference ? '-' : entry.providerReference}</td><td class="px-4 py-3">${empty entry.note ? '-' : entry.note}</td></tr>
+                <tr><td class="whitespace-nowrap px-4 py-3">${entry.createdAt}</td><td class="whitespace-nowrap px-4 py-3">${empty entry.lastOccurredAt ? entry.createdAt : entry.lastOccurredAt}</td><td class="px-4 py-3">${empty entry.eventType ? '-' : entry.eventType}</td><td class="px-4 py-3 font-semibold">${entry.outcome}</td><td class="px-4 py-3"><fmt:formatNumber value="${entry.eventCount}" /></td><td class="px-4 py-3">${entry.unitChange}</td><td class="px-4 py-3">${empty entry.providerReference ? '-' : entry.providerReference}</td><td class="px-4 py-3">${empty entry.note ? '-' : entry.note}</td></tr>
             </c:forEach>
-            <c:if test="${empty usageHistory.content}"><tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No SMS usage has been recorded for this station.</td></tr></c:if>
+            <c:if test="${empty usageHistory.content}"><tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No SMS usage has been recorded for this station.</td></tr></c:if>
             </tbody>
         </table>
+        </div>
         <c:if test="${usageHistory.totalPages gt 1 and not empty selectedAccount}">
             <div class="mt-4 flex justify-end gap-2">
+                <span class="inline-flex items-center px-2 text-sm text-slate-500">Page ${usageHistory.number + 1} of ${usageHistory.totalPages}</span>
                 <c:if test="${not usageHistory.first}"><a class="app-btn btn-neutral" href="/admin/sms-usage?accountId=${selectedAccount.id}&historyPage=${usageHistory.number - 1}">Previous</a></c:if>
                 <c:if test="${not usageHistory.last}"><a class="app-btn btn-neutral" href="/admin/sms-usage?accountId=${selectedAccount.id}&historyPage=${usageHistory.number + 1}">Next</a></c:if>
             </div>

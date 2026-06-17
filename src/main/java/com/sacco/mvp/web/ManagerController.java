@@ -29,6 +29,8 @@ import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -70,6 +72,7 @@ public class ManagerController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
+    private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -99,9 +102,9 @@ public class ManagerController {
                 row.put("applicantName", applicantNames.getOrDefault(loan.getApplicantMemberId(), "-"));
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", switch (loan.getStatus()) {
-                    case PAID -> "PAID";
-                    case DEFAULTED -> "DEFAULTED";
-                    default -> "DISBURSED LOAN";
+                    case PAID -> message("loan.status.PAID");
+                    case DEFAULTED -> message("loan.status.DEFAULTED");
+                    default -> message("manager.dashboard.disbursedLoan");
                 });
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
                 row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
@@ -140,7 +143,7 @@ public class ManagerController {
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
-        model.addAttribute("queueSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
+        model.addAttribute("queueSearchLabel", loanIdSearch ? message("loan.loanId") : message("loan.applicationId"));
         model.addAttribute("queueSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
         return "manager/queue";
     }
@@ -200,7 +203,7 @@ public class ManagerController {
                 row.put("loanId", entry.loan().getLoanId() == null || entry.loan().getLoanId().isBlank() ? "-" : entry.loan().getLoanId());
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), shortLoanId(entry.loan().getApplicantMemberId())));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
-                row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected");
+                row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? message("review.approved") : message("review.rejected"));
                 row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : REPORT_DATE_TIME.format(entry.review().getCreatedAt()));
                 row.put("currentStatusLabel", entry.currentStatusLabel());
                 return row;
@@ -209,7 +212,7 @@ public class ManagerController {
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
-        model.addAttribute("archiveSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
+        model.addAttribute("archiveSearchLabel", loanIdSearch ? message("loan.loanId") : message("loan.applicationId"));
         model.addAttribute("archiveSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
         model.addAttribute("archivePage", archivePage);
         return "manager/archive";
@@ -290,18 +293,18 @@ public class ManagerController {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("reviewBasePath", "/manager");
-        model.addAttribute("reviewPanelBreadcrumb", "Manager Panel / Review Detail");
-        model.addAttribute("reviewPanelTitle", "Manager Review");
-        model.addAttribute("reviewPanelSubtitle", "Inspect applicant details and move the application through the configured workflow.");
-        model.addAttribute("reviewCommentLabel", "Reasons");
-        model.addAttribute("reviewCommentPlaceholder", "Write the reason for approval note or rejection");
-        model.addAttribute("approveActionLabel", "Approve Loan");
-        model.addAttribute("rejectActionLabel", "Reject Loan");
+        model.addAttribute("reviewPanelBreadcrumb", message("review.manager.breadcrumb"));
+        model.addAttribute("reviewPanelTitle", message("review.manager.title"));
+        model.addAttribute("reviewPanelSubtitle", message("review.manager.subtitle"));
+        model.addAttribute("reviewCommentLabel", message("review.manager.commentLabel"));
+        model.addAttribute("reviewCommentPlaceholder", message("review.manager.commentPlaceholder"));
+        model.addAttribute("approveActionLabel", message("review.manager.approveLoan"));
+        model.addAttribute("rejectActionLabel", message("review.manager.rejectLoan"));
         model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.READY_FOR_MANAGER);
         model.addAttribute("showManagerReversalRequests", true);
         model.addAttribute("showDisbursementForm", false);
-        model.addAttribute("disbursementNotesLabel", "Manager Notes");
-        model.addAttribute("disbursementActionLabel", "Disburse Loan");
+        model.addAttribute("disbursementNotesLabel", message("review.manager.notes"));
+        model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
         model.addAttribute("showUndoForm", app.getStatus() == LoanStatus.MANAGER_REJECTED);
         model.addAttribute("allowPaymentSync", true);
@@ -575,7 +578,7 @@ public class ManagerController {
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
                 row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
-                row.put("managerDecisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected");
+                row.put("managerDecisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? message("review.approved") : message("review.rejected"));
                 row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
                 row.put("currentStatusLabel", dashboardStatusLabel(entry.loan().getStatus()));
                 return row;
@@ -853,6 +856,10 @@ public class ManagerController {
             throw new IllegalStateException(missingEmailMessage);
         }
         return member;
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private record QueueFilter(String key, String label, List<LoanStatus> statuses) {}

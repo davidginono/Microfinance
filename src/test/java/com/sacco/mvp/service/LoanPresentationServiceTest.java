@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.StaticMessageSource;
 
 import java.math.BigDecimal;
 import java.io.IOException;
@@ -30,6 +32,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -46,11 +49,22 @@ class LoanPresentationServiceTest {
 
     @BeforeEach
     void setUp() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        StaticMessageSource messageSource = new StaticMessageSource();
+        messageSource.addMessage("loan.status.DRAFT", Locale.ENGLISH, "Draft");
+        messageSource.addMessage("loan.status.AWAITING_GUARANTORS", Locale.ENGLISH, "Awaiting Guarantors");
+        messageSource.addMessage("loan.status.ALL_GUARANTORS_APPROVED", Locale.ENGLISH, "All Guarantors Approved");
+        messageSource.addMessage("loan.status.READY_FOR_MANAGER", Locale.ENGLISH, "On Review By Manager");
+        messageSource.addMessage("loan.status.AWAITING_LOAN_OFFICER", Locale.ENGLISH, "On Review By Loan Officer");
+        messageSource.addMessage("loan.status.AWAITING_BOARD", Locale.ENGLISH, "On Review By Board");
+        messageSource.addMessage("loan.status.AWAITING_ACCOUNTANT", Locale.ENGLISH, "On Review By Accountant");
+        messageSource.addMessage("loan.status.READY_FOR_DISBURSEMENT", Locale.ENGLISH, "Approved For Disbursement");
         loanPresentationService = new LoanPresentationService(
             JsonMapper.builder().findAndAddModules().build(),
             managerReviewRepository,
             loanAttachmentService,
-            loanProductWorkflowService
+            loanProductWorkflowService,
+            messageSource
         );
     }
 

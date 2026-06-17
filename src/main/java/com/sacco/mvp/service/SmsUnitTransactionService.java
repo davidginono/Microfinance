@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SmsUnitTransactionService {
     public static final long ALERT_RESERVE_TARGET = 3;
+    private static final String SMS_UNITS_DEPLETED = "SMS units depleted";
 
     private final StationSmsAccountRepository accountRepository;
     private final SmsUsageLedgerRepository ledgerRepository;
@@ -53,8 +54,8 @@ public class SmsUnitTransactionService {
             SmsUnitStatus alertStatus = markAlertIfNeeded(account, SmsUnitStatus.DEPLETED);
             account.setUpdatedAt(OffsetDateTime.now());
             accountRepository.save(account);
-            writeBlocked(account.getId(), normalizedSaccoId, normalizedStationId, notificationId, eventType, "SMS units depleted");
-            return ReservationResult.blocked("SMS units depleted", false, alertStatus, account.getAvailableUnits());
+            writeBlocked(account.getId(), normalizedSaccoId, normalizedStationId, notificationId, eventType, SMS_UNITS_DEPLETED);
+            return ReservationResult.blocked(SMS_UNITS_DEPLETED, false, alertStatus, account.getAvailableUnits());
         }
 
         account.setAvailableUnits(account.getAvailableUnits() - 1);
@@ -151,11 +152,17 @@ public class SmsUnitTransactionService {
         }
         ledger.setProviderReference(trim(result.providerReference(), 500));
         ledger.setNote(trim(result.message(), 500));
-        ledger.setUpdatedAt(OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        ledger.setUpdatedAt(now);
         if (result.consumesUnit()) {
             ledger.setOutcome(result.outcome() == SmsSendOutcome.ACCEPTED
                 ? SmsUsageOutcome.ACCEPTED
                 : SmsUsageOutcome.ACCEPTANCE_UNKNOWN);
+            if ("SMS_USAGE_DEPLETED_ALERT".equals(ledger.getEventType())) {
+                account.setDepletedAlertSmsSentCount(account.getDepletedAlertSmsSentCount() + 1);
+                account.setUpdatedAt(now);
+                accountRepository.save(account);
+            }
         } else {
             ledger.setOutcome(SmsUsageOutcome.RESTORED);
             ledger.setUnitChange(0);
@@ -265,6 +272,27 @@ public class SmsUnitTransactionService {
     }
 
     private void writeBlocked(UUID accountId, String saccoId, String stationId, UUID notificationId, String eventType, String reason) {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (accountId != null && SMS_UNITS_DEPLETED.equals(reason)) {
+            OffsetDateTime bucketStart = now.toLocalDate().atStartOfDay().atOffset(now.getOffset());
+            var existing = ledgerRepository
+                .findFirstByAccountIdAndEventTypeAndOutcomeAndNoteAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                    accountId,
+                    eventType,
+                    SmsUsageOutcome.BLOCKED,
+                    reason,
+                    bucketStart
+                );
+            if (existing.isPresent()) {
+                SmsUsageLedger ledger = existing.get();
+                ledger.setEventCount(Math.max(1, ledger.getEventCount()) + 1);
+                ledger.setNotificationId(notificationId);
+                ledger.setLastOccurredAt(now);
+                ledger.setUpdatedAt(now);
+                ledgerRepository.save(ledger);
+                return;
+            }
+        }
         ledgerRepository.save(SmsUsageLedger.builder()
             .id(UUID.randomUUID())
             .accountId(accountId)
@@ -273,10 +301,12 @@ public class SmsUnitTransactionService {
             .notificationId(notificationId)
             .eventType(eventType)
             .unitChange(0)
+            .eventCount(1)
             .outcome(SmsUsageOutcome.BLOCKED)
             .note(reason)
-            .createdAt(OffsetDateTime.now())
-            .updatedAt(OffsetDateTime.now())
+            .createdAt(now)
+            .lastOccurredAt(now)
+            .updatedAt(now)
             .build());
     }
 

@@ -257,6 +257,62 @@
         line-height: 1.1;
         font-weight: 800;
     }
+    .staff-interest-summary {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.85rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        background: #fff;
+        padding: 1rem;
+    }
+    .staff-interest-meta {
+        margin-top: 0.35rem;
+        color: #64748b;
+        font-size: 0.78rem;
+        line-height: 1.35;
+    }
+    .staff-financial-breakdown-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .staff-financial-breakdown-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        background: #fff;
+        padding: 0.9rem;
+    }
+    .staff-financial-table-wrap {
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+    }
+    .staff-financial-table {
+        min-width: 44rem;
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+    }
+    .staff-financial-table th,
+    .staff-financial-table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.7rem 0.8rem;
+        text-align: left;
+        font-size: 0.82rem;
+    }
+    .staff-financial-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .staff-financial-table tr:last-child td {
+        border-bottom: 0;
+    }
     .staff-chart-box {
         position: relative;
         width: 100%;
@@ -338,6 +394,9 @@
         }
         .staff-summary-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .staff-financial-breakdown-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
         .staff-summary-item {
             border-right: 1px solid #e2e8f0;
@@ -464,6 +523,8 @@
     }
 </style>
 
+<c:set var="currentQuery" value="fromDate=${fromDate}&toDate=${toDate}&loanType=${loanType}&viewAs=${viewAs}" />
+
 <div class="erp-page-header">
     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
@@ -471,18 +532,18 @@
             <p class="erp-page-subtitle">${staffAnalyticsSubtitle}</p>
         </div>
         <div class="staff-analytics-actions md:justify-end">
-            <button type="button" class="app-btn btn-neutral staff-filter-action" onclick="window.print()">
+            <a href="/documents/reports/staff-loan-analytics.pdf?${currentQuery}" class="app-btn btn-neutral staff-filter-action">
                 <span class="text-red-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
                 </span>
                 <spring:message code="reports.exportPdf" text="Export PDF" />
-            </button>
-            <button type="button" id="staffCsvExport" class="app-btn btn-neutral staff-filter-action">
+            </a>
+            <a href="/documents/reports/staff-loan-analytics.xlsx?${currentQuery}" class="app-btn btn-neutral staff-filter-action">
                 <span class="text-emerald-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
                 </span>
-                <spring:message code="reports.exportCsv" text="Export CSV" />
-            </button>
+                <spring:message code="reports.exportExcel" text="Export Excel" />
+            </a>
             <a href="/staff/analytics" class="app-btn btn-neutral staff-filter-action">
                 <span class="text-blue-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.6 6.1"/><path d="M3 12A9 9 0 0 1 18.6 5.9"/><path d="M3 18h5v-5"/><path d="M21 6h-5v5"/></svg>
@@ -523,7 +584,7 @@
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21a6 6 0 0 0-12 0"/><circle cx="11" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
                     <span>
                         <c:choose>
-                            <c:when test="${stationWideStaffView}">Station View</c:when>
+                            <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationView" text="Station View" /></c:when>
                             <c:otherwise><spring:message code="staff.analytics.staffView" text="Staff View" /></c:otherwise>
                         </c:choose>
                     </span>
@@ -587,7 +648,7 @@
                 <h2 class="text-lg font-bold text-sacco-ink">
                     <c:choose>
                         <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberPortfolioSummary" text="Member Portfolio Summary" /></c:when>
-                        <c:when test="${stationWideStaffView}">Station Portfolio Summary</c:when>
+                        <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationPortfolioSummary" text="Station Portfolio Summary" /></c:when>
                         <c:otherwise><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:otherwise>
                     </c:choose>
                 </h2>
@@ -615,6 +676,63 @@
                         <div><p class="erp-widget-title"><spring:message code="staff.analytics.defaultedAfterApproval" text="Defaulted After Approval" /></p><p class="staff-metric-value text-[1.35rem]"><fmt:formatNumber value="${staffPortfolio.defaultedAfterApproval}" /></p></div>
                     </div>
                 </div>
+                <c:if test="${stationWideStaffView}">
+                    <div class="staff-interest-summary">
+                        <span class="staff-summary-icon tone-emerald"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v18"/><path d="M17 7H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                        <div class="min-w-0">
+                            <p class="erp-widget-title"><spring:message code="staff.analytics.totalInterestAccumulated" text="Total Paid Interest Accumulated" /></p>
+                            <p class="staff-metric-value text-[1.35rem]">${totalInterestAccumulatedLabel}</p>
+                            <p class="staff-interest-meta">
+                                <spring:message code="staff.analytics.totalInterestScope" arguments="${selectedLoanProductLabel},${fromDate},${toDate}" text="Based on {0} from {1} to {2}." />
+                            </p>
+                        </div>
+                    </div>
+                    <div class="staff-financial-breakdown-grid">
+                        <div class="staff-financial-breakdown-card">
+                            <p class="erp-widget-title"><spring:message code="staff.analytics.totalInterestUnpaid" text="Total Interest Unpaid Yet" /></p>
+                            <p class="staff-metric-value text-[1.2rem]">${totalInterestUnpaidLabel}</p>
+                        </div>
+                        <div class="staff-financial-breakdown-card">
+                            <p class="erp-widget-title"><spring:message code="staff.analytics.totalLoanAmountPaid" text="Total Loan Amount Paid" /></p>
+                            <p class="staff-metric-value text-[1.2rem]">${totalLoanAmountPaidLabel}</p>
+                        </div>
+                        <div class="staff-financial-breakdown-card">
+                            <p class="erp-widget-title"><spring:message code="staff.analytics.totalLoanAmountUnpaid" text="Total Loan Amount Unpaid Yet" /></p>
+                            <p class="staff-metric-value text-[1.2rem]">${totalLoanAmountUnpaidLabel}</p>
+                        </div>
+                    </div>
+                    <c:if test="${empty loanType}">
+                        <div class="staff-financial-table-wrap">
+                            <table class="staff-financial-table">
+                                <thead>
+                                    <tr>
+                                        <th><spring:message code="reports.loanProductName" text="Loan Product" /></th>
+                                        <th><spring:message code="staff.analytics.totalInterestPaid" text="Total Interest Paid" /></th>
+                                        <th><spring:message code="staff.analytics.totalInterestUnpaid" text="Total Interest Unpaid Yet" /></th>
+                                        <th><spring:message code="staff.analytics.totalLoanAmountPaid" text="Total Loan Amount Paid" /></th>
+                                        <th><spring:message code="staff.analytics.totalLoanAmountUnpaid" text="Total Loan Amount Unpaid Yet" /></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <c:forEach items="${productFinancialRows}" var="row">
+                                        <tr>
+                                            <td class="font-semibold text-slate-800">${row.loanProduct}</td>
+                                            <td>${row.totalInterestPaidLabel}</td>
+                                            <td>${row.totalInterestUnpaidLabel}</td>
+                                            <td>${row.totalLoanAmountPaidLabel}</td>
+                                            <td>${row.totalLoanAmountUnpaidLabel}</td>
+                                        </tr>
+                                    </c:forEach>
+                                    <c:if test="${empty productFinancialRows}">
+                                        <tr>
+                                            <td colspan="5" class="text-slate-500"><spring:message code="staff.analytics.financialBreakdownEmpty" text="No financial breakdown is available for the selected filters." /></td>
+                                        </tr>
+                                    </c:if>
+                                </tbody>
+                            </table>
+                        </div>
+                    </c:if>
+                </c:if>
                 <div class="staff-risk-row">
                     <div class="flex items-center gap-3 border-b border-slate-200 pb-4 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-4">
                         <span class="staff-summary-icon tone-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9 12l2 2 4-5"/></svg></span>
@@ -642,7 +760,7 @@
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 class="text-lg font-bold text-sacco-ink"><spring:message code="reports.loanTrendOverTime" text="Loan Trend Over Time" /></h2>
             <div class="staff-trend-controls">
-                <select id="staffTrendInterval" title="Trend interval" aria-label="Trend interval" class="staff-trend-select h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">
+                <select id="staffTrendInterval" title="<spring:message code='staff.analytics.trendInterval' text='Trend interval' />" aria-label="<spring:message code='staff.analytics.trendInterval' text='Trend interval' />" class="staff-trend-select h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">
                     <option value="monthly"><spring:message code="reports.interval.monthly" text="Monthly" /></option>
                     <option value="quarterly"><spring:message code="reports.interval.quarterly" text="Quarterly" /></option>
                     <option value="yearly"><spring:message code="reports.interval.yearly" text="Yearly" /></option>
@@ -665,7 +783,7 @@
     <span>
         <c:choose>
             <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberViewHelp" text="You are viewing analytics for loans you applied for as a member." /></c:when>
-            <c:when test="${stationWideStaffView}">You are viewing station-wide loan status for all applicants and members in your station.</c:when>
+            <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationViewHelp" text="You are viewing station-wide loan status for all applicants and members in your station." /></c:when>
             <c:otherwise><spring:message code="staff.analytics.staffViewHelp" text="You are viewing analytics for loans you handled, reviewed, approved, rejected, disbursed, or managed." /></c:otherwise>
         </c:choose>
     </span>
@@ -704,34 +822,6 @@ window.addEventListener('load', function () {
         trendRangeUnit.textContent = interval === 'yearly' ? 'years' : interval === 'quarterly' ? 'quarters' : 'months';
     }
 
-    const exportButton = document.getElementById('staffCsvExport');
-    if (exportButton) {
-        exportButton.addEventListener('click', function () {
-            const rows = [['Product', 'Total Loans', 'Paid Loans', 'Defaulted Loans', 'Rejected Loans']];
-            const totals = {};
-            productSeries.forEach(function (series) {
-                series.dataPoints.forEach(function (point) {
-                    totals[point.label] = totals[point.label] || { label: point.label };
-                    totals[point.label][series.name] = point.y;
-                });
-            });
-            Object.keys(totals).forEach(function (label) {
-                const row = totals[label];
-                rows.push([label, row['Total Loans'] || 0, row['Paid Loans'] || 0, row['Defaulted Loans'] || 0, row['Rejected Loans'] || 0]);
-            });
-            const csv = rows.map(function (row) {
-                return row.map(function (value) {
-                    return '"' + String(value).replace(/"/g, '""') + '"';
-                }).join(',');
-            }).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'staff-loan-analytics.csv';
-            link.click();
-            URL.revokeObjectURL(link.href);
-        });
-    }
 });
 
 function chartSvg(width, height) {

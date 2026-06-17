@@ -27,6 +27,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -95,6 +97,7 @@ public class AppController {
     private final ForesightDirectoryService foresightDirectoryService;
     private final ObjectMapper objectMapper;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
+    private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -134,7 +137,7 @@ public class AppController {
         model.addAttribute("statusChartRows", buildStatusChartRows(statusChartCounts));
         model.addAttribute("activeLoanChartRows", activeLoanChartRows);
         model.addAttribute("archivedApplicationCount", archivedApplicationCount);
-        model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
+        model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading(message("loan.loadingLiveBalances")));
         model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
         model.addAttribute("currentWorkflowApplicationNumber",
             currentWorkflowApplication == null || currentWorkflowApplication.getApplicationNumber() == null
@@ -325,6 +328,8 @@ public class AppController {
         model.addAttribute("loanType", loanType);
         model.addAttribute("loanTypes", LoanType.values());
         model.addAttribute("trendSeriesJson", toJson(trendSeries));
+        model.addAttribute("activeLoanDetails", loanReportService.memberActiveLoanDetails(
+            principal.getMemberId(), resolvedFrom, resolvedTo, loanType));
         model.addAttribute("eligibilitySummary", eligibilitySummary);
         model.addAttribute("canApply", eligibilitySummary.canApply());
         model.addAttribute("canGuarantee", eligibilitySummary.canGuarantee());
@@ -433,6 +438,7 @@ public class AppController {
                 row.put("finalDueDate", app.getFinalDueDate());
                 row.put("countdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
                 row.put("canDismiss", hasRepaymentTimeframeEnded(app));
+                row.put("repaymentStateCode", app.getStatus().name());
                 row.put("repaymentStateLabel", repaymentStateLabel(app, paymentSummary, today));
                 row.put("repaymentStateClasses", repaymentStateClasses(app, paymentSummary, today));
                 row.put("paymentSummaryAvailable", paymentSummary.available());
@@ -1073,7 +1079,7 @@ public class AppController {
         }
         model.addAttribute("app", app);
         addMemberLoanViewDisplayAttributes(model, app);
-        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
+        model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading(message("loan.loadingLiveBalances")));
         model.addAttribute("topUpSourceLoan",
             app.getTopUpSourceLoanId() == null ? null
                 : loanApplicationRepository.findByIdAndApplicantMemberId(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
@@ -1522,7 +1528,7 @@ public class AppController {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("request", request);
                 row.put("loan", loan);
-                row.put("statusLabel", loan == null ? "Not available" : loan.getStatus().name().replace('_', ' '));
+                row.put("statusLabel", loan == null ? message("common.notAvailable") : dashboardStatusLabel(loan.getStatus()));
                 row.put("daysLeft", loan == null || loan.getFinalDueDate() == null
                     ? null
                     : Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), loan.getFinalDueDate())));
@@ -2416,7 +2422,7 @@ public class AppController {
         for (Map.Entry<UUID, LoanApplication> entry : applicationById.entrySet()) {
             LoanApplication application = entry.getValue();
             guaranteeNames.put(entry.getKey(),
-                applicantNames.getOrDefault(application.getApplicantMemberId(), "Unknown Member"));
+                applicantNames.getOrDefault(application.getApplicantMemberId(), message("member.unknown")));
             guaranteeLoanTypes.put(entry.getKey(), application.getLoanType());
             guaranteeLoanAmounts.put(entry.getKey(), application.getAmount());
         }
@@ -2514,32 +2520,39 @@ public class AppController {
                                        LoanPresentationService.LoanPaymentSummaryView paymentSummary,
                                        LocalDate today) {
         if (app.getStatus() == LoanStatus.PAID) {
-            return "Paid";
+            return message("analytics.paid");
         }
         if (app.getStatus() == LoanStatus.DEFAULTED) {
-            return "Defaulted";
+            return message("analytics.defaulted");
         }
         if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
             if (paymentSummary.available()
                 && paymentSummary.totalOutstanding() != null
                 && paymentSummary.totalOutstanding().compareTo(BigDecimal.ZERO) > 0) {
-                return "Defaulted";
+                return message("analytics.defaulted");
             }
-            return "Overdue";
+            return message("loan.repayment.overdue");
         }
-        return "Active";
+        return message("analytics.active");
     }
 
     private String repaymentStateClasses(LoanApplication app,
                                          LoanPresentationService.LoanPaymentSummaryView paymentSummary,
                                          LocalDate today) {
-        String state = repaymentStateLabel(app, paymentSummary, today);
-        return switch (state) {
-            case "Paid" -> "border-emerald-200 bg-emerald-50 text-emerald-700";
-            case "Defaulted" -> "border-rose-200 bg-rose-50 text-rose-700";
-            case "Overdue" -> "border-amber-200 bg-amber-50 text-amber-700";
-            default -> "border-slate-200 bg-slate-50 text-slate-700";
-        };
+        if (app.getStatus() == LoanStatus.PAID) {
+            return "border-emerald-200 bg-emerald-50 text-emerald-700";
+        }
+        if (app.getStatus() == LoanStatus.DEFAULTED
+            || (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)
+            && paymentSummary.available()
+            && paymentSummary.totalOutstanding() != null
+            && paymentSummary.totalOutstanding().compareTo(BigDecimal.ZERO) > 0)) {
+            return "border-rose-200 bg-rose-50 text-rose-700";
+        }
+        if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
+            return "border-amber-200 bg-amber-50 text-amber-700";
+        }
+        return "border-slate-200 bg-slate-50 text-slate-700";
     }
 
     private Set<UUID> dismissedActiveLoanChartIds(UUID memberId) {
@@ -2710,70 +2723,11 @@ public class AppController {
     }
 
     private String dashboardStatusLabel(LoanStatus status) {
-        if (status == LoanStatus.DRAFT) {
-            return "Draft";
-        }
-        if (status == LoanStatus.SUBMITTED) {
-            return "Submitted";
-        }
-        if (status == LoanStatus.AWAITING_GUARANTORS) {
-            return "Awaiting Guarantors";
-        }
-        if (status == LoanStatus.ALL_GUARANTORS_APPROVED) {
-            return "All Guarantors Approved";
-        }
-        if (status == LoanStatus.READY_FOR_MANAGER) {
-            return "On Review By Manager";
-        }
-        if (status == LoanStatus.MANAGER_ACCEPTED) {
-            return "Manager Approved";
-        }
-        if (status == LoanStatus.AWAITING_LOAN_OFFICER) {
-            return "On Review By Loan Officer";
-        }
-        if (status == LoanStatus.LOAN_OFFICER_APPROVED) {
-            return "Loan Officer Approved";
-        }
-        if (status == LoanStatus.LOAN_OFFICER_REJECTED) {
-            return "Loan Officer Rejected";
-        }
-        if (status == LoanStatus.AWAITING_BOARD) {
-            return "On Review By Board";
-        }
-        if (status == LoanStatus.BOARD_APPROVED) {
-            return "Board Approved";
-        }
-        if (status == LoanStatus.BOARD_REJECTED) {
-            return "Board Rejected";
-        }
-        if (status == LoanStatus.AWAITING_ACCOUNTANT) {
-            return "On Review By Accountant";
-        }
-        if (status == LoanStatus.ACCOUNTANT_APPROVED) {
-            return "Accountant Approved";
-        }
-        if (status == LoanStatus.ACCOUNTANT_REJECTED) {
-            return "Accountant Rejected";
-        }
-        if (status == LoanStatus.READY_FOR_DISBURSEMENT) {
-            return "Ready for Disbursement";
-        }
-        if (status == LoanStatus.FINAL_APPROVED) {
-            return "Final Approved and Disbursed";
-        }
-        if (status == LoanStatus.FINAL_REJECTED) {
-            return "Final Rejected";
-        }
-        if (status == LoanStatus.FORFEITED) {
-            return "Forfeited";
-        }
-        if (status == LoanStatus.DEFAULTED) {
-            return "Defaulted / Not Paid";
-        }
-        if (status == LoanStatus.PAID) {
-            return "Paid";
-        }
-        return status.name().replace('_', ' ');
+        return message("loan.status." + status.name());
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private String dashboardStatusColor(LoanStatus status) {

@@ -98,16 +98,16 @@
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="member.settings.payment.type" text="Payment Method" />
                 <select name="destinationType" class="mt-1 h-12 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" required>
-                    <option value="BANK_ACCOUNT" ${paymentDestinationType eq 'BANK_ACCOUNT' ? 'selected' : ''}>Bank Account</option>
-                    <option value="MOBILE_MONEY" ${paymentDestinationType eq 'MOBILE_MONEY' ? 'selected' : ''}>Mobile Money</option>
-                    <option value="OTHER" ${paymentDestinationType eq 'OTHER' ? 'selected' : ''}>Other Payment Method</option>
+                    <option value="BANK_ACCOUNT" ${paymentDestinationType eq 'BANK_ACCOUNT' ? 'selected' : ''}><spring:message code="paymentDestination.BANK_ACCOUNT" text="Bank Account" /></option>
+                    <option value="MOBILE_MONEY" ${paymentDestinationType eq 'MOBILE_MONEY' ? 'selected' : ''}><spring:message code="paymentDestination.MOBILE_MONEY" text="Mobile Money" /></option>
+                    <option value="OTHER" ${paymentDestinationType eq 'OTHER' ? 'selected' : ''}><spring:message code="paymentDestination.OTHER" text="Other Payment Method" /></option>
                 </select>
             </label>
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="member.settings.payment.provider" text="Bank or Provider" />
                 <input name="provider" type="text" maxlength="120" value="${fn:escapeXml(paymentDetails.provider)}"
                        class="mt-1 h-12 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                       placeholder="Example: CRDB Bank or M-Pesa" required />
+                       placeholder="<spring:message code='member.settings.payment.provider.placeholder' text='Example: CRDB Bank or M-Pesa' />" required />
             </label>
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="member.settings.payment.holder" text="Account Holder Name" />

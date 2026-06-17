@@ -66,7 +66,7 @@
             <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
             <c:if test="${currentFilterKey eq 'DISBURSED'}">
-                <p class="mt-1 text-sm text-slate-500">Displayed loans are the current active loans.</p>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.queue.activeLoansHelp" text="Displayed loans are the current active loans." /></p>
             </c:if>
         </div>
         <div class="erp-filter-row">
@@ -141,7 +141,7 @@
             </td>
             <td class="px-3 py-2">
                 <div class="flex flex-wrap gap-2">
-                    <a href="/manager/loan-applications/${app.id}" class="app-btn btn-primary">Open</a>
+                    <a href="/manager/loan-applications/${app.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a>
                 </div>
             </td>
         </tr>

@@ -61,6 +61,11 @@
     .tenure-unit-toggle.is-active:hover {
         background: #8DBFDE;
     }
+
+    #loanAmountDisplay::placeholder {
+        color: #cbd5e1;
+        opacity: 1;
+    }
 </style>
 
 <div class="erp-page-header">
@@ -132,9 +137,9 @@
         <div>
             <label id="tenorDisplayLabel" for="tenorDisplayInput" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>
             <input id="tenorInput" type="hidden" name="tenorMonths" value="${formValues['tenorMonths']}" />
-            <div class="tenure-unit-toggle-group mb-2 text-sm" role="group" aria-label="Tenure unit">
-                <button type="button" class="tenure-unit-toggle is-active px-3 py-2 transition" data-tenure-unit="MONTHS" aria-pressed="true">Months</button>
-                <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-tenure-unit="YEARS" aria-pressed="false">Years</button>
+            <div class="tenure-unit-toggle-group mb-2 text-sm" role="group" aria-label="<spring:message code='newloan.tenureUnit' text='Tenure unit' />">
+                <button type="button" class="tenure-unit-toggle is-active px-3 py-2 transition" data-tenure-unit="MONTHS" aria-pressed="true"><spring:message code="common.months.label" text="Months" /></button>
+                <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-tenure-unit="YEARS" aria-pressed="false"><spring:message code="common.years.label" text="Years" /></button>
             </div>
             <div>
                 <input id="tenorDisplayInput" type="number"
@@ -151,7 +156,7 @@
                data-prefix="<spring:message code='newloan.allowedTenureRange' />"
                data-to-label="<spring:message code='common.to' text='to' />"
                data-month-label="<spring:message code='common.months' text='month(s)' />"
-               data-year-label="year(s)"></p>
+               data-year-label="<spring:message code='common.years' text='year(s)' />"></p>
         </div>
     </div>
 
@@ -254,21 +259,21 @@
     <div id="repaymentSchedulePreviewCard" class="<c:if test='${empty repaymentSchedulePreviewRows}'>hidden </c:if>erp-section-muted">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <h5 class="erp-panel-title">Repayment Scheduler</h5>
-                <p class="text-sm text-slate-500">Estimated monthly installments with loan amount, interest, and balance after each payment.</p>
+                <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
+                <p class="text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
             </div>
         </div>
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table">
                 <thead>
                 <tr>
-                    <th>Pmt No.</th>
-                    <th>Month</th>
-                    <th>Beginning Balance</th>
-                    <th>Amount to Pay</th>
-                    <th>Loan Amount</th>
-                    <th>Interest</th>
-                    <th>Ending Balance</th>
+                    <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                    <th><spring:message code="repayment.month" text="Month" /></th>
+                    <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                    <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                    <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                    <th><spring:message code="repayment.interest" text="Interest" /></th>
+                    <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
                 </tr>
                 </thead>
                 <tbody id="repaymentSchedulePreviewBody">
@@ -358,11 +363,11 @@
             <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
             <span class="attachment-dropzone-main">
                 <span class="attachment-dropzone-copy">
-                    <span class="attachment-dropzone-title">Drop files here or choose from device</span>
-                    <span class="attachment-dropzone-help">Images and documents can be attached.</span>
-                    <span class="attachment-dropzone-files" data-attachment-files>No file selected</span>
+                    <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here or choose from device" /></span>
+                    <span class="attachment-dropzone-help"><spring:message code="attachments.dropzone.help" text="Images and documents can be attached." /></span>
+                    <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
                 </span>
-                <span class="attachment-dropzone-action">Choose files</span>
+                <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
             </span>
         </label>
         <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.attachments.note" /></p>
@@ -382,7 +387,7 @@
             </p>
             <label class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
                 <input id="loanTermsAccepted" type="checkbox" name="termsAccepted" value="true" class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                <span>I accept the terms and conditions for this loan application.</span>
+                <span><spring:message code="loan.terms.accept" text="I accept the terms and conditions for this loan application." /></span>
             </label>
             <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <c:choose>
@@ -497,6 +502,8 @@
         const msgUnableLoadSavings = "<spring:message code='newloan.js.unableLoadSavings' />";
         const msgStatusesLoaded = "<spring:message code='newloan.js.statusesLoaded' />";
         const msgUnableLoadOfficialDetails = "<spring:message code='newloan.js.unableLoadOfficialDetails' />";
+        const msgLoanDetailsLoaded = "<spring:message code='newloan.js.loanDetailsLoaded' text='Loan details loaded successfully.' />";
+        const msgFailedLoadLoanDetails = "<spring:message code='newloan.js.failedLoadLoanDetails' text='Failed to load the loan details.' />";
         const msgSendOtp = "<spring:message code='newloan.js.sendOtp' />";
         const msgSending = "<spring:message code='newloan.js.sending' />";
         const msgOtpSent = "<spring:message code='newloan.js.otpSent' />";
@@ -529,8 +536,12 @@
             }
             const parts = cleaned.split(".");
             const integerPart = parts.shift() || "";
+            const hasDecimal = cleaned.includes(".");
             const decimalPart = parts.join("").slice(0, 2);
-            return decimalPart ? integerPart + "." + decimalPart : integerPart;
+            if (hasDecimal) {
+                return (integerPart || "0") + "." + decimalPart;
+            }
+            return integerPart;
         }
 
         function formatMoneyInputValue(value) {
@@ -544,10 +555,46 @@
             return pieces.length > 1 ? withCommas + "." + pieces[1] : withCommas;
         }
 
-        function syncAmountInput() {
+        function caretPositionAfterMoneyFormat(rawValue, rawCaret, formattedValue) {
+            const valueBeforeCaret = rawValue.slice(0, rawCaret);
+            const decimalIndexBeforeCaret = valueBeforeCaret.indexOf(".");
+            if (decimalIndexBeforeCaret >= 0) {
+                const formattedDecimalIndex = formattedValue.indexOf(".");
+                if (formattedDecimalIndex >= 0) {
+                    const decimalDigitsBeforeCaret = valueBeforeCaret.slice(decimalIndexBeforeCaret + 1).replace(/\D/g, "").length;
+                    return Math.min(formattedDecimalIndex + 1 + decimalDigitsBeforeCaret, formattedValue.length);
+                }
+            }
+
+            const digitsBeforeCaret = valueBeforeCaret.replace(/\D/g, "").length;
+            if (digitsBeforeCaret <= 0) {
+                return 0;
+            }
+            let seenDigits = 0;
+            for (let index = 0; index < formattedValue.length; index++) {
+                if (/\d/.test(formattedValue.charAt(index))) {
+                    seenDigits++;
+                }
+                if (seenDigits >= digitsBeforeCaret) {
+                    return index + 1;
+                }
+            }
+            return formattedValue.length;
+        }
+
+        function syncAmountInput(preserveCaret) {
+            const rawValue = amountDisplayInput.value;
+            const rawCaret = typeof amountDisplayInput.selectionStart === "number"
+                ? amountDisplayInput.selectionStart
+                : rawValue.length;
             const normalized = normalizeMoneyInput(amountDisplayInput.value);
+            const formatted = formatMoneyInputValue(normalized);
             amountInput.value = normalized;
-            amountDisplayInput.value = formatMoneyInputValue(normalized);
+            amountDisplayInput.value = formatted;
+            if (preserveCaret && document.activeElement === amountDisplayInput) {
+                const nextCaret = caretPositionAfterMoneyFormat(rawValue, rawCaret, formatted);
+                amountDisplayInput.setSelectionRange(nextCaret, nextCaret);
+            }
         }
 
         let tenureUnit = "MONTHS";
@@ -983,7 +1030,9 @@
             }
         }
 
-        amountDisplayInput.addEventListener("input", syncAmountInput);
+        amountDisplayInput.addEventListener("input", function () {
+            syncAmountInput(true);
+        });
         amountDisplayInput.addEventListener("change", function () {
             syncAmountInput();
             resetFinancialPreview();
@@ -1074,9 +1123,9 @@
 
                 financialCard.classList.remove("hidden");
                 renderRepaymentSchedule(payload.repaymentSchedule || []);
-                showFinancialFeedback("success", payload.message || "Loan details loaded successfully.");
+                showFinancialFeedback("success", payload.message || msgLoanDetailsLoaded);
             } catch (error) {
-                showFinancialFeedback("error", error.message || "Failed to load the loan details.");
+                showFinancialFeedback("error", error.message || msgFailedLoadLoanDetails);
             } finally {
                 financialLoading.classList.add("hidden");
                 financialButton.disabled = false;
@@ -1171,7 +1220,7 @@
             purpose.setSelectionRange(start, end);
             const words = purpose.value.trim().split(/\s+/).filter(Boolean);
             if (words.length > 10) {
-                purpose.setCustomValidity("Use 10 words or fewer.");
+                purpose.setCustomValidity("<spring:message code='newloan.purpose.maxWords' text='Use 10 words or fewer.' />");
             } else {
                 purpose.setCustomValidity("");
             }
@@ -1295,7 +1344,7 @@
                             + (!eligible && item.disabledReason ? "<span class='mt-1 block text-xs text-rose-600'>" + item.disabledReason + "</span>" : "");
                         row.addEventListener("click", function () {
                             if (!eligible) {
-                                hint.textContent = item.disabledReason || "This guarantor is disabled by SACCO policy.";
+                                hint.textContent = item.disabledReason || "<spring:message code='newloan.js.guarantorDisabled' text='This guarantor is disabled by SACCO policy.' />";
                                 return;
                             }
                             if (selected.size >= required) {

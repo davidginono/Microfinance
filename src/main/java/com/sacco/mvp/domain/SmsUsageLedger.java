@@ -6,6 +6,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,6 +53,10 @@ public class SmsUsageLedger {
     @Column(name = "unit_change", nullable = false)
     private long unitChange;
 
+    @Builder.Default
+    @Column(name = "event_count", nullable = false)
+    private long eventCount = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SmsUsageOutcome outcome;
@@ -67,6 +73,20 @@ public class SmsUsageLedger {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "last_occurred_at", nullable = false)
+    private OffsetDateTime lastOccurredAt;
+
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @PrePersist
+    @PreUpdate
+    void applyDefaults() {
+        if (eventCount < 1) {
+            eventCount = 1;
+        }
+        if (lastOccurredAt == null) {
+            lastOccurredAt = createdAt == null ? OffsetDateTime.now() : createdAt;
+        }
+    }
 }
