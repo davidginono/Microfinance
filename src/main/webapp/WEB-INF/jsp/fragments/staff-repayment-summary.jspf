@@ -4,6 +4,11 @@
         [data-staff-repayment-summary] summary * {
             cursor: pointer !important;
         }
+        [data-staff-repayment-toggle]:hover {
+            background-color: #eff6ff !important;
+            box-shadow: 0 0 0 1px #bfdbfe !important;
+            color: #2563eb !important;
+        }
     </style>
     <details class="group erp-panel mt-5 overflow-hidden" data-staff-repayment-summary>
         <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sacco-blue">
@@ -11,7 +16,7 @@
                 <div class="text-sm font-semibold uppercase tracking-wide text-slate-700">Repayment Schedule</div>
                 <div class="mt-1 text-sm text-slate-500">
                     <c:choose>
-                        <c:when test="${repaymentSummaryEstimated}">Estimated from the applicant's loaded loan details.</c:when>
+                        <c:when test="${repaymentSummaryEstimated}">This is a calculated repayment schedule based on the applied loan amount.</c:when>
                         <c:otherwise>Actual repayment details recorded after disbursement.</c:otherwise>
                     </c:choose>
                 </div>
@@ -23,10 +28,12 @@
                 <c:if test="${not empty repaymentCountdown}">
                     <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">${repaymentCountdown}</span>
                 </c:if>
-                <span class="inline-flex cursor-pointer items-center gap-1 rounded-full bg-white px-3 py-1 text-sm font-semibold text-sacco-blue ring-1 ring-sacco-blue/20 transition hover:bg-sacco-blue hover:text-white hover:ring-sacco-blue">
-                    <span data-repayment-collapsed-label>Show schedule</span>
+                <span class="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold text-sacco-blue ring-1 ring-sacco-blue/20 transition" data-staff-repayment-toggle>
+                    <span data-repayment-collapsed-label>Show Schedule</span>
                     <span data-repayment-expanded-label class="hidden">Hide details</span>
-                    <span aria-hidden="true" class="text-xs transition group-open:rotate-180">v</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                    </svg>
                 </span>
             </div>
         </summary>
