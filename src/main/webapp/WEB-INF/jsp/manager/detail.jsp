@@ -516,7 +516,7 @@
                        autocomplete="off"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                       placeholder="TSh 100,000.00" />
+                       placeholder="100,000.00" />
                 <p class="mt-1 text-xs text-slate-500">This amount becomes the final disbursed principal and repayment basis.</p>
             </div>
             <div class="md:col-span-2">
@@ -688,7 +688,65 @@
         }
 
         function normalizeDisbursementAmount(value) {
-            return String(value || "").replace(/[^0-9.]/g, "");
+            const raw = String(value || "").replace(/[^0-9.]/g, "");
+            const parts = raw.split(".");
+            if (parts.length <= 1) {
+                return parts[0];
+            }
+            return parts[0] + "." + parts.slice(1).join("");
+        }
+
+        function formatDisbursementInputAmount(value, forceDecimals) {
+            const normalized = normalizeDisbursementAmount(value);
+            if (!normalized) {
+                return "";
+            }
+            const hasDecimal = normalized.includes(".");
+            const parts = normalized.split(".");
+            const whole = parts[0] || "0";
+            const decimals = parts[1] || "";
+            const formattedWhole = new Intl.NumberFormat("en-US", {
+                maximumFractionDigits: 0
+            }).format(Number(whole));
+            if (forceDecimals) {
+                return formattedWhole + "." + decimals.padEnd(2, "0").slice(0, 2);
+            }
+            if (hasDecimal) {
+                return formattedWhole + "." + decimals;
+            }
+            return formattedWhole;
+        }
+
+        function formatDisbursementInputWhileTyping(input) {
+            const rawValue = input.value;
+            const selectionStart = input.selectionStart || rawValue.length;
+            const valueBeforeCaret = rawValue.slice(0, selectionStart);
+            const digitsBeforeCaret = valueBeforeCaret.replace(/\D/g, "").length;
+            const decimalIndexBeforeCaret = valueBeforeCaret.indexOf(".");
+            const decimalDigitsBeforeCaret = decimalIndexBeforeCaret >= 0
+                ? valueBeforeCaret.slice(decimalIndexBeforeCaret + 1).replace(/\D/g, "").length
+                : 0;
+            input.value = formatDisbursementInputAmount(rawValue, false);
+
+            let nextCaret;
+            const formattedDecimalIndex = input.value.indexOf(".");
+            if (decimalIndexBeforeCaret >= 0 && formattedDecimalIndex >= 0) {
+                nextCaret = formattedDecimalIndex + 1 + decimalDigitsBeforeCaret;
+            } else {
+                let seenDigits = 0;
+                nextCaret = input.value.length;
+                for (let index = 0; index < input.value.length; index++) {
+                    if (/\d/.test(input.value.charAt(index))) {
+                        seenDigits++;
+                    }
+                    if (seenDigits >= digitsBeforeCaret) {
+                        nextCaret = index + 1;
+                        break;
+                    }
+                }
+            }
+            nextCaret = Math.min(nextCaret, input.value.length);
+            input.setSelectionRange(nextCaret, nextCaret);
         }
 
         const disbursementAmountInput = document.getElementById("disbursementAmountInput");
@@ -710,12 +768,12 @@
         if (disbursementRequestedAmount) {
             disbursementRequestedAmount.textContent = formatDisbursementAmount(disbursementRequestedAmount.textContent);
         }
-        disbursementAmountInput?.addEventListener("input", refreshDisbursementAmountPreview);
-        disbursementAmountInput?.addEventListener("focus", () => {
-            disbursementAmountInput.value = normalizeDisbursementAmount(disbursementAmountInput.value);
+        disbursementAmountInput?.addEventListener("input", () => {
+            formatDisbursementInputWhileTyping(disbursementAmountInput);
+            refreshDisbursementAmountPreview();
         });
         disbursementAmountInput?.addEventListener("blur", () => {
-            disbursementAmountInput.value = formatDisbursementAmount(disbursementAmountInput.value);
+            disbursementAmountInput.value = formatDisbursementInputAmount(disbursementAmountInput.value, true);
             refreshDisbursementAmountPreview();
         });
         disbursementAmountInput?.form?.addEventListener("submit", () => {
@@ -723,7 +781,7 @@
         });
         refreshDisbursementAmountPreview();
         if (disbursementAmountInput) {
-            disbursementAmountInput.value = formatDisbursementAmount(disbursementAmountInput.value);
+            disbursementAmountInput.value = formatDisbursementInputAmount(disbursementAmountInput.value, true);
         }
 
         function bindStaffOtpLiveStatus(input, statusBox, proceedButtons, verifyUrl) {
