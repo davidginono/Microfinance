@@ -134,18 +134,20 @@
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <p class="font-semibold text-slate-800">Estimated Repayment Schedule</p>
-                        <p class="mt-1 text-sm text-slate-500">Monthly amount, loan amount, and interest based on the amount and tenure entered.</p>
+                        <p class="mt-1 text-sm text-slate-500">Estimated monthly installments with loan amount, interest, and balance after each payment.</p>
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-slate-200">
                     <table class="erp-table">
                         <thead>
                         <tr>
+                            <th>Pmt No.</th>
                             <th>Month</th>
+                            <th>Beginning Balance</th>
                             <th>Amount to Pay</th>
                             <th>Loan Amount</th>
                             <th>Interest</th>
-                            <th>Balance After Payment</th>
+                            <th>Ending Balance</th>
                         </tr>
                         </thead>
                         <tbody id="productsRepaymentScheduleBody"></tbody>
@@ -470,12 +472,16 @@
                         + "<td class='px-3 py-2'></td>"
                         + "<td class='px-3 py-2'></td>"
                         + "<td class='px-3 py-2'></td>"
+                        + "<td class='px-3 py-2'></td>"
+                        + "<td class='px-3 py-2'></td>"
                         + "<td class='px-3 py-2'></td>";
-                    row.children[0].textContent = item.month || "-";
-                    row.children[1].textContent = item.installment || "-";
-                    row.children[2].textContent = item.principal || "-";
-                    row.children[3].textContent = item.interest || "-";
-                    row.children[4].textContent = item.outstandingBalance || "-";
+                    row.children[0].textContent = item.pmtNo || "-";
+                    row.children[1].textContent = item.month || "-";
+                    row.children[2].textContent = item.beginningBalance || "-";
+                    row.children[3].textContent = item.payment || item.installment || "-";
+                    row.children[4].textContent = item.loanAmount || item.principal || "-";
+                    row.children[5].textContent = item.interest || "-";
+                    row.children[6].textContent = item.endingBalance || item.outstandingBalance || "-";
                     scheduleBody.appendChild(row);
                 });
                 scheduleCard.classList.toggle("hidden", scheduleBody.children.length === 0);

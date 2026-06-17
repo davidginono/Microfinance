@@ -98,6 +98,7 @@ public class NotificationViewService {
         return new NotificationView(
             notification.getId(),
             notification.getType(),
+            humanizeType(notification.getType()),
             subject,
             message,
             source,
@@ -184,7 +185,7 @@ public class NotificationViewService {
             case "BOARD_APPROVED" -> "Board Approved";
             case "BOARD_REJECTED" -> "Board Rejected";
             case "ACCOUNTANT_REJECTED" -> "Accountant Rejected";
-            case "FINAL_APPROVED" -> "Loan Approved";
+            case "FINAL_APPROVED" -> "Final Approved and Disbursed";
             case "DEFAULTED" -> "Loan Defaulted";
             case "PAID" -> "Loan Marked As Paid";
             case "LOAN_FORFEITED" -> "Loan Forfeited";
@@ -221,8 +222,8 @@ public class NotificationViewService {
                 String finalDueDate = stringValue(details.get("finalDueDate"));
                 String firstRepaymentDate = stringValue(details.get("firstRepaymentDate"));
                 yield finalDueDate.isBlank()
-                    ? "Your loan application has been fully approved."
-                    : "Your loan was approved. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
+                    ? "Your loan application is Final Approved and Disbursed."
+                    : "Your loan is Final Approved and Disbursed. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
             }
             case "PAID" -> {
                 String source = stringValue(details.get("source"));
@@ -382,6 +383,7 @@ public class NotificationViewService {
     public record NotificationView(
         UUID id,
         String type,
+        String typeLabel,
         String subject,
         String message,
         String source,
@@ -400,6 +402,10 @@ public class NotificationViewService {
 
         public String getType() {
             return type;
+        }
+
+        public String getTypeLabel() {
+            return typeLabel;
         }
 
         public String getSubject() {

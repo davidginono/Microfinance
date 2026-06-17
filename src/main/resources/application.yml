@@ -1,6 +1,4 @@
 spring:
-  config:
-    import: optional:file:./application-local.yml
   sql:
     init:
       mode: never
@@ -30,12 +28,12 @@ spring:
   web:
     resources:
       cache:
-        period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:3600}
+        period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
     port: ${SPRING_MAIL_PORT:587}
-    username: ${SPRING_MAIL_USERNAME:}
-    password: ${SPRING_MAIL_PASSWORD:}
+    username: ${SPRING_MAIL_USERNAME:davidginono625@gmail.com}
+    password: ${SPRING_MAIL_PASSWORD:xgii umdj qghc egyp}
     properties:
       mail:
         smtp:
@@ -50,9 +48,14 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID:rwexcfvghbj}
             client-secret: ${GOOGLE_CLIENT_SECRET:werxtcfvghbj}
             scope: openid,email,profile
+  devtools:
+    restart:
+      enabled: ${SPRING_DEVTOOLS_RESTART_ENABLED:true}
+    livereload:
+      enabled: ${SPRING_DEVTOOLS_LIVERELOAD_ENABLED:true}
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   shutdown: graceful
   compression:
     enabled: ${SERVER_COMPRESSION_ENABLED:true}
@@ -71,7 +74,7 @@ server:
         same-site: lax
     jsp:
       init-parameters:
-        development: ${SERVER_SERVLET_JSP_DEVELOPMENT:false}
+        development: ${SERVER_SERVLET_JSP_DEVELOPMENT:true}
 
 logging:
   level:
@@ -83,37 +86,39 @@ app:
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
   outbox:
-    scheduler-enabled: true
+    scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:true}
     batch-size: ${APP_OUTBOX_BATCH_SIZE:250}
     fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:500}
   application-numbers:
     block-size: ${APP_APPLICATION_NUMBERS_BLOCK_SIZE:100}
   loan-payments:
-    sync-enabled: true
-    sync-cron: "0 0 10 1 * *"
-    sync-zone: "Africa/Nairobi"
+    sync-enabled: ${APP_LOAN_PAYMENTS_SYNC_ENABLED:true}
+    sync-cron: "${APP_LOAN_PAYMENTS_SYNC_CRON:0 0 10 1 * *}"
+    sync-zone: ${APP_LOAN_PAYMENTS_SYNC_ZONE:Africa/Nairobi}
   sms:
-    enabled: ${APP_SMS_ENABLED:false}
+    enabled: ${APP_SMS_ENABLED:true}
     connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}
     read-timeout: ${APP_SMS_READ_TIMEOUT:8s}
     benter:
       base-url: ${APP_SMS_BENTER_BASE_URL:https://api.onfonmedia.co.ke}
       send-path: ${APP_SMS_BENTER_SEND_PATH:/v1/sms/SendBulkSMS}
-      client-id: ${APP_SMS_BENTER_CLIENT_ID:}
-      api-key: ${APP_SMS_BENTER_API_KEY:}
-      sender-id: ${APP_SMS_BENTER_SENDER_ID:INFO}
+      client-id: ${APP_SMS_BENTER_CLIENT_ID:foresight}
+      api-key: ${APP_SMS_BENTER_API_KEY:Lm4HhIKNO8wl7TVzRAnoicjr02g6Euv9aS5FZMCWUqx3BQk1}
+      sender-id: ${APP_SMS_BENTER_SENDER_ID:FORESIGHT}
   retention:
-    cleanup-enabled: true
-    cleanup-cron: "0 30 2 * * *"
-    audit-log-days: 70
-    outbox-days: 70
+    cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:true}
+    cleanup-cron: "${APP_RETENTION_CLEANUP_CRON:0 30 2 * * *}"
+    audit-log-days: ${APP_RETENTION_AUDIT_LOG_DAYS:70}
+    outbox-days: ${APP_RETENTION_OUTBOX_DAYS:70}
   auth:
     google-sso:
       enabled: ${APP_AUTH_GOOGLE_SSO_ENABLED:false}
     otp:
-      ttl-minutes: 10
+      ttl-minutes: ${APP_AUTH_OTP_TTL_MINUTES:10}
     invitation:
       ttl-hours: ${APP_AUTH_INVITATION_TTL_HOURS:72}
+    local-dev-minor-admin-password-login-enabled: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD_LOGIN_ENABLED:true}
+    local-dev-minor-admin-password: ${APP_AUTH_LOCAL_DEV_MINOR_ADMIN_PASSWORD:DevMinor123!}
 
 external:
   foresight:

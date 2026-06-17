@@ -113,6 +113,12 @@ public class LoanProductSetting {
     @Column(name = "disbursement_officer_required")
     private Boolean disbursementOfficerRequired;
 
+    @Column(name = "disbursement_proof_required")
+    private Boolean disbursementProofRequired;
+
+    @Column(name = "applicant_attachment_required")
+    private Boolean applicantAttachmentRequired;
+
     @Column(name = "guarantor_min_savings_check_required")
     private Boolean guarantorMinSavingsCheckRequired;
 
@@ -232,6 +238,14 @@ public class LoanProductSetting {
 
     public boolean isDisbursementOfficerRequired() {
         return disbursementOfficerRequired == null || disbursementOfficerRequired;
+    }
+
+    public boolean isDisbursementProofRequired() {
+        return disbursementProofRequired == null || disbursementProofRequired;
+    }
+
+    public boolean isApplicantAttachmentRequired() {
+        return Boolean.TRUE.equals(applicantAttachmentRequired);
     }
 
     public boolean isGuarantorMinSavingsCheckRequired() {

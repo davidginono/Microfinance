@@ -877,6 +877,26 @@
 
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
+                            <p class="text-sm font-semibold text-sacco-ink">Disbursement Proof</p>
+                            <p class="text-sm text-slate-500">Controls whether a proof attachment is required before releasing this product.</p>
+                        </div>
+                        <p class="text-right text-base font-semibold ${product.disbursementProofRequired != false ? 'text-emerald-700' : 'text-slate-600'}">
+                            ${product.disbursementProofRequired != false ? 'Required' : 'Optional'}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <div>
+                            <p class="text-sm font-semibold text-sacco-ink">Applicant Attachments</p>
+                            <p class="text-sm text-slate-500">Controls whether members must upload a supporting attachment while applying.</p>
+                        </div>
+                        <p class="text-right text-base font-semibold ${product.applicantAttachmentRequired ? 'text-emerald-700' : 'text-slate-600'}">
+                            ${product.applicantAttachmentRequired ? 'Required' : 'Optional'}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Minimum votes assigned and approval threshold used for committee decisions." /></p>
                         </div>
@@ -1310,6 +1330,28 @@
                             </div>
 
                             <div class="workflow-subsection">
+                                <p class="workflow-subsection-title">Applicant</p>
+                                <div class="workflow-support-grid">
+                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                        <input name="applicantAttachmentRequired" type="checkbox" value="true" />
+                                        <span>Require applicant attachment while applying</span>
+                                    </label>
+                                    <input type="hidden" name="applicantAttachmentRequired" value="false" />
+                                </div>
+                            </div>
+
+                            <div class="workflow-subsection">
+                                <p class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement Officer" /></p>
+                                <div class="workflow-support-grid">
+                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                        <input name="disbursementProofRequired" type="checkbox" value="true" checked />
+                                        <span>Require proof attachment before disbursement</span>
+                                    </label>
+                                    <input type="hidden" name="disbursementProofRequired" value="false" />
+                                </div>
+                            </div>
+
+                            <div class="workflow-subsection">
                                 <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
                                 <div class="workflow-support-grid">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1736,6 +1778,28 @@
                                     <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Minimum Committee Approvals" />
                                     <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeApprovalThreshold}" data-number-range-max="15" data-workflow-committee-threshold />
                                 </label>
+                            </div>
+                        </div>
+
+                        <div class="workflow-subsection">
+                            <p class="workflow-subsection-title">Applicant</p>
+                            <div class="workflow-support-grid">
+                                <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    <input name="applicantAttachmentRequired" type="checkbox" value="true" ${product.applicantAttachmentRequired ? 'checked' : ''} />
+                                    <span>Require applicant attachment while applying</span>
+                                </label>
+                                <input type="hidden" name="applicantAttachmentRequired" value="false" />
+                            </div>
+                        </div>
+
+                        <div class="workflow-subsection">
+                            <p class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement Officer" /></p>
+                            <div class="workflow-support-grid">
+                                <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    <input name="disbursementProofRequired" type="checkbox" value="true" ${product.disbursementProofRequired != false ? 'checked' : ''} />
+                                    <span>Require proof attachment before disbursement</span>
+                                </label>
+                                <input type="hidden" name="disbursementProofRequired" value="false" />
                             </div>
                         </div>
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.GuarantorRequest;
+import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.ManagerDecision;
@@ -66,16 +67,20 @@ public class LoanPresentationService {
     }
 
     public Map<String, Object> parseFinancialFields(String json) {
-        return parseFinancialFields(json, null);
+        return parseFinancialFields(json, null, null);
     }
 
     public Map<String, Object> parseFinancialFields(LoanApplication app) {
         return app == null
             ? Collections.emptyMap()
-            : parseFinancialFields(app.getFinancialSnapshot(), app.getAmount());
+            : parseFinancialFields(app.getFinancialSnapshot(), app.getAmount(), app.getTenorMonths());
     }
 
     public Map<String, Object> parseFinancialFields(String json, BigDecimal effectivePrincipal) {
+        return parseFinancialFields(json, effectivePrincipal, null);
+    }
+
+    private Map<String, Object> parseFinancialFields(String json, BigDecimal effectivePrincipal, Integer fallbackTenorMonths) {
         if (json == null || json.isBlank()) {
             return Collections.emptyMap();
         }
@@ -86,7 +91,17 @@ public class LoanPresentationService {
             addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
             putMoney(display, "Loan Amount (TZS)", principalAmount);
+            putValue(display, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
             addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
+            Integer tenorMonths = readInteger(raw.get("tenorMonths"));
+            if (tenorMonths == null) {
+                tenorMonths = readInteger(raw.get("numberOfPayments"));
+            }
+            if (tenorMonths == null) {
+                tenorMonths = fallbackTenorMonths;
+            }
+            putValue(display, "Loan Period in Years", formatYears(tenorMonths));
+            putValue(display, "Number of Payments", tenorMonths);
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
                 display.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
@@ -143,6 +158,17 @@ public class LoanPresentationService {
             return null;
         }
         return new BigDecimal(text);
+    }
+
+    private Integer readInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).trim()).intValueExact();
+        } catch (ArithmeticException | NumberFormatException ex) {
+            return null;
+        }
     }
 
     public List<Map<String, Object>> buildProgressItems(LoanApplication app) {
@@ -203,16 +229,16 @@ public class LoanPresentationService {
                 currentIndex = labels.size() - 1;
             }
             case FINAL_APPROVED -> {
-                labels.add("Disbursed Loan");
+                labels.add("Final Approved and Disbursed");
                 currentIndex = labels.size() - 1;
             }
             case DEFAULTED -> {
-                labels.add("Disbursed Loan");
+                labels.add("Final Approved and Disbursed");
                 labels.add("Defaulted");
                 currentIndex = labels.size() - 1;
             }
             case PAID -> {
-                labels.add("Disbursed Loan");
+                labels.add("Final Approved and Disbursed");
                 labels.add("Paid");
                 currentIndex = labels.size() - 1;
             }
@@ -302,7 +328,9 @@ public class LoanPresentationService {
             putMoney(display, "Loan Amount", app.getAmount());
             putValue(display, "Repayment Period", app.getTenorMonths() == null ? null : app.getTenorMonths() + " month(s)");
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
-            putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putValue(display, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putValue(display, "Loan Period in Years", formatYears(app.getTenorMonths()));
+            putValue(display, "Number of Payments", app.getTenorMonths());
             putMoney(display, "Estimated Installment", raw.get("monthlyRepaymentAmount"));
             putMoney(display, "Total Interest", raw.get("interestAmount"));
             putMoney(display, "Estimated Total Repayment", raw.get("principalPlusInterest"));
@@ -353,6 +381,27 @@ public class LoanPresentationService {
         return parseRepaymentRows(json, Collections.emptyList());
     }
 
+    public List<Map<String, Object>> reviewRepaymentRows(LoanApplication app) {
+        return reviewRepaymentRows(app, Collections.emptyList(), LoanPaymentSummaryView.empty());
+    }
+
+    public List<Map<String, Object>> reviewRepaymentRows(LoanApplication app,
+                                                         List<LoanPaymentTransaction> transactions,
+                                                         LoanPaymentSummaryView paymentSummary) {
+        if (app == null) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> storedRows = parseRepaymentRows(
+            app.getRepaymentScheduleJson(),
+            transactions,
+            paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary
+        );
+        if (!storedRows.isEmpty()) {
+            return storedRows;
+        }
+        return estimatedReviewRepaymentRows(app);
+    }
+
     public List<Map<String, Object>> parseRepaymentRows(String json,
                                                         List<LoanPaymentTransaction> transactions,
                                                         LoanPaymentSummaryView paymentSummary) {
@@ -392,9 +441,14 @@ public class LoanPresentationService {
                 Map<String, Object> row = new LinkedHashMap<>();
                 Object installmentNumber = item.get("installmentNumber");
                 row.put("installment", installmentNumber == null ? "-" : "Installment " + installmentNumber);
+                row.put("installmentNumber", installmentNumber == null ? "-" : String.valueOf(installmentNumber));
+                row.put("pmtNo", installmentNumber == null ? "-" : String.valueOf(installmentNumber));
                 Object dueDateValue = item.get("dueDate");
                 row.put("dueDate", dueDateValue);
                 row.put("amount", formatMoneyValue(item.get("amount")));
+                row.put("payment", formatMoneyValue(item.get("amount")));
+                row.put("loanAmount", formatMoneyValue(item.get("principalComponent")));
+                row.put("interest", formatMoneyValue(item.get("interestComponent")));
                 row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
 
                 PaidBucket bucket = lookupBucket(paidByMonth, dueDateValue);
@@ -412,6 +466,118 @@ public class LoanPresentationService {
         } catch (Exception ex) {
             return Collections.emptyList();
         }
+    }
+
+    private List<Map<String, Object>> estimatedReviewRepaymentRows(LoanApplication app) {
+        if (!isEstimatedReviewRepaymentSummary(app) || app.getAmount() == null) {
+            return Collections.emptyList();
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            BigDecimal principal = app.getAmount().setScale(2, RoundingMode.HALF_UP);
+            int months = app.getTenorMonths() == null || app.getTenorMonths() <= 0 ? 1 : app.getTenorMonths();
+            BigDecimal annualRate = toBigDecimal(raw.get("interestRate"));
+            if (annualRate == null) {
+                annualRate = BigDecimal.ZERO;
+            }
+            InterestMethod interestMethod = resolveInterestMethod(raw.get("interestMethod"));
+            BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
+            BigDecimal flatTotalInterest = toBigDecimal(raw.get("interestAmount"));
+            if (flatTotalInterest == null) {
+                flatTotalInterest = principal.multiply(annualRate)
+                    .multiply(BigDecimal.valueOf(months))
+                    .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+            }
+            BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+            BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
+            BigDecimal reducingInstallment = toBigDecimal(raw.get("monthlyRepaymentAmount"));
+            if (reducingInstallment == null) {
+                reducingInstallment = reducingInstallment(principal, monthlyRate, months);
+            }
+
+            List<Map<String, Object>> rows = new ArrayList<>();
+            BigDecimal runningPrincipal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal runningInterest = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal remainingPrincipal = principal;
+            for (int month = 1; month <= months; month++) {
+                BigDecimal principalComponent;
+                BigDecimal interestComponent;
+                BigDecimal installmentAmount;
+                BigDecimal beginningBalance = remainingPrincipal;
+                if (interestMethod == InterestMethod.REDUCING_BALANCE) {
+                    interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
+                    principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                    if (principalComponent.compareTo(BigDecimal.ZERO) < 0) {
+                        principalComponent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    }
+                    if (month == months) {
+                        principalComponent = principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP);
+                        installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                    } else {
+                        installmentAmount = reducingInstallment;
+                    }
+                } else {
+                    principalComponent = month == months
+                        ? principal.subtract(runningPrincipal).setScale(2, RoundingMode.HALF_UP)
+                        : flatPrincipalBase;
+                    interestComponent = month == months
+                        ? flatTotalInterest.subtract(runningInterest).setScale(2, RoundingMode.HALF_UP)
+                        : flatInterestBase;
+                    installmentAmount = principalComponent.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                }
+
+                runningPrincipal = runningPrincipal.add(principalComponent).setScale(2, RoundingMode.HALF_UP);
+                runningInterest = runningInterest.add(interestComponent).setScale(2, RoundingMode.HALF_UP);
+                remainingPrincipal = principal.subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("installment", "Installment " + month);
+                row.put("installmentNumber", String.valueOf(month));
+                row.put("pmtNo", String.valueOf(month));
+                row.put("month", "Month " + month);
+                row.put("beginningBalance", formatMoney(beginningBalance));
+                row.put("dueDate", "-");
+                row.put("amount", formatMoney(installmentAmount));
+                row.put("payment", formatMoney(installmentAmount));
+                row.put("loanAmount", formatMoney(principalComponent));
+                row.put("interest", formatMoney(interestComponent));
+                row.put("scheduledBreakdown", "Loan Amount: " + formatMoney(principalComponent) + "\nInterest: " + formatMoney(interestComponent));
+                row.put("outstandingBalance", formatMoney(remainingPrincipal));
+                row.put("endingBalance", formatMoney(remainingPrincipal));
+                row.put("principalPaid", "-");
+                row.put("interestPaid", "-");
+                row.put("totalPaid", "-");
+                row.put("paymentDate", "-");
+                rows.add(row);
+            }
+            return rows;
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
+    }
+
+    private InterestMethod resolveInterestMethod(Object value) {
+        if (value == null) {
+            return InterestMethod.FLAT_RATE;
+        }
+        try {
+            return InterestMethod.valueOf(String.valueOf(value));
+        } catch (IllegalArgumentException ex) {
+            return InterestMethod.FLAT_RATE;
+        }
+    }
+
+    private BigDecimal reducingInstallment(BigDecimal principal, BigDecimal monthlyRate, int months) {
+        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        if (monthlyRate == null || monthlyRate.compareTo(BigDecimal.ZERO) <= 0) {
+            return principal.divide(BigDecimal.valueOf(Math.max(months, 1)), 2, RoundingMode.HALF_UP);
+        }
+        double rate = monthlyRate.doubleValue();
+        double factor = 1d - Math.pow(1d + rate, -Math.max(months, 1));
+        return BigDecimal.valueOf(principal.doubleValue() * rate / factor)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private YearMonth latestTransactionMonth(List<LoanPaymentTransaction> transactions) {
@@ -551,6 +717,17 @@ public class LoanPresentationService {
         return amount.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
     }
 
+    private String formatYears(Integer tenorMonths) {
+        if (tenorMonths == null || tenorMonths <= 0) {
+            return null;
+        }
+        BigDecimal years = BigDecimal.valueOf(tenorMonths)
+            .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
+            .stripTrailingZeros();
+        String suffix = BigDecimal.ONE.compareTo(years) == 0 ? " year" : " years";
+        return years.toPlainString() + suffix;
+    }
+
     private String scheduledAmountBreakdown(Map<?, ?> item) {
         String principal = formatMoneyValue(item.get("principalComponent"));
         String interest = formatMoneyValue(item.get("interestComponent"));
@@ -560,9 +737,9 @@ public class LoanPresentationService {
             return "";
         }
         if (!hasInterest || "TSh 0.00".equals(interest)) {
-            return "Principal " + principal;
+            return "Principal: " + principal;
         }
-        return "Principal " + principal + " + Interest " + interest;
+        return "Principal: " + principal + "\nInterest: " + interest;
     }
 
     private static final class PaidBucket {
@@ -650,6 +827,7 @@ public class LoanPresentationService {
                                      Map<String, Object> financialFields,
                                      List<GuarantorRequest> guarantorRequests,
                                      Map<UUID, String> guarantorNames,
+                                     Map<UUID, String> guarantorMemberNumbers,
                                      List<ManagerReview> staffReviews,
                                      Map<UUID, Member> staffReviewers,
                                      List<BoardReview> boardReviews,
@@ -659,7 +837,7 @@ public class LoanPresentationService {
         html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">");
         html.append("<title>Loan Application</title>");
         html.append("<style>");
-        html.append("body{font-family:Arial,sans-serif;margin:24px;color:#172033;}h1,h2{margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #d8dee8;padding:8px;text-align:left;vertical-align:top;}th{background:#f4f6f8;} .meta{margin:4px 0;} .note{margin-top:12px;padding:10px;background:#f7f4ee;border:1px solid #e7d6ca;} .signature-box{margin-top:18px;padding:16px;border:1px solid #d8dee8;background:#f8fafc;} .signature-text{margin-top:8px;font-family:'Brush Script MT','Segoe Script','Lucida Handwriting',cursive;font-size:54px;line-height:1.05;color:#0f172a;} .muted{color:#5b6b82;font-size:12px;}");
+        html.append("body{font-family:Arial,sans-serif;margin:24px;color:#172033;}h1,h2{margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #d8dee8;padding:8px;text-align:left;vertical-align:top;}th{background:#f4f6f8;} .meta{margin:4px 0;} .note{margin-top:12px;padding:10px;background:#f7f4ee;border:1px solid #e7d6ca;} .signature-box{margin-top:18px;padding:16px;border:1px solid #d8dee8;background:#f8fafc;} .signature-text{margin-top:8px;font-family:'Times New Roman',Times,serif;font-style:italic;font-size:34px;line-height:1.05;color:#0f172a;} .muted{color:#5b6b82;font-size:12px;}");
         html.append("</style></head><body>");
         String printableSaccoName = saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim();
         html.append("<h1>").append(esc(printableSaccoName)).append(" Loan Application</h1>");
@@ -692,7 +870,7 @@ public class LoanPresentationService {
             appendTable(html, "Repayment Timetable", repaymentTable);
         }
 
-        appendGuarantorSummary(html, guarantorRequests, guarantorNames);
+        appendGuarantorSummary(html, guarantorRequests, guarantorNames, guarantorMemberNumbers);
         appendStaffReviewSummary(html, staffReviews, staffReviewers);
         appendBoardCommitteeSummary(html, boardReviews, boardMembers);
         appendApplicantSignature(html, app, applicant);
@@ -707,6 +885,7 @@ public class LoanPresentationService {
                                     Map<String, Object> financialFields,
                                     List<GuarantorRequest> guarantorRequests,
                                     Map<UUID, String> guarantorNames,
+                                    Map<UUID, String> guarantorMemberNumbers,
                                     List<ManagerReview> staffReviews,
                                     Map<UUID, Member> staffReviewers,
                                     List<BoardReview> boardReviews,
@@ -726,6 +905,7 @@ public class LoanPresentationService {
                 parseRepaymentRows(app.getRepaymentScheduleJson()),
                 guarantorRequests,
                 guarantorNames,
+                guarantorMemberNumbers,
                 staffReviews,
                 staffReviewers,
                 boardReviews,
@@ -741,6 +921,9 @@ public class LoanPresentationService {
     }
 
     private void appendApplicantSignature(StringBuilder html, LoanApplication app, Member applicant) {
+        if (app.getApplicantSignatureVerifiedAt() == null) {
+            return;
+        }
         String signatureText = app.getApplicantSignatureText();
         if ((signatureText == null || signatureText.isBlank()) && applicant != null) {
             signatureText = applicant.getSignatureText();
@@ -772,20 +955,25 @@ public class LoanPresentationService {
 
     private void appendGuarantorSummary(StringBuilder html,
                                         List<GuarantorRequest> guarantorRequests,
-                                        Map<UUID, String> guarantorNames) {
+                                        Map<UUID, String> guarantorNames,
+                                        Map<UUID, String> guarantorMemberNumbers) {
         html.append("<h2>Guarantor Summary</h2>");
-        html.append("<table><thead><tr><th>Guarantor</th><th>Status</th><th>Signature</th><th>Verified At</th></tr></thead><tbody>");
+        html.append("<table><thead><tr><th>Guarantor</th><th>Member Number</th><th>Status</th><th>Signature</th><th>Verified At</th></tr></thead><tbody>");
         if (guarantorRequests == null || guarantorRequests.isEmpty()) {
-            html.append("<tr><td colspan=\"4\">No guarantor details available.</td></tr>");
+            html.append("<tr><td colspan=\"5\">No guarantor details available.</td></tr>");
         } else {
             for (GuarantorRequest request : guarantorRequests) {
                 String name = guarantorNames == null ? null : guarantorNames.get(request.getGuarantorMemberId());
+                String memberNumber = guarantorMemberNumbers == null ? null : guarantorMemberNumbers.get(request.getGuarantorMemberId());
                 html.append("<tr><td>")
                     .append(esc(name == null || name.isBlank() ? "Guarantor" : name))
+                    .append("</td><td>")
+                    .append(esc(memberNumber == null || memberNumber.isBlank() ? "-" : memberNumber))
                     .append("</td><td>")
                     .append(esc(humanizeValue(request.getStatus())))
                     .append("</td><td>");
                 if (request.getStatus() == com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
+                    && request.getGuarantorSignatureVerifiedAt() != null
                     && request.getGuarantorSignatureText() != null
                     && !request.getGuarantorSignatureText().isBlank()) {
                     html.append("<div class=\"signature-text\" style=\"font-size:34px;\">")
@@ -826,7 +1014,10 @@ public class LoanPresentationService {
                     .append("</td><td>")
                     .append(esc(formatTimestamp(review.getCreatedAt())))
                     .append("</td><td>");
-                if (signatureText != null && !signatureText.isBlank()) {
+                if (reviewer != null
+                    && reviewer.getSignatureRegisteredAt() != null
+                    && signatureText != null
+                    && !signatureText.isBlank()) {
                     html.append("<div class=\"signature-text\" style=\"font-size:34px;\">")
                         .append(esc(signatureText))
                         .append("</div>");
@@ -861,6 +1052,7 @@ public class LoanPresentationService {
                     .append(esc(formatTimestamp(review.getDecidedAt())))
                     .append("</td><td>");
                 if (review.getDecision() == BoardDecision.APPROVED
+                    && review.getBoardSignatureVerifiedAt() != null
                     && review.getBoardSignatureText() != null
                     && !review.getBoardSignatureText().isBlank()) {
                     html.append("<div class=\"signature-text\" style=\"font-size:34px;\">")
@@ -1103,6 +1295,7 @@ public class LoanPresentationService {
         private static final float LINE_GAP = 3f;
         private static final float CELL_PADDING_X = 6f;
         private static final float CELL_PADDING_Y = 5f;
+        private static final float MAX_ATTACHMENT_PREVIEW_HEIGHT = 280f;
         private static final Color TEXT_COLOR = new Color(41, 55, 71);
         private static final Color MUTED_COLOR = new Color(87, 106, 126);
         private static final Color BORDER_COLOR = new Color(225, 232, 238);
@@ -1123,6 +1316,7 @@ public class LoanPresentationService {
         private final List<Map<String, Object>> repaymentRows;
         private final List<GuarantorRequest> guarantorRequests;
         private final Map<UUID, String> guarantorNames;
+        private final Map<UUID, String> guarantorMemberNumbers;
         private final List<ManagerReview> staffReviews;
         private final Map<UUID, Member> staffReviewers;
         private final List<BoardReview> boardReviews;
@@ -1147,6 +1341,7 @@ public class LoanPresentationService {
                                                     List<Map<String, Object>> repaymentRows,
                                                     List<GuarantorRequest> guarantorRequests,
                                                     Map<UUID, String> guarantorNames,
+                                                    Map<UUID, String> guarantorMemberNumbers,
                                                     List<ManagerReview> staffReviews,
                                                     Map<UUID, Member> staffReviewers,
                                                     List<BoardReview> boardReviews,
@@ -1163,6 +1358,7 @@ public class LoanPresentationService {
             this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
             this.guarantorRequests = guarantorRequests == null ? Collections.emptyList() : guarantorRequests;
             this.guarantorNames = guarantorNames == null ? Collections.emptyMap() : guarantorNames;
+            this.guarantorMemberNumbers = guarantorMemberNumbers == null ? Collections.emptyMap() : guarantorMemberNumbers;
             this.staffReviews = staffReviews == null ? Collections.emptyList() : staffReviews;
             this.staffReviewers = staffReviewers == null ? Collections.emptyMap() : staffReviewers;
             this.boardReviews = boardReviews == null ? Collections.emptyList() : boardReviews;
@@ -1216,7 +1412,7 @@ public class LoanPresentationService {
         private void drawHeader() throws IOException {
             ensureSpace(116f);
             float pageWidth = page.getMediaBox().getWidth();
-            float headerTop = y;
+            float headerTop = page.getMediaBox().getHeight();
             stream.setNonStrokingColor(BRAND_BROWN);
             stream.addRect(0f, headerTop - 7f, pageWidth, 7f);
             stream.fill();
@@ -1238,9 +1434,7 @@ public class LoanPresentationService {
             stream.fill();
 
             y = headerTop - 124f;
-            writeText("Loan Application Review Copy", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
-            String copyLabel = includeRecordedSignatures ? "Signed staff record copy" : "Physical signature copy";
-            writeRightAligned(copyLabel, pageWidth - MARGIN, y + 1f, bold, META_SIZE, BRAND_GREEN);
+            writeText("Loan Application", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
             y -= 18f;
             writeText("Prepared from the system record for formal review and filing", MARGIN, y, regular, META_SIZE, MUTED_COLOR);
             y -= 20f;
@@ -1303,7 +1497,7 @@ public class LoanPresentationService {
         }
 
         private void drawRecordedInformationOverview() throws IOException {
-            drawSectionStrip("Recorded Information", "Key details not repeated in the summary");
+            drawSectionStrip("Recorded Information", "");
             List<String[]> cards = List.of(
                 new String[]{
                     "MEMBER RECORD",
@@ -1393,7 +1587,9 @@ public class LoanPresentationService {
             stream.addRect(MARGIN, y - 24f, contentWidth(), 24f);
             stream.stroke();
             writeText(title, MARGIN + 9f, y - 16f, bold, SECTION_SIZE, TEXT_COLOR);
-            writeRightAligned(helper, page.getMediaBox().getWidth() - MARGIN - 9f, y - 16f, regular, SMALL_SIZE, MUTED_COLOR);
+            if (helper != null && !helper.isBlank()) {
+                writeRightAligned(helper, page.getMediaBox().getWidth() - MARGIN - 9f, y - 16f, regular, SMALL_SIZE, MUTED_COLOR);
+            }
             y -= 34f;
         }
 
@@ -1492,7 +1688,6 @@ public class LoanPresentationService {
 
             float maxWidth = contentWidth();
             float availableHeight = y - (BOTTOM_MARGIN + FOOTER_GAP);
-            float fullPagePreviewHeight = page.getMediaBox().getHeight() - TOP_MARGIN - BOTTOM_MARGIN - FOOTER_GAP - 18f;
             if (availableHeight < 120f) {
                 startNewPage();
                 writeText(label, MARGIN, y, bold, BODY_SIZE, TEXT_COLOR);
@@ -1501,7 +1696,7 @@ public class LoanPresentationService {
             }
             float targetWidth = maxWidth;
             float targetHeight = image.getHeight() * (targetWidth / image.getWidth());
-            float maxHeight = Math.min(availableHeight, fullPagePreviewHeight);
+            float maxHeight = Math.min(availableHeight, MAX_ATTACHMENT_PREVIEW_HEIGHT);
             if (targetHeight > maxHeight) {
                 targetHeight = maxHeight;
                 targetWidth = image.getWidth() * (targetHeight / image.getHeight());
@@ -1521,9 +1716,9 @@ public class LoanPresentationService {
             List<String[]> rows = new ArrayList<>();
             for (Map<String, Object> row : repaymentRows) {
                 rows.add(new String[]{
-                    sanitizePdfText(String.valueOf(row.get("installment"))),
+                    sanitizePdfText(String.valueOf(row.get("installmentNumber"))),
                     sanitizePdfText(String.valueOf(row.get("dueDate"))),
-                    sanitizePdfText(String.valueOf(row.get("amount"))),
+                    repaymentAmountWithBreakdown(row),
                     sanitizePdfText(String.valueOf(row.get("outstandingBalance"))),
                     sanitizePdfText(String.valueOf(row.get("principalPaid"))),
                     sanitizePdfText(String.valueOf(row.get("interestPaid"))),
@@ -1532,8 +1727,8 @@ public class LoanPresentationService {
                 });
             }
             drawTable(
-                new String[]{"Installment", "Due Date", "Amount", "Outstanding", "Principal Paid", "Interest Paid", "Total Paid", "Payment Date"},
-                new float[]{48f, 62f, 64f, 68f, 68f, 64f, 58f, contentWidth() - 432f},
+                new String[]{"No.", "Due Date", "Monthly Amount", "Outstanding", "Principal Paid", "Interest Paid", "Total Paid", "Payment Date"},
+                new float[]{36f, 62f, 106f, 62f, 62f, 60f, 54f, contentWidth() - 442f},
                 rows,
                 SMALL_SIZE,
                 SMALL_SIZE,
@@ -1541,11 +1736,20 @@ public class LoanPresentationService {
             );
         }
 
+        private String repaymentAmountWithBreakdown(Map<String, Object> row) {
+            String amount = sanitizePdfText(String.valueOf(row.get("amount")));
+            String breakdown = sanitizePdfText(String.valueOf(row.get("scheduledBreakdown")));
+            if ("-".equals(breakdown)) {
+                return amount;
+            }
+            return amount + "\n" + breakdown;
+        }
+
         private void drawGuarantorSection() throws IOException {
             drawSectionHeading("Guarantor Summary");
             List<String[]> rows = new ArrayList<>();
             if (guarantorRequests.isEmpty()) {
-                rows.add(new String[]{"-", "No guarantor details available."});
+                rows.add(new String[]{"-", "-", "No guarantor details available.", "-", "-"});
             } else {
                 for (GuarantorRequest request : guarantorRequests) {
                     String guarantorLabel = guarantorNames.get(request.getGuarantorMemberId());
@@ -1554,22 +1758,34 @@ public class LoanPresentationService {
                     }
                     rows.add(new String[]{
                         sanitizePdfText(guarantorLabel),
+                        sanitizePdfText(guarantorMemberNumbers.get(request.getGuarantorMemberId())),
                         humanizeValue(request.getStatus()),
                         sanitizePdfText(request.getGuarantorSignatureText()),
                         sanitizePdfText(formatTimestamp(request.getGuarantorSignatureVerifiedAt()))
                     });
                 }
             }
-            drawTable(new String[]{"Guarantor", "Status", "Signature", "Verified At"}, new float[]{140f, 84f, 180f, contentWidth() - 404f}, rows, BODY_SIZE, BODY_SIZE, 14f);
+            drawTable(
+                new String[]{"Guarantor", "Member Number", "Status", "Signature", "Verified At"},
+                new float[]{116f, 76f, 72f, 150f, contentWidth() - 414f},
+                rows,
+                SMALL_SIZE,
+                BODY_SIZE,
+                14f
+            );
         }
 
         private void drawConfiguredReviewSignOffSection() throws IOException {
             ensureSpace(156f);
-            drawSectionStrip("Official Staff Review and Sign-off", includeRecordedSignatures ? "Recorded signatures included" : "Physical signatures required");
+            drawSectionStrip("Official Staff Review and Sign-off", includeRecordedSignatures ? "Recorded signatures included" : "Signatures required");
             List<ApprovalWorkflowStage> stages = configuredReviewStages();
             if (stages.isEmpty()) {
                 drawParagraph("No approval review roles are configured for this application.", regular, META_SIZE, MUTED_COLOR);
                 y -= 6f;
+                return;
+            }
+            if (includeRecordedSignatures) {
+                drawSystemSignedReviewTable(stages);
                 return;
             }
             for (ApprovalWorkflowStage stage : stages) {
@@ -1579,6 +1795,50 @@ public class LoanPresentationService {
                     drawStaffSignOffPanel(stage);
                 }
             }
+        }
+
+        private void drawSystemSignedReviewTable(List<ApprovalWorkflowStage> stages) throws IOException {
+            List<String[]> rows = new ArrayList<>();
+            for (ApprovalWorkflowStage stage : stages) {
+                if (stage == ApprovalWorkflowStage.BOARD) {
+                    if (boardReviews.isEmpty()) {
+                        rows.add(new String[]{stage.getDisplayLabel(), "-", "Pending", "-", "-", "-"});
+                    } else {
+                        for (BoardReview review : boardReviews) {
+                            Member boardMember = boardMembers.get(review.getBoardMemberId());
+                            rows.add(new String[]{
+                                stage.getDisplayLabel(),
+                                boardMember == null ? shortId(review.getBoardMemberId()) : sanitizePdfText(boardMember.getFullName()),
+                                humanizeValue(review.getDecision()),
+                                sanitizePdfText(review.getComment()),
+                                valueOrDash(boardSignOffText(review)),
+                                sanitizePdfText(formatTimestamp(review.getBoardSignatureVerifiedAt()))
+                            });
+                        }
+                    }
+                    continue;
+                }
+                ManagerReview review = latestStaffReview(stage);
+                Member reviewer = review == null ? null : staffReviewers.get(review.getManagerMemberId());
+                rows.add(new String[]{
+                    stage.getDisplayLabel(),
+                    review == null ? "-" : reviewerLabel(review, reviewer),
+                    review == null ? "Pending" : humanizeValue(review.getDecision()),
+                    review == null ? "-" : sanitizePdfText(review.getReasons()),
+                    valueOrDash(review == null ? null : staffSignature(reviewer)),
+                    review == null ? "-" : sanitizePdfText(formatTimestamp(review.getCreatedAt()))
+                });
+            }
+            drawTable(
+                new String[]{"Review Stage", "Reviewer", "Decision", "Review Note", "Signature", "Verified At"},
+                new float[]{84f, 112f, 58f, 100f, 92f, contentWidth() - 446f},
+                rows,
+                SMALL_SIZE,
+                SMALL_SIZE,
+                14f,
+                4f,
+                2f
+            );
         }
 
         private List<ApprovalWorkflowStage> configuredReviewStages() {
@@ -1599,7 +1859,7 @@ public class LoanPresentationService {
                 review == null ? "________________________________" : reviewerLabel(review, reviewer),
                 review == null ? "________________________________" : sanitizePdfText(review.getReasons()),
                 review == null ? "-" : humanizeValue(review.getDecision()),
-                review == null ? "________________________________" : staffSignature(reviewer),
+                review == null ? null : staffSignature(reviewer),
                 review == null ? "________________________________" : sanitizePdfText(formatTimestamp(review.getCreatedAt())),
                 stage == ApprovalWorkflowStage.ACCOUNTANT ? BRAND_GREEN : BRAND_NAVY
             );
@@ -1637,22 +1897,27 @@ public class LoanPresentationService {
             writeText(safeNote, MARGIN + 84f, topY - 86f, regular, BODY_SIZE, TEXT_COLOR);
 
             float signatureX = MARGIN + contentWidth() * 0.62f;
-            String signatureText = includeRecordedSignatures ? signature : "________________________________";
+            String signatureText = includeRecordedSignatures ? signature : null;
             boolean recordedSignature = hasRecordedSignature(signatureText);
-            writeText(
-                signatureText,
-                signatureX,
-                topY - 58f,
-                recordedSignature ? signatureFont : regular,
-                recordedSignature ? BODY_SIZE + 3f : BODY_SIZE + 1f,
-                TEXT_COLOR
-            );
+            if (recordedSignature) {
+                writeText(signatureText, signatureX, topY - 58f, signatureFont, BODY_SIZE + 3f, TEXT_COLOR);
+            }
             stream.setStrokingColor(MUTED_COLOR);
             stream.moveTo(signatureX, topY - 64f);
             stream.lineTo(page.getMediaBox().getWidth() - MARGIN - 14f, topY - 64f);
             stream.stroke();
-            writeText(includeRecordedSignatures ? "Authorized signature" : "Physical signature", signatureX, topY - 78f, regular, SMALL_SIZE, MUTED_COLOR);
-            writeText("Signed: " + (includeRecordedSignatures ? signedAt : "________________"), signatureX, topY - 95f, regular, SMALL_SIZE, MUTED_COLOR);
+            String signatureLabel = recordedSignature
+                ? "Authorized signature"
+                : includeRecordedSignatures ? "Signature not verified" : "Signature";
+            writeText(signatureLabel, signatureX, topY - 78f, regular, SMALL_SIZE, MUTED_COLOR);
+            writeText(
+                "Signed: " + (recordedSignature ? signedAt : includeRecordedSignatures ? "-" : "________________"),
+                signatureX,
+                topY - 95f,
+                regular,
+                SMALL_SIZE,
+                MUTED_COLOR
+            );
             y -= height + 10f;
         }
 
@@ -1661,7 +1926,7 @@ public class LoanPresentationService {
                 drawRoleSignOffCard(
                     ApprovalWorkflowStage.BOARD.getDisplayLabel(),
                     "PENDING REVIEW",
-                    "________________________________",
+                    null,
                     "________________________________",
                     "-",
                     "________________________________",
@@ -1699,20 +1964,25 @@ public class LoanPresentationService {
             if (reviewer == null) {
                 return shortId(review.getManagerMemberId());
             }
-            String memberNo = sanitizePdfText(reviewer.getMemberNo());
-            return sanitizePdfText(reviewer.getFullName()) + ("-".equals(memberNo) ? "" : " (" + memberNo + ")");
+            return sanitizePdfText(reviewer.getFullName());
         }
 
         private String staffSignature(Member reviewer) {
-            if (reviewer == null || reviewer.getSignatureText() == null || reviewer.getSignatureText().isBlank()) {
-                return "________________________________";
+            if (reviewer == null
+                || reviewer.getSignatureRegisteredAt() == null
+                || reviewer.getSignatureText() == null
+                || reviewer.getSignatureText().isBlank()) {
+                return null;
             }
             return sanitizePdfText(reviewer.getSignatureText());
         }
 
         private String boardSignOffText(BoardReview review) {
+            if (review.getBoardSignatureVerifiedAt() == null) {
+                return null;
+            }
             String signature = sanitizePdfText(review.getBoardSignatureText());
-            return "-".equals(signature) ? "________________________________" : signature;
+            return "-".equals(signature) ? null : signature;
         }
 
         private void drawApplicantSignatureSection() throws IOException {
@@ -1720,75 +1990,39 @@ public class LoanPresentationService {
             if ((signatureText == null || signatureText.isBlank()) && applicant.getSignatureText() != null && !applicant.getSignatureText().isBlank()) {
                 signatureText = applicant.getSignatureText();
             }
-            ensureSpace(156f);
-            drawSectionStrip("Applicant Declaration and Signature", includeRecordedSignatures ? "Recorded applicant signature" : "Physical signature required");
-            drawApplicantSignOffCard(signatureText);
+            ensureSpace(100f);
+            drawSectionStrip("Applicant Declaration and Signature", "Verified applicant signature");
+            drawApplicantSignatureTable(signatureText);
         }
 
-        private void drawApplicantSignOffCard(String signatureText) throws IOException {
-            float height = 112f;
-            ensureSpace(height + 10f);
-            float topY = y;
-            stream.setNonStrokingColor(Color.WHITE);
-            stream.addRect(MARGIN, topY - height, contentWidth(), height);
-            stream.fill();
-            stream.setStrokingColor(BORDER_COLOR);
-            stream.addRect(MARGIN, topY - height, contentWidth(), height);
-            stream.stroke();
-            stream.setNonStrokingColor(BRAND_BROWN);
-            stream.addRect(MARGIN, topY - height, 5f, height);
-            stream.fill();
-
-            writeText("APPLICANT", MARGIN + 16f, topY - 22f, bold, SECTION_SIZE + 1f, TEXT_COLOR);
-            writeRightAligned(
-                includeRecordedSignatures && signatureText != null && !signatureText.isBlank() ? "SIGNATURE RECORDED" : "SIGNATURE REQUIRED",
-                page.getMediaBox().getWidth() - MARGIN - 12f,
-                topY - 21f,
-                bold,
-                SMALL_SIZE,
-                BRAND_GREEN
-            );
-            writeText("Applicant", MARGIN + 16f, topY - 50f, regular, SMALL_SIZE, MUTED_COLOR);
-            writeText(sanitizePdfText(applicant.getFullName()), MARGIN + 84f, topY - 50f, bold, BODY_SIZE, TEXT_COLOR);
-            writeText("Member number", MARGIN + 16f, topY - 70f, regular, SMALL_SIZE, MUTED_COLOR);
-            writeText(sanitizePdfText(applicant.getMemberNo()), MARGIN + 84f, topY - 70f, regular, BODY_SIZE, TEXT_COLOR);
-            writeText("Declaration", MARGIN + 16f, topY - 90f, regular, SMALL_SIZE, MUTED_COLOR);
-            writeText("Application details confirmed", MARGIN + 84f, topY - 90f, regular, BODY_SIZE, TEXT_COLOR);
-
-            float signatureX = MARGIN + contentWidth() * 0.62f;
-            String displayedSignature = includeRecordedSignatures && signatureText != null && !signatureText.isBlank()
+        private void drawApplicantSignatureTable(String signatureText) throws IOException {
+            String displayedSignature = app.getApplicantSignatureVerifiedAt() != null && signatureText != null && !signatureText.isBlank()
                 ? sanitizePdfText(signatureText)
-                : "________________________________";
-            boolean recordedSignature = hasRecordedSignature(displayedSignature);
-            writeText(
-                displayedSignature,
-                signatureX,
-                topY - 58f,
-                recordedSignature ? signatureFont : regular,
-                recordedSignature ? BODY_SIZE + 3f : BODY_SIZE + 1f,
-                TEXT_COLOR
-            );
-            stream.setStrokingColor(MUTED_COLOR);
-            stream.moveTo(signatureX, topY - 64f);
-            stream.lineTo(page.getMediaBox().getWidth() - MARGIN - 14f, topY - 64f);
-            stream.stroke();
-            writeText(includeRecordedSignatures ? "Applicant signature" : "Physical signature", signatureX, topY - 78f, regular, SMALL_SIZE, MUTED_COLOR);
-            writeText(
-                "Signed: " + (includeRecordedSignatures ? sanitizePdfText(formatTimestamp(app.getApplicantSignatureVerifiedAt())) : "________________"),
-                signatureX,
-                topY - 95f,
-                regular,
+                : "-";
+            drawTable(
+                new String[]{"Applicant", "Member Number", "Declaration", "Signature", "Verified At"},
+                new float[]{112f, 80f, 126f, 116f, contentWidth() - 434f},
+                List.<String[]>of(new String[]{
+                    sanitizePdfText(applicant.getFullName()),
+                    sanitizePdfText(applicant.getMemberNo()),
+                    "Application details confirmed",
+                    displayedSignature,
+                    sanitizePdfText(formatTimestamp(app.getApplicantSignatureVerifiedAt()))
+                }),
                 SMALL_SIZE,
-                MUTED_COLOR
+                BODY_SIZE,
+                14f
             );
-            y -= height + 10f;
+        }
+
+        private String valueOrDash(String value) {
+            return value == null || value.isBlank() ? "-" : value;
         }
 
         private boolean hasRecordedSignature(String signatureText) {
             return includeRecordedSignatures
                 && signatureText != null
-                && !signatureText.isBlank()
-                && signatureText.chars().anyMatch(character -> character != '_');
+                && !signatureText.isBlank();
         }
 
         private void drawSectionHeading(String text) throws IOException {

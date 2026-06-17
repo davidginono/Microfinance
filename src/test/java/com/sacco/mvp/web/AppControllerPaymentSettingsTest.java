@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -123,7 +124,8 @@ class AppControllerPaymentSettingsTest {
         Member member = member(memberId);
         when(principal.getMemberId()).thenReturn(memberId);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(emailOtpService.issueOtp(
+        OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(10);
+        when(emailOtpService.issueOtpWithMetadata(
             eq(member.getEmail()),
             eq(EmailOtpPurpose.PAYMENT_DETAILS_CHANGE),
             eq(memberId),
@@ -132,9 +134,18 @@ class AppControllerPaymentSettingsTest {
             eq(member.getSaccoId()),
             eq(member.getStationId()),
             eq(member.getPhone())
-        )).thenReturn(new StationOtpDeliveryService.DeliveryReceipt(
-            com.sacco.mvp.domain.OtpDeliveryChannel.EMAIL,
-            "We sent an OTP code to your registered email."
+        )).thenReturn(new EmailOtpService.OtpIssueResult(
+            true,
+            new StationOtpDeliveryService.DeliveryReceipt(
+                com.sacco.mvp.domain.OtpDeliveryChannel.EMAIL,
+                "We sent an OTP code to your registered email."
+            ),
+            expiresAt,
+            600,
+            expiresAt,
+            0,
+            3,
+            3
         ));
 
         var response = controller.requestPaymentDetailsOtp(principal);

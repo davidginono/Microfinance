@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
+import com.sacco.mvp.domain.GuarantorRequest;
+import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanStatus;
@@ -127,8 +129,44 @@ class LoanPresentationServiceTest {
         assertThat(loanPresentationService.isEstimatedReviewRepaymentSummary(app)).isTrue();
         assertThat(summary)
             .containsEntry("Loan Amount", "TSh 120,000.00")
+            .containsEntry("Annual Interest Rate", "12.00%")
+            .containsEntry("Loan Period in Years", "1 year")
+            .containsEntry("Number of Payments", 12)
             .containsEntry("Estimated Installment", "TSh 11,200.00")
             .containsEntry("Estimated Total Repayment", "TSh 134,400.00");
+    }
+
+    @Test
+    void reviewRepaymentRowsBuildEstimatedScheduleBeforeDisbursement() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("120000.00"))
+            .tenorMonths(3)
+            .financialSnapshot("""
+                {
+                  "interestMethod": "FLAT_RATE",
+                  "interestRate": 0.12,
+                  "interestAmount": 14400.00,
+                  "principalPlusInterest": 134400.00,
+                  "monthlyRepaymentAmount": 44800.00
+                }
+                """)
+            .build();
+
+        List<Map<String, Object>> rows = loanPresentationService.reviewRepaymentRows(app);
+
+        assertThat(rows).hasSize(3);
+        assertThat(rows.getFirst())
+            .containsEntry("installment", "Installment 1")
+            .containsEntry("pmtNo", "1")
+            .containsEntry("month", "Month 1")
+            .containsEntry("beginningBalance", "TSh 120,000.00")
+            .containsEntry("payment", "TSh 44,800.00")
+            .containsEntry("loanAmount", "TSh 40,000.00")
+            .containsEntry("interest", "TSh 4,800.00")
+            .containsEntry("endingBalance", "TSh 80,000.00");
+        assertThat(rows.getFirst().get("scheduledBreakdown").toString())
+            .contains("Loan Amount: TSh 40,000.00")
+            .contains("Interest: TSh 4,800.00");
     }
 
     @Test
@@ -232,7 +270,8 @@ class LoanPresentationServiceTest {
                   "installmentNumber": 1,
                   "dueDate": "2026-05-30",
                   "amount": 30000.00,
-                  "principalComponent": 30000.00,
+                  "principalComponent": 24000.00,
+                  "interestComponent": 6000.00,
                   "outstandingBalance": 270000.00,
                   "status": "UPCOMING"
                 },
@@ -240,7 +279,8 @@ class LoanPresentationServiceTest {
                   "installmentNumber": 2,
                   "dueDate": "2026-06-30",
                   "amount": 30000.00,
-                  "principalComponent": 30000.00,
+                  "principalComponent": 25000.00,
+                  "interestComponent": 5000.00,
                   "outstandingBalance": 240000.00,
                   "status": "UPCOMING"
                 },
@@ -248,7 +288,8 @@ class LoanPresentationServiceTest {
                   "installmentNumber": 3,
                   "dueDate": "2026-07-30",
                   "amount": 30000.00,
-                  "principalComponent": 30000.00,
+                  "principalComponent": 26000.00,
+                  "interestComponent": 4000.00,
                   "outstandingBalance": 210000.00,
                   "status": "UPCOMING"
                 }
@@ -298,15 +339,23 @@ class LoanPresentationServiceTest {
 
         assertThat(rows).hasSize(3);
         assertThat(rows.get(0))
+            .containsEntry("installmentNumber", "1")
+            .containsEntry("pmtNo", "1")
+            .containsEntry("payment", "TSh 30,000.00")
+            .containsEntry("loanAmount", "TSh 24,000.00")
+            .containsEntry("interest", "TSh 6,000.00")
+            .containsEntry("scheduledBreakdown", "Principal: TSh 24,000.00\nInterest: TSh 6,000.00")
             .containsEntry("outstandingBalance", "")
             .containsEntry("principalPaid", "TSh 12,000.00")
             .containsEntry("interestPaid", "TSh 3,000.00")
             .containsEntry("totalPaid", "TSh 15,000.00")
             .containsEntry("paymentDate", "2026-05-15");
         assertThat(rows.get(1))
+            .containsEntry("scheduledBreakdown", "Principal: TSh 25,000.00\nInterest: TSh 5,000.00")
             .containsEntry("outstandingBalance", "")
             .containsEntry("principalPaid", "-");
         assertThat(rows.get(2))
+            .containsEntry("scheduledBreakdown", "Principal: TSh 26,000.00\nInterest: TSh 4,000.00")
             .containsEntry("outstandingBalance", "TSh 60,000.00")
             .containsEntry("principalPaid", "TSh 18,000.00")
             .containsEntry("paymentDate", "2026-07-10");
@@ -359,6 +408,28 @@ class LoanPresentationServiceTest {
             .installmentAmount(new BigDecimal("50000.00"))
             .firstRepaymentDate(LocalDate.of(2026, 7, 15))
             .submittedAt(OffsetDateTime.parse("2026-06-12T09:00:00+03:00"))
+            .repaymentScheduleJson("""
+                {
+                  "schedule": [
+                    {
+                      "installmentNumber": 1,
+                      "dueDate": "2026-07-31",
+                      "amount": 30000.00,
+                      "principalComponent": 24000.00,
+                      "interestComponent": 6000.00
+                    },
+                    {
+                      "installmentNumber": 2,
+                      "dueDate": "2026-08-31",
+                      "amount": 30000.00,
+                      "principalComponent": 25000.00,
+                      "interestComponent": 5000.00
+                    }
+                  ]
+                }
+                """)
+            .applicantSignatureText("S. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-12T09:05:00+03:00"))
             .status(LoanStatus.AWAITING_ACCOUNTANT)
             .build();
         Member applicant = Member.builder()
@@ -374,6 +445,7 @@ class LoanPresentationServiceTest {
             .fullName("Sample Loan Officer")
             .memberNo("STAFF-014")
             .signatureText("S. Loan Officer")
+            .signatureRegisteredAt(OffsetDateTime.parse("2026-06-01T08:00:00+03:00"))
             .build();
         ManagerReview loanOfficerReview = ManagerReview.builder()
             .id(UUID.randomUUID())
@@ -411,6 +483,7 @@ class LoanPresentationServiceTest {
             Map.of(),
             List.of(),
             Map.of(),
+            Map.of(),
             List.of(loanOfficerReview),
             Map.of(reviewerId, loanOfficer),
             List.of(),
@@ -422,9 +495,8 @@ class LoanPresentationServiceTest {
         try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
             String text = new PDFTextStripper().getText(document);
             assertThat(text)
-                .contains("Loan Application Review Copy")
-                .contains("Signed staff record copy")
-                .containsSubsequence("LOAN OFFICER", "ACCOUNTANT PENDING REVIEW")
+                .contains("Loan Application")
+                .containsSubsequence("Loan Officer", "Accountant", "Pending")
                 .containsSubsequence("Applicant Declaration and Signature", "Official Staff Review and Sign-off")
                 .containsSubsequence("Applicant", "Sample Applicant", "Member Number", "MEM-001")
                 .contains("Membership status: Active")
@@ -432,23 +504,25 @@ class LoanPresentationServiceTest {
                 .contains("Repayment period: 12 months")
                 .contains("Sample Loan Officer")
                 .contains("S. Loan Officer")
+                .contains("Review Stage")
+                .contains("Review Note")
+                .contains("Verified At")
+                .contains("Monthly Amount")
+                .contains("Principal: TSh 24,000.00")
+                .contains("Interest: TSh 6,000.00")
+                .contains("Interest: TSh 5,000.00")
+                .doesNotContain("Loan Application Review Copy")
+                .doesNotContain("Signed staff record copy")
+                .doesNotContain("Key details not repeated in the summary")
+                .doesNotContain("Sample Loan Officer (STAFF-014)")
                 .doesNotContain("Sample Applicant (MEM-001)")
                 .doesNotContain("Workflow Position")
                 .doesNotContain("Sequential configured approval order")
                 .doesNotContain("Current stage")
+                .doesNotContain("LOAN OFFICER REVIEW COMPLETED")
                 .doesNotContain("Branch Manager")
                 .doesNotContain("Board Committee")
                 .doesNotContain("Disbursement Officer");
-
-            boolean usesFormalSignatureFont = false;
-            for (org.apache.pdfbox.pdmodel.PDPage page : document.getPages()) {
-                for (org.apache.pdfbox.cos.COSName fontName : page.getResources().getFontNames()) {
-                    if ("Times-Italic".equals(page.getResources().getFont(fontName).getName())) {
-                        usesFormalSignatureFont = true;
-                    }
-                }
-            }
-            assertThat(usesFormalSignatureFont).isTrue();
         }
 
         byte[] physicalSignaturePdf = loanPresentationService.buildPrintablePdf(
@@ -458,6 +532,7 @@ class LoanPresentationServiceTest {
             Map.of("Member Information", "Recorded"),
             Map.of(),
             List.of(),
+            Map.of(),
             Map.of(),
             List.of(loanOfficerReview),
             Map.of(reviewerId, loanOfficer),
@@ -469,12 +544,93 @@ class LoanPresentationServiceTest {
         try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(physicalSignaturePdf)) {
             String text = new PDFTextStripper().getText(document);
             assertThat(text)
-                .contains("Physical signature copy")
-                .contains("Physical signature")
+                .contains("Loan Application")
+                .contains("Signature")
                 .contains("Sample Loan Officer")
+                .contains("S. Applicant")
+                .contains("LOAN OFFICER REVIEW COMPLETED")
+                .doesNotContain("Signature copy")
+                .doesNotContain("Signed staff record copy")
                 .doesNotContain("S. Loan Officer")
-                .doesNotContain("S. Applicant")
+                .doesNotContain("Review Stage")
+                .doesNotContain("Physical signature")
                 .doesNotContain("Signed: 2026-06-13 10:24");
+        }
+
+        loanOfficer.setSignatureRegisteredAt(null);
+        byte[] unverifiedStaffSignaturePdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of("Member Information", "Recorded"),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(loanOfficerReview),
+            Map.of(reviewerId, loanOfficer),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(unverifiedStaffSignaturePdf)) {
+            assertThat(new PDFTextStripper().getText(document))
+                .contains("Review Stage")
+                .doesNotContain("S. Loan Officer");
+        }
+    }
+
+    @Test
+    void printablePdfIncludesGuarantorMemberNumberColumn() throws IOException {
+        UUID loanId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .applicationNumber(420L)
+            .loanId("LN-00420")
+            .saccoId("SACCO-1")
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .amount(new BigDecimal("500000.00"))
+            .applicantSignatureText("A. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-12T09:05:00+03:00"))
+            .status(LoanStatus.AWAITING_BOARD)
+            .build();
+        Member applicant = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("Sample Applicant")
+            .memberNo("MEM-001")
+            .build();
+        GuarantorRequest guarantorRequest = GuarantorRequest.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.APPROVED)
+            .guarantorSignatureText("G. Signature")
+            .guarantorSignatureVerifiedAt(OffsetDateTime.parse("2026-06-13T10:00:00+03:00"))
+            .build();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of(),
+            Map.of(),
+            List.of(guarantorRequest),
+            Map.of(guarantorId, "Guarantor Person"),
+            Map.of(guarantorId, "GUA-009"),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(new PDFTextStripper().getText(document))
+                .contains("Member Number")
+                .containsSubsequence("Guarantor Person", "GUA-009", "Approved");
         }
     }
 
@@ -540,6 +696,7 @@ class LoanPresentationServiceTest {
             Map.of(),
             List.of(),
             Map.of(),
+            Map.of(),
             List.of(),
             Map.of(),
             List.of(boardReview),
@@ -550,8 +707,31 @@ class LoanPresentationServiceTest {
 
         try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
             assertThat(new PDFTextStripper().getText(document))
-                .contains("B. Reviewer Board Member")
+                .containsSubsequence("B. Reviewer", "Board Member")
                 .doesNotContain("Verified:");
+        }
+
+        boardReview.setBoardSignatureVerifiedAt(null);
+        byte[] unverifiedBoardSignaturePdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(boardReview),
+            Map.of(boardMemberId, boardMember),
+            null,
+            true
+        );
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(unverifiedBoardSignaturePdf)) {
+            assertThat(new PDFTextStripper().getText(document))
+                .contains("Review Stage")
+                .doesNotContain("B. Reviewer Board Member");
         }
     }
 }

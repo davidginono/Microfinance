@@ -279,8 +279,8 @@ public class AccountantController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
-            app.getRepaymentScheduleJson(),
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
+            app,
             loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
             loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));

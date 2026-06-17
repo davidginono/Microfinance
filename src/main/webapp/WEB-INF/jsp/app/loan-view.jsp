@@ -113,6 +113,16 @@
         <spring:message code="loan.view.guarantorsApproved" text="All guarantors have approved this application. You can now submit it for review." />
     </div>
 </c:if>
+<c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <span>Your loan is Final Approved and Disbursed.</span>
+        <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <input type="hidden" name="returnTo" value="detail" />
+            <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+        </form>
+    </div>
+</c:if>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="min-w-0">
@@ -240,6 +250,7 @@
                         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                         <input type="text" name="applicantSignatureOtpCode"
                                inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                               data-otp-hidden="true" data-otp-label="Applicant OTP code"
                                class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                placeholder="123456" />
                         <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
@@ -251,7 +262,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="submit" class="app-btn btn-approve"><spring:message code="loan.actions.submit" text="Submit" /></button>
+                <button type="submit" class="app-btn btn-approve action-button-disabled" disabled><spring:message code="loan.actions.submit" text="Submit" /></button>
             </form>
         </div>
     </div>
@@ -288,6 +299,42 @@
         </tbody>
     </table>
 </div>
+
+<c:if test="${not empty loanDetailRepaymentPreviewRows}">
+    <div class="erp-table-wrap overflow-x-auto">
+        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="text-sm font-semibold text-slate-900">Estimated Repayment Schedule</div>
+            <div class="mt-1 text-sm text-slate-500">Monthly installments based on the loaded loan details, including interest and remaining balance.</div>
+        </div>
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Pmt No.</th>
+                    <th>Month</th>
+                    <th>Beginning Balance</th>
+                    <th>Amount to Pay</th>
+                    <th>Loan Amount</th>
+                    <th>Interest</th>
+                    <th>Ending Balance</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                <c:forEach items="${loanDetailRepaymentPreviewRows}" var="row">
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                        <td class="px-3 py-2">${row.month}</td>
+                        <td class="px-3 py-2">${row.beginningBalance}</td>
+                        <td class="px-3 py-2 font-medium text-slate-900">${row.payment}</td>
+                        <td class="px-3 py-2">${row.loanAmount}</td>
+                        <td class="px-3 py-2">${row.interest}</td>
+                        <td class="px-3 py-2">${row.endingBalance}</td>
+                    </tr>
+                </c:forEach>
+            </tbody>
+        </table>
+    </div>
+</c:if>
+
 <c:if test="${app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div id="repayment-plan" class="erp-section">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -730,6 +777,7 @@
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                     <input type="text" name="applicantSignatureOtpCode"
                            inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                           data-otp-hidden="true" data-otp-label="Applicant OTP code"
                            class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                            placeholder="123456" />
                     <div class="signature-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
@@ -763,7 +811,8 @@
             </c:if>
             <button type="submit"
                     form="loan-submit-manager-form"
-                    class="app-btn btn-approve w-full ${showMemberReversalAction ? '' : 'sm:col-span-2'}">
+                    class="app-btn btn-approve action-button-disabled w-full ${showMemberReversalAction ? '' : 'sm:col-span-2'}"
+                    disabled>
                 <c:out value="${loanFinalSubmitLabel}" />
             </button>
         </div>
@@ -827,6 +876,7 @@
                                inputmode="numeric"
                                maxlength="6"
                                autocomplete="one-time-code"
+                               data-otp-hidden="true" data-otp-label="Forfeit OTP code"
                                class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                placeholder="123456" />
                     </div>
@@ -971,6 +1021,7 @@
                     verifiedCode = "";
                     setProceedEnabled(false);
                     render();
+                    window.SaccosOtp?.focusBoxes(input);
                 },
                 reset: function () {
                     otpRequested = false;
@@ -1084,7 +1135,8 @@
                     otpRequested = true;
                     setFeedback("success", payload.message || "${sentOtpEmailLabel}");
                     setOtpButtonState(requestButton, "sent", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
-                    input?.focus();
+                    window.SaccosOtp?.startCooldown(requestButton, payload, { idle: "${sendOtpLabel}" });
+                    window.SaccosOtp?.focusBoxes(input);
                     renderSubmitState();
                 } catch (error) {
                     setFeedback("error", error.message || "${unableSendOtpLabel}");
@@ -1147,9 +1199,10 @@
                     feedback.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
                     feedback.textContent = payload.message || "${sentOtpEmailLabel}";
                     setOtpButtonState(button, "sent", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
+                    window.SaccosOtp?.startCooldown(button, payload, { idle: "${sendOtpLabel}" });
                     otpUi.markRequested();
                     if (input) {
-                        input.focus();
+                        window.SaccosOtp?.focusBoxes(input);
                     }
                 } catch (error) {
                     feedback.classList.remove("hidden", "border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-sacco-brown/30", "bg-[#f7efe9]", "text-sacco-brown");

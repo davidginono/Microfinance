@@ -65,6 +65,9 @@
         <div>
             <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+            <c:if test="${currentFilterKey eq 'DISBURSED'}">
+                <p class="mt-1 text-sm text-slate-500">Displayed loans are the current active loans.</p>
+            </c:if>
         </div>
         <div class="erp-filter-row">
             <a href="/manager/loan-applications?filter=READY_FOR_MANAGER"

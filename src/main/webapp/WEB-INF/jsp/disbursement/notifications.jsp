@@ -44,7 +44,7 @@
                     <div class="max-w-[38rem] leading-relaxed text-slate-800">${n.message}</div>
                 </td>
                 <td class="px-3 py-3 align-top">${n.source}</td>
-                <td class="px-3 py-3 align-top">${n.type}</td>
+                <td class="px-3 py-3 align-top">${n.typeLabel}</td>
                 <td class="min-w-[11rem] whitespace-nowrap px-3 py-3 align-top">${n.createdAtLabel}</td>
             </tr>
         </c:forEach>

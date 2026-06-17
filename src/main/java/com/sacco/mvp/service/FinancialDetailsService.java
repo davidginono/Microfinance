@@ -79,6 +79,8 @@ public class FinancialDetailsService {
         snapshot.put("applicationFeeRate", applicationFee);
         snapshot.put("insuranceRate", insuranceRate);
         snapshot.put("interestRate", interestRate);
+        snapshot.put("tenorMonths", safeTenor);
+        snapshot.put("numberOfPayments", safeTenor);
         snapshot.put("interestMethod", product.getInterestMethod() == null ? InterestMethod.FLAT_RATE.name() : product.getInterestMethod().name());
         snapshot.put("topUpSourceLoanId", topUpSourceLoanId == null ? "" : topUpSourceLoanId.toString());
         return snapshot;

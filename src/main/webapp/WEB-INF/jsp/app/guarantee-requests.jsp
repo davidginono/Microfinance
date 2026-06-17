@@ -196,14 +196,15 @@
                         <div id="approve-feedback-${req.id}" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
                         <div class="mt-3">
                             <label class="mb-1 block text-sm font-medium text-slate-700">OTP Code</label>
-                            <input type="text"
-                                   name="guarantorSignatureOtpCode"
-                                   inputmode="numeric"
-                                   maxlength="6"
-                                   autocomplete="one-time-code"
-                                   class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                                   placeholder="123456"
-                                   required />
+                             <input type="text"
+                                    name="guarantorSignatureOtpCode"
+                                    inputmode="numeric"
+                                    maxlength="6"
+                                    autocomplete="one-time-code"
+                                    data-otp-hidden="true" data-otp-label="Guarantor OTP code"
+                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                    placeholder="123456"
+                                    required />
                             <p class="mt-2 text-sm text-slate-500">Enter the 6-digit code sent to your email before confirming approval.</p>
                             <div class="guarantor-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
@@ -221,8 +222,8 @@
                             Cancel
                         </button>
                         <button type="submit"
-                                class="app-btn btn-approve"
-                                ${hasGuarantorSignature and policyEligible ? '' : 'disabled'}>
+                                class="app-btn btn-approve action-button-disabled"
+                                disabled>
                             Confirm Approval
                         </button>
                     </div>
@@ -400,7 +401,7 @@
             button.classList.toggle("is-sent", sent);
         }
 
-        function bindOtpLiveStatus(input, statusBox, proceedButton) {
+        function bindOtpLiveStatus(input, statusBox, proceedButton, verifyOtp) {
             if (!input || !statusBox) {
                 return {
                     markRequested: function () {},
@@ -413,7 +414,9 @@
             let otpRequested = Boolean((input.value || "").trim());
             let lastReady = false;
             let verificationComplete = false;
+            let verificationError = "";
             let verificationTimer = null;
+            let verificationRun = 0;
 
             function clearVerification() {
                 if (verificationTimer) {
@@ -428,9 +431,14 @@
                 if (!otpRequested || !input.value) {
                     clearVerification();
                     verificationComplete = false;
+                    verificationError = "";
                     lastReady = false;
+                    if (proceedButton) {
+                        proceedButton.disabled = true;
+                        proceedButton.classList.add("action-button-disabled");
+                    }
                     statusBox.classList.add("hidden");
-                    statusBox.classList.remove("flex", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                    statusBox.classList.remove("flex", "border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-rose-200", "bg-rose-50", "text-rose-700");
                     statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
                     spinner.classList.remove("hidden");
                     tick.classList.add("hidden");
@@ -440,15 +448,46 @@
                 statusBox.classList.remove("hidden");
                 statusBox.classList.add("flex");
                 if (ready) {
+                    if (verificationError) {
+                        statusBox.classList.remove("border-slate-200", "bg-white", "text-slate-600", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                        statusBox.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
+                        spinner.classList.add("hidden");
+                        tick.classList.add("hidden");
+                        text.textContent = verificationError;
+                        if (proceedButton) {
+                            proceedButton.disabled = true;
+                            proceedButton.classList.add("action-button-disabled");
+                        }
+                        return;
+                    }
                     if (!verificationComplete) {
                         if (!verificationTimer) {
+                            const currentRun = ++verificationRun;
+                            const code = input.value;
                             verificationTimer = window.setTimeout(function () {
                                 verificationTimer = null;
-                                verificationComplete = true;
-                                render();
+                                Promise.resolve(verifyOtp(code))
+                                    .then(function () {
+                                        if (currentRun !== verificationRun || input.value !== code) {
+                                            return;
+                                        }
+                                        verificationComplete = true;
+                                        verificationError = "";
+                                        input.setCustomValidity("");
+                                        render();
+                                    })
+                                    .catch(function (error) {
+                                        if (currentRun !== verificationRun || input.value !== code) {
+                                            return;
+                                        }
+                                        verificationComplete = false;
+                                        verificationError = error && error.message ? error.message : "The OTP code is invalid.";
+                                        input.setCustomValidity(verificationError);
+                                        render();
+                                    });
                             }, 240);
                         }
-                        statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                        statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-rose-200", "bg-rose-50", "text-rose-700");
                         statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
                         spinner.classList.remove("hidden");
                         tick.classList.add("hidden");
@@ -466,14 +505,24 @@
                     statusBox.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
                     spinner.classList.add("hidden");
                     tick.classList.remove("hidden");
+                    if (proceedButton) {
+                        proceedButton.disabled = false;
+                        proceedButton.classList.remove("action-button-disabled");
+                    }
                     tick.classList.remove("otp-checkmark-pop");
                     void tick.offsetWidth;
                     tick.classList.add("otp-checkmark-pop");
                     text.textContent = "Verified";
                 } else {
                     clearVerification();
+                    verificationRun += 1;
                     verificationComplete = false;
-                    statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                    verificationError = "";
+                    if (proceedButton) {
+                        proceedButton.disabled = true;
+                        proceedButton.classList.add("action-button-disabled");
+                    }
+                    statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-rose-200", "bg-rose-50", "text-rose-700");
                     statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
                     spinner.classList.remove("hidden");
                     tick.classList.add("hidden");
@@ -488,12 +537,18 @@
                 markRequested: function () {
                     otpRequested = true;
                     verificationComplete = false;
+                    verificationError = "";
                     render();
+                    window.SaccosOtp?.focusBoxes(input);
                 },
                 reset: function () {
                     otpRequested = false;
                     clearVerification();
+                    verificationRun += 1;
                     verificationComplete = false;
+                    verificationError = "";
+                    input.value = "";
+                    input.setCustomValidity("");
                     render();
                 }
             };
@@ -508,7 +563,25 @@
                 const statusBox = form ? form.querySelector(".guarantor-otp-live-status") : null;
                 const proceedButton = form ? form.querySelector("button[type='submit'].btn-approve") : null;
                 const requestId = button.getAttribute("data-request-id") || "";
-                const otpUi = bindOtpLiveStatus(otpInput, statusBox, proceedButton);
+                const otpUi = bindOtpLiveStatus(otpInput, statusBox, proceedButton, async function (code) {
+                    const response = await fetch("/app/guarantee-requests/verify-signature-otp", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                            "Accept": "application/json"
+                        },
+                        body: new URLSearchParams({
+                            "${_csrf.parameterName}": csrfToken,
+                            "requestId": requestId,
+                            "otpCode": code
+                        })
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || payload.valid === false) {
+                        throw new Error(payload.message || "The OTP code is invalid.");
+                    }
+                    return payload;
+                });
                 otpUi.reset();
                 setOtpButtonState(button, "loading", "Send OTP Code", "Sending...", "OTP Sent");
                 try {
@@ -529,9 +602,10 @@
                     }
                     showOtpFeedback(feedback, "success", payload.message || "We sent a guarantor OTP code to your email.");
                     setOtpButtonState(button, "sent", "Send OTP Code", "Sending...", "OTP Sent");
+                    window.SaccosOtp?.startCooldown(button, payload, { idle: "Send OTP Code" });
                     otpUi.markRequested();
                     if (otpInput) {
-                        otpInput.focus();
+                        window.SaccosOtp?.focusBoxes(otpInput);
                     }
                 } catch (error) {
                     showOtpFeedback(feedback, "error", error.message || "Unable to send the OTP code right now.");

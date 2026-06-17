@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -75,5 +76,57 @@ class AppControllerFinancialPreviewTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("message", "Loan details loaded");
         verify(loanWorkflowService, never()).assertCanApplyForProduct(any(), any(), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void financialPreviewScheduleUsesLoadedInterestAmountForFlatRateRows() {
+        String saccoId = "SACCO-1";
+        UUID memberId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("1000000");
+        int tenorMonths = 6;
+        LoanProductSetting product = LoanProductSetting.builder()
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .build();
+        Map<String, Object> snapshot = Map.of(
+            "interestRate", new BigDecimal("0.1200"),
+            "interestAmount", new BigDecimal("120000.00"),
+            "principalPlusInterest", new BigDecimal("1120000.00"),
+            "interestMethod", "FLAT_RATE"
+        );
+
+        when(principal.getSaccoId()).thenReturn(saccoId);
+        when(principal.getMemberId()).thenReturn(memberId);
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(financialDetailsService.generateSnapshot(
+            saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount, tenorMonths, null
+        )).thenReturn(snapshot);
+        when(financialDetailsService.toJson(snapshot)).thenReturn("{}");
+        when(loanPresentationService.parseFinancialFields("{}")).thenReturn(Map.of("Interest", "TSh 120,000.00"));
+        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount)).thenReturn(
+            new EligibilityService.EligibilityResult(
+                true,
+                new BigDecimal("3"),
+                new BigDecimal("500000"),
+                new BigDecimal("1500000")
+            )
+        );
+
+        var response = controller.financialPreview(
+            principal, LoanType.DEVELOPMENT_LOAN, amount, tenorMonths, null, null
+        );
+
+        List<Map<String, String>> rows = (List<Map<String, String>>) response.getBody().get("repaymentSchedule");
+
+        assertThat(rows).hasSize(6);
+        assertThat(rows.get(0)).containsEntry("pmtNo", "1");
+        assertThat(rows.get(0)).containsEntry("month", "Month 1");
+        assertThat(rows.get(0)).containsEntry("beginningBalance", "TSh 1,000,000.00");
+        assertThat(rows.get(0)).containsEntry("payment", "TSh 186,666.67");
+        assertThat(rows.get(0)).containsEntry("loanAmount", "TSh 166,666.67");
+        assertThat(rows.get(0)).containsEntry("interest", "TSh 20,000.00");
+        assertThat(rows.get(5)).containsEntry("interest", "TSh 20,000.00");
+        assertThat(rows.get(5)).containsEntry("endingBalance", "TSh 0.00");
     }
 }

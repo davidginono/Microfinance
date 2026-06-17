@@ -33,11 +33,11 @@
         </div>
         <div class="app-modal-body space-y-3">
             <a href="#" data-loan-export-signed class="loan-export-option app-modal-section block">
-                <span class="loan-export-option-title block font-semibold text-slate-900">Signed system copy</span>
+                <span class="loan-export-option-title block font-semibold text-slate-900">System Signed</span>
                 <span class="mt-1 block text-sm text-slate-500">Includes signatures already recorded in the approval workflow.</span>
             </a>
             <a href="#" data-loan-export-unsigned class="loan-export-option app-modal-section block">
-                <span class="loan-export-option-title block font-semibold text-slate-900">Physical signature copy</span>
+                <span class="loan-export-option-title block font-semibold text-slate-900">Physically Signed (with empty signature slots)</span>
                 <span class="mt-1 block text-sm text-slate-500">Leaves staff signature spaces empty for signing on paper.</span>
             </a>
             <div class="app-modal-actions">

@@ -150,6 +150,7 @@
         }
         requestButton.addEventListener("click", async () => {
             requestButton.disabled = true;
+            requestButton.textContent = "Requesting...";
             message.className = "mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700";
             message.textContent = "Requesting confirmation code...";
             try {
@@ -169,11 +170,25 @@
                     ? "mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
                     : "mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
                 message.textContent = result.message || "The confirmation code could not be requested.";
+                if (response.ok) {
+                    const remaining = Number.isFinite(Number(result.resendAttemptsRemaining))
+                        ? Math.max(0, Number(result.resendAttemptsRemaining))
+                        : 3;
+                    requestButton.textContent = remaining > 0
+                        ? "Code not received? Resend (" + remaining + " left)"
+                        : "Resend limit reached";
+                    requestButton.disabled = remaining <= 0;
+                }
             } catch (error) {
                 message.className = "mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
                 message.textContent = "The confirmation code could not be requested. Try again.";
-            } finally {
+                requestButton.textContent = "Request OTP";
                 requestButton.disabled = false;
+            } finally {
+                if (requestButton.textContent === "Requesting...") {
+                    requestButton.textContent = "Request OTP";
+                    requestButton.disabled = false;
+                }
             }
         });
     })();

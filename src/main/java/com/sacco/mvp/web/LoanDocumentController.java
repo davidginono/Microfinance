@@ -74,12 +74,19 @@ public class LoanDocumentController {
 
         Member applicant = memberRepository.findById(app.getApplicantMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
+        boolean hasApplicantSignature = (app.getApplicantSignatureText() != null && !app.getApplicantSignatureText().isBlank())
+            || (applicant.getSignatureText() != null && !applicant.getSignatureText().isBlank());
+        if (app.getApplicantSignatureVerifiedAt() == null || !hasApplicantSignature) {
+            throw new IllegalStateException("Printing is available after the applicant signature is verified");
+        }
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(loanId);
         List<BoardReview> boardReviews = boardReviewRepository.findByLoanApplicationId(loanId);
         List<ManagerReview> staffReviews = managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
         Map<UUID, String> guarantorNames = new LinkedHashMap<>();
+        Map<UUID, String> guarantorMemberNumbers = new LinkedHashMap<>();
         for (Member member : memberRepository.findAllById(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
             guarantorNames.put(member.getId(), member.getFullName());
+            guarantorMemberNumbers.put(member.getId(), member.getMemberNo());
         }
         Map<UUID, Member> staffReviewers = new LinkedHashMap<>();
         for (Member member : memberRepository.findAllById(staffReviews.stream().map(ManagerReview::getManagerMemberId).toList())) {
@@ -98,6 +105,7 @@ public class LoanDocumentController {
             loanPresentationService.parseFinancialFields(app),
             guarantorRequests,
             guarantorNames,
+            guarantorMemberNumbers,
             staffReviews,
             staffReviewers,
             boardReviews,

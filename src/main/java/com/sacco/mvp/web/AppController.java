@@ -106,7 +106,8 @@ public class AppController {
             .mapToLong(Map.Entry::getValue)
             .sum();
         long currentApplicationCount = statusCounts.values().stream().mapToLong(Long::longValue).sum()
-            - archivedApplicationCount;
+            - archivedApplicationCount
+            + dashboard.unacknowledgedDisbursedApplicationCount();
         long rejectedLoans = statusCounts.entrySet().stream()
             .filter(entry -> isRejectedStatus(entry.getKey()))
             .mapToLong(Map.Entry::getValue)
@@ -223,6 +224,25 @@ public class AppController {
         model.addAttribute("managerReasons", loanPresentationService.latestManagerReasons(apps));
         model.addAttribute("archiveCount", applications.archiveCount());
         return "app/loan-applications";
+    }
+
+    @PostMapping("/loan-applications/{id}/acknowledge-disbursement")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    public String acknowledgeDisbursement(@AuthenticationPrincipal AppUserPrincipal principal,
+                                          @PathVariable UUID id,
+                                          @RequestParam(defaultValue = "applications") String returnTo,
+                                          RedirectAttributes ra) {
+        try {
+            loanWorkflowService.acknowledgeDisbursement(id, principal.getMemberId());
+            ra.addFlashAttribute("message", "Disbursement update acknowledged.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return switch (returnTo) {
+            case "dashboard" -> "redirect:/app/dashboard";
+            case "detail" -> "redirect:/app/loan-applications/" + id;
+            default -> "redirect:/app/loan-applications";
+        };
     }
 
     @GetMapping("/archives")
@@ -503,10 +523,15 @@ public class AppController {
     }
 
     private List<Map<String, Object>> buildDashboardWorkflowSteps(LoanApplication app) {
+        List<ApprovalWorkflowStage> reviewStages = dashboardReviewStages(app);
+        ApprovalWorkflowStage firstReviewStage = reviewStages.isEmpty()
+            ? ApprovalWorkflowStage.MANAGER
+            : reviewStages.get(0);
+        String furtherReviewDetail = dashboardFurtherReviewDetail(reviewStages);
         List<String> labels = List.of(
             "Applicant",
             "Guarantors",
-            "Manager",
+            dashboardReviewerLabel(firstReviewStage),
             "Further Review",
             "Ready for Release",
             "Disbursement"
@@ -519,13 +544,13 @@ public class AppController {
             "disbursement",
             "bank"
         );
-        int currentIndex = dashboardWorkflowStepIndex(app == null ? null : app.getStatus());
+        int currentIndex = dashboardWorkflowStepIndex(app, reviewStages);
         boolean workflowFinished = isDashboardWorkflowFinished(app);
         List<String> stageDates = List.of(
             dashboardApplicantStageDate(app),
             dashboardGuarantorStageDate(app),
-            dashboardManagerStageDate(app),
-            dashboardFurtherReviewStageDate(app),
+            dashboardReviewStageDate(app, firstReviewStage),
+            dashboardFurtherReviewStageDate(app, firstReviewStage),
             dashboardReadyForDisbursementDate(app),
             dashboardDisbursedDate(app)
         );
@@ -542,6 +567,7 @@ public class AppController {
             Map<String, Object> step = new LinkedHashMap<>();
             step.put("stepNumber", i + 1);
             step.put("label", labels.get(i));
+            step.put("detailLabel", i == 3 ? furtherReviewDetail : "");
             step.put("stateKey", stateKey);
             step.put("stateLabel", dashboardWorkflowStateLabel(i, stateKey, app));
             step.put("metaLabel", dashboardWorkflowMetaLabel(stateKey));
@@ -557,20 +583,109 @@ public class AppController {
         return steps;
     }
 
-    private int dashboardWorkflowStepIndex(LoanStatus status) {
+    private int dashboardWorkflowStepIndex(LoanApplication app, List<ApprovalWorkflowStage> reviewStages) {
+        LoanStatus status = app == null ? null : app.getStatus();
         if (status == null) {
             return 0;
         }
+        ApprovalWorkflowStage activeReviewStage = dashboardActiveReviewStage(status);
+        if (activeReviewStage != null) {
+            return dashboardReviewStepIndex(activeReviewStage, reviewStages);
+        }
+        ApprovalWorkflowStage approvedReviewStage = dashboardApprovedReviewStage(status);
+        if (approvedReviewStage != null) {
+            return dashboardStepAfterReviewStage(approvedReviewStage, reviewStages);
+        }
         return switch (status) {
             case DRAFT -> 0;
-            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 1;
-            case READY_FOR_MANAGER, MANAGER_ACCEPTED, MANAGER_REJECTED -> 2;
-            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_APPROVED, LOAN_OFFICER_REJECTED,
-                AWAITING_BOARD, BOARD_APPROVED, BOARD_REJECTED,
-                AWAITING_ACCOUNTANT, ACCOUNTANT_APPROVED, ACCOUNTANT_REJECTED -> 3;
+            case SUBMITTED, AWAITING_GUARANTORS -> 1;
+            case ALL_GUARANTORS_APPROVED -> 2;
+            case READY_FOR_MANAGER, MANAGER_REJECTED,
+                AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED,
+                AWAITING_BOARD, BOARD_REJECTED,
+                AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED -> 4;
             case READY_FOR_DISBURSEMENT, FORFEITED, FINAL_REJECTED -> 4;
             case FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
+    }
+
+    private ApprovalWorkflowStage dashboardActiveReviewStage(LoanStatus status) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case READY_FOR_MANAGER, MANAGER_REJECTED -> ApprovalWorkflowStage.MANAGER;
+            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED -> ApprovalWorkflowStage.LOAN_OFFICER;
+            case AWAITING_BOARD, BOARD_REJECTED -> ApprovalWorkflowStage.BOARD;
+            case AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> ApprovalWorkflowStage.ACCOUNTANT;
+            default -> null;
+        };
+    }
+
+    private ApprovalWorkflowStage dashboardApprovedReviewStage(LoanStatus status) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case MANAGER_ACCEPTED -> ApprovalWorkflowStage.MANAGER;
+            case LOAN_OFFICER_APPROVED -> ApprovalWorkflowStage.LOAN_OFFICER;
+            case BOARD_APPROVED -> ApprovalWorkflowStage.BOARD;
+            case ACCOUNTANT_APPROVED -> ApprovalWorkflowStage.ACCOUNTANT;
+            default -> null;
+        };
+    }
+
+    private int dashboardReviewStepIndex(ApprovalWorkflowStage stage, List<ApprovalWorkflowStage> reviewStages) {
+        if (stage == null) {
+            return 2;
+        }
+        ApprovalWorkflowStage firstReviewStage = reviewStages == null || reviewStages.isEmpty()
+            ? ApprovalWorkflowStage.MANAGER
+            : reviewStages.get(0);
+        return stage == firstReviewStage ? 2 : 3;
+    }
+
+    private int dashboardStepAfterReviewStage(ApprovalWorkflowStage stage, List<ApprovalWorkflowStage> reviewStages) {
+        if (reviewStages == null || reviewStages.isEmpty()) {
+            return 4;
+        }
+        int stageIndex = reviewStages.indexOf(stage);
+        if (stageIndex < 0) {
+            return dashboardReviewStepIndex(stage, reviewStages);
+        }
+        if (stageIndex + 1 < reviewStages.size()) {
+            return dashboardReviewStepIndex(reviewStages.get(stageIndex + 1), reviewStages);
+        }
+        return 4;
+    }
+
+    private List<ApprovalWorkflowStage> dashboardReviewStages(LoanApplication app) {
+        LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
+        return workflow.stages().stream()
+            .filter(stage -> stage != ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+            .toList();
+    }
+
+    private String dashboardReviewerLabel(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case MANAGER -> "Manager";
+            case LOAN_OFFICER -> "Loan Officer";
+            case BOARD -> "Board Committee";
+            case ACCOUNTANT -> "Accountant";
+            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+        };
+    }
+
+    private String dashboardFurtherReviewDetail(List<ApprovalWorkflowStage> reviewStages) {
+        if (reviewStages == null || reviewStages.size() <= 1) {
+            return "";
+        }
+        return reviewStages.stream()
+            .skip(1)
+            .map(this::dashboardReviewerLabel)
+            .distinct()
+            .collect(Collectors.joining(", "));
     }
 
     private String dashboardWorkflowStateLabel(int index, String stateKey, LoanApplication app) {
@@ -585,6 +700,12 @@ public class AppController {
             };
         }
         if ("current".equals(stateKey)) {
+            if (app != null && app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED && index == 2) {
+                return "Ready for Review";
+            }
+            if (app != null && dashboardApprovedReviewStage(app.getStatus()) != null && (index == 2 || index == 3)) {
+                return "Ready for Review";
+            }
             return switch (index) {
                 case 0 -> "Draft Saved";
                 case 1 -> "Awaiting Approval";
@@ -692,46 +813,45 @@ public class AppController {
             .orElseGet(() -> formatDashboardWorkflowTimestamp(app.getSubmittedAt()));
     }
 
-    private String dashboardManagerStageDate(LoanApplication app) {
-        if (app == null) {
+    private String dashboardReviewStageDate(LoanApplication app, ApprovalWorkflowStage stage) {
+        if (app == null || stage == null) {
             return "";
         }
-        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.MANAGER).stream()
-            .map(ManagerReview::getCreatedAt)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .map(this::formatDashboardWorkflowTimestamp)
-            .orElse("");
+        if (stage == ApprovalWorkflowStage.BOARD) {
+            return boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), ApprovalWorkflowStage.BOARD).stream()
+                .map(review -> review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt())
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .map(this::formatDashboardWorkflowTimestamp)
+                .orElse("");
+        }
+        if (stage == ApprovalWorkflowStage.MANAGER
+            || stage == ApprovalWorkflowStage.LOAN_OFFICER
+            || stage == ApprovalWorkflowStage.ACCOUNTANT) {
+            return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), stage).stream()
+                .map(ManagerReview::getCreatedAt)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(this::formatDashboardWorkflowTimestamp)
+                .orElse("");
+        }
+        return "";
     }
 
-    private String dashboardFurtherReviewStageDate(LoanApplication app) {
+    private String dashboardFurtherReviewStageDate(LoanApplication app, ApprovalWorkflowStage firstReviewStage) {
         if (app == null) {
             return "";
         }
-        Optional<String> loanOfficerReview = managerReviewRepository
-            .findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.LOAN_OFFICER)
-            .stream()
-            .map(ManagerReview::getCreatedAt)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .map(this::formatDashboardWorkflowTimestamp);
-        if (loanOfficerReview.isPresent()) {
-            return loanOfficerReview.get();
+        for (ApprovalWorkflowStage stage : dashboardReviewStages(app)) {
+            if (stage == firstReviewStage) {
+                continue;
+            }
+            String dateLabel = dashboardReviewStageDate(app, stage);
+            if (dateLabel != null && !dateLabel.isBlank()) {
+                return dateLabel;
+            }
         }
-        Optional<String> boardReview = boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), ApprovalWorkflowStage.BOARD).stream()
-            .map(review -> review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt())
-            .filter(Objects::nonNull)
-            .min(Comparator.naturalOrder())
-            .map(this::formatDashboardWorkflowTimestamp);
-        if (boardReview.isPresent()) {
-            return boardReview.get();
-        }
-        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), ApprovalWorkflowStage.ACCOUNTANT).stream()
-            .map(ManagerReview::getCreatedAt)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .map(this::formatDashboardWorkflowTimestamp)
-            .orElse("");
+        return "";
     }
 
     private String dashboardReadyForDisbursementDate(LoanApplication app) {
@@ -983,6 +1103,7 @@ public class AppController {
         model.addAttribute("managerReason",
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "");
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
+        model.addAttribute("loanDetailRepaymentPreviewRows", loanDetailRepaymentPreview(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
@@ -1468,7 +1589,7 @@ public class AppController {
             }
             String otpSaccoId = workflowApplication == null ? member.getSaccoId() : workflowApplication.getSaccoId();
             String otpStationId = workflowApplication == null ? member.getStationId() : workflowApplication.getStationId();
-            emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.GUARANTOR_SIGNATURE,
                 member.getId(),
@@ -1478,9 +1599,37 @@ public class AppController {
                 otpStationId,
                 member.getPhone()
             );
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a guarantor confirmation code using the station OTP delivery policy."));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/guarantee-requests/verify-signature-otp")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyGuarantorSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                           @RequestParam UUID requestId,
+                                                                           @RequestParam String otpCode) {
+        try {
+            GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+                throw new IllegalStateException("Request already decided");
+            }
+            Member guarantor = requireMemberWithSavedSignature(
+                principal.getMemberId(),
+                "Add an email address to your member profile before verifying a guarantor OTP.",
+                "Register your signature first before approving guarantor requests."
+            );
+            emailOtpService.validateOtp(
+                guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantor.getId(), otpCode);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a guarantor confirmation code using the station OTP delivery policy."
+                "message", "OTP code verified."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -1499,7 +1648,7 @@ public class AppController {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
             Member member = requireMemberWithSavedSignature(principal.getMemberId());
-            emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.APPLICANT_SIGNATURE,
                 member.getId(),
@@ -1509,10 +1658,7 @@ public class AppController {
                 application.getStationId(),
                 member.getPhone()
             );
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "message", "We sent a submission code using the station OTP delivery policy."
-            ));
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a submission code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -1554,7 +1700,7 @@ public class AppController {
                 throw new IllegalStateException("This application cannot be forfeited at its current stage.");
             }
             Member member = requireMemberWithEmail(principal.getMemberId());
-            emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.LOAN_APPLICATION_FORFEIT,
                 member.getId(),
@@ -1564,10 +1710,7 @@ public class AppController {
                 application.getStationId(),
                 member.getPhone()
             );
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "message", "We sent a forfeit confirmation code using the station OTP delivery policy."
-            ));
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a forfeit confirmation code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -1804,7 +1947,7 @@ public class AppController {
                 principal.getMemberId(),
                 "Add an email address to your member profile before changing financial details for the disbursement deposit."
             );
-            var delivery = emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.PAYMENT_DETAILS_CHANGE,
                 member.getId(),
@@ -1814,10 +1957,7 @@ public class AppController {
                 member.getStationId(),
                 member.getPhone()
             );
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "message", delivery.userMessage()
-            ));
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent an OTP code to your registered email."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -1895,10 +2035,52 @@ public class AppController {
         model.addAttribute("allowApplicationWithActiveLoan", schema.isApplicationWithActiveLoanAllowed());
         model.addAttribute("financialSnapshotDisplay",
             loanPresentationService.parseFinancialFields(formValues == null ? null : formValues.get("financialSnapshotJson")));
+        model.addAttribute("repaymentSchedulePreviewRows", draftRepaymentSchedulePreview(formValues));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         model.addAttribute("topUpLoanId", formValues == null ? null : formValues.get("topUpLoanId"));
         model.addAttribute("topUpSourceLoan", resolveTopUpSourceLoan(principal.getMemberId(), formValues == null ? null : formValues.get("topUpLoanId")));
         return "app/loan-new";
+    }
+
+    private List<Map<String, String>> loanDetailRepaymentPreview(LoanApplication app) {
+        if (app == null
+            || app.getFinancialSnapshot() == null
+            || app.getFinancialSnapshot().isBlank()
+            || app.getStatus() == LoanStatus.DRAFT
+            || app.getStatus() == LoanStatus.AWAITING_GUARANTORS
+            || app.getStatus() == LoanStatus.FINAL_APPROVED
+            || app.getStatus() == LoanStatus.DEFAULTED
+            || app.getStatus() == LoanStatus.PAID) {
+            return Collections.emptyList();
+        }
+        try {
+            Map<String, Object> snapshot = objectMapper.readValue(
+                app.getFinancialSnapshot(),
+                new TypeReference<Map<String, Object>>() {}
+            );
+            return previewRepaymentSchedule(app.getAmount(), app.getTenorMonths(), snapshot);
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<Map<String, String>> draftRepaymentSchedulePreview(Map<String, String> formValues) {
+        if (formValues == null || formValues.get("financialSnapshotJson") == null || formValues.get("financialSnapshotJson").isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            BigDecimal amount = readBigDecimal(formValues.get("amount"));
+            Integer tenorMonths = formValues.get("tenorMonths") == null || formValues.get("tenorMonths").isBlank()
+                ? null
+                : Integer.valueOf(formValues.get("tenorMonths"));
+            Map<String, Object> snapshot = objectMapper.readValue(
+                formValues.get("financialSnapshotJson"),
+                new TypeReference<Map<String, Object>>() {}
+            );
+            return previewRepaymentSchedule(amount, tenorMonths, snapshot);
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
     }
 
     private Integer resolveDraftRequiredGuarantors(UUID memberId, UUID applicationId) {
@@ -1952,9 +2134,10 @@ public class AppController {
         BigDecimal runningInterest = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal remainingPrincipal = principal;
         BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), 12, RoundingMode.HALF_UP);
-        BigDecimal flatTotalInterest = principal.multiply(annualRate)
-            .multiply(BigDecimal.valueOf(months))
-            .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+        BigDecimal flatTotalInterest = Optional.ofNullable(readBigDecimal(snapshot.get("interestAmount")))
+            .orElseGet(() -> principal.multiply(annualRate)
+                .multiply(BigDecimal.valueOf(months))
+                .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP));
         BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
         BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
         BigDecimal reducingInstallment = reducingInstallment(principal, monthlyRate, months);
@@ -1963,6 +2146,7 @@ public class AppController {
             BigDecimal principalComponent;
             BigDecimal interestComponent;
             BigDecimal installmentAmount;
+            BigDecimal beginningBalance = remainingPrincipal;
             if (interestMethod == InterestMethod.REDUCING_BALANCE) {
                 interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
                 principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
@@ -1990,10 +2174,15 @@ public class AppController {
             remainingPrincipal = principal.subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
             Map<String, String> row = new LinkedHashMap<>();
+            row.put("pmtNo", String.valueOf(month));
             row.put("month", "Month " + month);
+            row.put("beginningBalance", formatTzs(beginningBalance));
+            row.put("payment", formatTzs(installmentAmount));
+            row.put("loanAmount", formatTzs(principalComponent));
+            row.put("interest", formatTzs(interestComponent));
+            row.put("endingBalance", formatTzs(remainingPrincipal));
             row.put("installment", formatTzs(installmentAmount));
             row.put("principal", formatTzs(principalComponent));
-            row.put("interest", formatTzs(interestComponent));
             row.put("outstandingBalance", formatTzs(remainingPrincipal));
             rows.add(row);
         }
@@ -2095,6 +2284,19 @@ public class AppController {
             EmailOtpPurpose.APPLICANT_SIGNATURE,
             otpCode
         );
+    }
+
+    private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("valid", true);
+        response.put("message", otp.messageOrDefault(fallbackMessage));
+        response.put("expiresAt", otp.expiresAt());
+        response.put("secondsUntilExpiry", otp.secondsUntilExpiry());
+        response.put("resendAvailableAt", otp.resendAvailableAt());
+        response.put("resendCount", otp.resendCount());
+        response.put("maxResends", otp.maxResends());
+        response.put("resendAttemptsRemaining", otp.resendAttemptsRemaining());
+        return response;
     }
 
     private boolean requiresApplicantOtpBeforeImmediateSubmission(String saccoId, LoanType loanType) {
@@ -2557,7 +2759,7 @@ public class AppController {
             return "Ready for Disbursement";
         }
         if (status == LoanStatus.FINAL_APPROVED) {
-            return "Disbursed Loan";
+            return "Final Approved and Disbursed";
         }
         if (status == LoanStatus.FINAL_REJECTED) {
             return "Final Rejected";

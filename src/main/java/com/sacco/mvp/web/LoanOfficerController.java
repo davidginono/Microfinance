@@ -196,7 +196,7 @@ public class LoanOfficerController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(app.getRepaymentScheduleJson()));
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
@@ -279,7 +279,7 @@ public class LoanOfficerController {
                 throw new IllegalStateException("You have already submitted your loan officer decision.");
             }
             Member reviewer = requireMemberWithSavedSignature(principal.getMemberId());
-            emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 reviewer.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 reviewer.getId(),
@@ -289,9 +289,36 @@ public class LoanOfficerController {
                 app.getStationId(),
                 reviewer.getPhone()
             );
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a loan officer approval code using the station OTP delivery policy."));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/{id}/verify-signature-otp")
+    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifySignatureOtp(@PathVariable UUID id,
+                                                                  @AuthenticationPrincipal AppUserPrincipal principal,
+                                                                  @RequestParam String otpCode) {
+        try {
+            LoanApplication app = loanApplicationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+            if (app.getStatus() != LoanStatus.AWAITING_LOAN_OFFICER) {
+                throw new IllegalStateException("This application is no longer waiting for loan officer approval.");
+            }
+            BoardReview myReview = boardService.getMyReview(id, principal.getMemberId(), STAGE);
+            if (myReview.getDecision() != BoardDecision.PENDING) {
+                throw new IllegalStateException("You have already submitted your loan officer decision.");
+            }
+            Member reviewer = requireMemberWithSavedSignature(principal.getMemberId());
+            emailOtpService.validateOtp(reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a loan officer approval code using the station OTP delivery policy."
+                "message", "OTP code verified."
             ));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -408,6 +435,19 @@ public class LoanOfficerController {
         model.addAttribute("reviewAssessorDescription", "The assigned loan officer decision recorded for this application.");
         model.addAttribute("reviewApprovalOtpEnabled", true);
         model.addAttribute("reviewAwaitingStatus", "AWAITING_LOAN_OFFICER");
+    }
+
+    private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("valid", true);
+        response.put("message", otp.messageOrDefault(fallbackMessage));
+        response.put("expiresAt", otp.expiresAt());
+        response.put("secondsUntilExpiry", otp.secondsUntilExpiry());
+        response.put("resendAvailableAt", otp.resendAvailableAt());
+        response.put("resendCount", otp.resendCount());
+        response.put("maxResends", otp.maxResends());
+        response.put("resendAttemptsRemaining", otp.resendAttemptsRemaining());
+        return response;
     }
 
     private String populateListing(AppUserPrincipal principal,

@@ -145,6 +145,15 @@
         min-height: 2.15rem;
         overflow-wrap: anywhere;
     }
+    .member-dashboard-flow-detail {
+        margin-top: 0.25rem;
+        font-size: 0.72rem;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #64748b;
+        min-height: 0.9rem;
+        overflow-wrap: anywhere;
+    }
     .member-dashboard-flow-text--completed {
         color: #15803d;
     }
@@ -278,6 +287,14 @@
         color: #172033;
         overflow-wrap: anywhere;
     }
+    .member-dashboard-mobile-detail {
+        margin-top: 0.18rem;
+        font-size: 0.82rem;
+        line-height: 1.25;
+        font-weight: 700;
+        color: #64748b;
+        overflow-wrap: anywhere;
+    }
     .member-dashboard-mobile-status {
         margin-top: 0.45rem;
         font-size: 0.95rem;
@@ -332,7 +349,8 @@
             font-size: 0.8rem;
         }
         .member-dashboard-flow-date,
-        .member-dashboard-flow-meta {
+        .member-dashboard-flow-meta,
+        .member-dashboard-flow-detail {
             font-size: 0.72rem;
         }
     }
@@ -378,7 +396,8 @@
         }
         .member-dashboard-flow-status,
         .member-dashboard-flow-date,
-        .member-dashboard-flow-meta {
+        .member-dashboard-flow-meta,
+        .member-dashboard-flow-detail {
             font-size: 0.76rem;
         }
     }
@@ -784,6 +803,16 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     Updated ${currentWorkflowUpdatedAtLabel}
                                 </div>
                             </c:if>
+                            <c:if test="${not empty currentWorkflowApplication and currentWorkflowApplication.status eq 'FINAL_APPROVED' and empty currentWorkflowApplication.applicantDisbursementAcknowledgedAt}">
+                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                    <span>This loan is Final Approved and Disbursed.</span>
+                                    <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${currentWorkflowApplication.id}/acknowledge-disbursement" class="m-0">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                        <input type="hidden" name="returnTo" value="dashboard" />
+                                        <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+                                    </form>
+                                </div>
+                            </c:if>
 
                             <div class="member-dashboard-mobile-flow mt-6 space-y-4">
                                 <c:forEach items="${currentWorkflowSteps}" var="step" varStatus="loop">
@@ -855,6 +884,9 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                         <div class="member-dashboard-mobile-body">
                                             <p class="member-dashboard-mobile-step-number">Step ${step.stepNumber}</p>
                                             <p class="member-dashboard-mobile-title">${step.label}</p>
+                                            <c:if test="${not empty step.detailLabel}">
+                                                <p class="member-dashboard-mobile-detail">${step.detailLabel}</p>
+                                            </c:if>
                                             <p class="member-dashboard-mobile-status ${step.textClasses}">${step.stateLabel}</p>
                                             <c:if test="${not empty step.metaLabel}">
                                                 <p class="member-dashboard-mobile-meta">${step.metaLabel}</p>
@@ -936,6 +968,9 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                     </div>
                                                     <p class="member-dashboard-flow-number ${step.numberClasses}">${step.stepNumber}</p>
                                                     <p class="member-dashboard-flow-label">${step.label}</p>
+                                                    <c:if test="${not empty step.detailLabel}">
+                                                        <p class="member-dashboard-flow-detail">${step.detailLabel}</p>
+                                                    </c:if>
                                                     <p class="member-dashboard-flow-status ${step.textClasses}">${step.stateLabel}</p>
                                                     <c:if test="${not empty step.metaLabel}">
                                                         <p class="member-dashboard-flow-meta member-dashboard-flow-meta--current">${step.metaLabel}</p>

@@ -669,7 +669,7 @@ public class LoanReportService {
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case FORFEITED -> "Forfeited";
             case FINAL_REJECTED -> "Final Rejected";
-            case FINAL_APPROVED -> "Disbursed Loan";
+            case FINAL_APPROVED -> "Final Approved and Disbursed";
             case DEFAULTED -> "Defaulted";
             case PAID -> "Paid";
             case MANAGER_ACCEPTED -> "Manager Approved";
@@ -918,7 +918,7 @@ public class LoanReportService {
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             case FORFEITED -> "Forfeited";
             case FINAL_REJECTED -> "Final Rejected";
-            case FINAL_APPROVED -> "Disbursed Loan";
+            case FINAL_APPROVED -> "Final Approved and Disbursed";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
         };

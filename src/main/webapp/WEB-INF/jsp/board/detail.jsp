@@ -151,7 +151,7 @@
 
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
 
-<div class="loan-view-summary-card px-5 py-5">
+<div class="loan-view-summary-card mt-5 px-5 py-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
@@ -225,7 +225,7 @@
     </c:choose>
 </div>
 
-<div class="loan-view-summary-card px-5 py-5">
+<div class="loan-view-summary-card mt-5 px-5 py-5">
     <div>
         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewAssessorTitle}</p>
         <p class="mt-2 text-base text-slate-600">${reviewAssessorDescription}</p>
@@ -283,7 +283,7 @@
     </div>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Loan Details</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -309,7 +309,7 @@
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap overflow-x-auto">
+    <div class="erp-table-wrap mt-5 overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
@@ -342,7 +342,7 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -369,7 +369,7 @@
     </table>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -433,7 +433,7 @@
 
 <c:choose>
     <c:when test="${myReview.decision eq 'PENDING' and app.status eq reviewAwaitingStatus}">
-        <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="loan-view-summary-card mt-4 space-y-4 px-5 py-5" data-board-decision-form="true">
+        <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="loan-view-summary-card mt-5 space-y-4 px-5 py-5" data-board-decision-form="true">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewDecisionLabel}</p>
@@ -451,9 +451,10 @@
                                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                                 <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalHelp" arguments="${reviewRoleLabelLower}" text="Request a one-time code to confirm this approval." /></p>
                             </div>
-                            <button type="button"
-                                    class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
-                                    data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-signature-otp">
+                             <button type="button"
+                                     class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
+                                     data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-signature-otp"
+                                     data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-signature-otp">
                                 <span class="otp-button-spinner hidden"></span>
                                 <span class="otp-button-label">Send OTP Code</span>
                             </button>
@@ -466,6 +467,7 @@
                                    inputmode="numeric"
                                    maxlength="6"
                                    autocomplete="one-time-code"
+                                   data-otp-hidden="true" data-otp-label="${reviewRoleLabel} OTP code"
                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                    placeholder="123456"
                                    ${reviewApprovalOtpEnabled and hasBoardSavedSignature ? 'required' : ''} />
@@ -497,7 +499,7 @@
                 </c:otherwise>
             </c:choose>
             <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
-                <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit" ${hasBoardSavedSignature ? '' : 'disabled'}>Approve Review</button>
+                <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit action-button-disabled" disabled>Approve Review</button>
                 <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit" formnovalidate>Reject Review</button>
             </div>
         </form>
@@ -542,7 +544,7 @@
             button.classList.toggle("is-sent", sent);
         }
 
-        function bindOtpLiveStatus(input, statusBox, proceedButton) {
+        function bindOtpLiveStatus(input, statusBox, proceedButton, verifyUrl) {
             if (!input || !statusBox) {
                 return {
                     markRequested: function () {},
@@ -553,9 +555,9 @@
             const tick = statusBox.querySelector("[data-otp-tick]");
             const text = statusBox.querySelector("[data-otp-text]");
             let otpRequested = Boolean((input.value || "").trim());
-            let lastReady = false;
-            let verificationComplete = false;
+            let verifiedCode = "";
             let verificationTimer = null;
+            let verificationRun = 0;
 
             function clearVerification() {
                 if (verificationTimer) {
@@ -564,79 +566,119 @@
                 }
             }
 
-            function render() {
-                input.value = (input.value || "").replace(/\D/g, "").slice(0, 6);
-                const ready = /^\d{6}$/.test(input.value);
-                if (!otpRequested || !input.value) {
-                    clearVerification();
-                    verificationComplete = false;
-                    lastReady = false;
-                    statusBox.classList.add("hidden");
-                    statusBox.classList.remove("flex", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
-                    statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
-                    spinner.classList.remove("hidden");
-                    tick.classList.add("hidden");
-                    text.textContent = "Checking code...";
-                    return;
+            function setProceedEnabled(enabled) {
+                if (proceedButton) {
+                    proceedButton.disabled = !enabled;
+                    proceedButton.classList.toggle("action-button-disabled", !enabled);
                 }
-                statusBox.classList.remove("hidden");
+            }
+
+            function setStatus(state, message) {
+                statusBox.classList.remove("hidden", "border-slate-200", "bg-white", "text-slate-600", "border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-rose-200", "bg-rose-50", "text-rose-700");
                 statusBox.classList.add("flex");
-                if (ready) {
-                    if (!verificationComplete) {
-                        if (!verificationTimer) {
-                            verificationTimer = window.setTimeout(function () {
-                                verificationTimer = null;
-                                verificationComplete = true;
-                                render();
-                            }, 240);
-                        }
-                        statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700");
-                        statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
-                        spinner.classList.remove("hidden");
-                        tick.classList.add("hidden");
-                        text.textContent = "Verifying code...";
-                        return;
-                    }
-                    if (!lastReady && proceedButton && !proceedButton.disabled) {
-                        try {
-                            proceedButton.focus({ preventScroll: true });
-                        } catch (ignored) {
-                            proceedButton.focus();
-                        }
-                    }
-                    statusBox.classList.remove("border-slate-200", "bg-white", "text-slate-600");
+                spinner.classList.toggle("hidden", state !== "checking");
+                tick.classList.toggle("hidden", state !== "valid");
+                if (state === "valid") {
                     statusBox.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
-                    spinner.classList.add("hidden");
-                    tick.classList.remove("hidden");
                     tick.classList.remove("otp-checkmark-pop");
                     void tick.offsetWidth;
                     tick.classList.add("otp-checkmark-pop");
-                    text.textContent = "Verified";
+                } else if (state === "invalid") {
+                    statusBox.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
                 } else {
-                    clearVerification();
-                    verificationComplete = false;
-                    statusBox.classList.remove("border-emerald-200", "bg-emerald-50", "text-emerald-700");
                     statusBox.classList.add("border-slate-200", "bg-white", "text-slate-600");
-                    spinner.classList.remove("hidden");
-                    tick.classList.add("hidden");
-                    text.textContent = "Checking code...";
                 }
-                lastReady = ready;
+                text.textContent = message;
+            }
+
+            async function verifyCode(code, runId) {
+                setStatus("checking", "Verifying code...");
+                try {
+                    const response = await fetch(verifyUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                            "Accept": "application/json",
+                            "X-CSRF-TOKEN": csrfToken
+                        },
+                        body: new URLSearchParams({
+                            "otpCode": code
+                        }),
+                        credentials: "same-origin"
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (runId !== verificationRun || input.value !== code) {
+                        return;
+                    }
+                    if (!response.ok || payload.valid === false) {
+                        throw new Error(payload.message || "The OTP code is invalid.");
+                    }
+                    verifiedCode = code;
+                    input.setCustomValidity("");
+                    setProceedEnabled(true);
+                    setStatus("valid", payload.message || "OTP code verified.");
+                } catch (error) {
+                    if (runId !== verificationRun || input.value !== code) {
+                        return;
+                    }
+                    verifiedCode = "";
+                    input.setCustomValidity(error.message || "The OTP code is invalid.");
+                    setProceedEnabled(false);
+                    setStatus("invalid", error.message || "The OTP code is invalid.");
+                }
+            }
+
+            function render() {
+                input.value = (input.value || "").replace(/\D/g, "").slice(0, 6);
+                const code = input.value;
+                const ready = /^\d{6}$/.test(code);
+                clearVerification();
+                verificationRun += 1;
+                input.setCustomValidity("");
+                if (!otpRequested || !code) {
+                    verifiedCode = "";
+                    setProceedEnabled(false);
+                    statusBox.classList.add("hidden");
+                    statusBox.classList.remove("flex");
+                    return;
+                }
+                if (!ready) {
+                    verifiedCode = "";
+                    setProceedEnabled(false);
+                    setStatus("idle", "Enter all 6 digits to verify the code.");
+                    return;
+                }
+                if (verifiedCode === code) {
+                    setProceedEnabled(true);
+                    setStatus("valid", "OTP code verified.");
+                    return;
+                }
+                const runId = verificationRun;
+                setProceedEnabled(false);
+                verificationTimer = window.setTimeout(function () {
+                    verifyCode(code, runId);
+                }, 250);
+                setStatus("checking", "Verifying code...");
             }
 
             input.addEventListener("input", render);
+            setProceedEnabled(false);
             render();
             return {
                 markRequested: function () {
                     otpRequested = true;
-                    verificationComplete = false;
+                    verifiedCode = "";
+                    setProceedEnabled(false);
                     render();
                 },
                 reset: function () {
                     otpRequested = false;
                     clearVerification();
-                    verificationComplete = false;
+                    verificationRun += 1;
+                    verifiedCode = "";
                     input.value = "";
+                    input.setCustomValidity("");
+                    setProceedEnabled(false);
                     render();
                 }
             };
@@ -649,7 +691,7 @@
                 const statusBox = form ? form.querySelector(".board-otp-live-status") : null;
                 const feedback = form ? form.querySelector(".board-otp-feedback") : null;
                 const proceedButton = form ? form.querySelector("button[name='decision'][value='APPROVED']") : null;
-                const otpUi = bindOtpLiveStatus(input, statusBox, proceedButton);
+                const otpUi = bindOtpLiveStatus(input, statusBox, proceedButton, button.dataset.verifyUrl);
                 const requestUrl = button.getAttribute("data-request-url");
 
                 if (!requestUrl) {
@@ -674,9 +716,10 @@
                     }
                     showOtpFeedback(feedback, "success", payload.message || "We sent an approval code to your email.");
                     setOtpButtonState(button, "sent", "Send OTP Code", "Sending...", "OTP Sent");
+                    window.SaccosOtp?.startCooldown(button, payload, { idle: "Send OTP Code" });
                     otpUi.markRequested();
                     if (input) {
-                        input.focus();
+                        window.SaccosOtp?.focusBoxes(input);
                     }
                 } catch (error) {
                     showOtpFeedback(feedback, "error", error.message || "Unable to send the OTP code right now.");

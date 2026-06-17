@@ -681,6 +681,8 @@ public class AdminController {
                                     @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                     @RequestParam(required = false) Integer accountantPriority,
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
+                                    @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
+                                    @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
                                     @RequestParam(defaultValue = "1") Integer managerPriority,
                                     @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
                                     @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
@@ -706,7 +708,7 @@ public class AdminController {
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
                 resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
-                guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -742,6 +744,8 @@ public class AdminController {
                                               @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                               @RequestParam(required = false) Integer accountantPriority,
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
+                                              @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
+                                              @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
                                               @RequestParam(defaultValue = "1") Integer managerPriority,
                                               @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
                                               @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
@@ -788,6 +792,8 @@ public class AdminController {
                 accountantReviewRequired,
                 accountantPriority,
                 disbursementOfficerRequired,
+                disbursementProofRequired,
+                applicantAttachmentRequired,
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus

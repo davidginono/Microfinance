@@ -94,18 +94,25 @@ public class LoanWorkflowService {
         List<LoanApplication> activeLoans = loanApplicationRepository
             .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, ACTIVE_LOAN_LOCK_STATUSES);
         LoanApplication latestCurrentApplication = loanApplicationRepository
-            .findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(
-                memberId,
-                APPLICATION_IN_PROGRESS_LOCK_STATUSES
-            )
+            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, PageRequest.of(0, 1))
+            .stream()
+            .findFirst()
             .orElse(null);
+        long unacknowledgedDisbursedApplicationCount = loanApplicationRepository
+            .countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(memberId, LoanStatus.FINAL_APPROVED);
         long pendingGuaranteeCount = guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId);
-        return new MemberDashboardData(statusCounts, activeLoans, latestCurrentApplication, pendingGuaranteeCount);
+        return new MemberDashboardData(
+            statusCounts,
+            activeLoans,
+            latestCurrentApplication,
+            unacknowledgedDisbursedApplicationCount,
+            pendingGuaranteeCount
+        );
     }
 
     public MemberApplicationListData memberApplicationList(UUID memberId) {
         List<LoanApplication> currentApplications = loanApplicationRepository
-            .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES);
+            .findVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES);
         long archiveCount = loanApplicationRepository.countByStatusForApplicant(memberId).stream()
             .filter(row -> !APPLICATION_IN_PROGRESS_LOCK_STATUSES.contains(row.getStatus()))
             .mapToLong(LoanApplicationRepository.StatusCountProjection::getTotal)
@@ -116,6 +123,20 @@ public class LoanWorkflowService {
     public LoanApplication getMine(UUID appId, UUID memberId) {
         return loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+    }
+
+    @Transactional
+    public void acknowledgeDisbursement(UUID appId, UUID memberId) {
+        LoanApplication app = getMine(appId, memberId);
+        if (app.getStatus() != LoanStatus.FINAL_APPROVED) {
+            throw new IllegalStateException("Only disbursed loans can be acknowledged.");
+        }
+        if (app.getApplicantDisbursementAcknowledgedAt() == null) {
+            OffsetDateTime now = OffsetDateTime.now();
+            app.setApplicantDisbursementAcknowledgedAt(now);
+            app.setUpdatedAt(now);
+            loanApplicationRepository.save(app);
+        }
     }
 
     public Optional<LoanApplication> findApplicationInProgress(UUID memberId) {
@@ -226,6 +247,7 @@ public class LoanWorkflowService {
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
         appendLoanPurpose(formData, requestParams.get("purpose"));
+        validateApplicantAttachmentRequirement(product, existingDraft, attachments);
         validateGuarantorSelection(
             saccoId,
             applicantStationId,
@@ -275,6 +297,33 @@ public class LoanWorkflowService {
         LoanApplication saved = loanApplicationRepository.save(application);
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
         return loanApplicationRepository.save(saved);
+    }
+
+    private void validateApplicantAttachmentRequirement(LoanProductSetting product,
+                                                        LoanApplication existingDraft,
+                                                        List<MultipartFile> attachments) {
+        if (product == null || !product.isApplicantAttachmentRequired()) {
+            return;
+        }
+        if (hasNewAttachment(attachments) || hasExistingApplicationAttachment(existingDraft)) {
+            return;
+        }
+        throw new IllegalArgumentException("Upload at least one applicant attachment before saving this loan application.");
+    }
+
+    private boolean hasNewAttachment(List<MultipartFile> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return false;
+        }
+        return attachments.stream().anyMatch(file -> file != null && !file.isEmpty());
+    }
+
+    private boolean hasExistingApplicationAttachment(LoanApplication existingDraft) {
+        if (existingDraft == null) {
+            return false;
+        }
+        return loanAttachmentService.parse(existingDraft.getAttachmentsJson()).stream()
+            .anyMatch(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory"))));
     }
 
     private void appendLoanPurpose(Map<String, Object> formData, String purpose) {
@@ -1168,6 +1217,7 @@ public class LoanWorkflowService {
         Map<LoanStatus, Long> statusCounts,
         List<LoanApplication> activeLoans,
         LoanApplication latestCurrentApplication,
+        long unacknowledgedDisbursedApplicationCount,
         long pendingGuaranteeCount
     ) {
     }

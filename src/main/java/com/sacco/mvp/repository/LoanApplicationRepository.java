@@ -93,6 +93,41 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     List<LoanApplication> findBySaccoIdAndStatusInOrderByCreatedAtAsc(String saccoId, List<LoanStatus> statuses);
     List<LoanApplication> findByStatusAndFinalDueDateIsNotNull(LoanStatus status);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
+    long countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(UUID applicantMemberId, LoanStatus status);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (
+            l.status in :statuses
+            or (
+              l.status = com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+              and l.applicantDisbursementAcknowledgedAt is null
+            )
+          )
+        order by l.createdAt desc
+        """)
+    List<LoanApplication> findVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
+                                                         @Param("statuses") Collection<LoanStatus> statuses);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (
+            l.status in :statuses
+            or (
+              l.status = com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+              and l.applicantDisbursementAcknowledgedAt is null
+            )
+          )
+        order by l.updatedAt desc, l.createdAt desc
+        """)
+    List<LoanApplication> findLatestVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
+                                                               @Param("statuses") Collection<LoanStatus> statuses,
+                                                               Pageable pageable);
+
     Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
         UUID applicantMemberId,
         Collection<LoanStatus> statuses

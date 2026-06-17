@@ -1,0 +1,151 @@
+<style>
+    .attachment-dropzone {
+        display: block;
+        border: 1px dashed #cbd5e1;
+        border-radius: 0.5rem;
+        background: #ffffff;
+        padding: 1rem;
+        transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+        cursor: pointer;
+    }
+
+    .attachment-dropzone:hover,
+    .attachment-dropzone.is-dragging {
+        border-color: #0284c7;
+        background: #f0f9ff;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.08);
+    }
+
+    .attachment-dropzone-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .attachment-dropzone-main {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .attachment-dropzone-copy {
+        min-width: 12rem;
+        flex: 1 1 14rem;
+    }
+
+    .attachment-dropzone-title {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .attachment-dropzone-help,
+    .attachment-dropzone-files {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.8125rem;
+        color: #64748b;
+    }
+
+    .attachment-dropzone-action {
+        border-radius: 0.375rem;
+        background: #e2e8f0;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .attachment-dropzone.is-dragging .attachment-dropzone-action {
+        background: #bae6fd;
+        color: #075985;
+    }
+</style>
+<script>
+    (() => {
+        function formatFiles(files) {
+            if (!files || files.length === 0) {
+                return "No file selected";
+            }
+            const names = Array.from(files).slice(0, 3).map(file => file.name);
+            const suffix = files.length > 3 ? " +" + (files.length - 3) + " more" : "";
+            return names.join(", ") + suffix;
+        }
+
+        function refreshDropzone(dropzone) {
+            const input = dropzone.querySelector("[data-attachment-input]");
+            const filesLabel = dropzone.querySelector("[data-attachment-files]");
+            if (filesLabel && input) {
+                filesLabel.textContent = formatFiles(input.files);
+            }
+        }
+
+        function bindDropzone(dropzone) {
+            if (!dropzone || dropzone.dataset.attachmentDropzoneReady === "true") {
+                return;
+            }
+            dropzone.dataset.attachmentDropzoneReady = "true";
+            const input = dropzone.querySelector("[data-attachment-input]");
+            if (!input) {
+                return;
+            }
+
+            input.addEventListener("change", () => refreshDropzone(dropzone));
+            let dragDepth = 0;
+            ["dragenter", "dragover"].forEach(eventName => {
+                dropzone.addEventListener(eventName, event => {
+                    event.preventDefault();
+                    if (eventName === "dragenter") {
+                        dragDepth += 1;
+                    }
+                    if (event.dataTransfer) {
+                        event.dataTransfer.dropEffect = "copy";
+                    }
+                    dropzone.classList.add("is-dragging");
+                });
+            });
+
+            dropzone.addEventListener("dragleave", event => {
+                event.preventDefault();
+                dragDepth = Math.max(0, dragDepth - 1);
+                if (dragDepth === 0) {
+                    dropzone.classList.remove("is-dragging");
+                }
+            });
+
+            dropzone.addEventListener("drop", event => {
+                event.preventDefault();
+                dragDepth = 0;
+                if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+                    input.files = event.dataTransfer.files;
+                    input.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+                dropzone.classList.remove("is-dragging");
+            });
+            refreshDropzone(dropzone);
+        }
+
+        function initAttachmentDropzones(root) {
+            (root || document).querySelectorAll("[data-attachment-dropzone]").forEach(bindDropzone);
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => initAttachmentDropzones(document));
+        } else {
+            initAttachmentDropzones(document);
+        }
+
+        window.SaccoAttachmentDropzones = {
+            init: initAttachmentDropzones
+        };
+    })();
+</script>

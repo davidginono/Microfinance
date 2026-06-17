@@ -91,7 +91,7 @@ public class WorkflowStatusPresentationService {
             case AWAITING_BOARD -> "On Review By Board";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
-            case FINAL_APPROVED -> "Disbursed Loan";
+            case FINAL_APPROVED -> "Final Approved and Disbursed";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
             case MANAGER_REJECTED -> "Manager Rejected";

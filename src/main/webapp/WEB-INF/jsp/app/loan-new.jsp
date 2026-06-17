@@ -5,6 +5,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
+<%@ include file="../fragments/attachment-dropzone.jspf" %>
 <style>
     @keyframes otp-pop {
         0% { transform: translateY(4px) scale(0.82); opacity: 0; }
@@ -21,6 +22,44 @@
         justify-content: flex-end;
         gap: 0.75rem;
         padding-top: 0.5rem;
+    }
+
+    .tenure-unit-toggle-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.18rem;
+        min-height: 2.65rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.45rem;
+        background: #ffffff;
+        padding: 0.18rem;
+        box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.65);
+    }
+
+    .tenure-unit-toggle {
+        min-width: 0;
+        border: 1px solid transparent;
+        border-radius: 0.32rem;
+        background: transparent;
+        color: #475569;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .tenure-unit-toggle:hover {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+
+    .tenure-unit-toggle.is-active {
+        background: #9ACBEA;
+        border-color: #86bddd;
+        color: #0f172a;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .tenure-unit-toggle.is-active:hover {
+        background: #8DBFDE;
     }
 </style>
 
@@ -91,15 +130,28 @@
             <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedRange" /> ${minimumAmountLabel} <spring:message code="common.to" text="to" /> ${maximumAmountLabel}</p>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>
-            <input id="tenorInput" type="number" name="tenorMonths"
-                   min="${product.minimumRepaymentMonths}"
-                   max="${product.maxRepaymentMonths}"
-                   value="${formValues['tenorMonths']}"
-                   placeholder="12"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                   required />
-            <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedTenureRange" /> ${product.minimumRepaymentMonths} <spring:message code="common.to" text="to" /> ${product.maxRepaymentMonths} <spring:message code="common.months" text="month(s)" /></p>
+            <label id="tenorDisplayLabel" for="tenorDisplayInput" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>
+            <input id="tenorInput" type="hidden" name="tenorMonths" value="${formValues['tenorMonths']}" />
+            <div class="tenure-unit-toggle-group mb-2 text-sm" role="group" aria-label="Tenure unit">
+                <button type="button" class="tenure-unit-toggle is-active px-3 py-2 transition" data-tenure-unit="MONTHS" aria-pressed="true">Months</button>
+                <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-tenure-unit="YEARS" aria-pressed="false">Years</button>
+            </div>
+            <div>
+                <input id="tenorDisplayInput" type="number"
+                       min="${product.minimumRepaymentMonths}"
+                       max="${product.maxRepaymentMonths}"
+                       value="${formValues['tenorMonths']}"
+                       placeholder="12"
+                       data-min-months="${product.minimumRepaymentMonths}"
+                       data-max-months="${product.maxRepaymentMonths}"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       required />
+            </div>
+            <p id="tenorRangeHelp" class="mt-1 text-xs text-slate-500"
+               data-prefix="<spring:message code='newloan.allowedTenureRange' />"
+               data-to-label="<spring:message code='common.to' text='to' />"
+               data-month-label="<spring:message code='common.months' text='month(s)' />"
+               data-year-label="year(s)"></p>
         </div>
     </div>
 
@@ -199,6 +251,43 @@
         </div>
     </div>
 
+    <div id="repaymentSchedulePreviewCard" class="<c:if test='${empty repaymentSchedulePreviewRows}'>hidden </c:if>erp-section-muted">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <h5 class="erp-panel-title">Repayment Scheduler</h5>
+                <p class="text-sm text-slate-500">Estimated monthly installments with loan amount, interest, and balance after each payment.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap overflow-x-auto">
+            <table class="erp-table">
+                <thead>
+                <tr>
+                    <th>Pmt No.</th>
+                    <th>Month</th>
+                    <th>Beginning Balance</th>
+                    <th>Amount to Pay</th>
+                    <th>Loan Amount</th>
+                    <th>Interest</th>
+                    <th>Ending Balance</th>
+                </tr>
+                </thead>
+                <tbody id="repaymentSchedulePreviewBody">
+                <c:forEach items="${repaymentSchedulePreviewRows}" var="row">
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                        <td class="px-3 py-2">${row.month}</td>
+                        <td class="px-3 py-2">${row.beginningBalance}</td>
+                        <td class="px-3 py-2">${row.payment}</td>
+                        <td class="px-3 py-2">${row.loanAmount}</td>
+                        <td class="px-3 py-2">${row.interest}</td>
+                        <td class="px-3 py-2">${row.endingBalance}</td>
+                    </tr>
+                </c:forEach>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <c:if test="${requiredGuarantors gt 0}">
         <div class="erp-section-muted">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -249,11 +338,26 @@
     </c:if>
 
     <div class="erp-section-muted">
-        <div class="mb-2">
-            <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
-            <p class="text-sm text-slate-500"><spring:message code="newloan.attachments.helper" /></p>
+        <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
+            <div>
+                <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
+                <p class="text-sm text-slate-500"><spring:message code="newloan.attachments.helper" /></p>
+            </div>
+            <c:if test="${product.applicantAttachmentRequired}">
+                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Required</span>
+            </c:if>
         </div>
-        <input type="file" name="attachments" multiple class="w-full rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-700" />
+        <label class="attachment-dropzone" data-attachment-dropzone>
+            <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
+            <span class="attachment-dropzone-main">
+                <span class="attachment-dropzone-copy">
+                    <span class="attachment-dropzone-title">Drop files here or choose from device</span>
+                    <span class="attachment-dropzone-help">Images and documents can be attached.</span>
+                    <span class="attachment-dropzone-files" data-attachment-files>No file selected</span>
+                </span>
+                <span class="attachment-dropzone-action">Choose files</span>
+            </span>
+        </label>
         <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.attachments.note" /></p>
     </div>
 
@@ -300,6 +404,7 @@
                             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.otp.codeLabel" /></label>
                             <input type="text" name="applicantSignatureOtpCode" id="applicantSignatureOtpCode"
                                    inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                                   data-otp-hidden="true" data-otp-label="Applicant OTP code"
                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                    placeholder="123456" />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.otp.codeHelp" /></p>
@@ -352,6 +457,10 @@
         const amountInput = document.getElementById("loanAmountInput");
         const amountDisplayInput = document.getElementById("loanAmountDisplay");
         const tenorInput = document.getElementById("tenorInput");
+        const tenorDisplayInput = document.getElementById("tenorDisplayInput");
+        const tenorDisplayLabel = document.getElementById("tenorDisplayLabel");
+        const tenorRangeHelp = document.getElementById("tenorRangeHelp");
+        const tenureUnitButtons = Array.from(document.querySelectorAll("[data-tenure-unit]"));
         const actionInput = document.getElementById("loanFormAction");
         const financialButton = document.getElementById("loadFinancialDetailsButton");
         const financialFeedback = document.getElementById("financialFeedback");
@@ -359,6 +468,8 @@
         const financialCard = document.getElementById("financialPreviewCard");
         const financialBody = document.getElementById("financialPreviewBody");
         const financialSnapshotInput = document.getElementById("financialSnapshotJson");
+        const repaymentScheduleCard = document.getElementById("repaymentSchedulePreviewCard");
+        const repaymentScheduleBody = document.getElementById("repaymentSchedulePreviewBody");
         const topUpLoanIdInput = document.getElementById("topUpLoanId");
         const signatureOtpButton = document.getElementById("requestApplicantSignatureOtpButton");
         const signatureOtpFeedback = document.getElementById("applicantSignatureOtpFeedback");
@@ -432,6 +543,148 @@
             amountDisplayInput.value = formatMoneyInputValue(normalized);
         }
 
+        let tenureUnit = "MONTHS";
+
+        function minTenorMonths() {
+            return Number(tenorDisplayInput?.dataset.minMonths || 1);
+        }
+
+        function maxTenorMonths() {
+            return Number(tenorDisplayInput?.dataset.maxMonths || 0);
+        }
+
+        function yearsFromMonths(months, rounder) {
+            if (!Number.isFinite(months) || months <= 0) {
+                return 0;
+            }
+            return rounder(months / 12);
+        }
+
+        function visibleTenorBounds() {
+            const minMonths = minTenorMonths();
+            const maxMonths = maxTenorMonths();
+            if (tenureUnit === "YEARS") {
+                return {
+                    min: Math.max(1, yearsFromMonths(minMonths, Math.ceil)),
+                    max: maxMonths > 0 ? yearsFromMonths(maxMonths, Math.floor) : 0
+                };
+            }
+            return {
+                min: minMonths,
+                max: maxMonths
+            };
+        }
+
+        function hasWholeYearTenureOption() {
+            const maxMonths = maxTenorMonths();
+            return tenureUnit !== "YEARS" || maxMonths <= 0 || yearsFromMonths(maxMonths, Math.floor) >= Math.max(1, yearsFromMonths(minTenorMonths(), Math.ceil));
+        }
+
+        function renderTenureCopy() {
+            if (tenorDisplayLabel) {
+                tenorDisplayLabel.textContent = tenureUnit === "YEARS" ? "Total Years to Repay" : "Total Months to Repay";
+            }
+            if (tenorRangeHelp) {
+                if (!hasWholeYearTenureOption()) {
+                    tenorRangeHelp.textContent = "Allowed range: no full-year tenure for this product. Choose Months.";
+                    return;
+                }
+                const bounds = visibleTenorBounds();
+                const prefix = tenorRangeHelp.dataset.prefix || "Allowed range:";
+                const toLabel = tenorRangeHelp.dataset.toLabel || "to";
+                const unitLabel = tenureUnit === "YEARS"
+                    ? (tenorRangeHelp.dataset.yearLabel || "year(s)")
+                    : (tenorRangeHelp.dataset.monthLabel || "month(s)");
+                tenorRangeHelp.textContent = maxTenorMonths() > 0
+                    ? prefix + " " + bounds.min + " " + toLabel + " " + bounds.max + " " + unitLabel
+                    : prefix + " " + bounds.min + "+ " + unitLabel;
+            }
+        }
+
+        function monthsFromVisibleTenor() {
+            const rawValue = Number(tenorDisplayInput ? tenorDisplayInput.value : tenorInput.value);
+            if (!Number.isFinite(rawValue) || rawValue <= 0) {
+                return "";
+            }
+            return tenureUnit === "YEARS" ? Math.round(rawValue) * 12 : Math.round(rawValue);
+        }
+
+        function refreshTenureConstraints() {
+            if (!tenorDisplayInput) {
+                return;
+            }
+            if (tenureUnit === "YEARS") {
+                const bounds = visibleTenorBounds();
+                tenorDisplayInput.min = bounds.min;
+                if (bounds.max >= bounds.min) {
+                    tenorDisplayInput.max = bounds.max;
+                } else {
+                    tenorDisplayInput.removeAttribute("max");
+                }
+                tenorDisplayInput.step = "1";
+                tenorDisplayInput.placeholder = "1";
+            } else {
+                tenorDisplayInput.min = minTenorMonths();
+                const maxMonths = maxTenorMonths();
+                if (maxMonths > 0) {
+                    tenorDisplayInput.max = maxMonths;
+                } else {
+                    tenorDisplayInput.removeAttribute("max");
+                }
+                tenorDisplayInput.step = "1";
+                tenorDisplayInput.placeholder = "12";
+            }
+            renderTenureCopy();
+        }
+
+        function syncTenorInput() {
+            if (!tenorDisplayInput || !tenorInput) {
+                return true;
+            }
+            const months = monthsFromVisibleTenor();
+            tenorInput.value = months;
+            tenorDisplayInput.setCustomValidity("");
+            if (!months) {
+                return false;
+            }
+            if (tenureUnit === "YEARS" && !/^\d+$/.test(String(tenorDisplayInput.value || "").trim())) {
+                tenorDisplayInput.setCustomValidity("Enter whole years only.");
+                return false;
+            }
+            const minMonths = minTenorMonths();
+            const maxMonths = maxTenorMonths();
+            if (!hasWholeYearTenureOption()) {
+                tenorDisplayInput.setCustomValidity("This product does not allow a whole-year tenure. Choose Months.");
+                return false;
+            }
+            if (months < minMonths || (maxMonths > 0 && months > maxMonths)) {
+                const bounds = visibleTenorBounds();
+                const unitLabel = tenureUnit === "YEARS" ? "years" : "months";
+                const rangeLabel = maxMonths > 0 ? "between " + bounds.min + " and " + bounds.max : "of at least " + bounds.min;
+                tenorDisplayInput.setCustomValidity("Choose a tenure " + rangeLabel + " " + unitLabel + ".");
+                return false;
+            }
+            return true;
+        }
+
+        function setTenureUnit(unit) {
+            const currentMonths = Number(tenorInput.value || monthsFromVisibleTenor());
+            tenureUnit = unit === "YEARS" ? "YEARS" : "MONTHS";
+            tenureUnitButtons.forEach(function (button) {
+                const active = button.dataset.tenureUnit === tenureUnit;
+                button.setAttribute("aria-pressed", active ? "true" : "false");
+                button.classList.toggle("is-active", active);
+            });
+            refreshTenureConstraints();
+            if (Number.isFinite(currentMonths) && currentMonths > 0) {
+                tenorDisplayInput.value = tenureUnit === "YEARS"
+                    ? String(Math.max(1, Math.round(currentMonths / 12)))
+                    : String(Math.round(currentMonths));
+            }
+            renderTenureCopy();
+            syncTenorInput();
+        }
+
         function showFinancialFeedback(type, text) {
             financialFeedback.classList.add("hidden");
             financialFeedback.textContent = "";
@@ -468,8 +721,36 @@
             }
             financialSnapshotInput.value = "";
             financialCard.classList.add("hidden");
+            renderRepaymentSchedule([]);
             document.dispatchEvent(new CustomEvent("loanFinancialSnapshotChanged"));
             showFinancialFeedback("error", msgLoanAmountChanged);
+        }
+
+        function renderRepaymentSchedule(rows) {
+            if (!repaymentScheduleCard || !repaymentScheduleBody) {
+                return;
+            }
+            repaymentScheduleBody.innerHTML = "";
+            (rows || []).forEach(function (item) {
+                const row = document.createElement("tr");
+                row.innerHTML = ""
+                    + "<td class='px-3 py-2 font-medium text-slate-700'></td>"
+                    + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>"
+                    + "<td class='px-3 py-2'></td>";
+                row.children[0].textContent = item.pmtNo || "-";
+                row.children[1].textContent = item.month || "-";
+                row.children[2].textContent = item.beginningBalance || "-";
+                row.children[3].textContent = item.payment || item.installment || "-";
+                row.children[4].textContent = item.loanAmount || item.principal || "-";
+                row.children[5].textContent = item.interest || "-";
+                row.children[6].textContent = item.endingBalance || item.outstandingBalance || "-";
+                repaymentScheduleBody.appendChild(row);
+            });
+            repaymentScheduleCard.classList.toggle("hidden", repaymentScheduleBody.children.length === 0);
         }
 
         function showSignatureOtpFeedback(type, text) {
@@ -632,6 +913,7 @@
                     verifiedCode = "";
                     setProceedEnabled(false);
                     render();
+                    window.SaccosOtp?.focusBoxes(otpInput);
                 },
                 reset: function () {
                     otpRequested = false;
@@ -699,8 +981,20 @@
             syncAmountInput();
             resetFinancialPreview();
         });
-        tenorInput.addEventListener("change", resetFinancialPreview);
+        tenorDisplayInput?.addEventListener("input", syncTenorInput);
+        tenorDisplayInput?.addEventListener("change", function () {
+            syncTenorInput();
+            resetFinancialPreview();
+        });
+        tenureUnitButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                setTenureUnit(button.dataset.tenureUnit);
+                resetFinancialPreview();
+                tenorDisplayInput?.focus();
+            });
+        });
         syncAmountInput();
+        setTenureUnit("MONTHS");
         loadExternalEligibilitySummary();
         const applicantOtpUi = bindOtpLiveStatus(
             applicantSignatureOtpInput,
@@ -729,6 +1023,7 @@
         );
 
         financialButton.addEventListener("click", async function () {
+            syncTenorInput();
             if (!form.reportValidity()) {
                 return;
             }
@@ -771,6 +1066,7 @@
                 });
 
                 financialCard.classList.remove("hidden");
+                renderRepaymentSchedule(payload.repaymentSchedule || []);
                 showFinancialFeedback("success", payload.message || "Loan details loaded successfully.");
             } catch (error) {
                 showFinancialFeedback("error", error.message || "Failed to load the loan details.");
@@ -803,9 +1099,10 @@
                     }
                     showSignatureOtpFeedback("success", payload.message || msgOtpEmailSent);
                     setOtpButtonState(signatureOtpButton, "sent", msgSendOtp, msgSending, msgOtpSent);
+                    window.SaccosOtp?.startCooldown(signatureOtpButton, payload, { idle: msgSendOtp });
                     applicantOtpUi.markRequested();
                     if (applicantSignatureOtpInput) {
-                        applicantSignatureOtpInput.focus();
+                        window.SaccosOtp?.focusBoxes(applicantSignatureOtpInput);
                     }
                 } catch (error) {
                     showSignatureOtpFeedback("error", error.message || msgUnableSendOtp);
@@ -824,6 +1121,11 @@
             }
             if (actionInput) {
                 actionInput.value = submitButton.dataset.formAction || "SAVE_DRAFT";
+            }
+            syncTenorInput();
+            if (!tenorDisplayInput.reportValidity()) {
+                event.preventDefault();
+                return;
             }
             if (actionInput && actionInput.value === "SEND_TO_GUARANTORS") {
                 if (termsAcceptedInput && !termsAcceptedInput.checked) {

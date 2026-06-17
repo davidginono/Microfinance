@@ -38,4 +38,7 @@ public class EmailOtpToken {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @Column(name = "resend_count", nullable = false)
+    private Integer resendCount;
 }

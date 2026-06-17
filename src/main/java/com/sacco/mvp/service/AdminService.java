@@ -659,6 +659,11 @@ public class AdminService {
             committeeApprovalThreshold,
             accountantReviewRequired,
             accountantPriority,
+            true,
+            true,
+            false,
+            false,
+            null,
             productStatus
         );
     }
@@ -725,6 +730,8 @@ public class AdminService {
             accountantReviewRequired,
             accountantPriority,
             true,
+            true,
+            false,
             false,
             null,
             productStatus
@@ -762,6 +769,81 @@ public class AdminService {
                                   boolean accountantReviewRequired,
                                   Integer accountantPriority,
                                   boolean disbursementOfficerRequired,
+                                  boolean guarantorMinSavingsCheckRequired,
+                                  BigDecimal guarantorMinimumSavings,
+                                  LoanProductStatus productStatus) {
+        updateLoanProduct(
+            saccoId,
+            adminId,
+            productId,
+            productCode,
+            productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
+            guarantorsRequired,
+            ratio,
+            insuranceRate,
+            annualRate,
+            interestMethod,
+            minRepaymentMonths,
+            maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority,
+            disbursementOfficerRequired,
+            true,
+            false,
+            guarantorMinSavingsCheckRequired,
+            guarantorMinimumSavings,
+            productStatus
+        );
+    }
+
+    @Transactional
+    public void updateLoanProduct(String saccoId,
+                                  UUID adminId,
+                                  UUID productId,
+                                  String productCode,
+                                  String productName,
+                                  String productDescription,
+                                  Integer displayOrder,
+                                  BigDecimal minimumAmount,
+                                  BigDecimal maximumAmount,
+                                  Integer guarantorsRequired,
+                                  BigDecimal ratio,
+                                  BigDecimal insuranceRate,
+                                  BigDecimal annualRate,
+                                  InterestMethod interestMethod,
+                                  Integer minRepaymentMonths,
+                                  Integer maxRepaymentMonths,
+                                  boolean allowApplicationWithActiveLoan,
+                                  boolean freshFinancialDataRequired,
+                                  boolean managerReviewRequired,
+                                  boolean loanOfficerReviewRequired,
+                                  ApprovalWorkflowStage workflowStartStage,
+                                  Integer managerPriority,
+                                  Integer loanOfficerPriority,
+                                  boolean committeeReviewRequired,
+                                  Integer committeePriority,
+                                  Integer committeeMinimumVotes,
+                                  Integer committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  Integer accountantPriority,
+                                  boolean disbursementOfficerRequired,
+                                  boolean disbursementProofRequired,
+                                  boolean applicantAttachmentRequired,
                                   boolean guarantorMinSavingsCheckRequired,
                                   BigDecimal guarantorMinimumSavings,
                                   LoanProductStatus productStatus) {
@@ -823,6 +905,8 @@ public class AdminService {
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, accountantPriority, 4));
         product.setDisbursementOfficerRequired(disbursementOfficerRequired);
+        product.setDisbursementProofRequired(disbursementProofRequired);
+        product.setApplicantAttachmentRequired(applicantAttachmentRequired);
         product.setGuarantorMinSavingsCheckRequired(guarantorMinSavingsCheckRequired);
         product.setGuarantorMinimumSavings(nonNegativeAmount(guarantorMinimumSavings, "Minimum guarantor savings cannot be negative."));
         validateCommitteeConfiguration(saccoId, product.getCommitteeMinimumVotes(), product.getCommitteeApprovalThreshold(), committeeReviewRequired);
@@ -890,6 +974,79 @@ public class AdminService {
                                             boolean guarantorMinSavingsCheckRequired,
                                             BigDecimal guarantorMinimumSavings,
                                             LoanProductStatus productStatus) {
+        createCustomizedLoanProduct(
+            saccoId,
+            adminId,
+            productCode,
+            productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
+            guarantorsRequired,
+            ratio,
+            insuranceRate,
+            annualRate,
+            interestMethod,
+            minRepaymentMonths,
+            maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            accountantReviewRequired,
+            accountantPriority,
+            disbursementOfficerRequired,
+            true,
+            false,
+            guarantorMinSavingsCheckRequired,
+            guarantorMinimumSavings,
+            productStatus
+        );
+    }
+
+    @Transactional
+    public void createCustomizedLoanProduct(String saccoId,
+                                            UUID adminId,
+                                            String productCode,
+                                            String productName,
+                                            String productDescription,
+                                            Integer displayOrder,
+                                            BigDecimal minimumAmount,
+                                            BigDecimal maximumAmount,
+                                            Integer guarantorsRequired,
+                                            BigDecimal ratio,
+                                            BigDecimal insuranceRate,
+                                            BigDecimal annualRate,
+                                            InterestMethod interestMethod,
+                                            Integer minRepaymentMonths,
+                                            Integer maxRepaymentMonths,
+                                            boolean allowApplicationWithActiveLoan,
+                                            boolean freshFinancialDataRequired,
+                                            boolean managerReviewRequired,
+                                            boolean loanOfficerReviewRequired,
+                                            ApprovalWorkflowStage workflowStartStage,
+                                            Integer managerPriority,
+                                            Integer loanOfficerPriority,
+                                            boolean committeeReviewRequired,
+                                            Integer committeePriority,
+                                            Integer committeeMinimumVotes,
+                                            Integer committeeApprovalThreshold,
+                                            boolean accountantReviewRequired,
+                                            Integer accountantPriority,
+                                            boolean disbursementOfficerRequired,
+                                            boolean disbursementProofRequired,
+                                            boolean applicantAttachmentRequired,
+                                            boolean guarantorMinSavingsCheckRequired,
+                                            BigDecimal guarantorMinimumSavings,
+                                            LoanProductStatus productStatus) {
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
         Integer normalizedCommitteeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, committeeMinimumVotes);
         Integer normalizedCommitteeApprovalThreshold = normalizeCommitteeApprovalThreshold(
@@ -947,6 +1104,8 @@ public class AdminService {
             accountantReviewRequired,
             normalizeStagePriority(accountantReviewRequired, accountantPriority, 4),
             disbursementOfficerRequired,
+            disbursementProofRequired,
+            applicantAttachmentRequired,
             guarantorMinSavingsCheckRequired,
             nonNegativeAmount(guarantorMinimumSavings, "Minimum guarantor savings cannot be negative."),
             normalizedStatus,
@@ -2541,6 +2700,8 @@ public class AdminService {
         product.setAccountantReviewRequired(accountantReviewRequired);
         product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, snapshot.accountantPriority(), 4));
         product.setDisbursementOfficerRequired(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
+        product.setDisbursementProofRequired(!Boolean.FALSE.equals(snapshot.disbursementProofRequired()));
+        product.setApplicantAttachmentRequired(Boolean.TRUE.equals(snapshot.applicantAttachmentRequired()));
         product.setGuarantorMinSavingsCheckRequired(Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
         product.setGuarantorMinimumSavings(nonNegativeAmount(snapshot.guarantorMinimumSavings(), "Minimum guarantor savings cannot be negative."));
         LoanProductStatus normalizedStatus = normalizeProductStatus(snapshot.productStatus());
@@ -2579,6 +2740,8 @@ public class AdminService {
         data.put("accountantReviewRequired", !Boolean.FALSE.equals(snapshot.accountantReviewRequired()));
         data.put("accountantPriority", snapshot.accountantPriority());
         data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
+        data.put("disbursementProofRequired", !Boolean.FALSE.equals(snapshot.disbursementProofRequired()));
+        data.put("applicantAttachmentRequired", Boolean.TRUE.equals(snapshot.applicantAttachmentRequired()));
         data.put("guarantorMinSavingsCheckRequired", Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
         data.put("guarantorMinimumSavings", snapshot.guarantorMinimumSavings());
         data.put("productStatus", snapshot.productStatus());
@@ -3135,6 +3298,8 @@ public class AdminService {
         Boolean accountantReviewRequired,
         Integer accountantPriority,
         Boolean disbursementOfficerRequired,
+        Boolean disbursementProofRequired,
+        Boolean applicantAttachmentRequired,
         Boolean guarantorMinSavingsCheckRequired,
         BigDecimal guarantorMinimumSavings,
         LoanProductStatus productStatus
@@ -3169,6 +3334,8 @@ public class AdminService {
                 product.getAccountantReviewRequired(),
                 product.getAccountantPriority(),
                 product.getDisbursementOfficerRequired(),
+                product.getDisbursementProofRequired(),
+                product.getApplicantAttachmentRequired(),
                 product.getGuarantorMinSavingsCheckRequired(),
                 product.getGuarantorMinimumSavings(),
                 product.getStatus()

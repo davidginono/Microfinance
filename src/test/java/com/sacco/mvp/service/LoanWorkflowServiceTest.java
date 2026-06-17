@@ -91,8 +91,8 @@ class LoanWorkflowServiceTest {
         when(loanApplicationRepository.countByStatusForApplicant(memberId)).thenReturn(List.of(currentCount, paidCount));
         when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
             .thenReturn(List.of(activeLoan));
-        when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(eq(memberId), any()))
-            .thenReturn(Optional.of(currentLoan));
+        when(loanApplicationRepository.findLatestVisibleCurrentForApplicant(eq(memberId), any(), any()))
+            .thenReturn(List.of(currentLoan));
         when(guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId)).thenReturn(4L);
 
         LoanWorkflowService.MemberDashboardData dashboard = loanWorkflowService.memberDashboard(memberId);
@@ -123,7 +123,7 @@ class LoanWorkflowServiceTest {
         when(paidCount.getTotal()).thenReturn(3L);
         when(rejectedCount.getStatus()).thenReturn(LoanStatus.FINAL_REJECTED);
         when(rejectedCount.getTotal()).thenReturn(2L);
-        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+        when(loanApplicationRepository.findVisibleCurrentForApplicant(eq(memberId), any()))
             .thenReturn(List.of(currentLoan));
         when(loanApplicationRepository.countByStatusForApplicant(memberId))
             .thenReturn(List.of(currentCount, paidCount, rejectedCount));
@@ -133,6 +133,43 @@ class LoanWorkflowServiceTest {
         assertThat(applications.currentApplications()).containsExactly(currentLoan);
         assertThat(applications.archiveCount()).isEqualTo(5L);
         verify(loanApplicationRepository, never()).findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
+    }
+
+    @Test
+    void acknowledgeDisbursementMarksFinalApprovedLoanAsSeenByApplicant() {
+        UUID memberId = UUID.randomUUID();
+        UUID appId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.FINAL_APPROVED)
+            .updatedAt(OffsetDateTime.now().minusDays(1))
+            .build();
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        loanWorkflowService.acknowledgeDisbursement(appId, memberId);
+
+        assertThat(app.getApplicantDisbursementAcknowledgedAt()).isNotNull();
+        assertThat(app.getUpdatedAt()).isEqualTo(app.getApplicantDisbursementAcknowledgedAt());
+        verify(loanApplicationRepository).save(app);
+    }
+
+    @Test
+    void acknowledgeDisbursementRejectsNonDisbursedLoan() {
+        UUID memberId = UUID.randomUUID();
+        UUID appId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.READY_FOR_DISBURSEMENT)
+            .build();
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> loanWorkflowService.acknowledgeDisbursement(appId, memberId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Only disbursed loans can be acknowledged.");
+        verify(loanApplicationRepository, never()).save(any());
     }
 
     @Test

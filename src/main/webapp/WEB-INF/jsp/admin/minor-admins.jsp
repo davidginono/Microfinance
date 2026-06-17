@@ -75,6 +75,7 @@
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Phone
                     <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <span class="mt-1 block text-[11px] font-medium normal-case tracking-normal text-slate-500">Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0.</span>
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3">
@@ -263,6 +264,7 @@
                     <label class="block text-sm font-semibold text-slate-700">
                         Phone
                         <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.phone}" />
+                        <span class="mt-1 block text-[11px] font-medium text-slate-500">Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0.</span>
                     </label>
 
                     <div class="app-modal-actions">

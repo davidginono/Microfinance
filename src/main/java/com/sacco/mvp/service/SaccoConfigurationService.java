@@ -55,6 +55,8 @@ public class SaccoConfigurationService {
                                                 boolean accountantReviewRequired,
                                               Integer accountantPriority,
                                               boolean disbursementOfficerRequired,
+                                              boolean disbursementProofRequired,
+                                              boolean applicantAttachmentRequired,
                                               boolean guarantorMinSavingsCheckRequired,
                                               BigDecimal guarantorMinimumSavings,
                                               LoanProductStatus productStatus,
@@ -93,6 +95,8 @@ public class SaccoConfigurationService {
             accountantReviewRequired,
             accountantPriority,
             disbursementOfficerRequired,
+            disbursementProofRequired,
+            applicantAttachmentRequired,
             guarantorMinSavingsCheckRequired,
             guarantorMinimumSavings,
             productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus,
@@ -130,6 +134,8 @@ public class SaccoConfigurationService {
                                               boolean accountantReviewRequired,
                                               Integer accountantPriority,
                                               boolean disbursementOfficerRequired,
+                                              boolean disbursementProofRequired,
+                                              boolean applicantAttachmentRequired,
                                               boolean guarantorMinSavingsCheckRequired,
                                               BigDecimal guarantorMinimumSavings,
                                               LoanProductStatus productStatus,
@@ -166,6 +172,8 @@ public class SaccoConfigurationService {
             .accountantReviewRequired(accountantReviewRequired)
             .accountantPriority(accountantPriority)
             .disbursementOfficerRequired(disbursementOfficerRequired)
+            .disbursementProofRequired(disbursementProofRequired)
+            .applicantAttachmentRequired(applicantAttachmentRequired)
             .guarantorMinSavingsCheckRequired(guarantorMinSavingsCheckRequired)
             .guarantorMinimumSavings(guarantorMinimumSavings == null ? BigDecimal.ZERO : guarantorMinimumSavings)
             .productStatus(productStatus == null ? (active ? LoanProductStatus.ACTIVE : LoanProductStatus.SUSPENDED) : productStatus)

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Slf4j
 public class EmailOtpService {
     private static final SecureRandom RANDOM = new SecureRandom();
+    public static final int MAX_RESENDS_PER_OTP = 3;
 
     private final EmailOtpTokenRepository emailOtpTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -62,13 +64,39 @@ public class EmailOtpService {
                                                               String saccoId,
                                                               String stationId,
                                                               String phone) {
+        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, saccoId, stationId, phone).deliveryReceipt();
+    }
+
+    @Transactional
+    public OtpIssueResult issueOtpWithMetadata(String email,
+                                               EmailOtpPurpose purpose,
+                                               UUID memberId,
+                                               String subject,
+                                               String introMessage,
+                                               String saccoId,
+                                               String stationId,
+                                               String phone) {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            activeTokens(normalizedEmail, purpose, memberId)
-                .forEach(token -> token.setConsumedAt(now));
+            java.util.List<EmailOtpToken> activeTokens = activeTokens(normalizedEmail, purpose, memberId);
+            EmailOtpToken existingToken = activeTokens.stream()
+                .filter(token -> token.getExpiresAt() != null && token.getExpiresAt().isAfter(now))
+                .max(java.util.Comparator.comparing(EmailOtpToken::getCreatedAt))
+                .orElse(null);
+            int resendCount = 0;
+            if (existingToken != null) {
+                resendCount = resolvedResendCount(existingToken);
+                if (resendCount >= MAX_RESENDS_PER_OTP) {
+                    throw new IllegalStateException("OTP resend limit reached. Use the latest code or request a new one after it expires.");
+                }
+                resendCount += 1;
+            }
+
+            activeTokens.forEach(token -> token.setConsumedAt(now));
 
             String code = generateCode();
+            OffsetDateTime expiresAt = now.plusMinutes(Math.max(1, otpTtlMinutes));
             EmailOtpToken token = EmailOtpToken.builder()
                 .id(UUID.randomUUID())
                 .email(normalizedEmail)
@@ -76,7 +104,8 @@ public class EmailOtpService {
                 .memberId(memberId)
                 .codeHash(passwordEncoder.encode(code))
                 .createdAt(now)
-                .expiresAt(now.plusMinutes(Math.max(1, otpTtlMinutes)))
+                .expiresAt(expiresAt)
+                .resendCount(resendCount)
                 .build();
             emailOtpTokenRepository.save(token);
 
@@ -92,7 +121,7 @@ public class EmailOtpService {
                 Math.max(1, otpTtlMinutes)
             );
             log.info("Issued {} OTP for {}", purpose, normalizedEmail);
-            return receipt;
+            return OtpIssueResult.issued(receipt, expiresAt, secondsUntil(now, expiresAt), resendCount);
         } catch (DataAccessException ex) {
             log.error("Unable to issue {} OTP for {} due to a data access problem", purpose, normalizedEmail, ex);
             throw new IllegalStateException(
@@ -167,5 +196,51 @@ public class EmailOtpService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private long secondsUntil(OffsetDateTime now, OffsetDateTime expiresAt) {
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
+            return 0L;
+        }
+        return Math.max(0L, Duration.between(now, expiresAt).getSeconds());
+    }
+
+    private int resolvedResendCount(EmailOtpToken token) {
+        return token.getResendCount() == null ? 0 : Math.max(0, token.getResendCount());
+    }
+
+    public record OtpIssueResult(
+        boolean issued,
+        StationOtpDeliveryService.DeliveryReceipt deliveryReceipt,
+        OffsetDateTime expiresAt,
+        long secondsUntilExpiry,
+        OffsetDateTime resendAvailableAt,
+        int resendCount,
+        int maxResends,
+        int resendAttemptsRemaining
+    ) {
+        static OtpIssueResult issued(StationOtpDeliveryService.DeliveryReceipt receipt,
+                                     OffsetDateTime expiresAt,
+                                     long secondsUntilExpiry,
+                                     int resendCount) {
+            int safeCount = Math.max(0, resendCount);
+            return new OtpIssueResult(
+                true,
+                receipt,
+                expiresAt,
+                secondsUntilExpiry,
+                OffsetDateTime.now(),
+                safeCount,
+                MAX_RESENDS_PER_OTP,
+                Math.max(0, MAX_RESENDS_PER_OTP - safeCount)
+            );
+        }
+
+        public String messageOrDefault(String fallback) {
+            if (deliveryReceipt != null && deliveryReceipt.userMessage() != null && !deliveryReceipt.userMessage().isBlank()) {
+                return deliveryReceipt.userMessage();
+            }
+            return fallback;
+        }
     }
 }

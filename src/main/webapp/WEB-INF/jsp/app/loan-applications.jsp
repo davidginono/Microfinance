@@ -52,6 +52,9 @@
                     <td class="px-3 py-2">${app.amount}</td>
                     <td class="px-3 py-2">
                         <spring:message code="loan.status.${app.status}" text="${app.status}" />
+                        <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+                            <div class="mt-1 text-xs font-semibold text-emerald-700">Awaiting your acknowledgement</div>
+                        </c:if>
                     </td>
                     <td class="px-3 py-2">
                         <c:choose>
@@ -60,10 +63,20 @@
                         </c:choose>
                     </td>
                     <td class="px-3 py-2">${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</td>
-                    <td class="px-3 py-2"><a href="/app/loan-applications/${app.id}"
-                            class="app-btn btn-primary">
-                            <spring:message code="common.view" />
-                        </a></td>
+                    <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="${pageContext.request.contextPath}/app/loan-applications/${app.id}"
+                               class="app-btn btn-primary">
+                                <spring:message code="common.view" />
+                            </a>
+                            <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+                                <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
+                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                    <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+                                </form>
+                            </c:if>
+                        </div>
+                    </td>
                 </tr>
             </c:forEach>
         </tbody>

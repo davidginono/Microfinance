@@ -6,6 +6,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
+<%@ include file="../fragments/attachment-dropzone.jspf" %>
 
 <div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
     <div>
@@ -17,6 +18,11 @@
     </div>
     <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
 </div>
+<c:if test="${app.status eq 'AWAITING_BOARD'}">
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
+    </div>
+</c:if>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="min-w-0">
@@ -107,11 +113,6 @@
             <strong><spring:message code="review.currentRejectionReason" text="Current Rejection Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
-    <c:if test="${app.status eq 'AWAITING_BOARD'}">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
-        </div>
-    </c:if>
     <div class="loan-view-summary-card px-5 py-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -170,7 +171,7 @@
 
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
 
-<div class="loan-view-summary-card px-5 py-5">
+<div class="loan-view-summary-card mt-5 px-5 py-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
@@ -244,7 +245,7 @@
     </c:choose>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -268,7 +269,7 @@
 </div>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap overflow-x-auto">
+    <div class="erp-table-wrap mt-5 overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Disbursement Proof</h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
@@ -301,7 +302,7 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Application Attachments</h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -328,7 +329,7 @@
     </table>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
@@ -393,7 +394,7 @@
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${showReviewDecisionForm}">
-    <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap space-y-3" data-manager-decision-form="true">
+    <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap mt-5 space-y-3" data-manager-decision-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
         <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
@@ -419,6 +420,7 @@
                        inputmode="numeric"
                        maxlength="6"
                        autocomplete="one-time-code"
+                       data-otp-hidden="true" data-otp-label="Decision OTP code"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
@@ -440,7 +442,7 @@
 </c:if>
 
 <c:if test="${showManagerReversalRequests and not empty pendingManagerStageWithdrawal}">
-    <div class="erp-form-wrap space-y-3">
+    <div class="erp-form-wrap mt-5 space-y-3">
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             The applicant wants this loan application removed while it is still under manager review. Review the request before anything changes.
         </div>
@@ -466,7 +468,7 @@
 </c:if>
 
 <c:if test="${showDisbursementPermissionMessage}">
-    <div class="erp-form-wrap">
+    <div class="erp-form-wrap mt-5">
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
             This loan is ready for disbursement, but your account does not have the Disburse Loan claim. Ask the admin to update your role claims, then sign in again.
         </div>
@@ -477,7 +479,7 @@
     <form action="${reviewBasePath}/loan-applications/${app.id}/finalize"
           method="post"
           enctype="multipart/form-data"
-          class="erp-form-wrap space-y-3"
+          class="erp-form-wrap mt-5 space-y-3"
           data-confirm-title="Disburse Loan"
           data-confirm-message="Disburse this loan now? There will be no reversal of this action."
           data-confirm-proceed="Disburse Loan">
@@ -549,13 +551,35 @@
             </div>
         </div>
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Proof <span class="text-rose-600">*</span></label>
-            <input type="file"
-                   name="disbursementProofFile"
-                   accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                   required />
-            <p class="mt-1 text-xs text-slate-500">Attach the receipt, voucher, or signed proof the applicant can later view.</p>
+            <label class="mb-1 block text-sm font-medium text-slate-700">
+                Disbursement Proof
+                <c:choose>
+                    <c:when test="${disbursementProofRequired}"><span class="text-rose-600">*</span></c:when>
+                    <c:otherwise><span class="text-slate-500">(optional)</span></c:otherwise>
+                </c:choose>
+            </label>
+            <label class="attachment-dropzone" data-attachment-dropzone>
+                <input type="file"
+                       name="disbursementProofFile"
+                       accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                       class="attachment-dropzone-input"
+                       data-attachment-input
+                       ${disbursementProofRequired ? 'required' : ''} />
+                <span class="attachment-dropzone-main">
+                    <span class="attachment-dropzone-copy">
+                        <span class="attachment-dropzone-title">Drop proof here or choose from device</span>
+                        <span class="attachment-dropzone-help">Receipt, voucher, signed proof, image, or document.</span>
+                        <span class="attachment-dropzone-files" data-attachment-files>No file selected</span>
+                    </span>
+                    <span class="attachment-dropzone-action">Choose file</span>
+                </span>
+            </label>
+            <p class="mt-1 text-xs text-slate-500">
+                <c:choose>
+                    <c:when test="${disbursementProofRequired}">Attach the proof before disbursement.</c:when>
+                    <c:otherwise>This product allows disbursement without proof, but a proof file can still be attached.</c:otherwise>
+                </c:choose>
+            </p>
         </div>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
@@ -583,6 +607,7 @@
                        inputmode="numeric"
                        maxlength="6"
                        autocomplete="one-time-code"
+                       data-otp-hidden="true" data-otp-label="Disbursement OTP code"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
@@ -603,7 +628,7 @@
 <c:if test="${showUndoForm}">
     <form action="${reviewBasePath}/loan-applications/${app.id}/undo-decision"
           method="post"
-          class="erp-form-wrap"
+          class="erp-form-wrap mt-5"
           data-confirm-title='<spring:message code="review.reverseManagerAction" text="Reverse Manager Action" />'
           data-confirm-message="Return this rejected application to the manager queue for another review?"
           data-confirm-proceed="Return to Queue">
@@ -844,7 +869,7 @@
                     setProceedEnabled(false);
                     input.setCustomValidity("");
                     setStatus("idle", "Enter the 6-digit code to verify it.");
-                    input.focus();
+                    window.SaccosOtp?.focusBoxes(input);
                 },
                 reset: resetStatus,
                 isVerified: () => verified
@@ -902,6 +927,7 @@
                         throw new Error(payload.message || "Unable to send the OTP code right now.");
                     }
                     setOtpButtonState(button, "sent");
+                    window.SaccosOtp?.startCooldown(button, payload, { idle: "Send OTP Code" });
                     showOtpFeedback(feedback, "success", payload.message || "We sent an OTP code to your email.");
                     otpUi.markRequested();
                 } catch (error) {

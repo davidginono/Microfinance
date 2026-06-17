@@ -249,8 +249,8 @@ public class ManagerController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
-            app.getRepaymentScheduleJson(),
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
+            app,
             loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
             loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
@@ -302,6 +302,7 @@ public class ManagerController {
         model.addAttribute("showDisbursementForm", false);
         model.addAttribute("disbursementNotesLabel", "Manager Notes");
         model.addAttribute("disbursementActionLabel", "Disburse Loan");
+        model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
         model.addAttribute("showUndoForm", app.getStatus() == LoanStatus.MANAGER_REJECTED);
         model.addAttribute("allowPaymentSync", true);
         model.addAttribute("managerUndoWindowOpen",
@@ -403,7 +404,7 @@ public class ManagerController {
                 throw new IllegalStateException("This application is no longer waiting for manager review.");
             }
             Member manager = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting a manager decision OTP.");
-            emailOtpService.issueOtp(
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 manager.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 manager.getId(),
@@ -413,10 +414,7 @@ public class ManagerController {
                 application.getStationId(),
                 manager.getPhone()
             );
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "message", "We sent a manager decision code using the station OTP delivery policy."
-            ));
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a manager decision code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -833,6 +831,19 @@ public class ManagerController {
     private UUID validateStaffDecisionOtp(UUID memberId, String otpCode) {
         Member member = requireMemberWithEmail(memberId, "Add an email address to your member profile before confirming this decision.");
         return emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
+    }
+
+    private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("valid", true);
+        response.put("message", otp.messageOrDefault(fallbackMessage));
+        response.put("expiresAt", otp.expiresAt());
+        response.put("secondsUntilExpiry", otp.secondsUntilExpiry());
+        response.put("resendAvailableAt", otp.resendAvailableAt());
+        response.put("resendCount", otp.resendCount());
+        response.put("maxResends", otp.maxResends());
+        response.put("resendAttemptsRemaining", otp.resendAttemptsRemaining());
+        return response;
     }
 
     private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {

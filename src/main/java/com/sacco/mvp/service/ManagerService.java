@@ -330,7 +330,8 @@ public class ManagerService {
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
         validateDisbursement(disbursementDate, firstRepaymentDate);
         BigDecimal effectiveDisbursementAmount = validateDisbursementAmount(disbursementAmount);
-        if (disbursementProofFile == null || disbursementProofFile.isEmpty()) {
+        boolean hasUploadedProof = disbursementProofFile != null && !disbursementProofFile.isEmpty();
+        if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
         }
         String normalisedLoanId = blankToNull(loanId);
@@ -363,12 +364,14 @@ public class ManagerService {
         app.setDisbursementReference(blankToNull(disbursementReference));
         app.setDisbursementNotes(blankToNull(disbursementNotes));
         app.setRepaymentScheduleJson(schedule.scheduleJson());
-        app.setAttachmentsJson(loanAttachmentService.store(
-            app.getId(),
-            List.of(disbursementProofFile),
-            app.getAttachmentsJson(),
-            LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF
-        ));
+        if (hasUploadedProof) {
+            app.setAttachmentsJson(loanAttachmentService.store(
+                app.getId(),
+                List.of(disbursementProofFile),
+                app.getAttachmentsJson(),
+                LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF
+            ));
+        }
         managerReviewRepository.save(ManagerReview.builder()
             .id(UUID.randomUUID())
             .loanApplicationId(applicationId)
@@ -448,6 +451,24 @@ public class ManagerService {
         }
         String loanStationId = blankToNull(loan.getStationId());
         return loanStationId != null && loanStationId.equalsIgnoreCase(stationId);
+    }
+
+    public boolean isDisbursementProofRequired(LoanApplication app) {
+        if (app == null || app.getLoanType() == null) {
+            return true;
+        }
+        return loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType())
+            .map(LoanProductSetting::isDisbursementProofRequired)
+            .orElse(true);
+    }
+
+    private boolean hasDisbursementProofAttachment(LoanApplication app) {
+        List<Map<String, Object>> attachments = loanAttachmentService.parse(app.getAttachmentsJson());
+        if (attachments == null || attachments.isEmpty()) {
+            return false;
+        }
+        return attachments.stream()
+            .anyMatch(item -> LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(String.valueOf(item.get("attachmentCategory"))));
     }
 
     private LoanApplication getManagedApplication(UUID loanId, UUID managerId) {
