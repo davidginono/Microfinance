@@ -233,7 +233,7 @@
         <main class="login-form-panel">
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
-                <h1 class="auth-heading">Log in to Loan Application Portal</h1>
+                <h1 class="auth-heading">Log into the loan application portal</h1>
             </div>
         </div>
         <div class="mb-5">
