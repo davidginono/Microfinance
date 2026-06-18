@@ -12,6 +12,11 @@ public interface LoanPaymentTransactionRepository extends JpaRepository<LoanPaym
 
     List<LoanPaymentTransaction> findByLoanApplicationIdOrderByReceiptDateAsc(UUID loanApplicationId);
 
+    List<LoanPaymentTransaction> findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(
+        List<UUID> loanApplicationIds,
+        LocalDate fromDate,
+        LocalDate toDate);
+
     boolean existsByLoanApplicationIdAndReceiptDateAndPrincipalPaidAndInterestPaidAndTotalPaid(
         UUID loanApplicationId,
         LocalDate receiptDate,

@@ -12,13 +12,18 @@ import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.LoanPaymentTransaction;
+import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -37,7 +42,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -75,6 +82,7 @@ public class LoanReportService {
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final ManagerReviewRepository managerReviewRepository;
+    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final ObjectMapper objectMapper;
 
     public MemberLoanReport memberReport(UUID memberId) {
@@ -316,6 +324,120 @@ public class LoanReportService {
             entries,
             applicantMap
         );
+    }
+
+    public StationAnalyticsExportReport stationAnalyticsReport(String saccoId,
+                                                               String stationId,
+                                                               LocalDate fromDate,
+                                                               LocalDate toDate,
+                                                               LoanType loanType,
+                                                               String preparedBy,
+                                                               String preparedByRole) {
+        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveFrom = fromDate == null ? effectiveTo.minusYears(1) : fromDate;
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            LocalDate swap = effectiveFrom;
+            effectiveFrom = effectiveTo;
+            effectiveTo = swap;
+        }
+
+        List<LoanApplication> loans = loanApplicationRepository.findScopeLoansForAnalytics(
+            saccoId,
+            stationId,
+            effectiveFrom.atStartOfDay().atOffset(ZoneOffset.UTC),
+            effectiveTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC),
+            loanType,
+            null
+        );
+        List<LoanApplication> appliedLoans = loans.stream()
+            .filter(loan -> loan.getStatus() != LoanStatus.DRAFT)
+            .toList();
+        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan = paymentTransactionsByLoan(appliedLoans, effectiveFrom, effectiveTo);
+        long activeMembers = memberRepository.countActiveMemberAccountsForScope(saccoId, stationId);
+        StationParticipationSummary participation = buildStationParticipation(activeMembers, appliedLoans);
+        List<StationStatusRow> statusRows = stationStatusRows(appliedLoans);
+        List<StationProductRow> productRows = stationProductRows(appliedLoans, paymentsByLoan, loanType);
+        List<StationYearlySummaryRow> yearlyRows = stationYearlyRows(appliedLoans, paymentsByLoan, effectiveFrom, effectiveTo);
+
+        return new StationAnalyticsExportReport(
+            saccoId,
+            stationId == null || stationId.isBlank() ? "-" : stationId,
+            effectiveFrom,
+            effectiveTo,
+            loanType,
+            preparedBy == null || preparedBy.isBlank() ? "System" : preparedBy,
+            preparedByRole == null || preparedByRole.isBlank() ? "-" : preparedByRole,
+            LocalDate.now(),
+            statusRows,
+            participation,
+            productRows,
+            yearlyRows
+        );
+    }
+
+    public byte[] buildStationAnalyticsPdf(StationAnalyticsExportReport report) {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            StationPdfRenderer renderer = new StationPdfRenderer(document, report);
+            renderer.render();
+            document.save(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to generate station analytics PDF report.", ex);
+        }
+    }
+
+    public byte[] buildStationAnalyticsExcel(StationAnalyticsExportReport report) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            titleStyle.setFont(titleFont);
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            XSSFSheet summary = workbook.createSheet("Summary");
+            int row = writeTitle(summary, titleStyle, "STATION LOAN STATUS REPORT");
+            row = writeKeyValueTable(summary, row + 1, headerStyle, List.of(
+                new String[]{"Reporting Period", report.periodLabel()},
+                new String[]{"Generated On", formatDate(report.generatedOn())},
+                new String[]{"Name", report.preparedBy()},
+                new String[]{"Role", report.preparedByRole()},
+                new String[]{"Loan Product", report.loanProductLabel()}
+            ));
+            row = writeKeyValueTable(summary, row + 2, headerStyle, List.of(
+                new String[]{"Active Station Members", String.valueOf(report.participation().activeStationMembers())},
+                new String[]{"Unique Applicants", String.valueOf(report.participation().uniqueApplicants())},
+                new String[]{"Participation Rate", report.participation().participationRateLabel()},
+                new String[]{"Applications per Applicant", report.participation().applicationsPerApplicantLabel()},
+                new String[]{"Repeat Applicants", String.valueOf(report.participation().repeatApplicants())}
+            ));
+            writeStatusTable(summary, row + 2, headerStyle, report.statusRows());
+            autosize(summary, 8);
+
+            XSSFSheet status = workbook.createSheet("Loan Status Analysis");
+            writeTitle(status, titleStyle, "LOAN STATUS ANALYSIS");
+            writeStatusTable(status, 2, headerStyle, report.statusRows());
+            autosize(status, 5);
+
+            XSSFSheet product = workbook.createSheet("Product Performance");
+            writeTitle(product, titleStyle, "LOAN PRODUCT PERFORMANCE");
+            writeProductTable(product, 2, headerStyle, report.productRows());
+            autosize(product, 10);
+
+            XSSFSheet trends = workbook.createSheet("Trends");
+            writeTitle(trends, titleStyle, "YEARLY LOAN AND INTEREST SUMMARY");
+            writeYearlyTable(trends, 2, headerStyle, report.yearlyRows());
+            autosize(trends, 9);
+
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to generate station analytics Excel report.", ex);
+        }
     }
 
     public byte[] buildMemberPdf(MemberLoanReport report) {
@@ -894,6 +1016,303 @@ public class LoanReportService {
         return "No board committee decision details available";
     }
 
+    private Map<UUID, List<LoanPaymentTransaction>> paymentTransactionsByLoan(List<LoanApplication> loans,
+                                                                               LocalDate fromDate,
+                                                                               LocalDate toDate) {
+        List<UUID> loanIds = loans.stream()
+            .map(LoanApplication::getId)
+            .filter(java.util.Objects::nonNull)
+            .toList();
+        if (loanIds.isEmpty()) {
+            return Map.of();
+        }
+        return loanPaymentTransactionRepository
+            .findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(loanIds, fromDate, toDate)
+            .stream()
+            .collect(Collectors.groupingBy(
+                LoanPaymentTransaction::getLoanApplicationId,
+                LinkedHashMap::new,
+                Collectors.toList()
+            ));
+    }
+
+    private StationParticipationSummary buildStationParticipation(long activeMembers, List<LoanApplication> appliedLoans) {
+        Map<UUID, Long> applicationsByApplicant = appliedLoans.stream()
+            .filter(loan -> loan.getApplicantMemberId() != null)
+            .collect(Collectors.groupingBy(LoanApplication::getApplicantMemberId, LinkedHashMap::new, Collectors.counting()));
+        long uniqueApplicants = applicationsByApplicant.size();
+        long repeatApplicants = applicationsByApplicant.values().stream().filter(count -> count > 1).count();
+        BigDecimal participationRate = activeMembers == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(uniqueApplicants)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(activeMembers), 2, RoundingMode.HALF_UP);
+        BigDecimal applicationsPerApplicant = uniqueApplicants == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(appliedLoans.size())
+                .divide(BigDecimal.valueOf(uniqueApplicants), 2, RoundingMode.HALF_UP);
+        return new StationParticipationSummary(
+            activeMembers,
+            uniqueApplicants,
+            participationRate,
+            applicationsPerApplicant,
+            repeatApplicants
+        );
+    }
+
+    private List<StationStatusRow> stationStatusRows(List<LoanApplication> loans) {
+        return List.of(
+            stationStatusRow("Applied Loans", loans, loan -> loan.getStatus() != LoanStatus.DRAFT),
+            stationStatusRow("Active Loans", loans, loan -> ACTIVE_STATUSES.contains(loan.getStatus())),
+            stationStatusRow("Disbursed Loans", loans, loan -> DISBURSED_STATUSES.contains(loan.getStatus())),
+            stationStatusRow("Paid Loans", loans, loan -> loan.getStatus() == LoanStatus.PAID),
+            stationStatusRow("Defaulted Loans", loans, loan -> loan.getStatus() == LoanStatus.DEFAULTED),
+            stationStatusRow("Rejected Loans", loans, loan -> REJECTED_STATUSES.contains(loan.getStatus())),
+            stationStatusRow("Forfeited Loan Applications", loans, loan -> loan.getStatus() == LoanStatus.FORFEITED)
+        );
+    }
+
+    private StationStatusRow stationStatusRow(String label,
+                                              List<LoanApplication> loans,
+                                              java.util.function.Predicate<LoanApplication> predicate) {
+        List<LoanApplication> matching = loans.stream().filter(predicate).toList();
+        long applicants = matching.stream()
+            .map(LoanApplication::getApplicantMemberId)
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .count();
+        return new StationStatusRow(label, matching.size(), applicants);
+    }
+
+    private List<StationProductRow> stationProductRows(List<LoanApplication> loans,
+                                                       Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                                       LoanType selectedLoanType) {
+        List<LoanType> productTypes = java.util.Arrays.stream(LoanType.values())
+            .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
+            .filter(type -> selectedLoanType == null || type == selectedLoanType)
+            .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
+            .toList();
+        List<StationProductRow> rows = new ArrayList<>();
+        for (LoanType type : productTypes) {
+            List<LoanApplication> typedLoans = loans.stream()
+                .filter(loan -> loan.getLoanType() == type)
+                .toList();
+            rows.add(new StationProductRow(
+                type.getDisplayLabel(),
+                typedLoans.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count(),
+                typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.MANAGER_ACCEPTED
+                    || loan.getStatus() == LoanStatus.LOAN_OFFICER_APPROVED
+                    || loan.getStatus() == LoanStatus.BOARD_APPROVED
+                    || loan.getStatus() == LoanStatus.ACCOUNTANT_APPROVED
+                    || DISBURSED_STATUSES.contains(loan.getStatus())).count(),
+                typedLoans.stream().filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus())).count(),
+                typedLoans.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count(),
+                typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count(),
+                typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count(),
+                typedLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count(),
+                sumInterest(typedLoans, paymentsByLoan, false),
+                sumInterest(typedLoans, paymentsByLoan, true)
+            ));
+        }
+        return rows;
+    }
+
+    private List<StationYearlySummaryRow> stationYearlyRows(List<LoanApplication> loans,
+                                                            Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                                            LocalDate fromDate,
+                                                            LocalDate toDate) {
+        List<StationYearlySummaryRow> rows = new ArrayList<>();
+        int startYear = Year.from(fromDate).getValue();
+        int endYear = Year.from(toDate).getValue();
+        for (int year = startYear; year <= endYear; year++) {
+            int currentYear = year;
+            List<LoanApplication> yearlyApplicationLoans = loans.stream()
+                .filter(loan -> loan.getStatus() != LoanStatus.DRAFT)
+                .filter(loan -> loan.getCreatedAt() != null && loan.getCreatedAt().getYear() == currentYear)
+                .toList();
+            List<LoanApplication> yearlyPaidLoans = loans.stream()
+                .filter(loan -> loan.getStatus() == LoanStatus.PAID)
+                .filter(loan -> loanYear(loan) == currentYear)
+                .toList();
+            long defaulted = loans.stream()
+                .filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED)
+                .filter(loan -> loanYear(loan) == currentYear)
+                .count();
+            long uniqueApplicants = yearlyApplicationLoans.stream()
+                .map(LoanApplication::getApplicantMemberId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .count();
+            BigDecimal defaultRate = yearlyApplicationLoans.isEmpty()
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(defaulted)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(yearlyApplicationLoans.size()), 2, RoundingMode.HALF_UP);
+            BigDecimal paidInterest = sumInterestForYear(loans, paymentsByLoan, currentYear, false);
+            BigDecimal fullyPaidInterest = sumInterestForYear(loans, paymentsByLoan, currentYear, true);
+            rows.add(new StationYearlySummaryRow(
+                currentYear,
+                yearlyApplicationLoans.size(),
+                uniqueApplicants,
+                defaulted,
+                defaultRate,
+                yearlyPaidLoans.size(),
+                paidInterest,
+                fullyPaidInterest
+            ));
+        }
+        return rows;
+    }
+
+    private int loanYear(LoanApplication loan) {
+        if (loan.getPaidAt() != null) {
+            return loan.getPaidAt().getYear();
+        }
+        if (loan.getUpdatedAt() != null) {
+            return loan.getUpdatedAt().getYear();
+        }
+        return loan.getCreatedAt() == null ? 0 : loan.getCreatedAt().getYear();
+    }
+
+    private BigDecimal sumInterest(List<LoanApplication> loans,
+                                   Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                   boolean fullyPaidOnly) {
+        return loans.stream()
+            .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
+            .flatMap(loan -> paymentsByLoan.getOrDefault(loan.getId(), List.of()).stream())
+            .map(LoanPaymentTransaction::getInterestPaid)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumInterestForYear(List<LoanApplication> loans,
+                                          Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                          int year,
+                                          boolean fullyPaidOnly) {
+        return loans.stream()
+            .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
+            .flatMap(loan -> paymentsByLoan.getOrDefault(loan.getId(), List.of()).stream())
+            .filter(transaction -> transaction.getReceiptDate() != null && transaction.getReceiptDate().getYear() == year)
+            .map(LoanPaymentTransaction::getInterestPaid)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int writeTitle(XSSFSheet sheet, CellStyle titleStyle, String title) {
+        Row row = sheet.createRow(0);
+        Cell cell = row.createCell(0);
+        cell.setCellValue(title);
+        cell.setCellStyle(titleStyle);
+        return 1;
+    }
+
+    private int writeKeyValueTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<String[]> rows) {
+        Row header = sheet.createRow(rowIndex++);
+        header.createCell(0).setCellValue("Field");
+        header.createCell(1).setCellValue("Value");
+        header.getCell(0).setCellStyle(headerStyle);
+        header.getCell(1).setCellStyle(headerStyle);
+        for (String[] item : rows) {
+            Row row = sheet.createRow(rowIndex++);
+            row.createCell(0).setCellValue(item[0]);
+            row.createCell(1).setCellValue(item[1]);
+        }
+        return rowIndex;
+    }
+
+    private int writeStatusTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationStatusRow> rows) {
+        Row title = sheet.createRow(rowIndex++);
+        title.createCell(0).setCellValue("LOAN STATUS SUMMARY");
+        title.getCell(0).setCellStyle(headerStyle);
+        Row header = sheet.createRow(rowIndex++);
+        String[] columns = {"Metric", "Count", "Number of Applicants"};
+        for (int i = 0; i < columns.length; i++) {
+            header.createCell(i).setCellValue(columns[i]);
+            header.getCell(i).setCellStyle(headerStyle);
+        }
+        for (StationStatusRow item : rows) {
+            Row row = sheet.createRow(rowIndex++);
+            row.createCell(0).setCellValue(item.metric());
+            row.createCell(1).setCellValue(item.count());
+            row.createCell(2).setCellValue(item.applicantCount());
+        }
+        return rowIndex;
+    }
+
+    private int writeProductTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationProductRow> rows) {
+        Row header = sheet.createRow(rowIndex++);
+        String[] columns = {
+            "Loan Product",
+            "Applications",
+            "Approved",
+            "Active",
+            "Disbursed",
+            "Paid",
+            "Defaulted",
+            "Rejected",
+            "Total Paid Interest Accumulated",
+            "Total Interest Paid from Fully Paid Loans"
+        };
+        for (int i = 0; i < columns.length; i++) {
+            header.createCell(i).setCellValue(columns[i]);
+            header.getCell(i).setCellStyle(headerStyle);
+        }
+        for (StationProductRow item : rows) {
+            Row row = sheet.createRow(rowIndex++);
+            int column = 0;
+            row.createCell(column++).setCellValue(item.loanProduct());
+            row.createCell(column++).setCellValue(item.applications());
+            row.createCell(column++).setCellValue(item.approved());
+            row.createCell(column++).setCellValue(item.active());
+            row.createCell(column++).setCellValue(item.disbursed());
+            row.createCell(column++).setCellValue(item.paid());
+            row.createCell(column++).setCellValue(item.defaulted());
+            row.createCell(column++).setCellValue(item.rejected());
+            row.createCell(column++).setCellValue(item.totalPaidInterest().doubleValue());
+            row.createCell(column).setCellValue(item.fullyPaidLoanInterest().doubleValue());
+        }
+        return rowIndex;
+    }
+
+    private int writeYearlyTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationYearlySummaryRow> rows) {
+        Row header = sheet.createRow(rowIndex++);
+        String[] columns = {
+            "Year",
+            "Total Loan Applications",
+            "Unique Applicants",
+            "Defaulted Loans",
+            "Default Rate",
+            "Total Paid Loans",
+            "Total Paid Interest Accumulated",
+            "Total Interest Paid from Fully Paid Loans"
+        };
+        for (int i = 0; i < columns.length; i++) {
+            header.createCell(i).setCellValue(columns[i]);
+            header.getCell(i).setCellStyle(headerStyle);
+        }
+        for (StationYearlySummaryRow item : rows) {
+            Row row = sheet.createRow(rowIndex++);
+            int column = 0;
+            row.createCell(column++).setCellValue(item.year());
+            row.createCell(column++).setCellValue(item.totalLoanApplications());
+            row.createCell(column++).setCellValue(item.uniqueApplicants());
+            row.createCell(column++).setCellValue(item.defaultedLoans());
+            row.createCell(column++).setCellValue(item.defaultRateLabel());
+            row.createCell(column++).setCellValue(item.totalPaidLoans());
+            row.createCell(column++).setCellValue(item.totalPaidInterestAccumulated().doubleValue());
+            row.createCell(column).setCellValue(item.fullyPaidLoanInterest().doubleValue());
+        }
+        return rowIndex;
+    }
+
+    private void autosize(XSSFSheet sheet, int columns) {
+        for (int i = 0; i < columns; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
     private String formatMemberLoanStatus(LoanApplication loan) {
         if (loan == null || loan.getStatus() == null) {
             return "Unknown";
@@ -1028,6 +1447,111 @@ public class LoanReportService {
         String preparedByLabel,
         String preparedDateLabel
     ) {}
+
+    public record StationAnalyticsExportReport(
+        String saccoId,
+        String stationId,
+        LocalDate fromDate,
+        LocalDate toDate,
+        LoanType loanType,
+        String preparedBy,
+        String preparedByRole,
+        LocalDate generatedOn,
+        List<StationStatusRow> statusRows,
+        StationParticipationSummary participation,
+        List<StationProductRow> productRows,
+        List<StationYearlySummaryRow> yearlyRows
+    ) {
+        public String periodLabel() {
+            return DATE_FORMATTER.format(fromDate) + " - " + DATE_FORMATTER.format(toDate);
+        }
+
+        public String loanProductLabel() {
+            return loanType == null ? "All Products" : loanType.getDisplayLabel();
+        }
+    }
+
+    public record StationStatusRow(String metric, long count, long applicantCount) {}
+
+    public record StationParticipationSummary(
+        long activeStationMembers,
+        long uniqueApplicants,
+        BigDecimal participationRate,
+        BigDecimal applicationsPerApplicant,
+        long repeatApplicants
+    ) {
+        public long getActiveStationMembers() {
+            return activeStationMembers;
+        }
+
+        public long getUniqueApplicants() {
+            return uniqueApplicants;
+        }
+
+        public String participationRateLabel() {
+            return participationRate.setScale(2, RoundingMode.HALF_UP) + "%";
+        }
+
+        public String getParticipationRateLabel() {
+            return participationRateLabel();
+        }
+
+        public String applicationsPerApplicantLabel() {
+            return applicationsPerApplicant.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        }
+
+        public String getApplicationsPerApplicantLabel() {
+            return applicationsPerApplicantLabel();
+        }
+
+        public long getRepeatApplicants() {
+            return repeatApplicants;
+        }
+    }
+
+    public record StationProductRow(
+        String loanProduct,
+        long applications,
+        long approved,
+        long active,
+        long disbursed,
+        long paid,
+        long defaulted,
+        long rejected,
+        BigDecimal totalPaidInterest,
+        BigDecimal fullyPaidLoanInterest
+    ) {
+        public String totalPaidInterestLabel() {
+            return formatMoneyStatic(totalPaidInterest);
+        }
+
+        public String fullyPaidLoanInterestLabel() {
+            return formatMoneyStatic(fullyPaidLoanInterest);
+        }
+    }
+
+    public record StationYearlySummaryRow(
+        int year,
+        long totalLoanApplications,
+        long uniqueApplicants,
+        long defaultedLoans,
+        BigDecimal defaultRate,
+        long totalPaidLoans,
+        BigDecimal totalPaidInterestAccumulated,
+        BigDecimal fullyPaidLoanInterest
+    ) {
+        public String defaultRateLabel() {
+            return defaultRate.setScale(2, RoundingMode.HALF_UP) + "%";
+        }
+
+        public String totalPaidInterestAccumulatedLabel() {
+            return formatMoneyStatic(totalPaidInterestAccumulated);
+        }
+
+        public String fullyPaidLoanInterestLabel() {
+            return formatMoneyStatic(fullyPaidLoanInterest);
+        }
+    }
 
     public record ManagerLoanReport(
         String saccoId,
@@ -1203,6 +1727,296 @@ public class LoanReportService {
                 stream.close();
                 stream = null;
             }
+        }
+    }
+
+    private static final class StationPdfRenderer {
+        private static final float MARGIN = 28f;
+        private static final float TOP_MARGIN = 34f;
+        private static final float BOTTOM_MARGIN = 34f;
+        private static final float FOOTER_GAP = 18f;
+        private static final float TITLE_SIZE = 17f;
+        private static final float SECTION_SIZE = 10.2f;
+        private static final float BODY_SIZE = 7.4f;
+        private static final float SMALL_SIZE = 6.3f;
+        private static final float CELL_PADDING_X = 4f;
+        private static final float CELL_PADDING_Y = 3.2f;
+        private static final Color TEXT_COLOR = new Color(17, 24, 39);
+        private static final Color BORDER_COLOR = new Color(32, 32, 32);
+
+        private final PDDocument document;
+        private final StationAnalyticsExportReport report;
+        private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+        private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        private PDPage page;
+        private PDPageContentStream stream;
+        private float y;
+        private int pageNumber;
+
+        private StationPdfRenderer(PDDocument document, StationAnalyticsExportReport report) {
+            this.document = document;
+            this.report = report;
+        }
+
+        private void render() throws IOException {
+            startNewPage();
+            drawHeader();
+            drawSection("1. MEMBER INFORMATION", new String[]{"Field", "Value"}, new float[]{128f, 210f}, List.of(
+                new String[]{"Station", report.stationId()},
+                new String[]{"Name", report.preparedBy()},
+                new String[]{"Role", report.preparedByRole()}
+            ), BODY_SIZE);
+            drawSection("2. REPORT DETAILS", new String[]{"Field", "Value"}, new float[]{128f, 300f}, List.of(
+                new String[]{"Reporting Period", report.periodLabel()},
+                new String[]{"Generated On", formatDateStatic(report.generatedOn())},
+                new String[]{"Name", report.preparedBy()},
+                new String[]{"Role", report.preparedByRole()},
+                new String[]{"Report Type", "Station Loan Summary"},
+                new String[]{"Loan Product", report.loanProductLabel()}
+            ), BODY_SIZE);
+            drawStatusSection();
+            drawProductSection();
+            drawParticipationSection();
+            drawPortfolioSection();
+            drawYearlySection();
+            drawSignOffSection();
+            closePage();
+        }
+
+        private void startNewPage() throws IOException {
+            if (stream != null) {
+                drawFooter();
+                stream.close();
+            }
+            page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            stream = new PDPageContentStream(document, page);
+            pageNumber++;
+            y = page.getMediaBox().getHeight() - TOP_MARGIN;
+        }
+
+        private void closePage() throws IOException {
+            if (stream != null) {
+                drawFooter();
+                stream.close();
+                stream = null;
+            }
+        }
+
+        private void drawHeader() throws IOException {
+            writeCentered("IAA SACCOS LTD", y, bold, TITLE_SIZE);
+            writeRight("Generated: " + formatDateStatic(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y + 2f, regular, BODY_SIZE);
+            y -= 18f;
+            writeCentered("STATION LOAN STATUS REPORT", y, bold, 13f);
+            y -= 18f;
+            rule();
+            y -= 18f;
+        }
+
+        private void drawStatusSection() throws IOException {
+            List<String[]> rows = report.statusRows().stream()
+                .map(row -> new String[]{row.metric(), String.valueOf(row.count()), String.valueOf(row.applicantCount())})
+                .toList();
+            drawSection("3. LOAN STATUS SUMMARY", new String[]{"Metric", "Count", "Number of Applicants"},
+                new float[]{250f, 90f, 150f}, rows, BODY_SIZE);
+        }
+
+        private void drawProductSection() throws IOException {
+            List<String[]> rows = report.productRows().stream()
+                .map(row -> new String[]{
+                    row.loanProduct(),
+                    String.valueOf(row.applications()),
+                    String.valueOf(row.approved()),
+                    String.valueOf(row.active()),
+                    String.valueOf(row.disbursed()),
+                    String.valueOf(row.paid()),
+                    String.valueOf(row.defaulted()),
+                    String.valueOf(row.rejected()),
+                    row.totalPaidInterestLabel(),
+                    row.fullyPaidLoanInterestLabel()
+                })
+                .toList();
+            drawSection("4. LOAN PRODUCT PERFORMANCE",
+                new String[]{"Loan Product", "Applications", "Approved", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest Accumulated", "Fully Paid Loan Interest"},
+                new float[]{92f, 45f, 43f, 38f, 45f, 32f, 45f, 42f, 84f, 64f},
+                rows,
+                SMALL_SIZE);
+        }
+
+        private void drawParticipationSection() throws IOException {
+            StationParticipationSummary summary = report.participation();
+            drawSection("5. MEMBER / APPLICANT PARTICIPATION SUMMARY",
+                new String[]{"Indicator", "Value"},
+                new float[]{275f, 160f},
+                List.of(
+                    new String[]{"Active Station Members", String.valueOf(summary.activeStationMembers())},
+                    new String[]{"Unique Applicants", String.valueOf(summary.uniqueApplicants())},
+                    new String[]{"Participation Rate", summary.participationRateLabel()},
+                    new String[]{"Applications per Applicant", summary.applicationsPerApplicantLabel()},
+                    new String[]{"Repeat Applicants", String.valueOf(summary.repeatApplicants())}
+                ),
+                BODY_SIZE);
+        }
+
+        private void drawPortfolioSection() throws IOException {
+            long handled = report.statusRows().isEmpty() ? 0 : report.statusRows().get(0).count();
+            long paid = report.statusRows().stream().filter(row -> row.metric().startsWith("Paid")).mapToLong(StationStatusRow::count).findFirst().orElse(0L);
+            long defaulted = report.statusRows().stream().filter(row -> row.metric().startsWith("Defaulted")).mapToLong(StationStatusRow::count).findFirst().orElse(0L);
+            String risk = defaulted >= 1 ? "Review" : "Low";
+            drawSection("6. PORTFOLIO SUMMARY",
+                new String[]{"Indicator", "Value"},
+                new float[]{275f, 160f},
+                List.of(
+                    new String[]{"Loans Handled", String.valueOf(handled)},
+                    new String[]{"Paid Loans", String.valueOf(paid)},
+                    new String[]{"Defaulted After Approval", String.valueOf(defaulted)},
+                    new String[]{"Portfolio Risk Rating", risk}
+                ),
+                BODY_SIZE);
+        }
+
+        private void drawYearlySection() throws IOException {
+            List<String[]> rows = report.yearlyRows().stream()
+                .map(row -> new String[]{
+                    String.valueOf(row.year()),
+                    String.valueOf(row.totalLoanApplications()),
+                    String.valueOf(row.uniqueApplicants()),
+                    String.valueOf(row.defaultedLoans()),
+                    row.defaultRateLabel(),
+                    String.valueOf(row.totalPaidLoans()),
+                    row.totalPaidInterestAccumulatedLabel(),
+                    row.fullyPaidLoanInterestLabel()
+                })
+                .toList();
+            drawSection("7. YEARLY LOAN AND INTEREST SUMMARY",
+                new String[]{"Year", "Total Loan Applications", "Unique Applicants", "Defaulted Loans", "Default Rate", "Total Paid Loans", "Total Paid Interest Accumulated", "Fully Paid Loan Interest"},
+                new float[]{38f, 78f, 66f, 58f, 52f, 58f, 98f, 86f},
+                rows,
+                SMALL_SIZE);
+        }
+
+        private void drawSignOffSection() throws IOException {
+            drawSection("8. SIGN-OFF",
+                new String[]{"Field", "Name", "Date"},
+                new float[]{120f, 250f, 120f},
+                List.of(
+                    new String[]{"Prepared By", report.preparedBy(), formatDateStatic(report.generatedOn())},
+                    new String[]{"Reviewed By", "____________________________", "____________"},
+                    new String[]{"Approved By", "____________________________", "____________"}
+                ),
+                BODY_SIZE);
+        }
+
+        private void drawSection(String title, String[] headers, float[] widths, List<String[]> rows, float fontSize) throws IOException {
+            ensureSpace(34f);
+            write(title, MARGIN, y, bold, SECTION_SIZE);
+            y -= 9f;
+            drawTable(headers, widths, rows, fontSize);
+            y -= 13f;
+        }
+
+        private void drawTable(String[] headers, float[] widths, List<String[]> rows, float fontSize) throws IOException {
+            drawRow(headers, widths, bold, fontSize);
+            for (String[] row : rows) {
+                float needed = rowHeight(row, widths, regular, fontSize);
+                if (y - needed < (BOTTOM_MARGIN + FOOTER_GAP)) {
+                    startNewPage();
+                    drawRow(headers, widths, bold, fontSize);
+                }
+                drawRow(row, widths, regular, fontSize);
+            }
+        }
+
+        private void drawRow(String[] cells, float[] widths, PDType1Font font, float fontSize) throws IOException {
+            float rowHeight = rowHeight(cells, widths, font, fontSize);
+            ensureSpace(rowHeight);
+            float x = MARGIN;
+            for (int i = 0; i < cells.length; i++) {
+                stream.setStrokingColor(BORDER_COLOR);
+                stream.addRect(x, y - rowHeight, widths[i], rowHeight);
+                stream.stroke();
+                float textY = y - CELL_PADDING_Y - fontSize;
+                for (String line : wrapText(cells[i], font, fontSize, widths[i] - (CELL_PADDING_X * 2f))) {
+                    write(line, x + CELL_PADDING_X, textY, font, fontSize);
+                    textY -= fontSize + 1.6f;
+                }
+                x += widths[i];
+            }
+            y -= rowHeight;
+        }
+
+        private float rowHeight(String[] cells, float[] widths, PDType1Font font, float fontSize) throws IOException {
+            int maxLines = 1;
+            for (int i = 0; i < cells.length; i++) {
+                maxLines = Math.max(maxLines, wrapText(cells[i], font, fontSize, widths[i] - (CELL_PADDING_X * 2f)).size());
+            }
+            return (CELL_PADDING_Y * 2f) + (maxLines * (fontSize + 1.6f));
+        }
+
+        private List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+            String safe = sanitizePdfText(text);
+            List<String> lines = new ArrayList<>();
+            StringBuilder current = new StringBuilder();
+            for (String word : safe.split("\\s+")) {
+                String candidate = current.isEmpty() ? word : current + " " + word;
+                if (font.getStringWidth(candidate) / 1000f * fontSize > maxWidth && !current.isEmpty()) {
+                    lines.add(current.toString());
+                    current = new StringBuilder(word);
+                } else {
+                    current = new StringBuilder(candidate);
+                }
+            }
+            if (!current.isEmpty()) {
+                lines.add(current.toString());
+            }
+            return lines.isEmpty() ? List.of("-") : lines;
+        }
+
+        private void ensureSpace(float requiredHeight) throws IOException {
+            if (y - requiredHeight < (BOTTOM_MARGIN + FOOTER_GAP)) {
+                startNewPage();
+            }
+        }
+
+        private void drawFooter() throws IOException {
+            float footerY = BOTTOM_MARGIN;
+            ruleAt(footerY + 12f);
+            write("IAA SACCOS LTD | Station Loan Status Report", MARGIN, footerY, regular, 7f);
+            writeRight("Page " + pageNumber, page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7f);
+        }
+
+        private void rule() throws IOException {
+            ruleAt(y);
+        }
+
+        private void ruleAt(float lineY) throws IOException {
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.moveTo(MARGIN, lineY);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN, lineY);
+            stream.stroke();
+        }
+
+        private void writeCentered(String text, float baselineY, PDType1Font font, float fontSize) throws IOException {
+            float width = font.getStringWidth(sanitizePdfLineText(text)) / 1000f * fontSize;
+            write(text, (page.getMediaBox().getWidth() - width) / 2f, baselineY, font, fontSize);
+        }
+
+        private void writeRight(String text, float rightX, float baselineY, PDType1Font font, float fontSize) throws IOException {
+            float width = font.getStringWidth(sanitizePdfLineText(text)) / 1000f * fontSize;
+            write(text, rightX - width, baselineY, font, fontSize);
+        }
+
+        private void write(String text, float x, float baselineY, PDType1Font font, float fontSize) throws IOException {
+            stream.beginText();
+            stream.setNonStrokingColor(TEXT_COLOR);
+            stream.setFont(font, fontSize);
+            stream.newLineAtOffset(x, baselineY);
+            stream.showText(sanitizePdfLineText(text));
+            stream.endText();
+        }
+
+        private static String formatDateStatic(LocalDate date) {
+            return date == null ? "-" : DATE_FORMATTER.format(date);
         }
     }
 

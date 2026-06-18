@@ -19,6 +19,7 @@ import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.LoanAnalyticsService;
+import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,13 +64,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StaffAnalyticsControllerSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private LoanAnalyticsService loanAnalyticsService;
+    @Autowired private LoanReportService loanReportService;
     @Autowired private SaccoStationRepository saccoStationRepository;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(loanAnalyticsService, saccoStationRepository);
+        Mockito.reset(loanAnalyticsService, loanReportService, saccoStationRepository);
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -87,6 +89,21 @@ class StaffAnalyticsControllerSecurityTest {
         when(loanAnalyticsService.metricDeltas(any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
+        when(loanReportService.stationAnalyticsReport(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanReportService.StationAnalyticsExportReport(
+                "SACCO-01",
+                "AR704",
+                java.time.LocalDate.now().minusYears(1),
+                java.time.LocalDate.now(),
+                null,
+                "Test User",
+                "MANAGER",
+                java.time.LocalDate.now(),
+                List.of(),
+                new LoanReportService.StationParticipationSummary(0, 0, BigDecimal.ZERO, BigDecimal.ZERO, 0),
+                List.of(),
+                List.of()
+            ));
 
         mockMvc.perform(get("/staff/analytics").with(authentication(authenticationFor(principal))))
             .andExpect(status().isOk())
@@ -174,8 +191,9 @@ class StaffAnalyticsControllerSecurityTest {
     static class TestConfig {
         @Bean
         StaffAnalyticsController staffAnalyticsController(LoanAnalyticsService loanAnalyticsService,
+                                                          LoanReportService loanReportService,
                                                           ObjectMapper objectMapper) {
-            return new StaffAnalyticsController(loanAnalyticsService, objectMapper);
+            return new StaffAnalyticsController(loanAnalyticsService, loanReportService, objectMapper);
         }
 
         @Bean
@@ -204,6 +222,7 @@ class StaffAnalyticsControllerSecurityTest {
         }
 
         @Bean LoanAnalyticsService loanAnalyticsService() { return Mockito.mock(LoanAnalyticsService.class); }
+        @Bean LoanReportService loanReportService() { return Mockito.mock(LoanReportService.class); }
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }

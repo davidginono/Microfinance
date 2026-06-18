@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanAnalyticsService;
+import com.sacco.mvp.service.LoanReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
 public class StaffAnalyticsController {
     private final LoanAnalyticsService loanAnalyticsService;
+    private final LoanReportService loanReportService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/analytics")
@@ -96,6 +98,18 @@ public class StaffAnalyticsController {
         model.addAttribute("staffAnalyticsSubtitle", stationWideStaffView
             ? "View paid, disbursed, active, defaulted, rejected, and other loan status metrics for all members in your station."
             : "View loan performance, status breakdown, and risk indicators within a selected period.");
+        if (stationWideStaffView) {
+            LoanReportService.StationAnalyticsExportReport stationReport = loanReportService.stationAnalyticsReport(
+                principal.getSaccoId(),
+                principal.getStationId(),
+                resolvedFrom,
+                resolvedTo,
+                loanType,
+                principal.getFullName(),
+                roleLabel(principal.getPosition())
+            );
+            model.addAttribute("stationParticipation", stationReport.participation());
+        }
         model.addAttribute("staffName", principal.getFullName());
         return "staff/analytics";
     }
@@ -150,6 +164,21 @@ public class StaffAnalyticsController {
     private String formatPercent(BigDecimal value) {
         String sign = value.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
         return sign + value.setScale(2, java.math.RoundingMode.HALF_UP) + "%";
+    }
+
+    private String roleLabel(Position position) {
+        if (position == null) {
+            return "Staff";
+        }
+        String lower = position.name().toLowerCase(java.util.Locale.ENGLISH).replace('_', ' ');
+        StringBuilder label = new StringBuilder();
+        for (String part : lower.split(" ")) {
+            if (!label.isEmpty()) {
+                label.append(' ');
+            }
+            label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return label.toString();
     }
 
     private String toJson(Object value) {

@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
+import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.ManagerReview;
@@ -210,6 +211,54 @@ public class LoanDocumentController {
             .body(workbook);
     }
 
+    @GetMapping("/documents/reports/staff-loan-analytics.pdf")
+    @PreAuthorize("hasRole('MANAGER') and @authz.staffAnalyticsAccess(principal)")
+    public ResponseEntity<byte[]> downloadStaffLoanAnalyticsPdf(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                @RequestParam(required = false) LoanType loanType,
+                                                                @RequestParam(required = false, defaultValue = "staff") String viewAs) {
+        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+            principal.getSaccoId(),
+            principal.getStationId(),
+            fromDate,
+            toDate,
+            loanType,
+            principal.getFullName(),
+            roleLabel(principal.getPosition())
+        );
+        byte[] pdf = loanReportService.buildStationAnalyticsPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=station-loan-analytics-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/staff-loan-analytics.xlsx")
+    @PreAuthorize("hasRole('MANAGER') and @authz.staffAnalyticsAccess(principal)")
+    public ResponseEntity<byte[]> downloadStaffLoanAnalyticsExcel(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                  @RequestParam(required = false) LoanType loanType,
+                                                                  @RequestParam(required = false, defaultValue = "staff") String viewAs) {
+        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+            principal.getSaccoId(),
+            principal.getStationId(),
+            fromDate,
+            toDate,
+            loanType,
+            principal.getFullName(),
+            roleLabel(principal.getPosition())
+        );
+        byte[] workbook = loanReportService.buildStationAnalyticsExcel(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=station-loan-analytics-" + report.fromDate() + "-to-" + report.toDate() + ".xlsx")
+            .body(workbook);
+    }
+
     @GetMapping("/documents/reports/manager-loans.pdf")
     @PreAuthorize("hasRole('MANAGER') and @userClaims.has(principal, 'REVIEW_MANAGER_QUEUE')")
     public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -255,6 +304,21 @@ public class LoanDocumentController {
             .header(HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; filename=disbursement-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
             .body(pdf);
+    }
+
+    private String roleLabel(com.sacco.mvp.domain.Position position) {
+        if (position == null) {
+            return "Staff";
+        }
+        String lower = position.name().toLowerCase(java.util.Locale.ENGLISH).replace('_', ' ');
+        StringBuilder label = new StringBuilder();
+        for (String part : lower.split(" ")) {
+            if (!label.isEmpty()) {
+                label.append(' ');
+            }
+            label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return label.toString();
     }
 
 }

@@ -223,4 +223,14 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
           and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
         """)
     long countForScope(@Param("saccoId") String saccoId, @Param("stationId") String stationId);
+
+    @Query("""
+        select count(m)
+        from Member m
+        where m.saccoId = :saccoId
+          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
+          and (m.memberAccount = true or (m.memberAccount is null and m.position = com.sacco.mvp.domain.Position.MEMBER))
+        """)
+    long countActiveMemberAccountsForScope(@Param("saccoId") String saccoId, @Param("stationId") String stationId);
 }

@@ -465,24 +465,38 @@
 </style>
 
 <div class="erp-page-header">
+    <c:url var="staffPdfExportUrl" value="/documents/reports/staff-loan-analytics.pdf">
+        <c:param name="fromDate" value="${fromDate}" />
+        <c:param name="toDate" value="${toDate}" />
+        <c:param name="loanType" value="${loanType}" />
+        <c:param name="viewAs" value="${viewAs}" />
+    </c:url>
+    <c:url var="staffExcelExportUrl" value="/documents/reports/staff-loan-analytics.xlsx">
+        <c:param name="fromDate" value="${fromDate}" />
+        <c:param name="toDate" value="${toDate}" />
+        <c:param name="loanType" value="${loanType}" />
+        <c:param name="viewAs" value="${viewAs}" />
+    </c:url>
     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
             <h1 class="erp-page-title">${staffAnalyticsTitle}</h1>
             <p class="erp-page-subtitle">${staffAnalyticsSubtitle}</p>
         </div>
         <div class="staff-analytics-actions md:justify-end">
-            <button type="button" class="app-btn btn-neutral staff-filter-action" onclick="window.print()">
-                <span class="text-red-600" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
-                </span>
-                <spring:message code="reports.exportPdf" text="Export PDF" />
-            </button>
-            <button type="button" id="staffCsvExport" class="app-btn btn-neutral staff-filter-action">
-                <span class="text-emerald-600" aria-hidden="true">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
-                </span>
-                <spring:message code="reports.exportCsv" text="Export CSV" />
-            </button>
+            <c:if test="${stationWideStaffView}">
+                <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action">
+                    <span class="text-red-600" aria-hidden="true">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
+                    </span>
+                    <spring:message code="reports.exportPdf" text="Export PDF" />
+                </a>
+                <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action">
+                    <span class="text-emerald-600" aria-hidden="true">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
+                    </span>
+                    <spring:message code="reports.exportExcel" text="Export Excel" />
+                </a>
+            </c:if>
             <a href="/staff/analytics" class="app-btn btn-neutral staff-filter-action">
                 <span class="text-blue-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.6 6.1"/><path d="M3 12A9 9 0 0 1 18.6 5.9"/><path d="M3 18h5v-5"/><path d="M21 6h-5v5"/></svg>
@@ -578,6 +592,30 @@
             </div>
         </div>
     </c:forEach>
+    <c:if test="${stationWideStaffView and stationParticipation ne null}">
+        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.memberApplicantParticipation' text='Member / Applicant Participation' />">
+            <div class="staff-metric-main">
+                <span class="staff-metric-icon tone-blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 0 1 3-3.87"/><path d="M20 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="staff-metric-title"><spring:message code="staff.analytics.memberApplicantParticipation" text="Member / Applicant Participation" /></p>
+                    <p class="staff-metric-value"><fmt:formatNumber value="${stationParticipation.uniqueApplicants}" /> / <fmt:formatNumber value="${stationParticipation.activeStationMembers}" /></p>
+                    <p class="staff-metric-trend">
+                        <strong>${stationParticipation.participationRateLabel}</strong>
+                        <span><spring:message code="staff.analytics.uniqueApplicantsOfMembers" text="unique applicants of active station members" /></span>
+                    </p>
+                </div>
+            </div>
+            <div class="staff-spark-row">
+                <p class="text-xs font-semibold text-slate-600">
+                    <spring:message code="staff.analytics.repeatApplicants" text="Repeat Applicants" />:
+                    <fmt:formatNumber value="${stationParticipation.repeatApplicants}" />
+                </p>
+                <span class="staff-card-info" title="<spring:message code='staff.analytics.applicationsPerApplicant' text='Applications per Applicant' />">${stationParticipation.applicationsPerApplicantLabel}</span>
+            </div>
+        </div>
+    </c:if>
 </section>
 
 <section class="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
@@ -704,34 +742,6 @@ window.addEventListener('load', function () {
         trendRangeUnit.textContent = interval === 'yearly' ? 'years' : interval === 'quarterly' ? 'quarters' : 'months';
     }
 
-    const exportButton = document.getElementById('staffCsvExport');
-    if (exportButton) {
-        exportButton.addEventListener('click', function () {
-            const rows = [['Product', 'Total Loans', 'Paid Loans', 'Defaulted Loans', 'Rejected Loans']];
-            const totals = {};
-            productSeries.forEach(function (series) {
-                series.dataPoints.forEach(function (point) {
-                    totals[point.label] = totals[point.label] || { label: point.label };
-                    totals[point.label][series.name] = point.y;
-                });
-            });
-            Object.keys(totals).forEach(function (label) {
-                const row = totals[label];
-                rows.push([label, row['Total Loans'] || 0, row['Paid Loans'] || 0, row['Defaulted Loans'] || 0, row['Rejected Loans'] || 0]);
-            });
-            const csv = rows.map(function (row) {
-                return row.map(function (value) {
-                    return '"' + String(value).replace(/"/g, '""') + '"';
-                }).join(',');
-            }).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'staff-loan-analytics.csv';
-            link.click();
-            URL.revokeObjectURL(link.href);
-        });
-    }
 });
 
 function chartSvg(width, height) {
