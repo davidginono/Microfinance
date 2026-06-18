@@ -239,6 +239,16 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/notifications")
+    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
+                                @RequestParam(required = false) UUID highlight,
+                                Model model) {
+        model.addAttribute("notifications", notificationInboxService.allViews(principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("highlightNotificationId", highlight);
+        return "admin/notifications";
+    }
+
     @GetMapping("/notifications/{id}/open")
     @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
     public String openAdminNotification(@PathVariable UUID id,
@@ -247,12 +257,12 @@ public class AdminController {
         try {
             return "redirect:" + notificationInboxService.openForMember(
                 id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(),
-                principal.hasRole(Position.ADMIN) ? "/admin/incidents" : "/admin/support/replies");
+                principal.hasRole(Position.ADMIN) ? "/admin/incidents" : "/admin/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return principal != null && principal.hasRole(Position.ADMIN)
                 ? "redirect:/admin/incidents"
-                : "redirect:/admin/support/replies";
+                : "redirect:/admin/notifications";
         }
     }
 
@@ -279,7 +289,7 @@ public class AdminController {
             : "There were no unread notifications.");
         return principal != null && principal.hasRole(Position.ADMIN)
             ? "redirect:/admin/incidents"
-            : "redirect:/admin/support/replies";
+            : "redirect:/admin/notifications";
     }
 
     @GetMapping("/incidents")

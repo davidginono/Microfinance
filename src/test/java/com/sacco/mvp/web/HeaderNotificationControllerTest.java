@@ -39,6 +39,26 @@ class HeaderNotificationControllerTest {
                 "/app/notifications?highlight=" + notificationId + "#notification-" + notificationId));
     }
 
+    @Test
+    void minorAdminPayloadTargetsAdminNotificationInbox() {
+        NotificationInboxService inbox = mock(NotificationInboxService.class);
+        HeaderNotificationController controller = new HeaderNotificationController(inbox);
+        AppUserPrincipal principal = principal(Position.MINOR_ADMIN, false);
+        UUID notificationId = UUID.randomUUID();
+        NotificationViewService.HeaderNotificationView view = new NotificationViewService.HeaderNotificationView(
+            notificationId, "Station SMS units depleted", "SMS notifications are blocked.", "SMS Usage Control", null, "2026-06-18 15:00"
+        );
+        when(inbox.unreadHeaderViews(principal.getMemberId(), principal.getGrantedPositions())).thenReturn(List.of(view));
+        when(inbox.unreadCount(principal.getMemberId(), principal.getGrantedPositions())).thenReturn(1L);
+
+        HeaderNotificationController.HeaderNotificationPayload payload = controller.notifications(principal);
+
+        assertThat(payload.count()).isEqualTo(1L);
+        assertThat(payload.targetUrl()).isEqualTo("/admin/notifications");
+        assertThat(payload.notifications()).singleElement()
+            .satisfies(item -> assertThat(item.href()).isEqualTo("/admin/notifications/" + notificationId + "/open"));
+    }
+
     private AppUserPrincipal principal(Position position, boolean memberAccess) {
         Member member = Member.builder()
             .id(UUID.randomUUID())

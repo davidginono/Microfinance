@@ -43,7 +43,7 @@ public class HeaderNotificationController {
     private String notificationHref(AppUserPrincipal principal,
                                     String targetUrl,
                                     NotificationViewService.HeaderNotificationView view) {
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole() && view.incidentId() != null) {
+        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
             return "/admin/notifications/" + view.id() + "/open";
         }
         return targetUrl + (targetUrl.contains("?") ? "&" : "?")
@@ -55,7 +55,7 @@ public class HeaderNotificationController {
             return "/admin/incidents";
         }
         if (principal.hasRole(Position.MINOR_ADMIN)) {
-            return "/admin/support/replies";
+            return "/admin/notifications";
         }
         return switch (principal.getPosition()) {
             case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
