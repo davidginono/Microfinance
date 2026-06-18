@@ -222,6 +222,116 @@ class LoanReportServiceTest {
         }
     }
 
+    @Test
+    void stationAnalyticsReportCountsApplicantsAndFullyPaidInterest() {
+        UUID applicantOne = UUID.randomUUID();
+        UUID applicantTwo = UUID.randomUUID();
+        UUID paidLoanId = UUID.randomUUID();
+        UUID activeLoanId = UUID.randomUUID();
+        LoanApplication paidLoan = LoanApplication.builder()
+            .id(paidLoanId)
+            .saccoId("IAA")
+            .stationId("AR704")
+            .applicantMemberId(applicantOne)
+            .loanType(LoanType.LOAN_ADVANCE)
+            .amount(new BigDecimal("500000.00"))
+            .status(LoanStatus.PAID)
+            .createdAt(OffsetDateTime.parse("2026-02-10T08:00:00Z"))
+            .updatedAt(OffsetDateTime.parse("2026-04-10T08:00:00Z"))
+            .paidAt(OffsetDateTime.parse("2026-04-10T08:00:00Z"))
+            .build();
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(activeLoanId)
+            .saccoId("IAA")
+            .stationId("AR704")
+            .applicantMemberId(applicantTwo)
+            .loanType(LoanType.LOAN_ADVANCE)
+            .amount(new BigDecimal("300000.00"))
+            .status(LoanStatus.FINAL_APPROVED)
+            .createdAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
+            .updatedAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
+            .build();
+
+        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(paidLoan, activeLoan));
+        when(memberRepository.countActiveMemberAccountsForScope("IAA", "AR704")).thenReturn(10L);
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of(
+                LoanPaymentTransaction.builder()
+                    .id(UUID.randomUUID())
+                    .loanApplicationId(paidLoanId)
+                    .receiptDate(LocalDate.of(2026, 4, 10))
+                    .interestPaid(new BigDecimal("12000.00"))
+                    .principalPaid(BigDecimal.ZERO)
+                    .totalPaid(new BigDecimal("12000.00"))
+                    .build(),
+                LoanPaymentTransaction.builder()
+                    .id(UUID.randomUUID())
+                    .loanApplicationId(activeLoanId)
+                    .receiptDate(LocalDate.of(2026, 4, 12))
+                    .interestPaid(new BigDecimal("3000.00"))
+                    .principalPaid(BigDecimal.ZERO)
+                    .totalPaid(new BigDecimal("3000.00"))
+                    .build()
+            ));
+
+        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+            "IAA",
+            "AR704",
+            LocalDate.of(2026, 1, 1),
+            LocalDate.of(2026, 12, 31),
+            LoanType.LOAN_ADVANCE,
+            "Alex Jumapili",
+            "Manager"
+        );
+
+        assertThat(report.participation().activeStationMembers()).isEqualTo(10);
+        assertThat(report.participation().uniqueApplicants()).isEqualTo(2);
+        assertThat(report.statusRows())
+            .anySatisfy(row -> {
+                assertThat(row.metric()).isEqualTo("Applied Loans");
+                assertThat(row.count()).isEqualTo(2);
+                assertThat(row.applicantCount()).isEqualTo(2);
+            });
+        assertThat(report.productRows()).hasSize(1);
+        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("15000.00");
+        assertThat(report.productRows().getFirst().fullyPaidLoanInterest()).isEqualByComparingTo("12000.00");
+        assertThat(report.yearlyRows().getFirst().totalPaidLoans()).isEqualTo(1);
+        assertThat(report.yearlyRows().getFirst().fullyPaidLoanInterest()).isEqualByComparingTo("12000.00");
+    }
+
+    @Test
+    void stationAnalyticsExcelContainsApplicantAndYearlyInterestHeaders() throws Exception {
+        LoanReportService.StationAnalyticsExportReport report = new LoanReportService.StationAnalyticsExportReport(
+            "IAA",
+            "AR704",
+            LocalDate.of(2026, 1, 1),
+            LocalDate.of(2026, 12, 31),
+            null,
+            "Alex Jumapili",
+            "Manager",
+            LocalDate.of(2026, 6, 18),
+            List.of(new LoanReportService.StationStatusRow("Applied Loans", 2, 2)),
+            new LoanReportService.StationParticipationSummary(10, 2, new BigDecimal("20.00"), new BigDecimal("1.00"), 0),
+            List.of(new LoanReportService.StationProductRow("Loan Advance (Mkopo wa Chapchap)", 2, 2, 1, 2, 1, 0, 0, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),
+            List.of(new LoanReportService.StationYearlySummaryRow(2026, 2, 2, 0, BigDecimal.ZERO, 1, new BigDecimal("15000.00"), new BigDecimal("12000.00")))
+        );
+
+        byte[] workbookBytes = loanReportService.buildStationAnalyticsExcel(report);
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            assertThat(workbook.getSheet("Summary")).isNotNull();
+            assertThat(workbook.getSheet("Loan Status Analysis")).isNotNull();
+            assertThat(workbook.getSheet("Product Performance")).isNotNull();
+            assertThat(workbook.getSheet("Trends")).isNotNull();
+            assertThat(workbook.getSheet("Loan Status Analysis").getRow(3).getCell(2).getStringCellValue())
+                .isEqualTo("Number of Applicants");
+            assertThat(workbook.getSheet("Product Performance").getRow(2).getCell(9).getStringCellValue())
+                .isEqualTo("Total Interest Paid from Fully Paid Loans");
+            assertThat(workbook.getSheet("Trends").getRow(2).getCell(7).getStringCellValue())
+                .isEqualTo("Total Interest Paid from Fully Paid Loans");
+        }
+    }
+
     private LoanReportService.AnalyticsExportReport exportReport(LoanReportService.ReportKind kind) {
         LoanAnalyticsService.MemberLoanAnalytics analytics = new LoanAnalyticsService.MemberLoanAnalytics(
             0, 4, 0, 0, 5, 4, 0, new BigDecimal("772000.00"));

@@ -123,6 +123,18 @@ public class StaffAnalyticsController {
         model.addAttribute("staffAnalyticsSubtitle", stationWideStaffView
             ? "View paid, disbursed, active, defaulted, rejected, and other loan status metrics for all members in your station."
             : "View loan performance, status breakdown, and risk indicators within a selected period.");
+        if (stationWideStaffView) {
+            LoanReportService.StationAnalyticsExportReport stationReport = loanReportService.stationAnalyticsReport(
+                principal.getSaccoId(),
+                principal.getStationId(),
+                resolvedFrom,
+                resolvedTo,
+                loanType,
+                principal.getFullName(),
+                roleLabel(principal.getPosition())
+            );
+            model.addAttribute("stationParticipation", stationReport.participation());
+        }
         model.addAttribute("staffName", principal.getFullName());
         return "staff/analytics";
     }
@@ -195,6 +207,21 @@ public class StaffAnalyticsController {
             loanAmountUnpaid = loanAmountUnpaid.add(row.totalLoanAmountUnpaid() == null ? BigDecimal.ZERO : row.totalLoanAmountUnpaid());
         }
         return new ProductFinancialTotals(interestUnpaid, loanAmountPaid, loanAmountUnpaid);
+    }
+
+    private String roleLabel(Position position) {
+        if (position == null) {
+            return "Staff";
+        }
+        String lower = position.name().toLowerCase(java.util.Locale.ENGLISH).replace('_', ' ');
+        StringBuilder label = new StringBuilder();
+        for (String part : lower.split(" ")) {
+            if (!label.isEmpty()) {
+                label.append(' ');
+            }
+            label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return label.toString();
     }
 
     private String toJson(Object value) {

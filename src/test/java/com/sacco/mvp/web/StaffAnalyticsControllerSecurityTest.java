@@ -89,6 +89,21 @@ class StaffAnalyticsControllerSecurityTest {
         when(loanAnalyticsService.metricDeltas(any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
+        when(loanReportService.stationAnalyticsReport(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanReportService.StationAnalyticsExportReport(
+                "SACCO-01",
+                "AR704",
+                java.time.LocalDate.now().minusYears(1),
+                java.time.LocalDate.now(),
+                null,
+                "Test User",
+                "MANAGER",
+                java.time.LocalDate.now(),
+                List.of(),
+                new LoanReportService.StationParticipationSummary(0, 0, BigDecimal.ZERO, BigDecimal.ZERO, 0),
+                List.of(),
+                List.of()
+            ));
 
         mockMvc.perform(get("/staff/analytics").with(authentication(authenticationFor(principal))))
             .andExpect(status().isOk())
