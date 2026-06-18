@@ -144,7 +144,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     Optional<LoanApplication> findBySaccoIdAndApplicationNumber(String saccoId, Long applicationNumber);
 
-    List<LoanApplication> findByStatusInAndLoanIdIsNotNull(Collection<LoanStatus> statuses);
+    Page<LoanApplication> findByStatusInAndLoanIdIsNotNull(Collection<LoanStatus> statuses, Pageable pageable);
 
     @Query("""
         select l.saccoId as saccoId,
