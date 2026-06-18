@@ -439,6 +439,13 @@
         .staff-metric-grid > .staff-metric-card:nth-child(n + 5) {
             grid-column: span 4;
         }
+        .staff-metric-grid.is-station {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .staff-metric-grid.is-station > .staff-metric-card,
+        .staff-metric-grid.is-station > .staff-metric-card:nth-child(n + 5) {
+            grid-column: span 1;
+        }
         .staff-summary-grid {
             grid-template-columns: repeat(5, minmax(0, 1fr));
         }
@@ -475,6 +482,9 @@
         .staff-metric-grid {
             grid-template-columns: repeat(12, minmax(0, 1fr));
             gap: 1rem;
+        }
+        .staff-metric-grid.is-station {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
         .staff-metric-card {
             min-height: 8.75rem;
@@ -544,20 +554,18 @@
             <p class="erp-page-subtitle">${staffAnalyticsSubtitle}</p>
         </div>
         <div class="staff-analytics-actions md:justify-end">
-            <c:if test="${stationWideStaffView}">
-                <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action">
-                    <span class="text-red-600" aria-hidden="true">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
-                    </span>
-                    <spring:message code="reports.exportPdf" text="Export PDF" />
-                </a>
-                <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action">
-                    <span class="text-emerald-600" aria-hidden="true">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
-                    </span>
-                    <spring:message code="reports.exportExcel" text="Export Excel" />
-                </a>
-            </c:if>
+            <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action">
+                <span class="text-red-600" aria-hidden="true">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
+                </span>
+                <spring:message code="reports.exportPdf" text="Export PDF" />
+            </a>
+            <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action">
+                <span class="text-emerald-600" aria-hidden="true">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
+                </span>
+                <spring:message code="reports.exportExcel" text="Export Excel" />
+            </a>
             <a href="/staff/analytics" class="app-btn btn-neutral staff-filter-action">
                 <span class="text-blue-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.6 6.1"/><path d="M3 12A9 9 0 0 1 18.6 5.9"/><path d="M3 18h5v-5"/><path d="M21 6h-5v5"/></svg>
@@ -590,18 +598,13 @@
         <div class="staff-analytics-control is-view block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="staff.analytics.viewAs" text="View As" />
             <div class="staff-view-switch mt-1">
-                <button type="submit" name="viewAs" value="member" title="<spring:message code='staff.analytics.memberView' text='Member View' />" aria-label="<spring:message code='staff.analytics.memberView' text='Member View' />" class="staff-view-option ${viewAs eq 'member' ? 'is-active' : ''}" ${canViewMemberAnalytics ? '' : 'disabled'}>
+                <button type="submit" name="viewAs" value="member" title="<spring:message code='staff.analytics.staffView' text='Staff View' />" aria-label="<spring:message code='staff.analytics.staffView' text='Staff View' />" class="staff-view-option ${viewAs eq 'member' ? 'is-active' : ''}">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span><spring:message code="staff.analytics.memberView" text="Member View" /></span>
+                    <span><spring:message code="staff.analytics.staffView" text="Staff View" /></span>
                 </button>
-                <button type="submit" name="viewAs" value="staff" title="<spring:message code='staff.analytics.staffView' text='Staff View' />" aria-label="<spring:message code='staff.analytics.staffView' text='Staff View' />" class="staff-view-option ${viewAs eq 'staff' ? 'is-active' : ''}">
+                <button type="submit" name="viewAs" value="staff" title="<spring:message code='staff.analytics.stationView' text='Station View' />" aria-label="<spring:message code='staff.analytics.stationView' text='Station View' />" class="staff-view-option ${viewAs eq 'staff' ? 'is-active' : ''}" ${canViewStationAnalytics ? '' : 'disabled'}>
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21a6 6 0 0 0-12 0"/><circle cx="11" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
-                    <span>
-                        <c:choose>
-                            <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationView" text="Station View" /></c:when>
-                            <c:otherwise><spring:message code="staff.analytics.staffView" text="Staff View" /></c:otherwise>
-                        </c:choose>
-                    </span>
+                    <span><spring:message code="staff.analytics.stationView" text="Station View" /></span>
                 </button>
             </div>
         </div>
@@ -617,7 +620,8 @@
     <span>${metricComparisonLabel}</span>
 </div>
 
-<section class="staff-metric-grid">
+<c:if test="${not staffReviewView}">
+<section class="staff-metric-grid ${stationWideStaffView ? 'is-station' : ''}">
     <c:forEach items="${metricCards}" var="card">
         <div class="erp-panel staff-metric-card" data-spark-key="${card.sparkName}" data-spark-tone="${card.tone}" title="${card.label}: ${card.value}">
             <div class="staff-metric-main">
@@ -654,17 +658,38 @@
         </div>
     </c:forEach>
     <c:if test="${stationWideStaffView and stationParticipation ne null}">
-        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.memberApplicantParticipation' text='Member / Applicant Participation' />">
+        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.totalMembers' text='Total Members' />">
             <div class="staff-metric-main">
                 <span class="staff-metric-icon tone-blue">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 0 1 3-3.87"/><path d="M20 21v-2a4 4 0 0 0-3-3.87"/></svg>
                 </span>
                 <div class="min-w-0">
-                    <p class="staff-metric-title"><spring:message code="staff.analytics.memberApplicantParticipation" text="Member / Applicant Participation" /></p>
-                    <p class="staff-metric-value"><fmt:formatNumber value="${stationParticipation.uniqueApplicants}" /> / <fmt:formatNumber value="${stationParticipation.activeStationMembers}" /></p>
+                    <p class="staff-metric-title"><spring:message code="staff.analytics.totalMembers" text="Total Members" /></p>
+                    <p class="staff-metric-value"><fmt:formatNumber value="${stationTotalMembers}" /></p>
+                    <p class="staff-metric-trend">
+                        <strong><spring:message code="staff.analytics.activeMembers" text="Active" /></strong>
+                        <span><spring:message code="staff.analytics.stationMembers" text="station members" /></span>
+                    </p>
+                </div>
+            </div>
+            <div class="staff-spark-row">
+                <p class="text-xs font-semibold text-slate-600">
+                    <spring:message code="staff.analytics.stationScope" text="Current station scope" />
+                </p>
+                <span class="staff-card-info" title="<spring:message code='staff.analytics.totalMembers' text='Total Members' />">i</span>
+            </div>
+        </div>
+        <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.totalApplicants' text='Total Applicants' />">
+            <div class="staff-metric-main">
+                <span class="staff-metric-icon tone-emerald">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="staff-metric-title"><spring:message code="staff.analytics.totalApplicants" text="Total Applicants" /></p>
+                    <p class="staff-metric-value"><fmt:formatNumber value="${stationTotalApplicants}" /></p>
                     <p class="staff-metric-trend">
                         <strong>${stationParticipation.participationRateLabel}</strong>
-                        <span><spring:message code="staff.analytics.uniqueApplicantsOfMembers" text="unique applicants of active station members" /></span>
+                        <span><spring:message code="staff.analytics.ofMembers" text="of members" /></span>
                     </p>
                 </div>
             </div>
@@ -678,6 +703,7 @@
         </div>
     </c:if>
 </section>
+</c:if>
 
 <section class="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
     <div class="space-y-4">
@@ -685,7 +711,7 @@
             <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <h2 class="text-lg font-bold text-sacco-ink">
                     <c:choose>
-                        <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberPortfolioSummary" text="Member Portfolio Summary" /></c:when>
+                        <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:when>
                         <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationPortfolioSummary" text="Station Portfolio Summary" /></c:when>
                         <c:otherwise><spring:message code="staff.analytics.staffPortfolioSummary" text="Staff Portfolio Summary" /></c:otherwise>
                     </c:choose>
@@ -786,7 +812,12 @@
 
         <section class="erp-panel overflow-hidden">
             <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                <h2 class="text-lg font-bold text-sacco-ink"><spring:message code="staff.analytics.loanProductPerformance" text="Loan Product Performance" /></h2>
+                <h2 class="text-lg font-bold text-sacco-ink">
+                    <c:choose>
+                        <c:when test="${staffReviewView}"><spring:message code="staff.analytics.loanProductReviewBreakdown" text="Loan Product Review Breakdown" /></c:when>
+                        <c:otherwise><spring:message code="staff.analytics.loanProductPerformance" text="Loan Product Performance" /></c:otherwise>
+                    </c:choose>
+                </h2>
             </div>
             <div class="erp-panel-body">
                 <div id="staffProductChart" class="staff-chart-box"></div>
@@ -796,7 +827,12 @@
 
     <section class="erp-panel overflow-hidden">
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="text-lg font-bold text-sacco-ink"><spring:message code="reports.loanTrendOverTime" text="Loan Trend Over Time" /></h2>
+            <h2 class="text-lg font-bold text-sacco-ink">
+                <c:choose>
+                    <c:when test="${staffReviewView}"><spring:message code="staff.analytics.reviewTrendOverTime" text="Review Trend Over Time" /></c:when>
+                    <c:otherwise><spring:message code="reports.loanTrendOverTime" text="Loan Trend Over Time" /></c:otherwise>
+                </c:choose>
+            </h2>
             <div class="staff-trend-controls">
                 <select id="staffTrendInterval" title="<spring:message code='staff.analytics.trendInterval' text='Trend interval' />" aria-label="<spring:message code='staff.analytics.trendInterval' text='Trend interval' />" class="staff-trend-select h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">
                     <option value="monthly"><spring:message code="reports.interval.monthly" text="Monthly" /></option>
@@ -820,7 +856,7 @@
     <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">i</span>
     <span>
         <c:choose>
-            <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.memberViewHelp" text="You are viewing analytics for loans you applied for as a member." /></c:when>
+            <c:when test="${viewAs eq 'member'}"><spring:message code="staff.analytics.staffViewHelp" text="You are viewing analytics for loans you reviewed, approved, rejected, disbursed, or managed." /></c:when>
             <c:when test="${stationWideStaffView}"><spring:message code="staff.analytics.stationViewHelp" text="You are viewing station-wide loan status for all applicants and members in your station." /></c:when>
             <c:otherwise><spring:message code="staff.analytics.staffViewHelp" text="You are viewing analytics for loans you handled, reviewed, approved, rejected, disbursed, or managed." /></c:otherwise>
         </c:choose>
@@ -1085,10 +1121,17 @@ function aggregateTrendSeries(series, interval) {
 }
 
 function bucketCount(series, interval) {
-    const scoped = aggregateTrendSeries(series.filter(function (item) {
-        return ['Applied', 'Disbursed', 'Paid', 'Defaulted'].indexOf(item.name) >= 0;
-    }), interval || 'monthly');
+    const scoped = aggregateTrendSeries(visibleTrendSeries(series), interval || 'monthly');
     return (scoped[0] && scoped[0].dataPoints && scoped[0].dataPoints.length) || 1;
+}
+
+function visibleTrendSeries(series) {
+    const staffNames = ['Reviewed', 'Approved', 'Rejected', 'Pending'];
+    const hasStaffSeries = series.some(function (item) { return staffNames.indexOf(item.name) >= 0; });
+    const names = hasStaffSeries ? staffNames : ['Applied', 'Disbursed', 'Paid', 'Defaulted'];
+    return series.filter(function (item) {
+        return names.indexOf(item.name) >= 0;
+    });
 }
 
 function limitTrendRange(series, rangeCount) {
@@ -1104,9 +1147,7 @@ function renderLineChart(targetId, series, interval, rangeCount) {
     const target = document.getElementById(targetId);
     if (!target) return;
     target.innerHTML = '';
-    series = aggregateTrendSeries(series.filter(function (item) {
-        return ['Applied', 'Disbursed', 'Paid', 'Defaulted'].indexOf(item.name) >= 0;
-    }), interval || 'monthly');
+    series = aggregateTrendSeries(visibleTrendSeries(series), interval || 'monthly');
     series = limitTrendRange(series, rangeCount);
     const width = 980;
     const height = 340;

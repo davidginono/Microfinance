@@ -639,6 +639,8 @@ public class AdminController {
         model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
         model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
+        model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
+        model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
         model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
         model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
@@ -678,6 +680,7 @@ public class AdminController {
                                     @RequestParam(required = false) Integer committeePriority,
                                     @RequestParam(required = false) Integer committeeMinimumVotes,
                                     @RequestParam(required = false) Integer committeeApprovalThreshold,
+                                    @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
                                     @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                     @RequestParam(required = false) Integer accountantPriority,
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
@@ -707,7 +710,7 @@ public class AdminController {
                 maxLoanSavingsRatio, insuranceRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
                 resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
-                committeeApprovalThreshold, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
+                committeeApprovalThreshold, boardReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
                 disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -741,6 +744,7 @@ public class AdminController {
                                               @RequestParam(required = false) Integer committeePriority,
                                               @RequestParam(required = false) Integer committeeMinimumVotes,
                                               @RequestParam(required = false) Integer committeeApprovalThreshold,
+                                              @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
                                               @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                               @RequestParam(required = false) Integer accountantPriority,
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
@@ -789,6 +793,7 @@ public class AdminController {
                 committeePriority,
                 committeeMinimumVotes,
                 committeeApprovalThreshold,
+                boardReviewerIds,
                 accountantReviewRequired,
                 accountantPriority,
                 disbursementOfficerRequired,
@@ -1080,20 +1085,19 @@ public class AdminController {
             case "Maximum repayment period must be at least 1 month.",
                  "Maximum repayment period cannot be lower than the minimum repayment period." ->
                 fieldErrors.put("maxRepaymentMonths", message);
-            case "Committee minimum votes must be at least 1 when committee review is required.",
+            case "Assign at least one board reviewer before using committee review.",
+                 "Selected board reviewers must be active board members in this SACCO.",
+                 "Board reviewers assigned must be between 1 and 15.",
+                 "Committee minimum votes must be at least 1 when committee review is required.",
                  "Committee minimum votes must be between 1 and 15.",
-                 "Committee minimum votes cannot exceed the number of active board members." ->
-                fieldErrors.put("committeeMinimumVotes", message);
-            case "Committee approval threshold must be at least 1 when committee review is required.",
+                 "Committee minimum votes cannot exceed the number of active board members.",
+                 "Committee approval threshold must be at least 1 when committee review is required.",
                  "Committee approval threshold must be between 1 and 15.",
-                 "Committee approval threshold cannot exceed the number of active board members." ->
-                fieldErrors.put("committeeApprovalThreshold", message);
-            case "Committee approval threshold cannot be greater than committee minimum votes." -> {
-                fieldErrors.put("committeeMinimumVotes", "Committee approvals needed cannot be greater than committee reviewers assigned.");
-                fieldErrors.put("committeeApprovalThreshold", "Committee approvals needed cannot be greater than committee reviewers assigned.");
-            }
+                 "Committee approval threshold cannot exceed the number of active board members.",
+                 "Committee approval threshold cannot be greater than committee minimum votes." ->
+                fieldErrors.put("boardReviewerIds", "Assign at least one active board reviewer for this product.");
             case "No active board members are configured for this SACCO yet." ->
-                fieldErrors.put("committeeReviewRequired", "Assign at least one active committee reviewer before using this stage.");
+                fieldErrors.put("boardReviewerIds", "Add an active board member before using this stage.");
             case "Add at least one active Disbursement Officer before requiring that workflow role." ->
                 fieldErrors.put("disbursementOfficerRequired", "Assign at least one active Disbursement Officer before requiring this role.");
             case "Grant disbursement queue and release claims to at least one active staff user before removing the Disbursement Officer requirement." ->

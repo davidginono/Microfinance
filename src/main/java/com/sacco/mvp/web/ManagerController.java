@@ -480,9 +480,10 @@ public class ManagerController {
     public String rejectReversalRequest(@PathVariable UUID loanId,
                                         @PathVariable UUID requestId,
                                         @AuthenticationPrincipal AppUserPrincipal principal,
+                                        @RequestParam(required = false) String decisionReason,
                                         RedirectAttributes ra) {
         try {
-            reversalRequestService.decideManagerStageWithdrawal(requestId, principal.getMemberId(), false);
+            reversalRequestService.decideManagerStageWithdrawal(requestId, principal.getMemberId(), false, decisionReason);
             ra.addFlashAttribute("message", "Removal request declined.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());

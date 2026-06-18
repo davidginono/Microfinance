@@ -8,6 +8,8 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.BoardReviewRepository;
+import com.sacco.mvp.repository.LoanProductBoardReviewerRepository;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ public class WorkflowRoutingService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final ApprovalFlowService approvalFlowService;
     private final BoardReviewRepository boardReviewRepository;
+    private final LoanProductBoardReviewerRepository loanProductBoardReviewerRepository;
+    private final LoanProductSettingRepository loanProductSettingRepository;
     private final RoleDirectoryService roleDirectoryService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final OutboxService outboxService;
@@ -40,14 +44,13 @@ public class WorkflowRoutingService {
         LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
         ApprovalWorkflowStage firstStage = workflow.stages().isEmpty() ? null : workflow.stages().getFirst();
         LoanStatus nextStatus = approvalFlowService.pendingStatusFor(firstStage);
+        java.util.List<UUID> assignedBoardReviewers = java.util.List.of();
         if (firstStage == ApprovalWorkflowStage.LOAN_OFFICER || firstStage == ApprovalWorkflowStage.BOARD) {
-            assignReviewStage(app, firstStage, workflow);
+            assignedBoardReviewers = assignReviewStage(app, firstStage, workflow);
         }
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
-        outboxService.enqueue("LOAN", app.getId(), approvalFlowService.reviewAssignedEventType(firstStage), actorMemberId,
-            app.getSaccoId(), app.getStationId(),
-            Map.of("loanId", app.getId().toString()));
+        enqueueReviewAssignedEvents(app, firstStage, actorMemberId, assignedBoardReviewers);
         return nextStatus;
     }
 
@@ -61,20 +64,19 @@ public class WorkflowRoutingService {
         LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
         ApprovalWorkflowStage nextStage = approvalFlowService.nextStageAfter(workflow.stages(), currentStage);
         LoanStatus nextStatus = approvalFlowService.pendingStatusFor(nextStage);
+        java.util.List<UUID> assignedBoardReviewers = java.util.List.of();
         if (nextStage == ApprovalWorkflowStage.LOAN_OFFICER || nextStage == ApprovalWorkflowStage.BOARD) {
-            assignReviewStage(app, nextStage, workflow);
+            assignedBoardReviewers = assignReviewStage(app, nextStage, workflow);
         }
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
-        outboxService.enqueue("LOAN", app.getId(), approvalFlowService.reviewAssignedEventType(nextStage), actorMemberId,
-            app.getSaccoId(), app.getStationId(),
-            Map.of("loanId", app.getId().toString()));
+        enqueueReviewAssignedEvents(app, nextStage, actorMemberId, assignedBoardReviewers);
         return nextStatus;
     }
 
-    private void assignReviewStage(LoanApplication app,
-                                   ApprovalWorkflowStage stage,
-                                   LoanProductWorkflowService.WorkflowDefinition workflow) {
+    private java.util.List<UUID> assignReviewStage(LoanApplication app,
+                                                   ApprovalWorkflowStage stage,
+                                                   LoanProductWorkflowService.WorkflowDefinition workflow) {
         boardReviewRepository.deleteByLoanApplicationIdAndReviewStage(app.getId(), stage);
         boardReviewRepository.flush();
         if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
@@ -90,22 +92,46 @@ public class WorkflowRoutingService {
                 .decision(BoardDecision.PENDING)
                 .createdAt(OffsetDateTime.now())
                 .build());
-            return;
+            return java.util.List.of();
         }
 
-        int requiredBoardReviewers = Math.max(workflow.committeeMinimumVotes(), 1);
-        java.util.List<RoleDirectoryService.RoleAccountRef> boardMembers = roleDirectoryService
-            .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.BOARD);
-        if (boardMembers.size() < requiredBoardReviewers) {
-            throw new IllegalStateException("Not enough board members for the configured committee review requirement.");
+        java.util.List<UUID> boardMemberIds = productBoardReviewerIds(app);
+        if (boardMemberIds.isEmpty()) {
+            throw new IllegalStateException("No board reviewers are assigned to this loan product.");
         }
-        boardMembers.stream().limit(requiredBoardReviewers).forEach(board -> boardReviewRepository.save(BoardReview.builder()
+        boardMemberIds.forEach(boardMemberId -> boardReviewRepository.save(BoardReview.builder()
             .id(UUID.randomUUID())
             .loanApplicationId(app.getId())
-            .boardMemberId(board.getId())
+            .boardMemberId(boardMemberId)
             .reviewStage(stage)
             .decision(BoardDecision.PENDING)
             .createdAt(OffsetDateTime.now())
             .build()));
+        return boardMemberIds;
+    }
+
+    private java.util.List<UUID> productBoardReviewerIds(LoanApplication app) {
+        return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
+            .map(product -> loanProductBoardReviewerRepository.findByLoanProductSettingIdOrderByCreatedAtAsc(product.getId()).stream()
+                .map(com.sacco.mvp.domain.LoanProductBoardReviewer::getBoardMemberId)
+                .filter(boardMemberId -> roleDirectoryService.hasActiveRoleInSacco(boardMemberId, app.getSaccoId(), Position.BOARD))
+                .toList())
+            .orElse(java.util.List.of());
+    }
+
+    private void enqueueReviewAssignedEvents(LoanApplication app,
+                                             ApprovalWorkflowStage stage,
+                                             UUID actorMemberId,
+                                             java.util.List<UUID> assignedBoardReviewers) {
+        String eventType = approvalFlowService.reviewAssignedEventType(stage);
+        if (stage == ApprovalWorkflowStage.BOARD && assignedBoardReviewers != null && !assignedBoardReviewers.isEmpty()) {
+            assignedBoardReviewers.forEach(reviewerId -> outboxService.enqueue("LOAN", app.getId(), eventType, reviewerId,
+                app.getSaccoId(), app.getStationId(),
+                Map.of("loanId", app.getId().toString(), "boardMemberId", reviewerId.toString())));
+            return;
+        }
+        outboxService.enqueue("LOAN", app.getId(), eventType, actorMemberId,
+            app.getSaccoId(), app.getStationId(),
+            Map.of("loanId", app.getId().toString()));
     }
 }

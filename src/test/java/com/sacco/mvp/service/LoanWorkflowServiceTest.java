@@ -9,6 +9,9 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.ReversalRequest;
+import com.sacco.mvp.domain.ReversalRequestStatus;
+import com.sacco.mvp.domain.ReversalRequestType;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
@@ -65,6 +68,7 @@ class LoanWorkflowServiceTest {
     @Mock private WorkflowRoutingService workflowRoutingService;
     @Mock private LoanQualificationPolicyService loanQualificationPolicyService;
     @Mock private PaymentDetailsService paymentDetailsService;
+    @Mock private ReversalRequestRepository reversalRequestRepository;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
@@ -247,6 +251,9 @@ class LoanWorkflowServiceTest {
             .build();
 
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(reversalRequestRepository.findByLoanApplicationIdAndTypeAndStatusOrderByCreatedAtDesc(
+            appId, ReversalRequestType.GUARANTOR_DECISION_UNDO, ReversalRequestStatus.PENDING
+        )).thenReturn(List.of());
         when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
         when(financialDetailsService.generateSnapshot(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
             .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
@@ -265,6 +272,38 @@ class LoanWorkflowServiceTest {
 
         assertThat(submitted.getStatus()).isEqualTo(LoanStatus.READY_FOR_MANAGER);
         verifyNoInteractions(loanAttachmentService, saccoSettingsRepository);
+    }
+
+    @Test
+    void submitToManagerRequiresPendingGuarantorRemovalApproval() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .saccoId("CIRCLE-1001")
+            .status(LoanStatus.ALL_GUARANTORS_APPROVED)
+            .requiredGuarantors(1)
+            .financialSnapshot("{\"principalPlusInterest\":120000.00}")
+            .build();
+        ReversalRequest pendingRemoval = ReversalRequest.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(appId)
+            .type(ReversalRequestType.GUARANTOR_DECISION_UNDO)
+            .status(ReversalRequestStatus.PENDING)
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(reversalRequestRepository.findByLoanApplicationIdAndTypeAndStatusOrderByCreatedAtDesc(
+            appId, ReversalRequestType.GUARANTOR_DECISION_UNDO, ReversalRequestStatus.PENDING
+        )).thenReturn(List.of(pendingRemoval));
+
+        assertThatThrownBy(() -> loanWorkflowService.submitToManager(appId, memberId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Approve the pending guarantor removal request before submitting this application.");
+
+        verifyNoInteractions(workflowRoutingService);
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
     }
 
     @Test
@@ -630,7 +669,7 @@ class LoanWorkflowServiceTest {
             null
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Only DRAFT applications can be edited.");
+            .hasMessage("Only DRAFT applications or applications approved by all guarantors can be edited.");
 
         verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
         verify(loanAttachmentService, never()).store(any(), any(), anyString());
@@ -859,6 +898,26 @@ class LoanWorkflowServiceTest {
         assertThat(request.getGuarantorSignatureVerifiedAt()).isEqualTo(verifiedAt);
         assertThat(app.getStatus()).isEqualTo(LoanStatus.AWAITING_GUARANTORS);
         verify(outboxService, never()).enqueue(eq("LOAN"), eq(appId), eq("LOAN_GUARANTORS_APPROVED"), any(), any());
+    }
+
+    @Test
+    void rejectGuarantorRequestRequiresReason() {
+        UUID requestId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.PENDING)
+            .build();
+
+        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId))
+            .thenReturn(Optional.of(request));
+
+        assertThatThrownBy(() -> loanWorkflowService.rejectGuarantorRequest(requestId, guarantorId, " "))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Enter a reason before rejecting this guarantee request.");
+
+        verify(guarantorRequestRepository, never()).save(any());
     }
 
     @Test

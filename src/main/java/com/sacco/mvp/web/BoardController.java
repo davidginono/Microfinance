@@ -334,18 +334,18 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your board decision.");
             }
-            Member boardMember = requireMemberWithSavedSignature(principal.getMemberId());
+            Member boardMember = requireMemberWithEmail(principal.getMemberId());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 boardMember.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 boardMember.getId(),
-                "Your SACCO MVP board approval code",
-                "Use this OTP code to confirm your signature and approve the assigned board review.",
+                "Your SACCO MVP board decision code",
+                "Use this OTP code to confirm your assigned board review decision.",
                 app.getSaccoId(),
                 app.getStationId(),
                 boardMember.getPhone()
             );
-            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a board approval code using the station OTP delivery policy."));
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a board decision code using the station OTP delivery policy."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -370,7 +370,7 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your board decision.");
             }
-            Member boardMember = requireMemberWithSavedSignature(principal.getMemberId());
+            Member boardMember = requireMemberWithEmail(principal.getMemberId());
             emailOtpService.validateOtp(boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -393,10 +393,11 @@ public class BoardController {
                          @RequestParam(required = false) String boardSignatureOtpCode,
                          RedirectAttributes ra) {
         try {
+            Member boardMember = requireMemberWithEmail(principal.getMemberId());
+            UUID otpTokenId = emailOtpService.validateOtp(
+                boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
             if (decision == BoardDecision.APPROVED) {
-                Member boardMember = requireMemberWithSavedSignature(principal.getMemberId());
-                UUID otpTokenId = emailOtpService.validateOtp(
-                    boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
+                requireSavedSignature(boardMember);
                 boardService.decide(
                     id,
                     principal.getMemberId(),
@@ -406,10 +407,10 @@ public class BoardController {
                     boardMember.getSignatureText(),
                     OffsetDateTime.now()
                 );
-                emailOtpService.consumeOtpById(otpTokenId);
             } else {
                 boardService.decide(id, principal.getMemberId(), decision, comment);
             }
+            emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", "Board decision submitted");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -634,16 +635,19 @@ public class BoardController {
         return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
     }
 
-    private Member requireMemberWithSavedSignature(UUID memberId) {
+    private Member requireMemberWithEmail(UUID memberId) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException("Add an email address to your member profile before requesting a board OTP.");
         }
+        return member;
+    }
+
+    private void requireSavedSignature(Member member) {
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
             throw new IllegalStateException("Register your signature first before approving board reviews.");
         }
-        return member;
     }
 
     private String resolveSavedSignatureText(UUID memberId) {

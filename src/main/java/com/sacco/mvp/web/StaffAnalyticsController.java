@@ -50,27 +50,31 @@ public class StaffAnalyticsController {
             resolvedTo = swap;
         }
 
-        String selectedView = "member".equalsIgnoreCase(viewAs) && principal.isMemberAccess() ? "member" : "staff";
+        String selectedView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(Position.MANAGER) ? "staff" : "member";
         boolean stationWideStaffView = "staff".equals(selectedView) && principal.hasRole(Position.MANAGER);
+        boolean staffReviewView = !stationWideStaffView;
         DateRange previousRange = previousRange(resolvedFrom, resolvedTo);
+        LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = staffReviewView
+            ? loanAnalyticsService.staffReviewAnalytics(principal, resolvedFrom, resolvedTo, loanType, null)
+            : null;
 
-        LoanAnalyticsService.MemberLoanAnalytics analytics = "member".equals(selectedView)
-            ? loanAnalyticsService.forMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null)
+        LoanAnalyticsService.MemberLoanAnalytics analytics = staffReviewView
+            ? loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, loanType, null)
             : stationWideStaffView
                 ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
             : loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, loanType, null);
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics = "member".equals(selectedView)
-            ? loanAnalyticsService.forMember(principal.getMemberId(), previousRange.fromDate(), previousRange.toDate(), loanType, null)
+        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics = staffReviewView
+            ? loanAnalyticsService.forStaff(principal, previousRange.fromDate(), previousRange.toDate(), loanType, null)
             : stationWideStaffView
                 ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), previousRange.fromDate(), previousRange.toDate(), loanType, null)
             : loanAnalyticsService.forStaff(principal, previousRange.fromDate(), previousRange.toDate(), loanType, null);
-        List<LoanAnalyticsService.MetricTrendSeries> trendSeries = "member".equals(selectedView)
-            ? loanAnalyticsService.statusTrendForMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null)
+        List<LoanAnalyticsService.MetricTrendSeries> trendSeries = staffReviewView
+            ? staffReviewAnalytics.trendSeries()
             : stationWideStaffView
                 ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
             : loanAnalyticsService.statusTrendForStaff(principal, resolvedFrom, resolvedTo, loanType, null);
-        List<LoanAnalyticsService.LoanProductPerformance> productPerformance = "member".equals(selectedView)
-            ? loanAnalyticsService.productPerformanceForMember(principal.getSaccoId(), principal.getStationId(), principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null)
+        List<LoanAnalyticsService.LoanProductPerformance> productPerformance = staffReviewView
+            ? loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, loanType, null)
             : stationWideStaffView
                 ? loanAnalyticsService.productPerformanceForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
             : loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, loanType, null);
@@ -97,13 +101,16 @@ public class StaffAnalyticsController {
         model.addAttribute("metricCards", metricCards(analytics, metricDeltas));
         model.addAttribute("metricPeriodLabel", previousPeriodLabel(resolvedFrom, resolvedTo));
         model.addAttribute("metricComparisonLabel", comparisonLabel(resolvedFrom, resolvedTo, previousRange));
-        model.addAttribute("staffPortfolio", "member".equals(selectedView)
-            ? memberPortfolio(analytics)
+        model.addAttribute("staffPortfolio", staffReviewView
+            ? loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, loanType, null)
             : stationWideStaffView
                 ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
             : loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, loanType, null));
         model.addAttribute("productPerformance", productPerformance);
-        model.addAttribute("productPerformanceJson", toJson(loanAnalyticsService.productChartSeries(productPerformance)));
+        model.addAttribute("staffReviewAnalytics", staffReviewAnalytics);
+        model.addAttribute("productPerformanceJson", toJson(staffReviewView
+            ? loanAnalyticsService.staffReviewProductChartSeries(staffReviewAnalytics.productRows())
+            : loanAnalyticsService.productChartSeries(productPerformance)));
         model.addAttribute("totalInterestAccumulated", totalInterestAccumulated);
         model.addAttribute("totalInterestAccumulatedLabel", moneyLabel(totalInterestAccumulated));
         model.addAttribute("totalInterestUnpaidLabel", moneyLabel(productFinancialTotals.totalInterestUnpaid()));
@@ -117,12 +124,13 @@ public class StaffAnalyticsController {
         model.addAttribute("loanType", loanType);
         model.addAttribute("loanTypes", LoanType.values());
         model.addAttribute("viewAs", selectedView);
-        model.addAttribute("canViewMemberAnalytics", principal.isMemberAccess());
+        model.addAttribute("staffReviewView", staffReviewView);
+        model.addAttribute("canViewStationAnalytics", principal.hasRole(Position.MANAGER));
         model.addAttribute("stationWideStaffView", stationWideStaffView);
-        model.addAttribute("staffAnalyticsTitle", stationWideStaffView ? "Station Loan Status" : "Loan Analytics");
+        model.addAttribute("staffAnalyticsTitle", stationWideStaffView ? "Station Loan Status" : "Staff Loan Review Analytics");
         model.addAttribute("staffAnalyticsSubtitle", stationWideStaffView
             ? "View paid, disbursed, active, defaulted, rejected, and other loan status metrics for all members in your station."
-            : "View loan performance, status breakdown, and risk indicators within a selected period.");
+            : "View review activity, decisions, and staff portfolio performance within a selected period.");
         if (stationWideStaffView) {
             LoanReportService.StationAnalyticsExportReport stationReport = loanReportService.stationAnalyticsReport(
                 principal.getSaccoId(),
@@ -134,6 +142,8 @@ public class StaffAnalyticsController {
                 roleLabel(principal.getPosition())
             );
             model.addAttribute("stationParticipation", stationReport.participation());
+            model.addAttribute("stationTotalMembers", stationReport.participation().activeStationMembers());
+            model.addAttribute("stationTotalApplicants", stationReport.participation().uniqueApplicants());
         }
         model.addAttribute("staffName", principal.getFullName());
         return "staff/analytics";

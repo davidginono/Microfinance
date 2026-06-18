@@ -260,6 +260,37 @@ public class LoanAnalyticsService {
         return new StaffPortfolioSummary(events.size(), approved, rejected, disbursed, defaultedAfterApproval, defaultedRate, riskLevel);
     }
 
+    public StaffReviewAnalytics staffReviewAnalytics(AppUserPrincipal principal,
+                                                     LocalDate fromDate,
+                                                     LocalDate toDate,
+                                                     LoanType loanType,
+                                                     LoanStatus loanStatus) {
+        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
+        List<YearMonth> months = monthsBetween(start, end);
+        List<StaffLoanEvent> events = staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus);
+        List<StaffReviewProductPerformance> productRows = staffReviewProductPerformance(
+            principal == null ? null : principal.getSaccoId(),
+            events
+        );
+        List<MetricTrendSeries> trendSeries = List.of(
+            staffTrendSeries("Reviewed", "#111827", months, events, event -> true),
+            staffTrendSeries("Approved", "#65a30d", months, events, StaffLoanEvent::approved),
+            staffTrendSeries("Rejected", "#ef4444", months, events, StaffLoanEvent::rejected),
+            staffTrendSeries("Pending", "#7e22ce", months, events, StaffLoanEvent::pending)
+        );
+        return new StaffReviewAnalytics(
+            events.size(),
+            events.stream().filter(StaffLoanEvent::approved).count(),
+            events.stream().filter(StaffLoanEvent::rejected).count(),
+            events.stream().filter(StaffLoanEvent::pending).count(),
+            events.stream().filter(event -> event.disbursed() || DISBURSED_STATUSES.contains(event.loan().getStatus())).count(),
+            events.stream().filter(StaffLoanEvent::approved).filter(event -> event.loan().getStatus() == LoanStatus.DEFAULTED).count(),
+            productRows,
+            trendSeries
+        );
+    }
+
     public StaffPortfolioSummary stationPortfolio(String saccoId,
                                                   String stationId,
                                                   LocalDate fromDate,
@@ -292,6 +323,15 @@ public class LoanAnalyticsService {
             productChartSeries("Paid Loans", "#059669", performance, LoanProductPerformance::paidLoans),
             productChartSeries("Defaulted Loans", "#f97316", performance, LoanProductPerformance::defaultedLoans),
             productChartSeries("Rejected Loans", "#ef4444", performance, LoanProductPerformance::rejectedLoans)
+        );
+    }
+
+    public List<Map<String, Object>> staffReviewProductChartSeries(List<StaffReviewProductPerformance> performance) {
+        return List.of(
+            staffReviewProductChartSeries("Reviewed", "#111827", performance, StaffReviewProductPerformance::reviewed),
+            staffReviewProductChartSeries("Approved", "#65a30d", performance, StaffReviewProductPerformance::approved),
+            staffReviewProductChartSeries("Rejected", "#ef4444", performance, StaffReviewProductPerformance::rejected),
+            staffReviewProductChartSeries("Pending", "#7e22ce", performance, StaffReviewProductPerformance::pending)
         );
     }
 
@@ -492,6 +532,34 @@ public class LoanAnalyticsService {
             .toList();
     }
 
+    private List<StaffReviewProductPerformance> staffReviewProductPerformance(String saccoId, List<StaffLoanEvent> events) {
+        List<ProductRef> productRefs = configuredProductRefs(saccoId);
+        if (productRefs.isEmpty()) {
+            productRefs = java.util.Arrays.stream(LoanType.values())
+                .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
+                .map(type -> new ProductRef(type, shortProductLabel(type)))
+                .toList();
+        }
+        return productRefs.stream()
+            .filter(product -> product.loanType() != LoanType.CUSTOMIZED_LOAN)
+            .map(product -> {
+                List<StaffLoanEvent> productEvents = events.stream()
+                    .filter(event -> event.loan().getLoanType() == product.loanType())
+                    .toList();
+                long reviewed = productEvents.size();
+                long approved = productEvents.stream().filter(StaffLoanEvent::approved).count();
+                long rejected = productEvents.stream().filter(StaffLoanEvent::rejected).count();
+                long pending = productEvents.stream().filter(StaffLoanEvent::pending).count();
+                BigDecimal approvalRate = reviewed == 0
+                    ? BigDecimal.ZERO
+                    : BigDecimal.valueOf(approved)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(reviewed), 2, RoundingMode.HALF_UP);
+                return new StaffReviewProductPerformance(product.label(), reviewed, approved, rejected, pending, approvalRate);
+            })
+            .toList();
+    }
+
     private List<ProductRef> configuredProductRefs(String saccoId) {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
@@ -507,6 +575,22 @@ public class LoanAnalyticsService {
                                                    String color,
                                                    List<LoanProductPerformance> performance,
                                                    java.util.function.ToLongFunction<LoanProductPerformance> valueExtractor) {
+        Map<String, Object> series = new LinkedHashMap<>();
+        series.put("name", name);
+        series.put("color", color);
+        series.put("dataPoints", performance.stream().map(item -> {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("label", item.label());
+            point.put("y", valueExtractor.applyAsLong(item));
+            return point;
+        }).toList());
+        return series;
+    }
+
+    private Map<String, Object> staffReviewProductChartSeries(String name,
+                                                              String color,
+                                                              List<StaffReviewProductPerformance> performance,
+                                                              java.util.function.ToLongFunction<StaffReviewProductPerformance> valueExtractor) {
         Map<String, Object> series = new LinkedHashMap<>();
         series.put("name", name);
         series.put("color", color);
@@ -785,9 +869,89 @@ public class LoanAnalyticsService {
         }
     }
 
+    public record StaffReviewAnalytics(
+        long reviewedLoans,
+        long approvedLoans,
+        long rejectedLoans,
+        long pendingLoans,
+        long disbursedLoans,
+        long defaultedAfterApproval,
+        List<StaffReviewProductPerformance> productRows,
+        List<MetricTrendSeries> trendSeries
+    ) {
+        public long getReviewedLoans() {
+            return reviewedLoans;
+        }
+
+        public long getApprovedLoans() {
+            return approvedLoans;
+        }
+
+        public long getRejectedLoans() {
+            return rejectedLoans;
+        }
+
+        public long getPendingLoans() {
+            return pendingLoans;
+        }
+
+        public long getDisbursedLoans() {
+            return disbursedLoans;
+        }
+
+        public long getDefaultedAfterApproval() {
+            return defaultedAfterApproval;
+        }
+
+        public List<StaffReviewProductPerformance> getProductRows() {
+            return productRows;
+        }
+
+        public List<MetricTrendSeries> getTrendSeries() {
+            return trendSeries;
+        }
+    }
+
+    public record StaffReviewProductPerformance(
+        String label,
+        long reviewed,
+        long approved,
+        long rejected,
+        long pending,
+        BigDecimal approvalRate
+    ) {
+        public String getLabel() {
+            return label;
+        }
+
+        public long getReviewed() {
+            return reviewed;
+        }
+
+        public long getApproved() {
+            return approved;
+        }
+
+        public long getRejected() {
+            return rejected;
+        }
+
+        public long getPending() {
+            return pending;
+        }
+
+        public BigDecimal getApprovalRate() {
+            return approvalRate;
+        }
+    }
+
     private record ReviewRef(UUID loanId, OffsetDateTime reviewedAt, boolean approved, boolean rejected, boolean disbursed) {}
 
-    private record StaffLoanEvent(LoanApplication loan, OffsetDateTime reviewedAt, boolean approved, boolean rejected, boolean disbursed) {}
+    private record StaffLoanEvent(LoanApplication loan, OffsetDateTime reviewedAt, boolean approved, boolean rejected, boolean disbursed) {
+        private boolean pending() {
+            return !approved && !rejected;
+        }
+    }
 
     private record ProductRef(LoanType loanType, String label) {}
 }

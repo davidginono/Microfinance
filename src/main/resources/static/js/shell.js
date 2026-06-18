@@ -6,6 +6,7 @@
     const pageTitleRailText = document.getElementById('shellPageTitleRailText');
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
+    const scrollRestoreStorageKey = 'saccos:restore-scroll';
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
@@ -134,6 +135,46 @@
         }
     };
 
+    const currentScrollRestorePath = function () {
+        return window.location.pathname + window.location.search;
+    };
+
+    const rememberScrollForReload = function () {
+        try {
+            window.sessionStorage.setItem(scrollRestoreStorageKey, JSON.stringify({
+                path: currentScrollRestorePath(),
+                x: window.scrollX || window.pageXOffset || 0,
+                y: window.scrollY || window.pageYOffset || 0,
+                at: Date.now()
+            }));
+        } catch (ignored) {
+            // Storage can be unavailable in private browsing or strict browser modes.
+        }
+    };
+
+    const restoreScrollAfterReload = function () {
+        let saved;
+        try {
+            saved = JSON.parse(window.sessionStorage.getItem(scrollRestoreStorageKey) || 'null');
+            window.sessionStorage.removeItem(scrollRestoreStorageKey);
+        } catch (ignored) {
+            return;
+        }
+        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > 60000) {
+            return;
+        }
+        const targetX = Math.max(Number(saved.x) || 0, 0);
+        const targetY = Math.max(Number(saved.y) || 0, 0);
+        const restore = function () {
+            window.scrollTo({ left: targetX, top: targetY, behavior: 'auto' });
+            schedulePageTitleRailUpdate();
+        };
+        window.requestAnimationFrame(function () {
+            restore();
+            window.setTimeout(restore, 120);
+        });
+    };
+
     document.addEventListener('submit', function (event) {
         const form = event.target instanceof HTMLFormElement ? event.target : null;
         if (!form || event.defaultPrevented) {
@@ -153,6 +194,7 @@
         }
         window.setTimeout(function () {
             if (!event.defaultPrevented) {
+                rememberScrollForReload();
                 showPageSubmitPreloader(form);
             }
         }, 0);
@@ -205,6 +247,7 @@
         if (initialAlert) {
             window.scrollToFeedback(initialAlert);
         }
+        restoreScrollAfterReload();
     });
 
     window.addEventListener('resize', function () {

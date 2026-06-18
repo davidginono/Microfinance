@@ -132,36 +132,24 @@ public class ReversalRequestService {
         LoanApplication app = loanApplicationRepository.findById(reversalRequest.getLoanApplicationId())
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
 
-        if (approve) {
-            loanWorkflowService.removeGuarantorFromLoan(reversalRequest.getGuarantorRequestId(), reversalRequest.getRequesterMemberId());
-            reversalRequest.setStatus(ReversalRequestStatus.APPROVED);
-            outboxService.enqueue(
-                "REVERSAL_REQUEST",
-                reversalRequest.getId(),
-                "GUARANTOR_UNDO_APPROVED",
-                reversalRequest.getRequesterMemberId(),
-                app.getSaccoId(),
-                app.getStationId(),
-                Map.of(
-                    "loanId", reversalRequest.getLoanApplicationId().toString(),
-                    "reversalRequestId", reversalRequest.getId().toString()
-                )
-            );
-        } else {
-            reversalRequest.setStatus(ReversalRequestStatus.REJECTED);
-            outboxService.enqueue(
-                "REVERSAL_REQUEST",
-                reversalRequest.getId(),
-                "GUARANTOR_UNDO_REJECTED",
-                reversalRequest.getRequesterMemberId(),
-                app.getSaccoId(),
-                app.getStationId(),
-                Map.of(
-                    "loanId", reversalRequest.getLoanApplicationId().toString(),
-                    "reversalRequestId", reversalRequest.getId().toString()
-                )
-            );
+        if (!approve) {
+            throw new IllegalStateException("Guarantor removal requests can only be approved by the applicant.");
         }
+
+        loanWorkflowService.removeGuarantorFromLoan(reversalRequest.getGuarantorRequestId(), reversalRequest.getRequesterMemberId());
+        reversalRequest.setStatus(ReversalRequestStatus.APPROVED);
+        outboxService.enqueue(
+            "REVERSAL_REQUEST",
+            reversalRequest.getId(),
+            "GUARANTOR_UNDO_APPROVED",
+            reversalRequest.getRequesterMemberId(),
+            app.getSaccoId(),
+            app.getStationId(),
+            Map.of(
+                "loanId", reversalRequest.getLoanApplicationId().toString(),
+                "reversalRequestId", reversalRequest.getId().toString()
+            )
+        );
         reversalRequest.setDecidedByMemberId(applicantMemberId);
         reversalRequest.setDecidedAt(OffsetDateTime.now());
         reversalRequestRepository.save(reversalRequest);
@@ -169,6 +157,11 @@ public class ReversalRequestService {
 
     @Transactional
     public void decideManagerStageWithdrawal(UUID reversalRequestId, UUID managerMemberId, boolean approve) {
+        decideManagerStageWithdrawal(reversalRequestId, managerMemberId, approve, null);
+    }
+
+    @Transactional
+    public void decideManagerStageWithdrawal(UUID reversalRequestId, UUID managerMemberId, boolean approve, String decisionReason) {
         ReversalRequest reversalRequest = reversalRequestRepository.findById(reversalRequestId)
             .orElseThrow(() -> new IllegalArgumentException("Reversal request not found"));
         if (reversalRequest.getType() != ReversalRequestType.MANAGER_STAGE_WITHDRAWAL) {
@@ -187,6 +180,11 @@ public class ReversalRequestService {
             throw new IllegalArgumentException("Loan application not found");
         }
 
+        String normalizedDecisionReason = normalizeDecisionReason(decisionReason);
+        if (!approve && normalizedDecisionReason.isBlank()) {
+            throw new IllegalStateException("Enter a reason before declining this request.");
+        }
+
         if (approve) {
             loanWorkflowService.removeApplicationAtManagerStage(reversalRequest.getLoanApplicationId(), reversalRequest.getRequesterMemberId());
             reversalRequest.setStatus(ReversalRequestStatus.APPROVED);
@@ -203,6 +201,7 @@ public class ReversalRequestService {
             );
         } else {
             reversalRequest.setStatus(ReversalRequestStatus.REJECTED);
+            reversalRequest.setDecisionReason(normalizedDecisionReason);
             outboxService.enqueue(
                 "REVERSAL_REQUEST",
                 reversalRequest.getId(),
@@ -219,6 +218,10 @@ public class ReversalRequestService {
         reversalRequest.setDecidedByMemberId(managerMemberId);
         reversalRequest.setDecidedAt(OffsetDateTime.now());
         reversalRequestRepository.save(reversalRequest);
+    }
+
+    private String normalizeDecisionReason(String decisionReason) {
+        return decisionReason == null ? "" : decisionReason.trim();
     }
 
     @Transactional(readOnly = true)

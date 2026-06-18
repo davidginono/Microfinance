@@ -422,49 +422,27 @@ public class LoanReportService {
 
     public byte[] buildStationAnalyticsExcel(StationAnalyticsExportReport report) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            CellStyle titleStyle = workbook.createCellStyle();
-            Font titleFont = workbook.createFont();
-            titleFont.setBold(true);
-            titleFont.setFontHeightInPoints((short) 14);
-            titleStyle.setFont(titleFont);
-
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
+            ExcelStyles styles = new ExcelStyles(workbook);
 
             XSSFSheet summary = workbook.createSheet("Summary");
-            int row = writeTitle(summary, titleStyle, "STATION LOAN STATUS REPORT");
-            row = writeKeyValueTable(summary, row + 1, headerStyle, List.of(
-                new String[]{"Reporting Period", report.periodLabel()},
-                new String[]{"Generated On", formatDate(report.generatedOn())},
-                new String[]{"Name", report.preparedBy()},
-                new String[]{"Role", report.preparedByRole()},
-                new String[]{"Loan Product", report.loanProductLabel()}
-            ));
-            row = writeKeyValueTable(summary, row + 2, headerStyle, List.of(
-                new String[]{"Active Station Members", String.valueOf(report.participation().activeStationMembers())},
-                new String[]{"Unique Applicants", String.valueOf(report.participation().uniqueApplicants())},
-                new String[]{"Participation Rate", report.participation().participationRateLabel()},
-                new String[]{"Applications per Applicant", report.participation().applicationsPerApplicantLabel()},
-                new String[]{"Repeat Applicants", String.valueOf(report.participation().repeatApplicants())}
-            ));
-            writeStatusTable(summary, row + 2, headerStyle, report.statusRows());
-            autosize(summary, 8);
+            writeStationExportSummarySheet(summary, report, styles);
+            autosize(summary, 10);
 
             XSSFSheet status = workbook.createSheet("Loan Status Analysis");
-            writeTitle(status, titleStyle, "LOAN STATUS ANALYSIS");
-            writeStatusTable(status, 2, headerStyle, report.statusRows());
+            int row = titleRows(status, "IAA SACCOS LTD", "LOAN STATUS ANALYSIS", styles);
+            writeStationStatusTable(status, row, report.statusRows(), styles);
             autosize(status, 5);
 
             XSSFSheet product = workbook.createSheet("Product Performance");
-            writeTitle(product, titleStyle, "LOAN PRODUCT PERFORMANCE");
-            writeProductTable(product, 2, headerStyle, report.productRows());
+            row = titleRows(product, "IAA SACCOS LTD", "LOAN PRODUCT PERFORMANCE", styles);
+            writeStationProductTable(product, row, report.productRows(), styles);
             autosize(product, 10);
 
             XSSFSheet trends = workbook.createSheet("Trends");
-            writeTitle(trends, titleStyle, "YEARLY LOAN AND INTEREST SUMMARY");
-            writeYearlyTable(trends, 2, headerStyle, report.yearlyRows());
+            row = titleRows(trends, "IAA SACCOS LTD", "YEARLY LOAN TREND AND INTEREST SUMMARY", styles);
+            int tableStart = writeStationYearlySummaryTable(trends, row, report.yearlyRows(), styles);
+            makeStationYearlyValuesNumeric(trends, tableStart, report.yearlyRows().size());
+            addStationYearlyChart(trends, tableStart + 1, report.yearlyRows().size());
             autosize(trends, 9);
 
             workbook.write(output);
@@ -584,6 +562,7 @@ public class LoanReportService {
             memberPortfolio(analytics),
             productRowsFromLoans(loans, paymentTotalsByLoanId),
             productFinancialRowsFromLoans(loans, paymentTotalsByLoanId),
+            null,
             trendSeries,
             recentActivityRows(loans),
             activeLoanRowsFromLoans(loans, paymentTotalsByLoanId),
@@ -611,12 +590,12 @@ public class LoanReportService {
                                                             LocalDate toDate,
                                                             com.sacco.mvp.domain.LoanType loanType,
                                                             String viewAs) {
-        if ("member".equalsIgnoreCase(viewAs) && principal.isMemberAccess()) {
-            return memberAnalyticsExportReport(principal, fromDate, toDate, loanType);
-        }
         DateRange range = resolveReportRange(fromDate, toDate);
         DateRange previous = previousRange(range.fromDate(), range.toDate());
-        boolean stationWideStaffView = principal.hasRole(Position.MANAGER);
+        boolean stationWideStaffView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(Position.MANAGER);
+        LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = stationWideStaffView
+            ? null
+            : loanAnalyticsService.staffReviewAnalytics(principal, range.fromDate(), range.toDate(), loanType, null);
         LoanAnalyticsService.MemberLoanAnalytics analytics = stationWideStaffView
             ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
             : loanAnalyticsService.forStaff(principal, range.fromDate(), range.toDate(), loanType, null);
@@ -625,7 +604,7 @@ public class LoanReportService {
             : loanAnalyticsService.forStaff(principal, previous.fromDate(), previous.toDate(), loanType, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries = stationWideStaffView
             ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
-            : loanAnalyticsService.statusTrendForStaff(principal, range.fromDate(), range.toDate(), loanType, null);
+            : staffReviewAnalytics.trendSeries();
         LoanAnalyticsService.StaffPortfolioSummary portfolio = stationWideStaffView
             ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
             : loanAnalyticsService.staffPortfolio(principal, range.fromDate(), range.toDate(), loanType, null);
@@ -640,7 +619,7 @@ public class LoanReportService {
         return new AnalyticsExportReport(
             stationWideStaffView ? ReportKind.STATION : ReportKind.STAFF,
             context.saccoName(),
-            stationWideStaffView ? "STATION LOAN STATUS REPORT" : "STAFF LOAN ANALYTICS REPORT",
+            stationWideStaffView ? "STATION LOAN STATUS REPORT" : "STAFF LOAN REVIEW REPORT",
             context.stationId(),
             context.branchName(),
             range.fromDate(),
@@ -656,6 +635,7 @@ public class LoanReportService {
             portfolio,
             productRows,
             productFinancialRows,
+            staffReviewAnalytics,
             trendSeries,
             stationWideStaffView ? recentActivityRows(stationLoans) : List.of(),
             List.of(),
@@ -682,7 +662,12 @@ public class LoanReportService {
             return buildMemberAnalyticsPdf(report);
         }
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            new FormalPdf(document, report, PDRectangle.A4).renderStationTwoPage();
+            FormalPdf renderer = new FormalPdf(document, report, PDRectangle.A4);
+            if (report.kind() == ReportKind.STAFF) {
+                renderer.renderStaffTwoPage();
+            } else {
+                renderer.renderStationTwoPage();
+            }
             document.save(output);
             return output.toByteArray();
         } catch (IOException ex) {
@@ -713,9 +698,14 @@ public class LoanReportService {
         }
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             ExcelStyles styles = new ExcelStyles(workbook);
-            writeStationSummarySheet(workbook.createSheet("Summary"), report, styles);
-            writeStatusSheet(workbook.createSheet("Loan Status Analysis"), report, styles);
-            writeProductSheet(workbook.createSheet("Product Performance"), report, styles);
+            if (report.kind() == ReportKind.STAFF) {
+                writeStaffSummarySheet(workbook.createSheet("Summary"), report, styles);
+                writeStaffProductReviewSheet(workbook.createSheet("Product Review Breakdown"), report, styles);
+            } else {
+                writeStationSummarySheet(workbook.createSheet("Summary"), report, styles);
+                writeStatusSheet(workbook.createSheet("Loan Status Analysis"), report, styles);
+                writeProductSheet(workbook.createSheet("Product Performance"), report, styles);
+            }
             writeTrendSheet(workbook.createSheet("Trends"), report, styles);
             workbook.write(output);
             return output.toByteArray();
@@ -956,7 +946,12 @@ public class LoanReportService {
                     .map(LoanApplication::getId)
                     .map(id -> paymentTotalsByLoanId.getOrDefault(id, PaymentTotals.ZERO).interestPaid())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-                return new ProductPerformanceRow(entry.getKey().getDisplayLabel(), applied, active, disbursed, paid, defaulted, rejected, interestPaid);
+                BigDecimal fullyPaidInterest = values.stream()
+                    .filter(loan -> loan.getStatus() == LoanStatus.PAID)
+                    .map(LoanApplication::getId)
+                    .map(id -> paymentTotalsByLoanId.getOrDefault(id, PaymentTotals.ZERO).interestPaid())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                return new ProductPerformanceRow(entry.getKey().getDisplayLabel(), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
             })
             .toList();
     }
@@ -966,7 +961,7 @@ public class LoanReportService {
             .map(item -> {
                 long active = Math.max(0, item.totalLoans() - item.paidLoans() - item.rejectedLoans());
                 long disbursed = Math.max(0, item.totalLoans() - item.rejectedLoans());
-                return new ProductPerformanceRow(item.label(), item.totalLoans(), active, disbursed, item.paidLoans(), item.defaultedLoans(), item.rejectedLoans(), BigDecimal.ZERO);
+                return new ProductPerformanceRow(item.label(), item.totalLoans(), active, disbursed, item.paidLoans(), item.defaultedLoans(), item.rejectedLoans(), BigDecimal.ZERO, BigDecimal.ZERO);
             })
             .toList();
     }
@@ -1182,21 +1177,20 @@ public class LoanReportService {
 
     private List<String[]> statusRows(AnalyticsExportReport report) {
         LoanAnalyticsService.MemberLoanAnalytics analytics = report.analytics();
-        long total = Math.max(analytics.appliedLoans(), 1);
         return List.of(
-            statusRow("Applied", analytics.appliedLoans(), total),
-            statusRow("Active", analytics.activeLoans(), total),
-            statusRow("Disbursed", analytics.disbursedLoans(), total),
-            statusRow("Paid", analytics.paidLoans(), total),
-            statusRow("Defaulted", analytics.defaultedLoans(), total),
-            statusRow("Forfeited", analytics.forfeitedLoans(), total),
-            statusRow("Rejected", analytics.rejectedLoans(), total)
+            statusRow(report, "Applied", analytics.appliedLoans()),
+            statusRow(report, "Active", analytics.activeLoans()),
+            statusRow(report, "Disbursed", analytics.disbursedLoans()),
+            statusRow(report, "Paid", analytics.paidLoans()),
+            statusRow(report, "Defaulted", analytics.defaultedLoans()),
+            statusRow(report, "Forfeited", analytics.forfeitedLoans()),
+            statusRow(report, "Rejected", analytics.rejectedLoans())
         );
     }
 
-    private String[] statusRow(String label, long count, long total) {
-        long percent = total == 0 ? 0 : Math.round((count * 100d) / total);
-        return new String[]{label, String.valueOf(count), percent + "%"};
+    private String[] statusRow(AnalyticsExportReport report, String label, long count) {
+        long applicantCount = report.kind() == ReportKind.MEMBER ? (count > 0 ? 1 : 0) : count;
+        return new String[]{label, String.valueOf(count), String.valueOf(applicantCount)};
     }
 
     private String percentLabel(LoanAnalyticsService.MetricDelta delta) {
@@ -1241,13 +1235,13 @@ public class LoanReportService {
         ), styles);
         row = writeMetricSummary(sheet, row + 1, report, styles);
         row = writeTable(sheet, row + 1, "LOAN STATUS BREAKDOWN",
-            new String[]{"Status", "Count", "% of Total"},
+            new String[]{"Status", "Count", "Number of Applicants"},
             statusRowsWithoutDelta(report), styles);
         row = writeProductTable(sheet, row + 1, report, styles);
         row = writeActiveLoanTable(sheet, row + 1, report, styles);
         row = writeFinancialTable(sheet, row + 1, report, styles);
         writeSignOff(sheet, row + 1, report, styles);
-        autosize(sheet, 8);
+        autosize(sheet, 9);
     }
 
     private void writeStationSummarySheet(XSSFSheet sheet, AnalyticsExportReport report, ExcelStyles styles) {
@@ -1265,7 +1259,7 @@ public class LoanReportService {
             new String[]{"Risk Level", totalRiskLevel(report)}
         ), styles);
         row = writeTable(sheet, row + 1, "LOAN STATUS ANALYSIS",
-            new String[]{"Status", "Count", "% of Total"},
+            new String[]{"Status", "Count", "Number of Applicants"},
             statusRowsWithoutDelta(report), styles);
         row = writeProductTable(sheet, row + 1, report, styles);
         row = writeProductFinancialBreakdownTable(sheet, row + 1, report, styles);
@@ -1273,6 +1267,28 @@ public class LoanReportService {
             new String[]{"Observation"},
             report.observations().stream().map(value -> new String[]{value}).toList(), styles);
         writeSignOff(sheet, row + 1, report, styles);
+        autosize(sheet, 9);
+    }
+
+    private void writeStaffSummarySheet(XSSFSheet sheet, AnalyticsExportReport report, ExcelStyles styles) {
+        int row = titleRows(sheet, report.saccoName(), report.title(), styles);
+        row = writeKeyValueBlock(sheet, row, "STAFF INFORMATION", List.of(
+            new String[]{"Staff Name", report.generatedBy()},
+            new String[]{"Position", report.generatedByRole()},
+            new String[]{"Branch/Station", report.stationId() + " - " + report.branchName()}
+        ), styles);
+        row = writeReportDetails(sheet, row + 1, report, styles);
+        row = writeStaffReviewSummaryTable(sheet, row + 1, report, styles);
+        row = writeStaffProductReviewTable(sheet, row + 1, report, styles);
+        row = writeStaffKpiTable(sheet, row + 1, report, styles);
+        writeSignOff(sheet, row + 1, report, styles);
+        autosize(sheet, 8);
+    }
+
+    private void writeStaffProductReviewSheet(XSSFSheet sheet, AnalyticsExportReport report, ExcelStyles styles) {
+        int row = titleRows(sheet, report.saccoName(), "PRODUCT REVIEW BREAKDOWN", styles);
+        row = writeReportDetails(sheet, row, report, styles);
+        writeStaffProductReviewTable(sheet, row, report, styles);
         autosize(sheet, 8);
     }
 
@@ -1280,7 +1296,7 @@ public class LoanReportService {
         int row = titleRows(sheet, report.saccoName(), "LOAN STATUS ANALYSIS", styles);
         row = writeReportDetails(sheet, row, report, styles);
         writeTable(sheet, row, "STATUS BREAKDOWN",
-            new String[]{"Status", "Count", "% of Total"},
+            new String[]{"Status", "Count", "Number of Applicants"},
             statusRowsWithoutDelta(report), styles);
         autosize(sheet, 8);
     }
@@ -1292,7 +1308,7 @@ public class LoanReportService {
         if (report.kind() != ReportKind.MEMBER) {
             writeProductFinancialBreakdownTable(sheet, row + 1, report, styles);
         }
-        autosize(sheet, 8);
+        autosize(sheet, 9);
     }
 
     private void writeTrendSheet(XSSFSheet sheet, AnalyticsExportReport report, ExcelStyles styles) {
@@ -1300,11 +1316,19 @@ public class LoanReportService {
         row = writeReportDetails(sheet, row, report, styles);
         List<String[]> rows = trendTableRows(report);
         int tableStart = row;
-        writeTable(sheet, tableStart, "LOAN TREND OVER TIME",
-            new String[]{"Period", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Forfeited", "Rejected"},
-            rows, styles);
-        makeTrendValuesNumeric(sheet, tableStart, rows.size());
-        addTrendChart(sheet, tableStart, rows.size());
+        if (report.kind() == ReportKind.STAFF) {
+            writeTable(sheet, tableStart, "REVIEW TREND OVER TIME",
+                new String[]{"Period", "Reviewed", "Approved", "Rejected", "Pending"},
+                rows, styles);
+            makeTrendValuesNumeric(sheet, tableStart, rows.size(), 4);
+            addTrendChart(sheet, tableStart, rows.size(), new int[]{1, 2, 3, 4}, new String[]{"Reviewed", "Approved", "Rejected", "Pending"});
+        } else {
+            writeTable(sheet, tableStart, "LOAN TREND OVER TIME",
+                new String[]{"Period", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Forfeited", "Rejected"},
+                rows, styles);
+            makeTrendValuesNumeric(sheet, tableStart, rows.size(), 7);
+            addTrendChart(sheet, tableStart, rows.size(), new int[]{1, 3, 4, 5}, new String[]{"Applied", "Disbursed", "Paid", "Defaulted"});
+        }
         autosize(sheet, 8);
     }
 
@@ -1386,7 +1410,8 @@ public class LoanReportService {
                 item.label(), String.valueOf(item.applied()), String.valueOf(item.active()),
                 String.valueOf(item.disbursed()), String.valueOf(item.paid()),
                 String.valueOf(item.defaulted()), String.valueOf(item.rejected()),
-                moneyPlain(item.interestPaid())
+                moneyPlain(item.interestPaid()),
+                moneyPlain(item.fullyPaidInterest())
             });
             applied += item.applied();
             active += item.active();
@@ -1396,13 +1421,64 @@ public class LoanReportService {
             rejected += item.rejected();
         }
         BigDecimal interestPaid = BigDecimal.ZERO;
+        BigDecimal fullyPaidInterest = BigDecimal.ZERO;
         for (ProductPerformanceRow item : report.productRows()) {
             interestPaid = interestPaid.add(item.interestPaid() == null ? BigDecimal.ZERO : item.interestPaid());
+            fullyPaidInterest = fullyPaidInterest.add(item.fullyPaidInterest() == null ? BigDecimal.ZERO : item.fullyPaidInterest());
         }
-        rows.add(new String[]{"TOTAL", String.valueOf(applied), String.valueOf(active), String.valueOf(disbursed), String.valueOf(paid), String.valueOf(defaulted), String.valueOf(rejected), moneyPlain(interestPaid)});
+        rows.add(new String[]{"TOTAL", String.valueOf(applied), String.valueOf(active), String.valueOf(disbursed), String.valueOf(paid), String.valueOf(defaulted), String.valueOf(rejected), moneyPlain(interestPaid), moneyPlain(fullyPaidInterest)});
         return writeTable(sheet, startRow, "LOAN PRODUCT PERFORMANCE",
-            new String[]{"Loan Product", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", report.kind() == ReportKind.STATION ? "Total Paid Interest Accumulated" : "Total Interest Paid"},
+            new String[]{"Loan Product", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", report.kind() == ReportKind.STATION ? "Total Paid Interest Accumulated" : "Total Interest Paid", "Total Interest of Fully Paid Loan"},
             rows, styles);
+    }
+
+    private int writeStaffReviewSummaryTable(XSSFSheet sheet, int startRow, AnalyticsExportReport report, ExcelStyles styles) {
+        LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+        return writeTable(sheet, startRow, "REVIEW SUMMARY OVERVIEW",
+            new String[]{"Metric", "Count", "Number of Applicants"},
+            List.of(
+                new String[]{"Total Applications Reviewed", String.valueOf(review.reviewedLoans()), String.valueOf(review.reviewedLoans())},
+                new String[]{"Approved Loans", String.valueOf(review.approvedLoans()), String.valueOf(review.approvedLoans())},
+                new String[]{"Rejected Loans", String.valueOf(review.rejectedLoans()), String.valueOf(review.rejectedLoans())},
+                new String[]{"Pending / In Progress", String.valueOf(review.pendingLoans()), String.valueOf(review.pendingLoans())}
+            ), styles);
+    }
+
+    private int writeStaffProductReviewTable(XSSFSheet sheet, int startRow, AnalyticsExportReport report, ExcelStyles styles) {
+        LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+        List<String[]> rows = review.productRows().stream()
+            .map(row -> new String[]{
+                row.label(),
+                String.valueOf(row.reviewed()),
+                String.valueOf(row.approved()),
+                String.valueOf(row.rejected()),
+                String.valueOf(row.pending()),
+                row.approvalRate().setScale(2, RoundingMode.HALF_UP) + "%"
+            })
+            .collect(Collectors.toCollection(ArrayList::new));
+        long reviewed = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::reviewed).sum();
+        long approved = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::approved).sum();
+        long rejected = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::rejected).sum();
+        long pending = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::pending).sum();
+        BigDecimal approvalRate = reviewed == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(approved).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(reviewed), 2, RoundingMode.HALF_UP);
+        rows.add(new String[]{"TOTAL", String.valueOf(reviewed), String.valueOf(approved), String.valueOf(rejected), String.valueOf(pending), approvalRate + "%"});
+        return writeTable(sheet, startRow, "LOAN PRODUCT REVIEW BREAKDOWN",
+            new String[]{"Loan Product", "Reviewed", "Approved", "Rejected", "Pending", "Approval Rate"},
+            rows, styles);
+    }
+
+    private int writeStaffKpiTable(XSSFSheet sheet, int startRow, AnalyticsExportReport report, ExcelStyles styles) {
+        LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+        BigDecimal reviewed = BigDecimal.valueOf(Math.max(review.reviewedLoans(), 1));
+        return writeTable(sheet, startRow, "KEY PERFORMANCE INDICATORS",
+            new String[]{"KPI", "This Period"},
+            List.of(
+                new String[]{"Approval Rate", percent(review.approvedLoans(), reviewed)},
+                new String[]{"Rejection Rate", percent(review.rejectedLoans(), reviewed)},
+                new String[]{"Pending Rate", percent(review.pendingLoans(), reviewed)}
+            ), styles);
     }
 
     private int writeActiveLoanTable(XSSFSheet sheet, int startRow, AnalyticsExportReport report, ExcelStyles styles) {
@@ -1435,6 +1511,22 @@ public class LoanReportService {
             .map(ProductPerformanceRow::interestPaid)
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private LoanAnalyticsService.StaffReviewAnalytics staffReview(AnalyticsExportReport report) {
+        if (report.staffReviewAnalytics() != null) {
+            return report.staffReviewAnalytics();
+        }
+        return new LoanAnalyticsService.StaffReviewAnalytics(0, 0, 0, 0, 0, 0, List.of(), List.of());
+    }
+
+    private String percent(long numerator, BigDecimal denominator) {
+        BigDecimal safeDenominator = denominator == null || denominator.compareTo(BigDecimal.ZERO) == 0
+            ? BigDecimal.ONE
+            : denominator;
+        return BigDecimal.valueOf(numerator)
+            .multiply(BigDecimal.valueOf(100))
+            .divide(safeDenominator, 2, RoundingMode.HALF_UP) + "%";
     }
 
     private List<String[]> productFinancialRowsForExcel(AnalyticsExportReport report) {
@@ -1470,10 +1562,111 @@ public class LoanReportService {
         ), styles);
     }
 
+    private void writeStationExportSummarySheet(XSSFSheet sheet, StationAnalyticsExportReport report, ExcelStyles styles) {
+        int row = titleRows(sheet, "IAA SACCOS LTD", "STATION LOAN STATUS REPORT", styles);
+        row = writeKeyValueBlock(sheet, row, "REPORT DETAILS", List.of(
+            new String[]{"Reporting Period", report.periodLabel()},
+            new String[]{"Generated On", formatDate(report.generatedOn())},
+            new String[]{"Name", report.preparedBy()},
+            new String[]{"Role", report.preparedByRole()},
+            new String[]{"Loan Product", report.loanProductLabel()}
+        ), styles);
+        row = writeKeyValueBlock(sheet, row + 1, "STATION PARTICIPATION SUMMARY", List.of(
+            new String[]{"Total Members", String.valueOf(report.participation().activeStationMembers())},
+            new String[]{"Total Applicants", String.valueOf(report.participation().uniqueApplicants())},
+            new String[]{"Participation Rate", report.participation().participationRateLabel()},
+            new String[]{"Applications per Applicant", report.participation().applicationsPerApplicantLabel()},
+            new String[]{"Repeat Applicants", String.valueOf(report.participation().repeatApplicants())}
+        ), styles);
+        row = writeStationStatusTable(sheet, row + 1, report.statusRows(), styles);
+        row = writeStationProductTable(sheet, row + 1, report.productRows(), styles);
+        writeStationYearlySummaryTable(sheet, row + 1, report.yearlyRows(), styles);
+    }
+
+    private int writeStationStatusTable(XSSFSheet sheet, int startRow, List<StationStatusRow> rows, ExcelStyles styles) {
+        return writeTable(sheet, startRow, "LOAN STATUS SUMMARY",
+            new String[]{"Metric", "Count", "Number of Applicants"},
+            rows.stream()
+                .map(row -> new String[]{row.metric(), String.valueOf(row.count()), String.valueOf(row.applicantCount())})
+                .toList(),
+            styles);
+    }
+
+    private int writeStationProductTable(XSSFSheet sheet, int startRow, List<StationProductRow> rows, ExcelStyles styles) {
+        List<String[]> tableRows = rows.stream()
+            .map(row -> new String[]{
+                row.loanProduct(),
+                String.valueOf(row.applications()),
+                String.valueOf(row.approved()),
+                String.valueOf(row.active()),
+                String.valueOf(row.disbursed()),
+                String.valueOf(row.paid()),
+                String.valueOf(row.defaulted()),
+                String.valueOf(row.rejected()),
+                row.totalPaidInterestLabel(),
+                row.fullyPaidLoanInterestLabel()
+            })
+            .toList();
+        return writeTable(sheet, startRow, "LOAN PRODUCT PERFORMANCE",
+            new String[]{"Loan Product", "Applications", "Approved", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest Accumulated", "Total Interest of Fully Paid Loan"},
+            tableRows,
+            styles);
+    }
+
+    private int writeStationYearlySummaryTable(XSSFSheet sheet, int startRow, List<StationYearlySummaryRow> rows, ExcelStyles styles) {
+        List<String[]> tableRows = rows.stream()
+            .map(row -> new String[]{
+                String.valueOf(row.year()),
+                String.valueOf(row.totalLoanApplications()),
+                String.valueOf(row.uniqueApplicants()),
+                String.valueOf(row.defaultedLoans()),
+                row.defaultRateLabel(),
+                String.valueOf(row.totalPaidLoans()),
+                row.totalPaidInterestAccumulatedLabel(),
+                row.fullyPaidLoanInterestLabel()
+            })
+            .toList();
+        return writeTable(sheet, startRow, "YEARLY LOAN AND INTEREST SUMMARY",
+            new String[]{"Year", "Total Loan Applications", "Unique Applicants", "Defaulted Loans", "Default Rate", "Total Paid Loans", "Total Paid Interest Accumulated", "Total Interest of Fully Paid Loan"},
+            tableRows,
+            styles);
+    }
+
+    private void makeStationYearlyValuesNumeric(XSSFSheet sheet, int tableStartRow, int dataRowCount) {
+        int dataStart = tableStartRow + 2;
+        int dataEnd = dataStart + dataRowCount - 1;
+        for (int rowIndex = dataStart; rowIndex <= dataEnd; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) {
+                continue;
+            }
+            makeCellNumeric(row, 0);
+            makeCellNumeric(row, 1);
+            makeCellNumeric(row, 2);
+            makeCellNumeric(row, 3);
+            makeCellNumeric(row, 5);
+        }
+    }
+
+    private void makeCellNumeric(Row row, int column) {
+        Cell cell = row.getCell(column);
+        if (cell == null || cell.getCellType() != org.apache.poi.ss.usermodel.CellType.STRING) {
+            return;
+        }
+        String value = cell.getStringCellValue();
+        if (value == null || !value.matches("-?\\d+(\\.\\d+)?")) {
+            return;
+        }
+        CellStyle style = cell.getCellStyle();
+        cell.setCellValue(Double.parseDouble(value));
+        cell.setCellStyle(style);
+    }
+
     private int writeTable(XSSFSheet sheet, int startRow, String title, String[] headers, List<String[]> rows, ExcelStyles styles) {
         Row titleRow = sheet.createRow(startRow++);
         writeCell(titleRow, 0, title, styles.section);
         Row headerRow = sheet.createRow(startRow++);
+        headerRow.setHeightInPoints(28f);
         for (int i = 0; i < headers.length; i++) {
             writeCell(headerRow, i, headers[i], styles.header);
         }
@@ -1484,6 +1677,7 @@ public class LoanReportService {
         }
         for (String[] rowValues : rows) {
             Row row = sheet.createRow(startRow++);
+            row.setHeightInPoints(24f);
             for (int i = 0; i < rowValues.length; i++) {
                 writeCell(row, i, rowValues[i], styles.body);
             }
@@ -1511,6 +1705,20 @@ public class LoanReportService {
                 byPeriod.computeIfAbsent(period, key -> new LinkedHashMap<>()).put(series.name(), numberValue(point.get("y")));
             }
         }
+        if (report.kind() == ReportKind.STAFF) {
+            return byPeriod.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Long> values = entry.getValue();
+                    return new String[]{
+                        entry.getKey(),
+                        String.valueOf(values.getOrDefault("Reviewed", 0L)),
+                        String.valueOf(values.getOrDefault("Approved", 0L)),
+                        String.valueOf(values.getOrDefault("Rejected", 0L)),
+                        String.valueOf(values.getOrDefault("Pending", 0L))
+                    };
+                })
+                .toList();
+        }
         return byPeriod.entrySet().stream()
             .map(entry -> {
                 Map<String, Long> values = entry.getValue();
@@ -1528,7 +1736,7 @@ public class LoanReportService {
             .toList();
     }
 
-    private void makeTrendValuesNumeric(XSSFSheet sheet, int tableStartRow, int dataRowCount) {
+    private void makeTrendValuesNumeric(XSSFSheet sheet, int tableStartRow, int dataRowCount, int lastColumn) {
         int dataStart = tableStartRow + 2;
         int dataEnd = dataStart + dataRowCount - 1;
         for (int rowIndex = dataStart; rowIndex <= dataEnd; rowIndex++) {
@@ -1536,7 +1744,7 @@ public class LoanReportService {
             if (row == null) {
                 continue;
             }
-            for (int column = 1; column <= 7; column++) {
+            for (int column = 1; column <= lastColumn; column++) {
                 Cell cell = row.getCell(column);
                 if (cell != null && cell.getCellType() == org.apache.poi.ss.usermodel.CellType.STRING) {
                     String value = cell.getStringCellValue();
@@ -1550,7 +1758,7 @@ public class LoanReportService {
         }
     }
 
-    private void addTrendChart(XSSFSheet sheet, int tableStartRow, int dataRowCount) {
+    private void addTrendChart(XSSFSheet sheet, int tableStartRow, int dataRowCount, int[] columns, String[] titles) {
         if (dataRowCount <= 0) {
             return;
         }
@@ -1572,10 +1780,9 @@ public class LoanReportService {
         XDDFDataSource<String> periods = XDDFDataSourcesFactory.fromStringCellRange(
             sheet, new CellRangeAddress(dataStart, dataEnd, 0, 0));
         XDDFLineChartData data = (XDDFLineChartData) chart.createData(ChartTypes.LINE, bottomAxis, leftAxis);
-        addTrendSeries(data, periods, sheet, dataStart, dataEnd, 1, "Applied");
-        addTrendSeries(data, periods, sheet, dataStart, dataEnd, 3, "Disbursed");
-        addTrendSeries(data, periods, sheet, dataStart, dataEnd, 4, "Paid");
-        addTrendSeries(data, periods, sheet, dataStart, dataEnd, 5, "Defaulted");
+        for (int i = 0; i < columns.length && i < titles.length; i++) {
+            addTrendSeries(data, periods, sheet, dataStart, dataEnd, columns[i], titles[i]);
+        }
         chart.plot(data);
     }
 
@@ -2211,7 +2418,7 @@ public class LoanReportService {
             "Defaulted",
             "Rejected",
             "Total Paid Interest Accumulated",
-            "Total Interest Paid from Fully Paid Loans"
+            "Total Interest of Fully Paid Loan"
         };
         for (int i = 0; i < columns.length; i++) {
             header.createCell(i).setCellValue(columns[i]);
@@ -2244,7 +2451,7 @@ public class LoanReportService {
             "Default Rate",
             "Total Paid Loans",
             "Total Paid Interest Accumulated",
-            "Total Interest Paid from Fully Paid Loans"
+            "Total Interest of Fully Paid Loan"
         };
         for (int i = 0; i < columns.length; i++) {
             header.createCell(i).setCellValue(columns[i]);
@@ -2263,6 +2470,50 @@ public class LoanReportService {
             row.createCell(column).setCellValue(item.fullyPaidLoanInterest().doubleValue());
         }
         return rowIndex;
+    }
+
+    private void addStationYearlyChart(XSSFSheet sheet, int tableStartRow, int dataRowCount) {
+        if (dataRowCount <= 0) {
+            return;
+        }
+        int dataStart = tableStartRow + 1;
+        int dataEnd = dataStart + dataRowCount - 1;
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 0, dataEnd + 3, 8, dataEnd + 21);
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText("Yearly Loan and Interest Summary");
+        chart.setTitleOverlay(false);
+        chart.getOrAddLegend().setPosition(LegendPosition.TOP);
+
+        XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        bottomAxis.setTitle("Year");
+        XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+        leftAxis.setTitle("Loans");
+        leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+
+        XDDFDataSource<Double> years = XDDFDataSourcesFactory.fromNumericCellRange(
+            sheet, new CellRangeAddress(dataStart, dataEnd, 0, 0));
+        XDDFLineChartData data = (XDDFLineChartData) chart.createData(ChartTypes.LINE, bottomAxis, leftAxis);
+        addStationYearlySeries(data, years, sheet, dataStart, dataEnd, 1, "Applications");
+        addStationYearlySeries(data, years, sheet, dataStart, dataEnd, 5, "Paid Loans");
+        addStationYearlySeries(data, years, sheet, dataStart, dataEnd, 3, "Defaulted Loans");
+        chart.plot(data);
+    }
+
+    private void addStationYearlySeries(XDDFChartData data,
+                                        XDDFDataSource<Double> years,
+                                        XSSFSheet sheet,
+                                        int dataStart,
+                                        int dataEnd,
+                                        int column,
+                                        String title) {
+        XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
+            sheet, new CellRangeAddress(dataStart, dataEnd, column, column));
+        XDDFChartData.Series series = data.addSeries(years, values);
+        series.setTitle(title, null);
+        if (series instanceof XDDFLineChartData.Series lineSeries) {
+            lineSeries.setSmooth(false);
+        }
     }
 
     private String formatMemberLoanStatus(LoanApplication loan) {
@@ -2373,10 +2624,15 @@ public class LoanReportService {
         long paid,
         long defaulted,
         long rejected,
-        BigDecimal interestPaid
+        BigDecimal interestPaid,
+        BigDecimal fullyPaidInterest
     ) {
         public String getInterestPaidLabel() {
             return formatMoneyPlainStatic(interestPaid);
+        }
+
+        public String getFullyPaidInterestLabel() {
+            return formatMoneyPlainStatic(fullyPaidInterest);
         }
     }
 
@@ -2486,6 +2742,7 @@ public class LoanReportService {
         LoanAnalyticsService.StaffPortfolioSummary portfolioSummary,
         List<ProductPerformanceRow> productRows,
         List<ProductFinancialBreakdownRow> productFinancialRows,
+        LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics,
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries,
         List<ActivityRow> activityRows,
         List<ActiveLoanDetailRow> activeLoanRows,
@@ -2530,6 +2787,7 @@ public class LoanReportService {
 
             body = bordered(workbook);
             body.setVerticalAlignment(VerticalAlignment.CENTER);
+            body.setIndention((short) 1);
         }
 
         private static CellStyle bordered(XSSFWorkbook workbook) {
@@ -2601,7 +2859,7 @@ public class LoanReportService {
             float tableTop = y;
             sectionAt(MARGIN, tableTop, "2. LOAN STATUS BREAKDOWN");
             table(MARGIN, tableTop - 16, new float[]{leftWidth * .45f, leftWidth * .22f, leftWidth * .33f},
-                new String[]{"Status", "Count", "% of Total"},
+                new String[]{"Status", "Count", "Applicants"},
                 statusRows(report), SMALL, 15f);
             sectionAt(MARGIN + leftWidth + 18, tableTop, "3. LOAN PRODUCT PERFORMANCE");
             table(MARGIN + leftWidth + 18, tableTop - 16,
@@ -2613,10 +2871,10 @@ public class LoanReportService {
             y -= 136;
 
             section("4. RISK / ELIGIBILITY SUMMARY");
-            table(MARGIN, y, new float[]{145, 90, 145, 90, 90, 90},
+            table(MARGIN, y, new float[]{132, 80, 134, 88, 88, 128},
                 new String[]{"Current Active Loan Amount", "Defaulted Loans", "Forfeited Loan Applications", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
                 List.of(new String[]{moneyPlain(report.financialSummary().activeLoanAmount()), String.valueOf(report.analytics().defaultedLoans()), String.valueOf(report.analytics().forfeitedLoans()), "0.00", "Yes", "Yes"},
-                    new String[]{"Eligibility Reason", report.remarks(), "", "", "", ""}), SMALL, 16f);
+                    new String[]{"Eligibility Reason", report.remarks(), "", "", "", ""}), SMALL, 20f);
             y -= 60;
 
             section("5. LOAN TREND OVER TIME");
@@ -2638,6 +2896,7 @@ public class LoanReportService {
         }
 
         private void renderMemberTwoPage() throws IOException {
+            int pageCount = activeLoanRowsForPdf().size() > 6 ? 3 : 2;
             open();
             memberHeader(false);
             section("1. MEMBER INFORMATION");
@@ -2657,21 +2916,20 @@ public class LoanReportService {
             ), BODY, 16f);
             y -= 112;
             section("3. LOAN STATUS SUMMARY");
-            table(MARGIN, y, new float[]{220, 120}, new String[]{"Metric", "Count"}, metricRows().stream()
-                .map(row -> new String[]{row[0], row[1]})
-                .toList(), BODY, 17f);
+            table(MARGIN, y, new float[]{220, 120, 145}, new String[]{"Metric", "Count", "Number of Applicants"},
+                statusRows(report), BODY, 17f);
             y -= 170;
             section("5. LOAN PRODUCT PERFORMANCE");
-            table(MARGIN, y, new float[]{120, 50, 50, 60, 45, 55, 55, 88},
-                new String[]{"Loan Product", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Interest Paid"},
-                productRowsForPdf(false), SMALL, 16f);
-            close(1, 2, "Member Loan Report");
+            table(MARGIN, y, new float[]{96, 38, 38, 46, 34, 42, 40, 82, 109},
+                new String[]{"Loan Product", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Interest Paid", "Total Interest of Fully Paid Loan"},
+                productRowsForPdf(false), SMALL - 0.4f, 24f);
+            close(1, pageCount, "Member Loan Report");
 
             open();
             right("Generated: " + humanDate(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y, regular, SMALL);
             y -= 34;
             section("6. RISK / ELIGIBILITY SUMMARY");
-            table(MARGIN, y, new float[]{118, 72, 128, 112, 45, 50},
+            table(MARGIN, y, new float[]{112, 66, 118, 102, 55, 72},
                 new String[]{"Current Active Loan Amount", "Defaulted Loans", "Forfeited Loan Applications", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
                 java.util.Collections.singletonList(new String[]{
                     moneyPlain(report.financialSummary().activeLoanAmount()),
@@ -2680,16 +2938,22 @@ public class LoanReportService {
                     "0.00",
                     "Yes",
                     "Yes"
-                }), SMALL, 24f);
+                }), SMALL, 30f);
             y -= 72;
             section("7. LOAN TREND OVER TIME");
             drawTrendChart(MARGIN, y, page.getMediaBox().getWidth() - (MARGIN * 2), 150);
             y -= 175;
             section("8. ACTIVE LOAN DETAILS");
-            table(MARGIN, y, new float[]{46, 88, 65, 78, 78, 64, 58, 58},
+            y = table(MARGIN, y, new float[]{46, 88, 65, 78, 78, 64, 58, 58},
                 new String[]{"Loan ID", "Loan Product", "Loan Amount", "Outstanding Balance", "Required Interest", "Paid Loan Amount", "Interest Paid", "Remaining Interest"},
                 activeLoanRowsForPdf(), SMALL, 22f);
-            y -= 112;
+            y -= 24;
+            if (pageCount == 3) {
+                close(2, pageCount, "Member Loan Report");
+                open();
+                right("Generated: " + humanDate(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y, regular, SMALL);
+                y -= 50;
+            }
             float half = (page.getMediaBox().getWidth() - (MARGIN * 2)) / 2f;
             box(MARGIN, y - 118, half - 8, 110);
             sectionAt(MARGIN + 10, y - 20, "10. REMARKS");
@@ -2697,7 +2961,63 @@ public class LoanReportService {
             box(MARGIN + half + 8, y - 118, half - 8, 110);
             sectionAt(MARGIN + half + 18, y - 20, "11. SIGN-OFF");
             signOff(MARGIN + half + 18, y - 38, half - 18);
-            close(2, 2, "Member Loan Report");
+            close(pageCount, pageCount, "Member Loan Report");
+        }
+
+        private void renderStaffTwoPage() throws IOException {
+            open();
+            write(report.saccoName(), MARGIN, y, bold, TITLE);
+            write(report.title(), MARGIN, y - 18, bold, HEADER + 2);
+            right("Generated: " + humanDate(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y - 8, regular, SMALL);
+            write("Loan Review Performance and Analytics", MARGIN, y - 42, regular, HEADER + 1);
+            line(MARGIN, y - 56, page.getMediaBox().getWidth() - MARGIN, y - 56);
+            y -= 86;
+
+            float half = (page.getMediaBox().getWidth() - (MARGIN * 2) - 18) / 2f;
+            sectionAt(MARGIN, y, "1. STAFF INFORMATION");
+            table(MARGIN, y - 18, new float[]{105, half - 105}, new String[]{"Field", "Value"}, List.of(
+                new String[]{"Staff Name", report.generatedBy()},
+                new String[]{"Position", report.generatedByRole()},
+                new String[]{"Branch/Station", report.stationId() + " - " + report.branchName()}
+            ), BODY, 18f);
+            sectionAt(MARGIN + half + 18, y, "2. REPORT DETAILS");
+            table(MARGIN + half + 18, y - 18, new float[]{115, half - 115}, new String[]{"Field", "Value"}, List.of(
+                new String[]{"Reporting Period", periodLabel(report)},
+                new String[]{"Generated On", humanDate(report.generatedOn())},
+                new String[]{"Generated By", report.generatedBy()},
+                new String[]{"Report Type", "Staff Loan Review Summary"},
+                new String[]{"Loan Product", report.loanProductLabel()}
+            ), BODY, 18f);
+            y -= 130;
+
+            section("3. REVIEW SUMMARY OVERVIEW");
+            y = table(MARGIN, y, new float[]{205, 145, 175}, new String[]{"Metric", "Count", "Number of Applicants"},
+                staffReviewSummaryRows(), BODY, 18f);
+            y -= 28;
+            section("4. LOAN PRODUCT REVIEW BREAKDOWN");
+            y = table(MARGIN, y, new float[]{132, 72, 72, 72, 72, 105},
+                new String[]{"Loan Product", "Reviewed", "Approved", "Rejected", "Pending", "Approval Rate"},
+                staffProductReviewRows(), SMALL, 19f);
+            close(1, 2, "Staff Loan Review Report");
+
+            open();
+            right("Generated: " + humanDate(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y, regular, SMALL);
+            y -= 34;
+            section("5. REVIEW TREND OVER TIME");
+            drawTrendChart(MARGIN, y, page.getMediaBox().getWidth() - (MARGIN * 2), 160);
+            y -= 188;
+            sectionAt(MARGIN, y, "6. KEY PERFORMANCE INDICATORS");
+            table(MARGIN, y - 16, new float[]{half * .58f, half * .42f}, new String[]{"KPI", "This Period"}, staffKpiRows(), BODY, 18f);
+            sectionAt(MARGIN + half + 18, y, "7. PRODUCTIVITY SUMMARY");
+            table(MARGIN + half + 18, y - 16, new float[]{half * .58f, half * .42f}, new String[]{"Metric", "This Period"}, staffProductivityRows(), BODY, 18f);
+            y -= 118;
+            box(MARGIN, y - 118, half - 8, 110);
+            sectionAt(MARGIN + 10, y - 20, "8. REMARKS");
+            writeWrapped(report.remarks(), MARGIN + 10, y - 40, half - 26, SMALL);
+            box(MARGIN + half + 8, y - 118, half - 8, 110);
+            sectionAt(MARGIN + half + 18, y - 20, "9. SIGN-OFF");
+            signOff(MARGIN + half + 18, y - 40, half - 18);
+            close(2, 2, "Staff Loan Review Report");
         }
 
         private void renderStationTwoPage() throws IOException {
@@ -2725,14 +3045,14 @@ public class LoanReportService {
             ), BODY, 17f);
             y -= 20;
             stationSection("3. LOAN STATUS SUMMARY");
-            y = table(MARGIN, y, new float[]{190, 75, 120}, new String[]{"Metric", "Count", "% of Total Applicants"}, statusRows(report).stream()
+            y = table(MARGIN, y, new float[]{190, 75, 120}, new String[]{"Metric", "Count", "Number of Applicants"}, statusRows(report).stream()
                 .map(row -> new String[]{row[0], row[1], row[2]})
                 .toList(), SMALL, 14f);
             y -= 20;
             stationSection("4. LOAN PRODUCT PERFORMANCE");
-            y = table(MARGIN, y, new float[]{146, 54, 48, 52, 38, 48, 45, 84},
-                new String[]{"Loan Product", "Applications", "Approved", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest Accumulated"},
-                productRowsForPdf(true), SMALL - 0.4f, 22f);
+            y = table(MARGIN, y, new float[]{98, 48, 46, 48, 34, 42, 42, 70, 97},
+                new String[]{"Loan Product", "Applications", "Approved", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest", "Total Interest of Fully Paid Loan"},
+                productRowsForPdf(true), SMALL - 0.5f, 28f);
             close(1, 2, "Station Loan Status Report");
 
             open();
@@ -2843,7 +3163,8 @@ public class LoanReportService {
                     String.valueOf(row.paid()),
                     String.valueOf(row.defaulted()),
                     String.valueOf(row.rejected()),
-                    moneyPlain(row.interestPaid())
+                    moneyPlain(row.interestPaid()),
+                    moneyPlain(row.fullyPaidInterest())
                 });
                 applied += row.applied();
                 active += row.active();
@@ -2861,9 +3182,67 @@ public class LoanReportService {
                 String.valueOf(paid),
                 String.valueOf(defaulted),
                 String.valueOf(rejected),
-                moneyPlain(interest)
+                moneyPlain(interest),
+                moneyPlain(report.productRows().stream()
+                    .map(ProductPerformanceRow::fullyPaidInterest)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add))
             });
             return rows;
+        }
+
+        private List<String[]> staffReviewSummaryRows() {
+            LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+            return List.of(
+                new String[]{"Total Applications Reviewed", String.valueOf(review.reviewedLoans()), String.valueOf(review.reviewedLoans())},
+                new String[]{"Approved Loans", String.valueOf(review.approvedLoans()), String.valueOf(review.approvedLoans())},
+                new String[]{"Rejected Loans", String.valueOf(review.rejectedLoans()), String.valueOf(review.rejectedLoans())},
+                new String[]{"Pending / In Progress", String.valueOf(review.pendingLoans()), String.valueOf(review.pendingLoans())}
+            );
+        }
+
+        private List<String[]> staffProductReviewRows() {
+            LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+            List<String[]> rows = review.productRows().stream()
+                .map(row -> new String[]{
+                    row.label(),
+                    String.valueOf(row.reviewed()),
+                    String.valueOf(row.approved()),
+                    String.valueOf(row.rejected()),
+                    String.valueOf(row.pending()),
+                    row.approvalRate().setScale(2, RoundingMode.HALF_UP) + "%"
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
+            long reviewed = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::reviewed).sum();
+            long approved = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::approved).sum();
+            long rejected = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::rejected).sum();
+            long pending = review.productRows().stream().mapToLong(LoanAnalyticsService.StaffReviewProductPerformance::pending).sum();
+            BigDecimal approvalRate = reviewed == 0
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(approved).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(reviewed), 2, RoundingMode.HALF_UP);
+            rows.add(new String[]{"TOTAL", String.valueOf(reviewed), String.valueOf(approved), String.valueOf(rejected), String.valueOf(pending), approvalRate + "%"});
+            return rows;
+        }
+
+        private List<String[]> staffKpiRows() {
+            LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+            BigDecimal reviewed = BigDecimal.valueOf(Math.max(review.reviewedLoans(), 1));
+            return List.of(
+                new String[]{"Approval Rate", percent(review.approvedLoans(), reviewed)},
+                new String[]{"Rejection Rate", percent(review.rejectedLoans(), reviewed)},
+                new String[]{"Pending Rate", percent(review.pendingLoans(), reviewed)}
+            );
+        }
+
+        private List<String[]> staffProductivityRows() {
+            LoanAnalyticsService.StaffReviewAnalytics review = staffReview(report);
+            long days = Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(report.fromDate(), report.toDate()) + 1);
+            return List.of(
+                new String[]{"Applications Reviewed per Day", BigDecimal.valueOf(review.reviewedLoans()).divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP).toPlainString()},
+                new String[]{"Approvals per Day", BigDecimal.valueOf(review.approvedLoans()).divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP).toPlainString()},
+                new String[]{"Rejections per Day", BigDecimal.valueOf(review.rejectedLoans()).divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP).toPlainString()},
+                new String[]{"Pending Reviews", String.valueOf(review.pendingLoans())}
+            );
         }
 
         private List<String[]> activeLoanRowsForPdf() {
@@ -2989,7 +3368,8 @@ public class LoanReportService {
                 return;
             }
             float firstY = top - 7;
-            int count = Math.min(2, lines.size());
+            int maxLines = Math.max(1, (int) Math.floor((rowHeight - 8f) / (size + 2f)));
+            int count = Math.min(maxLines, lines.size());
             for (int line = 0; line < count; line++) {
                 writeClipped(lines.get(line), x, firstY - (line * (size + 2)), maxWidth, font, Math.max(6f, size - 0.4f));
             }
@@ -3548,6 +3928,7 @@ public class LoanReportService {
             drawParticipationSection();
             drawPortfolioSection();
             drawYearlySection();
+            drawYearlyGraphSection();
             drawSignOffSection();
             closePage();
         }
@@ -3606,7 +3987,7 @@ public class LoanReportService {
                 })
                 .toList();
             drawSection("4. LOAN PRODUCT PERFORMANCE",
-                new String[]{"Loan Product", "Applications", "Approved", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest Accumulated", "Fully Paid Loan Interest"},
+                new String[]{"Loan Product", "Applications", "Approved", "Active", "Disbursed", "Paid", "Defaulted", "Rejected", "Total Paid Interest Accumulated", "Total Interest of Fully Paid Loan"},
                 new float[]{92f, 45f, 43f, 38f, 45f, 32f, 45f, 42f, 84f, 64f},
                 rows,
                 SMALL_SIZE);
@@ -3658,14 +4039,14 @@ public class LoanReportService {
                 })
                 .toList();
             drawSection("7. YEARLY LOAN AND INTEREST SUMMARY",
-                new String[]{"Year", "Total Loan Applications", "Unique Applicants", "Defaulted Loans", "Default Rate", "Total Paid Loans", "Total Paid Interest Accumulated", "Fully Paid Loan Interest"},
+                new String[]{"Year", "Total Loan Applications", "Unique Applicants", "Defaulted Loans", "Default Rate", "Total Paid Loans", "Total Paid Interest Accumulated", "Total Interest of Fully Paid Loan"},
                 new float[]{38f, 78f, 66f, 58f, 52f, 58f, 98f, 86f},
                 rows,
                 SMALL_SIZE);
         }
 
         private void drawSignOffSection() throws IOException {
-            drawSection("8. SIGN-OFF",
+            drawSection("9. SIGN-OFF",
                 new String[]{"Field", "Name", "Date"},
                 new float[]{120f, 250f, 120f},
                 List.of(
@@ -3674,6 +4055,83 @@ public class LoanReportService {
                     new String[]{"Approved By", "____________________________", "____________"}
                 ),
                 BODY_SIZE);
+        }
+
+        private void drawYearlyGraphSection() throws IOException {
+            ensureSpace(152f);
+            write("8. YEARLY LOAN TREND GRAPH", MARGIN, y, bold, SECTION_SIZE);
+            y -= 12f;
+            float width = page.getMediaBox().getWidth() - (MARGIN * 2);
+            float height = 118f;
+            float bottom = y - height;
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.addRect(MARGIN, bottom, width, height);
+            stream.stroke();
+            float chartX = MARGIN + 30f;
+            float chartY = bottom + 28f;
+            float chartWidth = width - 52f;
+            float chartHeight = height - 54f;
+            drawLine(chartX, chartY, chartX + chartWidth, chartY);
+            drawLine(chartX, chartY, chartX, chartY + chartHeight);
+            long max = report.yearlyRows().stream()
+                .mapToLong(row -> Math.max(row.totalLoanApplications(), Math.max(row.totalPaidLoans(), row.defaultedLoans())))
+                .max()
+                .orElse(1L);
+            max = Math.max(max, 1L);
+            write("0", chartX - 12f, chartY - 2f, regular, SMALL_SIZE);
+            write(String.valueOf(max), chartX - 18f, chartY + chartHeight - 2f, regular, SMALL_SIZE);
+            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 0, "Applications", new Color(37, 99, 235));
+            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 1, "Paid", new Color(5, 150, 105));
+            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 2, "Defaulted", new Color(220, 38, 38));
+            y = bottom - 14f;
+        }
+
+        private void drawYearSeries(float chartX,
+                                    float chartY,
+                                    float chartWidth,
+                                    float chartHeight,
+                                    long max,
+                                    int valueIndex,
+                                    String label,
+                                    Color color) throws IOException {
+            List<StationYearlySummaryRow> rows = report.yearlyRows();
+            if (rows.isEmpty()) {
+                return;
+            }
+            stream.setStrokingColor(color);
+            stream.setLineWidth(1f);
+            for (int i = 1; i < rows.size(); i++) {
+                float x1 = chartX + chartWidth * (i - 1) / Math.max(rows.size() - 1, 1);
+                float y1 = chartY + chartHeight * yearValue(rows.get(i - 1), valueIndex) / max;
+                float x2 = chartX + chartWidth * i / Math.max(rows.size() - 1, 1);
+                float y2 = chartY + chartHeight * yearValue(rows.get(i), valueIndex) / max;
+                drawLine(x1, y1, x2, y2);
+            }
+            stream.setNonStrokingColor(color);
+            float legendX = chartX + 20f + (valueIndex * 108f);
+            write(label, legendX, chartY + chartHeight + 18f, regular, SMALL_SIZE);
+            stream.setNonStrokingColor(TEXT_COLOR);
+            for (int i = 0; i < rows.size(); i++) {
+                float x = chartX + chartWidth * i / Math.max(rows.size() - 1, 1);
+                if (valueIndex == 0) {
+                    write(String.valueOf(rows.get(i).year()), x - 8f, chartY - 14f, regular, SMALL_SIZE);
+                }
+            }
+            stream.setStrokingColor(BORDER_COLOR);
+        }
+
+        private long yearValue(StationYearlySummaryRow row, int index) {
+            return switch (index) {
+                case 1 -> row.totalPaidLoans();
+                case 2 -> row.defaultedLoans();
+                default -> row.totalLoanApplications();
+            };
+        }
+
+        private void drawLine(float x1, float y1, float x2, float y2) throws IOException {
+            stream.moveTo(x1, y1);
+            stream.lineTo(x2, y2);
+            stream.stroke();
         }
 
         private void drawSection(String title, String[] headers, float[] widths, List<String[]> rows, float fontSize) throws IOException {

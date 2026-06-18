@@ -76,6 +76,7 @@ public class LoanWorkflowService {
     private final WorkflowRoutingService workflowRoutingService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
     private final PaymentDetailsService paymentDetailsService;
+    private final ReversalRequestRepository reversalRequestRepository;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -441,6 +442,9 @@ public class LoanWorkflowService {
         if (app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
             throw new IllegalStateException("Only applications with all guarantors approved can be submitted to manager");
         }
+        if (hasPendingGuarantorRemovalRequest(app.getId())) {
+            throw new IllegalStateException("Approve the pending guarantor removal request before submitting this application.");
+        }
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             throw new IllegalStateException("Load SACCO financial details before submitting the application");
         }
@@ -468,6 +472,15 @@ public class LoanWorkflowService {
         if (app.getPaymentDetailsSnapshot() == null || app.getPaymentDetailsSnapshot().isBlank()) {
             app.setPaymentDetailsSnapshot(paymentDetailsService.snapshotJsonForMember(app.getApplicantMemberId()));
         }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasPendingGuarantorRemovalRequest(UUID appId) {
+        return !reversalRequestRepository.findByLoanApplicationIdAndTypeAndStatusOrderByCreatedAtDesc(
+            appId,
+            ReversalRequestType.GUARANTOR_DECISION_UNDO,
+            ReversalRequestStatus.PENDING
+        ).isEmpty();
     }
 
     private void assertApplicantCanAdvanceToManagerReview(UUID applicantId, UUID currentApplicationId) {
@@ -668,8 +681,12 @@ public class LoanWorkflowService {
         if (request.getStatus() != GuarantorRequestStatus.PENDING) {
             throw new IllegalStateException("Request already decided");
         }
+        String normalizedReason = reason == null ? "" : reason.trim();
+        if (normalizedReason.isBlank()) {
+            throw new IllegalStateException("Enter a reason before rejecting this guarantee request.");
+        }
         request.setStatus(GuarantorRequestStatus.REJECTED);
-        request.setDecisionReason(reason);
+        request.setDecisionReason(normalizedReason);
         request.setGuarantorSignatureText(null);
         request.setGuarantorSignatureVerifiedAt(null);
         request.setDecidedAt(OffsetDateTime.now());

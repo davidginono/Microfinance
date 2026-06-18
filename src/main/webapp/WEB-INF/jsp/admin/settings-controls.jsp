@@ -898,13 +898,10 @@
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Minimum votes assigned and approval threshold used for committee decisions." /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Named board reviewers assigned to this product." /></p>
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
-                            ${product.committeeReviewRequired ? product.resolvedCommitteeMinimumVotes : 0} vote(s)
-                            <span class="block text-sm font-medium text-slate-600">
-                                Approve at ${product.committeeReviewRequired ? product.resolvedCommitteeApprovalThreshold : 0}
-                            </span>
+                            ${product.committeeReviewRequired ? product.resolvedCommitteeMinimumVotes : 0} reviewer(s)
                         </p>
                     </div>
                 </div>
@@ -1317,15 +1314,26 @@
 
                             <div class="workflow-subsection">
                                 <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
-                                <div class="workflow-support-grid">
+                                <div class="grid gap-3">
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
-                                        <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-votes />
+                                        Board Reviewers Assigned
+                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
                                     </label>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Minimum Committee Approvals" />
-                                        <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-committee-threshold />
-                                    </label>
+                                    <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-board-reviewer-list>
+                                        <c:forEach items="${boardReviewerOptions}" var="reviewer">
+                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                                <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" />
+                                                <span>
+                                                    <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
+                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                                </span>
+                                            </label>
+                                        </c:forEach>
+                                        <c:if test="${empty boardReviewerOptions}">
+                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active board members are available.</div>
+                                        </c:if>
+                                    </div>
+                                    <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
                                 </div>
                             </div>
 
@@ -1769,15 +1777,28 @@
 
                         <div class="workflow-subsection">
                             <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.committeeRules" text="Board Committee" /></p>
-                            <div class="workflow-support-grid">
+                            <div class="grid gap-3">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <spring:message code="admin.settings.workflow.committeeReviewersAssigned" text="Committee Reviewers Assigned" />
-                                    <input name="committeeMinimumVotes" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeMinimumVotes}" data-number-range-max="15" data-workflow-committee-votes />
+                                    Board Reviewers Assigned
+                                    <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
                                 </label>
-                                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <spring:message code="admin.settings.workflow.committeeApprovalsNeeded" text="Minimum Committee Approvals" />
-                                    <input name="committeeApprovalThreshold" type="number" min="1" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedCommitteeApprovalThreshold}" data-number-range-max="15" data-workflow-committee-threshold />
-                                </label>
+                                <c:set var="assignedBoardReviewerTokens" value="${productBoardReviewerIdTokens[product.id]}" />
+                                <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-board-reviewer-list>
+                                    <c:forEach items="${boardReviewerOptions}" var="reviewer">
+                                        <c:set var="reviewerToken" value="|${reviewer.id}|" />
+                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                            <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" ${fn:contains(assignedBoardReviewerTokens, reviewerToken) ? 'checked' : ''} />
+                                            <span>
+                                                <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
+                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                            </span>
+                                        </label>
+                                    </c:forEach>
+                                    <c:if test="${empty boardReviewerOptions}">
+                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active board members are available.</div>
+                                    </c:if>
+                                </div>
+                                <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
                             </div>
                         </div>
 
@@ -1861,8 +1882,6 @@
 <spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
 <spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority from 1 to 4." var="warningDuplicatePriorities" />
 <spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Committee review is configured, but there are no active board members available for assignment." var="warningNoCommitteeReviewers" />
-<spring:message code="admin.settings.workflow.warning.committeeVotesTooHigh" text="Committee minimum votes are higher than the active board member count." var="warningCommitteeVotesTooHigh" />
-<spring:message code="admin.settings.workflow.warning.committeeThresholdTooHigh" text="Committee approval threshold cannot be greater than committee minimum votes." var="warningCommitteeThresholdTooHigh" />
 <spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
 <spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementOfficers" text="Disbursement Officer is required, but there are no active Disbursement Officers assigned yet." var="warningNoDisbursementOfficers" />
@@ -1906,11 +1925,6 @@
 <spring:message code="admin.settings.validation.managerLoanOfficerDifferentPriority" text="Choose different priorities for Manager and Loan Officer." var="validationManagerLoanOfficerDifferentPriority" />
 <spring:message code="admin.settings.validation.assignLoanOfficer" text="Assign at least one active Loan Officer before using this stage." var="validationAssignLoanOfficer" />
 <spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active committee reviewer before using this stage." var="validationAssignCommitteeReviewer" />
-<spring:message code="admin.settings.validation.committeeMinimumVotes" text="Committee reviewers assigned must be at least 1." var="validationCommitteeMinimumVotes" />
-<spring:message code="admin.settings.validation.committeeApprovalThreshold" text="Committee approvals needed must be at least 1." var="validationCommitteeApprovalThreshold" />
-<spring:message code="admin.settings.validation.committeeThresholdAboveVotes" text="Committee approvals needed cannot be greater than committee reviewers assigned." var="validationCommitteeThresholdAboveVotes" />
-<spring:message code="admin.settings.validation.committeeVotesAboveActive" text="Committee reviewers assigned cannot exceed the active board member count." var="validationCommitteeVotesAboveActive" />
-<spring:message code="admin.settings.validation.committeeThresholdAboveActive" text="Committee approvals needed cannot exceed the active board member count." var="validationCommitteeThresholdAboveActive" />
 <spring:message code="admin.settings.validation.committeeAccountantDifferentPriority" text="Committee and Accountant cannot share the same priority slot." var="validationCommitteeAccountantDifferentPriority" />
 <spring:message code="admin.settings.validation.assignAccountant" text="Assign at least one active Accountant before using this stage." var="validationAssignAccountant" />
 <spring:message code="admin.settings.validation.assignDisbursementOfficer" text="Assign at least one active Disbursement Officer before requiring this role." var="validationAssignDisbursementOfficer" />
@@ -1925,8 +1939,6 @@
             warningManagerLoanOfficerSamePriority: "${warningManagerLoanOfficerSamePriority}",
             warningDuplicatePriorities: "${warningDuplicatePriorities}",
             warningNoCommitteeReviewers: "${warningNoCommitteeReviewers}",
-            warningCommitteeVotesTooHigh: "${warningCommitteeVotesTooHigh}",
-            warningCommitteeThresholdTooHigh: "${warningCommitteeThresholdTooHigh}",
             warningCommitteeAccountantSamePriority: "${warningCommitteeAccountantSamePriority}",
             warningNoAccountants: "${warningNoAccountants}",
             warningNoDisbursementOfficers: "${warningNoDisbursementOfficers}",
@@ -2251,8 +2263,9 @@
 
             const committeeToggle = form.querySelector('[data-workflow-committee]');
             const loanOfficerToggle = form.querySelector('[data-workflow-loan-officer]');
-            const committeeVotes = form.querySelector('[data-workflow-committee-votes]');
-            const committeeThreshold = form.querySelector('[data-workflow-committee-threshold]');
+            const boardReviewerSearch = form.querySelector('[data-board-reviewer-search]');
+            const boardReviewerOptions = Array.from(form.querySelectorAll('[data-board-reviewer-option]'));
+            const boardReviewerInputs = Array.from(form.querySelectorAll('[name="boardReviewerIds"]'));
             const committeePriority = form.querySelector('[data-workflow-committee-priority]');
             const guarantorsInput = form.querySelector('[data-workflow-guarantors]');
             const loadedFinancialInput = form.querySelector('[data-workflow-loaded-financial]');
@@ -2290,6 +2303,21 @@
             const activeAccountants = Number(form.dataset.activeAccountants || '0');
             const activeDisbursementOfficers = Number(form.dataset.activeDisbursementOfficers || '0');
             const activeDisbursementClaimHolders = Number(form.dataset.activeDisbursementClaimHolders || '0');
+
+            function selectedBoardReviewerCount() {
+                return boardReviewerInputs.filter((input) => input.checked).length;
+            }
+
+            function filterBoardReviewers() {
+                if (!boardReviewerSearch) {
+                    return;
+                }
+                const query = boardReviewerSearch.value.trim().toLowerCase();
+                boardReviewerOptions.forEach((option) => {
+                    const text = option.dataset.boardReviewerText || '';
+                    option.classList.toggle('hidden', query !== '' && !text.includes(query));
+                });
+            }
 
             function priorityEntries(managerEnabled, loanOfficerEnabled, committeeEnabled, accountantEnabled, managerValue, loanOfficerValue, committeeValue, accountantValue) {
                 return [
@@ -2537,8 +2565,7 @@
                 const accountantEnabled = accountantToggle && accountantToggle.checked;
                 const disbursementOfficerRequired = !disbursementOfficerToggle || disbursementOfficerToggle.checked;
                 const guarantors = Math.max(0, numericValue(guarantorsInput, 0));
-                const minimumVotes = Math.max(1, numericValue(committeeVotes, 1));
-                const approvalThreshold = Math.max(1, numericValue(committeeThreshold, 1));
+                const assignedReviewers = selectedBoardReviewerCount();
                 const loadedFinancialRequired = loadedFinancialInput && loadedFinancialInput.checked;
 
                 syncProductCode();
@@ -2584,11 +2611,8 @@
                 if (committeeEnabled && activeBoardMembers <= 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningNoCommitteeReviewers));
                 }
-                if (committeeEnabled && minimumVotes > activeBoardMembers && activeBoardMembers > 0) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningCommitteeVotesTooHigh));
-                }
-                if (committeeEnabled && approvalThreshold > minimumVotes) {
-                    warnings.push(workflowWarning('danger', productSettingsText.warningCommitteeThresholdTooHigh));
+                if (committeeEnabled && assignedReviewers <= 0) {
+                    warnings.push(workflowWarning('danger', productSettingsText.validationAssignCommitteeReviewer));
                 }
                 if (accountantEnabled && activeAccountants <= 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningNoAccountants));
@@ -2641,8 +2665,6 @@
                 const minRepaymentMonths = numberOrNull(form.querySelector('[name="minRepaymentMonths"]'));
                 const maxRepaymentMonths = numberOrNull(form.querySelector('[name="maxRepaymentMonths"]'));
                 const guarantorsRequired = numberOrNull(form.querySelector('[name="guarantorsRequired"]'));
-                const committeeVotesValue = numberOrNull(committeeVotes);
-                const committeeThresholdValue = numberOrNull(committeeThreshold);
                 const managerPriorityValue = numberOrNull(managerPriority);
                 const loanOfficerPriorityValue = numberOrNull(loanOfficerPriority);
                 const committeePriorityValue = numberOrNull(committeePriority);
@@ -2742,21 +2764,8 @@
                     if (activeBoardMembers <= 0) {
                         addValidationError(errors, 'committeeReviewRequired', productSettingsText.validationAssignCommitteeReviewer);
                     }
-                    if (committeeVotesValue === null || Number.isNaN(committeeVotesValue) || committeeVotesValue < 1 || committeeVotesValue > 15) {
-                        addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeCountRange);
-                    }
-                    if (committeeThresholdValue === null || Number.isNaN(committeeThresholdValue) || committeeThresholdValue < 1 || committeeThresholdValue > 15) {
-                        addValidationError(errors, 'committeeApprovalThreshold', productSettingsText.validationCommitteeCountRange);
-                    }
-                    if (!Number.isNaN(committeeVotesValue) && !Number.isNaN(committeeThresholdValue) && committeeThresholdValue > committeeVotesValue) {
-                        addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeThresholdAboveVotes);
-                        addValidationError(errors, 'committeeApprovalThreshold', productSettingsText.validationCommitteeThresholdAboveVotes);
-                    }
-                    if (activeBoardMembers > 0 && !Number.isNaN(committeeVotesValue) && committeeVotesValue > activeBoardMembers) {
-                        addValidationError(errors, 'committeeMinimumVotes', productSettingsText.validationCommitteeVotesAboveActive);
-                    }
-                    if (activeBoardMembers > 0 && !Number.isNaN(committeeThresholdValue) && committeeThresholdValue > activeBoardMembers) {
-                        addValidationError(errors, 'committeeApprovalThreshold', productSettingsText.validationCommitteeThresholdAboveActive);
+                    if (selectedBoardReviewerCount() <= 0) {
+                        addValidationError(errors, 'boardReviewerIds', productSettingsText.validationAssignCommitteeReviewer);
                     }
                 }
 
@@ -2774,12 +2783,18 @@
                 return errors;
             }
 
-            [managerToggle, loanOfficerToggle, committeeToggle, committeeVotes, committeeThreshold, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput]
+            [managerToggle, loanOfficerToggle, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, boardReviewerSearch]
                 .filter(Boolean)
                 .forEach((field) => {
                     field.addEventListener('change', applyRules);
                     field.addEventListener('input', applyRules);
                 });
+            boardReviewerInputs.forEach((field) => {
+                field.addEventListener('change', applyRules);
+            });
+            if (boardReviewerSearch) {
+                boardReviewerSearch.addEventListener('input', filterBoardReviewers);
+            }
             [savingsMultiplierInput]
                 .filter(Boolean)
                 .forEach((field) => {

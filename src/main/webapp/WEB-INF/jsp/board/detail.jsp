@@ -18,8 +18,6 @@
     }
 </style>
 
-<c:set var="hasBoardSavedSignature" value="${not empty boardSavedSignatureText}" />
-
 <div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
     <div>
         <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
@@ -449,7 +447,7 @@
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
-                                <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalHelp" arguments="${reviewRoleLabelLower}" text="Request a one-time code to confirm this approval." /></p>
+                                <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalHelp" arguments="${reviewRoleLabelLower}" text="Request a one-time code to confirm this review decision." /></p>
                             </div>
                              <button type="button"
                                      class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
@@ -470,8 +468,8 @@
                                    data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.roleCodeLabel' arguments='${reviewRoleLabel}' text='${reviewRoleLabel} OTP code' />"
                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                    placeholder="123456"
-                                   ${reviewApprovalOtpEnabled and hasBoardSavedSignature ? 'required' : ''} />
-                            <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.codeHelp" text="Enter the 6-digit code sent to your email before confirming approval." /></p>
+                                   ${reviewApprovalOtpEnabled ? 'required' : ''} />
+                            <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.codeHelp" text="Enter the 6-digit code sent to your email before confirming your decision." /></p>
                             <div class="board-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -500,7 +498,7 @@
             </c:choose>
             <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
                 <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit action-button-disabled" disabled><spring:message code="review.approveReview" text="Approve Review" /></button>
-                <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit" formnovalidate><spring:message code="review.rejectReview" text="Reject Review" /></button>
+                <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit action-button-disabled" disabled><spring:message code="review.rejectReview" text="Reject Review" /></button>
             </div>
         </form>
     </c:when>
@@ -520,7 +518,7 @@
             verified: "<spring:message code='loan.otp.codeVerified' text='OTP code verified.' javaScriptEscape='true' />",
             enterDigits: "<spring:message code='loan.otp.enterAllDigits' text='Enter all 6 digits to verify the code.' javaScriptEscape='true' />",
             unableToSend: "<spring:message code='loan.otp.unableToSend' text='Unable to send the OTP code right now.' javaScriptEscape='true' />",
-            approvalCodeSent: "<spring:message code='loan.otp.approvalCodeSent' text='We sent an approval code to your email.' javaScriptEscape='true' />",
+            approvalCodeSent: "<spring:message code='loan.otp.approvalCodeSent' text='We sent a review decision code to your email.' javaScriptEscape='true' />",
             requestNotConfigured: "<spring:message code='loan.otp.roleRequestNotConfigured' arguments='${reviewRoleLabel}' text='OTP request is not configured.' javaScriptEscape='true' />"
         };
         const confirmMessages = {
@@ -567,7 +565,7 @@
             button.classList.toggle("is-sent", sent);
         }
 
-        function bindOtpLiveStatus(input, statusBox, proceedButton, verifyUrl) {
+        function bindOtpLiveStatus(input, statusBox, proceedButtons, verifyUrl) {
             if (!input || !statusBox) {
                 return {
                     markRequested: function () {},
@@ -590,10 +588,10 @@
             }
 
             function setProceedEnabled(enabled) {
-                if (proceedButton) {
-                    proceedButton.disabled = !enabled;
-                    proceedButton.classList.toggle("action-button-disabled", !enabled);
-                }
+                proceedButtons.forEach((button) => {
+                    button.disabled = !enabled;
+                    button.classList.toggle("action-button-disabled", !enabled);
+                });
             }
 
             function setStatus(state, message) {
@@ -713,8 +711,8 @@
                 const input = form ? form.querySelector("input[name='boardSignatureOtpCode']") : null;
                 const statusBox = form ? form.querySelector(".board-otp-live-status") : null;
                 const feedback = form ? form.querySelector(".board-otp-feedback") : null;
-                const proceedButton = form ? form.querySelector("button[name='decision'][value='APPROVED']") : null;
-                const otpUi = bindOtpLiveStatus(input, statusBox, proceedButton, button.dataset.verifyUrl);
+                const proceedButtons = form ? Array.from(form.querySelectorAll("button[name='decision']")) : [];
+                const otpUi = bindOtpLiveStatus(input, statusBox, proceedButtons, button.dataset.verifyUrl);
                 const requestUrl = button.getAttribute("data-request-url");
 
                 if (!requestUrl) {

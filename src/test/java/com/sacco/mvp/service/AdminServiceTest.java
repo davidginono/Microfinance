@@ -23,6 +23,7 @@ import com.sacco.mvp.repository.AdminIncidentRepository;
 import com.sacco.mvp.repository.AuditLogRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.repository.LoanProductBoardReviewerRepository;
 import com.sacco.mvp.repository.LoanProductsVersionRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.LoanProductVersionRepository;
@@ -71,6 +72,7 @@ class AdminServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
+    @Mock private LoanProductBoardReviewerRepository loanProductBoardReviewerRepository;
     @Mock private LoanProductVersionRepository loanProductVersionRepository;
     @Mock private LoanProductsVersionRepository loanProductsVersionRepository;
     @Mock private RegisteredSaccoRepository registeredSaccoRepository;
@@ -149,6 +151,7 @@ class AdminServiceTest {
             userSettingsRepository,
             loanApplicationRepository,
             loanProductSettingRepository,
+            loanProductBoardReviewerRepository,
             loanProductVersionRepository,
             loanProductsVersionRepository,
             saccoSettingsRepository,
@@ -1113,6 +1116,7 @@ class AdminServiceTest {
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_LOAN", productId)).thenReturn(false);
         when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
+        UUID boardReviewerId = UUID.randomUUID();
         stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
@@ -1124,7 +1128,7 @@ class AdminServiceTest {
                 .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
                 .build(),
             Member.builder()
-                .id(UUID.randomUUID())
+                .id(boardReviewerId)
                 .saccoId("SACCO-01")
                 .memberNo("BOARD-1")
                 .fullName("Committee Reviewer")
@@ -1180,9 +1184,12 @@ class AdminServiceTest {
             1,
             1,
             1,
+            List.of(boardReviewerId),
             true,
             2,
             true,
+            true,
+            false,
             false,
             BigDecimal.ZERO,
             LoanProductStatus.ACTIVE

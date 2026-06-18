@@ -209,50 +209,84 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/staff-loan-analytics.pdf")
-    @PreAuthorize("hasRole('MANAGER') and @authz.staffAnalyticsAccess(principal)")
+    @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsPdf(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                                 @RequestParam(required = false) LoanType loanType,
                                                                 @RequestParam(required = false, defaultValue = "staff") String viewAs) {
-        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
-            principal.getSaccoId(),
-            principal.getStationId(),
-            fromDate,
-            toDate,
-            loanType,
-            principal.getFullName(),
-            roleLabel(principal.getPosition())
-        );
-        byte[] pdf = loanReportService.buildStationAnalyticsPdf(report);
+        boolean stationView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(com.sacco.mvp.domain.Position.MANAGER);
+        LocalDate filenameFrom;
+        LocalDate filenameTo;
+        byte[] pdf;
+        String reportSlug;
+        if (stationView) {
+            LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+                principal.getSaccoId(),
+                principal.getStationId(),
+                fromDate,
+                toDate,
+                loanType,
+                principal.getFullName(),
+                roleLabel(principal.getPosition())
+            );
+            pdf = loanReportService.buildStationAnalyticsPdf(report);
+            filenameFrom = report.fromDate();
+            filenameTo = report.toDate();
+            reportSlug = "station-loan-analytics";
+        } else {
+            LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
+                principal, fromDate, toDate, loanType, "member");
+            pdf = loanReportService.buildStationAnalyticsPdf(report);
+            filenameFrom = report.fromDate();
+            filenameTo = report.toDate();
+            reportSlug = "staff-loan-review";
+        }
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=station-loan-analytics-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+                "attachment; filename=" + reportSlug + "-" + filenameFrom + "-to-" + filenameTo + ".pdf")
             .body(pdf);
     }
 
     @GetMapping("/documents/reports/staff-loan-analytics.xlsx")
-    @PreAuthorize("hasRole('MANAGER') and @authz.staffAnalyticsAccess(principal)")
+    @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsExcel(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                                   @RequestParam(required = false) LoanType loanType,
                                                                   @RequestParam(required = false, defaultValue = "staff") String viewAs) {
-        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
-            principal.getSaccoId(),
-            principal.getStationId(),
-            fromDate,
-            toDate,
-            loanType,
-            principal.getFullName(),
-            roleLabel(principal.getPosition())
-        );
-        byte[] workbook = loanReportService.buildStationAnalyticsExcel(report);
+        boolean stationView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(com.sacco.mvp.domain.Position.MANAGER);
+        LocalDate filenameFrom;
+        LocalDate filenameTo;
+        byte[] workbook;
+        String reportSlug;
+        if (stationView) {
+            LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+                principal.getSaccoId(),
+                principal.getStationId(),
+                fromDate,
+                toDate,
+                loanType,
+                principal.getFullName(),
+                roleLabel(principal.getPosition())
+            );
+            workbook = loanReportService.buildStationAnalyticsExcel(report);
+            filenameFrom = report.fromDate();
+            filenameTo = report.toDate();
+            reportSlug = "station-loan-analytics";
+        } else {
+            LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
+                principal, fromDate, toDate, loanType, "member");
+            workbook = loanReportService.buildStationAnalyticsExcel(report);
+            filenameFrom = report.fromDate();
+            filenameTo = report.toDate();
+            reportSlug = "staff-loan-review";
+        }
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=station-loan-analytics-" + report.fromDate() + "-to-" + report.toDate() + ".xlsx")
+                "attachment; filename=" + reportSlug + "-" + filenameFrom + "-to-" + filenameTo + ".xlsx")
             .body(workbook);
     }
 

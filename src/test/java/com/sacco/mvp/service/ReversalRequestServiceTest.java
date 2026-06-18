@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.ReversalRequest;
 import com.sacco.mvp.domain.ReversalRequestStatus;
 import com.sacco.mvp.domain.ReversalRequestType;
@@ -59,5 +60,69 @@ class ReversalRequestServiceTest {
 
         verify(loanApplicationRepository, never()).findById(org.mockito.ArgumentMatchers.any());
         verify(loanWorkflowService, never()).removeApplicationAtManagerStage(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void decideManagerStageWithdrawalRejectRequiresReason() {
+        UUID requestId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        ReversalRequest request = ReversalRequest.builder()
+            .id(requestId)
+            .saccoId("SACCO-A")
+            .loanApplicationId(loanId)
+            .type(ReversalRequestType.MANAGER_STAGE_WITHDRAWAL)
+            .status(ReversalRequestStatus.PENDING)
+            .requesterMemberId(UUID.randomUUID())
+            .approverRole(Position.MANAGER)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .build();
+
+        when(reversalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(roleDirectoryService.hasActiveRoleInSacco(managerId, "SACCO-A", Position.MANAGER)).thenReturn(true);
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> reversalRequestService.decideManagerStageWithdrawal(requestId, managerId, false, " "))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Enter a reason before declining this request.");
+
+        verify(reversalRequestRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(loanWorkflowService, never()).removeApplicationAtManagerStage(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void decideGuarantorUndoCannotBeDeclinedByApplicant() {
+        UUID requestId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        ReversalRequest request = ReversalRequest.builder()
+            .id(requestId)
+            .saccoId("SACCO-A")
+            .loanApplicationId(loanId)
+            .guarantorRequestId(UUID.randomUUID())
+            .type(ReversalRequestType.GUARANTOR_DECISION_UNDO)
+            .status(ReversalRequestStatus.PENDING)
+            .requesterMemberId(UUID.randomUUID())
+            .approverMemberId(applicantId)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .build();
+
+        when(reversalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> reversalRequestService.decideGuarantorUndo(requestId, applicantId, false))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Guarantor removal requests can only be approved by the applicant.");
+
+        verify(reversalRequestRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(loanWorkflowService, never()).removeGuarantorFromLoan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 }

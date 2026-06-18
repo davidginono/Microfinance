@@ -573,14 +573,6 @@
                                             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                             <button type="submit" class="app-btn btn-primary"><spring:message code="loan.guarantorRemoval.approve" text="Approve Removal" /></button>
                                         </form>
-                                        <form action="/app/loan-applications/${app.id}/guarantor-reversal-requests/${pendingUndo.id}/reject"
-                                              method="post"
-                                              data-confirm-title="Keep Guarantor"
-                                              data-confirm-message="Keep this guarantor on the loan and decline the removal request?"
-                                              data-confirm-proceed="Keep Guarantor">
-                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                            <button type="submit" class="app-btn btn-reject"><spring:message code="loan.guarantorRemoval.keep" text="Keep Guarantor" /></button>
-                                        </form>
                                     </div>
                                 </div>
                             </c:when>
@@ -616,13 +608,19 @@
 </div>
 
 <c:set var="showEditAction" value="${app.status eq 'DRAFT' or app.status eq 'ALL_GUARANTORS_APPROVED'}" />
+<c:set var="showDraftSendToGuarantorsAction" value="${app.status eq 'DRAFT' and app.requiredGuarantors gt 0}" />
 <c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showEditAction or showTopUpAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction or canForfeitApplication}" />
+<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or showTopUpAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction or canForfeitApplication}" />
+<c:set var="canSubmitApprovedGuarantorLoan" value="${app.status eq 'ALL_GUARANTORS_APPROVED' and not pendingGuarantorRemovalRequest}" />
 <spring:message code="loan.confirm.cancelSubmission.title" text="Cancel Application" var="cancelSubmissionTitle" />
 <spring:message code="loan.confirm.cancelSubmission.message" text="Move this application back to draft so you can keep editing it?" var="cancelSubmissionMessage" />
 <spring:message code="loan.confirm.cancelSubmission.proceed" text="Cancel Application" var="cancelSubmissionProceed" />
+<spring:message code="loan.confirm.sendToGuarantors.title" text="Send to Guarantors" var="sendToGuarantorsTitle" />
+<spring:message code="loan.confirm.sendToGuarantors.message" text="Send this draft to the selected guarantors for approval?" var="sendToGuarantorsMessage" />
+<spring:message code="loan.confirm.sendToGuarantors.proceed" text="Send to Guarantors" var="sendToGuarantorsProceed" />
+<spring:message code="loan.submit.blockedByGuarantorRemoval" text="Approve the pending guarantor removal request before submitting this application." var="submitBlockedByGuarantorRemovalMessage" />
 <spring:message code="loan.confirm.deleteApplication.title" text="Delete Application" var="deleteApplicationTitle" />
 <spring:message code="loan.confirm.deleteApplication.message" text="Delete this application completely? This will remove it from your view and from every review queue." var="deleteApplicationMessage" />
 <spring:message code="loan.confirm.deleteApplication.proceed" text="Delete Application" var="deleteApplicationProceed" />
@@ -633,6 +631,18 @@
                 <a href="/app/loan-applications/${app.id}/edit" class="app-btn btn-neutral">
                     <spring:message code="loan.actions.reEdit" text="Re-edit Application" />
                 </a>
+            </c:if>
+            <c:if test="${showDraftSendToGuarantorsAction}">
+                <form action="/app/loan-applications/${app.id}/submit"
+                      method="post"
+                      data-confirm-title="${sendToGuarantorsTitle}"
+                      data-confirm-message="${sendToGuarantorsMessage}"
+                      data-confirm-proceed="${sendToGuarantorsProceed}">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <button type="submit" class="app-btn btn-primary">
+                        <spring:message code="loan.actions.sendToGuarantors" text="Send to Guarantors" />
+                    </button>
+                </form>
             </c:if>
             <c:if test="${showTopUpAction}">
                 <a href="/app/loan-applications/new?loanType=${app.loanType}&topUpLoanId=${app.id}" class="app-btn btn-neutral">
@@ -654,9 +664,21 @@
                 </form>
             </c:if>
             <c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">
-                <button type="button" id="openApplicantSubmitOtp" class="app-btn btn-primary">
-                    <c:out value="${loanFinalSubmitLabel}" />
-                </button>
+                <c:choose>
+                    <c:when test="${pendingGuarantorRemovalRequest}">
+                        <button type="button" class="app-btn btn-primary action-button-disabled" disabled>
+                            <c:out value="${loanFinalSubmitLabel}" />
+                        </button>
+                        <p class="basis-full text-sm text-amber-700">
+                            <c:out value="${submitBlockedByGuarantorRemovalMessage}" />
+                        </p>
+                    </c:when>
+                    <c:otherwise>
+                        <button type="button" id="openApplicantSubmitOtp" class="app-btn btn-primary">
+                            <c:out value="${loanFinalSubmitLabel}" />
+                        </button>
+                    </c:otherwise>
+                </c:choose>
             </c:if>
             <c:if test="${showDeleteAction}">
                 <form action="/app/loan-applications/${app.id}/delete"
@@ -675,7 +697,7 @@
     </div>
 </c:if>
 
-<c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">
+<c:if test="${canSubmitApprovedGuarantorLoan}">
     <div id="loanSubmitOtpCard" class="erp-form-wrap mt-4 hidden space-y-4">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.verification" text="OTP Verification" /></p>

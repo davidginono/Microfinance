@@ -2,6 +2,7 @@ package com.sacco.mvp.web;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
@@ -16,6 +17,7 @@ import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -73,6 +75,7 @@ public class AccountantController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
     private final MessageSource messageSource;
+    private final EmailOtpService emailOtpService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -389,9 +392,12 @@ public class AccountantController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
                          @RequestParam(required = false) String reasons,
+                         @RequestParam(required = false) String managerDecisionOtpCode,
                          RedirectAttributes ra) {
         try {
+            UUID otpTokenId = validateAccountantDecisionOtp(principal.getMemberId(), managerDecisionOtpCode);
             managerService.decideAccountant(id, principal.getMemberId(), decision, reasons);
+            emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", decision == ManagerDecision.ACCEPT
                 ? "Accountant approved the loan for disbursement."
                 : "Accountant rejected the loan.");
@@ -399,6 +405,57 @@ public class AccountantController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/accountant/loan-applications/" + id;
+    }
+
+    @PostMapping("/loan-applications/{id}/request-decision-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestDecisionOtp(@PathVariable UUID id,
+                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
+        try {
+            LoanApplication application = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (application.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
+                throw new IllegalStateException("This application is no longer waiting for accountant review.");
+            }
+            Member accountant = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting an accountant decision OTP.");
+            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
+                accountant.getEmail(),
+                EmailOtpPurpose.BOARD_SIGNATURE,
+                accountant.getId(),
+                "Your SACCO LMS accountant decision code",
+                "Use this OTP code to confirm your accountant decision on the loan application.",
+                application.getSaccoId(),
+                application.getStationId(),
+                accountant.getPhone()
+            );
+            return ResponseEntity.ok(otpIssueResponse(otp, "We sent an accountant decision code using the station OTP delivery policy."));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/{id}/verify-decision-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyDecisionOtp(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal,
+                                                                 @RequestParam String otpCode) {
+        try {
+            if (requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId()).getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
+                throw new IllegalStateException("This application is no longer waiting for accountant review.");
+            }
+            validateAccountantDecisionOtp(principal.getMemberId(), otpCode);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "OTP code verified."
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
     }
 
     @GetMapping("/notifications")
@@ -515,6 +572,33 @@ public class AccountantController {
 
     private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(LoanApplication loan) {
         return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
+    }
+
+    private UUID validateAccountantDecisionOtp(UUID memberId, String otpCode) {
+        Member member = requireMemberWithEmail(memberId, "Add an email address to your member profile before confirming this decision.");
+        return emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
+    }
+
+    private Member requireMemberWithEmail(UUID memberId, String message) {
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
+        if (member.getEmail() == null || member.getEmail().isBlank()) {
+            throw new IllegalStateException(message);
+        }
+        return member;
+    }
+
+    private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("valid", true);
+        response.put("message", otp.messageOrDefault(fallbackMessage));
+        response.put("expiresAt", otp.expiresAt());
+        response.put("secondsUntilExpiry", otp.secondsUntilExpiry());
+        response.put("resendAvailableAt", otp.resendAvailableAt());
+        response.put("resendCount", otp.resendCount());
+        response.put("maxResends", otp.maxResends());
+        response.put("resendAttemptsRemaining", otp.resendAttemptsRemaining());
+        return response;
     }
 
     private void addReviewDisplayAttributes(Model model, LoanApplication app) {

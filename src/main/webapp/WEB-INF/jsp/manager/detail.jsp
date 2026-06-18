@@ -402,7 +402,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
-                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your manager decision." /></p>
+                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your review decision." /></p>
                 </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
@@ -461,6 +461,14 @@
                   data-confirm-message="Keep this application in the manager queue and decline the removal request?"
                   data-confirm-proceed="Decline Removal">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <label class="mb-1 block text-sm font-medium text-slate-700">
+                    Decline Reason <span class="text-rose-600">*</span>
+                    <textarea name="decisionReason"
+                              rows="2"
+                              required
+                              class="mt-1 w-full min-w-[16rem] rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 focus:border-sacco-blue focus:outline-none"
+                              placeholder="Enter why this removal request is declined."></textarea>
+                </label>
                 <button type="submit" class="app-btn btn-reject">Decline Removal</button>
             </form>
         </div>

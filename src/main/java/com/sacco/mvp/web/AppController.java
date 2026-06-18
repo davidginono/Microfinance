@@ -1100,6 +1100,7 @@ public class AppController {
             }
         }
         model.addAttribute("pendingGuarantorUndoRequests", pendingGuarantorUndoRequests);
+        model.addAttribute("pendingGuarantorRemovalRequest", !pendingGuarantorUndoRequests.isEmpty());
         model.addAttribute("pendingManagerStageWithdrawal", reversalRequestService.pendingManagerStageWithdrawal(id));
         OffsetDateTime memberReversalReferenceAt = app.getStatus() == LoanStatus.READY_FOR_MANAGER
             ? app.getUpdatedAt()
@@ -1729,9 +1730,14 @@ public class AppController {
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS') and @authz.isGuarantorAssignee(#requestId, principal)")
     public String rejectRequest(@PathVariable UUID requestId,
                                 @AuthenticationPrincipal AppUserPrincipal principal,
+                                @RequestParam(required = false) String reason,
                                 RedirectAttributes ra) {
-        loanWorkflowService.rejectGuarantorRequest(requestId, principal.getMemberId(), "Declined by guarantor");
-        ra.addFlashAttribute("message", "Guarantee request rejected");
+        try {
+            loanWorkflowService.rejectGuarantorRequest(requestId, principal.getMemberId(), reason);
+            ra.addFlashAttribute("message", "Guarantee request rejected");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
         return "redirect:/app/guarantee-requests";
     }
 
@@ -1758,21 +1764,6 @@ public class AppController {
         try {
             reversalRequestService.decideGuarantorUndo(requestId, principal.getMemberId(), true);
             ra.addFlashAttribute("message", "Guarantor removed from this application.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/app/loan-applications/" + loanId;
-    }
-
-    @PostMapping("/loan-applications/{loanId}/guarantor-reversal-requests/{requestId}/reject")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
-    public String rejectGuarantorUndoRequest(@PathVariable UUID loanId,
-                                             @PathVariable UUID requestId,
-                                             @AuthenticationPrincipal AppUserPrincipal principal,
-                                             RedirectAttributes ra) {
-        try {
-            reversalRequestService.decideGuarantorUndo(requestId, principal.getMemberId(), false);
-            ra.addFlashAttribute("message", "Guarantor removal request declined.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

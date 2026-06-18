@@ -256,6 +256,16 @@
                     <div class="app-modal-section text-sm text-slate-700">
                         <spring:message code="guaranteeRequests.rejectNotice" text="Rejecting this request will stop your approval for loan" /> ${fn:substring(req.loanApplicationId, 0, 8)}.
                     </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-700">
+                            Rejection Reason <span class="text-rose-600">*</span>
+                        </label>
+                        <textarea name="reason"
+                                  rows="3"
+                                  required
+                                  class="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none"
+                                  placeholder="Enter why you are rejecting this guarantee request."></textarea>
+                    </div>
                     <div class="flex flex-wrap justify-end gap-3">
                         <button type="button"
                                 class="app-btn btn-neutral"

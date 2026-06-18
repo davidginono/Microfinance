@@ -166,6 +166,27 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void staffAnalyticsExportsUseReviewTrendAndProductBreakdown() throws Exception {
+        LoanReportService.AnalyticsExportReport report = exportReport(LoanReportService.ReportKind.STAFF);
+
+        byte[] pdf = loanReportService.buildStationAnalyticsPdf(report);
+        byte[] workbookBytes = loanReportService.buildStationAnalyticsExcel(report);
+
+        try (PDDocument document = Loader.loadPDF(pdf);
+             XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(document.getNumberOfPages()).isEqualTo(2);
+            assertThat(text).contains("STAFF LOAN REVIEW REPORT");
+            assertThat(text).contains("REVIEW TREND OVER TIME");
+            assertThat(workbook.getSheet("Summary")).isNotNull();
+            assertThat(workbook.getSheet("Product Review Breakdown")).isNotNull();
+            assertThat(workbook.getSheet("Trends")).isNotNull();
+            assertThat(sheetContains(workbook, "Trends", "Reviewed")).isTrue();
+            assertThat(sheetContains(workbook, "Trends", "Pending")).isTrue();
+        }
+    }
+
+    @Test
     void memberActiveLoanDetailsUseFilteredTransactionInterestAndOutstandingInterest() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
@@ -323,12 +344,10 @@ class LoanReportServiceTest {
             assertThat(workbook.getSheet("Loan Status Analysis")).isNotNull();
             assertThat(workbook.getSheet("Product Performance")).isNotNull();
             assertThat(workbook.getSheet("Trends")).isNotNull();
-            assertThat(workbook.getSheet("Loan Status Analysis").getRow(3).getCell(2).getStringCellValue())
-                .isEqualTo("Number of Applicants");
-            assertThat(workbook.getSheet("Product Performance").getRow(2).getCell(9).getStringCellValue())
-                .isEqualTo("Total Interest Paid from Fully Paid Loans");
-            assertThat(workbook.getSheet("Trends").getRow(2).getCell(7).getStringCellValue())
-                .isEqualTo("Total Interest Paid from Fully Paid Loans");
+            assertThat(sheetContains(workbook, "Loan Status Analysis", "Number of Applicants")).isTrue();
+            assertThat(sheetContains(workbook, "Product Performance", "Total Interest of Fully Paid Loan")).isTrue();
+            assertThat(sheetContains(workbook, "Trends", "Total Interest of Fully Paid Loan")).isTrue();
+            assertThat(workbook.getSheet("Trends").getDrawingPatriarch()).isNotNull();
         }
     }
 
@@ -348,7 +367,9 @@ class LoanReportServiceTest {
         return new LoanReportService.AnalyticsExportReport(
             kind,
             "IAA SACCOS LTD",
-            kind == LoanReportService.ReportKind.MEMBER ? "MEMBER LOAN REPORT" : "STATION LOAN STATUS REPORT",
+            kind == LoanReportService.ReportKind.MEMBER
+                ? "MEMBER LOAN REPORT"
+                : kind == LoanReportService.ReportKind.STAFF ? "STAFF LOAN REVIEW REPORT" : "STATION LOAN STATUS REPORT",
             "AR704",
             "Arusha Central Branch",
             LocalDate.of(2025, 6, 17),
@@ -362,8 +383,25 @@ class LoanReportServiceTest {
             new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
             deltas,
             new LoanAnalyticsService.StaffPortfolioSummary(5, 4, 0, 4, 0, BigDecimal.ZERO, "Low"),
-            List.of(new LoanReportService.ProductPerformanceRow("Loan Advance", 5, 5, 4, 0, 0, 0, new BigDecimal("15000.00"))),
+            List.of(new LoanReportService.ProductPerformanceRow("Loan Advance", 5, 5, 4, 0, 0, 0, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),
             List.of(new LoanReportService.ProductFinancialBreakdownRow("Loan Advance", new BigDecimal("15000.00"), new BigDecimal("13000.00"), new BigDecimal("28000.00"), new BigDecimal("772000.00"))),
+            kind == LoanReportService.ReportKind.STAFF
+                ? new LoanAnalyticsService.StaffReviewAnalytics(
+                    5,
+                    4,
+                    0,
+                    1,
+                    4,
+                    0,
+                    List.of(new LoanAnalyticsService.StaffReviewProductPerformance("Loan Advance", 5, 4, 0, 1, new BigDecimal("80.00"))),
+                    List.of(
+                        new LoanAnalyticsService.MetricTrendSeries("Reviewed", "#111827", List.of(Map.of("x", 1748736000000L, "y", 1L), Map.of("x", 1780272000000L, "y", 5L))),
+                        new LoanAnalyticsService.MetricTrendSeries("Approved", "#65a30d", List.of(Map.of("x", 1748736000000L, "y", 1L), Map.of("x", 1780272000000L, "y", 4L))),
+                        new LoanAnalyticsService.MetricTrendSeries("Rejected", "#ef4444", List.of(Map.of("x", 1748736000000L, "y", 0L), Map.of("x", 1780272000000L, "y", 0L))),
+                        new LoanAnalyticsService.MetricTrendSeries("Pending", "#7e22ce", List.of(Map.of("x", 1748736000000L, "y", 0L), Map.of("x", 1780272000000L, "y", 1L)))
+                    )
+                )
+                : null,
             List.of(new LoanAnalyticsService.MetricTrendSeries("Applied", "#000000", List.of(
                 Map.of("x", 1748736000000L, "y", 0L),
                 Map.of("x", 1780272000000L, "y", 5L)
