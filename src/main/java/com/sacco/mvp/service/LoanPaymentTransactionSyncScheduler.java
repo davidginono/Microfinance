@@ -42,7 +42,7 @@ public class LoanPaymentTransactionSyncScheduler {
     @Value("${app.loan-payments.sync-page-size:100}")
     private int syncPageSize;
 
-    @Scheduled(cron = "${app.loan-payments.sync-cron:0 17 3 1 * *}")
+    @Scheduled(cron = "${app.loan-payments.sync-cron:0 17 3 1 * *}", zone = "${app.loan-payments.sync-zone:Africa/Nairobi}")
     public void syncPreviousMonth() {
         YearMonth target = YearMonth.now().minusMonths(1);
         SyncTotals totals = syncPaged("monthly loan payment transaction sync for " + target,
@@ -51,7 +51,7 @@ public class LoanPaymentTransactionSyncScheduler {
             target, totals.loans(), totals.inserted(), totals.failures());
     }
 
-    @Scheduled(cron = "${app.loan-payments.recent-sync-cron:0 0 6-21/3 * * *}")
+    @Scheduled(cron = "${app.loan-payments.recent-sync-cron:0 0 6-21/3 * * *}", zone = "${app.loan-payments.sync-zone:Africa/Nairobi}")
     public void syncRecentPayments() {
         if (!recentSyncRunning.compareAndSet(false, true)) {
             log.info("Skipping recent loan payment transaction sync because a previous run is still active.");

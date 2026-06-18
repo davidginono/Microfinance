@@ -45,6 +45,7 @@ public class AdminScopeInterceptor implements HandlerInterceptor {
         String redirectUrl = UriComponentsBuilder.fromPath("/admin/scope/select")
             .queryParam("next", next)
             .build()
+            .encode()
             .toUriString();
         response.sendRedirect(redirectUrl);
         return false;
