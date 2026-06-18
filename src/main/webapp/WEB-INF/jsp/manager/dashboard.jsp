@@ -232,6 +232,12 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     .manager-pie-chart.is-hovering .manager-pie-slice-group .manager-pie-subtext {
         opacity: 0.55;
     }
+    .manager-recent-disbursements-scroll {
+        max-height: 18rem;
+        overflow-y: auto;
+        padding-right: 0.35rem;
+        scrollbar-gutter: stable;
+    }
 </style>
 
 <spring:message code="manager.dashboard.breadcrumb" text="Manager Panel / Dashboard" var="dashboardDefaultBreadcrumb" />
@@ -412,7 +418,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
         </div>
     </div>
     <div class="erp-panel-body">
-        <div class="space-y-3">
+        <div class="manager-recent-disbursements-scroll space-y-3">
             <c:forEach items="${dashboardDisbursementRows}" var="loan">
                 <a href="${dashboardDetailBasePathValue}/${loan.id}" class="block rounded border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50">
                     <div class="flex items-start justify-between gap-3">

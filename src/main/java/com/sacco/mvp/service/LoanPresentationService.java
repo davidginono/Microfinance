@@ -25,6 +25,8 @@ import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
@@ -61,6 +63,7 @@ public class LoanPresentationService {
     private final ManagerReviewRepository managerReviewRepository;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
+    private final MessageSource messageSource;
 
     public Map<String, Object> parseFormFields(String json) {
         return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
@@ -246,7 +249,7 @@ public class LoanPresentationService {
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
-            items.add(progressItem(labels.get(i), i <= currentIndex, i == currentIndex));
+            items.add(progressItem(progressDisplayLabel(labels.get(i)), i <= currentIndex, i == currentIndex));
         }
         return items;
     }
@@ -675,6 +678,33 @@ public class LoanPresentationService {
             case ACCOUNTANT -> "On Review By Accountant";
             case DISBURSEMENT_OFFICER -> "Approved For Disbursement";
         };
+    }
+
+    private String progressDisplayLabel(String label) {
+        return switch (label) {
+            case "Draft" -> message("loan.status.DRAFT");
+            case "Awaiting Guarantors" -> message("loan.status.AWAITING_GUARANTORS");
+            case "All Guarantors Approved" -> message("loan.status.ALL_GUARANTORS_APPROVED");
+            case "On Review By Manager" -> message("loan.status.READY_FOR_MANAGER");
+            case "Manager Rejected" -> message("loan.status.MANAGER_REJECTED");
+            case "On Review By Loan Officer" -> message("loan.status.AWAITING_LOAN_OFFICER");
+            case "Loan Officer Rejected" -> message("loan.status.LOAN_OFFICER_REJECTED");
+            case "On Review By Board" -> message("loan.status.AWAITING_BOARD");
+            case "Board Rejected" -> message("loan.status.BOARD_REJECTED");
+            case "On Review By Accountant" -> message("loan.status.AWAITING_ACCOUNTANT");
+            case "Accountant Rejected" -> message("loan.status.ACCOUNTANT_REJECTED");
+            case "Approved For Disbursement" -> message("loan.status.READY_FOR_DISBURSEMENT");
+            case "Forfeited" -> message("loan.status.FORFEITED");
+            case "Final Rejected" -> message("loan.status.FINAL_REJECTED");
+            case "Final Approved and Disbursed" -> message("loan.status.FINAL_APPROVED");
+            case "Defaulted" -> message("loan.status.DEFAULTED");
+            case "Paid" -> message("loan.status.PAID");
+            default -> label;
+        };
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private BigDecimal toBigDecimal(Object value) {

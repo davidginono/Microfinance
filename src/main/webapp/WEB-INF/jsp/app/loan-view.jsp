@@ -96,7 +96,7 @@
         <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
     </div>
     <c:if test="${canPrint}">
-        <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary">Export</button>
+        <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
     </c:if>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
@@ -115,11 +115,11 @@
 </c:if>
 <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-        <span>Your loan is Final Approved and Disbursed.</span>
+        <span><spring:message code="loan.disbursement.memberReadyAck" text="Your loan is Final Approved and Disbursed." /></span>
         <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <input type="hidden" name="returnTo" value="detail" />
-            <button type="submit" class="app-btn btn-neutral">Acknowledge</button>
+            <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
         </form>
     </div>
 </c:if>
@@ -206,7 +206,7 @@
 <div class="mt-4 space-y-4">
     <c:if test="${not empty managerReason}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
-            <strong>Manager Reason:</strong> ${managerReason}
+            <strong><spring:message code="review.managerReason" text="Manager Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
 </div>
@@ -246,19 +246,19 @@
 <c:if test="${not empty loanDetailRepaymentPreviewRows}">
     <div class="erp-table-wrap overflow-x-auto">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="text-sm font-semibold text-slate-900">Estimated Repayment Schedule</div>
-            <div class="mt-1 text-sm text-slate-500">Monthly installments based on the loaded loan details, including interest and remaining balance.</div>
+            <div class="text-sm font-semibold text-slate-900"><spring:message code="repayment.estimatedSchedule" text="Estimated Repayment Schedule" /></div>
+            <div class="mt-1 text-sm text-slate-500"><spring:message code="repayment.loadedScheduleHelp" text="Monthly installments based on the loaded loan details, including interest and remaining balance." /></div>
         </div>
         <table class="erp-table">
             <thead>
                 <tr>
-                    <th>Pmt No.</th>
-                    <th>Month</th>
-                    <th>Beginning Balance</th>
-                    <th>Amount to Pay</th>
-                    <th>Loan Amount</th>
-                    <th>Interest</th>
-                    <th>Ending Balance</th>
+                    <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                    <th><spring:message code="repayment.month" text="Month" /></th>
+                    <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                    <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                    <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                    <th><spring:message code="repayment.interest" text="Interest" /></th>
+                    <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -693,7 +693,7 @@
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <label class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
                 <input type="checkbox" name="termsAccepted" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                <span>I accept the terms and conditions for this loan application.</span>
+                <span><spring:message code="loan.terms.accept" text="I accept the terms and conditions for this loan application." /></span>
             </label>
             <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">

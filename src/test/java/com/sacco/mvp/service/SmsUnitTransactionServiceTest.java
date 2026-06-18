@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -91,6 +92,37 @@ class SmsUnitTransactionServiceTest {
     }
 
     @Test
+    void zeroBalanceAggregatesRepeatedDepletedBlocksForTheDay() {
+        Fixture fixture = new Fixture(0);
+        SmsUsageLedger existing = SmsUsageLedger.builder()
+            .id(UUID.randomUUID())
+            .accountId(fixture.account.getId())
+            .saccoId("SACCO-1")
+            .stationId("STN001")
+            .eventType("REPAYMENT_REMINDER")
+            .unitChange(0)
+            .eventCount(2)
+            .outcome(SmsUsageOutcome.BLOCKED)
+            .note("SMS units depleted")
+            .createdAt(OffsetDateTime.now())
+            .lastOccurredAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        when(fixture.ledgerRepository.findFirstByAccountIdAndEventTypeAndOutcomeAndNoteAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+            eq(fixture.account.getId()),
+            eq("REPAYMENT_REMINDER"),
+            eq(SmsUsageOutcome.BLOCKED),
+            eq("SMS units depleted"),
+            any()
+        )).thenReturn(Optional.of(existing));
+
+        fixture.service.reserve("SACCO-1", "STN001", UUID.randomUUID(), "REPAYMENT_REMINDER");
+
+        assertEquals(3, existing.getEventCount());
+        verify(fixture.ledgerRepository).save(existing);
+    }
+
+    @Test
     void allocationReplenishesThreeAlertUnitsBeforeUsableBalance() {
         Fixture fixture = new Fixture(0);
 
@@ -118,6 +150,21 @@ class SmsUnitTransactionServiceTest {
         assertEquals(SmsUsageOutcome.RESTORED, ledger.getOutcome());
     }
 
+    @Test
+    void acceptedDepletedAlertIncrementsMinorAdminSmsCounter() {
+        Fixture fixture = new Fixture(0);
+        UUID ledgerId = UUID.randomUUID();
+        SmsUsageLedger ledger = fixture.ledger(ledgerId);
+        ledger.setEventType("SMS_USAGE_DEPLETED_ALERT");
+        when(fixture.accountRepository.findByIdForUpdate(fixture.account.getId())).thenReturn(Optional.of(fixture.account));
+        when(fixture.ledgerRepository.findByIdAndAccountId(ledgerId, fixture.account.getId())).thenReturn(Optional.of(ledger));
+
+        fixture.service.completeAlert(fixture.account.getId(), ledgerId, SmsSendResult.sent("provider-id"));
+
+        assertEquals(1, fixture.account.getDepletedAlertSmsSentCount());
+        assertEquals(SmsUsageOutcome.ACCEPTED, ledger.getOutcome());
+    }
+
     private static class Fixture {
         final StationSmsAccountRepository accountRepository = mock(StationSmsAccountRepository.class);
         final SmsUsageLedgerRepository ledgerRepository = mock(SmsUsageLedgerRepository.class);
@@ -141,6 +188,9 @@ class SmsUnitTransactionServiceTest {
             when(stationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-1", "STN001"))
                 .thenReturn(Optional.of(SaccoStation.builder().saccoId("SACCO-1").stationId("STN001").active(true).build()));
             when(accountRepository.findForUpdate("SACCO-1", "STN001")).thenReturn(Optional.of(account));
+            when(ledgerRepository.findFirstByAccountIdAndEventTypeAndOutcomeAndNoteAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                any(), any(), any(), any(), any()
+            )).thenReturn(Optional.empty());
             when(settingsRepository.findById(PlatformSmsSettings.DEFAULT_ID)).thenReturn(Optional.of(PlatformSmsSettings.builder()
                 .id(PlatformSmsSettings.DEFAULT_ID)
                 .lowPercent(20)

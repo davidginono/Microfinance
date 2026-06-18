@@ -1,27 +1,28 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / Support / Replies</p>
-    <h1 class="erp-page-title">Support Replies</h1>
-    <p class="erp-page-subtitle">Read replies and broadcasts from your station admin.</p>
+    <p class="erp-breadcrumb"><spring:message code="support.replies.breadcrumb" text="Member Workspace / Support / Replies" /></p>
+    <h1 class="erp-page-title"><spring:message code="support.replies.title" text="Support Replies" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="support.replies.subtitle" text="Read replies and broadcasts from your station admin." /></p>
 </div>
 
 <section class="erp-panel">
     <div class="erp-panel-header flex flex-wrap items-center justify-between gap-3">
-        <p class="erp-panel-title">Replies From Station Admin</p>
+        <p class="erp-panel-title"><spring:message code="support.replies.fromStationAdmin" text="Replies From Station Admin" /></p>
         <form action="/app/support/replies/mark-all-read" method="post">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <button type="submit" class="app-btn btn-neutral">Mark All Read</button>
+            <button type="submit" class="app-btn btn-neutral"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
         </form>
     </div>
     <div class="erp-panel-body">
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table">
                 <thead>
-                <tr><th>Subject</th><th>Message</th><th>Source</th><th>Date</th></tr>
+                <tr><th><spring:message code="common.subject" text="Subject" /></th><th><spring:message code="common.message" text="Message" /></th><th><spring:message code="notifications.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${replies}" var="item">
@@ -30,7 +31,7 @@
                             <a href="/app/support/replies/${item.id}/open" class="hover:text-sacco-blue">
                                 ${item.subject}
                                 <c:if test="${item.unread}">
-                                    <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white">Unread</span>
+                                    <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white"><spring:message code="notifications.unread" text="Unread" /></span>
                                 </c:if>
                             </a>
                         </td>
@@ -40,7 +41,7 @@
                     </tr>
                 </c:forEach>
                 <c:if test="${empty replies}">
-                    <tr><td colspan="4" class="px-3 py-3 text-slate-500">No replies yet.</td></tr>
+                    <tr><td colspan="4" class="px-3 py-3 text-slate-500"><spring:message code="support.replies.empty" text="No replies yet." /></td></tr>
                 </c:if>
                 </tbody>
             </table>
@@ -49,12 +50,12 @@
 </section>
 
 <section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title">Station Admin Broadcasts</p></div>
+    <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="support.broadcasts.title" text="Station Admin Broadcasts" /></p></div>
     <div class="erp-panel-body">
         <div class="erp-table-wrap overflow-x-auto">
             <table class="erp-table">
                 <thead>
-                <tr><th>Subject</th><th>Message</th><th>Source</th><th>Date</th></tr>
+                <tr><th><spring:message code="common.subject" text="Subject" /></th><th><spring:message code="common.message" text="Message" /></th><th><spring:message code="notifications.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${broadcasts}" var="item">
@@ -63,7 +64,7 @@
                             <a href="/app/support/replies/${item.id}/open" class="hover:text-sacco-blue">
                                 ${item.subject}
                                 <c:if test="${item.unread}">
-                                    <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white">Unread</span>
+                                    <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white"><spring:message code="notifications.unread" text="Unread" /></span>
                                 </c:if>
                             </a>
                         </td>
@@ -73,7 +74,7 @@
                     </tr>
                 </c:forEach>
                 <c:if test="${empty broadcasts}">
-                    <tr><td colspan="4" class="px-3 py-3 text-slate-500">No broadcasts yet.</td></tr>
+                    <tr><td colspan="4" class="px-3 py-3 text-slate-500"><spring:message code="support.broadcasts.empty" text="No broadcasts yet." /></td></tr>
                 </c:if>
                 </tbody>
             </table>

@@ -85,12 +85,12 @@
                     <div class="erp-dropdown-header">
                         <div class="erp-dropdown-heading">
                             <p class="erp-dropdown-title"><spring:message code="notifications.title" text="Notifications" /></p>
-                            <p id="notificationPanelSubtitle" class="erp-dropdown-subtitle">Loading latest notifications...</p>
+                            <p id="notificationPanelSubtitle" class="erp-dropdown-subtitle"><spring:message code="notifications.loadingLatest" text="Loading latest notifications..." /></p>
                         </div>
                         <a id="notificationViewAll" href="#" class="erp-dropdown-link"><spring:message code="common.viewAll" text="View all" /></a>
                     </div>
                     <div id="notificationPanelBody" class="erp-notification-body space-y-2">
-                        <div class="erp-notification-empty">Loading...</div>
+                        <div class="erp-notification-empty"><spring:message code="common.loading" text="Loading..." /></div>
                     </div>
                 </div>
             </div>

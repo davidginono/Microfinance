@@ -1,3 +1,4 @@
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="./modal-shell.jspf" %>
 <style>
     .app-confirm-modal {
@@ -9,10 +10,10 @@
     <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
         <div class="app-modal-header">
             <div>
-                <p id="appConfirmEyebrow" class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Please Confirm</p>
-                <h2 id="appConfirmTitle" class="mt-2 text-2xl font-semibold text-sacco-ink">Confirm Action</h2>
+                <p id="appConfirmEyebrow" class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500"><spring:message code="confirm.eyebrow" text="Please Confirm" /></p>
+                <h2 id="appConfirmTitle" class="mt-2 text-2xl font-semibold text-sacco-ink"><spring:message code="confirm.title" text="Confirm Action" /></h2>
             </div>
-            <button type="button" id="appConfirmClose" class="app-modal-close" aria-label="Close confirmation">
+            <button type="button" id="appConfirmClose" class="app-modal-close" aria-label="<spring:message code='confirm.close' text='Close confirmation' />">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                 </svg>
@@ -23,8 +24,8 @@
         </div>
         <div class="app-modal-body pt-0">
         <div class="app-modal-actions">
-            <button type="button" id="appConfirmCancel" class="app-btn btn-neutral">Cancel</button>
-            <button type="button" id="appConfirmProceed" class="app-btn btn-primary">Continue</button>
+            <button type="button" id="appConfirmCancel" class="app-btn btn-neutral"><spring:message code="common.cancel" text="Cancel" /></button>
+            <button type="button" id="appConfirmProceed" class="app-btn btn-primary"><spring:message code="common.continue" text="Continue" /></button>
         </div>
         </div>
     </div>
@@ -66,10 +67,10 @@
             function openModal(form, submitter) {
                 pendingForm = form;
                 pendingSubmitter = submitter || null;
-                title.textContent = form.dataset.confirmTitle || "Confirm Action";
-                eyebrow.textContent = form.dataset.confirmEyebrow || "Please Confirm";
-                message.textContent = form.dataset.confirmMessage || "Do you want to continue?";
-                proceed.textContent = form.dataset.confirmProceed || "Continue";
+                title.textContent = form.dataset.confirmTitle || "<spring:message code='confirm.title' text='Confirm Action' />";
+                eyebrow.textContent = form.dataset.confirmEyebrow || "<spring:message code='confirm.eyebrow' text='Please Confirm' />";
+                message.textContent = form.dataset.confirmMessage || "<spring:message code='confirm.message' text='Do you want to continue?' />";
+                proceed.textContent = form.dataset.confirmProceed || "<spring:message code='common.continue' text='Continue' />";
                 modal.classList.add("is-open");
                 modal.setAttribute("aria-hidden", "false");
                 body.classList.add("overflow-hidden");

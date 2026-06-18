@@ -180,34 +180,31 @@ public class LoanDocumentController {
 
     @GetMapping("/documents/reports/member-loans.pdf")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
-    public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal) {
-        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
-        byte[] pdf = loanReportService.buildMemberPdf(report);
+    public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                           @RequestParam(required = false) LoanType loanType) {
+        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType);
+        byte[] pdf = loanReportService.buildMemberAnalyticsPdf(report);
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=member-loan-report-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
             .body(pdf);
-    }
-
-    @GetMapping("/documents/reports/member-loans.csv")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
-    public ResponseEntity<byte[]> downloadMemberLoanReportCsv(@AuthenticationPrincipal AppUserPrincipal principal) {
-        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
-        byte[] csv = loanReportService.buildMemberCsv(report);
-        return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType("text/csv"))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.csv")
-            .body(csv);
     }
 
     @GetMapping("/documents/reports/member-loans.xlsx")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
-    public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal) {
-        LoanReportService.MemberLoanReport report = loanReportService.memberReport(principal.getMemberId());
-        byte[] workbook = loanReportService.buildMemberExcel(report);
+    public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                @RequestParam(required = false) LoanType loanType) {
+        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType);
+        byte[] workbook = loanReportService.buildMemberAnalyticsExcel(report);
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=member-loan-report.xlsx")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=member-loan-report-" + report.fromDate() + "-to-" + report.toDate() + ".xlsx")
             .body(workbook);
     }
 

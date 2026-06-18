@@ -23,6 +23,8 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -70,6 +72,7 @@ public class AccountantController {
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
+    private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -190,8 +193,8 @@ public class AccountantController {
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
-        model.addAttribute("archivePrimaryColumnLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
-        model.addAttribute("archiveSearchLabel", loanIdSearch ? "Loan ID" : "Loan Application ID");
+        model.addAttribute("archivePrimaryColumnLabel", loanIdSearch ? message("loan.loanId") : message("loan.applicationId"));
+        model.addAttribute("archiveSearchLabel", loanIdSearch ? message("loan.loanId") : message("loan.applicationId"));
         model.addAttribute("archiveSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
         model.addAttribute("archiveLoanIdMode", loanIdSearch);
         model.addAttribute("archivePage", archivePage);
@@ -234,8 +237,8 @@ public class AccountantController {
                 row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT
-                    ? "Ready for Disbursement"
-                    : "Rejected");
+                    ? message("loan.status.READY_FOR_DISBURSEMENT")
+                    : message("review.rejected"));
                 row.put("reviewedAt", entry.review().getCreatedAt() == null
                     ? "-"
                     : entry.review().getCreatedAt().toLocalDate().toString());
@@ -319,18 +322,18 @@ public class AccountantController {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("reviewBasePath", "/accountant");
-        model.addAttribute("reviewPanelBreadcrumb", "Accountant Panel / Review Detail");
-        model.addAttribute("reviewPanelTitle", "Accountant Review");
-        model.addAttribute("reviewPanelSubtitle", "Review the approved loan package before releasing it to the disbursement queue.");
-        model.addAttribute("reviewCommentLabel", "Accountant Notes");
-        model.addAttribute("reviewCommentPlaceholder", "Record the approval note or rejection reason");
-        model.addAttribute("approveActionLabel", "Approve for Disbursement");
-        model.addAttribute("rejectActionLabel", "Reject Loan");
+        model.addAttribute("reviewPanelBreadcrumb", message("review.accountant.breadcrumb"));
+        model.addAttribute("reviewPanelTitle", message("review.accountant.title"));
+        model.addAttribute("reviewPanelSubtitle", message("review.accountant.subtitle"));
+        model.addAttribute("reviewCommentLabel", message("review.accountant.notes"));
+        model.addAttribute("reviewCommentPlaceholder", message("review.accountant.commentPlaceholder"));
+        model.addAttribute("approveActionLabel", message("review.accountant.approveForDisbursement"));
+        model.addAttribute("rejectActionLabel", message("review.manager.rejectLoan"));
         model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.AWAITING_ACCOUNTANT);
         model.addAttribute("showManagerReversalRequests", false);
         model.addAttribute("showDisbursementForm", false);
-        model.addAttribute("disbursementNotesLabel", "Disbursement Notes");
-        model.addAttribute("disbursementActionLabel", "Disburse Loan");
+        model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
+        model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("showUndoForm", false);
         model.addAttribute("allowPaymentSync", false);
         addReviewDisplayAttributes(model, app);
@@ -584,6 +587,10 @@ public class AccountantController {
         }
         Long applicationNumber = app.getApplicationNumber();
         return applicationNumber != null && String.valueOf(applicationNumber).contains(searchId);
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private record QueueFilter(String key, String label, List<LoanStatus> statuses) {}

@@ -84,7 +84,7 @@ class StaffAnalyticsControllerSecurityTest {
         when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO));
         when(loanAnalyticsService.statusTrendForStation(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
-        when(loanAnalyticsService.productPerformanceForStation(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(loanAnalyticsService.productPerformanceForStation(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.productChartSeries(any())).thenReturn(List.of());
         when(loanAnalyticsService.metricDeltas(any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any()))

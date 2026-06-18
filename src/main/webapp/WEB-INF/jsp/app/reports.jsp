@@ -224,6 +224,34 @@
         font-size: 0.78rem;
         line-height: 1.35;
     }
+    .loan-active-detail-table {
+        width: 100%;
+        min-width: 1040px;
+        border-collapse: collapse;
+    }
+    .loan-active-detail-table th,
+    .loan-active-detail-table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        vertical-align: top;
+    }
+    .loan-active-detail-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .loan-active-detail-table td {
+        color: #334155;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    .loan-active-detail-table td:first-child {
+        color: #0f172a;
+    }
     .loan-chart-box {
         position: relative;
         height: 370px;
@@ -314,7 +342,7 @@
         </div>
         <div class="loan-analytics-actions md:justify-end">
             <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral"><spring:message code="reports.exportPdf" text="Export PDF" /></a>
-            <a href="/documents/reports/member-loans.csv?${currentQuery}" class="app-btn btn-neutral"><spring:message code="reports.exportCsv" text="Export CSV" /></a>
+            <a href="/documents/reports/member-loans.xlsx?${currentQuery}" class="app-btn btn-neutral"><spring:message code="reports.exportExcel" text="Export Excel" /></a>
             <a href="/app/reports" class="app-btn btn-neutral"><spring:message code="common.refresh" text="Refresh" /></a>
         </div>
     </div>
@@ -440,6 +468,52 @@
     <div class="loan-risk-note">
         <p class="erp-widget-title"><spring:message code="reports.eligibilityReason" text="Eligibility Reason" /></p>
         <p class="mt-1">${riskNote}</p>
+    </div>
+</section>
+
+<section class="erp-panel overflow-hidden">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <p class="erp-widget-title"><spring:message code="reports.activeLoanDetails" text="Active Loan Details" /></p>
+        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="reports.activeLoanDetailsSummary" text="Active Loans and Interest Summary" /></h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="loan-active-detail-table">
+            <thead>
+                <tr>
+                    <th><spring:message code="reports.loanId" text="Loan ID" /></th>
+                    <th><spring:message code="reports.loanProductName" text="Loan Product" /></th>
+                    <th><spring:message code="reports.loanAmount" text="Loan Amount" /></th>
+                    <th><spring:message code="reports.outstandingBalance" text="Outstanding Balance" /></th>
+                    <th><spring:message code="reports.requiredInterestAmount" text="Required Interest Amount" /></th>
+                    <th><spring:message code="reports.paidLoanAmount" text="Paid Loan Amount" /></th>
+                    <th><spring:message code="reports.interestPaid" text="Interest Paid" /></th>
+                    <th><spring:message code="reports.interestNotYetPaid" text="Interest Not Yet Paid" /></th>
+                </tr>
+            </thead>
+            <tbody>
+                <c:choose>
+                    <c:when test="${not empty activeLoanDetails}">
+                        <c:forEach items="${activeLoanDetails}" var="loan">
+                            <tr>
+                                <td>${loan.loanId}</td>
+                                <td>${loan.loanProduct}</td>
+                                <td>${loan.loanAmount}</td>
+                                <td>${loan.outstandingBalance}</td>
+                                <td>${loan.requiredInterestAmount}</td>
+                                <td>${loan.paidLoanAmount}</td>
+                                <td>${loan.interestPaid}</td>
+                                <td>${loan.interestNotYetPaid}</td>
+                            </tr>
+                        </c:forEach>
+                    </c:when>
+                    <c:otherwise>
+                        <tr>
+                            <td colspan="8" class="font-medium text-slate-500"><spring:message code="reports.activeLoanDetailsEmpty" text="No active loans matched the selected period." /></td>
+                        </tr>
+                    </c:otherwise>
+                </c:choose>
+            </tbody>
+        </table>
     </div>
 </section>
 

@@ -131,7 +131,7 @@
                     <c:param name="searchId" value="${queueSearchValue}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
-                <a class="app-btn btn-neutral" href="${archivePreviousUrl}">Previous</a>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
             </c:if>
             <c:if test="${not archivePage.last}">
                 <c:url var="archiveNextUrl" value="/manager/archive">
@@ -139,7 +139,7 @@
                     <c:param name="searchId" value="${queueSearchValue}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
-                <a class="app-btn btn-primary" href="${archiveNextUrl}">Next</a>
+                <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
             </c:if>
         </div>
     </div>

@@ -133,21 +133,21 @@
             <div id="productsRepaymentScheduleCard" class="hidden app-modal-section">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                        <p class="font-semibold text-slate-800">Estimated Repayment Schedule</p>
-                        <p class="mt-1 text-sm text-slate-500">Estimated monthly installments with loan amount, interest, and balance after each payment.</p>
+                        <p class="font-semibold text-slate-800"><spring:message code="repayment.estimatedSchedule" text="Estimated Repayment Schedule" /></p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-slate-200">
                     <table class="erp-table">
                         <thead>
                         <tr>
-                            <th>Pmt No.</th>
-                            <th>Month</th>
-                            <th>Beginning Balance</th>
-                            <th>Amount to Pay</th>
-                            <th>Loan Amount</th>
-                            <th>Interest</th>
-                            <th>Ending Balance</th>
+                            <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                            <th><spring:message code="repayment.month" text="Month" /></th>
+                            <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                            <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                            <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                            <th><spring:message code="repayment.interest" text="Interest" /></th>
+                            <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
                         </tr>
                         </thead>
                         <tbody id="productsRepaymentScheduleBody"></tbody>
@@ -197,7 +197,7 @@
                 <th><spring:message code="products.table.amountRules" /></th>
                 <th><spring:message code="products.table.guarantors" /></th>
                 <th><spring:message code="products.table.annualInterest" /></th>
-                <th>Repayment Method</th>
+                <th><spring:message code="products.table.repaymentMethod" text="Repayment Method" /></th>
                 <th><spring:message code="products.table.tenure" /></th>
                 <th><spring:message code="products.table.action" /></th>
             </tr>
@@ -232,11 +232,11 @@
                 </td>
                 <td>
                     <c:choose>
-                        <c:when test="${p.interestMethod eq 'REDUCING_BALANCE'}">Reducing Balance</c:when>
-                        <c:otherwise>Flat Rate</c:otherwise>
+                        <c:when test="${p.interestMethod eq 'REDUCING_BALANCE'}"><spring:message code="interestMethod.REDUCING_BALANCE" text="Reducing Balance" /></c:when>
+                        <c:otherwise><spring:message code="interestMethod.FLAT_RATE" text="Flat Rate" /></c:otherwise>
                     </c:choose>
                 </td>
-                <td>${p.minimumRepaymentMonths} - ${p.maxRepaymentMonths} month(s)</td>
+                <td>${p.minimumRepaymentMonths} - ${p.maxRepaymentMonths} <spring:message code="common.months" text="month(s)" /></td>
                 <td>
                     <c:choose>
                         <c:when test="${not empty applicationLockApp}">
@@ -247,7 +247,7 @@
                         <c:when test="${applicantPolicyEligible eq false}">
                             <div class="space-y-2">
                                 <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
-                                    Not Eligible
+                                    <spring:message code="products.js.notEligibleStatus" text="Not eligible" />
                                 </button>
                                 <p class="max-w-xs text-xs leading-5 text-rose-600">${applicantPolicyReason}</p>
                             </div>

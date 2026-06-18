@@ -100,7 +100,7 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">
-                    <a href="/accountant/loan-applications/${app.id}" class="app-btn btn-primary">Open</a>
+                    <a href="/accountant/loan-applications/${app.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a>
                 </td>
             </tr>
         </c:forEach>

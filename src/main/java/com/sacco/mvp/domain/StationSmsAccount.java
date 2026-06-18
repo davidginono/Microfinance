@@ -64,6 +64,9 @@ public class StationSmsAccount {
     @Column(name = "depleted_alert_sent", nullable = false)
     private boolean depletedAlertSent;
 
+    @Column(name = "depleted_alert_sms_sent_count", nullable = false)
+    private long depletedAlertSmsSentCount;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

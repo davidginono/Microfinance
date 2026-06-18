@@ -1,29 +1,30 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb">Member Workspace / Notifications</p>
-    <h1 class="erp-page-title">Notifications</h1>
-    <p class="erp-page-subtitle">Read workflow updates, approval alerts, and repayment reminders in one place.</p>
+    <p class="erp-breadcrumb"><spring:message code="notifications.member.breadcrumb" text="Member Workspace / Notifications" /></p>
+    <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="notifications.member.subtitle" text="Read workflow updates, approval alerts, and repayment reminders in one place." /></p>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="/app/notifications/mark-all-read" method="post" class="m-0">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <button type="submit" class="app-btn btn-primary">Mark all as read</button>
+        <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
     </form>
 </div>
 <div class="erp-table-wrap overflow-x-auto">
     <table class="erp-table">
         <thead>
         <tr>
-            <th class="px-3 py-2 text-left">Subject</th>
-            <th class="px-3 py-2 text-left">Message</th>
-            <th class="px-3 py-2 text-left">Source</th>
-            <th class="px-3 py-2 text-left">Type</th>
-            <th class="min-w-[11rem] whitespace-nowrap px-3 py-2 text-left">Date</th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.subject" text="Subject" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="common.message" text="Message" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="notifications.source" text="Source" /></th>
+            <th class="px-3 py-2 text-left"><spring:message code="notifications.type" text="Type" /></th>
+            <th class="min-w-[11rem] whitespace-nowrap px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
         </tr>
         </thead>
         <tbody>
@@ -32,7 +33,7 @@
                 <td class="px-3 py-3 align-top font-semibold text-slate-800">
                     <a href="/app/notifications/${n.id}/open" class="flex items-start gap-3 hover:text-sacco-blue">
                         <c:if test="${n.unread}">
-                            <span class="inline-flex w-16 shrink-0 justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white">Unread</span>
+                            <span class="inline-flex w-16 shrink-0 justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white"><spring:message code="notifications.unread" text="Unread" /></span>
                         </c:if>
                         <c:if test="${not n.unread}">
                             <span class="w-16 shrink-0" aria-hidden="true"></span>
@@ -56,7 +57,7 @@
             </tr>
         </c:forEach>
         <c:if test="${empty notifications}">
-            <tr><td colspan="5" class="px-3 py-3 text-slate-500">No notifications yet.</td></tr>
+            <tr><td colspan="5" class="px-3 py-3 text-slate-500"><spring:message code="notifications.empty" text="No notifications yet." /></td></tr>
         </c:if>
         </tbody>
     </table>
