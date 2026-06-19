@@ -56,6 +56,9 @@
     </div>
 </section>
 
+<c:set var="usageShowSaccoColumn" value="true" />
+<%@ include file="../fragments/admin-usage-analytics.jspf" %>
+
 <section class="space-y-4">
     <div class="erp-panel">
         <div class="erp-panel-header">

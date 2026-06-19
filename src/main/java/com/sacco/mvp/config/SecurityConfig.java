@@ -6,10 +6,12 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserDetailsService;
+import com.sacco.mvp.security.AppUsageTrackingFilter;
 import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
+import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.UserClaimService;
 import jakarta.servlet.DispatcherType;
@@ -61,7 +63,8 @@ public class SecurityConfig {
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
                                                    StaffMfaService staffMfaService,
-                                                   UserClaimService userClaimService) throws Exception {
+                                                   UserClaimService userClaimService,
+                                                   AppUsageAnalyticsService appUsageAnalyticsService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
@@ -190,7 +193,8 @@ public class SecurityConfig {
             .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
             .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
             .csrf(Customizer.withDefaults())
-            .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class);
+            .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
+            .addFilterAfter(new AppUsageTrackingFilter(appUsageAnalyticsService), AuthorizationFilter.class);
 
         if (isGoogleSsoConfigured()) {
             http.oauth2Login(oauth -> oauth

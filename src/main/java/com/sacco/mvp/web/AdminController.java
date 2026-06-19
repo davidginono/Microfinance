@@ -14,6 +14,7 @@ import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
+import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PlatformAdminService;
@@ -57,6 +58,7 @@ public class AdminController {
     private final SaccoRegistryService saccoRegistryService;
     private final PlatformAdminService platformAdminService;
     private final DatabaseUtilizationService databaseUtilizationService;
+    private final AppUsageAnalyticsService appUsageAnalyticsService;
     private final NotificationInboxService notificationInboxService;
     private final SmsUsageManagementService smsUsageManagementService;
     private final StationOtpSettingsService stationOtpSettingsService;
@@ -191,6 +193,18 @@ public class AdminController {
     @ResponseBody
     public DatabaseUtilizationService.DatabaseUtilizationPayload databaseUtilization(@AuthenticationPrincipal AppUserPrincipal principal) {
         return databaseUtilizationService.snapshot();
+    }
+
+    @GetMapping(value = "/dashboard/usage-activity", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public AppUsageAnalyticsService.UsageDashboardPayload usageActivity(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                        @RequestParam(defaultValue = "today") String range) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        return appUsageAnalyticsService.dashboard(
+            range,
+            superAdmin ? null : adminScopeService.currentSaccoId(principal),
+            superAdmin ? null : adminScopeService.currentStationId(principal)
+        );
     }
 
     @GetMapping("/messages")
