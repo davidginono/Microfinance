@@ -588,15 +588,36 @@ button:active {
 .erp-table-scroll {
     --erp-table-height: clamp(18rem, 48vh, 34rem);
     max-width: 100%;
-    max-height: var(--erp-table-height);
-    overflow: auto;
+    height: var(--erp-table-height);
+    max-height: calc(100vh - 10rem);
+    overflow-x: scroll;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
     scrollbar-gutter: stable both-edges;
+    scrollbar-color: #94a3b8 #f1f5f9;
+    scrollbar-width: thin;
 }
 .erp-table-scroll-sm {
     --erp-table-height: clamp(14rem, 34vh, 24rem);
 }
 .erp-table-scroll-lg {
     --erp-table-height: clamp(22rem, 58vh, 42rem);
+}
+.erp-table-scroll::-webkit-scrollbar {
+    width: 0.7rem;
+    height: 0.7rem;
+}
+.erp-table-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 999px;
+}
+.erp-table-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border: 2px solid #f1f5f9;
+    border-radius: 999px;
+}
+.erp-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
 }
 .erp-table-scroll .erp-table,
 .erp-table-scroll table {
