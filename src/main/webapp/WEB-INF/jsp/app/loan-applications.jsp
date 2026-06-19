@@ -39,7 +39,7 @@
                 </th>
                 <th class="px-3 py-2 text-left"><spring:message code="common.reason" text="Reason" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th class="px-3 py-2 text-left"></th>
+                <th class="px-3 py-2 text-left"><spring:message code="common.actions" text="Actions" /></th>
             </tr>
         </thead>
         <tbody>
