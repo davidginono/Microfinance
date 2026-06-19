@@ -4434,6 +4434,8 @@ public class LoanReportService {
         private static final float CELL_PADDING_Y = 3.2f;
         private static final Color TEXT_COLOR = new Color(17, 24, 39);
         private static final Color BORDER_COLOR = new Color(32, 32, 32);
+        private static final Color GRID_COLOR = new Color(210, 216, 224);
+        private static final Color MUTED_COLOR = new Color(85, 99, 116);
 
         private final PDDocument document;
         private final StationAnalyticsExportReport report;
@@ -4600,32 +4602,68 @@ public class LoanReportService {
         }
 
         private void drawYearlyGraphSection() throws IOException {
-            ensureSpace(152f);
+            ensureSpace(166f);
             write("8. YEARLY LOAN TREND GRAPH", MARGIN, y, bold, SECTION_SIZE);
             y -= 12f;
             float width = page.getMediaBox().getWidth() - (MARGIN * 2);
-            float height = 118f;
+            float height = 132f;
             float bottom = y - height;
             stream.setStrokingColor(BORDER_COLOR);
             stream.addRect(MARGIN, bottom, width, height);
             stream.stroke();
-            float chartX = MARGIN + 30f;
-            float chartY = bottom + 28f;
-            float chartWidth = width - 52f;
-            float chartHeight = height - 54f;
-            drawLine(chartX, chartY, chartX + chartWidth, chartY);
-            drawLine(chartX, chartY, chartX, chartY + chartHeight);
-            long max = report.yearlyRows().stream()
+            float chartX = MARGIN + 38f;
+            float chartY = bottom + 34f;
+            float chartWidth = width - 68f;
+            float chartHeight = height - 66f;
+            List<StationYearlySummaryRow> rows = report.yearlyRows();
+            long rawMax = rows.stream()
                 .mapToLong(row -> Math.max(row.totalLoanApplications(), Math.max(row.totalPaidLoans(), row.defaultedLoans())))
                 .max()
                 .orElse(1L);
-            max = Math.max(max, 1L);
-            write("0", chartX - 12f, chartY - 2f, regular, SMALL_SIZE);
-            write(String.valueOf(max), chartX - 18f, chartY + chartHeight - 2f, regular, SMALL_SIZE);
-            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 0, "Applications", new Color(37, 99, 235));
-            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 1, "Paid", new Color(5, 150, 105));
-            drawYearSeries(chartX, chartY, chartWidth, chartHeight, max, 2, "Defaulted", new Color(220, 38, 38));
+            long axisMax = niceAxisMax(rawMax);
+            drawYearAxis(chartX, chartY, chartWidth, chartHeight, axisMax, rows);
+            if (rawMax == 0L) {
+                stream.setNonStrokingColor(MUTED_COLOR);
+                writeCenteredAt("No loan activity recorded for the selected years.", chartX + (chartWidth / 2f), chartY + (chartHeight / 2f), regular, BODY_SIZE);
+                stream.setNonStrokingColor(TEXT_COLOR);
+            } else {
+                drawYearSeries(chartX, chartY, chartWidth, chartHeight, axisMax, 0, "Applications", new Color(37, 99, 235));
+                drawYearSeries(chartX, chartY, chartWidth, chartHeight, axisMax, 1, "Paid", new Color(5, 150, 105));
+                drawYearSeries(chartX, chartY, chartWidth, chartHeight, axisMax, 2, "Defaulted", new Color(220, 38, 38));
+            }
             y = bottom - 14f;
+        }
+
+        private void drawYearAxis(float chartX,
+                                  float chartY,
+                                  float chartWidth,
+                                  float chartHeight,
+                                  long axisMax,
+                                  List<StationYearlySummaryRow> rows) throws IOException {
+            int tickCount = axisMax <= 4 ? (int) axisMax : 4;
+            tickCount = Math.max(tickCount, 1);
+            stream.setLineWidth(0.45f);
+            for (int i = 0; i <= tickCount; i++) {
+                long tickValue = Math.round(axisMax * (i / (double) tickCount));
+                float tickY = chartY + chartHeight * tickValue / axisMax;
+                stream.setStrokingColor(i == 0 ? BORDER_COLOR : GRID_COLOR);
+                drawLine(chartX, tickY, chartX + chartWidth, tickY);
+                stream.setNonStrokingColor(MUTED_COLOR);
+                writeRight(String.valueOf(tickValue), chartX - 6f, tickY - 2f, regular, SMALL_SIZE);
+            }
+            stream.setStrokingColor(BORDER_COLOR);
+            stream.setLineWidth(0.8f);
+            drawLine(chartX, chartY, chartX + chartWidth, chartY);
+            drawLine(chartX, chartY, chartX, chartY + chartHeight);
+            for (int i = 0; i < rows.size(); i++) {
+                if (!shouldShowYearLabel(i, rows.size())) {
+                    continue;
+                }
+                float x = yearX(chartX, chartWidth, i, rows.size());
+                stream.setNonStrokingColor(MUTED_COLOR);
+                writeCenteredAt(String.valueOf(rows.get(i).year()), x, chartY - 14f, regular, SMALL_SIZE);
+            }
+            stream.setNonStrokingColor(TEXT_COLOR);
         }
 
         private void drawYearSeries(float chartX,
@@ -4641,25 +4679,66 @@ public class LoanReportService {
                 return;
             }
             stream.setStrokingColor(color);
-            stream.setLineWidth(1f);
+            stream.setLineWidth(valueIndex == 0 ? 1.2f : 0.9f);
             for (int i = 1; i < rows.size(); i++) {
-                float x1 = chartX + chartWidth * (i - 1) / Math.max(rows.size() - 1, 1);
+                float x1 = yearX(chartX, chartWidth, i - 1, rows.size());
                 float y1 = chartY + chartHeight * yearValue(rows.get(i - 1), valueIndex) / max;
-                float x2 = chartX + chartWidth * i / Math.max(rows.size() - 1, 1);
+                float x2 = yearX(chartX, chartWidth, i, rows.size());
                 float y2 = chartY + chartHeight * yearValue(rows.get(i), valueIndex) / max;
                 drawLine(x1, y1, x2, y2);
             }
-            stream.setNonStrokingColor(color);
-            float legendX = chartX + 20f + (valueIndex * 108f);
-            write(label, legendX, chartY + chartHeight + 18f, regular, SMALL_SIZE);
-            stream.setNonStrokingColor(TEXT_COLOR);
             for (int i = 0; i < rows.size(); i++) {
-                float x = chartX + chartWidth * i / Math.max(rows.size() - 1, 1);
-                if (valueIndex == 0) {
-                    write(String.valueOf(rows.get(i).year()), x - 8f, chartY - 14f, regular, SMALL_SIZE);
+                long value = yearValue(rows.get(i), valueIndex);
+                float x = yearX(chartX, chartWidth, i, rows.size());
+                float pointY = chartY + chartHeight * value / max;
+                drawPoint(x, pointY, color);
+                if (rows.size() <= 8 || i == 0 || i == rows.size() - 1) {
+                    stream.setNonStrokingColor(color);
+                    writeCenteredAt(String.valueOf(value), x, pointY + 6f + (valueIndex * 6f), regular, SMALL_SIZE);
                 }
             }
+            stream.setNonStrokingColor(color);
+            float legendX = chartX + 24f + (valueIndex * 118f);
+            stream.setStrokingColor(color);
+            drawLine(legendX - 14f, chartY + chartHeight + 19f, legendX - 4f, chartY + chartHeight + 19f);
+            write(label, legendX, chartY + chartHeight + 17f, regular, SMALL_SIZE);
+            stream.setNonStrokingColor(TEXT_COLOR);
             stream.setStrokingColor(BORDER_COLOR);
+        }
+
+        private long niceAxisMax(long rawMax) {
+            if (rawMax <= 1L) {
+                return 1L;
+            }
+            if (rawMax <= 4L) {
+                return rawMax;
+            }
+            long magnitude = 1L;
+            while (magnitude * 10L < rawMax) {
+                magnitude *= 10L;
+            }
+            long[] steps = {1L, 2L, 5L, 10L};
+            for (long step : steps) {
+                long candidate = step * magnitude;
+                if (candidate >= rawMax) {
+                    return candidate;
+                }
+            }
+            return 10L * magnitude;
+        }
+
+        private boolean shouldShowYearLabel(int index, int count) {
+            return count <= 8 || index == 0 || index == count - 1 || index % 2 == 0;
+        }
+
+        private float yearX(float chartX, float chartWidth, int index, int count) {
+            return chartX + chartWidth * index / Math.max(count - 1, 1);
+        }
+
+        private void drawPoint(float x, float pointY, Color color) throws IOException {
+            stream.setNonStrokingColor(color);
+            stream.addRect(x - 1.7f, pointY - 1.7f, 3.4f, 3.4f);
+            stream.fill();
         }
 
         private long yearValue(StationYearlySummaryRow row, int index) {
@@ -4773,6 +4852,11 @@ public class LoanReportService {
         private void writeRight(String text, float rightX, float baselineY, PDType1Font font, float fontSize) throws IOException {
             float width = font.getStringWidth(sanitizePdfLineText(text)) / 1000f * fontSize;
             write(text, rightX - width, baselineY, font, fontSize);
+        }
+
+        private void writeCenteredAt(String text, float centerX, float baselineY, PDType1Font font, float fontSize) throws IOException {
+            float width = font.getStringWidth(sanitizePdfLineText(text)) / 1000f * fontSize;
+            write(text, centerX - (width / 2f), baselineY, font, fontSize);
         }
 
         private void write(String text, float x, float baselineY, PDType1Font font, float fontSize) throws IOException {

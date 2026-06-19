@@ -152,6 +152,35 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void stationAnalyticsPdfShowsClearZeroActivityYearlyGraph() throws Exception {
+        LoanReportService.StationAnalyticsExportReport report = new LoanReportService.StationAnalyticsExportReport(
+            "IAA",
+            "AR704",
+            LocalDate.of(2025, 6, 19),
+            LocalDate.of(2026, 6, 19),
+            null,
+            "Ben Board One",
+            "Manager",
+            LocalDate.of(2026, 6, 19),
+            List.of(new LoanReportService.StationStatusRow("Applied Loans", 0, 0)),
+            new LoanReportService.StationParticipationSummary(0, 0, BigDecimal.ZERO, BigDecimal.ZERO, 0),
+            List.of(),
+            List.of(
+                new LoanReportService.StationYearlySummaryRow(2025, 0, 0, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, BigDecimal.ZERO),
+                new LoanReportService.StationYearlySummaryRow(2026, 0, 0, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, BigDecimal.ZERO)
+            )
+        );
+
+        byte[] pdf = loanReportService.buildStationAnalyticsPdf(report);
+
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("8. YEARLY LOAN TREND GRAPH");
+            assertThat(text).contains("No loan activity recorded for the selected years.");
+        }
+    }
+
+    @Test
     void stationAnalyticsExcelIncludesProductFinancialBreakdown() throws Exception {
         byte[] workbookBytes = loanReportService.buildStationAnalyticsExcel(exportReport(LoanReportService.ReportKind.STATION));
 
