@@ -18,6 +18,8 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.StaffMfaService;
@@ -193,7 +195,7 @@ class StaffAnalyticsControllerSecurityTest {
         StaffAnalyticsController staffAnalyticsController(LoanAnalyticsService loanAnalyticsService,
                                                           LoanReportService loanReportService,
                                                           ObjectMapper objectMapper) {
-            return new StaffAnalyticsController(loanAnalyticsService, loanReportService, objectMapper);
+            return new StaffAnalyticsController(loanAnalyticsService, loanReportService, objectMapper, new ApplicationClock("Africa/Nairobi"));
         }
 
         @Bean
@@ -223,6 +225,7 @@ class StaffAnalyticsControllerSecurityTest {
 
         @Bean LoanAnalyticsService loanAnalyticsService() { return Mockito.mock(LoanAnalyticsService.class); }
         @Bean LoanReportService loanReportService() { return Mockito.mock(LoanReportService.class); }
+        @Bean AppUsageAnalyticsService appUsageAnalyticsService() { return Mockito.mock(AppUsageAnalyticsService.class); }
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }

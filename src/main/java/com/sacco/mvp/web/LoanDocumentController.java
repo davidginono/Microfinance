@@ -2,6 +2,7 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
@@ -215,7 +216,7 @@ public class LoanDocumentController {
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                                 @RequestParam(required = false) LoanType loanType,
                                                                 @RequestParam(required = false, defaultValue = "staff") String viewAs) {
-        boolean stationView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(com.sacco.mvp.domain.Position.MANAGER);
+        boolean stationView = "staff".equalsIgnoreCase(viewAs);
         LocalDate filenameFrom;
         LocalDate filenameTo;
         byte[] pdf;
@@ -256,7 +257,7 @@ public class LoanDocumentController {
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                                   @RequestParam(required = false) LoanType loanType,
                                                                   @RequestParam(required = false, defaultValue = "staff") String viewAs) {
-        boolean stationView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(com.sacco.mvp.domain.Position.MANAGER);
+        boolean stationView = "staff".equalsIgnoreCase(viewAs);
         LocalDate filenameFrom;
         LocalDate filenameTo;
         byte[] workbook;
@@ -303,6 +304,40 @@ public class LoanDocumentController {
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; filename=manager-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/board-loans.pdf")
+    @PreAuthorize("hasRole('BOARD') and @userClaims.has(principal, 'REVIEW_BOARD_QUEUE')")
+    public ResponseEntity<byte[]> downloadBoardLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                          @RequestParam(required = false) String decisionFilter) {
+        LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
+            ApprovalWorkflowStage.BOARD, fromDate, toDate, decisionFilter);
+        byte[] pdf = loanReportService.buildBoardWorkflowPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=board-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
+            .body(pdf);
+    }
+
+    @GetMapping("/documents/reports/loan-officer-loans.pdf")
+    @PreAuthorize("hasRole('LOAN_OFFICER') and @userClaims.has(principal, 'REVIEW_LOAN_OFFICER_QUEUE')")
+    public ResponseEntity<byte[]> downloadLoanOfficerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                @RequestParam(required = false) String decisionFilter) {
+        LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
+            ApprovalWorkflowStage.LOAN_OFFICER, fromDate, toDate, decisionFilter);
+        byte[] pdf = loanReportService.buildLoanOfficerWorkflowPdf(report);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=loan-officer-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
             .body(pdf);
     }
 

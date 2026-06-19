@@ -11,22 +11,22 @@
     <p class="erp-page-subtitle"><spring:message code="manager.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then compare your decision with the loan's current workflow status." /></p>
 </div>
 
-<form method="get" action="/manager/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 lg:grid-cols-4">
-    <div>
+<form method="get" action="/documents/reports/manager-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
+    <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
                name="fromDate"
                value="${fromDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
-    <div>
+    <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
                name="toDate"
                value="${toDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
-    <div>
+    <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
         <select name="decisionFilter" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
             <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
@@ -34,13 +34,12 @@
             <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
         </select>
     </div>
-    <div class="flex items-end gap-2">
-        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generate" text="Generate Report" /></button>
-        <a href="/documents/reports/manager-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}&decisionFilter=${decisionFilterValue}" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" text="Download PDF" /></a>
+    <div class="erp-table-toolbar__actions pt-6">
+        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generatePdf" text="Generate PDF Report" /></button>
     </div>
 </form>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>

@@ -26,7 +26,7 @@
     <h1 class="erp-page-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
 <table class="erp-table">
     <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="loan.type" text="Loan Type" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>

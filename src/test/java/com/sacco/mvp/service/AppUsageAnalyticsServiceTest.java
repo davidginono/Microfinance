@@ -115,11 +115,11 @@ class AppUsageAnalyticsServiceTest {
 
         ArgumentCaptor<OffsetDateTime> cutoffCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
         verify(usageEventRepository).deleteByOccurredAtBefore(cutoffCaptor.capture());
-        assertThat(cutoffCaptor.getValue()).isBefore(OffsetDateTime.now().minusDays(89));
+        assertThat(cutoffCaptor.getValue()).isBefore(new ApplicationClock("Africa/Nairobi").now().minusDays(89));
     }
 
     private AppUsageAnalyticsService service() {
-        return new AppUsageAnalyticsService(usageEventRepository, registeredSaccoRepository);
+        return new AppUsageAnalyticsService(usageEventRepository, registeredSaccoRepository, new ApplicationClock("Africa/Nairobi"));
     }
 
     private void stubDashboardQueries() {

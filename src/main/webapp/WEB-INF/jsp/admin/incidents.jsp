@@ -108,7 +108,7 @@
     </form>
 </section>
 
-<section class="erp-table-wrap overflow-x-auto">
+<section class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr><th>Subject</th><th>Category</th><th>Severity</th><th>Status</th><th>Created</th><th>Action</th></tr>

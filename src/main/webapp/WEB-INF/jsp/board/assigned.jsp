@@ -63,7 +63,7 @@
             <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
         </div>
     </form>
-    <div class="erp-table-wrap overflow-x-auto border-0 shadow-none">
+    <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
         <table class="erp-table">
             <thead>
             <tr>

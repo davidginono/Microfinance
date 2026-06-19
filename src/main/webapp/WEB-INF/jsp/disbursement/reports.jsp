@@ -10,28 +10,27 @@
     <p class="erp-page-subtitle"><spring:message code="disbursement.reports.subtitle" text="Filter the loans you disbursed by date range and export the report when needed." /></p>
 </div>
 
-<form method="get" action="/disbursement/reports" class="erp-form-wrap erp-filter-form mb-4 grid gap-4 lg:grid-cols-3">
-    <div>
+<form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
+    <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
                name="fromDate"
                value="${fromDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
-    <div>
+    <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
                name="toDate"
                value="${toDateValue}"
                class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
-    <div class="flex items-end gap-2">
-        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generate" text="Generate Report" /></button>
-        <a href="/documents/reports/disbursement-loans.pdf?fromDate=${fromDateValue}&toDate=${toDateValue}" class="app-btn btn-neutral"><spring:message code="reports.downloadPdf" text="Download PDF" /></a>
+    <div class="erp-table-toolbar__actions pt-6">
+        <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generatePdf" text="Generate PDF Report" /></button>
     </div>
 </form>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>

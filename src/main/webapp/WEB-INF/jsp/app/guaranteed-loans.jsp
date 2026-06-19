@@ -16,7 +16,7 @@
         <p class="erp-widget-title"><spring:message code="guaranteedLoans.panel" text="Guaranteed Loans" /></p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="guaranteedLoans.activePosition" text="Active Guarantee Position" /></h2>
     </div>
-    <div class="overflow-x-auto">
+    <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>

@@ -111,7 +111,7 @@
                     </div>
                     <button type="submit" class="app-btn btn-neutral min-w-[9rem] justify-center" style="height:3rem;min-height:3rem;max-height:3rem;">Apply Filters</button>
                 </form>
-                <div class="overflow-x-auto">
+                <div class="erp-table-wrap erp-table-scroll">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr><th class="px-4 py-3">SACCO</th><th class="px-4 py-3">Station</th><th class="px-4 py-3">Available</th><th class="px-4 py-3">Alert Reserve</th><th class="px-4 py-3">Baseline</th><th class="px-4 py-3">Depleted Alerts Sent</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
@@ -182,8 +182,8 @@
             <p class="mt-1 text-sm text-slate-500">Showing ${usageHistory.numberOfElements} of ${usageHistory.totalElements} history rows. Repeated depleted blocks are grouped by day.</p>
         </div>
     </div>
-    <div class="erp-panel-body overflow-x-auto">
-        <div class="max-h-[32rem] overflow-auto">
+    <div class="erp-panel-body">
+        <div class="erp-table-wrap erp-table-scroll">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">First Seen</th><th class="px-4 py-3">Last Seen</th><th class="px-4 py-3">Event</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3">Count</th><th class="px-4 py-3">Unit Change</th><th class="px-4 py-3">Provider Reference</th><th class="px-4 py-3">Note</th></tr></thead>
             <tbody class="divide-y divide-slate-100 bg-white">

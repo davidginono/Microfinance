@@ -1,17 +1,16 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="accountant.reports.breadcrumb" text="Accountant Panel / Reports" /></p>
-    <h1 class="erp-page-title"><spring:message code="accountant.reports.title" text="Accountant Review Reports" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="accountant.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then export the report when needed." /></p>
+    <p class="erp-breadcrumb"><spring:message code="loanOfficer.reports.breadcrumb" text="Loan Officer Panel / Loan Reports" /></p>
+    <h1 class="erp-page-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="loanOfficer.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then export the report when needed." /></p>
 </div>
 
-<form method="get" action="/documents/reports/accountant-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
+<form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
     <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
@@ -30,7 +29,7 @@
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
         <select name="decisionFilter" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
             <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
-            <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}><spring:message code="archive.approvedForDisbursement" text="Ready for disbursement" /></option>
+            <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}><spring:message code="review.approved" text="Approved" /></option>
             <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
         </select>
     </div>
@@ -48,7 +47,7 @@
             <th><spring:message code="common.applicant" text="Applicant" /></th>
             <th><spring:message code="loan.type" text="Loan Type" /></th>
             <th><spring:message code="common.amount" text="Amount" /></th>
-            <th><spring:message code="review.decision" text="Decision" /></th>
+            <th><spring:message code="review.loanOfficerDecision" text="Loan Officer Decision" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th></th>
@@ -65,13 +64,13 @@
                 <td>${row.decisionLabel}</td>
                 <td>${row.reviewedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/accountant/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
+                <td><a href="/loan-officer/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">
             <tr>
                 <td colspan="9" class="px-3 py-8 text-center text-slate-500">
-                    <spring:message code="accountant.reports.empty" text="No accountant-reviewed loans matched the selected period." />
+                    <spring:message code="loanOfficer.reports.empty" text="No loan officer-reviewed loans matched the selected period." />
                 </td>
             </tr>
         </c:if>

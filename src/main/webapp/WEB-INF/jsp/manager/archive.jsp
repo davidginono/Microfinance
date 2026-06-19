@@ -83,7 +83,7 @@
     </div>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>

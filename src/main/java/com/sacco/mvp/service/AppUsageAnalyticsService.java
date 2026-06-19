@@ -41,6 +41,7 @@ public class AppUsageAnalyticsService {
 
     private final AppUsageEventRepository usageEventRepository;
     private final RegisteredSaccoRepository registeredSaccoRepository;
+    private final ApplicationClock applicationClock;
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
 
     @Transactional
@@ -53,7 +54,7 @@ public class AppUsageAnalyticsService {
             return;
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = applicationClock.now();
         String sessionId = request.getSession(false).getId();
         String deviceType = deviceType(request.getHeader("User-Agent"));
         String browserFamily = browserFamily(request.getHeader("User-Agent"));
@@ -76,14 +77,14 @@ public class AppUsageAnalyticsService {
         }
         ActiveSession session = activeSessions.remove(sessionId);
         if (session != null) {
-            usageEventRepository.save(toEvent(AppUsageEventType.LOGOUT, session, session.currentPage(), OffsetDateTime.now()));
+            usageEventRepository.save(toEvent(AppUsageEventType.LOGOUT, session, session.currentPage(), applicationClock.now()));
         }
     }
 
     public UsageDashboardPayload dashboard(String range, String saccoId, String stationId) {
         UsageRange usageRange = UsageRange.from(range);
-        OffsetDateTime now = OffsetDateTime.now();
-        ZoneId zoneId = ZoneId.systemDefault();
+        OffsetDateTime now = applicationClock.now();
+        ZoneId zoneId = applicationClock.zoneId();
         OffsetDateTime from = usageRange.start(now, zoneId);
         String normalizedSaccoId = normalizeScope(saccoId);
         String normalizedStationId = normalizeScope(stationId);
@@ -119,7 +120,7 @@ public class AppUsageAnalyticsService {
     @Scheduled(cron = "0 20 2 * * *")
     @Transactional
     public void deleteExpiredUsageEvents() {
-        usageEventRepository.deleteByOccurredAtBefore(OffsetDateTime.now().minusDays(RETENTION_DAYS));
+        usageEventRepository.deleteByOccurredAtBefore(applicationClock.now().minusDays(RETENTION_DAYS));
     }
 
     private List<ActiveUserRow> activeUsers(OffsetDateTime now, String saccoId, String stationId) {

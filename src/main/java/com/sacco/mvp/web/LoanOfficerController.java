@@ -15,15 +15,18 @@ import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,6 +43,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -68,6 +72,8 @@ public class LoanOfficerController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
+    private final LoanReportService loanReportService;
+    private final ApplicationClock applicationClock;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -164,6 +170,48 @@ public class LoanOfficerController {
             "/loan-officer/archive",
             searchId
         );
+    }
+
+    @GetMapping("/reports")
+    public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                          @RequestParam(required = false) String decisionFilter,
+                          Model model) {
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
+        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            model.addAttribute("error", "From date cannot be after to date.");
+            effectiveFrom = effectiveTo.withDayOfMonth(1);
+        }
+        LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
+            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
+            STAGE, effectiveFrom, effectiveTo, decisionFilter);
+        Map<UUID, String> applicantNames = report.applicantMap().values().stream()
+            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+
+        model.addAttribute("report", report);
+        model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("fromDateValue", report.fromDate().toString());
+        model.addAttribute("toDateValue", report.toDate().toString());
+        model.addAttribute("decisionFilterValue", report.decisionFilter());
+        model.addAttribute("reportRows", report.entries().stream()
+            .map(entry -> {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("id", entry.loan().getId().toString());
+                row.put("shortId", entry.loan().getApplicationNumber() == null ? "" : entry.loan().getApplicationNumber().toString());
+                row.put("loanId", entry.loan().getLoanId() == null ? "" : entry.loan().getLoanId());
+                row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
+                row.put("loanTypeLabel", entry.loan().getLoanType() == null ? "-" : entry.loan().getLoanType().getDisplayLabel());
+                row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
+                row.put("decisionLabel", entry.review().getDecision() == BoardDecision.APPROVED ? "Approved" : "Rejected");
+                OffsetDateTime reviewedAt = entry.review().getDecidedAt() == null ? entry.review().getCreatedAt() : entry.review().getDecidedAt();
+                row.put("reviewedAt", reviewedAt == null ? "-" : reviewedAt.toLocalDate().toString());
+                row.put("currentStatusLabel", workflowStatusPresentationService.dashboardStatusLabel(entry.loan().getStatus()));
+                return row;
+            })
+            .toList());
+        return "loan-officer/reports";
     }
 
     @GetMapping("/loan-applications/{id}")

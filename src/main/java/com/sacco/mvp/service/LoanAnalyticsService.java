@@ -60,6 +60,7 @@ public class LoanAnalyticsService {
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
+    private final ApplicationClock applicationClock;
 
     public MemberLoanAnalytics forMember(UUID memberId, LocalDate fromDate, LocalDate toDate) {
         return forMember(memberId, fromDate, toDate, null, null);
@@ -103,7 +104,7 @@ public class LoanAnalyticsService {
                                                         LocalDate toDate,
                                                         LoanType loanType,
                                                         LoanStatus loanStatus) {
-        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = new ArrayList<>();
         YearMonth cursor = YearMonth.from(start);
@@ -130,7 +131,7 @@ public class LoanAnalyticsService {
                                                        LocalDate toDate,
                                                        LoanType loanType,
                                                        LoanStatus loanStatus) {
-        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
         List<StaffLoanEvent> events = staffLoanEvents(principal, start, end, loanType, loanStatus);
@@ -152,7 +153,7 @@ public class LoanAnalyticsService {
                                                          LocalDate toDate,
                                                          LoanType loanType,
                                                          LoanStatus loanStatus) {
-        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
         List<LoanApplication> loans = stationLoans(saccoId, stationId, start, end, loanType, loanStatus);
@@ -265,7 +266,7 @@ public class LoanAnalyticsService {
                                                      LocalDate toDate,
                                                      LoanType loanType,
                                                      LoanStatus loanStatus) {
-        LocalDate end = toDate == null ? LocalDate.now() : toDate;
+        LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
         List<StaffLoanEvent> events = staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus);

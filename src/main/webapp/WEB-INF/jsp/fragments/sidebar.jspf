@@ -349,7 +349,7 @@
                 </div>
             </sec:authorize>
             <sec:authorize access="hasRole('BOARD') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_BOARD_QUEUE')">
-                <c:set var="boardOfficeActive" value="${requestUri eq '/board/dashboard' || requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || fn:startsWith(requestUri, '/board/loan-applications')}" />
+                <c:set var="boardOfficeActive" value="${requestUri eq '/board/dashboard' || requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || requestUri eq '/board/reports' || fn:startsWith(requestUri, '/board/loan-applications')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.board" text="Board" /></p>
                 </div>
@@ -369,6 +369,7 @@
                         <a href="/board/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/dashboard' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardDashboard" text="Board Dashboard" /></a>
                         <a href="/board/queue" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications')) ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardQueue" text="Board Queue" /></a>
                         <a href="/board/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/archive' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardArchive" text="Board Archive" /></a>
+                        <a href="/board/reports" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/reports' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardReports" text="Loan Reports" /></a>
                     </div>
                 </div>
             </sec:authorize>
@@ -393,6 +394,7 @@
                         <a href="/loan-officer/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/loan-officer/dashboard' ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerDashboard" text="Loan Officer Dashboard" /></a>
                         <a href="/loan-officer/queue" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/loan-officer/queue' or requestUri eq '/loan-officer/assigned' or fn:startsWith(requestUri, '/loan-officer/loan-applications')) ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerQueue" text="Loan Officer Queue" /></a>
                         <a href="/loan-officer/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/loan-officer/archive' ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerArchive" text="Loan Officer Archive" /></a>
+                        <a href="/loan-officer/reports" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/loan-officer/reports' ? 'bg-white text-amber-800 ring-1 ring-amber-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.loanOfficerReports" text="Loan Reports" /></a>
                     </div>
                 </div>
             </sec:authorize>

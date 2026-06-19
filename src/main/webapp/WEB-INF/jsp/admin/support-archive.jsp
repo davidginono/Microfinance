@@ -10,7 +10,7 @@
     <p class="erp-page-subtitle"><spring:message code="admin.support.archiveSubtitle" text="Track messages sent to the platform admin." /></p>
 </div>
 
-<section class="erp-table-wrap overflow-x-auto">
+<section class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr><th><spring:message code="support.subject" text="Subject" /></th><th><spring:message code="support.message" text="Message" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="support.superAdminRead" text="Super Admin Read" /></th><th><spring:message code="support.sent" text="Sent" /></th></tr>

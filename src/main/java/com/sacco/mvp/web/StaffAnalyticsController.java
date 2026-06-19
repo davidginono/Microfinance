@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanReportService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class StaffAnalyticsController {
     private final LoanAnalyticsService loanAnalyticsService;
     private final LoanReportService loanReportService;
     private final ObjectMapper objectMapper;
+    private final ApplicationClock applicationClock;
 
     @GetMapping("/analytics")
     public String analytics(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -42,7 +44,7 @@ public class StaffAnalyticsController {
                             @RequestParam(required = false) LoanType loanType,
                             @RequestParam(required = false, defaultValue = "staff") String viewAs,
                             Model model) {
-        LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate resolvedTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusYears(1) : fromDate;
         if (resolvedFrom.isAfter(resolvedTo)) {
             LocalDate swap = resolvedFrom;
@@ -50,8 +52,9 @@ public class StaffAnalyticsController {
             resolvedTo = swap;
         }
 
-        String selectedView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(Position.MANAGER) ? "staff" : "member";
-        boolean stationWideStaffView = "staff".equals(selectedView) && principal.hasRole(Position.MANAGER);
+        boolean canViewStationAnalytics = true;
+        String selectedView = "staff".equalsIgnoreCase(viewAs) && canViewStationAnalytics ? "staff" : "member";
+        boolean stationWideStaffView = "staff".equals(selectedView);
         boolean staffReviewView = !stationWideStaffView;
         DateRange previousRange = previousRange(resolvedFrom, resolvedTo);
         LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = staffReviewView
@@ -125,7 +128,7 @@ public class StaffAnalyticsController {
         model.addAttribute("loanTypes", LoanType.values());
         model.addAttribute("viewAs", selectedView);
         model.addAttribute("staffReviewView", staffReviewView);
-        model.addAttribute("canViewStationAnalytics", principal.hasRole(Position.MANAGER));
+        model.addAttribute("canViewStationAnalytics", canViewStationAnalytics);
         model.addAttribute("stationWideStaffView", stationWideStaffView);
         model.addAttribute("staffAnalyticsTitle", stationWideStaffView ? "Station Loan Status" : "Staff Loan Review Analytics");
         model.addAttribute("staffAnalyticsSubtitle", stationWideStaffView

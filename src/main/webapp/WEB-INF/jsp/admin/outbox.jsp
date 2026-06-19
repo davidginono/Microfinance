@@ -149,7 +149,7 @@
         </div>
     </form>
 </section>
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Action</th></tr>

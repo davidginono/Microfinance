@@ -46,7 +46,7 @@
                     </div>
                 </form>
             </div>
-            <div class="erp-table-wrap overflow-x-auto border-0 shadow-none">
+            <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -125,7 +125,7 @@
                     </div>
                 </form>
             </div>
-            <div class="erp-table-wrap overflow-x-auto border-0 shadow-none">
+            <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
                 <table class="erp-table">
                     <thead>
                     <tr>

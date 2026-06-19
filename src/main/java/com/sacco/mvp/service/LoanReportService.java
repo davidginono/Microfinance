@@ -118,6 +118,7 @@ public class LoanReportService {
     private final LoanAnalyticsService loanAnalyticsService;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoStationRepository saccoStationRepository;
+    private final ApplicationClock applicationClock;
 
     public MemberLoanReport memberReport(UUID memberId) {
         Member member = memberRepository.findById(memberId)
@@ -133,7 +134,7 @@ public class LoanReportService {
     }
 
     public ManagerLoanReport managerReport(String saccoId, Integer year, boolean returnedOnly) {
-        int effectiveYear = year == null ? LocalDate.now().getYear() : year;
+        int effectiveYear = year == null ? applicationClock.today().getYear() : year;
         LocalDate fromDate = LocalDate.of(effectiveYear, 1, 1);
         LocalDate toDate = LocalDate.of(effectiveYear, 12, 31);
         List<LoanApplication> loans = loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
@@ -165,7 +166,7 @@ public class LoanReportService {
             .distinct()
             .sorted(Comparator.reverseOrder())
             .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        int currentYear = LocalDate.now().getYear();
+        int currentYear = applicationClock.today().getYear();
         if (!years.contains(currentYear)) {
             years.add(0, currentYear);
         }
@@ -178,14 +179,14 @@ public class LoanReportService {
                                                  LocalDate fromDate,
                                                  LocalDate toDate,
                                                  String decisionFilter) {
-        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
             throw new IllegalArgumentException("From date cannot be after to date.");
         }
 
-        OffsetDateTime fromAt = effectiveFrom.atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
-        OffsetDateTime toAt = effectiveTo.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()).minusNanos(1);
+        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
+        OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
         ManagerDecision expectedDecision = resolveAccountantDecisionFilter(decisionFilter);
         String effectiveFilter = expectedDecision == null
             ? "ALL"
@@ -243,14 +244,14 @@ public class LoanReportService {
                                                        LocalDate fromDate,
                                                        LocalDate toDate,
                                                        String decisionFilter) {
-        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
             throw new IllegalArgumentException("From date cannot be after to date.");
         }
 
-        OffsetDateTime fromAt = effectiveFrom.atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
-        OffsetDateTime toAt = effectiveTo.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()).minusNanos(1);
+        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
+        OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
         ManagerDecision expectedDecision = resolveAccountantDecisionFilter(decisionFilter);
         String effectiveFilter = expectedDecision == null
             ? "ALL"
@@ -302,19 +303,84 @@ public class LoanReportService {
         );
     }
 
-    public DisbursementLoanReport disbursementReport(UUID disbursementOfficerId,
-                                                     String saccoId,
-                                                     String stationId,
-                                                     LocalDate fromDate,
-                                                     LocalDate toDate) {
-        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+    public BoardWorkflowReport boardWorkflowReport(UUID reviewerId,
+                                                   String saccoId,
+                                                   String stationId,
+                                                   ApprovalWorkflowStage reviewStage,
+                                                   LocalDate fromDate,
+                                                   LocalDate toDate,
+                                                   String decisionFilter) {
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
             throw new IllegalArgumentException("From date cannot be after to date.");
         }
 
-        OffsetDateTime fromAt = effectiveFrom.atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
-        OffsetDateTime toAt = effectiveTo.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()).minusNanos(1);
+        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
+        OffsetDateTime toExclusive = applicationClock.dayAfter(effectiveTo);
+        BoardDecision expectedDecision = resolveBoardDecisionFilter(decisionFilter);
+        String effectiveFilter = expectedDecision == null ? "ALL" : expectedDecision.name();
+
+        List<BoardReview> reviews = boardReviewRepository
+            .findForAnalytics(reviewerId, reviewStage, fromAt, toExclusive).stream()
+            .filter(review -> review.getDecision() != BoardDecision.PENDING)
+            .filter(review -> expectedDecision == null || review.getDecision() == expectedDecision)
+            .toList();
+
+        Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
+                reviews.stream().map(BoardReview::getLoanApplicationId).collect(Collectors.toSet()))
+            .stream()
+            .filter(loan -> loan.getSaccoId().equals(saccoId))
+            .filter(loan -> matchesApplicantStation(loan, stationId))
+            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
+
+        List<BoardWorkflowEntry> entries = reviews.stream()
+            .map(review -> {
+                LoanApplication loan = loanMap.get(review.getLoanApplicationId());
+                return loan == null ? null : new BoardWorkflowEntry(review, loan);
+            })
+            .filter(Objects::nonNull)
+            .sorted(Comparator.comparing((BoardWorkflowEntry entry) -> reviewSortTime(entry.review())).reversed())
+            .toList();
+
+        Map<UUID, Member> applicantMap = memberRepository.findAllById(
+                entries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
+
+        long approvedCount = entries.stream().filter(entry -> entry.review().getDecision() == BoardDecision.APPROVED).count();
+        long rejectedCount = entries.stream().filter(entry -> entry.review().getDecision() == BoardDecision.REJECTED).count();
+        BigDecimal totalAmount = entries.stream()
+            .map(entry -> entry.loan().getAmount())
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new BoardWorkflowReport(
+            reviewerId,
+            saccoId,
+            reviewStage,
+            effectiveFrom,
+            effectiveTo,
+            effectiveFilter,
+            new BoardWorkflowSummary(entries.size(), approvedCount, rejectedCount, totalAmount),
+            entries,
+            applicantMap
+        );
+    }
+
+    public DisbursementLoanReport disbursementReport(UUID disbursementOfficerId,
+                                                     String saccoId,
+                                                     String stationId,
+                                                     LocalDate fromDate,
+                                                     LocalDate toDate) {
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
+        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            throw new IllegalArgumentException("From date cannot be after to date.");
+        }
+
+        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
+        OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
         List<ManagerReview> reviews = managerReviewRepository
             .findByManagerMemberIdAndReviewStageAndCreatedAtBetweenOrderByCreatedAtDesc(
                 disbursementOfficerId, ApprovalWorkflowStage.DISBURSEMENT_OFFICER, fromAt, toAt).stream()
@@ -367,7 +433,7 @@ public class LoanReportService {
                                                                LoanType loanType,
                                                                String preparedBy,
                                                                String preparedByRole) {
-        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.minusYears(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
             LocalDate swap = effectiveFrom;
@@ -378,8 +444,8 @@ public class LoanReportService {
         List<LoanApplication> loans = loanApplicationRepository.findScopeLoansForAnalytics(
             saccoId,
             stationId,
-            effectiveFrom.atStartOfDay().atOffset(ZoneOffset.UTC),
-            effectiveTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC),
+            applicationClock.startOfDay(effectiveFrom),
+            applicationClock.dayAfter(effectiveTo),
             loanType,
             null
         );
@@ -401,7 +467,7 @@ public class LoanReportService {
             loanType,
             preparedBy == null || preparedBy.isBlank() ? "System" : preparedBy,
             preparedByRole == null || preparedByRole.isBlank() ? "-" : preparedByRole,
-            LocalDate.now(),
+            applicationClock.today(),
             statusRows,
             participation,
             productRows,
@@ -454,7 +520,7 @@ public class LoanReportService {
 
     public byte[] buildMemberPdf(MemberLoanReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            MemberPdfRenderer renderer = new MemberPdfRenderer(document, report);
+            MemberPdfRenderer renderer = new MemberPdfRenderer(document, report, DATE_FORMATTER.format(applicationClock.today()));
             renderer.render();
             document.save(output);
             return output.toByteArray();
@@ -551,7 +617,7 @@ public class LoanReportService {
             context.branchName(),
             range.fromDate(),
             range.toDate(),
-            LocalDate.now(),
+            applicationClock.today(),
             principal.getFullName(),
             exporterRoleLabel(principal),
             loanProductLabel(loanType),
@@ -592,7 +658,7 @@ public class LoanReportService {
                                                             String viewAs) {
         DateRange range = resolveReportRange(fromDate, toDate);
         DateRange previous = previousRange(range.fromDate(), range.toDate());
-        boolean stationWideStaffView = "staff".equalsIgnoreCase(viewAs) && principal.hasRole(Position.MANAGER);
+        boolean stationWideStaffView = "staff".equalsIgnoreCase(viewAs);
         LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = stationWideStaffView
             ? null
             : loanAnalyticsService.staffReviewAnalytics(principal, range.fromDate(), range.toDate(), loanType, null);
@@ -624,7 +690,7 @@ public class LoanReportService {
             context.branchName(),
             range.fromDate(),
             range.toDate(),
-            LocalDate.now(),
+            applicationClock.today(),
             principal.getFullName(),
             exporterRoleLabel(principal),
             loanProductLabel(loanType),
@@ -718,7 +784,7 @@ public class LoanReportService {
         List<String> lines = new ArrayList<>();
         lines.add("Manager Disbursed Loans Report");
         lines.add("SACCO: " + report.saccoId());
-        lines.add("Generated: " + DATE_FORMATTER.format(LocalDate.now()));
+        lines.add("Generated: " + DATE_FORMATTER.format(applicationClock.today()));
         lines.add("Year: " + report.year());
         lines.add("Returned Only: " + (report.returnedOnly() ? "Yes" : "No"));
         lines.add("");
@@ -738,81 +804,165 @@ public class LoanReportService {
     }
 
     public byte[] buildAccountantPdf(AccountantLoanReport report) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Accountant Review Report");
-        lines.add("SACCO: " + report.saccoId());
-        lines.add("Generated: " + DATE_FORMATTER.format(LocalDate.now()));
-        lines.add("Period: " + DATE_FORMATTER.format(report.fromDate()) + " to " + DATE_FORMATTER.format(report.toDate()));
-        lines.add("Decision Filter: " + accountantDecisionFilterLabel(report.decisionFilter()));
-        lines.add("");
-        lines.add("Summary");
-        lines.add("Reviewed loans: " + report.summary().reviewedCount());
-        lines.add("Ready for disbursement: " + report.summary().approvedCount());
-        lines.add("Rejected: " + report.summary().rejectedCount());
-        lines.add("Reviewed amount: " + formatMoney(report.summary().reviewedAmount()));
-        lines.add("");
-        lines.add("Loan List");
+        List<String[]> rows = new ArrayList<>();
         for (AccountantReviewEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
-            lines.add(accountantLoanRow(entry, applicant));
+            LoanApplication loan = entry.loan();
+            rows.add(new String[]{
+                applicationLabel(loan),
+                loanIdLabel(loan),
+                applicantLabel(applicant),
+                loanTypeLabel(loan),
+                formatMoney(loan.getAmount()),
+                entry.review().getDecision() == ManagerDecision.ACCEPT ? "Ready for Disbursement" : "Rejected",
+                formatTimestamp(entry.review().getCreatedAt()),
+                humanizeLoanStatusForReport(loan.getStatus())
+            });
         }
-        if (report.entries().isEmpty()) {
-            lines.add("No accountant-reviewed loans matched the selected period.");
-        }
-        return renderPdf(lines);
+        return renderStaffReviewPdf(
+            report.saccoId(),
+            "ACCOUNTANT REVIEW REPORTS",
+            "Accountant Decisions on Loan Applications",
+            "Decision Filter: " + accountantDecisionFilterLabel(report.decisionFilter())
+                + " | Reviewed: " + report.summary().reviewedCount()
+                + " | Amount: " + formatMoney(report.summary().reviewedAmount()),
+            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", "DECISION", "REVIEWED AT", "CURRENT STATUS"},
+            new float[]{78f, 66f, 80f, 70f, 72f, 74f, 74f, 84f},
+            rows,
+            "No accountant-reviewed loans matched the selected period.",
+            "Accountant Review Reports",
+            report.fromDate(),
+            report.toDate()
+        );
     }
 
     public byte[] buildManagerWorkflowPdf(ManagerWorkflowReport report) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Manager Review Report");
-        lines.add("SACCO: " + report.saccoId());
-        lines.add("Generated: " + DATE_FORMATTER.format(LocalDate.now()));
-        lines.add("Period: " + DATE_FORMATTER.format(report.fromDate()) + " to " + DATE_FORMATTER.format(report.toDate()));
-        lines.add("Decision Filter: " + managerDecisionFilterLabel(report.decisionFilter()));
-        lines.add("");
-        lines.add("Summary");
-        lines.add("Reviewed loans: " + report.summary().reviewedCount());
-        lines.add("Approved: " + report.summary().approvedCount());
-        lines.add("Rejected: " + report.summary().rejectedCount());
-        lines.add("Reviewed amount: " + formatMoney(report.summary().reviewedAmount()));
-        lines.add("");
-        lines.add("Loan List");
+        List<String[]> rows = new ArrayList<>();
         for (ManagerWorkflowEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
-            lines.add(managerWorkflowRow(entry, applicant));
+            LoanApplication loan = entry.loan();
+            rows.add(new String[]{
+                applicationLabel(loan),
+                loanIdLabel(loan),
+                applicantLabel(applicant),
+                loanTypeLabel(loan),
+                formatMoney(loan.getAmount()),
+                entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected",
+                formatTimestamp(entry.review().getCreatedAt()),
+                humanizeLoanStatusForReport(loan.getStatus())
+            });
         }
-        if (report.entries().isEmpty()) {
-            lines.add("No manager-reviewed loans matched the selected period.");
+        return renderStaffReviewPdf(
+            report.saccoId(),
+            "MANAGER REVIEW REPORTS",
+            "Manager Decisions on Loan Applications",
+            "Decision Filter: " + managerDecisionFilterLabel(report.decisionFilter())
+                + " | Reviewed: " + report.summary().reviewedCount()
+                + " | Amount: " + formatMoney(report.summary().reviewedAmount()),
+            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", "MANAGER DECISION", "REVIEWED AT", "CURRENT STATUS"},
+            new float[]{78f, 66f, 80f, 70f, 72f, 74f, 74f, 84f},
+            rows,
+            "No manager-reviewed loans matched the selected period.",
+            "Manager Review Reports",
+            report.fromDate(),
+            report.toDate()
+        );
+    }
+
+    public byte[] buildBoardWorkflowPdf(BoardWorkflowReport report) {
+        return buildBoardStageWorkflowPdf(
+            report,
+            "BOARD REVIEW REPORTS",
+            "Board Decisions on Loan Applications",
+            "BOARD DECISION",
+            "No board-reviewed loans matched the selected period.",
+            "Board Review Reports"
+        );
+    }
+
+    public byte[] buildLoanOfficerWorkflowPdf(BoardWorkflowReport report) {
+        return buildBoardStageWorkflowPdf(
+            report,
+            "LOAN OFFICER REVIEW REPORTS",
+            "Loan Officer Decisions on Loan Applications",
+            "LOAN OFFICER DECISION",
+            "No loan officer-reviewed loans matched the selected period.",
+            "Loan Officer Review Reports"
+        );
+    }
+
+    private byte[] buildBoardStageWorkflowPdf(BoardWorkflowReport report,
+                                              String title,
+                                              String subtitle,
+                                              String decisionHeader,
+                                              String emptyMessage,
+                                              String footerTitle) {
+        List<String[]> rows = new ArrayList<>();
+        for (BoardWorkflowEntry entry : report.entries()) {
+            Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
+            LoanApplication loan = entry.loan();
+            rows.add(new String[]{
+                applicationLabel(loan),
+                loanIdLabel(loan),
+                applicantLabel(applicant),
+                loanTypeLabel(loan),
+                formatMoney(loan.getAmount()),
+                boardDecisionLabel(entry.review().getDecision()),
+                formatTimestamp(reviewSortTime(entry.review())),
+                humanizeLoanStatusForReport(loan.getStatus())
+            });
         }
-        return renderPdf(lines);
+        return renderStaffReviewPdf(
+            report.saccoId(),
+            title,
+            subtitle,
+            "Decision Filter: " + boardDecisionFilterLabel(report.decisionFilter())
+                + " | Reviewed: " + report.summary().reviewedCount()
+                + " | Amount: " + formatMoney(report.summary().reviewedAmount()),
+            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", decisionHeader, "REVIEWED AT", "CURRENT STATUS"},
+            new float[]{78f, 66f, 80f, 70f, 72f, 74f, 74f, 84f},
+            rows,
+            emptyMessage,
+            footerTitle,
+            report.fromDate(),
+            report.toDate()
+        );
     }
 
     public byte[] buildDisbursementPdf(DisbursementLoanReport report) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Disbursement Officer Report");
-        lines.add("SACCO: " + report.saccoId());
-        lines.add("Generated: " + DATE_FORMATTER.format(LocalDate.now()));
-        lines.add("Period: " + DATE_FORMATTER.format(report.fromDate()) + " to " + DATE_FORMATTER.format(report.toDate()));
-        lines.add("");
-        lines.add("Summary");
-        lines.add("Disbursed loans: " + report.summary().disbursedCount());
-        lines.add("Paid loans: " + report.summary().paidCount());
-        lines.add("Defaulted loans: " + report.summary().defaultedCount());
-        lines.add("Disbursed amount: " + formatMoney(report.summary().disbursedAmount()));
-        lines.add("");
-        lines.add("Loan List");
+        List<String[]> rows = new ArrayList<>();
         for (DisbursementReviewEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
-            lines.add(disbursementLoanRow(entry, applicant));
+            LoanApplication loan = entry.loan();
+            rows.add(new String[]{
+                applicationLabel(loan),
+                loanIdLabel(loan),
+                applicantLabel(applicant),
+                loanTypeLabel(loan),
+                formatMoney(loan.getAmount()),
+                formatTimestamp(entry.review().getCreatedAt()),
+                humanizeLoanStatusForReport(loan.getStatus())
+            });
         }
-        if (report.entries().isEmpty()) {
-            lines.add("No disbursed loans matched the selected period.");
-        }
-        return renderPdf(lines);
+        return renderStaffReviewPdf(
+            report.saccoId(),
+            "DISBURSEMENT REPORTS",
+            "Disbursement Decisions on Loan Applications",
+            "Disbursed: " + report.summary().disbursedCount()
+                + " | Paid: " + report.summary().paidCount()
+                + " | Amount: " + formatMoney(report.summary().disbursedAmount()),
+            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", "DISBURSED AT", "CURRENT STATUS"},
+            new float[]{84f, 70f, 88f, 74f, 76f, 78f, 100f},
+            rows,
+            "No disbursed loans matched the selected period.",
+            "Disbursement Reports",
+            report.fromDate(),
+            report.toDate()
+        );
     }
 
     private DateRange resolveReportRange(LocalDate fromDate, LocalDate toDate) {
-        LocalDate effectiveTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.minusYears(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
             return new DateRange(effectiveTo, effectiveFrom);
@@ -828,11 +978,11 @@ public class LoanReportService {
     }
 
     private OffsetDateTime startOfDay(LocalDate value) {
-        return value == null ? null : value.atStartOfDay().atOffset(ZoneOffset.UTC);
+        return applicationClock.startOfDay(value);
     }
 
     private OffsetDateTime dayAfter(LocalDate value) {
-        return value == null ? null : value.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        return applicationClock.dayAfter(value);
     }
 
     private ExportContext exportContext(AppUserPrincipal principal, DateRange range, com.sacco.mvp.domain.LoanType loanType) {
@@ -1876,6 +2026,114 @@ public class LoanReportService {
         }
     }
 
+    private byte[] renderStaffReviewPdf(String saccoId,
+                                        String title,
+                                        String subtitle,
+                                        String summaryLine,
+                                        String[] headers,
+                                        float[] widths,
+                                        List<String[]> rows,
+                                        String emptyMessage,
+                                        String footerTitle,
+                                        LocalDate fromDate,
+                                        LocalDate toDate) {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            StaffReviewPdfRenderer renderer = new StaffReviewPdfRenderer(
+                document,
+                saccoReportTitle(saccoId),
+                title,
+                subtitle,
+                "Period: " + DATE_FORMATTER.format(fromDate) + " to " + DATE_FORMATTER.format(toDate),
+                summaryLine,
+                DATE_FORMATTER.format(applicationClock.today()),
+                footerTitle,
+                headers,
+                widths,
+                rowsOrEmpty(rows, headers.length, emptyMessage)
+            );
+            renderer.render();
+            document.save(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to generate PDF report.", ex);
+        }
+    }
+
+    private String saccoReportTitle(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return "SACCOS LMS";
+        }
+        return registeredSaccoRepository.findById(saccoId)
+            .map(RegisteredSacco::getSaccoName)
+            .filter(name -> !name.isBlank())
+            .orElse(saccoId);
+    }
+
+    private static String[] singleCellRow(int columns, String message) {
+        String[] row = new String[columns];
+        row[0] = message;
+        for (int i = 1; i < columns; i++) {
+            row[i] = "";
+        }
+        return row;
+    }
+
+    private static List<String[]> rowsOrEmpty(List<String[]> rows, int columns, String message) {
+        if (rows == null || rows.isEmpty()) {
+            List<String[]> emptyRows = new ArrayList<>();
+            emptyRows.add(singleCellRow(columns, message));
+            return emptyRows;
+        }
+        return rows;
+    }
+
+    private String applicationLabel(LoanApplication loan) {
+        if (loan == null) {
+            return "-";
+        }
+        Object applicationNumber = loan.getApplicationNumber();
+        return applicationNumber == null ? shortId(loan.getId()) : applicationNumber.toString();
+    }
+
+    private String loanIdLabel(LoanApplication loan) {
+        return loan == null ? "-" : blankToFallback(loan.getLoanId(), "-");
+    }
+
+    private String applicantLabel(Member applicant) {
+        if (applicant == null) {
+            return "-";
+        }
+        return blankToFallback(applicant.getFullName(), applicant.getMemberNo());
+    }
+
+    private String loanTypeLabel(LoanApplication loan) {
+        if (loan == null || loan.getLoanType() == null) {
+            return "-";
+        }
+        return titleCase(humanizeLoanType(loan.getLoanType().name()));
+    }
+
+    private String blankToFallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String titleCase(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        StringBuilder label = new StringBuilder();
+        for (String part : value.toLowerCase(Locale.ROOT).split("\\s+")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!label.isEmpty()) {
+                label.append(' ');
+            }
+            label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return label.isEmpty() ? value : label.toString();
+    }
+
     private String shortLoanRow(LoanApplication loan, Member applicant) {
         StringBuilder line = new StringBuilder();
         line.append(shortId(loan.getId())).append(" | ");
@@ -1981,6 +2239,21 @@ public class LoanReportService {
         };
     }
 
+    private BoardDecision resolveBoardDecisionFilter(String decisionFilter) {
+        if (decisionFilter == null || decisionFilter.isBlank()) {
+            return null;
+        }
+        return switch (decisionFilter.trim().toUpperCase(Locale.ENGLISH)) {
+            case "APPROVED", "ACCEPT", "ACCEPTED" -> BoardDecision.APPROVED;
+            case "REJECTED", "REJECT" -> BoardDecision.REJECTED;
+            default -> null;
+        };
+    }
+
+    private String boardDecisionLabel(BoardDecision decision) {
+        return decision == BoardDecision.APPROVED ? "Approved" : "Rejected";
+    }
+
     private String accountantDecisionFilterLabel(String decisionFilter) {
         if (decisionFilter == null || decisionFilter.isBlank() || "ALL".equalsIgnoreCase(decisionFilter)) {
             return "All decisions";
@@ -1997,6 +2270,19 @@ public class LoanReportService {
         return "APPROVED".equalsIgnoreCase(decisionFilter)
             ? "Approved"
             : "Rejected";
+    }
+
+    private String boardDecisionFilterLabel(String decisionFilter) {
+        if (decisionFilter == null || decisionFilter.isBlank() || "ALL".equalsIgnoreCase(decisionFilter)) {
+            return "All decisions";
+        }
+        return "APPROVED".equalsIgnoreCase(decisionFilter)
+            ? "Approved"
+            : "Rejected";
+    }
+
+    private OffsetDateTime reviewSortTime(BoardReview review) {
+        return review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt();
     }
 
     private boolean matchesApplicantStation(LoanApplication loan, String stationId) {
@@ -2084,7 +2370,7 @@ public class LoanReportService {
             formatDate(loan.getFinalDueDate()),
             formatMemberLoanStatus(loan),
             member.getFullName(),
-            DATE_FORMATTER.format(LocalDate.now())
+            DATE_FORMATTER.format(applicationClock.today())
         );
     }
 
@@ -2565,7 +2851,7 @@ public class LoanReportService {
     }
 
     private String formatTimestamp(OffsetDateTime dateTime) {
-        return dateTime == null ? "-" : dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        return dateTime == null ? "-" : applicationClock.zoned(dateTime).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
     private static String sanitizePdfText(String text) {
@@ -3759,6 +4045,34 @@ public class LoanReportService {
         LoanApplication loan
     ) {}
 
+    public record BoardWorkflowReport(
+        UUID reviewerId,
+        String saccoId,
+        ApprovalWorkflowStage reviewStage,
+        LocalDate fromDate,
+        LocalDate toDate,
+        String decisionFilter,
+        BoardWorkflowSummary summary,
+        List<BoardWorkflowEntry> entries,
+        Map<UUID, Member> applicantMap
+    ) {}
+
+    public record BoardWorkflowSummary(
+        long reviewedCount,
+        long approvedCount,
+        long rejectedCount,
+        BigDecimal reviewedAmount
+    ) {
+        public String getReviewedAmountLabel() {
+            return formatMoneyStatic(reviewedAmount);
+        }
+    }
+
+    public record BoardWorkflowEntry(
+        BoardReview review,
+        LoanApplication loan
+    ) {}
+
     public record DisbursementLoanReport(
         UUID disbursementOfficerId,
         String saccoId,
@@ -3795,6 +4109,234 @@ public class LoanReportService {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
         java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
         return format.format(safe);
+    }
+
+    private static final class StaffReviewPdfRenderer {
+        private static final float MARGIN = 34f;
+        private static final float TOP_MARGIN = 42f;
+        private static final float BOTTOM_MARGIN = 52f;
+        private static final float TITLE_SIZE = 18f;
+        private static final float SUBTITLE_SIZE = 11f;
+        private static final float META_SIZE = 8.6f;
+        private static final float HEADER_SIZE = 7.2f;
+        private static final float BODY_SIZE = 7.6f;
+        private static final float CELL_PADDING_X = 6f;
+        private static final float CELL_PADDING_Y = 6f;
+        private static final Color TEXT_COLOR = new Color(17, 24, 39);
+        private static final Color MUTED_COLOR = new Color(71, 85, 105);
+        private static final Color BORDER_COLOR = new Color(218, 225, 232);
+        private static final Color HEADER_FILL = new Color(248, 250, 252);
+        private static final Color RULE_COLOR = new Color(31, 41, 55);
+
+        private final PDDocument document;
+        private final String saccoName;
+        private final String title;
+        private final String subtitle;
+        private final String periodLine;
+        private final String summaryLine;
+        private final String generatedDate;
+        private final String footerTitle;
+        private final String[] headers;
+        private final float[] widths;
+        private final List<String[]> rows;
+        private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN);
+        private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.TIMES_BOLD);
+        private PDPage page;
+        private PDPageContentStream stream;
+        private float y;
+
+        private StaffReviewPdfRenderer(PDDocument document,
+                                       String saccoName,
+                                       String title,
+                                       String subtitle,
+                                       String periodLine,
+                                       String summaryLine,
+                                       String generatedDate,
+                                       String footerTitle,
+                                       String[] headers,
+                                       float[] widths,
+                                       List<String[]> rows) {
+            this.document = document;
+            this.saccoName = sanitizePdfText(saccoName).toUpperCase(Locale.ROOT);
+            this.title = sanitizePdfText(title);
+            this.subtitle = sanitizePdfText(subtitle);
+            this.periodLine = sanitizePdfText(periodLine);
+            this.summaryLine = sanitizePdfText(summaryLine);
+            this.generatedDate = sanitizePdfText(generatedDate);
+            this.footerTitle = sanitizePdfText(footerTitle);
+            this.headers = headers;
+            this.widths = scaleWidths(widths, PDRectangle.A4.getWidth() - (MARGIN * 2f));
+            this.rows = rows;
+        }
+
+        private void render() throws IOException {
+            startPage();
+            drawTableHeader();
+            for (String[] row : rows) {
+                drawBodyRow(row);
+            }
+            closeContent();
+            drawFooters();
+        }
+
+        private void startPage() throws IOException {
+            closeContent();
+            page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            stream = new PDPageContentStream(document, page);
+            y = page.getMediaBox().getHeight() - TOP_MARGIN;
+            drawHeader();
+        }
+
+        private void closeContent() throws IOException {
+            if (stream != null) {
+                stream.close();
+                stream = null;
+            }
+        }
+
+        private void drawHeader() throws IOException {
+            writeText(saccoName, MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
+            writeRightAligned("Generated: " + generatedDate, page.getMediaBox().getWidth() - MARGIN, y - 2f, bold, META_SIZE, TEXT_COLOR);
+            y -= 19f;
+            writeText(title, MARGIN, y, bold, TITLE_SIZE - 2f, TEXT_COLOR);
+            y -= 18f;
+            writeText(subtitle, MARGIN, y, regular, SUBTITLE_SIZE, MUTED_COLOR);
+            y -= 17f;
+            writeText(periodLine, MARGIN, y, regular, META_SIZE, MUTED_COLOR);
+            y -= 12f;
+            writeText(summaryLine, MARGIN, y, regular, META_SIZE, MUTED_COLOR);
+            y -= 16f;
+            stream.setStrokingColor(RULE_COLOR);
+            stream.moveTo(MARGIN, y);
+            stream.lineTo(page.getMediaBox().getWidth() - MARGIN, y);
+            stream.stroke();
+            y -= 18f;
+        }
+
+        private void drawTableHeader() throws IOException {
+            drawRow(headers, bold, HEADER_SIZE, true);
+        }
+
+        private void drawBodyRow(String[] row) throws IOException {
+            float rowHeight = measureRow(row, regular, BODY_SIZE);
+            if (y - rowHeight < BOTTOM_MARGIN) {
+                startPage();
+                drawTableHeader();
+            }
+            drawRow(row, regular, BODY_SIZE, false);
+        }
+
+        private void drawRow(String[] cells, PDType1Font font, float fontSize, boolean header) throws IOException {
+            float rowHeight = measureRow(cells, font, fontSize);
+            float x = MARGIN;
+            float lineHeight = fontSize + 2.2f;
+            for (int i = 0; i < widths.length; i++) {
+                stream.setNonStrokingColor(header ? HEADER_FILL : Color.WHITE);
+                stream.addRect(x, y - rowHeight, widths[i], rowHeight);
+                stream.fill();
+                stream.setStrokingColor(BORDER_COLOR);
+                stream.addRect(x, y - rowHeight, widths[i], rowHeight);
+                stream.stroke();
+
+                List<String> lines = wrap(cell(cells, i), font, fontSize, widths[i] - (CELL_PADDING_X * 2f));
+                float textY = y - CELL_PADDING_Y - fontSize;
+                for (String line : lines) {
+                    writeText(line, x + CELL_PADDING_X, textY, font, fontSize, TEXT_COLOR);
+                    textY -= lineHeight;
+                }
+                x += widths[i];
+            }
+            y -= rowHeight;
+        }
+
+        private float measureRow(String[] cells, PDType1Font font, float fontSize) throws IOException {
+            int maxLines = 1;
+            for (int i = 0; i < widths.length; i++) {
+                maxLines = Math.max(maxLines, wrap(cell(cells, i), font, fontSize, widths[i] - (CELL_PADDING_X * 2f)).size());
+            }
+            return Math.max(26f, (CELL_PADDING_Y * 2f) + (maxLines * (fontSize + 2.2f)));
+        }
+
+        private List<String> wrap(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+            String safe = sanitizePdfText(text);
+            List<String> lines = new ArrayList<>();
+            for (String paragraph : safe.split("\\n", -1)) {
+                StringBuilder current = new StringBuilder();
+                for (String token : paragraph.split("\\s+")) {
+                    String candidate = current.isEmpty() ? token : current + " " + token;
+                    if (stringWidth(candidate, font, fontSize) > maxWidth && !current.isEmpty()) {
+                        lines.add(current.toString());
+                        current = new StringBuilder(token);
+                    } else {
+                        current = new StringBuilder(candidate);
+                    }
+                }
+                if (!current.isEmpty()) {
+                    lines.add(current.toString());
+                }
+            }
+            return lines.isEmpty() ? List.of("-") : lines;
+        }
+
+        private void drawFooters() throws IOException {
+            int total = document.getNumberOfPages();
+            for (int i = 0; i < total; i++) {
+                PDPage footerPage = document.getPage(i);
+                try (PDPageContentStream footerStream = new PDPageContentStream(document, footerPage, PDPageContentStream.AppendMode.APPEND, true, true)) {
+                    float footerY = BOTTOM_MARGIN - 20f;
+                    footerStream.setStrokingColor(RULE_COLOR);
+                    footerStream.moveTo(MARGIN, footerY + 16f);
+                    footerStream.lineTo(footerPage.getMediaBox().getWidth() - MARGIN, footerY + 16f);
+                    footerStream.stroke();
+                    writeText(footerStream, saccoName + " | " + footerTitle, MARGIN, footerY, regular, META_SIZE, TEXT_COLOR);
+                    writeRightAligned(footerStream, "Page " + (i + 1) + " of " + total, footerPage.getMediaBox().getWidth() - MARGIN, footerY, bold, META_SIZE, TEXT_COLOR);
+                }
+            }
+        }
+
+        private void writeText(String text, float x, float y, PDType1Font font, float size, Color color) throws IOException {
+            writeText(stream, text, x, y, font, size, color);
+        }
+
+        private void writeRightAligned(String text, float rightX, float y, PDType1Font font, float size, Color color) throws IOException {
+            writeRightAligned(stream, text, rightX, y, font, size, color);
+        }
+
+        private static void writeText(PDPageContentStream target, String text, float x, float y, PDType1Font font, float size, Color color) throws IOException {
+            target.beginText();
+            target.setNonStrokingColor(color);
+            target.setFont(font, size);
+            target.newLineAtOffset(x, y);
+            target.showText(sanitizePdfLineText(text));
+            target.endText();
+        }
+
+        private static void writeRightAligned(PDPageContentStream target, String text, float rightX, float y, PDType1Font font, float size, Color color) throws IOException {
+            float width = stringWidth(sanitizePdfLineText(text), font, size);
+            writeText(target, text, rightX - width, y, font, size, color);
+        }
+
+        private static String cell(String[] cells, int index) {
+            return cells != null && index < cells.length ? cells[index] : "";
+        }
+
+        private static float stringWidth(String text, PDType1Font font, float fontSize) throws IOException {
+            return font.getStringWidth(sanitizePdfLineText(text)) / 1000f * fontSize;
+        }
+
+        private static float[] scaleWidths(float[] rawWidths, float targetWidth) {
+            float total = 0f;
+            for (float width : rawWidths) {
+                total += width;
+            }
+            float scale = total == 0f ? 1f : targetWidth / total;
+            float[] scaled = new float[rawWidths.length];
+            for (int i = 0; i < rawWidths.length; i++) {
+                scaled[i] = rawWidths[i] * scale;
+            }
+            return scaled;
+        }
     }
 
     private static final class PDFCursor {
@@ -4270,13 +4812,15 @@ public class LoanReportService {
         private final MemberLoanReport report;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        private final String generatedDate;
         private PDPage page;
         private PDPageContentStream stream;
         private float y;
 
-        private MemberPdfRenderer(PDDocument document, MemberLoanReport report) {
+        private MemberPdfRenderer(PDDocument document, MemberLoanReport report, String generatedDate) {
             this.document = document;
             this.report = report;
+            this.generatedDate = generatedDate;
         }
 
         private void render() throws IOException {
@@ -4318,7 +4862,7 @@ public class LoanReportService {
             ensureSpace(56f);
             writeText(sanitizePdfText("Member Loan Report"), MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
             writeRightAligned(
-                "Generated: " + DATE_FORMATTER.format(LocalDate.now()),
+                "Generated: " + generatedDate,
                 page.getMediaBox().getWidth() - MARGIN,
                 y + 1f,
                 regular,
@@ -4638,7 +5182,7 @@ public class LoanReportService {
             stream.lineTo(page.getMediaBox().getWidth() - MARGIN, footerY + 10f);
             stream.stroke();
             String preparedBy = sanitizePdfText(report.member().getFullName());
-            String preparedDate = DATE_FORMATTER.format(LocalDate.now());
+            String preparedDate = generatedDate;
             writeText("Prepared by: " + preparedBy, MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
             writeRightAligned("Date: " + preparedDate, page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
         }

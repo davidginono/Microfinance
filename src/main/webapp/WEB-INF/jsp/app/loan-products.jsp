@@ -119,7 +119,7 @@
                     </div>
                 </div>
             </div>
-            <div id="productsFinancialCard" class="hidden erp-table-wrap overflow-x-auto">
+            <div id="productsFinancialCard" class="hidden erp-table-wrap erp-table-scroll erp-table-scroll-sm">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -137,7 +137,7 @@
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
                     </div>
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm">
                     <table class="erp-table">
                         <thead>
                         <tr>
@@ -189,7 +189,7 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
             <tr>

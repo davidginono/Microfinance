@@ -83,6 +83,7 @@ logging:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
+  time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
   outbox:

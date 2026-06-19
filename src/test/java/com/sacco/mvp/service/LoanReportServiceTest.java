@@ -70,7 +70,8 @@ class LoanReportServiceTest {
             JsonMapper.builder().findAndAddModules().build(),
             loanAnalyticsService,
             registeredSaccoRepository,
-            saccoStationRepository
+            saccoStationRepository,
+            new ApplicationClock("Africa/Nairobi")
         );
     }
 

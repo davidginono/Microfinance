@@ -557,6 +557,64 @@ button:active {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
 }
+.erp-table-toolbar {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: end;
+    gap: 0.65rem;
+    margin-bottom: 0.8rem;
+}
+.erp-table-toolbar > * {
+    min-width: 0;
+}
+.erp-table-toolbar__search {
+    flex: 1 1 16rem;
+}
+.erp-table-toolbar__control {
+    flex: 0 1 12rem;
+}
+.erp-table-toolbar__actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+.erp-table-toolbar input,
+.erp-table-toolbar select,
+.erp-table-toolbar .app-btn,
+.erp-table-toolbar button {
+    min-height: 2.75rem;
+}
+.erp-table-scroll {
+    --erp-table-height: clamp(18rem, 48vh, 34rem);
+    max-width: 100%;
+    max-height: var(--erp-table-height);
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
+}
+.erp-table-scroll-sm {
+    --erp-table-height: clamp(14rem, 34vh, 24rem);
+}
+.erp-table-scroll-lg {
+    --erp-table-height: clamp(22rem, 58vh, 42rem);
+}
+.erp-table-scroll .erp-table,
+.erp-table-scroll table {
+    min-width: max(100%, 56rem);
+}
+.erp-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f8fafc;
+    box-shadow: inset 0 -1px 0 #e5e7eb;
+}
+.erp-table-scroll tbody tr:last-child td {
+    border-bottom: 0;
+}
+.erp-table-actions {
+    white-space: nowrap;
+}
 .erp-table {
     width: 100%;
     border-collapse: collapse;
@@ -833,6 +891,9 @@ button:active {
     .erp-table th,
     .erp-table td {
         padding: 0.6rem 0.7rem;
+    }
+    .erp-table-scroll {
+        --erp-table-height: min(28rem, 62vh);
     }
     .erp-stat-value {
         font-size: 1.45rem;

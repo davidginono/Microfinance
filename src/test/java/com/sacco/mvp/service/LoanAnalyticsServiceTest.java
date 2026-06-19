@@ -49,7 +49,8 @@ class LoanAnalyticsServiceTest {
             loanApplicationRepository,
             managerReviewRepository,
             boardReviewRepository,
-            loanProductSettingRepository
+            loanProductSettingRepository,
+            new ApplicationClock("Africa/Nairobi")
         );
 
         when(managerReviewRepository.findForAnalytics(

@@ -1127,8 +1127,10 @@ function bucketCount(series, interval) {
 
 function visibleTrendSeries(series) {
     const staffNames = ['Reviewed', 'Approved', 'Rejected', 'Pending'];
-    const hasStaffSeries = series.some(function (item) { return staffNames.indexOf(item.name) >= 0; });
-    const names = hasStaffSeries ? staffNames : ['Applied', 'Disbursed', 'Paid', 'Defaulted'];
+    const stationNames = ['Applied', 'Active', 'Disbursed', 'Paid', 'Defaulted', 'Forfeited', 'Rejected'];
+    const staffOnlyNames = ['Reviewed', 'Approved', 'Pending'];
+    const hasStaffSeries = series.some(function (item) { return staffOnlyNames.indexOf(item.name) >= 0; });
+    const names = hasStaffSeries ? staffNames : stationNames;
     return series.filter(function (item) {
         return names.indexOf(item.name) >= 0;
     });

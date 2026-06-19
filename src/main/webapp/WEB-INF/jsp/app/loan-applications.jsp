@@ -23,7 +23,7 @@
         setTimeout(function () { window.location.reload(); }, 3600000);
     </script>
 </c:if>
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
             <tr>
