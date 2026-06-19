@@ -622,14 +622,6 @@ button:active {
 .erp-table-scroll table {
     min-width: max(100%, 56rem);
 }
-.erp-table-scroll .erp-table th,
-.erp-table-scroll .erp-table td {
-    border-right: 1px solid #e5e7eb;
-}
-.erp-table-scroll .erp-table th:last-child,
-.erp-table-scroll .erp-table td:last-child {
-    border-right: 0;
-}
 .erp-table-scroll thead th {
     position: sticky;
     top: 0;

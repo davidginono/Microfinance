@@ -221,6 +221,36 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function niceTickStep(value) {
+            const exponent = Math.floor(Math.log10(value));
+            const fraction = value / Math.pow(10, exponent);
+            let niceFraction = 1;
+            if (fraction > 5) {
+                niceFraction = 10;
+            } else if (fraction > 2) {
+                niceFraction = 5;
+            } else if (fraction > 1) {
+                niceFraction = 2;
+            }
+            return niceFraction * Math.pow(10, exponent);
+        }
+
+        function buildYAxis(maxValue) {
+            const rawMax = Math.max(1, Math.ceil(Number(maxValue || 0)));
+            let step;
+            if (rawMax <= 6) {
+                step = 1;
+            } else {
+                step = niceTickStep(rawMax / 4);
+            }
+            const axisMax = Math.max(step, Math.ceil(rawMax / step) * step);
+            const ticks = [];
+            for (let value = 0; value <= axisMax + (step / 2); value += step) {
+                ticks.push(Math.round(value));
+            }
+            return { max: axisMax, ticks: ticks };
+        }
+
         function drawChart(rows) {
             const dpr = window.devicePixelRatio || 1;
             const parentWidth = chart.parentElement ? chart.parentElement.clientWidth : chart.clientWidth;
@@ -242,28 +272,35 @@
             }
 
             const compact = cssWidth < 520;
-            const padding = { top: 20, right: compact ? 10 : 20, bottom: compact ? 54 : 42, left: compact ? 34 : 44 };
+            const maxValue = Math.max(1, ...data.map(function (row) { return Number(row.total || 0); }));
+            const axis = buildYAxis(maxValue);
+            let padding = { top: 20, right: compact ? 10 : 20, bottom: compact ? 54 : 42, left: compact ? 34 : 44 };
+            ctx.font = '11px Manrope, sans-serif';
+            padding.left = Math.max(padding.left, Math.ceil(ctx.measureText(formatNumber(axis.max)).width) + 14);
             const width = cssWidth - padding.left - padding.right;
             const height = cssHeight - padding.top - padding.bottom;
-            const max = Math.max(1, ...data.map(function (row) { return Number(row.total || 0); }));
-
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 4; i++) {
-                const y = padding.top + (height * i / 4);
-                ctx.beginPath();
-                ctx.moveTo(padding.left, y);
-                ctx.lineTo(padding.left + width, y);
-                ctx.stroke();
-            }
 
             function x(index) {
                 return data.length === 1 ? padding.left + width / 2 : padding.left + width * index / (data.length - 1);
             }
 
             function y(value) {
-                return padding.top + height - ((Number(value || 0) / max) * height);
+                return padding.top + height - ((Number(value || 0) / axis.max) * height);
             }
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#64748b';
+            ctx.font = '11px Manrope, sans-serif';
+            ctx.textAlign = 'right';
+            axis.ticks.forEach(function (tick) {
+                const gridY = y(tick);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, gridY);
+                ctx.lineTo(padding.left + width, gridY);
+                ctx.stroke();
+                ctx.fillText(formatNumber(tick), padding.left - 8, gridY + 4);
+            });
 
             ctx.beginPath();
             data.forEach(function (row, index) {
@@ -303,9 +340,6 @@
                     }
                 }
             });
-            ctx.textAlign = 'right';
-            ctx.fillText(String(max), padding.left - 8, padding.top + 4);
-            ctx.fillText('0', padding.left - 8, padding.top + height + 4);
         }
 
         function renderBreakdown(container, rows) {
