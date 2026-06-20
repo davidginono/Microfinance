@@ -40,6 +40,7 @@ import com.sacco.mvp.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -58,6 +59,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -1200,6 +1202,10 @@ class AdminServiceTest {
         assertThat(product.getCommitteePriority()).isEqualTo(1);
         assertThat(product.getAccountantPriority()).isEqualTo(2);
         assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.LOAN_OFFICER);
+        InOrder reviewerReplacement = inOrder(loanProductBoardReviewerRepository);
+        reviewerReplacement.verify(loanProductBoardReviewerRepository).deleteByLoanProductSettingId(productId);
+        reviewerReplacement.verify(loanProductBoardReviewerRepository).flush();
+        reviewerReplacement.verify(loanProductBoardReviewerRepository).save(any());
     }
 
     @Test

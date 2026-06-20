@@ -2577,6 +2577,7 @@ public class AdminService {
 
     private void replaceLoanProductBoardReviewers(LoanProductSetting product, List<UUID> boardReviewerIds) {
         loanProductBoardReviewerRepository.deleteByLoanProductSettingId(product.getId());
+        loanProductBoardReviewerRepository.flush();
         if (boardReviewerIds == null || boardReviewerIds.isEmpty()) {
             return;
         }
