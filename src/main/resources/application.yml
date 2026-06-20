@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:./application-local.yml
   sql:
     init:
       mode: never
@@ -30,16 +32,16 @@ spring:
       cache:
         period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
   mail:
-    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
-    port: ${SPRING_MAIL_PORT:587}
-    username: ${SPRING_MAIL_USERNAME:davidginono625@gmail.com}
-    password: ${SPRING_MAIL_PASSWORD:xgii umdj qghc egyp}
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:no-reply@sacco.local}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          auth: ${SPRING_MAIL_SMTP_AUTH:false}
           starttls:
-            enable: ${SPRING_MAIL_SMTP_STARTTLS:true}
+            enable: ${SPRING_MAIL_SMTP_STARTTLS:false}
   security:
     oauth2:
       client:
@@ -84,6 +86,8 @@ logging:
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
   time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
+  mail:
+    override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
   outbox:

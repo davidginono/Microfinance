@@ -133,6 +133,7 @@ Important notes:
 - Java 21
 - Maven 3.9+
 - PostgreSQL
+- Mailpit for local email capture
 
 ### Run locally
 
@@ -143,6 +144,14 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 Application URL:
 
 - [http://localhost:8080](http://localhost:8080)
+
+Local OTP and notification emails are captured by Mailpit when it is running:
+
+- SMTP: `localhost:1025`
+- Inbox UI: [http://localhost:8025](http://localhost:8025)
+- Local user: `no-reply@sacco.local`
+- Local password: `sacco_dev_password`
+- Local recipient override: `ginonodavid625@gmail.com`
 
 ### Compile
 
@@ -186,8 +195,16 @@ spring:
   datasource:
     password: your-local-db-password
   mail:
-    username: your-mail-username
+    host: smtp.example.com
+    port: 587
+    username: your-from-address@example.com
     password: your-mail-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 Legacy filesystem uploads can be imported once after applying `V40__store_uploads_in_postgresql.sql` by starting the
 application with `APP_UPLOAD_MIGRATION_ENABLED=true`. The runner verifies database size and SHA-256 before deleting each
@@ -231,6 +248,7 @@ Default compose services:
 
 - app on port `8080`
 - PostgreSQL on port `5432`
+- Mailpit SMTP on port `1025` and inbox UI on port `8025`
 
 ## Important Routes
 

@@ -22,6 +22,9 @@ public class NotificationEmailService {
     @Value("${spring.mail.username:no-reply@sacco.local}")
     private String fromAddress;
 
+    @Value("${app.mail.override-recipient:}")
+    private String overrideRecipient;
+
     public void sendDirectEmail(String email, String subject, String message) {
         if (email == null || email.isBlank()) {
             return;
@@ -34,7 +37,7 @@ public class NotificationEmailService {
 
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
-            mail.setTo(email);
+            mail.setTo(resolveRecipient(email));
             mail.setFrom(fromAddress);
             mail.setSubject(subject);
             mail.setText(message);
@@ -53,5 +56,12 @@ public class NotificationEmailService {
             return;
         }
         sendDirectEmail(recipient.getEmail(), subject, message);
+    }
+
+    private String resolveRecipient(String email) {
+        if (overrideRecipient != null && !overrideRecipient.isBlank()) {
+            return overrideRecipient.trim().toLowerCase();
+        }
+        return email.trim();
     }
 }

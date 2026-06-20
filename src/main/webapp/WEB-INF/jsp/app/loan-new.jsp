@@ -263,7 +263,7 @@
                 <p class="text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
             </div>
         </div>
-        <div class="erp-table-wrap overflow-x-auto">
+        <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm">
             <table class="erp-table">
                 <thead>
                 <tr>
