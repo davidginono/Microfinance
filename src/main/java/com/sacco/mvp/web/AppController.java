@@ -2043,8 +2043,6 @@ public class AppController {
         if (app == null
             || app.getFinancialSnapshot() == null
             || app.getFinancialSnapshot().isBlank()
-            || app.getStatus() == LoanStatus.DRAFT
-            || app.getStatus() == LoanStatus.AWAITING_GUARANTORS
             || app.getStatus() == LoanStatus.FINAL_APPROVED
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID) {
