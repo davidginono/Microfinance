@@ -1471,6 +1471,7 @@ public class AppController {
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
             eligibilityMap.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+            eligibilityMap.put("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
             eligibilityMap.put("ratioPercentLabel",
                 eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
             response.put("eligibility", eligibilityMap);
@@ -1500,6 +1501,7 @@ public class AppController {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("savingsLabel", formatTzs(eligibility.savings()));
+        response.put("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
         response.put("ratioPercentLabel", eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
         response.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
         response.put("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
@@ -2017,6 +2019,7 @@ public class AppController {
         model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds));
         model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
         model.addAttribute("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+        model.addAttribute("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
         model.addAttribute("ratioPercentLabel",
             eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
         model.addAttribute("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
@@ -2202,6 +2205,11 @@ public class AppController {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
         DecimalFormat format = new DecimalFormat("#,##0.00", symbols);
         return "TSh " + format.format(safeAmount);
+    }
+
+    private String formatSavingsMultiple(BigDecimal ratio) {
+        BigDecimal safeRatio = ratio == null ? BigDecimal.ZERO : ratio.setScale(4, RoundingMode.HALF_UP).stripTrailingZeros();
+        return safeRatio.toPlainString() + "x your savings";
     }
 
     private BigDecimal readBigDecimal(Object value) {

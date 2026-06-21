@@ -1048,6 +1048,8 @@ public class AdminController {
                 fieldErrors.put("maximumAmount", message);
             case "Savings ratio must be greater than zero." ->
                 fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple must be greater than zero.");
+            case "Savings ratio cannot exceed ten times savings." ->
+                fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple cannot be more than 10x savings.");
             case "Guarantors required cannot be negative." ->
                 fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
             case "Guarantors required must be between 0 and 15." ->

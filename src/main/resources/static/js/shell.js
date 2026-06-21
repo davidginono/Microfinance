@@ -62,10 +62,9 @@
         }
         const settings = options || {};
         const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
-        const modalOpen = Boolean(document.querySelector('.app-modal-overlay.is-open'));
         const duration = Number.isFinite(settings.duration)
             ? settings.duration
-            : (variant === 'error' && modalOpen ? 0 : (variant === 'error' ? 5200 : 3600));
+            : (variant === 'error' ? 5200 : 3600);
         const toast = document.createElement('div');
         toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm ' +
             (variant === 'success' ? 'app-toast-success' : variant === 'error' ? 'app-toast-error' : 'app-toast-info');

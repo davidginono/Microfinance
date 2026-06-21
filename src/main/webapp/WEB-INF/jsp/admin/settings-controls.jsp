@@ -1144,13 +1144,13 @@
                                         <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
                                     </div>
                                     <div class="savings-multiplier-control mt-1">
-                                        <input type="number" min="0.01" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan savings multiplier" data-savings-multiplier />
+                                        <input type="number" min="0.01" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan savings multiplier" data-savings-multiplier />
                                         <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
                                     </div>
                                     <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
-                                        <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                        <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
                                         <span class="savings-fraction-divider">/</span>
-                                        <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                        <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
                                     </div>
                                 </div>
                             </div>
@@ -1607,13 +1607,13 @@
                                     <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
                                 </div>
                                 <div class="savings-multiplier-control mt-1">
-                                    <input type="number" min="0.01" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
+                                    <input type="number" min="0.01" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
                                     <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
                                 </div>
                                 <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
-                                    <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
+                                    <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
                                     <span class="savings-fraction-divider">/</span>
-                                    <input type="number" min="1" max="9" step="1" maxlength="1" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
+                                    <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
                                 </div>
                             </div>
                         </div>
@@ -1909,7 +1909,7 @@
 <spring:message code="admin.settings.validation.minimumAmount" text="Minimum amount cannot be negative." var="validationMinimumAmount" />
 <spring:message code="admin.settings.validation.maximumAmountPositive" text="Maximum amount must be greater than zero." var="validationMaximumAmountPositive" />
 <spring:message code="admin.settings.validation.maximumBelowMinimum" text="Maximum amount cannot be lower than the minimum amount." var="validationMaximumBelowMinimum" />
-<spring:message code="admin.settings.validation.savingsPercent" text="Loan savings multiple must be greater than zero." var="validationSavingsPercent" />
+<spring:message code="admin.settings.validation.savingsPercent" text="Loan savings multiple must be greater than zero and no more than 10x." var="validationSavingsPercent" />
 <spring:message code="admin.settings.validation.insurancePercent" text="Insurance percentage cannot be negative." var="validationInsurancePercent" />
 <spring:message code="admin.settings.validation.annualInterestPercent" text="Annual interest percentage cannot be negative." var="validationAnnualInterestPercent" />
 <spring:message code="admin.settings.validation.minRepaymentMonths" text="Minimum repayment period must be at least 1 month." var="validationMinRepaymentMonths" />
@@ -2387,8 +2387,8 @@
                 let bestNumerator = 1;
                 let bestDenominator = 1;
                 let bestError = Math.abs(ratio - 1);
-                for (let denominator = 1; denominator <= 9; denominator += 1) {
-                    const numerator = Math.max(1, Math.min(9, Math.round(ratio * denominator)));
+                for (let denominator = 1; denominator <= 10; denominator += 1) {
+                    const numerator = Math.max(1, Math.min(10, Math.round(ratio * denominator)));
                     const error = Math.abs(ratio - numerator / denominator);
                     if (error < bestError) {
                         bestNumerator = numerator;
@@ -2452,10 +2452,10 @@
                     return null;
                 }
                 const rawDigits = String(field.value || '').replace(/\D/g, '');
-                const digit = rawDigits ? Number(rawDigits.charAt(0)) : null;
-                const clamped = digit == null || !Number.isFinite(digit)
+                const fractionValue = rawDigits ? Number(rawDigits.slice(0, 2)) : null;
+                const clamped = fractionValue == null || !Number.isFinite(fractionValue)
                     ? null
-                    : Math.max(1, Math.min(9, digit));
+                    : Math.max(1, Math.min(10, fractionValue));
                 if (clamped == null) {
                     field.value = '';
                     return null;
@@ -2696,7 +2696,7 @@
                         addValidationError(errors, 'maximumAmount', productSettingsText.validationMaximumBelowMinimum);
                     }
                 }
-                if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent <= 0) {
+                if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent <= 0 || savingsPercent > 1000) {
                     addValidationError(errors, 'maxLoanSavingsPercent', productSettingsText.validationSavingsPercent);
                 }
                 if (insurancePercent === null || Number.isNaN(insurancePercent) || insurancePercent < 0) {

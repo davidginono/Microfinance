@@ -669,7 +669,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
                     <p class="erp-stat-value">${totalApplications}</p>
-                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.applications.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 7L13 3.293A1 1 0 0012.293 3H4z"/></svg>
@@ -684,7 +683,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
                     <p class="erp-stat-value">${activeLoanCount}</p>
-                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.activeLoans.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v3H4V4zm0 5h12v7H4V9zm2 2v3h4v-3H6z"/></svg>
@@ -699,7 +697,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
                     <p class="erp-stat-value">${pendingGuaranteeApprovals}</p>
-                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.guarantorRequests.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v5a3 3 0 003 3h8a3 3 0 003-3v-5a2 2 0 00-2-2h-1V6a4 4 0 00-4-4z"/></svg>
@@ -714,7 +711,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>
                     <p class="erp-stat-value">${rejectedLoanCount}</p>
-                    <p class="erp-stat-meta"><spring:message code="dashboard.stat.archivedRejections.meta" /></p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-10.293l-4 4a1 1 0 01-1.414 0l-2-2 1.414-1.414L9 9.586l3.293-3.293 1.414 1.414z"/></svg>
@@ -742,16 +738,13 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.savings.label" /></p>
                     <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
-                    <p class="mt-2 text-sm text-slate-500"><spring:message code="dashboard.savings.meta" /></p>
                 </div>
 
                 <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.shares.label" /></p>
                     <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
-                    <p class="mt-2 text-sm text-slate-500"><spring:message code="dashboard.shares.meta" /></p>
                 </div>
             </div>
-            <p class="mt-4 text-sm text-slate-500" data-live-account-status-message>${dashboardExternalAccountStatus.statusMessage}</p>
         </div>
     </section>
 

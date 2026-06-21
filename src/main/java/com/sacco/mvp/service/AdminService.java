@@ -42,6 +42,7 @@ public class AdminService {
     private static final int MAX_PRODUCT_VERSION_HISTORY = 3;
     private static final int MAX_LOAN_PRODUCTS_VERSION_HISTORY = 3;
     private static final int MAX_WORKFLOW_COUNT = 15;
+    private static final BigDecimal MAX_LOAN_SAVINGS_RATIO = new BigDecimal("10.0000");
     private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");
     private static final DateTimeFormatter PRODUCT_VERSION_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -2261,7 +2262,11 @@ public class AdminService {
         if (ratio == null || ratio.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Savings ratio must be greater than zero.");
         }
-        return ratio.setScale(4, java.math.RoundingMode.HALF_UP);
+        BigDecimal normalized = ratio.setScale(4, java.math.RoundingMode.HALF_UP);
+        if (normalized.compareTo(MAX_LOAN_SAVINGS_RATIO) > 0) {
+            throw new IllegalStateException("Savings ratio cannot exceed ten times savings.");
+        }
+        return normalized;
     }
 
     private Integer normalizeGuarantorCount(Integer guarantorsRequired) {

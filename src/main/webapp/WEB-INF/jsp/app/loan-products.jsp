@@ -488,7 +488,7 @@
 
                 const eligibility = payload.eligibility || {};
                 savingsLabel.textContent = eligibility.savingsLabel || "-";
-                ratioLabel.textContent = eligibility.ratioPercentLabel || "-";
+                ratioLabel.textContent = eligibility.savingsMultipleLabel || eligibility.ratioPercentLabel || "-";
                 maxAllowedLabel.textContent = eligibility.maxAllowedLabel || "-";
                 eligibilityMessage.textContent = eligibility.eligible
                     ? msgWithinEligibility
