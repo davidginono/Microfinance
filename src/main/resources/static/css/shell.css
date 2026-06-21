@@ -877,6 +877,32 @@ button:active {
 .app-toast-exit {
     animation: toast-out 180ms ease-in forwards;
 }
+.app-toast-close {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    z-index: 1;
+    display: inline-flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.72);
+    color: currentColor;
+    opacity: 0.9;
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1;
+    transition: background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+}
+.app-toast-close:hover,
+.app-toast-close:focus-visible {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(100, 116, 139, 0.4);
+    opacity: 1;
+}
 .app-toast-success {
     border-color: #bbf7d0;
     background: #f0fdf4;
@@ -891,6 +917,39 @@ button:active {
     border-color: #bfdbfe;
     background: #eff6ff;
     color: #1d4ed8;
+}
+.tenure-unit-toggle-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.18rem;
+    min-height: 2.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.45rem;
+    background: #ffffff;
+    padding: 0.18rem;
+    box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.65);
+}
+.tenure-unit-toggle {
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: 0.32rem;
+    background: transparent;
+    color: #475569;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.tenure-unit-toggle:hover {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+.tenure-unit-toggle.is-active {
+    background: #9ACBEA;
+    border-color: #86bddd;
+    color: #0f172a;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.tenure-unit-toggle.is-active:hover {
+    background: #8DBFDE;
 }
 @media (max-width: 1024px) {
     .erp-page-title {

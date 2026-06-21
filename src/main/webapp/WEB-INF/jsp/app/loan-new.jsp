@@ -24,44 +24,6 @@
         padding-top: 0.5rem;
     }
 
-    .tenure-unit-toggle-group {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.18rem;
-        min-height: 2.65rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.45rem;
-        background: #ffffff;
-        padding: 0.18rem;
-        box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.65);
-    }
-
-    .tenure-unit-toggle {
-        min-width: 0;
-        border: 1px solid transparent;
-        border-radius: 0.32rem;
-        background: transparent;
-        color: #475569;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .tenure-unit-toggle:hover {
-        background: #f8fafc;
-        border-color: #e2e8f0;
-    }
-
-    .tenure-unit-toggle.is-active {
-        background: #9ACBEA;
-        border-color: #86bddd;
-        color: #0f172a;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-    }
-
-    .tenure-unit-toggle.is-active:hover {
-        background: #8DBFDE;
-    }
-
     #loanAmountDisplay::placeholder {
         color: #cbd5e1;
         opacity: 1;

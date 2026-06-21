@@ -49,7 +49,7 @@
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
                     <select id="productsLoanType" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
-                            <option value="${p.loanType}" data-max-months="${p.maxRepaymentMonths}">
+                            <option value="${p.loanType}" data-min-months="${p.minimumRepaymentMonths}" data-max-months="${p.maxRepaymentMonths}">
                                 <c:out value="${p.displayName}" />
                             </option>
                         </c:forEach>
@@ -63,10 +63,23 @@
                            placeholder="100,000.00" />
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.tenor.label" /></label>
-                    <input id="productsTenorMonths" type="number" min="1"
+                    <label id="productsTenorDisplayLabel" class="mb-1 block text-sm font-medium text-slate-700"
+                           data-month-label="<spring:message code='products.tenor.months.label' text='Total Months to Repay' />"
+                           data-year-label="<spring:message code='products.tenor.years.label' text='Total Years to Repay' />"><spring:message code="products.tenor.label" /></label>
+                    <input id="productsTenorMonths" type="hidden" />
+                    <div class="tenure-unit-toggle-group mb-2 text-sm" role="group" aria-label="<spring:message code='newloan.tenureUnit' text='Tenure unit' />">
+                        <button type="button" class="tenure-unit-toggle is-active px-3 py-2 transition" data-products-tenure-unit="MONTHS" aria-pressed="true"><spring:message code="common.months.label" text="Months" /></button>
+                        <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-products-tenure-unit="YEARS" aria-pressed="false"><spring:message code="common.years.label" text="Years" /></button>
+                    </div>
+                    <input id="productsTenorDisplay" type="number" min="1" step="1"
                            class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="12" />
+                    <p id="productsTenorRangeHelp" class="mt-1 text-xs text-slate-500"
+                       data-prefix="<spring:message code='newloan.allowedTenureRange' text='Allowed range:' />"
+                       data-to-label="<spring:message code='common.to' text='to' />"
+                       data-month-label="<spring:message code='common.months' text='month(s)' />"
+                       data-year-label="<spring:message code='common.years' text='year(s)' />"
+                       data-no-year-label="<spring:message code='products.tenor.noWholeYear' text='No full-year tenure for this product. Choose Months.' />"></p>
                 </div>
             </div>
 
@@ -280,6 +293,10 @@
         const amountInput = document.getElementById("productsLoanAmount");
         const amountDisplayInput = document.getElementById("productsLoanAmountDisplay");
         const tenorInput = document.getElementById("productsTenorMonths");
+        const tenorDisplayInput = document.getElementById("productsTenorDisplay");
+        const tenorDisplayLabel = document.getElementById("productsTenorDisplayLabel");
+        const tenorRangeHelp = document.getElementById("productsTenorRangeHelp");
+        const tenureUnitButtons = Array.from(document.querySelectorAll("[data-products-tenure-unit]"));
         const feedback = document.getElementById("productsFinancialFeedback");
         const loading = document.getElementById("productsFinancialLoading");
         const card = document.getElementById("productsFinancialCard");
@@ -304,6 +321,7 @@
         const msgNotCheckedStatus = "<spring:message code='products.eligibilityResult.notChecked' text='Not checked' />";
         const msgLoaded = "<spring:message code='products.js.loaded' />";
         const msgFailedLoad = "<spring:message code='products.js.failedLoad' />";
+        let tenureUnit = "MONTHS";
 
         if (modal) {
             modal.style.position = "fixed";
@@ -358,6 +376,145 @@
             amountDisplayInput.value = formatMoneyInputValue(normalized);
         }
 
+        function selectedProductOption() {
+            return loanTypeInput ? loanTypeInput.options[loanTypeInput.selectedIndex] : null;
+        }
+
+        function minTenorMonths() {
+            const option = selectedProductOption();
+            const value = Number(option ? option.dataset.minMonths : 1);
+            return Number.isFinite(value) && value > 0 ? Math.round(value) : 1;
+        }
+
+        function maxTenorMonths() {
+            const option = selectedProductOption();
+            const value = Number(option ? option.dataset.maxMonths : 0);
+            return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+        }
+
+        function yearsFromMonths(months, rounder) {
+            if (!Number.isFinite(months) || months <= 0) {
+                return 0;
+            }
+            return rounder(months / 12);
+        }
+
+        function visibleTenorBounds() {
+            const minMonths = minTenorMonths();
+            const maxMonths = maxTenorMonths();
+            if (tenureUnit === "YEARS") {
+                return {
+                    min: Math.max(1, yearsFromMonths(minMonths, Math.ceil)),
+                    max: maxMonths > 0 ? yearsFromMonths(maxMonths, Math.floor) : 0
+                };
+            }
+            return {
+                min: minMonths,
+                max: maxMonths
+            };
+        }
+
+        function hasWholeYearTenureOption() {
+            const maxMonths = maxTenorMonths();
+            return tenureUnit !== "YEARS" || maxMonths <= 0 || yearsFromMonths(maxMonths, Math.floor) >= Math.max(1, yearsFromMonths(minTenorMonths(), Math.ceil));
+        }
+
+        function renderTenureCopy() {
+            if (tenorDisplayLabel) {
+                tenorDisplayLabel.textContent = tenureUnit === "YEARS"
+                    ? (tenorDisplayLabel.dataset.yearLabel || "Total Years to Repay")
+                    : (tenorDisplayLabel.dataset.monthLabel || "Total Months to Repay");
+            }
+            if (!tenorRangeHelp) {
+                return;
+            }
+            if (!hasWholeYearTenureOption()) {
+                tenorRangeHelp.textContent = tenorRangeHelp.dataset.noYearLabel || "No full-year tenure for this product. Choose Months.";
+                return;
+            }
+            const bounds = visibleTenorBounds();
+            const prefix = tenorRangeHelp.dataset.prefix || "Allowed range:";
+            const toLabel = tenorRangeHelp.dataset.toLabel || "to";
+            const unitLabel = tenureUnit === "YEARS"
+                ? (tenorRangeHelp.dataset.yearLabel || "year(s)")
+                : (tenorRangeHelp.dataset.monthLabel || "month(s)");
+            tenorRangeHelp.textContent = maxTenorMonths() > 0
+                ? prefix + " " + bounds.min + " " + toLabel + " " + bounds.max + " " + unitLabel
+                : prefix + " " + bounds.min + "+ " + unitLabel;
+        }
+
+        function monthsFromVisibleTenor() {
+            const rawValue = Number(tenorDisplayInput ? tenorDisplayInput.value : tenorInput.value);
+            if (!Number.isFinite(rawValue) || rawValue <= 0) {
+                return "";
+            }
+            return tenureUnit === "YEARS" ? Math.round(rawValue) * 12 : Math.round(rawValue);
+        }
+
+        function refreshTenureConstraints() {
+            if (!tenorDisplayInput) {
+                return;
+            }
+            const bounds = visibleTenorBounds();
+            tenorDisplayInput.min = bounds.min;
+            if (bounds.max >= bounds.min) {
+                tenorDisplayInput.max = bounds.max;
+            } else {
+                tenorDisplayInput.removeAttribute("max");
+            }
+            tenorDisplayInput.step = "1";
+            tenorDisplayInput.placeholder = tenureUnit === "YEARS" ? "1" : "12";
+            renderTenureCopy();
+        }
+
+        function syncTenorInput() {
+            const months = monthsFromVisibleTenor();
+            tenorInput.value = months;
+            if (!tenorDisplayInput) {
+                return Boolean(months);
+            }
+            tenorDisplayInput.setCustomValidity("");
+            if (!months) {
+                return false;
+            }
+            if (tenureUnit === "YEARS" && !/^\d+$/.test(String(tenorDisplayInput.value || "").trim())) {
+                tenorDisplayInput.setCustomValidity("Enter whole years only.");
+                return false;
+            }
+            if (!hasWholeYearTenureOption()) {
+                tenorDisplayInput.setCustomValidity(tenorRangeHelp?.dataset.noYearLabel || "No full-year tenure for this product. Choose Months.");
+                return false;
+            }
+            const minMonths = minTenorMonths();
+            const maxMonths = maxTenorMonths();
+            if (months < minMonths || (maxMonths > 0 && months > maxMonths)) {
+                const bounds = visibleTenorBounds();
+                const unitLabel = tenureUnit === "YEARS" ? "years" : "months";
+                const rangeLabel = maxMonths > 0 ? "between " + bounds.min + " and " + bounds.max : "of at least " + bounds.min;
+                tenorDisplayInput.setCustomValidity("Choose a tenure " + rangeLabel + " " + unitLabel + ".");
+                return false;
+            }
+            return true;
+        }
+
+        function setTenureUnit(unit) {
+            const currentMonths = Number(tenorInput.value || monthsFromVisibleTenor());
+            tenureUnit = unit === "YEARS" ? "YEARS" : "MONTHS";
+            tenureUnitButtons.forEach(function (button) {
+                const active = button.dataset.productsTenureUnit === tenureUnit;
+                button.setAttribute("aria-pressed", active ? "true" : "false");
+                button.classList.toggle("is-active", active);
+            });
+            refreshTenureConstraints();
+            if (tenorDisplayInput && Number.isFinite(currentMonths) && currentMonths > 0) {
+                tenorDisplayInput.value = tenureUnit === "YEARS"
+                    ? String(Math.max(1, Math.round(currentMonths / 12)))
+                    : String(Math.round(currentMonths));
+            }
+            syncTenorInput();
+            clearPreview();
+        }
+
         function showFeedback(type, text) {
             feedback.classList.add("hidden");
             feedback.textContent = "";
@@ -396,8 +553,25 @@
             eligibilityStatus.classList.add("bg-slate-100", "text-slate-600");
         }
 
-        [loanTypeInput, tenorInput].forEach(function (input) {
+        [loanTypeInput, tenorDisplayInput].forEach(function (input) {
             input.addEventListener("change", clearPreview);
+        });
+        loanTypeInput.addEventListener("change", function () {
+            refreshTenureConstraints();
+            syncTenorInput();
+        });
+        tenorDisplayInput.addEventListener("input", function () {
+            syncTenorInput();
+            clearPreview();
+        });
+        tenorDisplayInput.addEventListener("change", function () {
+            syncTenorInput();
+            clearPreview();
+        });
+        tenureUnitButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                setTenureUnit(button.dataset.productsTenureUnit);
+            });
         });
         amountDisplayInput.addEventListener("input", function () {
             syncAmountInput();
@@ -408,6 +582,8 @@
             clearPreview();
         });
         syncAmountInput();
+        refreshTenureConstraints();
+        syncTenorInput();
 
         openButton.addEventListener("click", openModal);
         closeButton.addEventListener("click", closeModal);
@@ -423,9 +599,13 @@
         });
 
         loadButton.addEventListener("click", async function () {
+            const validTenor = syncTenorInput();
             const amount = amountInput.value.trim();
             const tenorMonths = tenorInput.value.trim();
-            if (!amount || !tenorMonths) {
+            if (!amount || !tenorMonths || !validTenor) {
+                if (tenorDisplayInput && !validTenor) {
+                    tenorDisplayInput.reportValidity();
+                }
                 showFeedback("error", msgEnterAmountTenor);
                 return;
             }

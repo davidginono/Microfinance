@@ -33,6 +33,32 @@
         .app-toast-exit {
             animation: toast-out 180ms ease-in forwards;
         }
+        .app-toast-close {
+            position: absolute;
+            top: 0.45rem;
+            right: 0.45rem;
+            z-index: 1;
+            display: inline-flex;
+            width: 1.75rem;
+            height: 1.75rem;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 0.45rem;
+            background: rgba(255, 255, 255, 0.72);
+            color: currentColor;
+            opacity: 0.9;
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1;
+            transition: background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+        }
+        .app-toast-close:hover,
+        .app-toast-close:focus-visible {
+            background: rgba(255, 255, 255, 0.96);
+            border-color: rgba(100, 116, 139, 0.4);
+            opacity: 1;
+        }
         .auth-shell {
             background:
                 radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
@@ -354,7 +380,8 @@
             }
             const settings = options || {};
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
-            const duration = Number.isFinite(settings.duration) ? settings.duration : (variant === 'error' ? 5200 : 3600);
+            const requestedDuration = Number(settings.duration);
+            const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (variant === 'error' ? 5200 : 3600);
             const palette = variant === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : variant === 'error'
@@ -371,11 +398,12 @@
             toast.innerHTML =
                 '<div class="flex items-start gap-3">' +
                     '<div class="mt-0.5 shrink-0">' + icon + '</div>' +
-                    '<div class="min-w-0 flex-1 pr-6"><p class="text-sm font-semibold leading-5">' + String(message) + '</p></div>' +
-                    '<button type="button" class="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-current/70 transition hover:bg-black/5 hover:text-current" aria-label="Dismiss notification">' +
-                        '<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 011.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 11-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg>' +
+                    '<div class="min-w-0 flex-1 pr-6"><p class="text-sm font-semibold leading-5" data-toast-text></p></div>' +
+                    '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
+                        '<span aria-hidden="true">&times;</span>' +
                     '</button>' +
                 '</div>';
+            toast.querySelector('[data-toast-text]').textContent = String(message);
             const dismiss = () => {
                 if (!toast.isConnected || toast.classList.contains('app-toast-exit')) {
                     return;
@@ -386,9 +414,7 @@
             };
             toast.querySelector('button')?.addEventListener('click', dismiss);
             toastContainer.appendChild(toast);
-            if (duration > 0) {
-                window.setTimeout(dismiss, duration);
-            }
+            window.setTimeout(dismiss, duration);
             return { dismiss, element: toast };
         };
 

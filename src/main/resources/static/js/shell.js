@@ -62,8 +62,9 @@
         }
         const settings = options || {};
         const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
-        const duration = Number.isFinite(settings.duration)
-            ? settings.duration
+        const requestedDuration = Number(settings.duration);
+        const duration = Number.isFinite(requestedDuration) && requestedDuration > 0
+            ? Math.min(requestedDuration, 10000)
             : (variant === 'error' ? 5200 : 3600);
         const toast = document.createElement('div');
         toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm ' +
@@ -79,12 +80,13 @@
                             : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>') +
                 '</div>' +
                 '<div class="min-w-0 flex-1 pr-6">' +
-                    '<p class="text-sm font-semibold leading-5">' + String(message) + '</p>' +
+                    '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
                 '</div>' +
-                '<button type="button" class="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-current/70 transition hover:bg-black/5 hover:text-current" aria-label="Dismiss notification">' +
-                    '<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.22 4.22a.75.75 0 011.06 0L10 8.94l4.72-4.72a.75.75 0 011.06 1.06L11.06 10l4.72 4.72a.75.75 0 11-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 11-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg>' +
+                '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
+                    '<span aria-hidden="true">&times;</span>' +
                 '</button>' +
             '</div>';
+        toast.querySelector('[data-toast-text]').textContent = String(message);
 
         const dismiss = function () {
             if (!toast.isConnected || toast.classList.contains('app-toast-exit')) {
@@ -100,10 +102,7 @@
         const closeButton = toast.querySelector('button');
         closeButton?.addEventListener('click', dismiss);
         toastContainer.appendChild(toast);
-
-        if (duration > 0) {
-            window.setTimeout(dismiss, duration);
-        }
+        window.setTimeout(dismiss, duration);
         return { dismiss: dismiss, element: toast };
     };
 
@@ -237,7 +236,7 @@
             window.showToast(
                 element.getAttribute('data-toast-type') || 'info',
                 message,
-                { duration: element.getAttribute('data-toast-persist') === 'true' ? 0 : undefined }
+                {}
             );
         });
         const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find(function (element) {
