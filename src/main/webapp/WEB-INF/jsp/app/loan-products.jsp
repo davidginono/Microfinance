@@ -132,17 +132,7 @@
                     </div>
                 </div>
             </div>
-            <div id="productsFinancialCard" class="hidden erp-table-wrap erp-table-scroll erp-table-scroll-sm">
-                <table class="erp-table">
-                    <thead>
-                    <tr>
-                        <th><spring:message code="products.table.section" /></th>
-                        <th><spring:message code="products.table.value" /></th>
-                    </tr>
-                    </thead>
-                    <tbody id="productsFinancialBody"></tbody>
-                </table>
-            </div>
+            <div id="productsFinancialCard" class="hidden grid gap-3 md:grid-cols-2"></div>
             <div id="productsRepaymentScheduleCard" class="hidden app-modal-section">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -300,7 +290,6 @@
         const feedback = document.getElementById("productsFinancialFeedback");
         const loading = document.getElementById("productsFinancialLoading");
         const card = document.getElementById("productsFinancialCard");
-        const body = document.getElementById("productsFinancialBody");
         const scheduleCard = document.getElementById("productsRepaymentScheduleCard");
         const scheduleBody = document.getElementById("productsRepaymentScheduleBody");
         const eligibilityMessage = document.getElementById("productsEligibilityMessage");
@@ -321,6 +310,8 @@
         const msgNotCheckedStatus = "<spring:message code='products.eligibilityResult.notChecked' text='Not checked' />";
         const msgLoaded = "<spring:message code='products.js.loaded' />";
         const msgFailedLoad = "<spring:message code='products.js.failedLoad' />";
+        const tableSectionLabel = "<spring:message code='products.table.section' text='Section' />";
+        const tableValueLabel = "<spring:message code='products.table.value' text='Value' />";
         let tenureUnit = "MONTHS";
 
         if (modal) {
@@ -523,7 +514,7 @@
 
         function clearPreview() {
             card.classList.add("hidden");
-            body.innerHTML = "";
+            card.innerHTML = "";
             scheduleCard.classList.add("hidden");
             scheduleBody.innerHTML = "";
             eligibilityMessage.textContent = msgLoadPrompt;
@@ -532,6 +523,36 @@
             ratioLabel.textContent = "-";
             maxAllowedLabel.textContent = "-";
             feedback.classList.add("hidden");
+        }
+
+        function renderFinancialSections(sections) {
+            card.innerHTML = "";
+            Object.entries(sections || {}).forEach(function (section) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "erp-table-wrap overflow-hidden";
+                wrapper.innerHTML = ""
+                    + "<div class='border-b border-slate-200 bg-slate-50 px-3 py-2'>"
+                    + "<p class='text-xs font-bold uppercase tracking-[0.16em] text-slate-600'></p>"
+                    + "</div>"
+                    + "<table class='erp-table'>"
+                    + "<thead><tr><th></th><th></th></tr></thead>"
+                    + "<tbody></tbody>"
+                    + "</table>";
+                wrapper.querySelector("p").textContent = section[0];
+                const headerCells = wrapper.querySelectorAll("th");
+                headerCells[0].textContent = tableSectionLabel;
+                headerCells[1].textContent = tableValueLabel;
+                const tableBody = wrapper.querySelector("tbody");
+                Object.entries(section[1] || {}).forEach(function (entry) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
+                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
+                    row.children[1].textContent = entry[1];
+                    tableBody.appendChild(row);
+                });
+                card.appendChild(wrapper);
+            });
+            card.classList.toggle("hidden", card.children.length === 0);
         }
 
         function updateEligibilityStatus(eligible) {
@@ -635,15 +656,7 @@
                     throw new Error(payload.message || msgUnableLoadCalculator);
                 }
 
-                body.innerHTML = "";
-                Object.entries(payload.fields || {}).forEach(function (entry) {
-                    const row = document.createElement("tr");
-                    row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
-                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
-                    row.children[1].textContent = entry[1];
-                    body.appendChild(row);
-                });
-                card.classList.remove("hidden");
+                renderFinancialSections(payload.fieldSections || {});
                 scheduleBody.innerHTML = "";
                 (payload.repaymentSchedule || []).forEach(function (item) {
                     const row = document.createElement("tr");

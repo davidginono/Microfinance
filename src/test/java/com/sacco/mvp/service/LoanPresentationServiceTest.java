@@ -107,6 +107,9 @@ class LoanPresentationServiceTest {
                 {
                   "applicationFee": 15000.00,
                   "insuranceFee": 2250.00,
+                  "insuranceRate": 0.015,
+                  "processingFee": 3750.00,
+                  "processingFeeRate": 0.025,
                   "principalAmount": 150000.00,
                   "interestAmount": 12000.00,
                   "principalPlusInterest": 162000.00,
@@ -118,6 +121,8 @@ class LoanPresentationServiceTest {
         Map<String, Object> fields = loanPresentationService.parseFinancialFields(app);
 
         assertThat(fields)
+            .containsEntry("Insurance Fee (1.5%)", "TSh 2,250.00")
+            .containsEntry("Loan Processing Fee (2.5%)", "TSh 3,750.00")
             .containsEntry("Loan Amount (TZS)", "TSh 125,000.00")
             .containsEntry("Loan Amount + Interest (TZS)", "TSh 137,000.00");
     }

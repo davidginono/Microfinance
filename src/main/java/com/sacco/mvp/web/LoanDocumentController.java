@@ -20,6 +20,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.MemberProfileImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -53,6 +54,7 @@ public class LoanDocumentController {
     private final LoanPresentationService loanPresentationService;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanReportService loanReportService;
+    private final MemberProfileImageService memberProfileImageService;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
@@ -103,6 +105,7 @@ public class LoanDocumentController {
             app,
             resolvePrintableSaccoName(app.getSaccoId()),
             applicant,
+            applicantProfileImage(applicant.getId()),
             loanPresentationService.parseFormFields(app.getFormData()),
             loanPresentationService.parseFinancialFields(app),
             guarantorRequests,
@@ -121,6 +124,14 @@ public class LoanDocumentController {
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + "-" + modeLabel + ".pdf")
             .body(pdf);
+    }
+
+    private byte[] applicantProfileImage(UUID applicantId) {
+        try {
+            return memberProfileImageService.load(applicantId).content();
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private String resolvePrintableSaccoName(String saccoId) {

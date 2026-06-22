@@ -683,11 +683,6 @@
 
 <c:if test="${settingsSection eq 'loan'}">
     <div class="mb-4 flex flex-wrap justify-end gap-3">
-        <button type="button"
-                class="app-btn btn-neutral"
-                data-product-modal-open="application-fee">
-            <spring:message code="admin.settings.loanProducts.editApplicationFee" text="Edit application fee" />
-        </button>
         <c:if test="${not empty loanProductsVersions}">
             <button type="button"
                     class="app-btn btn-neutral"
@@ -902,6 +897,21 @@
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
                             ${product.committeeReviewRequired ? product.resolvedCommitteeMinimumVotes : 0} reviewer(s)
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <div>
+                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></p>
+                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.repaymentChargesHelp" text="Update pricing, interest treatment, and repayment duration for this product." /></p>
+                        </div>
+                        <p class="text-right text-base font-semibold text-slate-900">
+                            <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />:
+                            <fmt:formatNumber value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" minFractionDigits="2" maxFractionDigits="2" />
+                            <span class="block text-sm font-medium text-slate-600">
+                                <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />:
+                                <fmt:formatNumber value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" minFractionDigits="2" maxFractionDigits="2" />%
+                            </span>
                         </p>
                     </div>
                 </div>
@@ -1173,8 +1183,18 @@
                         </div>
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
+                                <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${settings.resolvedApplicationFee}" />
+                            </label>
+
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
                                 <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.50" />
+                            </label>
+
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
+                                <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1636,8 +1656,18 @@
                     </div>
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
+                            <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
                             <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.insuranceRate * 100}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
+                            <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1930,6 +1960,7 @@
 <spring:message code="admin.settings.validation.assignDisbursementOfficer" text="Assign at least one active Disbursement Officer before requiring this role." var="validationAssignDisbursementOfficer" />
 <spring:message code="admin.settings.validation.assignDisbursementClaims" text="Grant both disbursement claims to at least one active staff user before removing this role requirement." var="validationAssignDisbursementClaims" />
 <spring:message code="admin.settings.validation.applicationFee" text="Application fee cannot be negative." var="validationApplicationFee" />
+<spring:message code="admin.settings.validation.processingFeePercent" text="Loan processing fee percentage cannot be negative." var="validationProcessingFeePercent" />
 <script>
     (() => {
         const body = document.body;
@@ -1991,7 +2022,8 @@
             validationAssignAccountant: "${validationAssignAccountant}",
             validationAssignDisbursementOfficer: "${validationAssignDisbursementOfficer}",
             validationAssignDisbursementClaims: "${validationAssignDisbursementClaims}",
-            validationApplicationFee: "${validationApplicationFee}"
+            validationApplicationFee: "${validationApplicationFee}",
+            validationProcessingFeePercent: "${validationProcessingFeePercent}"
         };
 
         document.querySelectorAll('[data-product-modal]').forEach((modal) => {
@@ -2660,7 +2692,9 @@
                 const minimumAmount = numberOrNull(form.querySelector('[name="minimumAmount"]'));
                 const maximumAmount = numberOrNull(form.querySelector('[name="maximumAmount"]'));
                 const savingsPercent = numberOrNull(form.querySelector('[name="maxLoanSavingsPercent"]'));
+                const applicationFee = numberOrNull(form.querySelector('[name="applicationFee"]'));
                 const insurancePercent = numberOrNull(form.querySelector('[name="insurancePercent"]'));
+                const processingFeePercent = numberOrNull(form.querySelector('[name="processingFeePercent"]'));
                 const annualInterestPercent = numberOrNull(form.querySelector('[name="annualInterestPercent"]'));
                 const minRepaymentMonths = numberOrNull(form.querySelector('[name="minRepaymentMonths"]'));
                 const maxRepaymentMonths = numberOrNull(form.querySelector('[name="maxRepaymentMonths"]'));
@@ -2699,8 +2733,14 @@
                 if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent <= 0 || savingsPercent > 1000) {
                     addValidationError(errors, 'maxLoanSavingsPercent', productSettingsText.validationSavingsPercent);
                 }
+                if (applicationFee === null || Number.isNaN(applicationFee) || applicationFee < 0) {
+                    addValidationError(errors, 'applicationFee', productSettingsText.validationApplicationFee);
+                }
                 if (insurancePercent === null || Number.isNaN(insurancePercent) || insurancePercent < 0) {
                     addValidationError(errors, 'insurancePercent', productSettingsText.validationInsurancePercent);
+                }
+                if (processingFeePercent === null || Number.isNaN(processingFeePercent) || processingFeePercent < 0) {
+                    addValidationError(errors, 'processingFeePercent', productSettingsText.validationProcessingFeePercent);
                 }
                 if (annualInterestPercent === null || Number.isNaN(annualInterestPercent) || annualInterestPercent < 0) {
                     addValidationError(errors, 'annualInterestPercent', productSettingsText.validationAnnualInterestPercent);

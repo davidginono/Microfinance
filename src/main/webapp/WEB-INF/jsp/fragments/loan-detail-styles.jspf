@@ -94,6 +94,48 @@
         display: grid;
         gap: 0.9rem 1.35rem;
     }
+    .loan-hero-with-photo {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 1rem;
+    }
+    .loan-applicant-photo-card {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        min-height: 100%;
+        border-left: 1px solid #e2e8f0;
+        padding-left: 1.25rem;
+    }
+    .loan-applicant-photo-frame {
+        display: inline-flex;
+        height: 10rem;
+        width: 8rem;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border: 1px solid #d7e1ea;
+        border-radius: 0.35rem;
+        background: #f8fafc;
+        color: #64748b;
+    }
+    .loan-applicant-photo-frame img {
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
+    }
+    @media (max-width: 767px) {
+        .loan-applicant-photo-card {
+            justify-content: flex-end;
+            border-left: 0;
+            padding-left: 0;
+        }
+        .loan-applicant-photo-frame {
+            height: 7.5rem;
+            width: 6rem;
+        }
+    }
     .loan-hero-fact {
         min-width: 0;
     }
@@ -201,6 +243,15 @@
         line-height: 1.45;
         color: #0f172a;
         font-family: inherit;
+    }
+    .loan-financial-section-grid {
+        display: grid;
+        gap: 1rem;
+    }
+    @media (min-width: 900px) {
+        .loan-financial-section-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
     .guarantor-financial-trigger {
         min-width: 10.5rem;

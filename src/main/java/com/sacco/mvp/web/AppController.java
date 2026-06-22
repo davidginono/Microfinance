@@ -1459,7 +1459,8 @@ public class AppController {
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
-            response.put("message", "Loan details loaded");
+            response.put("fieldSections", loanPresentationService.parseFinancialFieldSections(financialDetailsService.toJson(snapshot)));
+            response.put("message", "Loan calculations loaded");
             BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
             if (principalPlusInterest == null) {
                 principalPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
@@ -2035,6 +2036,8 @@ public class AppController {
         model.addAttribute("allowApplicationWithActiveLoan", schema.isApplicationWithActiveLoanAllowed());
         model.addAttribute("financialSnapshotDisplay",
             loanPresentationService.parseFinancialFields(formValues == null ? null : formValues.get("financialSnapshotJson")));
+        model.addAttribute("financialSnapshotSections",
+            loanPresentationService.parseFinancialFieldSections(formValues == null ? null : formValues.get("financialSnapshotJson")));
         model.addAttribute("repaymentSchedulePreviewRows", draftRepaymentSchedulePreview(formValues));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         model.addAttribute("topUpLoanId", formValues == null ? null : formValues.get("topUpLoanId"));
@@ -2232,7 +2235,7 @@ public class AppController {
                 + "% of savings " + formatTzs(eligibility.savings()) + ").";
         }
         if (message != null && message.contains("Load SACCO financial details")) {
-            return "Load the loan details first so the application can include the official deductions section.";
+            return "Load the loan calculations first so the application can include the official deductions section.";
         }
         return message == null ? "Unable to process loan form." : message;
     }

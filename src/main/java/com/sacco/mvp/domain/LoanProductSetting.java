@@ -57,6 +57,12 @@ public class LoanProductSetting {
     @Column(name = "insurance_rate", precision = 6, scale = 4)
     private BigDecimal insuranceRate;
 
+    @Column(name = "application_fee", precision = 18, scale = 2)
+    private BigDecimal applicationFee;
+
+    @Column(name = "processing_fee_rate", precision = 6, scale = 4)
+    private BigDecimal processingFeeRate;
+
     @Column(name = "interest_rate", precision = 6, scale = 4)
     private BigDecimal interestRate;
 
@@ -254,6 +260,15 @@ public class LoanProductSetting {
 
     public BigDecimal getResolvedGuarantorMinimumSavings() {
         return guarantorMinimumSavings == null ? BigDecimal.ZERO : guarantorMinimumSavings;
+    }
+
+    public BigDecimal getResolvedApplicationFee(BigDecimal fallbackApplicationFee) {
+        BigDecimal resolved = applicationFee == null ? fallbackApplicationFee : applicationFee;
+        return resolved == null ? BigDecimal.ZERO.setScale(2) : resolved.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal getResolvedProcessingFeeRate() {
+        return processingFeeRate == null ? BigDecimal.ZERO.setScale(4) : processingFeeRate.setScale(4, java.math.RoundingMode.HALF_UP);
     }
 
     public LoanProductStatus getStatus() {

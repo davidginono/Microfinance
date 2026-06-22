@@ -74,7 +74,7 @@ class AppControllerFinancialPreviewTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("message", "Loan details loaded");
+        assertThat(response.getBody()).containsEntry("message", "Loan calculations loaded");
         verify(loanWorkflowService, never()).assertCanApplyForProduct(any(), any(), any(), any());
     }
 

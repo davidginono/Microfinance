@@ -43,18 +43,22 @@ public class FinancialDetailsService {
         validateRepaymentPeriod(product, safeTenor);
 
         BigDecimal insuranceRate = product.getInsuranceRate() == null ? DEFAULT_INSURANCE_RATE : product.getInsuranceRate();
-        BigDecimal applicationFee = saccoSettingsRepository.findById(saccoId)
+        BigDecimal fallbackApplicationFee = saccoSettingsRepository.findById(saccoId)
             .map(SaccoSettings::getResolvedApplicationFee)
             .orElse(APPLICATION_FEE);
+        BigDecimal applicationFee = product.getResolvedApplicationFee(fallbackApplicationFee);
+        BigDecimal processingFeeRate = product.getResolvedProcessingFeeRate();
         BigDecimal interestRate = product.getInterestRate() == null ? DEFAULT_INTEREST_RATE : product.getInterestRate();
 
         BigDecimal insuranceFee = safeAmount.multiply(insuranceRate)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal processingFee = safeAmount.multiply(processingFeeRate)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal loanBalance = outstandingLoanBalance(memberId, topUpSourceLoanId);
         BigDecimal principalAmount = safeAmount
             .add(loanBalance)
             .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalDeductions = applicationFee.add(insuranceFee)
+        BigDecimal totalDeductions = applicationFee.add(insuranceFee).add(processingFee)
             .setScale(2, RoundingMode.HALF_UP);
 
         AmortizationResult amortization = amortize(safeAmount, safeTenor, interestRate, product.getInterestMethod());
@@ -68,6 +72,7 @@ public class FinancialDetailsService {
         snapshot.put("requestedAmount", safeAmount);
         snapshot.put("applicationFee", applicationFee);
         snapshot.put("insuranceFee", insuranceFee);
+        snapshot.put("processingFee", processingFee);
         snapshot.put("totalDeductions", totalDeductions);
         snapshot.put("loanBalance", loanBalance);
         snapshot.put("principalAmount", principalAmount);
@@ -78,6 +83,7 @@ public class FinancialDetailsService {
         snapshot.put("monthlyRepaymentAmount", periodicRepaymentAmount);
         snapshot.put("applicationFeeRate", applicationFee);
         snapshot.put("insuranceRate", insuranceRate);
+        snapshot.put("processingFeeRate", processingFeeRate);
         snapshot.put("interestRate", interestRate);
         snapshot.put("tenorMonths", safeTenor);
         snapshot.put("numberOfPayments", safeTenor);

@@ -198,23 +198,30 @@
                 </div>
             </div>
         </div>
-        <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotDisplay}'>hidden </c:if>mt-4 erp-table-wrap overflow-x-auto">
-            <table class="erp-table">
-                <thead>
-                <tr>
-                    <th><spring:message code="newloan.table.section" /></th>
-                    <th><spring:message code="newloan.table.value" /></th>
-                </tr>
-                </thead>
-                <tbody id="financialPreviewBody">
-                <c:forEach items="${financialSnapshotDisplay}" var="entry">
-                    <tr>
-                        <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
-                        <td class="px-3 py-2">${entry.value}</td>
-                    </tr>
-                </c:forEach>
-                </tbody>
-            </table>
+        <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotSections}'>hidden </c:if>mt-4 grid gap-3 md:grid-cols-2">
+            <c:forEach items="${financialSnapshotSections}" var="section">
+                <div class="erp-table-wrap overflow-hidden">
+                    <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
+                    </div>
+                    <table class="erp-table">
+                        <thead>
+                        <tr>
+                            <th><spring:message code="newloan.table.section" /></th>
+                            <th><spring:message code="newloan.table.value" /></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <c:forEach items="${section.value}" var="entry">
+                            <tr>
+                                <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
+                                <td class="px-3 py-2">${entry.value}</td>
+                            </tr>
+                        </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
+            </c:forEach>
         </div>
     </div>
 
@@ -440,7 +447,6 @@
         const financialFeedback = document.getElementById("financialFeedback");
         const financialLoading = document.getElementById("financialLoading");
         const financialCard = document.getElementById("financialPreviewCard");
-        const financialBody = document.getElementById("financialPreviewBody");
         const financialSnapshotInput = document.getElementById("financialSnapshotJson");
         const repaymentScheduleCard = document.getElementById("repaymentSchedulePreviewCard");
         const repaymentScheduleBody = document.getElementById("repaymentSchedulePreviewBody");
@@ -464,14 +470,16 @@
         const msgUnableLoadSavings = "<spring:message code='newloan.js.unableLoadSavings' />";
         const msgStatusesLoaded = "<spring:message code='newloan.js.statusesLoaded' />";
         const msgUnableLoadOfficialDetails = "<spring:message code='newloan.js.unableLoadOfficialDetails' />";
-        const msgLoanDetailsLoaded = "<spring:message code='newloan.js.loanDetailsLoaded' text='Loan details loaded successfully.' />";
-        const msgFailedLoadLoanDetails = "<spring:message code='newloan.js.failedLoadLoanDetails' text='Failed to load the loan details.' />";
+        const msgLoanDetailsLoaded = "<spring:message code='newloan.js.loanDetailsLoaded' text='Loan calculations loaded successfully.' />";
+        const msgFailedLoadLoanDetails = "<spring:message code='newloan.js.failedLoadLoanDetails' text='Failed to load the loan calculations.' />";
         const msgSendOtp = "<spring:message code='newloan.js.sendOtp' />";
         const msgSending = "<spring:message code='newloan.js.sending' />";
         const msgOtpSent = "<spring:message code='newloan.js.otpSent' />";
         const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
         const msgLoanAmountChanged = "<spring:message code='newloan.js.loanAmountChanged' />";
         const msgLoadFinancialDetails = "<spring:message code='newloan.loanDetails.loading' />";
+        const tableSectionLabel = "<spring:message code='newloan.table.section' text='Section' />";
+        const tableValueLabel = "<spring:message code='newloan.table.value' text='Value' />";
         const msgUnableSendOtp = "<spring:message code='newloan.js.unableSendOtp' />";
         const msgOtpEmailSent = "<spring:message code='newloan.js.otpEmailSent' />";
         const msgInvalidOtpCode = "<spring:message code='newloan.js.invalidOtp' />";
@@ -736,10 +744,41 @@
                 return;
             }
             financialSnapshotInput.value = "";
+            financialCard.innerHTML = "";
             financialCard.classList.add("hidden");
             renderRepaymentSchedule([]);
             document.dispatchEvent(new CustomEvent("loanFinancialSnapshotChanged"));
             showFinancialFeedback("error", msgLoanAmountChanged);
+        }
+
+        function renderFinancialSections(sections) {
+            financialCard.innerHTML = "";
+            Object.entries(sections || {}).forEach(function (section) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "erp-table-wrap overflow-hidden";
+                wrapper.innerHTML = ""
+                    + "<div class='border-b border-slate-200 bg-slate-50 px-3 py-2'>"
+                    + "<p class='text-xs font-bold uppercase tracking-[0.16em] text-slate-600'></p>"
+                    + "</div>"
+                    + "<table class='erp-table'>"
+                    + "<thead><tr><th></th><th></th></tr></thead>"
+                    + "<tbody></tbody>"
+                    + "</table>";
+                wrapper.querySelector("p").textContent = section[0];
+                const headerCells = wrapper.querySelectorAll("th");
+                headerCells[0].textContent = tableSectionLabel;
+                headerCells[1].textContent = tableValueLabel;
+                const body = wrapper.querySelector("tbody");
+                Object.entries(section[1] || {}).forEach(function (entry) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
+                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
+                    row.children[1].textContent = entry[1];
+                    body.appendChild(row);
+                });
+                financialCard.appendChild(wrapper);
+            });
+            financialCard.classList.toggle("hidden", financialCard.children.length === 0);
         }
 
         function renderRepaymentSchedule(rows) {
@@ -1073,17 +1112,7 @@
                 const payload = await response.json();
                 financialSnapshotInput.value = payload.snapshotJson || "";
                 document.dispatchEvent(new CustomEvent("loanFinancialSnapshotChanged", { detail: payload }));
-                financialBody.innerHTML = "";
-
-                Object.entries(payload.fields || {}).forEach(function (entry) {
-                    const row = document.createElement("tr");
-                    row.innerHTML = "<td class='px-3 py-2 font-medium text-slate-700'></td><td class='px-3 py-2'></td>";
-                    row.children[0].textContent = entry[0].replace(/\bPrincipal\b/g, "Loan Amount");
-                    row.children[1].textContent = entry[1];
-                    financialBody.appendChild(row);
-                });
-
-                financialCard.classList.remove("hidden");
+                renderFinancialSections(payload.fieldSections || {});
                 renderRepaymentSchedule(payload.repaymentSchedule || []);
                 showFinancialFeedback("success", payload.message || msgLoanDetailsLoaded);
             } catch (error) {

@@ -690,7 +690,9 @@ public class AdminController {
                                     @RequestParam(required = false) BigDecimal maximumAmount,
                                     @RequestParam Integer guarantorsRequired,
                                     @RequestParam BigDecimal maxLoanSavingsPercent,
+                                    @RequestParam BigDecimal applicationFee,
                                     @RequestParam BigDecimal insurancePercent,
+                                    @RequestParam BigDecimal processingFeePercent,
                                     @RequestParam BigDecimal annualInterestPercent,
                                     @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
                                     @RequestParam Integer minRepaymentMonths,
@@ -720,6 +722,7 @@ public class AdminController {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "product-" + id : normalizeLoanSettingsModalKey(modalKey);
         try {
             BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
+            BigDecimal processingFeeRate = percentToRatio(processingFeePercent);
             BigDecimal insuranceRate = percentToRatio(insurancePercent);
             BigDecimal annualRate = percentToRatio(annualInterestPercent);
             ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
@@ -731,7 +734,7 @@ public class AdminController {
             );
             adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
-                maxLoanSavingsRatio, insuranceRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
+                maxLoanSavingsRatio, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
                 resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, boardReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
@@ -754,7 +757,9 @@ public class AdminController {
                                               @RequestParam(required = false) BigDecimal maximumAmount,
                                               @RequestParam Integer guarantorsRequired,
                                               @RequestParam BigDecimal maxLoanSavingsPercent,
+                                              @RequestParam BigDecimal applicationFee,
                                               @RequestParam BigDecimal insurancePercent,
+                                              @RequestParam BigDecimal processingFeePercent,
                                               @RequestParam BigDecimal annualInterestPercent,
                                               @RequestParam(defaultValue = "FLAT_RATE") InterestMethod interestMethod,
                                               @RequestParam Integer minRepaymentMonths,
@@ -801,7 +806,9 @@ public class AdminController {
                 maximumAmount,
                 guarantorsRequired,
                 percentToRatio(maxLoanSavingsPercent),
+                applicationFee,
                 percentToRatio(insurancePercent),
+                percentToRatio(processingFeePercent),
                 percentToRatio(annualInterestPercent),
                 interestMethod,
                 minRepaymentMonths,
@@ -1058,6 +1065,8 @@ public class AdminController {
                 fieldErrors.put("guarantorMinimumSavings", "Minimum guarantor savings cannot be negative.");
             case "Insurance rate cannot be negative." ->
                 fieldErrors.put("insurancePercent", "Insurance percentage cannot be negative.");
+            case "Loan processing fee percentage cannot be negative." ->
+                fieldErrors.put("processingFeePercent", "Loan processing fee percentage cannot be negative.");
             case "Application fee cannot be negative." ->
                 fieldErrors.put("applicationFee", "Application fee cannot be negative.");
             case "Annual interest rate cannot be negative." ->

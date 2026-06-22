@@ -237,6 +237,7 @@ public class BoardController {
         model.addAttribute("myReview", myReview);
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
+        model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));

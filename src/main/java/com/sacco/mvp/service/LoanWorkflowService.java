@@ -1130,7 +1130,7 @@ public class LoanWorkflowService {
             return;
         }
         if (financialSnapshotJson == null || financialSnapshotJson.isBlank()) {
-            throw new IllegalStateException("Load loan details before saving this draft. This loan product requires loaded financial data.");
+            throw new IllegalStateException("Load loan calculations before saving this draft. This loan product requires loaded financial data.");
         }
     }
 

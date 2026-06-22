@@ -1,0 +1,35 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+<div class="mt-5 loan-financial-section-grid">
+    <c:forEach items="${financialFieldSections}" var="section">
+        <div class="loan-view-summary-card overflow-hidden">
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">${section.key}</h5>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left"><spring:message code="common.section" text="Section" /></th>
+                        <th class="px-3 py-2 text-left"><spring:message code="common.value" text="Value" /></th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                    <c:forEach items="${section.value}" var="entry">
+                        <tr>
+                            <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
+                            <td class="px-3 py-2">${entry.value}</td>
+                        </tr>
+                    </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </c:forEach>
+    <c:if test="${empty financialFieldSections}">
+        <div class="loan-view-summary-card px-4 py-4 text-sm text-slate-500">
+            <spring:message code="loan.view.noFinancialDetails" text="Financial details have not been loaded for this application yet." />
+        </div>
+    </c:if>
+</div>

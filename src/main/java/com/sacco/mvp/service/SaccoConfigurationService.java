@@ -19,7 +19,9 @@ import java.util.UUID;
 public class SaccoConfigurationService {
     private static final BigDecimal DEFAULT_MINIMUM_AMOUNT = BigDecimal.ZERO.setScale(2);
     private static final BigDecimal DEFAULT_RATIO = new BigDecimal("0.3333");
+    private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");
     private static final BigDecimal DEFAULT_INSURANCE_RATE = new BigDecimal("0.0150");
+    private static final BigDecimal DEFAULT_PROCESSING_FEE_RATE = BigDecimal.ZERO.setScale(4);
     private static final BigDecimal DEFAULT_INTEREST_RATE = new BigDecimal("0.1000");
     private static final int DEFAULT_MIN_REPAYMENT_MONTHS = 1;
 
@@ -36,7 +38,9 @@ public class SaccoConfigurationService {
                                                 BigDecimal maximumAmount,
                                                 Integer guarantorsRequired,
                                                 BigDecimal maxLoanSavingsRatio,
+                                                BigDecimal applicationFee,
                                                 BigDecimal insuranceRate,
+                                                BigDecimal processingFeeRate,
                                                 BigDecimal interestRate,
                                                 InterestMethod interestMethod,
                                                 Integer minRepaymentMonths,
@@ -76,7 +80,9 @@ public class SaccoConfigurationService {
             maximumAmount,
             guarantorsRequired,
             maxLoanSavingsRatio == null ? DEFAULT_RATIO : maxLoanSavingsRatio,
+            applicationFee == null ? DEFAULT_APPLICATION_FEE : applicationFee,
             insuranceRate == null ? DEFAULT_INSURANCE_RATE : insuranceRate,
+            processingFeeRate == null ? DEFAULT_PROCESSING_FEE_RATE : processingFeeRate,
             interestRate == null ? DEFAULT_INTEREST_RATE : interestRate,
             interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod,
             minRepaymentMonths == null ? DEFAULT_MIN_REPAYMENT_MONTHS : minRepaymentMonths,
@@ -115,7 +121,9 @@ public class SaccoConfigurationService {
                                               BigDecimal maximumAmount,
                                               Integer guarantorsRequired,
                                               BigDecimal maxLoanSavingsRatio,
+                                              BigDecimal applicationFee,
                                               BigDecimal insuranceRate,
+                                              BigDecimal processingFeeRate,
                                               BigDecimal interestRate,
                                               InterestMethod interestMethod,
                                               Integer minRepaymentMonths,
@@ -153,7 +161,9 @@ public class SaccoConfigurationService {
             .maximumAmount(maximumAmount)
             .guarantorsRequired(guarantorsRequired)
             .maxLoanSavingsRatio(maxLoanSavingsRatio)
+            .applicationFee(applicationFee == null ? DEFAULT_APPLICATION_FEE : applicationFee)
             .insuranceRate(insuranceRate)
+            .processingFeeRate(processingFeeRate == null ? DEFAULT_PROCESSING_FEE_RATE : processingFeeRate)
             .interestRate(interestRate)
             .interestMethod(interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod)
             .minRepaymentMonths(minRepaymentMonths == null ? DEFAULT_MIN_REPAYMENT_MONTHS : minRepaymentMonths)

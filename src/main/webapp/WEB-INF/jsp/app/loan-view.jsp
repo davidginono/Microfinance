@@ -247,7 +247,7 @@
     <div class="erp-table-wrap erp-table-scroll">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div class="text-sm font-semibold text-slate-900"><spring:message code="repayment.estimatedSchedule" text="Estimated Repayment Schedule" /></div>
-            <div class="mt-1 text-sm text-slate-500"><spring:message code="repayment.loadedScheduleHelp" text="Monthly installments based on the loaded loan details, including interest and remaining balance." /></div>
+            <div class="mt-1 text-sm text-slate-500"><spring:message code="repayment.loadedScheduleHelp" text="Monthly installments based on the loaded loan calculations, including interest and remaining balance." /></div>
         </div>
         <table class="erp-table">
             <thead>

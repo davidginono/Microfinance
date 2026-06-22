@@ -669,7 +669,9 @@ public class AdminService {
             maximumAmount,
             guarantorsRequired,
             ratio,
+            null,
             insuranceRate,
+            null,
             annualRate,
             interestMethod,
             minRepaymentMonths,
@@ -740,7 +742,9 @@ public class AdminService {
             maximumAmount,
             guarantorsRequired,
             ratio,
+            null,
             insuranceRate,
+            null,
             annualRate,
             interestMethod,
             minRepaymentMonths,
@@ -814,7 +818,9 @@ public class AdminService {
             maximumAmount,
             guarantorsRequired,
             ratio,
+            null,
             insuranceRate,
+            null,
             annualRate,
             interestMethod,
             minRepaymentMonths,
@@ -854,7 +860,9 @@ public class AdminService {
                                   BigDecimal maximumAmount,
                                   Integer guarantorsRequired,
                                   BigDecimal ratio,
+                                  BigDecimal applicationFee,
                                   BigDecimal insuranceRate,
+                                  BigDecimal processingFeeRate,
                                   BigDecimal annualRate,
                                   InterestMethod interestMethod,
                                   Integer minRepaymentMonths,
@@ -896,7 +904,9 @@ public class AdminService {
         product.setMaximumAmount(normalizeMaximumAmount(product.getMinimumAmount(), maximumAmount));
         product.setGuarantorsRequired(normalizeGuarantorCount(guarantorsRequired));
         product.setMaxLoanSavingsRatio(normalizeRatio(ratio));
+        product.setApplicationFee(normalizeApplicationFee(applicationFee));
         product.setInsuranceRate(normalizeInsuranceRate(insuranceRate));
+        product.setProcessingFeeRate(normalizePercentageRate(processingFeeRate, "Loan processing fee percentage cannot be negative."));
         product.setInterestRate(normalizeAnnualRate(annualRate));
         product.setInterestMethod(normalizeInterestMethod(interestMethod));
         product.setMinRepaymentMonths(normalizeMinimumRepaymentMonths(minRepaymentMonths));
@@ -985,7 +995,9 @@ public class AdminService {
                                             BigDecimal maximumAmount,
                                             Integer guarantorsRequired,
                                             BigDecimal ratio,
+                                            BigDecimal applicationFee,
                                             BigDecimal insuranceRate,
+                                            BigDecimal processingFeeRate,
                                             BigDecimal annualRate,
                                             InterestMethod interestMethod,
                                             Integer minRepaymentMonths,
@@ -1018,7 +1030,9 @@ public class AdminService {
             maximumAmount,
             guarantorsRequired,
             ratio,
+            applicationFee,
             insuranceRate,
+            processingFeeRate,
             annualRate,
             interestMethod,
             minRepaymentMonths,
@@ -1057,7 +1071,9 @@ public class AdminService {
                                             BigDecimal maximumAmount,
                                             Integer guarantorsRequired,
                                             BigDecimal ratio,
+                                            BigDecimal applicationFee,
                                             BigDecimal insuranceRate,
+                                            BigDecimal processingFeeRate,
                                             BigDecimal annualRate,
                                             InterestMethod interestMethod,
                                             Integer minRepaymentMonths,
@@ -1116,7 +1132,9 @@ public class AdminService {
             normalizeMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
             normalizeGuarantorCount(guarantorsRequired),
             normalizeRatio(ratio),
+            normalizeApplicationFee(applicationFee),
             normalizeInsuranceRate(insuranceRate),
+            normalizePercentageRate(processingFeeRate, "Loan processing fee percentage cannot be negative."),
             normalizeAnnualRate(annualRate),
             normalizeInterestMethod(interestMethod),
             normalizeMinimumRepaymentMonths(minRepaymentMonths),
@@ -2286,6 +2304,16 @@ public class AdminService {
         return insuranceRate.setScale(4, java.math.RoundingMode.HALF_UP);
     }
 
+    private BigDecimal normalizePercentageRate(BigDecimal rate, String negativeMessage) {
+        if (rate == null) {
+            return BigDecimal.ZERO.setScale(4, java.math.RoundingMode.HALF_UP);
+        }
+        if (rate.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException(negativeMessage);
+        }
+        return rate.setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
     private BigDecimal normalizeApplicationFee(BigDecimal applicationFee) {
         if (applicationFee == null) {
             return DEFAULT_APPLICATION_FEE.setScale(2, java.math.RoundingMode.HALF_UP);
@@ -2743,7 +2771,9 @@ public class AdminService {
         product.setMaximumAmount(normalizeMaximumAmount(normalizedMinimumAmount, snapshot.maximumAmount()));
         product.setGuarantorsRequired(normalizeGuarantorCount(snapshot.guarantorsRequired()));
         product.setMaxLoanSavingsRatio(normalizeRatio(snapshot.maxLoanSavingsRatio()));
+        product.setApplicationFee(normalizeApplicationFee(snapshot.applicationFee()));
         product.setInsuranceRate(normalizeInsuranceRate(snapshot.insuranceRate()));
+        product.setProcessingFeeRate(normalizePercentageRate(snapshot.processingFeeRate(), "Loan processing fee percentage cannot be negative."));
         product.setInterestRate(normalizeAnnualRate(snapshot.interestRate()));
         product.setInterestMethod(normalizeInterestMethod(snapshot.interestMethod()));
         int minRepaymentMonths = normalizeMinimumRepaymentMonths(snapshot.minRepaymentMonths());
@@ -2813,7 +2843,9 @@ public class AdminService {
         data.put("maximumAmount", snapshot.maximumAmount());
         data.put("guarantorsRequired", snapshot.guarantorsRequired());
         data.put("ratio", snapshot.maxLoanSavingsRatio());
+        data.put("applicationFee", snapshot.applicationFee());
         data.put("insuranceRate", snapshot.insuranceRate());
+        data.put("processingFeeRate", snapshot.processingFeeRate());
         data.put("interestRate", snapshot.interestRate());
         data.put("interestMethod", snapshot.interestMethod());
         data.put("minRepaymentMonths", snapshot.minRepaymentMonths());
@@ -3402,7 +3434,9 @@ public class AdminService {
         BigDecimal maximumAmount,
         Integer guarantorsRequired,
         BigDecimal maxLoanSavingsRatio,
+        BigDecimal applicationFee,
         BigDecimal insuranceRate,
+        BigDecimal processingFeeRate,
         BigDecimal interestRate,
         InterestMethod interestMethod,
         Integer minRepaymentMonths,
@@ -3443,7 +3477,9 @@ public class AdminService {
                 product.getMaximumAmount(),
                 product.getGuarantorsRequired(),
                 product.getMaxLoanSavingsRatio(),
+                product.getApplicationFee(),
                 product.getInsuranceRate(),
+                product.getProcessingFeeRate(),
                 product.getInterestRate(),
                 product.getInterestMethod(),
                 product.getMinimumRepaymentMonths(),

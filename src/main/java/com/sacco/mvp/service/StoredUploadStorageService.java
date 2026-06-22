@@ -17,7 +17,9 @@ import java.util.UUID;
 public class StoredUploadStorageService {
     public static final String OWNER_LOAN_APPLICATION = "LOAN_APPLICATION";
     public static final String OWNER_SACCO = "SACCO";
+    public static final String OWNER_MEMBER = "MEMBER";
     public static final String CATEGORY_SACCO_LOGO = "SACCO_LOGO";
+    public static final String CATEGORY_MEMBER_PROFILE_PHOTO = "MEMBER_PROFILE_PHOTO";
 
     private final StoredUploadRepository repository;
 

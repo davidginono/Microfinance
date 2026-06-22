@@ -277,6 +277,7 @@ public class DisbursementController {
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
+        model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));

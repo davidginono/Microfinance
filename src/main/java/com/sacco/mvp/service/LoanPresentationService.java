@@ -31,6 +31,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -83,19 +85,42 @@ public class LoanPresentationService {
         return parseFinancialFields(json, effectivePrincipal, null);
     }
 
+    public Map<String, Map<String, Object>> parseFinancialFieldSections(String json) {
+        return parseFinancialFieldSections(json, null, null);
+    }
+
+    public Map<String, Map<String, Object>> parseFinancialFieldSections(LoanApplication app) {
+        return app == null
+            ? Collections.emptyMap()
+            : parseFinancialFieldSections(app.getFinancialSnapshot(), app.getAmount(), app.getTenorMonths());
+    }
+
     private Map<String, Object> parseFinancialFields(String json, BigDecimal effectivePrincipal, Integer fallbackTenorMonths) {
+        Map<String, Map<String, Object>> sections = parseFinancialFieldSections(json, effectivePrincipal, fallbackTenorMonths);
+        if (sections.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> display = new LinkedHashMap<>();
+        sections.values().forEach(display::putAll);
+        return display;
+    }
+
+    private Map<String, Map<String, Object>> parseFinancialFieldSections(String json, BigDecimal effectivePrincipal, Integer fallbackTenorMonths) {
         if (json == null || json.isBlank()) {
             return Collections.emptyMap();
         }
         try {
             Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<>() {});
-            Map<String, Object> display = new LinkedHashMap<>();
-            addFinancialRow(display, "Application Fee (TZS)", raw.get("applicationFee"));
-            addFinancialRow(display, "Insurance Fee (TZS)", raw.get("insuranceFee"));
+            Map<String, Object> fees = new LinkedHashMap<>();
+            Map<String, Object> calculations = new LinkedHashMap<>();
+            addFinancialRow(fees, "Application Fee (TZS)", raw.get("applicationFee"));
+            addFinancialRow(fees, feeLabelWithRate("Insurance Fee", raw.get("insuranceRate")), raw.get("insuranceFee"));
+            addFinancialRow(fees, feeLabelWithRate("Loan Processing Fee", raw.get("processingFeeRate")), raw.get("processingFee"));
+            addFinancialRow(fees, "Total Fees (TZS)", raw.get("totalDeductions"));
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
-            putMoney(display, "Loan Amount (TZS)", principalAmount);
-            putValue(display, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
-            addFinancialRow(display, "Interest (TZS)", raw.get("interestAmount"));
+            putMoney(calculations, "Loan Amount (TZS)", principalAmount);
+            putValue(calculations, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
+            addFinancialRow(calculations, "Interest (TZS)", raw.get("interestAmount"));
             Integer tenorMonths = readInteger(raw.get("tenorMonths"));
             if (tenorMonths == null) {
                 tenorMonths = readInteger(raw.get("numberOfPayments"));
@@ -103,14 +128,17 @@ public class LoanPresentationService {
             if (tenorMonths == null) {
                 tenorMonths = fallbackTenorMonths;
             }
-            putValue(display, "Loan Period in Years", formatYears(tenorMonths));
-            putValue(display, "Number of Payments", tenorMonths);
+            putValue(calculations, "Loan Period in Years", formatYears(tenorMonths));
+            putValue(calculations, "Number of Payments", tenorMonths);
             BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principalAmount);
             if (principalPlusInterest != null) {
-                display.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
+                calculations.put("Loan Amount + Interest (TZS)", formatMoney(principalPlusInterest));
             }
-            addFinancialRow(display, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
-            return display;
+            addFinancialRow(calculations, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
+            Map<String, Map<String, Object>> sections = new LinkedHashMap<>();
+            sections.put("Fees", fees);
+            sections.put("Loan Calculations", calculations);
+            return sections;
         } catch (Exception e) {
             return Collections.emptyMap();
         }
@@ -127,9 +155,11 @@ public class LoanPresentationService {
         }
         BigDecimal applicationFee = readBigDecimal(raw.get("applicationFee"));
         BigDecimal insuranceFee = readBigDecimal(raw.get("insuranceFee"));
+        BigDecimal processingFee = readBigDecimal(raw.get("processingFee"));
         return totalBeforeInterest
             .subtract(applicationFee == null ? BigDecimal.ZERO : applicationFee)
             .subtract(insuranceFee == null ? BigDecimal.ZERO : insuranceFee)
+            .subtract(processingFee == null ? BigDecimal.ZERO : processingFee)
             .setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -751,6 +781,18 @@ public class LoanPresentationService {
         return amount.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
     }
 
+    private String feeLabelWithRate(String label, Object rate) {
+        BigDecimal amount = toBigDecimal(rate);
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return label + " (TZS)";
+        }
+        String percent = amount.multiply(BigDecimal.valueOf(100))
+            .setScale(2, RoundingMode.HALF_UP)
+            .stripTrailingZeros()
+            .toPlainString();
+        return label + " (" + percent + "%)";
+    }
+
     private String formatYears(Integer tenorMonths) {
         if (tenorMonths == null || tenorMonths <= 0) {
             return null;
@@ -926,12 +968,47 @@ public class LoanPresentationService {
                                     Map<UUID, Member> boardMembers,
                                     String managerReason,
                                     boolean includeRecordedSignatures) {
+        return buildPrintablePdf(
+            app,
+            saccoName,
+            applicant,
+            null,
+            formFields,
+            financialFields,
+            guarantorRequests,
+            guarantorNames,
+            guarantorMemberNumbers,
+            staffReviews,
+            staffReviewers,
+            boardReviews,
+            boardMembers,
+            managerReason,
+            includeRecordedSignatures
+        );
+    }
+
+    public byte[] buildPrintablePdf(LoanApplication app,
+                                    String saccoName,
+                                    Member applicant,
+                                    byte[] applicantProfileImage,
+                                    Map<String, Object> formFields,
+                                    Map<String, Object> financialFields,
+                                    List<GuarantorRequest> guarantorRequests,
+                                    Map<UUID, String> guarantorNames,
+                                    Map<UUID, String> guarantorMemberNumbers,
+                                    List<ManagerReview> staffReviews,
+                                    Map<UUID, Member> staffReviewers,
+                                    List<BoardReview> boardReviews,
+                                    Map<UUID, Member> boardMembers,
+                                    String managerReason,
+                                    boolean includeRecordedSignatures) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PrintableLoanApplicationPdfRenderer renderer = new PrintableLoanApplicationPdfRenderer(
                 document,
                 app,
                 saccoName,
                 applicant,
+                applicantProfileImage,
                 formFields,
                 financialFields,
                 parseDisbursementProofAttachments(app.getAttachmentsJson()),
@@ -1126,15 +1203,19 @@ public class LoanPresentationService {
         if (value == null || String.valueOf(value).isBlank()) {
             return;
         }
-        if (label.contains("(TZS)") && value instanceof Number) {
+        if (isMoneyRowLabel(label) && value instanceof Number) {
             display.put(label, formatMoney(new BigDecimal(String.valueOf(value))));
             return;
         }
-        if (label.contains("(TZS)") && value instanceof String stringValue && stringValue.matches("-?\\d+(\\.\\d+)?")) {
+        if (isMoneyRowLabel(label) && value instanceof String stringValue && stringValue.matches("-?\\d+(\\.\\d+)?")) {
             display.put(label, formatMoney(new BigDecimal(stringValue)));
             return;
         }
         display.put(label, value);
+    }
+
+    private boolean isMoneyRowLabel(String label) {
+        return label.contains("(TZS)") || label.matches(".*\\([0-9]+(?:\\.[0-9]+)?%\\)$");
     }
 
     private void putValue(Map<String, Object> display, String label, Object value) {
@@ -1343,6 +1424,7 @@ public class LoanPresentationService {
         private final LoanApplication app;
         private final String saccoName;
         private final Member applicant;
+        private final byte[] applicantProfileImage;
         private final Map<String, Object> formFields;
         private final Map<String, Object> financialFields;
         private final List<Map<String, Object>> disbursementProofAttachments;
@@ -1368,6 +1450,7 @@ public class LoanPresentationService {
                                                     LoanApplication app,
                                                     String saccoName,
                                                     Member applicant,
+                                                    byte[] applicantProfileImage,
                                                     Map<String, Object> formFields,
                                                     Map<String, Object> financialFields,
                                                     List<Map<String, Object>> disbursementProofAttachments,
@@ -1385,6 +1468,7 @@ public class LoanPresentationService {
             this.app = app;
             this.saccoName = saccoName;
             this.applicant = applicant;
+            this.applicantProfileImage = applicantProfileImage == null ? new byte[0] : applicantProfileImage;
             this.formFields = formFields == null ? Collections.emptyMap() : formFields;
             this.financialFields = financialFields == null ? Collections.emptyMap() : financialFields;
             this.disbursementProofAttachments = disbursementProofAttachments == null ? Collections.emptyList() : disbursementProofAttachments;
@@ -1444,26 +1528,82 @@ public class LoanPresentationService {
         }
 
         private void drawHeader() throws IOException {
-            ensureSpace(96f);
+            ensureSpace(132f);
             float pageWidth = page.getMediaBox().getWidth();
             float headerTop = page.getMediaBox().getHeight();
+            float profileSize = 72f;
+            float profileX = pageWidth - MARGIN - profileSize;
+            float profileY = headerTop - 132f;
 
             String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
             writeText(saccoLabel.toUpperCase(Locale.ROOT), MARGIN, headerTop - 42f, bold, 15f, TEXT_COLOR);
             writeText("Official loan workflow document", MARGIN, headerTop - 59f, regular, META_SIZE, MUTED_COLOR);
             writeRightAligned("Generated: " + LocalDate.now(), pageWidth - MARGIN, headerTop - 42f, regular, META_SIZE, MUTED_COLOR);
+            drawApplicantProfileImage(profileX, profileY, profileSize);
 
             stream.setStrokingColor(BORDER_COLOR);
             stream.setLineWidth(0.8f);
-            stream.moveTo(MARGIN, headerTop - 78f);
-            stream.lineTo(pageWidth - MARGIN, headerTop - 78f);
+            stream.moveTo(MARGIN, headerTop - 92f);
+            stream.lineTo(profileX - 18f, headerTop - 92f);
             stream.stroke();
 
-            y = headerTop - 102f;
+            y = headerTop - 120f;
             writeText("Loan Application", MARGIN, y, bold, TITLE_SIZE, TEXT_COLOR);
             y -= 18f;
             writeText("Prepared from the system record for formal review and filing", MARGIN, y, regular, META_SIZE, MUTED_COLOR);
             y -= 20f;
+        }
+
+        private void drawApplicantProfileImage(float x, float y, float size) throws IOException {
+            BufferedImage image = readApplicantProfileImage();
+            if (image == null) {
+                image = createProfileFallbackImage(220);
+            }
+            PDImageXObject pdfImage = LosslessFactory.createFromImage(document, squareProfileImage(image, 220));
+            stream.drawImage(pdfImage, x, y, size, size);
+        }
+
+        private BufferedImage readApplicantProfileImage() {
+            if (applicantProfileImage.length == 0) {
+                return null;
+            }
+            try {
+                return ImageIO.read(new ByteArrayInputStream(applicantProfileImage));
+            } catch (IOException ex) {
+                return null;
+            }
+        }
+
+        private BufferedImage squareProfileImage(BufferedImage source, int size) {
+            int cropSize = Math.min(source.getWidth(), source.getHeight());
+            int cropX = Math.max((source.getWidth() - cropSize) / 2, 0);
+            int cropY = Math.max((source.getHeight() - cropSize) / 2, 0);
+            BufferedImage output = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = output.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                graphics.drawImage(source, 0, 0, size, size, cropX, cropY, cropX + cropSize, cropY + cropSize, null);
+            } finally {
+                graphics.dispose();
+            }
+            return output;
+        }
+
+        private BufferedImage createProfileFallbackImage(int size) {
+            BufferedImage output = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = output.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                graphics.setColor(new Color(244, 246, 248));
+                graphics.fillRect(0, 0, size, size);
+                graphics.setColor(new Color(101, 116, 139));
+                graphics.fillOval(size / 2 - 24, size / 2 - 46, 48, 48);
+                graphics.fillOval(size / 2 - 54, size / 2 + 8, 108, 70);
+            } finally {
+                graphics.dispose();
+            }
+            return output;
         }
 
         private long completedReviewCount() {

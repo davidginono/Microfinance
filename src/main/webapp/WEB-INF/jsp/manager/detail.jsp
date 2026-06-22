@@ -25,6 +25,7 @@
 </c:if>
 <div class="loan-view-hero-summary">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
+        <div class="loan-hero-with-photo">
         <div class="min-w-0">
             <div class="loan-hero-primary-grid">
                 <div class="loan-hero-inline-fact">
@@ -62,6 +63,18 @@
                     </div>
                 </c:if>
             </div>
+        </div>
+        <div class="loan-applicant-photo-card">
+            <div class="loan-applicant-photo-frame" title="<spring:message code='profile.photo.applicant' text='Applicant profile photo' />">
+                <img src="<c:url value='/profile/image/members/${applicant.id}' />"
+                     alt="<spring:message code='profile.photo.applicantAlt' text='Applicant profile photo' />"
+                     onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 21a8 8 0 0 0-16 0"/>
+                    <circle cx="12" cy="8" r="4"/>
+                </svg>
+            </div>
+        </div>
         </div>
     </div>
 
@@ -245,28 +258,7 @@
     </c:choose>
 </div>
 
-<div class="erp-table-wrap mt-5 overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
-        <tr>
-            <th class="px-3 py-2 text-left"><spring:message code="common.section" text="Section" /></th>
-            <th class="px-3 py-2 text-left"><spring:message code="common.value" text="Value" /></th>
-        </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-        <c:forEach items="${financialFields}" var="entry">
-            <tr>
-                <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
-                <td class="px-3 py-2">${entry.value}</td>
-            </tr>
-        </c:forEach>
-        <c:if test="${empty financialFields}">
-            <tr><td colspan="2" class="px-3 py-3 text-slate-500"><spring:message code="loan.view.noFinancialDetails" text="Financial details have not been loaded for this application yet." /></td></tr>
-        </c:if>
-        </tbody>
-    </table>
-</div>
+<%@ include file="../fragments/financial-field-sections.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap mt-5 overflow-x-auto">

@@ -63,7 +63,7 @@ public class AuditLog {
             return "System activity";
         }
         return switch (normalizeKey(action)) {
-            case "WEBFINANCIALPREVIEW" -> "Loan details loaded";
+            case "WEBFINANCIALPREVIEW" -> "Loan calculations loaded";
             case "WEBDECIDE" -> "Review decision submitted";
             case "WEBFINALIZE" -> "Final loan decision completed";
             case "WEBRETRYOUTBOX" -> "Outbox event retried";

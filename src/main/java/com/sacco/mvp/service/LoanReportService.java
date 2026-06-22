@@ -541,9 +541,10 @@ public class LoanReportService {
                 "Approved Product",
                 "Approved Amount",
                 "Tenure",
-                "Estimated Fee / Insurance Deductions",
+                "Estimated Fee / Insurance / Processing Deductions",
                 "Application Fee",
                 "Insurance Fee",
+                "Loan Processing Fee",
                 "Total Deductions",
                 "Guarantor Details",
                 "Approval Decision Summary",
@@ -569,6 +570,7 @@ public class LoanReportService {
                 row.createCell(column++).setCellValue(detail.deductionSummaryLabel());
                 row.createCell(column++).setCellValue(detail.applicationFeeLabel());
                 row.createCell(column++).setCellValue(detail.insuranceFeeLabel());
+                row.createCell(column++).setCellValue(detail.processingFeeLabel());
                 row.createCell(column++).setCellValue(detail.totalDeductionsLabel());
                 row.createCell(column++).setCellValue(detail.guarantorDetailsLabel());
                 row.createCell(column++).setCellValue(detail.approvalDecisionSummaryLabel());
@@ -2348,9 +2350,11 @@ public class LoanReportService {
         Map<String, Object> financialSnapshot = parseJsonMap(loan.getFinancialSnapshot());
         String applicationFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("applicationFee")));
         String insuranceFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("insuranceFee")));
+        String processingFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("processingFee")));
         String totalDeductionsLabel = formatMoney(resolveTotalDeductions(financialSnapshot));
         String deductionSummary = "Application Fee: " + applicationFeeLabel
             + ", Insurance Fee: " + insuranceFeeLabel
+            + ", Loan Processing Fee: " + processingFeeLabel
             + ", Total Deductions: " + totalDeductionsLabel;
         return new MemberLoanDetail(
             loan.getId(),
@@ -2362,6 +2366,7 @@ public class LoanReportService {
             loan.getTenorMonths() == null ? "-" : loan.getTenorMonths() + " month(s)",
             applicationFeeLabel,
             insuranceFeeLabel,
+            processingFeeLabel,
             totalDeductionsLabel,
             deductionSummary,
             formatGuarantorDetails(guarantorRequests, memberMap),
@@ -2403,6 +2408,7 @@ public class LoanReportService {
         }
         return readBigDecimal(financialSnapshot.get("applicationFee"))
             .add(readBigDecimal(financialSnapshot.get("insuranceFee")))
+            .add(readBigDecimal(financialSnapshot.get("processingFee")))
             .setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -3866,6 +3872,7 @@ public class LoanReportService {
         String tenureLabel,
         String applicationFeeLabel,
         String insuranceFeeLabel,
+        String processingFeeLabel,
         String totalDeductionsLabel,
         String deductionSummaryLabel,
         String guarantorDetailsLabel,
@@ -5028,7 +5035,9 @@ public class LoanReportService {
                         sanitizePdfText(detail.loanIdLabel()),
                         sanitizePdfText(detail.approvedAmountLabel()),
                         sanitizePdfText(detail.tenureLabel()),
-                        "App: " + sanitizePdfText(detail.applicationFeeLabel()) + "\nIns: " + sanitizePdfText(detail.insuranceFeeLabel()),
+                        "App: " + sanitizePdfText(detail.applicationFeeLabel())
+                            + "\nIns: " + sanitizePdfText(detail.insuranceFeeLabel())
+                            + "\nProc: " + sanitizePdfText(detail.processingFeeLabel()),
                         sanitizePdfText(detail.totalDeductionsLabel()),
                         sanitizePdfText(detail.statusLabel()),
                         sanitizePdfText(detail.disbursementDateLabel()) + " / " + sanitizePdfText(detail.finalDueDateLabel())
