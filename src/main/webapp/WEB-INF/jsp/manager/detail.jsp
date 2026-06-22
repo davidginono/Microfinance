@@ -1030,12 +1030,21 @@
 
         document.querySelectorAll("form[data-manager-decision-form='true']").forEach((form) => {
             const reasonsField = form.querySelector("textarea[name='reasons']");
+            const decisionButtons = form.querySelectorAll("button[type='submit'][name='decision']");
             reasonsField?.addEventListener("input", () => {
                 reasonsField.setCustomValidity("");
+            });
+            decisionButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    if (button.value === "ACCEPT") {
+                        reasonsField?.setCustomValidity("");
+                    }
+                });
             });
 
             form.addEventListener("submit", (event) => {
                 const decision = event.submitter ? event.submitter.value : "";
+                reasonsField?.setCustomValidity("");
                 if (decision === "REJECT") {
                     if (reasonsField && !reasonsField.value.trim()) {
                         event.preventDefault();
