@@ -350,6 +350,7 @@ class LoanWorkflowServiceTest {
             List.of(guarantorOne, guarantorTwo),
             "{\"principalPlusInterest\":120000.00}",
             null,
+            null,
             null
         );
 
@@ -394,6 +395,7 @@ class LoanWorkflowServiceTest {
             null,
             List.of(staffOnlyGuarantor),
             "{\"principalPlusInterest\":120000.00}",
+            null,
             null,
             null
         ))
@@ -539,6 +541,7 @@ class LoanWorkflowServiceTest {
             List.of(guarantorId),
             "{\"principalPlusInterest\":120000.00}",
             null,
+            null,
             null
         ))
             .isInstanceOf(LoanWorkflowService.GuarantorValidationException.class)
@@ -666,6 +669,7 @@ class LoanWorkflowServiceTest {
             List.of(UUID.randomUUID(), UUID.randomUUID()),
             "{\"balance\":1000}",
             null,
+            null,
             null
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -703,6 +707,7 @@ class LoanWorkflowServiceTest {
             List.of(),
             "{\"balance\":1000}",
             sourceLoanId,
+            null,
             null
         ))
             .isInstanceOf(IllegalStateException.class)

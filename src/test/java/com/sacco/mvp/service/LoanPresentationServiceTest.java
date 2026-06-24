@@ -15,6 +15,7 @@ import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.RepaymentFrequency;
+import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LoanPresentationServiceTest {
 
     @Mock private ManagerReviewRepository managerReviewRepository;
+    @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
 
@@ -62,6 +64,7 @@ class LoanPresentationServiceTest {
         loanPresentationService = new LoanPresentationService(
             JsonMapper.builder().findAndAddModules().build(),
             managerReviewRepository,
+            boardReviewRepository,
             loanAttachmentService,
             loanProductWorkflowService,
             messageSource
@@ -214,6 +217,8 @@ class LoanPresentationServiceTest {
                 1,
                 true,
                 3,
+                false,
+                1,
                 1,
                 1,
                 true,
@@ -264,8 +269,7 @@ class LoanPresentationServiceTest {
                 0,
                 0,
                 false,
-                4,
-                true
+                4
             )
         );
 
@@ -489,8 +493,7 @@ class LoanPresentationServiceTest {
                 0,
                 0,
                 true,
-                4,
-                true
+                4
             )
         );
 
@@ -699,6 +702,8 @@ class LoanPresentationServiceTest {
                 1,
                 true,
                 3,
+                false,
+                1,
                 1,
                 1,
                 false,

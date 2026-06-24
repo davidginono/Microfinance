@@ -213,8 +213,7 @@ class BoardServiceTest {
             0,
             0,
             false,
-            4,
-            true
+            4
         ));
         when(workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.LOAN_OFFICER, loanOfficerId))
             .thenAnswer(invocation -> {
