@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 class MemberProfileImageServiceTest {
 
     @Test
-    void storesNormalizedPassportJpeg() throws Exception {
+    void storesNormalizedProfileJpeg() throws Exception {
         StoredUploadStorageService storageService = mock(StoredUploadStorageService.class);
         MemberProfileImageService service = new MemberProfileImageService(storageService);
         UUID memberId = UUID.randomUUID();
@@ -39,7 +39,38 @@ class MemberProfileImageServiceTest {
         );
         BufferedImage normalized = ImageIO.read(new ByteArrayInputStream(contentCaptor.getValue()));
         assertThat(normalized.getWidth()).isEqualTo(600);
-        assertThat(normalized.getHeight()).isEqualTo(750);
+        assertThat(normalized.getHeight()).isEqualTo(600);
+    }
+
+    @Test
+    void cropsWideProfileImageToSquare() throws Exception {
+        StoredUploadStorageService storageService = mock(StoredUploadStorageService.class);
+        MemberProfileImageService service = new MemberProfileImageService(storageService);
+
+        service.store(UUID.randomUUID(), imageFile("wide.png", "image/png", 900, 300));
+
+        org.mockito.ArgumentCaptor<byte[]> contentCaptor = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(storageService).replaceCategory(
+            eq(StoredUploadStorageService.OWNER_MEMBER),
+            any(),
+            eq(StoredUploadStorageService.CATEGORY_MEMBER_PROFILE_PHOTO),
+            eq("wide.png"),
+            eq("image/jpeg"),
+            contentCaptor.capture()
+        );
+        BufferedImage normalized = ImageIO.read(new ByteArrayInputStream(contentCaptor.getValue()));
+        assertThat(normalized.getWidth()).isEqualTo(600);
+        assertThat(normalized.getHeight()).isEqualTo(600);
+    }
+
+    @Test
+    void rejectsOversizedProfileImageDimensions() throws Exception {
+        StoredUploadStorageService storageService = mock(StoredUploadStorageService.class);
+        MemberProfileImageService service = new MemberProfileImageService(storageService);
+
+        assertThatThrownBy(() -> service.store(UUID.randomUUID(), imageFile("huge.png", "image/png", 3001, 3000)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("3000x3000");
     }
 
     @Test

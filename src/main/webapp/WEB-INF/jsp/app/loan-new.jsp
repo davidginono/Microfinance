@@ -315,7 +315,9 @@
         <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
-                <p class="text-sm text-slate-500"><spring:message code="newloan.attachments.helper" /></p>
+                <c:if test="${product.applicantAttachmentRequired and not empty requiredAttachmentDefinitions}">
+                    <p class="text-sm text-slate-500">Upload each required document listed below.</p>
+                </c:if>
             </div>
             <span class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${product.applicantAttachmentRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
                 <c:choose>
@@ -328,18 +330,58 @@
                 </c:choose>
             </span>
         </div>
-        <label class="attachment-dropzone" data-attachment-dropzone>
-            <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
-            <span class="attachment-dropzone-main">
-                <span class="attachment-dropzone-copy">
-                    <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here or choose from device" /></span>
-                    <span class="attachment-dropzone-help"><spring:message code="attachments.dropzone.help" text="Images and documents can be attached." /></span>
-                    <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
-                </span>
-                <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
-            </span>
-        </label>
-        <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.attachments.note" /></p>
+        <c:choose>
+            <c:when test="${not empty requiredAttachmentDefinitions}">
+                <div class="grid gap-3">
+                    <c:forEach items="${requiredAttachmentDefinitions}" var="requirement">
+                        <c:set var="existingAttachmentNames" value="${existingRequiredAttachmentNames[requirement.id]}" />
+                        <div class="rounded-md border border-slate-200 bg-white p-3">
+                            <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900"><c:out value="${requirement.attachmentName}" /></p>
+                                    <p class="text-xs text-slate-500">Maximum file size: ${requirement.maxSizeMb} MB</p>
+                                </div>
+                                <c:if test="${existingRequiredAttachmentIds.contains(requirement.id.toString())}">
+                                    <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Already uploaded</span>
+                                </c:if>
+                            </div>
+                            <label class="attachment-dropzone" data-attachment-dropzone>
+                                <input type="file" name="requiredAttachmentFiles_${requirement.id}" class="attachment-dropzone-input" data-attachment-input />
+                                <span class="attachment-dropzone-main">
+                                    <span class="attachment-dropzone-copy">
+                                        <span class="attachment-dropzone-title">Drop <c:out value="${requirement.attachmentName}" /> here or choose from device</span>
+                                        <span class="attachment-dropzone-files" data-attachment-files data-existing-attachment-files="${fn:escapeXml(existingAttachmentNames)}">
+                                            <c:choose>
+                                                <c:when test="${not empty existingAttachmentNames}"><c:out value="${existingAttachmentNames}" /></c:when>
+                                                <c:otherwise><spring:message code="attachments.dropzone.none" text="No file selected" /></c:otherwise>
+                                            </c:choose>
+                                        </span>
+                                    </span>
+                                    <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
+                                </span>
+                            </label>
+                        </div>
+                    </c:forEach>
+                </div>
+            </c:when>
+            <c:otherwise>
+                <label class="attachment-dropzone" data-attachment-dropzone>
+                    <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
+                    <span class="attachment-dropzone-main">
+                        <span class="attachment-dropzone-copy">
+                            <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here or choose from device" /></span>
+                            <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
+                        </span>
+                        <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
+                    </span>
+                </label>
+            </c:otherwise>
+        </c:choose>
+        <c:if test="${not product.applicantAttachmentRequired}">
+            <p class="mt-2 text-sm text-slate-500">
+                <span class="attachment-dropzone-help"><spring:message code="attachments.dropzone.help" text="Images and documents can be attached." /></span>
+            </p>
+        </c:if>
     </div>
 
     <c:if test="${requiredGuarantors le 0}">

@@ -4,6 +4,7 @@ public enum ApprovalWorkflowStage {
     MANAGER,
     LOAN_OFFICER,
     BOARD,
+    CREDIT_COMMITTEE,
     ACCOUNTANT,
     DISBURSEMENT_OFFICER;
 
@@ -11,9 +12,10 @@ public enum ApprovalWorkflowStage {
         return switch (this) {
             case MANAGER -> "Branch Manager";
             case LOAN_OFFICER -> "Loan Officer";
-            case BOARD -> "Board Committee";
+            case BOARD -> "Board Member";
+            case CREDIT_COMMITTEE -> "Credit Committee";
             case ACCOUNTANT -> "Accountant";
-            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
         };
     }
 }

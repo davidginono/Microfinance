@@ -1013,8 +1013,9 @@ public class LoanReportService {
             case MINOR_ADMIN -> "Minor Admin";
             case MANAGER -> "Manager";
             case ACCOUNTANT -> "Accountant";
-            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
             case BOARD -> "Board";
+            case CREDIT_COMMITTEE -> "Credit Committee";
             case LOAN_OFFICER -> "Loan Officer";
             case ADMIN -> "Admin";
         };

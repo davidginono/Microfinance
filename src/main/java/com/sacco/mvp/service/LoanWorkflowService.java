@@ -66,6 +66,7 @@ public class LoanWorkflowService {
     private final EligibilityService eligibilityService;
     private final OutboxService outboxService;
     private final LoanAttachmentService loanAttachmentService;
+    private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final FinancialDetailsService financialDetailsService;
     private final ObjectMapper objectMapper;
@@ -225,7 +226,8 @@ public class LoanWorkflowService {
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                      List<UUID> guarantorIds,
-                                     String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments) {
+                                     String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
+                                     Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
         LoanApplication existingDraft = existingId == null
             ? null
@@ -251,7 +253,12 @@ public class LoanWorkflowService {
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
         appendLoanPurpose(formData, requestParams.get("purpose"));
-        validateApplicantAttachmentRequirement(product, existingDraft, attachments);
+        List<LoanProductRequiredAttachment> requiredAttachmentDefinitions = validateApplicantAttachmentRequirement(
+            product,
+            existingDraft,
+            attachments,
+            requiredAttachments
+        );
         validateGuarantorSelection(
             saccoId,
             applicantStationId,
@@ -303,6 +310,17 @@ public class LoanWorkflowService {
             expireGuarantorApprovalsForApplicantEdit(saved.getId());
         }
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
+        saved.setAttachmentsJson(loanAttachmentService.storeRequired(
+            saved.getId(),
+            requiredAttachmentDefinitions.stream()
+                .map(requirement -> new LoanAttachmentService.RequiredAttachmentUpload(
+                    requirement.getId(),
+                    requirement.getAttachmentName(),
+                    requiredAttachments == null ? List.of() : requiredAttachments.getOrDefault(requirement.getId(), List.of())
+                ))
+                .toList(),
+            saved.getAttachmentsJson()
+        ));
         return loanApplicationRepository.save(saved);
     }
 
@@ -322,16 +340,41 @@ public class LoanWorkflowService {
         guarantorRequestRepository.saveAll(requests);
     }
 
-    private void validateApplicantAttachmentRequirement(LoanProductSetting product,
-                                                        LoanApplication existingDraft,
-                                                        List<MultipartFile> attachments) {
+    private List<LoanProductRequiredAttachment> validateApplicantAttachmentRequirement(LoanProductSetting product,
+                                                                                       LoanApplication existingDraft,
+                                                                                       List<MultipartFile> attachments,
+                                                                                       Map<UUID, List<MultipartFile>> requiredAttachments) {
         if (product == null || !product.isApplicantAttachmentRequired()) {
-            return;
+            return List.of();
+        }
+        List<LoanProductRequiredAttachment> requirements = requiredAttachmentService.activeForProduct(product.getId());
+        if (!requirements.isEmpty()) {
+            for (LoanProductRequiredAttachment requirement : requirements) {
+                List<MultipartFile> files = requiredAttachments == null ? List.of() : requiredAttachments.getOrDefault(requirement.getId(), List.of());
+                validateRequiredAttachmentSize(requirement, files);
+                if (!hasNewAttachment(files) && !hasExistingRequiredApplicationAttachment(existingDraft, requirement.getId())) {
+                    throw new IllegalArgumentException("Upload " + requirement.getAttachmentName() + " before saving this loan application.");
+                }
+            }
+            return requirements;
         }
         if (hasNewAttachment(attachments) || hasExistingApplicationAttachment(existingDraft)) {
-            return;
+            return List.of();
         }
         throw new IllegalArgumentException("Upload at least one applicant attachment before saving this loan application.");
+    }
+
+    private void validateRequiredAttachmentSize(LoanProductRequiredAttachment requirement, List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            return;
+        }
+        long maxBytes = requiredAttachmentService.maxSizeBytes(requirement);
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty() && file.getSize() > maxBytes) {
+                throw new IllegalArgumentException(requirement.getAttachmentName() + " must be "
+                    + requirement.getMaxSizeMb().stripTrailingZeros().toPlainString() + " MB or smaller.");
+            }
+        }
     }
 
     private boolean hasNewAttachment(List<MultipartFile> attachments) {
@@ -347,6 +390,15 @@ public class LoanWorkflowService {
         }
         return loanAttachmentService.parse(existingDraft.getAttachmentsJson()).stream()
             .anyMatch(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory"))));
+    }
+
+    private boolean hasExistingRequiredApplicationAttachment(LoanApplication existingDraft, UUID requirementId) {
+        if (existingDraft == null || requirementId == null) {
+            return false;
+        }
+        return loanAttachmentService.parse(existingDraft.getAttachmentsJson()).stream()
+            .anyMatch(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory")))
+                && requirementId.toString().equals(String.valueOf(item.get("requiredAttachmentId"))));
     }
 
     private void appendLoanPurpose(Map<String, Object> formData, String purpose) {
@@ -375,10 +427,11 @@ public class LoanWorkflowService {
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                          List<UUID> guarantorIds,
-                                         String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments) {
+                                         String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
+                                         Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication saved = saveDraft(
             saccoId, applicantId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
-            financialSnapshotJson, topUpSourceLoanId, attachments);
+            financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
         LoanApplication submitted = submit(saved.getId(), applicantId);
         // Return reloaded row to guarantee caller sees persisted status/form data.
         return getMine(submitted.getId(), applicantId);

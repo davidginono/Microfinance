@@ -45,7 +45,7 @@ public class WorkflowRoutingService {
         ApprovalWorkflowStage firstStage = workflow.stages().isEmpty() ? null : workflow.stages().getFirst();
         LoanStatus nextStatus = approvalFlowService.pendingStatusFor(firstStage);
         java.util.List<UUID> assignedBoardReviewers = java.util.List.of();
-        if (firstStage == ApprovalWorkflowStage.LOAN_OFFICER || firstStage == ApprovalWorkflowStage.BOARD) {
+        if (firstStage == ApprovalWorkflowStage.LOAN_OFFICER || isAssignedReviewerStage(firstStage)) {
             assignedBoardReviewers = assignReviewStage(app, firstStage, workflow);
         }
         app.setStatus(nextStatus);
@@ -65,7 +65,7 @@ public class WorkflowRoutingService {
         ApprovalWorkflowStage nextStage = approvalFlowService.nextStageAfter(workflow.stages(), currentStage);
         LoanStatus nextStatus = approvalFlowService.pendingStatusFor(nextStage);
         java.util.List<UUID> assignedBoardReviewers = java.util.List.of();
-        if (nextStage == ApprovalWorkflowStage.LOAN_OFFICER || nextStage == ApprovalWorkflowStage.BOARD) {
+        if (nextStage == ApprovalWorkflowStage.LOAN_OFFICER || isAssignedReviewerStage(nextStage)) {
             assignedBoardReviewers = assignReviewStage(app, nextStage, workflow);
         }
         app.setStatus(nextStatus);
@@ -95,9 +95,9 @@ public class WorkflowRoutingService {
             return java.util.List.of();
         }
 
-        java.util.List<UUID> boardMemberIds = productBoardReviewerIds(app);
+        java.util.List<UUID> boardMemberIds = productReviewerIds(app, stage);
         if (boardMemberIds.isEmpty()) {
-            throw new IllegalStateException("No board reviewers are assigned to this loan product.");
+            throw new IllegalStateException("No reviewers are assigned to this loan product stage.");
         }
         boardMemberIds.forEach(boardMemberId -> boardReviewRepository.save(BoardReview.builder()
             .id(UUID.randomUUID())
@@ -110,11 +110,14 @@ public class WorkflowRoutingService {
         return boardMemberIds;
     }
 
-    private java.util.List<UUID> productBoardReviewerIds(LoanApplication app) {
+    private java.util.List<UUID> productReviewerIds(LoanApplication app, ApprovalWorkflowStage stage) {
+        Position requiredRole = stage == ApprovalWorkflowStage.CREDIT_COMMITTEE
+            ? Position.CREDIT_COMMITTEE
+            : Position.BOARD;
         return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
-            .map(product -> loanProductBoardReviewerRepository.findByLoanProductSettingIdOrderByCreatedAtAsc(product.getId()).stream()
+            .map(product -> loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(product.getId(), stage).stream()
                 .map(com.sacco.mvp.domain.LoanProductBoardReviewer::getBoardMemberId)
-                .filter(boardMemberId -> roleDirectoryService.hasActiveRoleInSacco(boardMemberId, app.getSaccoId(), Position.BOARD))
+                .filter(boardMemberId -> roleDirectoryService.hasActiveRoleInSacco(boardMemberId, app.getSaccoId(), requiredRole))
                 .toList())
             .orElse(java.util.List.of());
     }
@@ -124,7 +127,7 @@ public class WorkflowRoutingService {
                                              UUID actorMemberId,
                                              java.util.List<UUID> assignedBoardReviewers) {
         String eventType = approvalFlowService.reviewAssignedEventType(stage);
-        if (stage == ApprovalWorkflowStage.BOARD && assignedBoardReviewers != null && !assignedBoardReviewers.isEmpty()) {
+        if (isAssignedReviewerStage(stage) && assignedBoardReviewers != null && !assignedBoardReviewers.isEmpty()) {
             assignedBoardReviewers.forEach(reviewerId -> outboxService.enqueue("LOAN", app.getId(), eventType, reviewerId,
                 app.getSaccoId(), app.getStationId(),
                 Map.of("loanId", app.getId().toString(), "boardMemberId", reviewerId.toString())));
@@ -133,5 +136,9 @@ public class WorkflowRoutingService {
         outboxService.enqueue("LOAN", app.getId(), eventType, actorMemberId,
             app.getSaccoId(), app.getStationId(),
             Map.of("loanId", app.getId().toString()));
+    }
+
+    private boolean isAssignedReviewerStage(ApprovalWorkflowStage stage) {
+        return stage == ApprovalWorkflowStage.BOARD || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE;
     }
 }

@@ -89,11 +89,9 @@ public class AccountantController {
 
         model.addAttribute("dashboardBreadcrumb", "Accountant Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Accountant Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track accountant review decisions and keep an eye on loans waiting for accounting action.");
         model.addAttribute("dashboardQueueLabel", "On Review By Accountant");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_ACCOUNTANT));
-        model.addAttribute("dashboardQueueMeta", "Applications currently waiting for your action.");
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
         model.addAttribute("dashboardQueueIcon", "C");
         model.addAttribute("dashboardDetailBasePath", "/accountant/loan-applications");
@@ -103,7 +101,6 @@ public class AccountantController {
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardChartTitle", "Accountant Review Chart");
-        model.addAttribute("dashboardChartHelp", "An accountant-focused view of loans waiting for review, approved, rejected, and ready for disbursement.");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildAccountantDashboardChartRows(
                 dashboard.statusBreakdown(),

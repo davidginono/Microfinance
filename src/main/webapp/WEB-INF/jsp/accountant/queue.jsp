@@ -35,7 +35,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement officer." /></p>
+    <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement/teller officer." /></p>
 </div>
 <div class="erp-toolbar">
     <div class="space-y-3">

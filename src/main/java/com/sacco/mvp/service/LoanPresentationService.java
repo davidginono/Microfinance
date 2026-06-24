@@ -14,6 +14,7 @@ import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryDto;
 import com.sacco.mvp.repository.ManagerReviewRepository;
+import com.sacco.mvp.repository.BoardReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -31,9 +32,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
 import javax.imageio.ImageIO;
+import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.Color;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -45,6 +48,7 @@ import java.text.DecimalFormatSymbols;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +67,7 @@ public class LoanPresentationService {
 
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
+    private final BoardReviewRepository boardReviewRepository;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final MessageSource messageSource;
@@ -95,6 +100,19 @@ public class LoanPresentationService {
             : parseFinancialFieldSections(app.getFinancialSnapshot(), app.getAmount(), app.getTenorMonths());
     }
 
+    public BigDecimal totalDeductions(LoanApplication app) {
+        if (app == null || app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            BigDecimal total = readBigDecimal(raw.get("totalDeductions"));
+            return total == null ? BigDecimal.ZERO.setScale(2) : total.setScale(2, java.math.RoundingMode.HALF_UP);
+        } catch (Exception ex) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+    }
+
     private Map<String, Object> parseFinancialFields(String json, BigDecimal effectivePrincipal, Integer fallbackTenorMonths) {
         Map<String, Map<String, Object>> sections = parseFinancialFieldSections(json, effectivePrincipal, fallbackTenorMonths);
         if (sections.isEmpty()) {
@@ -120,6 +138,7 @@ public class LoanPresentationService {
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
             putMoney(calculations, "Loan Amount (TZS)", principalAmount);
             putValue(calculations, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
+            putValue(calculations, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             addFinancialRow(calculations, "Interest (TZS)", raw.get("interestAmount"));
             Integer tenorMonths = readInteger(raw.get("tenorMonths"));
             if (tenorMonths == null) {
@@ -136,8 +155,8 @@ public class LoanPresentationService {
             }
             addFinancialRow(calculations, "Monthly Repayment Amount (TZS)", raw.get("monthlyRepaymentAmount"));
             Map<String, Map<String, Object>> sections = new LinkedHashMap<>();
-            sections.put("Fees", fees);
             sections.put("Loan Calculations", calculations);
+            sections.put("Loan Fees", fees);
             return sections;
         } catch (Exception e) {
             return Collections.emptyMap();
@@ -331,6 +350,7 @@ public class LoanPresentationService {
             putValue(display, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             putValue(display, "Interest Rate", formatPercentValue(raw.get("interestRate")));
             putMoney(display, "Disbursed Principal", raw.get("disbursedPrincipal"));
+            putMoney(display, "Deposit Amount", raw.get("depositAmount"));
             putMoney(display, "Installment Amount", raw.get("installmentAmount"));
             putValue(display, "Installments", raw.get("installments"));
             putValue(display, "Disbursement Reference", raw.get("disbursementReference"));
@@ -705,6 +725,7 @@ public class LoanPresentationService {
             case MANAGER -> "On Review By Manager";
             case LOAN_OFFICER -> "On Review By Loan Officer";
             case BOARD -> "On Review By Board";
+            case CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case ACCOUNTANT -> "On Review By Accountant";
             case DISBURSEMENT_OFFICER -> "Approved For Disbursement";
         };
@@ -720,6 +741,7 @@ public class LoanPresentationService {
             case "On Review By Loan Officer" -> message("loan.status.AWAITING_LOAN_OFFICER");
             case "Loan Officer Rejected" -> message("loan.status.LOAN_OFFICER_REJECTED");
             case "On Review By Board" -> message("loan.status.AWAITING_BOARD");
+            case "On Review By Credit Committee" -> message("loan.status.AWAITING_BOARD");
             case "Board Rejected" -> message("loan.status.BOARD_REJECTED");
             case "On Review By Accountant" -> message("loan.status.AWAITING_ACCOUNTANT");
             case "Accountant Rejected" -> message("loan.status.ACCOUNTANT_REJECTED");
@@ -894,6 +916,61 @@ public class LoanPresentationService {
             }
         }
         return reasons;
+    }
+
+    public List<DecisionFeedback> rejectionFeedback(UUID loanId) {
+        if (loanId == null) {
+            return List.of();
+        }
+        List<DecisionFeedback> feedback = new ArrayList<>();
+        managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId).stream()
+            .filter(review -> review.getDecision() == ManagerDecision.REJECT)
+            .filter(review -> review.getReasons() != null && !review.getReasons().isBlank())
+            .forEach(review -> feedback.add(new DecisionFeedback(
+                review.getReviewStage() == null ? "Staff Review" : review.getReviewStage().getDisplayLabel(),
+                review.getReasons(),
+                review.getCreatedAt()
+            )));
+        boardReviewRepository.findByLoanApplicationId(loanId).stream()
+            .filter(review -> review.getDecision() == BoardDecision.REJECTED)
+            .filter(review -> review.getComment() != null && !review.getComment().isBlank())
+            .forEach(review -> feedback.add(new DecisionFeedback(
+                review.getReviewStage() == null ? "Board Review" : review.getReviewStage().getDisplayLabel(),
+                review.getComment(),
+                review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt()
+            )));
+        feedback.sort(Comparator.comparing(DecisionFeedback::decidedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        return feedback;
+    }
+
+    public Map<UUID, String> rejectionFeedbackReasons(Collection<LoanApplication> apps) {
+        if (apps == null || apps.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, String> reasons = new LinkedHashMap<>();
+        for (LoanApplication app : apps) {
+            if (app == null || app.getId() == null) {
+                continue;
+            }
+            if (!isRejectedStatus(app.getStatus())) {
+                continue;
+            }
+            rejectionFeedback(app.getId()).stream()
+                .findFirst()
+                .ifPresent(feedback -> reasons.put(app.getId(), feedback.reason()));
+        }
+        return reasons;
+    }
+
+    private boolean isRejectedStatus(com.sacco.mvp.domain.LoanStatus status) {
+        return status == com.sacco.mvp.domain.LoanStatus.MANAGER_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.LOAN_OFFICER_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.BOARD_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.ACCOUNTANT_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.FINAL_REJECTED;
+    }
+
+    public record DecisionFeedback(String role, String reason, java.time.OffsetDateTime decidedAt) {
     }
 
     public String buildPrintableHtml(LoanApplication app,
@@ -1144,7 +1221,7 @@ public class LoanPresentationService {
     private void appendBoardCommitteeSummary(StringBuilder html,
                                              List<BoardReview> boardReviews,
                                              Map<UUID, Member> boardMembers) {
-        html.append("<h2>Board Committee Assessors</h2>");
+        html.append("<h2>Credit Committee Assessors</h2>");
         html.append("<table><thead><tr><th>Assessor</th><th>Member Number</th><th>Decision</th><th>Comment</th><th>Decision Date</th><th>Signature</th><th>Verified At</th></tr></thead><tbody>");
         if (boardReviews == null || boardReviews.isEmpty()) {
             html.append("<tr><td colspan=\"7\">No board assessor details available.</td></tr>");
@@ -1292,6 +1369,12 @@ public class LoanPresentationService {
         if (text.isBlank()) {
             return "";
         }
+        if ("ACCEPT".equalsIgnoreCase(text) || "ACCEPTED".equalsIgnoreCase(text)) {
+            return "Approved";
+        }
+        if ("MANAGER_ACCEPTED".equalsIgnoreCase(text)) {
+            return "Manager Approved";
+        }
         String[] parts = text.replace('_', ' ').toLowerCase(Locale.ROOT).split("\\s+");
         StringBuilder builder = new StringBuilder();
         for (String part : parts) {
@@ -1427,6 +1510,7 @@ public class LoanPresentationService {
         private final byte[] applicantProfileImage;
         private final Map<String, Object> formFields;
         private final Map<String, Object> financialFields;
+        private final List<Map<String, Object>> applicationAttachments;
         private final List<Map<String, Object>> disbursementProofAttachments;
         private final Map<String, Object> repaymentSummary;
         private final List<Map<String, Object>> repaymentRows;
@@ -1471,6 +1555,7 @@ public class LoanPresentationService {
             this.applicantProfileImage = applicantProfileImage == null ? new byte[0] : applicantProfileImage;
             this.formFields = formFields == null ? Collections.emptyMap() : formFields;
             this.financialFields = financialFields == null ? Collections.emptyMap() : financialFields;
+            this.applicationAttachments = parseApplicationAttachments(app.getAttachmentsJson());
             this.disbursementProofAttachments = disbursementProofAttachments == null ? Collections.emptyList() : disbursementProofAttachments;
             this.repaymentSummary = repaymentSummary == null ? Collections.emptyMap() : repaymentSummary;
             this.repaymentRows = repaymentRows == null ? Collections.emptyList() : repaymentRows;
@@ -1493,12 +1578,13 @@ public class LoanPresentationService {
             drawSectionStrip("Supporting Application Details", "System-record detail");
             drawSectionTable("Application Details", formFields);
             drawSectionTable("Financial Details", financialFields);
-            drawAttachmentSection("Disbursement Proof", disbursementProofAttachments);
             drawSectionTable("Repayment Summary", repaymentSummary);
             drawRepaymentRowsSection();
             drawGuarantorSection();
             drawApplicantSignatureSection();
             drawConfiguredReviewSignOffSection();
+            drawAttachmentAppendixSection("Application Attachments", applicationAttachments);
+            drawAttachmentAppendixSection("Disbursement Proof", disbursementProofAttachments);
             closePage();
         }
 
@@ -1531,9 +1617,9 @@ public class LoanPresentationService {
             ensureSpace(132f);
             float pageWidth = page.getMediaBox().getWidth();
             float headerTop = page.getMediaBox().getHeight();
-            float profileSize = 72f;
+            float profileSize = 78f;
             float profileX = pageWidth - MARGIN - profileSize;
-            float profileY = headerTop - 132f;
+            float profileY = headerTop - 150f;
 
             String saccoLabel = sanitizePdfText(saccoName == null || saccoName.isBlank() ? "SACCO" : saccoName.trim());
             writeText(saccoLabel.toUpperCase(Locale.ROOT), MARGIN, headerTop - 42f, bold, 15f, TEXT_COLOR);
@@ -1557,9 +1643,9 @@ public class LoanPresentationService {
         private void drawApplicantProfileImage(float x, float y, float size) throws IOException {
             BufferedImage image = readApplicantProfileImage();
             if (image == null) {
-                image = createProfileFallbackImage(220);
+                image = createProfileFallbackImage(220, 220);
             }
-            PDImageXObject pdfImage = LosslessFactory.createFromImage(document, squareProfileImage(image, 220));
+            PDImageXObject pdfImage = LosslessFactory.createFromImage(document, createCircularProfileImage(image, 220));
             stream.drawImage(pdfImage, x, y, size, size);
         }
 
@@ -1574,32 +1660,42 @@ public class LoanPresentationService {
             }
         }
 
-        private BufferedImage squareProfileImage(BufferedImage source, int size) {
-            int cropSize = Math.min(source.getWidth(), source.getHeight());
-            int cropX = Math.max((source.getWidth() - cropSize) / 2, 0);
-            int cropY = Math.max((source.getHeight() - cropSize) / 2, 0);
-            BufferedImage output = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        private BufferedImage createCircularProfileImage(BufferedImage source, int size) {
+            BufferedImage output = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
             Graphics2D graphics = output.createGraphics();
             try {
                 graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                graphics.drawImage(source, 0, 0, size, size, cropX, cropY, cropX + cropSize, cropY + cropSize, null);
+                graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                graphics.setClip(new Ellipse2D.Float(0, 0, size, size));
+                graphics.setColor(Color.WHITE);
+                graphics.fillOval(0, 0, size, size);
+                double scale = Math.max((double) size / source.getWidth(), (double) size / source.getHeight());
+                int drawWidth = Math.max(1, (int) Math.round(source.getWidth() * scale));
+                int drawHeight = Math.max(1, (int) Math.round(source.getHeight() * scale));
+                int x = (size - drawWidth) / 2;
+                int y = (size - drawHeight) / 2;
+                graphics.drawImage(source, x, y, drawWidth, drawHeight, null);
+                graphics.setClip(null);
+                graphics.setStroke(new BasicStroke(3f));
+                graphics.setColor(new Color(215, 225, 234));
+                graphics.drawOval(1, 1, size - 2, size - 2);
             } finally {
                 graphics.dispose();
             }
             return output;
         }
 
-        private BufferedImage createProfileFallbackImage(int size) {
-            BufferedImage output = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        private BufferedImage createProfileFallbackImage(int width, int height) {
+            BufferedImage output = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
             Graphics2D graphics = output.createGraphics();
             try {
                 graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 graphics.setColor(new Color(244, 246, 248));
-                graphics.fillRect(0, 0, size, size);
+                graphics.fillRect(0, 0, width, height);
                 graphics.setColor(new Color(101, 116, 139));
-                graphics.fillOval(size / 2 - 24, size / 2 - 46, 48, 48);
-                graphics.fillOval(size / 2 - 54, size / 2 + 8, 108, 70);
+                graphics.fillOval(width / 2 - 24, height / 2 - 54, 48, 48);
+                graphics.fillOval(width / 2 - 54, height / 2, 108, 70);
             } finally {
                 graphics.dispose();
             }
@@ -1759,6 +1855,33 @@ public class LoanPresentationService {
             drawTable(new String[]{"Field", "Value"}, new float[]{contentWidth() * 0.36f, contentWidth() * 0.64f}, rows, BODY_SIZE, BODY_SIZE, 14f);
         }
 
+        private void drawAttachmentAppendixSection(String title, List<Map<String, Object>> attachments) throws IOException {
+            if (attachments == null || attachments.isEmpty()) {
+                return;
+            }
+            startNewPage();
+            drawSectionStrip(title, "Attached documents");
+            List<String[]> rows = new ArrayList<>();
+            for (Map<String, Object> attachment : attachments) {
+                String label = String.valueOf(attachment.getOrDefault("requiredAttachmentName",
+                    attachment.getOrDefault("originalName", "-")));
+                rows.add(new String[]{
+                    sanitizePdfText(label),
+                    sanitizePdfText(String.valueOf(attachment.getOrDefault("originalName", "-"))),
+                    sanitizePdfText(String.valueOf(attachment.getOrDefault("sizeLabel", "-")))
+                });
+            }
+            drawTable(
+                new String[]{"Document", "File", "Size"},
+                new float[]{contentWidth() * 0.34f, contentWidth() * 0.46f, contentWidth() * 0.20f},
+                rows,
+                BODY_SIZE,
+                BODY_SIZE,
+                14f
+            );
+            drawAttachmentPreviews(attachments);
+        }
+
         private void drawAttachmentSection(String title, List<Map<String, Object>> attachments) throws IOException {
             if (attachments == null || attachments.isEmpty()) {
                 return;
@@ -1784,6 +1907,10 @@ public class LoanPresentationService {
         }
 
         private void drawAttachmentPreviews(List<Map<String, Object>> attachments) throws IOException {
+            if (attachments == null || attachments.isEmpty()) {
+                return;
+            }
+            drawSectionHeading("Attachment Contents");
             for (Map<String, Object> attachment : attachments) {
                 String attachmentId = String.valueOf(attachment.getOrDefault("id", ""));
                 if (attachmentId.isBlank()) {
@@ -1802,12 +1929,10 @@ public class LoanPresentationService {
 
         private void drawAttachmentResource(String displayName, LoanAttachmentService.AttachmentResource resource) throws IOException {
             String contentType = resource.getContentType() == null ? "" : resource.getContentType().toLowerCase(Locale.ROOT);
-            if (contentType.startsWith("image/")) {
-                BufferedImage image = ImageIO.read(new ByteArrayInputStream(resource.getContent()));
-                if (image != null) {
-                    drawAttachmentImage(displayName, image);
-                    return;
-                }
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(resource.getContent()));
+            if (image != null) {
+                drawAttachmentImage(displayName, image);
+                return;
             }
             if ("application/pdf".equals(contentType) || displayName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
                 drawAttachmentPdf(displayName, resource.getContent());

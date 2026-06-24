@@ -460,8 +460,8 @@ private static String[] splitLabel(String label) {
     if ("On Review By Board".equals(label)) {
         return new String[] {"On Review", "By Board"};
     }
-    if ("Accepted Loan".equals(label)) {
-        return new String[] {"Accepted", "Loan"};
+    if ("Accepted Loan".equals(label) || "Approved Loan".equals(label)) {
+        return new String[] {"Approved", "Loan"};
     }
     return new String[] {label};
 }
@@ -648,9 +648,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 
 <section class="space-y-4">
     <div class="erp-page-header">
-        <p class="erp-breadcrumb"><spring:message code="dashboard.breadcrumb" /></p>
-        <h1 class="erp-page-title" data-sticky-title-source="true"><spring:message code="dashboard.title" /></h1>
-        <p class="erp-page-heading"><spring:message code="dashboard.welcome" />,
+        <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
+        <p class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="dashboard.welcome" />,
             <c:choose>
                 <c:when test="${not empty currentMember and not empty currentMember.fullName}">
                     ${currentMember.fullName}

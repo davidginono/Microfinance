@@ -318,7 +318,7 @@ public class ManagerService {
                              LocalDate firstRepaymentDate,
                              RepaymentFrequency repaymentFrequency,
                              BigDecimal installmentAmount,
-                             BigDecimal disbursementAmount,
+                             BigDecimal depositAmount,
                              String loanId,
                              String disbursementReference,
                              String disbursementNotes,
@@ -329,7 +329,7 @@ public class ManagerService {
         }
         RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
         validateDisbursement(disbursementDate, firstRepaymentDate);
-        BigDecimal effectiveDisbursementAmount = validateDisbursementAmount(disbursementAmount);
+        BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, app.getAmount());
         boolean hasUploadedProof = disbursementProofFile != null && !disbursementProofFile.isEmpty();
         if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
@@ -345,7 +345,7 @@ public class ManagerService {
             && loanApplicationRepository.existsBySaccoIdAndLoanId(app.getSaccoId(), normalisedLoanId)) {
             throw new IllegalArgumentException("Loan ID is already used in this SACCO");
         }
-        app.setAmount(effectiveDisbursementAmount);
+        app.setDepositAmount(effectiveDepositAmount);
         RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
             app,
             disbursementDate,
@@ -391,6 +391,7 @@ public class ManagerService {
         details.put("repaymentFrequency", app.getRepaymentFrequency() == null ? "" : app.getRepaymentFrequency().name());
         details.put("installmentAmount", app.getInstallmentAmount());
         details.put("disbursementAmount", app.getAmount());
+        details.put("depositAmount", app.getDepositAmount());
         details.put("applicationId", applicationId.toString());
         details.put("loanId", app.getLoanId());
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
@@ -515,14 +516,16 @@ public class ManagerService {
         }
     }
 
-    private BigDecimal validateDisbursementAmount(BigDecimal disbursementAmount) {
-        if (disbursementAmount == null) {
-            throw new IllegalArgumentException("Disbursement amount is required to disburse this loan");
+    private BigDecimal validateDepositAmount(BigDecimal depositAmount, BigDecimal disbursementAmount) {
+        BigDecimal principal = disbursementAmount == null ? BigDecimal.ZERO : disbursementAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal normalized = depositAmount == null ? principal : depositAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        if (normalized.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Deposit amount cannot be negative");
         }
-        if (disbursementAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Disbursement amount must be greater than zero");
+        if (principal.compareTo(BigDecimal.ZERO) > 0 && normalized.compareTo(principal) > 0) {
+            throw new IllegalArgumentException("Deposit amount cannot be greater than the approved loan amount");
         }
-        return disbursementAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        return normalized;
     }
 
     private boolean matchesQueueSearch(LoanApplication app, String lookup, boolean searchByLoanId) {

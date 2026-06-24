@@ -37,7 +37,8 @@ public class AuthzService {
                 || principal.hasRole(Position.MANAGER)
                 || principal.hasRole(Position.ACCOUNTANT)
                 || principal.hasRole(Position.DISBURSEMENT_OFFICER)
-                || principal.hasRole(Position.BOARD));
+                || principal.hasRole(Position.BOARD)
+                || principal.hasRole(Position.CREDIT_COMMITTEE));
     }
 
     public boolean platformAdminIdentity(AppUserPrincipal principal) {
@@ -72,7 +73,22 @@ public class AuthzService {
     }
 
     public boolean isBoardAssignee(UUID loanId, AppUserPrincipal principal) {
-        return hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD);
+        if (principal == null) {
+            return false;
+        }
+        return (principal.hasRole(Position.BOARD)
+                && principal.getClaims().contains("REVIEW_BOARD_QUEUE")
+                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD))
+            || (principal.hasRole(Position.CREDIT_COMMITTEE)
+                && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")
+                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.CREDIT_COMMITTEE));
+    }
+
+    public boolean isBoardReviewer(AppUserPrincipal principal) {
+        return principal != null
+            && ((principal.hasRole(Position.BOARD) && principal.getClaims().contains("REVIEW_BOARD_QUEUE"))
+                || (principal.hasRole(Position.CREDIT_COMMITTEE)
+                    && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")));
     }
 
     public boolean isLoanOfficerAssignee(UUID loanId, AppUserPrincipal principal) {
@@ -102,8 +118,8 @@ public class AuthzService {
                 if (principal.hasRole(com.sacco.mvp.domain.Position.LOAN_OFFICER)) {
                     return hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.LOAN_OFFICER);
                 }
-                if (principal.hasRole(com.sacco.mvp.domain.Position.BOARD)) {
-                    return hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD);
+                if (isBoardAssignee(loanId, principal)) {
+                    return true;
                 }
                 return false;
             })

@@ -11,6 +11,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
+import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -60,6 +61,7 @@ public class LoanOfficerController {
     private static final ApprovalWorkflowStage STAGE = ApprovalWorkflowStage.LOAN_OFFICER;
 
     private final BoardService boardService;
+    private final BoardReviewRepository boardReviewRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
@@ -92,11 +94,9 @@ public class LoanOfficerController {
 
         model.addAttribute("dashboardBreadcrumb", "Loan Officer Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Loan Officer Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track loan officer review decisions and keep an eye on loans waiting for your action.");
         model.addAttribute("dashboardQueueLabel", "On Review By Loan Officer");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_LOAN_OFFICER));
-        model.addAttribute("dashboardQueueMeta", "Applications currently waiting for your action.");
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
         model.addAttribute("dashboardQueueIcon", "L");
         model.addAttribute("dashboardDetailBasePath", "/loan-officer/loan-applications");
@@ -106,7 +106,6 @@ public class LoanOfficerController {
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardChartTitle", "Loan Officer Review Chart");
-        model.addAttribute("dashboardChartHelp", "A loan-officer-focused view of applications waiting for review, approved, and rejected.");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildLoanOfficerDashboardChartRows(
                 dashboard.statusBreakdown(),
@@ -154,15 +153,30 @@ public class LoanOfficerController {
     @GetMapping("/archive")
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(required = false) String filter,
+                          @RequestParam(defaultValue = "0") int page,
                           Model model) {
         applyLoanOfficerUi(model);
-        List<BoardReview> myReviews = boardService.assignedAll(principal.getMemberId(), STAGE).stream()
-            .filter(review -> review.getDecision() != BoardDecision.PENDING)
-            .toList();
-        return populateListing(
+        ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        List<String> statuses = currentFilter.statuses().isEmpty()
+            ? List.of(com.sacco.mvp.domain.LoanStatus.DRAFT.name())
+            : currentFilter.statuses().stream().map(Enum::name).toList();
+        org.springframework.data.domain.Page<BoardReview> archivePage = boardReviewRepository.findArchivePage(
+            principal.getMemberId(),
+            STAGE.name(),
+            principal.getSaccoId(),
+            principal.getStationId(),
+            currentFilter.decision() != null,
+            currentFilter.decision() == null ? BoardDecision.APPROVED.name() : currentFilter.decision().name(),
+            !currentFilter.statuses().isEmpty(),
+            statuses,
+            normalizeSearch(searchId),
+            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
+        );
+        String view = populateListing(
             principal,
             model,
-            myReviews,
+            archivePage.getContent(),
             false,
             "Loan Officer Panel / Archive",
             "Loan Officer Archive",
@@ -170,6 +184,11 @@ public class LoanOfficerController {
             "/loan-officer/archive",
             searchId
         );
+        model.addAttribute("archiveView", true);
+        model.addAttribute("archivePage", archivePage);
+        model.addAttribute("currentFilterKey", currentFilter.key());
+        model.addAttribute("currentFilterLabel", currentFilter.label());
+        return view;
     }
 
     @GetMapping("/reports")
@@ -505,6 +524,23 @@ public class LoanOfficerController {
         return response;
     }
 
+    private ArchiveFilter resolveArchiveFilter(String filter) {
+        String key = filter == null || filter.isBlank() ? "ALL" : filter.trim().toUpperCase(java.util.Locale.ENGLISH);
+        return switch (key) {
+            case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
+            case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
+            case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
+                List.of(com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID));
+            default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
+        };
+    }
+
+    private record ArchiveFilter(String key,
+                                 String label,
+                                 BoardDecision decision,
+                                 List<com.sacco.mvp.domain.LoanStatus> statuses) {
+    }
+
     private String populateListing(AppUserPrincipal principal,
                                    Model model,
                                    List<BoardReview> reviews,
@@ -517,6 +553,7 @@ public class LoanOfficerController {
         List<LoanApplication> apps = new java.util.ArrayList<>();
         Map<UUID, BoardDecision> myDecisions = new java.util.LinkedHashMap<>();
         Map<UUID, java.time.OffsetDateTime> myDecisionDates = new java.util.LinkedHashMap<>();
+        Map<UUID, String> myDecisionReasons = new java.util.LinkedHashMap<>();
         String normalizedSearchId = normalizeSearch(searchId);
         for (BoardReview review : reviews) {
             loanApplicationRepository.findById(review.getLoanApplicationId())
@@ -528,6 +565,11 @@ public class LoanOfficerController {
                     apps.add(app);
                     myDecisions.put(app.getId(), review.getDecision());
                     myDecisionDates.put(app.getId(), review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt());
+                    myDecisionReasons.put(app.getId(), review.getDecision() == BoardDecision.REJECTED
+                        && review.getComment() != null
+                        && !review.getComment().isBlank()
+                        ? review.getComment()
+                        : "-");
                 });
         }
         Map<UUID, String> applicantNames = memberRepository.findAllById(
@@ -539,6 +581,7 @@ public class LoanOfficerController {
         model.addAttribute("applicantNames", applicantNames);
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);
+        model.addAttribute("myDecisionReasons", myDecisionReasons);
         model.addAttribute("boardListBreadcrumb", breadcrumb);
         model.addAttribute("boardListTitle", pageTitle);
         model.addAttribute("boardListEmptyState", emptyState);

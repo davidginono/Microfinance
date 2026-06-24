@@ -212,6 +212,9 @@
     (() => {
         document.querySelectorAll("form[data-confirm-title]").forEach((form) => {
             form.addEventListener("submit", () => {
+                if (form.dataset.confirmTitle) {
+                    return;
+                }
                 const submitButton = form.querySelector("button[type='submit']");
                 if (!submitButton || submitButton.disabled) {
                     return;

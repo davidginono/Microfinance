@@ -57,9 +57,9 @@
                class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
                 <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
             </a>
-            <a href="/manager/archive?filter=APPROVED_FOR_DISBURSEMENT"
-               class="erp-filter-tab ${currentFilterKey eq 'APPROVED_FOR_DISBURSEMENT' ? 'is-active' : ''}">
-                <spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" />
+            <a href="/manager/archive?filter=DISBURSED"
+               class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
+                <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
             </a>
         </div>
         <form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form">
@@ -70,7 +70,7 @@
                        name="searchId"
                        value="${fn:escapeXml(queueSearchValue)}"
                        placeholder="${archiveSearchPlaceholder}"
-                       inputmode="${currentFilterKey eq 'APPROVED_FOR_DISBURSEMENT' ? 'text' : 'numeric'}"
+                       inputmode="${currentFilterKey eq 'DISBURSED' ? 'text' : 'numeric'}"
                        class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
             </label>
             <div class="manager-archive-search-actions">
@@ -92,6 +92,7 @@
             <th><spring:message code="common.applicant" text="Applicant" /></th>
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="review.managerDecision" text="Manager Decision" /></th>
+            <th><spring:message code="review.reason" text="Reason" /></th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th><spring:message code="common.action" text="Action" /></th>
@@ -105,6 +106,7 @@
                 <td>${row.applicantName}</td>
                 <td>${row.amount}</td>
                 <td>${row.decisionLabel}</td>
+                <td><c:out value="${row.reason}" /></td>
                 <td>${row.reviewedAt}</td>
                 <td>${row.currentStatusLabel}</td>
                 <td><a href="/manager/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
@@ -112,7 +114,7 @@
         </c:forEach>
         <c:if test="${empty archiveRows}">
             <tr>
-                <td colspan="8" class="px-3 py-8 text-center text-slate-500">
+                <td colspan="9" class="px-3 py-8 text-center text-slate-500">
                     <spring:message code="manager.archive.empty" text="No manager-reviewed loan applications matched the current filter." />
                 </td>
             </tr>

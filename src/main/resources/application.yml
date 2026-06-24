@@ -27,6 +27,10 @@ spring:
     view:
       prefix: /WEB-INF/jsp/
       suffix: .jsp
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:512MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:512MB}
   web:
     resources:
       cache:
@@ -68,6 +72,7 @@ server:
       min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:20}
     max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:10000}
     accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:1000}
+    max-swallow-size: ${SERVER_TOMCAT_MAX_SWALLOW_SIZE:-1}
   servlet:
     session:
       cookie:

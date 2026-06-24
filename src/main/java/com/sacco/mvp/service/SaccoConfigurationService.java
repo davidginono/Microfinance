@@ -52,6 +52,8 @@ public class SaccoConfigurationService {
                                                 ApprovalWorkflowStage workflowStartStage,
                                                 Integer managerPriority,
                                                 Integer loanOfficerPriority,
+                                                boolean boardReviewRequired,
+                                                Integer boardPriority,
                                                 boolean committeeReviewRequired,
                                                 Integer committeePriority,
                                                 Integer committeeMinimumVotes,
@@ -94,6 +96,8 @@ public class SaccoConfigurationService {
             workflowStartStage,
             managerPriority,
             loanOfficerPriority,
+            boardReviewRequired,
+            boardPriority,
             committeeReviewRequired,
             committeePriority,
             committeeMinimumVotes,
@@ -135,6 +139,8 @@ public class SaccoConfigurationService {
                                               ApprovalWorkflowStage workflowStartStage,
                                               Integer managerPriority,
                                               Integer loanOfficerPriority,
+                                              boolean boardReviewRequired,
+                                              Integer boardPriority,
                                               boolean committeeReviewRequired,
                                               Integer committeePriority,
                                               Integer committeeMinimumVotes,
@@ -175,6 +181,8 @@ public class SaccoConfigurationService {
             .loanOfficerReviewRequired(loanOfficerReviewRequired)
             .loanOfficerPriority(loanOfficerPriority == null ? 2 : loanOfficerPriority)
             .workflowStartStage(workflowStartStage == null ? ApprovalWorkflowStage.MANAGER : workflowStartStage)
+            .boardReviewRequired(boardReviewRequired)
+            .boardPriority(boardPriority)
             .committeeReviewRequired(committeeReviewRequired)
             .committeePriority(committeePriority)
             .committeeMinimumVotes(committeeMinimumVotes)

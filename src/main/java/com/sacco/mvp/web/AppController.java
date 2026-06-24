@@ -17,6 +17,7 @@ import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanQualificationPolicyService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.LoanProductWorkflowService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
@@ -39,6 +40,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -77,6 +81,7 @@ public class AppController {
     private final FinancialDetailsService financialDetailsService;
     private final LoanPresentationService loanPresentationService;
     private final LoanReportService loanReportService;
+    private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final AdminService adminService;
     private final EmailOtpService emailOtpService;
@@ -224,7 +229,7 @@ public class AppController {
         LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(principal.getMemberId());
         List<LoanApplication> apps = applications.currentApplications();
         model.addAttribute("apps", apps);
-        model.addAttribute("managerReasons", loanPresentationService.latestManagerReasons(apps));
+        model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(apps));
         model.addAttribute("archiveCount", applications.archiveCount());
         return "app/loan-applications";
     }
@@ -289,7 +294,7 @@ public class AppController {
         model.addAttribute("loanArchiveFilter", safeArchiveFilter(loanArchiveFilter));
         model.addAttribute("guarantorArchiveQuery", safeArchiveQuery(guarantorArchiveQuery));
         model.addAttribute("guarantorArchiveFilter", safeArchiveFilter(guarantorArchiveFilter));
-        model.addAttribute("managerReasons", loanPresentationService.latestManagerReasons(archives));
+        model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(archives));
         addGuaranteeContext(guarantorArchives, model);
         return "app/archives";
     }
@@ -677,9 +682,10 @@ public class AppController {
         return switch (stage) {
             case MANAGER -> "Manager";
             case LOAN_OFFICER -> "Loan Officer";
-            case BOARD -> "Board Committee";
+            case BOARD -> "Board Member";
+            case CREDIT_COMMITTEE -> "Credit Committee";
             case ACCOUNTANT -> "Accountant";
-            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
         };
     }
 
@@ -823,8 +829,8 @@ public class AppController {
         if (app == null || stage == null) {
             return "";
         }
-        if (stage == ApprovalWorkflowStage.BOARD) {
-            return boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), ApprovalWorkflowStage.BOARD).stream()
+        if (stage == ApprovalWorkflowStage.BOARD || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE) {
+            return boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), stage).stream()
                 .map(review -> review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt())
                 .filter(Objects::nonNull)
                 .min(Comparator.naturalOrder())
@@ -970,6 +976,7 @@ public class AppController {
                               @RequestParam(required = false) UUID topUpLoanId,
                               @RequestParam Map<String, String> params,
                               @RequestParam(required = false, name = "attachments") List<MultipartFile> attachments,
+                              HttpServletRequest request,
                               RedirectAttributes ra,
                               Model model) {
         Map<String, String> submittedValues = new LinkedHashMap<>(params);
@@ -984,6 +991,7 @@ public class AppController {
         formPayload.remove("financialSnapshotJson");
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
+        Map<UUID, List<MultipartFile>> requiredAttachmentFiles = requiredAttachmentFiles(request);
 
         try {
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
@@ -1009,7 +1017,8 @@ public class AppController {
                     guarantorIds,
                     financialSnapshotJson,
                     topUpLoanId,
-                    attachments
+                    attachments,
+                    requiredAttachmentFiles
                 );
                 if (submitted.getStatus() == LoanStatus.AWAITING_GUARANTORS) {
                     ra.addFlashAttribute("message", "Application sent to guarantors successfully. Current status: " + submitted.getStatus());
@@ -1033,7 +1042,7 @@ public class AppController {
 
             LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), loanType,
                 amount, tenorMonths, formPayload, applicationId, guarantorIds,
-                financialSnapshotJson, topUpLoanId, attachments);
+                financialSnapshotJson, topUpLoanId, attachments, requiredAttachmentFiles);
 
             ra.addFlashAttribute("message", "Draft saved successfully. You can continue editing.");
             return "redirect:/app/loan-applications/" + app.getId() + "/edit";
@@ -1110,6 +1119,8 @@ public class AppController {
         model.addAttribute("managerReason",
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "");
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
+        model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
+        model.addAttribute("decisionFeedback", isRejectedStatus(app.getStatus()) ? loanPresentationService.rejectionFeedback(id) : List.of());
         model.addAttribute("loanDetailRepaymentPreviewRows", loanDetailRepaymentPreview(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
@@ -1173,9 +1184,10 @@ public class AppController {
         return switch (stage) {
             case MANAGER -> "Manager";
             case LOAN_OFFICER -> "Loan Officer";
-            case BOARD -> "Committee";
+            case BOARD -> "Board Member";
+            case CREDIT_COMMITTEE -> "Credit Committee";
             case ACCOUNTANT -> "Accountant";
-            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
         };
     }
 
@@ -1994,6 +2006,12 @@ public class AppController {
         return "redirect:/app/dashboard";
     }
 
+    @ExceptionHandler({MaxUploadSizeExceededException.class, MultipartException.class})
+    public String handleMultipartError(RuntimeException ex, RedirectAttributes ra) {
+        ra.addFlashAttribute("error", "The selected attachment upload is too large. Reduce the file size and try again.");
+        return "redirect:/app/loan-applications";
+    }
+
     private String prepareLoanNewModel(AppUserPrincipal principal,
                                        LoanType loanType,
                                        Map<String, String> formValues,
@@ -2010,6 +2028,9 @@ public class AppController {
 
         model.addAttribute("formModel", form);
         model.addAttribute("product", schema);
+        model.addAttribute("requiredAttachmentDefinitions", requiredAttachmentService.activeForProduct(schema.getId()));
+        model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(formValues));
+        model.addAttribute("existingRequiredAttachmentNames", existingRequiredAttachmentNames(formValues));
         model.addAttribute("loanType", loanType);
         model.addAttribute("loanProductName", schema.getDisplayName());
         model.addAttribute("loanProductCode", schema.getDisplayCode());
@@ -2043,6 +2064,76 @@ public class AppController {
         model.addAttribute("topUpLoanId", formValues == null ? null : formValues.get("topUpLoanId"));
         model.addAttribute("topUpSourceLoan", resolveTopUpSourceLoan(principal.getMemberId(), formValues == null ? null : formValues.get("topUpLoanId")));
         return "app/loan-new";
+    }
+
+    private Map<UUID, List<MultipartFile>> requiredAttachmentFiles(HttpServletRequest request) {
+        if (!(request instanceof MultipartHttpServletRequest multipartRequest)) {
+            return Map.of();
+        }
+        Map<UUID, List<MultipartFile>> filesByRequirement = new LinkedHashMap<>();
+        multipartRequest.getMultiFileMap().forEach((name, files) -> {
+            if (name == null || !name.startsWith("requiredAttachmentFiles_")) {
+                return;
+            }
+            try {
+                UUID requirementId = UUID.fromString(name.substring("requiredAttachmentFiles_".length()));
+                List<MultipartFile> nonEmptyFiles = files == null
+                    ? List.of()
+                    : files.stream().filter(file -> file != null && !file.isEmpty()).toList();
+                if (!nonEmptyFiles.isEmpty()) {
+                    filesByRequirement.put(requirementId, nonEmptyFiles);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed field names; server-side validation will still require configured slots.
+            }
+        });
+        return filesByRequirement;
+    }
+
+    private Set<String> existingRequiredAttachmentIds(Map<String, String> formValues) {
+        return existingRequiredAttachmentNames(formValues).keySet().stream()
+            .map(UUID::toString)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Map<UUID, String> existingRequiredAttachmentNames(Map<String, String> formValues) {
+        if (formValues == null) {
+            return Map.of();
+        }
+        String applicationId = formValues.get("applicationId");
+        if (applicationId == null || applicationId.isBlank()) {
+            return Map.of();
+        }
+        try {
+            UUID appId = UUID.fromString(applicationId);
+            return loanApplicationRepository.findById(appId)
+                .map(app -> {
+                    Map<UUID, List<String>> namesByRequirement = new LinkedHashMap<>();
+                    loanAttachmentService.parse(app.getAttachmentsJson()).stream()
+                        .filter(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory"))))
+                        .forEach(item -> {
+                            String requirementId = String.valueOf(item.getOrDefault("requiredAttachmentId", ""));
+                            if (requirementId == null || requirementId.isBlank()) {
+                                return;
+                            }
+                            try {
+                                UUID id = UUID.fromString(requirementId);
+                                String name = String.valueOf(item.getOrDefault("originalName", ""));
+                                if (name != null && !name.isBlank()) {
+                                    namesByRequirement.computeIfAbsent(id, ignored -> new ArrayList<>()).add(name);
+                                }
+                            } catch (IllegalArgumentException ignored) {
+                                // Ignore malformed historical metadata.
+                            }
+                        });
+                    Map<UUID, String> result = new LinkedHashMap<>();
+                    namesByRequirement.forEach((id, names) -> result.put(id, String.join(", ", names)));
+                    return result;
+                })
+                .orElseGet(LinkedHashMap::new);
+        } catch (IllegalArgumentException ex) {
+            return Map.of();
+        }
     }
 
     private List<Map<String, String>> loanDetailRepaymentPreview(LoanApplication app) {
@@ -2698,7 +2789,9 @@ public class AppController {
 
     private boolean isRejectedStatus(LoanStatus status) {
         return status == LoanStatus.MANAGER_REJECTED
+            || status == LoanStatus.LOAN_OFFICER_REJECTED
             || status == LoanStatus.BOARD_REJECTED
+            || status == LoanStatus.ACCOUNTANT_REJECTED
             || status == LoanStatus.FINAL_REJECTED;
     }
 

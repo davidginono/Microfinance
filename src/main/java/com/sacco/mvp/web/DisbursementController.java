@@ -27,6 +27,8 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,6 +77,7 @@ public class DisbursementController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
+    private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -88,11 +91,9 @@ public class DisbursementController {
 
         model.addAttribute("dashboardBreadcrumb", "Disbursement Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Disbursement Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track the disbursed portfolio and keep an eye on loans waiting for release.");
         model.addAttribute("dashboardQueueLabel", "Ready for Disbursement");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.READY_FOR_DISBURSEMENT));
-        model.addAttribute("dashboardQueueMeta", "Approved loans currently waiting for release.");
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
         model.addAttribute("dashboardQueueIcon", "R");
         model.addAttribute("dashboardDetailBasePath", "/disbursement/loan-applications");
@@ -102,7 +103,6 @@ public class DisbursementController {
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardChartTitle", "Disbursement Status Chart");
-        model.addAttribute("dashboardChartHelp", "A disbursement-focused view of loans ready for release and the current disbursed portfolio status.");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildDisbursementDashboardChartRows(dashboard.statusBreakdown()));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
@@ -278,6 +278,7 @@ public class DisbursementController {
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
+        model.addAttribute("totalDeductions", loanPresentationService.totalDeductions(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
@@ -322,9 +323,9 @@ public class DisbursementController {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("reviewBasePath", "/disbursement");
-        model.addAttribute("reviewPanelBreadcrumb", "Disbursement Panel / Loan Detail");
-        model.addAttribute("reviewPanelTitle", "Disbursement Review");
-        model.addAttribute("reviewPanelSubtitle", "Confirm disbursement details and release approved loans.");
+        model.addAttribute("reviewPanelBreadcrumb", message("review.disbursement.breadcrumb"));
+        model.addAttribute("reviewPanelTitle", message("review.disbursement.title"));
+        model.addAttribute("reviewPanelSubtitle", message("review.disbursement.subtitle"));
         model.addAttribute("reviewCommentLabel", "Notes");
         model.addAttribute("reviewCommentPlaceholder", "Record any operational notes");
         model.addAttribute("approveActionLabel", "Approve");
@@ -334,8 +335,8 @@ public class DisbursementController {
         boolean canDisburseLoan = principal.getClaims().contains("DISBURSE_LOAN");
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
-        model.addAttribute("disbursementNotesLabel", "Disbursement Notes");
-        model.addAttribute("disbursementActionLabel", "Disburse Loan");
+        model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
+        model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
         model.addAttribute("showUndoForm", false);
         model.addAttribute("allowPaymentSync", true);
@@ -393,7 +394,7 @@ public class DisbursementController {
                            @AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disbursementDate,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate firstRepaymentDate,
-                           @RequestParam(required = false) BigDecimal disbursementAmount,
+                           @RequestParam(required = false) BigDecimal depositAmount,
                            @RequestParam(required = false) String loanId,
                            @RequestParam(required = false) String disbursementReference,
                            @RequestParam(required = false) String disbursementNotes,
@@ -409,7 +410,7 @@ public class DisbursementController {
                 firstRepaymentDate,
                 null,
                 null,
-                disbursementAmount,
+                depositAmount,
                 loanId,
                 disbursementReference,
                 disbursementNotes,
@@ -734,6 +735,10 @@ public class DisbursementController {
         }
         String loanId = app.getLoanId();
         return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(searchId.toLowerCase(Locale.ENGLISH));
+    }
+
+    private String message(String code) {
+        return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
     }
 
     private record QueueFilter(String key, String label, List<LoanStatus> statuses) {}

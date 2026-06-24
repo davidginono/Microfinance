@@ -496,6 +496,9 @@ public class LoanAnalyticsService {
         if (principal.hasRole(Position.BOARD)) {
             stages.add(ApprovalWorkflowStage.BOARD);
         }
+        if (principal.hasRole(Position.CREDIT_COMMITTEE)) {
+            stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
+        }
         return stages;
     }
 

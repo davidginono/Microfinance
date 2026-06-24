@@ -10,10 +10,11 @@ import java.util.UUID;
 @Table(
     name = "loan_product_board_reviewers",
     uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"loan_product_setting_id", "board_member_id"})
+        @UniqueConstraint(columnNames = {"loan_product_setting_id", "review_stage", "board_member_id"})
     },
     indexes = {
         @Index(name = "idx_loan_product_board_reviewers_product", columnList = "loan_product_setting_id"),
+        @Index(name = "idx_loan_product_board_reviewers_product_stage", columnList = "loan_product_setting_id, review_stage"),
         @Index(name = "idx_loan_product_board_reviewers_member", columnList = "board_member_id")
     }
 )
@@ -31,6 +32,10 @@ public class LoanProductBoardReviewer {
 
     @Column(name = "sacco_id", nullable = false)
     private String saccoId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_stage", nullable = false, length = 32)
+    private ApprovalWorkflowStage reviewStage;
 
     @Column(name = "board_member_id", nullable = false)
     private UUID boardMemberId;

@@ -144,12 +144,20 @@ public class BoardService {
         long rejections = boardReviewRepository.countByLoanApplicationIdAndReviewStageAndDecision(
             loanId, stage, BoardDecision.REJECTED);
         LoanProductWorkflowService.WorkflowDefinition workflow = loanProductWorkflowService.resolveForApplication(app);
-        int minimumVotes = stage == ApprovalWorkflowStage.LOAN_OFFICER
-            ? 1
-            : Math.max(workflow.committeeMinimumVotes(), 1);
-        int approvalThreshold = stage == ApprovalWorkflowStage.LOAN_OFFICER
-            ? 1
-            : Math.max(workflow.committeeApprovalThreshold(), 1);
+        long assignedReviewers = boardReviewRepository.countByLoanApplicationIdAndReviewStage(loanId, stage);
+        int minimumVotes;
+        int approvalThreshold;
+        if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
+            minimumVotes = 1;
+            approvalThreshold = 1;
+        } else if (stage == ApprovalWorkflowStage.BOARD) {
+            int requiredBoardApprovals = Math.max(1, Math.toIntExact(Math.max(assignedReviewers, 1L)));
+            minimumVotes = requiredBoardApprovals;
+            approvalThreshold = requiredBoardApprovals;
+        } else {
+            minimumVotes = Math.max(workflow.committeeMinimumVotes(), 1);
+            approvalThreshold = Math.max(workflow.committeeApprovalThreshold(), 1);
+        }
         long totalDecisions = approvals + rejections;
         long rejectionThreshold = Math.max(1, minimumVotes - approvalThreshold + 1L);
 

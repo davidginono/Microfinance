@@ -1,18 +1,7 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <c:if test="${not empty repaymentSummary}">
-    <style>
-        [data-staff-repayment-summary] summary,
-        [data-staff-repayment-summary] summary * {
-            cursor: pointer !important;
-        }
-        [data-staff-repayment-toggle]:hover {
-            background-color: #eff6ff !important;
-            box-shadow: 0 0 0 1px #bfdbfe !important;
-            color: #2563eb !important;
-        }
-    </style>
-    <details class="group erp-panel mt-5 overflow-hidden" data-staff-repayment-summary>
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sacco-blue">
+    <section class="erp-panel mt-5 overflow-hidden" data-staff-repayment-summary>
+        <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div>
                 <div class="text-sm font-semibold uppercase tracking-wide text-slate-700"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></div>
                 <div class="mt-1 text-sm text-slate-500">
@@ -29,15 +18,8 @@
                 <c:if test="${not empty repaymentCountdown}">
                     <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">${repaymentCountdown}</span>
                 </c:if>
-                <span class="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-semibold text-sacco-blue ring-1 ring-sacco-blue/20 transition" data-staff-repayment-toggle>
-                    <span data-repayment-collapsed-label><spring:message code="loan.repayment.showSchedule" text="Show Schedule" /></span>
-                    <span data-repayment-expanded-label class="hidden"><spring:message code="common.hideDetails" text="Hide details" /></span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                    </svg>
-                </span>
             </div>
-        </summary>
+        </div>
         <div class="space-y-4 px-4 py-4">
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <c:forEach items="${repaymentSummary}" var="entry">
@@ -134,23 +116,5 @@
                 </div>
             </c:if>
         </div>
-    </details>
-    <script>
-        (function () {
-            document.querySelectorAll("[data-staff-repayment-summary]").forEach(function (details) {
-                const collapsedLabel = details.querySelector("[data-repayment-collapsed-label]");
-                const expandedLabel = details.querySelector("[data-repayment-expanded-label]");
-                const render = function () {
-                    if (collapsedLabel) {
-                        collapsedLabel.classList.toggle("hidden", details.open);
-                    }
-                    if (expandedLabel) {
-                        expandedLabel.classList.toggle("hidden", !details.open);
-                    }
-                };
-                details.addEventListener("toggle", render);
-                render();
-            });
-        })();
-    </script>
+    </section>
 </c:if>

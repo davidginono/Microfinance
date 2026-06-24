@@ -246,7 +246,7 @@ public class AppUsageAnalyticsService {
             case ADMIN -> "Super Admin";
             case MINOR_ADMIN -> "Minor Admin";
             case LOAN_OFFICER -> "Loan Officer";
-            case DISBURSEMENT_OFFICER -> "Disbursement Officer";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
             default -> titleCase(role.name().replace('_', ' '));
         };
     }

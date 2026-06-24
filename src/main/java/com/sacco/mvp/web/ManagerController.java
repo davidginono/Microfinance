@@ -92,7 +92,6 @@ public class ManagerController {
         model.addAttribute("dashboardQueueValue", dashboard.onReviewByManagerLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardChartTitle", "Station Loan Status Chart");
-        model.addAttribute("dashboardChartHelp", "A station-wide view of manager review outcomes and current disbursed loan status.");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildManagerDashboardChartRows(dashboard.statusBreakdown()));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
@@ -123,8 +122,12 @@ public class ManagerController {
                         @RequestParam(required = false) String searchId,
                         @RequestParam(required = false) LoanStatus status,
                         Model model) {
-        QueueFilter currentFilter = resolveQueueFilter(filter, status);
-        boolean loanIdSearch = "DISBURSED".equals(currentFilter.key());
+        QueueFilter currentFilter = new QueueFilter(
+            "READY_FOR_MANAGER",
+            "On Review By Manager",
+            List.of(LoanStatus.READY_FOR_MANAGER)
+        );
+        boolean loanIdSearch = false;
         String normalizedSearchId = normalizeQueueSearch(searchId);
         List<com.sacco.mvp.domain.LoanApplication> apps = managerService.queue(
             principal.getSaccoId(),
@@ -204,6 +207,11 @@ public class ManagerController {
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), shortLoanId(entry.loan().getApplicantMemberId())));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("decisionLabel", entry.review().getDecision() == ManagerDecision.ACCEPT ? message("review.approved") : message("review.rejected"));
+                row.put("reason", entry.review().getDecision() == ManagerDecision.REJECT
+                    && entry.review().getReasons() != null
+                    && !entry.review().getReasons().isBlank()
+                    ? entry.review().getReasons()
+                    : "-");
                 row.put("reviewedAt", entry.review().getCreatedAt() == null ? "-" : REPORT_DATE_TIME.format(entry.review().getCreatedAt()));
                 row.put("currentStatusLabel", entry.currentStatusLabel());
                 return row;
@@ -249,6 +257,7 @@ public class ManagerController {
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
+        model.addAttribute("totalDeductions", loanPresentationService.totalDeductions(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
@@ -382,11 +391,11 @@ public class ManagerController {
             if (decision == ManagerDecision.ACCEPT) {
                 LoanStatus updatedStatus = managerService.get(id, principal.getSaccoId(), principal.getStationId()).getStatus();
                 String message = switch (updatedStatus) {
-                    case AWAITING_LOAN_OFFICER -> "Manager accepted. Status moved to ON REVIEW BY LOAN OFFICER.";
-                    case AWAITING_BOARD -> "Manager accepted. Status moved to ON REVIEW BY BOARD.";
-                    case AWAITING_ACCOUNTANT -> "Manager accepted. Status moved to ON REVIEW BY ACCOUNTANT.";
-                    case READY_FOR_DISBURSEMENT -> "Manager accepted. Loan is now READY FOR DISBURSEMENT.";
-                    default -> "Manager accepted. The application moved to the next configured stage.";
+                    case AWAITING_LOAN_OFFICER -> "Manager approved. Status moved to ON REVIEW BY LOAN OFFICER.";
+                    case AWAITING_BOARD -> "Manager approved. Status moved to ON REVIEW BY BOARD.";
+                    case AWAITING_ACCOUNTANT -> "Manager approved. Status moved to ON REVIEW BY ACCOUNTANT.";
+                    case READY_FOR_DISBURSEMENT -> "Manager approved. Loan is now READY FOR DISBURSEMENT.";
+                    default -> "Manager approved. The application moved to the next configured stage.";
                 };
                 ra.addFlashAttribute("message", message);
             } else {
@@ -503,7 +512,7 @@ public class ManagerController {
                            @RequestParam(required = false) String disbursementNotes,
                            @RequestParam(required = false) MultipartFile disbursementProofFile,
                            RedirectAttributes ra) {
-        ra.addFlashAttribute("error", "Managers can no longer disburse loans. Use the Disbursement Officer queue instead.");
+        ra.addFlashAttribute("error", "Managers can no longer disburse loans. Use the Disbursement/Teller Officer queue instead.");
         return "redirect:/manager/loan-applications/" + id;
     }
 
@@ -823,8 +832,8 @@ public class ManagerController {
         return switch (key) {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", ManagerDecision.ACCEPT, List.of(), false);
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", ManagerDecision.REJECT, List.of(), false);
-            case "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("APPROVED_FOR_DISBURSEMENT", "Ready for Disbursement", null,
-                List.of(LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
+            case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
+                List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of(), false);
         };
     }

@@ -56,6 +56,23 @@
         color: #64748b;
     }
 
+    .attachment-dropzone-file-list {
+        margin-top: 0.45rem;
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .attachment-dropzone-file-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.35rem;
+        background: #fff;
+        padding: 0.35rem 0.5rem;
+        color: #334155;
+    }
+
     .attachment-dropzone-action {
         border-radius: 0.375rem;
         background: #e2e8f0;
@@ -72,20 +89,42 @@
 </style>
 <script>
     (() => {
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function formatBytes(bytes) {
+            if (!Number.isFinite(bytes) || bytes <= 0) {
+                return "";
+            }
+            if (bytes >= 1024 * 1024) {
+                return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+            }
+            return Math.max(1, Math.round(bytes / 1024)) + " KB";
+        }
+
         function formatFiles(files) {
             if (!files || files.length === 0) {
                 return "No file selected";
             }
-            const names = Array.from(files).slice(0, 3).map(file => file.name);
-            const suffix = files.length > 3 ? " +" + (files.length - 3) + " more" : "";
-            return names.join(", ") + suffix;
+            return '<ul class="attachment-dropzone-file-list">'
+                + Array.from(files).map(file => '<li><span>' + escapeHtml(file.name) + '</span><span>' + escapeHtml(formatBytes(file.size)) + '</span></li>').join("")
+                + '</ul>';
         }
 
         function refreshDropzone(dropzone) {
             const input = dropzone.querySelector("[data-attachment-input]");
             const filesLabel = dropzone.querySelector("[data-attachment-files]");
             if (filesLabel && input) {
-                filesLabel.textContent = formatFiles(input.files);
+                const existingFiles = (filesLabel.dataset.existingAttachmentFiles || "").trim();
+                filesLabel.innerHTML = input.files && input.files.length > 0
+                    ? formatFiles(input.files)
+                    : (existingFiles ? escapeHtml(existingFiles) : formatFiles(input.files));
             }
         }
 

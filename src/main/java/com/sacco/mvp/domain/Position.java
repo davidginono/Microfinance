@@ -13,6 +13,7 @@ public enum Position {
     ACCOUNTANT,
     DISBURSEMENT_OFFICER,
     BOARD,
+    CREDIT_COMMITTEE,
     LOAN_OFFICER,
     ADMIN;
 
@@ -29,7 +30,7 @@ public enum Position {
     }
 
     public static List<Position> staffAssignableRoles() {
-        return List.of(ADMIN, MINOR_ADMIN, LOAN_OFFICER, MANAGER, ACCOUNTANT, DISBURSEMENT_OFFICER, BOARD);
+        return List.of(ADMIN, MINOR_ADMIN, LOAN_OFFICER, MANAGER, ACCOUNTANT, DISBURSEMENT_OFFICER, BOARD, CREDIT_COMMITTEE);
     }
 
     public static boolean containsAdminRole(Collection<Position> roles) {
@@ -69,7 +70,8 @@ public enum Position {
             case ACCOUNTANT -> 4;
             case DISBURSEMENT_OFFICER -> 5;
             case BOARD -> 6;
-            case MEMBER -> 7;
+            case CREDIT_COMMITTEE -> 7;
+            case MEMBER -> 8;
         };
     }
 }

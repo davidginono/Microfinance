@@ -102,6 +102,7 @@ public class UserClaimService {
                     claims.add(UserClaim.DISBURSE_LOAN);
                 }
                 case BOARD -> claims.add(UserClaim.REVIEW_BOARD_QUEUE);
+                case CREDIT_COMMITTEE -> claims.add(UserClaim.REVIEW_CREDIT_COMMITTEE_QUEUE);
                 case LOAN_OFFICER -> claims.add(UserClaim.REVIEW_LOAN_OFFICER_QUEUE);
                 case ADMIN, MINOR_ADMIN -> {
                     claims.add(UserClaim.ACCESS_ADMIN_SETTINGS);

@@ -88,6 +88,99 @@
             return "sidebar:" + sidebarStateScope + ":" + name;
         }
 
+        const sidebarScroll = sidebar.querySelector(".shell-sidebar-scroll");
+        const lastClickedSidebarKey = sidebarStateKey("lastClickedLink");
+
+        function normalizeSidebarUrl(url) {
+            try {
+                const parsed = new URL(url, window.location.origin);
+                return parsed.pathname + parsed.search;
+            } catch (ignored) {
+                return "";
+            }
+        }
+
+        function rememberSidebarClick(event) {
+            const eventTarget = event.target instanceof Element ? event.target : null;
+            const link = eventTarget ? eventTarget.closest(".shell-sidebar-scroll a[href]") : null;
+            if (!link) {
+                return;
+            }
+            try {
+                window.sessionStorage.setItem(lastClickedSidebarKey, JSON.stringify({
+                    href: normalizeSidebarUrl(link.href),
+                    at: Date.now()
+                }));
+            } catch (ignored) {
+                // Storage can be blocked in private browsing modes.
+            }
+        }
+
+        function restoreLastClickedSidebarLink() {
+            if (!sidebarScroll) {
+                return;
+            }
+
+            const currentHref = window.location.pathname + window.location.search;
+            let savedHref = "";
+            try {
+                const saved = JSON.parse(window.sessionStorage.getItem(lastClickedSidebarKey) || "null");
+                if (saved && Date.now() - Number(saved.at || 0) <= 24 * 60 * 60 * 1000) {
+                    savedHref = saved.href || "";
+                }
+            } catch (ignored) {
+                savedHref = "";
+            }
+
+            const links = Array.from(sidebarScroll.querySelectorAll("a[href]"));
+            const activeTokens = new Set([
+                "text-cyan-800",
+                "text-blue-800",
+                "text-green-800",
+                "text-amber-800",
+                "text-teal-800",
+                "text-emerald-800",
+                "text-sacco-blue",
+                "text-sacco-green",
+                "text-sacco-brown"
+            ]);
+            const isActiveLink = function (link) {
+                return Array.from(link.classList).some(function (className) {
+                    return activeTokens.has(className);
+                });
+            };
+            const exactCurrentLink = links.find(function (link) {
+                return normalizeSidebarUrl(link.href) === currentHref;
+            });
+            const savedLink = savedHref
+                ? links.find(function (link) {
+                    const linkHref = normalizeSidebarUrl(link.href);
+                    return linkHref === savedHref || (currentHref.indexOf(savedHref.split("?")[0]) === 0 && linkHref === savedHref);
+                })
+                : null;
+            const activeLink = links.find(isActiveLink);
+            const target = exactCurrentLink || savedLink || activeLink;
+            if (!target) {
+                return;
+            }
+
+            const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+            window.requestAnimationFrame(function () {
+                window.setTimeout(function () {
+                    const scrollRect = sidebarScroll.getBoundingClientRect();
+                    const targetRect = target.getBoundingClientRect();
+                    const targetTop = sidebarScroll.scrollTop
+                        + targetRect.top
+                        - scrollRect.top
+                        - Math.max(12, (sidebarScroll.clientHeight - target.offsetHeight) / 2);
+                    sidebarScroll.scrollTo({
+                        top: Math.max(targetTop, 0),
+                        behavior: behavior
+                    });
+                }, 80);
+            });
+        }
+
         function registerExpandableMenu(toggle, panel, chevron, keyName) {
             if (!toggle || !panel) {
                 return;
@@ -110,6 +203,10 @@
                 applyExpanded(nextExpanded);
                 window.sessionStorage.setItem(storageKey, String(nextExpanded));
             });
+        }
+
+        if (sidebarScroll) {
+            sidebarScroll.addEventListener("click", rememberSidebarClick);
         }
 
         if (adminScopeToggle && adminScopePanel) {
@@ -136,6 +233,7 @@
         registerExpandableMenu(loanOfficerOfficeToggle, loanOfficerOfficePanel, loanOfficerOfficeChevron, "loanOfficerOfficeExpanded");
         registerExpandableMenu(accountantOfficeToggle, accountantOfficePanel, accountantOfficeChevron, "accountantOfficeExpanded");
         registerExpandableMenu(disbursementOfficeToggle, disbursementOfficePanel, disbursementOfficeChevron, "disbursementOfficeExpanded");
+        restoreLastClickedSidebarLink();
     })();
 </script>
 </div>

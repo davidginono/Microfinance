@@ -45,8 +45,36 @@
     <h1 class="erp-page-title">${boardListTitle}</h1>
 </div>
 
+<c:if test="${archiveView}">
+    <div class="erp-toolbar">
+        <div class="space-y-3">
+            <div>
+                <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+                <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+            </div>
+            <div class="erp-filter-row">
+                <a href="${boardListRoute}?filter=ALL" class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
+                    <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
+                </a>
+                <a href="${boardListRoute}?filter=APPROVED" class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
+                    <spring:message code="archive.approvedLoans" text="Approved Loans" />
+                </a>
+                <a href="${boardListRoute}?filter=REJECTED" class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
+                    <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
+                </a>
+                <a href="${boardListRoute}?filter=DISBURSED" class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
+                    <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
+                </a>
+            </div>
+        </div>
+    </div>
+</c:if>
+
 <div class="erp-panel overflow-hidden">
     <form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form">
+        <c:if test="${archiveView}">
+            <input type="hidden" name="filter" value="${currentFilterKey}" />
+        </c:if>
         <label class="board-queue-search-label text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="loan.applicationId" text="Loan Application ID" />
             <input type="search"
@@ -72,6 +100,9 @@
                 <th><spring:message code="common.amount" text="Amount" /></th>
                 <th><spring:message code="common.applicationStatus" text="Application Status" /></th>
                 <th><spring:message code="board.myReview" text="My Review" /></th>
+                <c:if test="${archiveView}">
+                    <th><spring:message code="review.reason" text="Reason" /></th>
+                </c:if>
                 <th><spring:message code="loan.date" text="Date" /></th>
                 <th></th>
             </tr>
@@ -89,6 +120,9 @@
                     <td class="px-3 py-2">${app.amount}</td>
                     <td class="px-3 py-2"><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
                     <td class="px-3 py-2">${myDecisions[app.id]}</td>
+                    <c:if test="${archiveView}">
+                        <td class="px-3 py-2"><c:out value="${myDecisionReasons[app.id]}" /></td>
+                    </c:if>
                     <td class="px-3 py-2">
                         <c:choose>
                             <c:when test="${not empty myDecisionDates[app.id]}">${fn:replace(fn:substring(myDecisionDates[app.id], 0, 16), 'T', ' ')}</c:when>
@@ -107,7 +141,7 @@
             </c:forEach>
             <c:if test="${empty apps}">
                 <tr>
-                    <td colspan="7" class="px-4 py-5 text-sm text-slate-500">
+                    <td colspan="${archiveView ? 8 : 7}" class="px-4 py-5 text-sm text-slate-500">
                         <c:choose>
                             <c:when test="${not empty boardSearchValue}">
                                 No applications found for loan application ID
@@ -123,5 +157,29 @@
         </table>
     </div>
 </div>
+
+<c:if test="${archiveView and archivePage.totalPages gt 1}">
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <span class="text-sm text-slate-500">Page ${archivePage.number + 1} of ${archivePage.totalPages}</span>
+        <div class="flex flex-wrap gap-2">
+            <c:if test="${not archivePage.first}">
+                <c:url var="archivePreviousUrl" value="${boardListRoute}">
+                    <c:param name="filter" value="${currentFilterKey}" />
+                    <c:param name="searchId" value="${boardSearchValue}" />
+                    <c:param name="page" value="${archivePage.number - 1}" />
+                </c:url>
+                <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
+            </c:if>
+            <c:if test="${not archivePage.last}">
+                <c:url var="archiveNextUrl" value="${boardListRoute}">
+                    <c:param name="filter" value="${currentFilterKey}" />
+                    <c:param name="searchId" value="${boardSearchValue}" />
+                    <c:param name="page" value="${archivePage.number + 1}" />
+                </c:url>
+                <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
+            </c:if>
+        </div>
+    </div>
+</c:if>
 
 <%@ include file="../fragments/footer.jspf" %>

@@ -20,6 +20,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class LoanProductSetting {
+    private static final int MAX_WORKFLOW_PRIORITY = 6;
     @Id
     private UUID id;
 
@@ -110,6 +111,12 @@ public class LoanProductSetting {
     @Column(name = "committee_approval_threshold")
     private Integer committeeApprovalThreshold;
 
+    @Column(name = "board_review_required")
+    private Boolean boardReviewRequired;
+
+    @Column(name = "board_priority")
+    private Integer boardPriority;
+
     @Column(name = "accountant_review_required")
     private Boolean accountantReviewRequired;
 
@@ -196,6 +203,10 @@ public class LoanProductSetting {
         return committeeReviewRequired == null || committeeReviewRequired;
     }
 
+    public boolean isBoardReviewRequired() {
+        return Boolean.TRUE.equals(boardReviewRequired);
+    }
+
     public ApprovalWorkflowStage getResolvedWorkflowStartStage() {
         return workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER
             ? ApprovalWorkflowStage.LOAN_OFFICER
@@ -217,9 +228,9 @@ public class LoanProductSetting {
     }
 
     public int getResolvedCommitteePriority() {
-        return committeePriority != null && committeePriority >= 1 && committeePriority <= 4
+        return committeePriority != null && committeePriority >= 1 && committeePriority <= MAX_WORKFLOW_PRIORITY
             ? committeePriority
-            : 3;
+            : 4;
     }
 
     public int getResolvedCommitteeMinimumVotes() {
@@ -232,14 +243,20 @@ public class LoanProductSetting {
             : committeeApprovalThreshold;
     }
 
+    public int getResolvedBoardPriority() {
+        return boardPriority != null && boardPriority >= 1 && boardPriority <= MAX_WORKFLOW_PRIORITY
+            ? boardPriority
+            : 3;
+    }
+
     public boolean isAccountantReviewRequired() {
         return accountantReviewRequired == null || accountantReviewRequired;
     }
 
     public int getResolvedAccountantPriority() {
-        return accountantPriority != null && accountantPriority >= 1 && accountantPriority <= 4
+        return accountantPriority != null && accountantPriority >= 1 && accountantPriority <= MAX_WORKFLOW_PRIORITY
             ? accountantPriority
-            : 4;
+            : 5;
     }
 
     public boolean isDisbursementOfficerRequired() {

@@ -108,6 +108,9 @@ public class LoanApplication {
     @Column(name = "disbursement_notes", length = 4000)
     private String disbursementNotes;
 
+    @Column(name = "deposit_amount", precision = 18, scale = 2)
+    private BigDecimal depositAmount;
+
     @Column(name = "applicant_disbursement_acknowledged_at")
     private OffsetDateTime applicantDisbursementAcknowledgedAt;
 

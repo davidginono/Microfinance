@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.repository.BoardReviewRepository;
@@ -319,14 +320,17 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/board-loans.pdf")
-    @PreAuthorize("hasRole('BOARD') and @userClaims.has(principal, 'REVIEW_BOARD_QUEUE')")
+    @PreAuthorize("@authz.isBoardReviewer(principal)")
     public ResponseEntity<byte[]> downloadBoardLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                           @RequestParam(required = false) String decisionFilter) {
         LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
-            ApprovalWorkflowStage.BOARD, fromDate, toDate, decisionFilter);
+            principal.hasRole(Position.CREDIT_COMMITTEE) && !principal.hasRole(Position.BOARD)
+                ? ApprovalWorkflowStage.CREDIT_COMMITTEE
+                : ApprovalWorkflowStage.BOARD,
+            fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildBoardWorkflowPdf(report);
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)

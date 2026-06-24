@@ -7,6 +7,7 @@ public final class WorkspaceLanding {
     private static final String MANAGER_REVIEW_CLAIM = "REVIEW_MANAGER_QUEUE";
     private static final String ACCOUNTANT_REVIEW_CLAIM = "REVIEW_ACCOUNTANT_QUEUE";
     private static final String BOARD_REVIEW_CLAIM = "REVIEW_BOARD_QUEUE";
+    private static final String CREDIT_COMMITTEE_REVIEW_CLAIM = "REVIEW_CREDIT_COMMITTEE_QUEUE";
     private static final String LOAN_OFFICER_REVIEW_CLAIM = "REVIEW_LOAN_OFFICER_QUEUE";
     private static final String DISBURSEMENT_ACCESS_CLAIM = "ACCESS_DISBURSEMENT_QUEUE";
 
@@ -69,6 +70,7 @@ public final class WorkspaceLanding {
             case ACCOUNTANT -> "/accountant/dashboard";
             case DISBURSEMENT_OFFICER -> "/disbursement/dashboard";
             case BOARD -> "/board/dashboard";
+            case CREDIT_COMMITTEE -> "/board/dashboard";
             case MEMBER -> memberDashboard();
         };
     }
@@ -84,6 +86,7 @@ public final class WorkspaceLanding {
             case ACCOUNTANT -> hasClaim(principal, ACCOUNTANT_REVIEW_CLAIM) ? "/accountant/dashboard" : null;
             case DISBURSEMENT_OFFICER -> hasClaim(principal, DISBURSEMENT_ACCESS_CLAIM) ? "/disbursement/dashboard" : null;
             case BOARD -> hasClaim(principal, BOARD_REVIEW_CLAIM) ? "/board/dashboard" : null;
+            case CREDIT_COMMITTEE -> hasClaim(principal, CREDIT_COMMITTEE_REVIEW_CLAIM) ? "/board/dashboard" : null;
             case MEMBER -> memberDashboard();
         };
     }

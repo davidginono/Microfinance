@@ -23,7 +23,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationViewService {
     private static final EnumSet<Position> MEMBER_SIDE_POSITIONS = EnumSet.of(
-        Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER, Position.BOARD, Position.LOAN_OFFICER
+        Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER,
+        Position.BOARD, Position.CREDIT_COMMITTEE, Position.LOAN_OFFICER
     );
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final ObjectMapper objectMapper;
@@ -193,6 +194,7 @@ public class NotificationViewService {
             case "LOAN_READY_FOR_MANAGER" -> "On Review By Manager";
             case "LOAN_READY_FOR_ACCOUNTANT" -> "On Review By Accountant";
             case "LOAN_READY_FOR_BOARD" -> "On Review By Board";
+            case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "Credit Committee Review Assigned";
             case "LOAN_READY_FOR_DISBURSEMENT" -> "Ready for Disbursement";
             case "LOAN_GUARANTORS_APPROVED" -> "All Guarantors Approved";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "Guarantor Request";
@@ -241,6 +243,7 @@ public class NotificationViewService {
             case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
             case "BOARD_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for board review.";
+            case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for credit committee review.";
             case "LOAN_OFFICER_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for loan officer review.";
             case "GUARANTOR_UNDO_REQUESTED" -> "A guarantor asked to be removed from your loan application.";
             case "GUARANTOR_UNDO_APPROVED" -> "The applicant approved your request to be removed from this loan.";
@@ -294,6 +297,7 @@ public class NotificationViewService {
             case "finalDueDate" -> "Final Due Date";
             case "firstRepaymentDate" -> "First Repayment Date";
             case "disbursementAmount" -> "Disbursed Principal";
+            case "depositAmount" -> "Deposit Amount";
             case "installmentAmount" -> "Installment Amount";
             case "repaymentFrequency" -> "Repayment Frequency";
             case "incidentId" -> "Incident";
@@ -322,7 +326,7 @@ public class NotificationViewService {
         return switch (key) {
             case "managerId", "senderId", "boardMemberId", "recipientMemberId" -> resolveMemberLabel(text);
             case "loanId", "incidentId" -> shortenUuid(text);
-            case "disbursementAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
+            case "disbursementAmount", "depositAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
             case "repaymentFrequency" -> humanizeKey(text);
             default -> text;
         };

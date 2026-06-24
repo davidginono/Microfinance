@@ -8,6 +8,9 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/attachment-dropzone.jspf" %>
 
+<c:set var="isDisbursementReview" value="${reviewBasePath eq '/disbursement'}" />
+<c:set var="hideDisbursementSupportSections" value="${isDisbursementReview and app.status eq 'READY_FOR_DISBURSEMENT'}" />
+
 <div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
     <div>
         <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
@@ -23,7 +26,7 @@
         <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
     </div>
 </c:if>
-<div class="loan-view-hero-summary">
+<div class="loan-view-hero-summary loan-staff-review-template">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="loan-hero-with-photo">
         <div class="min-w-0">
@@ -81,20 +84,51 @@
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
         <div class="space-y-3"
              data-live-account-status-url="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status">
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div class="loan-view-summary-card px-4 py-4">
+            <div class="loan-staff-kpi-grid">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7h15a3 3 0 0 1 3 3v8H6a3 3 0 0 1-3-3V7Z"/>
+                            <path d="M3 7a3 3 0 0 1 3-3h11v3"/>
+                            <path d="M16 13h2"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
                     <div class="loan-stat-value" data-disbursement-loan-amount-display>${app.amount}</div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 2v4"/>
+                            <path d="M16 2v4"/>
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <path d="M3 10h18"/>
+                            <path d="M8 14h.01"/>
+                            <path d="M12 14h.01"/>
+                            <path d="M16 14h.01"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
                     <div class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/>
+                            <path d="M9 9V6a3 3 0 0 1 5.5-1.7"/>
+                            <path d="M18 12h.01"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
                     <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-9-9v9h9Z"/>
+                            <path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
@@ -110,8 +144,20 @@
             <div class="loan-simple-progress-list">
                 <c:forEach items="${loanProgressItems}" var="item">
                     <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
-                        <span class="loan-simple-progress-dot"></span>
-                        <span>${item.label}</span>
+                        <span class="loan-simple-progress-dot" aria-hidden="true"></span>
+                        <span class="loan-simple-progress-content">
+                            <span class="loan-simple-progress-label">${item.label}</span>
+                            <span class="loan-simple-progress-state">
+                                <c:choose>
+                                    <c:when test="${item.current}"><spring:message code="loan.progress.inProgress" text="In Progress" /></c:when>
+                                    <c:when test="${item.active}"><spring:message code="loan.progress.completed" text="Completed" /></c:when>
+                                    <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                            <c:if test="${item.current}">
+                                <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
+                            </c:if>
+                        </span>
                     </div>
                 </c:forEach>
             </div>
@@ -184,6 +230,7 @@
 
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
 
+<c:if test="${not hideDisbursementSupportSections}">
 <div class="loan-view-summary-card mt-5 px-5 py-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -257,6 +304,7 @@
         </c:otherwise>
     </c:choose>
 </div>
+</c:if>
 
 <%@ include file="../fragments/financial-field-sections.jspf" %>
 
@@ -294,6 +342,7 @@
     </div>
 </c:if>
 
+<c:if test="${not hideDisbursementSupportSections}">
 <div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -320,7 +369,9 @@
         </tbody>
     </table>
 </div>
+</c:if>
 
+<c:if test="${not hideDisbursementSupportSections}">
 <div class="erp-table-wrap mt-5 overflow-x-auto">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -382,8 +433,11 @@
         </tbody>
     </table>
 </div>
+</c:if>
 
-<%@ include file="../fragments/staff-repayment-summary.jspf" %>
+<c:if test="${not hideDisbursementSupportSections}">
+    <%@ include file="../fragments/staff-repayment-summary.jspf" %>
+</c:if>
 
 <c:if test="${showReviewDecisionForm}">
     <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap mt-5 space-y-3" data-manager-decision-form="true">
@@ -470,7 +524,7 @@
 <c:if test="${showDisbursementPermissionMessage}">
     <div class="erp-form-wrap mt-5">
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            This loan is ready for disbursement, but your account does not have the Disburse Loan claim. Ask the admin to update your role claims, then sign in again.
+            <spring:message code="loan.disbursement.permissionMissing" text="This loan is ready for disbursement, but your account does not have the Disburse Loan claim. Ask the admin to update your role claims, then sign in again." />
         </div>
     </div>
 </c:if>
@@ -480,20 +534,20 @@
           method="post"
           enctype="multipart/form-data"
           class="erp-form-wrap mt-5 space-y-3"
-          data-confirm-title="Disburse Loan"
-          data-confirm-message="Disburse this loan now? There will be no reversal of this action."
-          data-confirm-proceed="Disburse Loan">
+          data-confirm-title="<spring:message code='loan.disbursement.action' text='Disburse Loan' />"
+          data-confirm-message="<spring:message code='loan.disbursement.confirmMessage' text='Disburse this loan now? There will be no reversal of this action.' />"
+          data-confirm-proceed="<spring:message code='loan.disbursement.action' text='Disburse Loan' />">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <input type="hidden" name="decision" value="FINAL_APPROVE" />
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700">Loan Disbursement</label>
-                <p class="mt-1 text-sm text-slate-500">Enter the release date and repayment terms before final approval.</p>
+                <label class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></label>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="loan.disbursement.formHelp" text="Enter the release date and repayment terms before final approval." /></p>
             </div>
             <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                 <c:choose>
-                    <c:when test="${app.status eq 'BOARD_APPROVED'}">Committee approval threshold reached</c:when>
-                    <c:otherwise>Ready for disbursement</c:otherwise>
+                    <c:when test="${app.status eq 'BOARD_APPROVED'}"><spring:message code="loan.disbursement.committeeThresholdReady" text="Committee approval threshold reached" /></c:when>
+                    <c:otherwise><spring:message code="loan.disbursement.readyStatus" text="Ready for disbursement" /></c:otherwise>
                 </c:choose>
             </span>
         </div>
@@ -507,52 +561,71 @@
                 <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">Disbursement Amount <span class="text-rose-600">*</span></label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
-                       id="disbursementAmountInput"
-                       name="disbursementAmount"
-                       value="${app.amount}"
+                       id="depositAmountInput"
+                       name="depositAmount"
+                       value="${app.depositAmount ne null ? app.depositAmount : app.amount}"
                        inputmode="decimal"
                        autocomplete="off"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        placeholder="100,000.00" />
-                <p class="mt-1 text-xs text-slate-500">This amount becomes the final disbursed principal and repayment basis.</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button type="button"
+                            class="app-btn btn-neutral"
+                            data-deduct-fees
+                            data-loan-amount="${app.amount}"
+                            data-total-fees="${totalDeductions}">
+                        <spring:message code="loan.disbursement.deductFees" text="Deduct fees" />
+                    </button>
+                    <button type="button"
+                            class="app-btn btn-neutral"
+                            data-approved-amount
+                            data-loan-amount="${app.amount}">
+                        <spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" />
+                    </button>
+                    <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.cashOrDepositHelp" text="This is the amount the applicant will receive in cash/bank, while the required loan to be returned by the applicant remains the approved amount." /></p>
+                </div>
             </div>
             <div class="md:col-span-2">
                 <div class="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="grid gap-3 sm:grid-cols-3">
                         <div>
-                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Requested Amount</span>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.approvedLoanAmount" text="Approved Loan Amount" /></span>
                             <span class="mt-1 block font-semibold text-slate-900" data-disbursement-requested-amount>${app.amount}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Loaded Disbursement Amount</span>
-                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-preview-amount>${app.amount}</span>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.totalFees" text="Total Fees" /></span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-fees-amount>${totalDeductions}</span>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /></span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount>${app.depositAmount ne null ? app.depositAmount : app.amount}</span>
                         </div>
                     </div>
-                    <p class="mt-3 text-xs text-slate-600">The loan details and repayment schedule will use the loaded disbursement amount when this loan is released.</p>
+                    <p class="mt-3 text-xs text-slate-600"><spring:message code="loan.disbursement.depositPreviewHelp" text="Repayment and principal use the approved loan amount. Deposit amount only records what reaches the applicant after any fee deduction." /></p>
                 </div>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
                 <input type="text" name="loanId" value="${app.loanId}"
                        pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
-                       title="Enter the SACCO loan-book number (4-20 digits)"
+                       title="<spring:message code='loan.disbursement.loanIdTitle' text='Enter the SACCO loan-book number (4-20 digits)' />"
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                       placeholder="SACCO loan-book number (digits only)" />
-                <p class="mt-1 text-xs text-slate-500">Entered at disbursement. 4-20 digits, unique within this SACCO.</p>
+                       placeholder="<spring:message code='loan.disbursement.loanIdPlaceholder' text='SACCO loan-book number (digits only)' />" />
+                <p class="mt-1 text-xs text-slate-500"><spring:message code="loan.disbursement.loanIdHelp" text="Entered at disbursement. 4-20 digits, unique within this SACCO." /></p>
             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700">Tenor Guidance</label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
                 <div class="erp-section-muted text-sm text-slate-600">
-                    Tenor is ${app.tenorMonths} month(s). The repayment schedule will use the standard monthly cycle and calculate the final due date automatically.
+                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The repayment schedule will use the standard monthly cycle and calculate the final due date automatically." />
                 </div>
             </div>
         </div>
         <div>
             <label class="mb-1 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
-                <span>Disbursement Proof</span>
+                <span><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></span>
                 <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${disbursementProofRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
                     <c:choose>
                         <c:when test="${disbursementProofRequired}">
@@ -573,17 +646,17 @@
                        ${disbursementProofRequired ? 'required' : ''} />
                 <span class="attachment-dropzone-main">
                     <span class="attachment-dropzone-copy">
-                        <span class="attachment-dropzone-title">Drop proof here or choose from device</span>
-                        <span class="attachment-dropzone-help">Receipt, voucher, signed proof, image, or document.</span>
-                        <span class="attachment-dropzone-files" data-attachment-files>No file selected</span>
+                        <span class="attachment-dropzone-title"><spring:message code="loan.disbursement.proofDropzoneTitle" text="Drop proof here or choose from device" /></span>
+                        <span class="attachment-dropzone-help"><spring:message code="loan.disbursement.proofDropzoneHelp" text="Receipt, voucher, signed proof, image, or document." /></span>
+                        <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
                     </span>
-                    <span class="attachment-dropzone-action">Choose file</span>
+                    <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.chooseOne" text="Choose file" /></span>
                 </span>
             </label>
             <p class="mt-1 text-xs text-slate-500">
                 <c:choose>
-                    <c:when test="${disbursementProofRequired}">Attach the proof before disbursement.</c:when>
-                    <c:otherwise>This product allows disbursement without proof, but a proof file can still be attached.</c:otherwise>
+                    <c:when test="${disbursementProofRequired}"><spring:message code="loan.disbursement.proofRequiredHelp" text="Attach the proof before disbursement." /></c:when>
+                    <c:otherwise><spring:message code="loan.disbursement.proofOptionalHelp" text="This product allows disbursement without proof, but a proof file can still be attached." /></c:otherwise>
                 </c:choose>
             </p>
         </div>
@@ -705,7 +778,7 @@
 
         function formatDisbursementAmount(value) {
             const amount = Number(normalizeDisbursementAmount(value));
-            if (!Number.isFinite(amount) || amount <= 0) {
+            if (!Number.isFinite(amount) || amount < 0) {
                 return "-";
             }
             return "TSh " + new Intl.NumberFormat("en-US", {
@@ -776,39 +849,64 @@
             input.setSelectionRange(nextCaret, nextCaret);
         }
 
-        const disbursementAmountInput = document.getElementById("disbursementAmountInput");
+        const depositAmountInput = document.getElementById("depositAmountInput");
         const disbursementAmountDisplay = document.querySelector("[data-disbursement-loan-amount-display]");
         const disbursementRequestedAmount = document.querySelector("[data-disbursement-requested-amount]");
-        const disbursementPreviewAmount = document.querySelector("[data-disbursement-preview-amount]");
-        function refreshDisbursementAmountPreview() {
-            if (!disbursementAmountInput) {
+        const disbursementFeesAmount = document.querySelector("[data-disbursement-fees-amount]");
+        const depositPreviewAmount = document.querySelector("[data-deposit-preview-amount]");
+        const deductFeesButton = document.querySelector("[data-deduct-fees]");
+        const approvedAmountButton = document.querySelector("[data-approved-amount]");
+        function refreshDepositAmountPreview() {
+            if (!depositAmountInput) {
                 return;
             }
-            const label = formatDisbursementAmount(disbursementAmountInput.value);
+            const label = formatDisbursementAmount(depositAmountInput.value);
             if (disbursementAmountDisplay) {
-                disbursementAmountDisplay.textContent = label;
+                disbursementAmountDisplay.textContent = formatDisbursementAmount(disbursementRequestedAmount ? disbursementRequestedAmount.textContent : "");
             }
-            if (disbursementPreviewAmount) {
-                disbursementPreviewAmount.textContent = label;
+            if (depositPreviewAmount) {
+                depositPreviewAmount.textContent = label;
             }
         }
         if (disbursementRequestedAmount) {
             disbursementRequestedAmount.textContent = formatDisbursementAmount(disbursementRequestedAmount.textContent);
         }
-        disbursementAmountInput?.addEventListener("input", () => {
-            formatDisbursementInputWhileTyping(disbursementAmountInput);
-            refreshDisbursementAmountPreview();
+        if (disbursementFeesAmount) {
+            disbursementFeesAmount.textContent = formatDisbursementAmount(disbursementFeesAmount.textContent);
+        }
+        depositAmountInput?.addEventListener("input", () => {
+            formatDisbursementInputWhileTyping(depositAmountInput);
+            refreshDepositAmountPreview();
         });
-        disbursementAmountInput?.addEventListener("blur", () => {
-            disbursementAmountInput.value = formatDisbursementInputAmount(disbursementAmountInput.value, true);
-            refreshDisbursementAmountPreview();
+        depositAmountInput?.addEventListener("blur", () => {
+            depositAmountInput.value = formatDisbursementInputAmount(depositAmountInput.value, true);
+            refreshDepositAmountPreview();
         });
-        disbursementAmountInput?.form?.addEventListener("submit", () => {
-            disbursementAmountInput.value = normalizeDisbursementAmount(disbursementAmountInput.value);
+        depositAmountInput?.form?.addEventListener("submit", () => {
+            depositAmountInput.value = normalizeDisbursementAmount(depositAmountInput.value);
         });
-        refreshDisbursementAmountPreview();
-        if (disbursementAmountInput) {
-            disbursementAmountInput.value = formatDisbursementInputAmount(disbursementAmountInput.value, true);
+        deductFeesButton?.addEventListener("click", () => {
+            if (!depositAmountInput) {
+                return;
+            }
+            const loanAmount = Number(normalizeDisbursementAmount(deductFeesButton.dataset.loanAmount || "0"));
+            const feesAmount = Number(normalizeDisbursementAmount(deductFeesButton.dataset.totalFees || "0"));
+            const depositAmount = Math.max(0, (Number.isFinite(loanAmount) ? loanAmount : 0) - (Number.isFinite(feesAmount) ? feesAmount : 0));
+            depositAmountInput.value = formatDisbursementInputAmount(String(depositAmount.toFixed(2)), true);
+            refreshDepositAmountPreview();
+        });
+        approvedAmountButton?.addEventListener("click", () => {
+            if (!depositAmountInput) {
+                return;
+            }
+            const loanAmount = Number(normalizeDisbursementAmount(approvedAmountButton.dataset.loanAmount || "0"));
+            const approvedAmount = Number.isFinite(loanAmount) ? loanAmount : 0;
+            depositAmountInput.value = formatDisbursementInputAmount(String(approvedAmount.toFixed(2)), true);
+            refreshDepositAmountPreview();
+        });
+        refreshDepositAmountPreview();
+        if (depositAmountInput) {
+            depositAmountInput.value = formatDisbursementInputAmount(depositAmountInput.value, true);
         }
 
         function bindStaffOtpLiveStatus(input, statusBox, proceedButtons, verifyUrl) {
@@ -992,7 +1090,6 @@
                     showOtpFeedback(feedback, "error", otpMessages.requestNotConfigured);
                     return;
                 }
-                otpUi.reset();
                 setOtpButtonState(button, "loading");
                 try {
                     const response = await fetch(requestUrl, {
@@ -1020,6 +1117,7 @@
                     setOtpButtonState(button, "sent");
                     window.SaccosOtp?.startCooldown(button, payload, { idle: otpMessages.send });
                     showOtpFeedback(feedback, "success", payload.message || otpMessages.sentToEmail);
+                    otpUi.reset();
                     otpUi.markRequested();
                 } catch (error) {
                     setOtpButtonState(button, "idle");

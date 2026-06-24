@@ -460,1116 +460,27 @@
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="admin.settings.breadcrumb" text="Admin Tools / Settings & Controls" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.settings.title" text="Settings & Controls" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.settings.subtitle" text="Manage loan, guarantor, and board controls." /></p>
+    <p class="erp-breadcrumb">Admin Tools / Settings & Controls / Loan Products</p>
+    <h1 class="erp-page-title">Edit Loan Product</h1>
+    <p class="erp-page-subtitle">Update product rules using the same layout and validation as the Settings modal.</p>
 </div>
 
-<c:if test="${not empty openProductModalKey}">
-    <div hidden data-open-product-modal="${fn:escapeXml(openProductModalKey)}"></div>
-</c:if>
-
-<c:if test="${settingsSection eq 'language'}">
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.language.eyebrow" text="Language Settings" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.language.title" text="Workspace Default Language" /></h2>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.language.subtitle" text="Sets the default language used by SACCO workflow screens that follow the workspace setting." /></p>
-        </div>
-        <form action="/admin/settings-controls/language" method="post" class="erp-panel-body">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar">
-                <label class="settings-action-note block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="admin.settings.language.label" text="Default language" />
-                    <select name="defaultLanguage" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800">
-                        <option value="en" ${settings.defaultLanguage ne 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.english" text="English" /></option>
-                        <option value="sw" ${settings.defaultLanguage eq 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.swahili" text="Kiswahili" /></option>
-                    </select>
-                </label>
-                <button type="submit" class="settings-action-button app-btn btn-primary"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
-            </div>
-        </form>
-    </section>
-</c:if>
-
-<c:if test="${settingsSection eq 'otp'}">
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.otp.eyebrow" text="Authentication" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.otp.title" text="Station OTP Delivery" /></h2>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.otp.subtitle" text="Choose how this station sends authentication and workflow confirmation codes." /></p>
-        </div>
-        <form action="/admin/settings-controls/otp-delivery" method="post" class="erp-panel-body">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="grid gap-3 lg:grid-cols-3">
-                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.email" text="Email" /></span>
-                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.emailHelp" text="Always send OTP codes to the account email." /></span>
-                    </span>
-                </label>
-                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS' ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsOnly" text="SMS only" /></span>
-                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsOnlyHelp" text="Use normal station SMS units. OTP requests stop when units are depleted." /></span>
-                    </span>
-                </label>
-                <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="otpDeliveryChannel" type="radio" value="SMS_WITH_EMAIL_FALLBACK" class="mt-1" ${stationOtpDeliveryChannel eq 'SMS_WITH_EMAIL_FALLBACK' ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.smsFallback" text="SMS with email fallback" /></span>
-                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.smsFallbackHelp" text="Try SMS first, then use email when SMS cannot be sent." /></span>
-                    </span>
-                </label>
-            </div>
-            <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
-                <p class="text-sm text-slate-500"><spring:message code="admin.settings.otp.reserveNotice" text="The three reserved SMS alert units are never used for OTP codes." /></p>
-                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Delivery" /></button>
-            </div>
-        </form>
-    </section>
-</c:if>
-
-<c:if test="${settingsSection eq 'board'}">
-    <div class="erp-panel mb-4">
-        <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <p class="erp-widget-title"><spring:message code="admin.settings.approvalFlow.eyebrow" text="Approval Flow" /></p>
-                <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.approvalFlow.title" text="Tenant Approval Configuration" /></h2>
-                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.approvalFlow.subtitle" text="Product workflows decide the review path. Final release remains manual and claim-protected." /></p>
-            </div>
-        </div>
-        <form action="/admin/settings-controls/review-rules" method="post" class="erp-panel-body grid gap-4">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-
-            <div class="grid gap-4 lg:grid-cols-2">
-                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="loanOfficerReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.loanOfficerReviewRequired ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.loanOfficerRequired" text="Require Loan Officer Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Adds a single assigned Loan Officer stage between Manager and Board or Accountant." /></span>
-                    </span>
-                </label>
-                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.boardRequired" text="Require Credit Committee Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.boardHelp" text="Adds the committee stage before Accountant review for SACCOs that need group approval." /></span>
-                    </span>
-                </label>
-            </div>
-
-            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Required Board Members Per Review
-                    <input name="boardQuorum"
-                           type="number"
-                           min="1"
-                           max="${activeBoardMemberCount gt 0 ? activeBoardMemberCount : 1}"
-                           class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                           value="${settings.boardQuorum}" />
-                    <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                        Used only when Credit Committee review is enabled.
-                    </span>
-                </label>
-
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.approvalFlow.resolved" text="Resolved Flow" /></p>
-                    <div class="mt-3 flex flex-wrap items-center gap-2">
-                        <c:forEach items="${approvalFlowStageLabels}" var="stage" varStatus="status">
-                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-800 ring-1 ring-slate-200">${stage}</span>
-                            <c:if test="${not status.last}">
-                                <span class="text-slate-400">→</span>
-                            </c:if>
-                        </c:forEach>
-                    </div>
-                    <p class="mt-3 text-xs text-slate-500"><spring:message code="admin.settings.approvalFlow.examples" text="Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Credit Committee to Accountant to Disbursement." /></p>
-                </div>
-            </div>
-
-            <div class="grid gap-3 md:grid-cols-4">
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Loan Officers: <strong>${activeLoanOfficerCount}</strong>
-                </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Board Members: <strong>${activeBoardMemberCount}</strong>
-                </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Accountants: <strong>${activeAccountantCount}</strong>
-                </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Disbursement Claim Holders: <strong>${activeDisbursementClaimHolderCount}</strong>
-                </div>
-            </div>
-
-            <div class="app-modal-actions !justify-start md:justify-end">
-                <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
-            </div>
-        </form>
-    </div>
-</c:if>
-
-<c:if test="${settingsSection eq 'guarantor'}">
-    <section class="erp-panel overflow-hidden mb-4">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.qualification.title" text="Applicant And Guarantor Controls" /></h2>
-        </div>
-        <form action="/admin/settings-controls/qualification-policies" method="post" class="erp-panel-body grid gap-5">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar settings-action-bar--split">
-                <p class="settings-action-note max-w-3xl text-sm text-slate-500"><spring:message code="admin.settings.qualification.subtitle" text="These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
-                <button type="submit" class="settings-action-button app-btn btn-primary"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
-            </div>
-            <div class="grid gap-4 lg:grid-cols-2">
-                <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title"><spring:message code="admin.settings.loanApplicants" text="Loan Applicants" /></p>
-                    <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
-                            </span>
-                        </label>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Forfeited Application Waiting Period (Days)
-                            <input name="applicantForfeitedWaitDays" type="number" min="0" max="15" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantForfeitedWaitDays}" />
-                            <input name="applicantMaxForfeitedLoans" type="hidden" value="${policyApplicantMaxForfeitedLoans}" />
-                            <input name="applicantForfeitedLookbackDays" type="hidden" value="${policyApplicantForfeitedLookbackDays}" />
-                        </label>
-                    </div>
-                </div>
-                <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title"><spring:message code="loan.guarantors" text="Guarantors" /></p>
-                    <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, members with active loans cannot guarantee." /></span>
-                            </span>
-                        </label>
-                        <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Max Guarantees
-                            <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxGuarantees}" />
-                        </label>
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
-                            </span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </section>
-
-</c:if>
-
-<c:if test="${settingsSection eq 'loan'}">
-    <div class="mb-4 flex flex-wrap justify-end gap-3">
-        <c:if test="${not empty loanProductsVersions}">
-            <button type="button"
-                    class="app-btn btn-neutral"
-                    data-product-modal-open="loan-products-versions">
-                <spring:message code="admin.settings.loanProducts.versions" text="Loan Products Versions" />
-            </button>
-        </c:if>
-        <c:if test="${not customizedProductExists}">
-            <button type="button"
-                    class="app-btn btn-primary"
-                    data-product-modal-open="create-product">
-                <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
-            </button>
-        </c:if>
-    </div>
-
-    <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-        <c:forEach items="${products}" var="product">
-            <c:set var="productManagerEnabled" value="${product.managerReviewRequired != false}" />
-            <c:set var="productLoanOfficerEnabled"
-                   value="${product.loanOfficerReviewRequired == true || (product.loanOfficerReviewRequired == null && settings.loanOfficerReviewRequired)}" />
-            <c:set var="productWorkflowStartStage"><c:out value="${product.resolvedWorkflowStartStage}" /></c:set>
-            <section class="erp-panel overflow-hidden">
-                <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.single" text="Loan Product" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><c:out value="${product.displayDescription}" /></p>
-                    </div>
-                    <div class="flex items-center gap-2 sm:pt-1">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                            ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
-                            ${product.status eq 'DRAFT' ? 'bg-amber-50 text-amber-700' : ''}
-                            ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
-                            ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">
-                            ${product.status}
-                        </span>
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-open="versions-${product.id}">
-                            <spring:message code="admin.settings.loanProducts.versionsShort" text="Versions" />
-                        </button>
-                        <a class="app-btn btn-primary"
-                           href="/admin/settings-controls/loan-products/${product.id}/edit">
-                            <spring:message code="common.edit" text="Edit" />
-                        </a>
-                    </div>
-                </div>
-
-                <div class="divide-y divide-slate-200">
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.displayOrderHelp" text="Controls how products appear across the workspace." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">${product.resolvedDisplayOrder}</p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.amountRange" text="Amount Range" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.amountRangeHelp" text="Minimum and maximum loan amount allowed for this product." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold text-slate-900">
-                            <fmt:formatNumber value="${product.minimumAmount}" minFractionDigits="2" maxFractionDigits="2" />
-                            <spring:message code="common.to" text="to" />
-                            <c:choose>
-                                <c:when test="${product.maximumAmount ne null}">
-                                    <fmt:formatNumber value="${product.maximumAmount}" minFractionDigits="2" maxFractionDigits="2" />
-                                </c:when>
-                                <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.maximumLoanMultipleHelp" text="Maximum loan multiple allowed against member savings." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">
-                            <c:choose>
-                                <c:when test="${product.maxLoanSavingsRatio gt 0}">
-                                    Loan can be up to <fmt:formatNumber value="${product.maxLoanSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" />
-                                </c:when>
-                                <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.interestMethod" text="Interest Method" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.interestMethodHelp" text="Method and annual rate applied during repayment calculations." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold text-slate-900">
-                            ${product.interestMethod}
-                            <span class="block text-sm font-medium text-slate-600"><fmt:formatNumber value="${product.interestRate * 100}" minFractionDigits="2" maxFractionDigits="2" />%</span>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.tenureRules" text="Tenure Rules" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.tenureRulesHelp" text="Minimum and maximum repayment duration allowed for this product." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">${product.minimumRepaymentMonths} - ${product.maxRepaymentMonths} <spring:message code="common.months" text="month(s)" /></p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.guarantors" text="Guarantors" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.guarantorsHelp" text="Number of guarantors required before review moves forward." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">${product.guarantorsRequired}</p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.guarantorSavingsCheck" text="Guarantor Savings Check" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.guarantorSavingsCheckHelp" text="Controls whether selected guarantors must meet this product's minimum savings." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">
-                            <c:choose>
-                                <c:when test="${product.guarantorMinSavingsCheckRequired}"><spring:message code="common.enabled" text="Enabled" /></c:when>
-                                <c:otherwise><spring:message code="common.disabled" text="Disabled" /></c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.activeLoanApplication" text="Application With Active Loan" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.activeLoanApplicationHelp" text="Controls whether members can apply again while a disbursed loan is still open." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">
-                            <c:choose>
-                                <c:when test="${product.applicationWithActiveLoanAllowed}"><spring:message code="common.allowed" text="Allowed" /></c:when>
-                                <c:otherwise><spring:message code="common.blocked" text="Blocked" /></c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.loadedFinancialData" text="Loaded Financial Data (Savings & Shares)" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.loadedFinancialDataHelp" text="Controls whether the member must load current financial data before the application can move forward." /></p>
-                        </div>
-                        <p class="text-base font-semibold text-slate-900">
-                            <c:choose>
-                                <c:when test="${product.freshFinancialDataRequired}"><spring:message code="common.required" text="Required" /></c:when>
-                                <c:otherwise><spring:message code="common.optional" text="Optional" /></c:otherwise>
-                            </c:choose>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.priorityFlow" text="Priority Flow" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.priorityFlowHelp" text="Saved approval order used in the product workflow preview." /></p>
-                        </div>
-                        <div class="flex flex-col items-end text-right">
-                            <span class="block text-sm font-semibold text-emerald-700" style="order: ${productManagerEnabled ? product.resolvedManagerPriority : 6};">
-                                <c:choose>
-                                    <c:when test="${productManagerEnabled}">P${product.resolvedManagerPriority} Manager</c:when>
-                                    <c:otherwise><spring:message code="admin.settings.managerSkipped" text="Manager Skipped" /></c:otherwise>
-                                </c:choose>
-                            </span>
-                            <span class="mt-1 block text-sm font-semibold ${(productLoanOfficerEnabled or productManagerEnabled) ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${productLoanOfficerEnabled ? product.resolvedLoanOfficerPriority : 6};">
-                                <c:choose>
-                                    <c:when test="${productLoanOfficerEnabled}">P${product.resolvedLoanOfficerPriority} Loan Officer</c:when>
-                                    <c:otherwise><spring:message code="admin.settings.loanOfficerSkipped" text="Loan Officer Skipped" /></c:otherwise>
-                                </c:choose>
-                            </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.boardReviewRequired ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.boardReviewRequired ? product.resolvedBoardPriority : 6};">
-                                P${product.resolvedBoardPriority} Board Member ${product.boardReviewRequired ? 'Configured' : 'Skipped'}
-                            </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.committeeReviewRequired ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.committeeReviewRequired ? product.resolvedCommitteePriority : 6};">
-                                P${product.resolvedCommitteePriority} Credit Committee ${product.committeeReviewRequired ? 'Configured' : 'Skipped'}
-                            </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.accountantReviewRequired != false ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.accountantReviewRequired != false ? product.resolvedAccountantPriority : 6};">
-                                P${product.resolvedAccountantPriority} Accountant ${product.accountantReviewRequired != false ? 'Configured' : 'Skipped'}
-                            </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.disbursementOfficerRequired != false ? 'text-emerald-700' : 'text-slate-500'}" style="order: 7;">
-                                P5 ${product.disbursementOfficerRequired != false ? 'Disbursement/Teller Officer Required' : 'Disbursement Claim Release'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.disbursementProofHelp" text="Controls whether a proof attachment is required before releasing this product." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold ${product.disbursementProofRequired != false ? 'text-emerald-700' : 'text-slate-600'}">
-                            ${product.disbursementProofRequired != false ? 'Required' : 'Optional'}
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.applicantAttachments" text="Applicant Attachments" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.applicantAttachmentsHelp" text="Controls whether members must upload a supporting attachment while applying." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold ${product.applicantAttachmentRequired ? 'text-emerald-700' : 'text-slate-600'}">
-                            ${product.applicantAttachmentRequired ? 'Required' : 'Optional'}
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.workflow.committeeRules" text="Credit Committee" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.workflow.committeeRulesHelp" text="Named credit committee reviewers assigned to this product." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold text-slate-900">
-                            ${product.committeeReviewRequired ? product.resolvedCommitteeMinimumVotes : 0} reviewer(s)
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></p>
-                            <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.repaymentChargesHelp" text="Update pricing, interest treatment, and repayment duration for this product." /></p>
-                        </div>
-                        <p class="text-right text-base font-semibold text-slate-900">
-                            <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />:
-                            <fmt:formatNumber value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" minFractionDigits="2" maxFractionDigits="2" />
-                            <span class="block text-sm font-medium text-slate-600">
-                                <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />:
-                                <fmt:formatNumber value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" minFractionDigits="2" maxFractionDigits="2" />%
-                            </span>
-                        </p>
-                    </div>
-                </div>
-            </section>
-        </c:forEach>
-    </div>
-</c:if>
-
-<c:if test="${settingsSection eq 'loan'}">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="application-fee">
-        <div class="app-modal-panel max-w-2xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanControls" text="Loan Controls" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.editApplicationFee" text="Edit Application Fee" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.applicationFeeHelp" text="This fee is deducted from every loan application in this SACCO." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="application-fee" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <form action="/admin/settings-controls/loan-rules" method="post" class="app-modal-body" data-inline-validation-form="loan-settings">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <input type="hidden" name="modalKey" value="application-fee" />
-
-                    <c:if test="${openProductModalKey eq 'application-fee' and not empty message}">
-                        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
-                    </c:if>
-                    <c:if test="${openProductModalKey eq 'application-fee' and not empty error}">
-                        <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
-                    </c:if>
-                    <c:if test="${openProductModalKey eq 'application-fee' and not empty loanSettingsFieldErrors}">
-                        <div hidden data-modal-server-errors>
-                            <c:forEach items="${loanSettingsFieldErrors}" var="fieldError">
-                                <div data-modal-field-error="${fieldError.key}"><c:out value="${fieldError.value}" /></div>
-                            </c:forEach>
-                        </div>
-                    </c:if>
-
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Application Fee
-                        <input name="applicationFee"
-                               type="number"
-                               min="0"
-                               step="0.01"
-                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                               value="${settings.resolvedApplicationFee}" />
-                        <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                            Deducted from every loan application, regardless of product type.
-                        </span>
-                    </label>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="application-fee">
-                            Cancel
-                        </button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</c:if>
-
-<c:if test="${settingsSection eq 'loan' and not empty loanProductsVersions}">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="loan-products-versions">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProductVersions" text="Loan Products Versions" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.portfolioSnapshots" text="Portfolio Snapshots" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.portfolioSnapshotsHelp" text="Each entry stores the full loan products configuration set for this SACCO at that moment." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="loan-products-versions" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="app-modal-body">
-                    <div class="overflow-x-auto rounded-lg border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <tr>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.applicationFee" text="Application Fee" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.products" text="Products" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.productNames" text="Product Names" /></th>
-                            </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
-                            <c:forEach items="${loanProductsVersions}" var="version">
-                                <tr>
-                                    <td class="px-4 py-3 align-top">
-                                        <p class="font-semibold text-sacco-ink">V${version.versionNumber}</p>
-                                        <p class="mt-1 text-xs text-slate-500">${version.snapshotType}</p>
-                                    </td>
-                                    <td class="px-4 py-3 align-top">${version.savedAtLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.savedByLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.applicationFeeLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.productCount}</td>
-                                    <td class="px-4 py-3 align-top">${version.productsLabel}</td>
-                                </tr>
-                            </c:forEach>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="loan-products-versions">
-                            <spring:message code="common.close" text="Close" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</c:if>
-
-<c:if test="${settingsSection eq 'loan' and not customizedProductExists}">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="create-product">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.addLoanProduct" text="Add Loan Product" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.createLoanProduct" text="Create Loan Product" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.createLoanProductHelp" text="Set the loan name, approval path, and lending limits for this SACCO." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="create-product" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <form action="/admin/settings-controls/customized-product"
-                      method="post"
-                      class="app-modal-body product-builder-form"
-                      data-inline-validation-form="loan-settings"
-                      data-product-workflow-builder="true"
-                      data-active-loan-officers="${activeLoanOfficerCount}"
-                      data-active-board-members="${activeBoardMemberCount}"
-                      data-active-credit-committee-members="${activeCreditCommitteeMemberCount}"
-                      data-active-accountants="${activeAccountantCount}"
-                      data-active-disbursement-officers="${activeDisbursementOfficerCount}"
-                      data-active-disbursement-claim-holders="${activeDisbursementClaimHolderCount}"
-                      data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
-                      data-tenant-board-enabled="${settings.boardReviewRequired}">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <input type="hidden" name="modalKey" value="create-product" />
-                    <input type="hidden" name="productCode" value="" data-product-code-field data-product-code-generated="true" />
-                    <input type="hidden" name="workflowStartStage" value="MANAGER" data-workflow-start-stage-field />
-
-                    <c:if test="${openProductModalKey eq 'create-product' and not empty message}">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
-                    </c:if>
-                    <c:if test="${openProductModalKey eq 'create-product' and not empty error}">
-                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
-                    </c:if>
-                    <c:if test="${openProductModalKey eq 'create-product' and not empty loanSettingsFieldErrors}">
-                        <div hidden data-modal-server-errors>
-                            <c:forEach items="${loanSettingsFieldErrors}" var="fieldError">
-                                <div data-modal-field-error="${fieldError.key}"><c:out value="${fieldError.value}" /></div>
-                            </c:forEach>
-                        </div>
-                    </c:if>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
-                            <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityCreateHelp" text="Set the member-facing name, display order, and status for this product." /></p>
-                        </div>
-                        <div class="product-builder-section-body product-identity-grid">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
-                                <input name="displayOrder" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="5" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
-                                <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.namePlaceholder" text="e.g. School Fees Booster" />' data-product-name-field />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.status" text="Product Status" />
-                                <select name="productStatus" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                                    <option value="ACTIVE" selected><spring:message code="status.active" text="Active" /></option>
-                                    <option value="SUSPENDED"><spring:message code="status.suspended" text="Suspended" /></option>
-                                </select>
-                            </label>
-
-                            <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="common.description" text="Description" />
-                                <textarea name="productDescription" rows="3" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to members when choosing this product." />'></textarea>
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></p>
-                            <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityCreateHelp" text="Define lending limits and savings coverage for this product." /></p>
-                        </div>
-                        <div class="product-builder-section-body product-builder-grid two-up">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                                <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                                <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank for no product cap" />' />
-                            </label>
-
-                            <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
-                                <input name="maxLoanSavingsPercent" type="hidden" value="300.00" data-savings-percent />
-                                <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
-                                    <div class="savings-ratio-mode-toggle mt-2" data-savings-ratio-mode-toggle>
-                                        <button type="button" class="is-active" data-savings-ratio-mode="multiple"><spring:message code="admin.settings.loanProducts.savingsMultipleMode" text="Multiple" /></button>
-                                        <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
-                                    </div>
-                                    <div class="savings-multiplier-control mt-1">
-                                        <input type="number" min="0" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Loan savings multiplier" data-savings-multiplier />
-                                        <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
-                                    </div>
-                                    <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
-                                        <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="3" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
-                                        <span class="savings-fraction-divider">/</span>
-                                        <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
-                                        <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsFractionSuffix" text="times savings" /></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <input name="freshFinancialDataRequired" type="checkbox" value="true" data-workflow-loaded-financial />
-                                <span><spring:message code="admin.settings.workflow.requireLoadedFinancialData" text="Require Loaded Financial Data (Savings & Shares) At Submission" /></span>
-                            </label>
-                            <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" />
-                                <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></p>
-                            <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.repaymentChargesCreateHelp" text="Control pricing, interest treatment, and the repayment period for this product." /></p>
-                        </div>
-                        <div class="product-builder-section-body product-builder-grid two-up">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
-                                <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${settings.resolvedApplicationFee}" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
-                                <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.50" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
-                                <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
-                                <input name="annualInterestPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="10.00" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.amountReturnMethod" text="Interest Method" />
-                                <select name="interestMethod" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                                    <option value="FLAT_RATE" selected><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
-                                    <option value="REDUCING_BALANCE"><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
-                                </select>
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                                <input name="minRepaymentMonths" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                                <input name="maxRepaymentMonths" type="number" min="1" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="12" />
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
-                            <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.subtitle" text="Configure the approval path for this loan product." /></p>
-                        </div>
-                        <div class="product-builder-section-body">
-                            <div class="workflow-subsection mt-4">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></p>
-                                <div class="workflow-table">
-                                    <div class="workflow-table-head">
-                                        <div><spring:message code="admin.settings.workflow.stage" text="Stage" /></div>
-                                        <div><spring:message code="admin.settings.workflow.required" text="Required" /></div>
-                                        <div><spring:message code="admin.settings.workflow.priority" text="Priority" /></div>
-                                        <div><spring:message code="admin.settings.workflow.notes" text="Notes" /></div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.manager" text="Manager" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="managerReviewRequired" type="checkbox" value="true" checked data-workflow-manager aria-label="Manager required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="managerPriority" class="workflow-priority-select" data-workflow-manager-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 1 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'><spring:message code="admin.settings.workflow.managerLoanOfficerPriorityNote" text="Choose any open priority from 1 to 6." /></div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.loanOfficer" text="Loan Officer" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="loanOfficerReviewRequired" type="checkbox" value="true" ${settings.loanOfficerReviewRequired ? 'checked' : ''} data-workflow-loan-officer aria-label="Loan Officer required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="loanOfficerPriority" class="workflow-priority-select" data-workflow-loan-officer-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 2 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <c:choose>
-                                                <c:when test="${settings.loanOfficerReviewRequired}">
-                                                    <spring:message code="admin.settings.workflow.loanOfficerPriorityNote" text="Choose any open priority from 1 to 6." />
-                                                </c:when>
-                                                <c:otherwise>
-                                                    <spring:message code="admin.settings.workflow.enableLoanOfficerNote" text="Enable Loan Officer review in tenant approval flow settings to use this stage." />
-                                                </c:otherwise>
-                                            </c:choose>
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Board Member" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" data-workflow-board aria-label="Board Member required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 3 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${settings.boardReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="committeePriority" class="workflow-priority-select" data-workflow-committee-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 4 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.accountant" text="Accountant" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="accountantReviewRequired" type="checkbox" value="true" checked data-workflow-accountant aria-label="Accountant required" /></label>
-                                            <input type="hidden" name="accountantReviewRequired" value="false" />
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="accountantPriority" class="workflow-priority-select" data-workflow-accountant-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 5 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="disbursementOfficerRequired" type="checkbox" value="true" checked data-workflow-disbursement-officer aria-label="Disbursement/Teller Officer required" /></label>
-                                            <input type="hidden" name="disbursementOfficerRequired" value="false" />
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select class="workflow-priority-select" disabled><option selected>6</option></select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.disbursementOfficerNote" text="Role requirement for final manual release." />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></p>
-                                <div class="grid gap-3">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Board Members Assigned
-                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
-                                    </label>
-                                    <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-board-reviewer-list>
-                                        <c:forEach items="${boardReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
-                                                <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" />
-                                                <span>
-                                                    <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
-                                                </span>
-                                            </label>
-                                        </c:forEach>
-                                        <c:if test="${empty boardReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active board members are available.</div>
-                                        </c:if>
-                                    </div>
-                                    <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.committee" text="Credit Committee" /></p>
-                                <div class="grid gap-3">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Credit Committee Assigned
-                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search credit committee..." data-credit-committee-reviewer-search />
-                                    </label>
-                                    <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-credit-committee-reviewer-list>
-                                        <c:forEach items="${creditCommitteeReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
-                                                <input name="creditCommitteeReviewerIds" type="checkbox" value="${reviewer.id}" />
-                                                <span>
-                                                    <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
-                                                </span>
-                                            </label>
-                                        </c:forEach>
-                                        <c:if test="${empty creditCommitteeReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee members are available.</div>
-                                        </c:if>
-                                    </div>
-                                    <p class="text-xs text-slate-500">Every selected credit committee member will be assigned and notified for this product.</p>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="common.applicant" text="Applicant" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="applicantAttachmentRequired" type="checkbox" value="true" data-required-attachments-toggle />
-                                        <span><spring:message code="admin.settings.requireApplicantAttachment" text="Require applicant attachment while applying" /></span>
-                                    </label>
-                                    <input type="hidden" name="applicantAttachmentRequired" value="false" />
-                                </div>
-                                <div class="mt-3 hidden rounded-md border border-slate-200 bg-white p-3" data-required-attachments-panel>
-                                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
-                                        <button type="button" class="app-btn btn-neutral" data-add-required-attachment>Add Name of Required Attachment</button>
-                                    </div>
-                                    <div class="grid gap-2" data-required-attachments-list></div>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="disbursementProofRequired" type="checkbox" value="true" checked />
-                                        <span><spring:message code="admin.settings.requireProofBeforeDisbursement" text="Require proof attachment before disbursement" /></span>
-                                    </label>
-                                    <input type="hidden" name="disbursementProofRequired" value="false" />
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <spring:message code="admin.settings.workflow.guarantorsRequired" text="Guarantors Required" />
-                                        <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-guarantors />
-                                    </label>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Minimum Guarantor Savings
-                                        <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
-                                    </label>
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
-                                        <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></p>
-                                <div class="workflow-warning-stack mt-4" data-workflow-warnings></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.workflow.preview" text="Preview" /></p>
-                            <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.resolvedFlow" text="Resolved Flow" /></h3>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.resolvedFlowHelp" text="The runtime path below reflects what the system would execute with current tenant settings." /></p>
-                        </div>
-                        <div class="product-builder-section-body">
-                            <div class="workflow-preview-shell">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
-                                <div class="mt-3 workflow-preview-runtime" data-workflow-preview-runtime></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="create-product">
-                            <spring:message code="common.cancel" text="Cancel" />
-                        </button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.loanProducts.add" text="Add loan product" /></button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</c:if>
-
-<c:forEach items="${products}" var="product">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="versions-${product.id}">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.productVersions" text="Product Versions" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.productVersionsHelp" text="Preserved configuration snapshots for this product. The most recent three versions are shown." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="versions-${product.id}" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="app-modal-body">
-                    <c:set var="productVersions" value="${productVersionsByProductId[product.id]}" />
-                    <c:choose>
-                        <c:when test="${empty productVersions}">
-                            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-600">
-                                No saved versions are available yet. A snapshot is preserved automatically the next time this product is changed.
-                            </div>
-                        </c:when>
-                        <c:otherwise>
-                            <div class="overflow-x-auto rounded-lg border border-slate-200">
-                                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <tr>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.amountRange" text="Amount Range" /></th>
-                                            <th class="px-4 py-3"><spring:message code="products.table.tenure" text="Tenure" /></th>
-                                            <th class="px-4 py-3"><spring:message code="repayment.interest" text="Interest" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.workflow" text="Workflow" /></th>
-                                            <th class="px-4 py-3"><spring:message code="common.status" text="Status" /></th>
-                                            <th class="px-4 py-3 text-right"><spring:message code="common.action" text="Action" /></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
-                                        <c:forEach items="${productVersions}" var="version">
-                                            <tr>
-                                                <td class="px-4 py-3 align-top">
-                                                    <p class="font-semibold text-sacco-ink">V${version.versionNumber}</p>
-                                                    <p class="mt-1 text-xs text-slate-500">${version.snapshotType}</p>
-                                                </td>
-                                                <td class="px-4 py-3 align-top">${version.savedAtLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.savedByLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.amountRangeLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.tenureLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.interestLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.workflowLabel}</td>
-                                                <td class="px-4 py-3 align-top">
-                                                    <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                                        ${version.statusLabel}
-                                                    </span>
-                                                </td>
-                                                <td class="px-4 py-3 align-top text-right">
-                                                    <form action="/admin/settings-controls/${product.id}/versions/${version.id}/rollback" method="post" class="inline">
-                                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.rollback" text="Rollback" /></button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        </c:forEach>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </c:otherwise>
-                    </c:choose>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="versions-${product.id}">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="app-modal-overlay hidden"
-         data-product-modal="product-${product.id}">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-            <div class="app-modal-header">
-                <div>
-                    <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.editProduct" text="Edit Product" /></p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.editTitle" text="Edit Loan Product:" /> <c:out value="${product.displayName}" /></h2>
-                </div>
-                <button type="button" class="app-modal-close" data-product-modal-close="product-${product.id}" aria-label='<spring:message code="common.closeModal" text="Close modal" />'>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
-            </div>
-
-            <form action="/admin/settings-controls/${product.id}"
+<div class="mb-4 flex flex-wrap justify-between gap-3">
+    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Back to loan products</a>
+    <form action="/admin/settings-controls/loan-products/${product.id}/delete"
+          method="post"
+          data-confirm-eyebrow="Confirm Deletion"
+          data-confirm-title="Delete Loan Product"
+          data-confirm-message="Delete this loan product from active settings? Historical loan applications and reports will remain preserved."
+          data-confirm-proceed="Delete Product">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <button type="submit" class="app-btn btn-reject">Delete Product</button>
+    </form>
+</div>
+
+<form action="/admin/settings-controls/${product.id}"
                   method="post"
-                  class="app-modal-body product-builder-form"
+                  class="product-builder-form"
                   data-inline-validation-form="loan-settings"
                   data-product-workflow-builder="true"
                   data-product-edit-mode="true"
@@ -1910,24 +821,57 @@
                                 <input type="hidden" name="applicantAttachmentRequired" value="false" />
                             </div>
                             <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '}rounded-md border border-slate-200 bg-white p-3" data-required-attachments-panel>
-                                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
-                                    <button type="button" class="app-btn btn-neutral" data-add-required-attachment>Add Name of Required Attachment</button>
+                                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
+                                        <p class="mt-1 text-xs text-slate-500">Create one record for each document the applicant must upload.</p>
+                                    </div>
+                                    <button type="button" class="app-btn btn-neutral" data-required-attachment-add>Add Name of Required Attachment</button>
                                 </div>
-                                <div class="grid gap-2" data-required-attachments-list>
-                                    <c:forEach items="${requiredAttachmentsByProductId[product.id]}" var="attachmentRequirement">
-                                        <div class="grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]" data-required-attachment-row>
-                                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                Name
-                                                <input name="requiredAttachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${attachmentRequirement.attachmentName}" />
-                                            </label>
-                                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                Max MB
-                                                <input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${attachmentRequirement.maxSizeMb}" />
-                                            </label>
-                                            <button type="button" class="app-btn btn-neutral self-end" data-remove-required-attachment>Remove</button>
-                                        </div>
-                                    </c:forEach>
+                                <div class="hidden rounded-md border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
+                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end">
+                                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Attachment Name
+                                            <input form="requiredAttachmentCreateForm" name="attachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. Salary slip" />
+                                        </label>
+                                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Max MB
+                                            <input form="requiredAttachmentCreateForm" name="maxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="5.00" />
+                                        </label>
+                                        <button form="requiredAttachmentCreateForm" type="submit" class="app-btn btn-primary">Create</button>
+                                        <button type="button" class="app-btn btn-neutral" data-required-attachment-cancel>Cancel</button>
+                                    </div>
+                                </div>
+                                <div class="mt-4 max-h-72 overflow-y-auto rounded-md border border-slate-200">
+                                    <table class="erp-table min-w-[620px]">
+                                        <thead>
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">Name</th>
+                                            <th class="px-3 py-2 text-left">Max MB</th>
+                                            <th class="px-3 py-2 text-left">Action</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <c:choose>
+                                            <c:when test="${empty requiredAttachments}">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-5 text-sm text-slate-500">No required attachments have been created yet.</td>
+                                                </tr>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <c:forEach items="${requiredAttachments}" var="attachmentRequirement">
+                                                    <tr>
+                                                        <td class="px-3 py-2 font-semibold text-slate-800"><c:out value="${attachmentRequirement.attachmentName}" /></td>
+                                                        <td class="px-3 py-2"><fmt:formatNumber value="${attachmentRequirement.maxSizeMb}" minFractionDigits="2" maxFractionDigits="2" /></td>
+                                                        <td class="px-3 py-2">
+                                                            <button form="deleteRequiredAttachment-${attachmentRequirement.id}" type="submit" class="app-btn btn-reject">Delete</button>
+                                                        </td>
+                                                    </tr>
+                                                </c:forEach>
+                                            </c:otherwise>
+                                        </c:choose>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -1982,18 +926,19 @@
                     </div>
                 </section>
 
-                <div class="app-modal-actions">
-                    <button type="button"
-                            class="app-btn btn-neutral"
-                            data-product-modal-close="product-${product.id}">
-                        <spring:message code="common.cancel" text="Cancel" />
-                    </button>
+                <div class="flex flex-wrap justify-end gap-3">
+                    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
                     <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
                 </div>
-            </form>
-            </div>
-        </div>
-    </div>
+</form>
+
+<form id="requiredAttachmentCreateForm" action="/admin/settings-controls/loan-products/${product.id}/required-attachments" method="post" class="hidden">
+    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+</form>
+<c:forEach items="${requiredAttachments}" var="attachmentRequirement">
+    <form id="deleteRequiredAttachment-${attachmentRequirement.id}" action="/admin/settings-controls/loan-products/${product.id}/required-attachments/${attachmentRequirement.id}/delete" method="post" class="hidden">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+    </form>
 </c:forEach>
 
 <spring:message code="admin.settings.workflow.warning.noReviewStage" text="At least one review or approval stage must be enabled before disbursement." var="warningNoReviewStage" />
@@ -2001,7 +946,7 @@
 <spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
 <spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority from 1 to 6." var="warningDuplicatePriorities" />
 <spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Board Member review is configured, but there are no active board members available for assignment." var="warningNoBoardReviewers" />
-<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Credit Committee review is configured, but there are no active credit committee members available for assignment." var="warningNoCommitteeReviewers" />
+<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Committee review is configured, but there are no active board members available for assignment." var="warningNoCommitteeReviewers" />
 <spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
 <spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
 <spring:message code="admin.settings.workflow.warning.noDisbursementOfficers" text="Disbursement/Teller Officer is required, but there are no active Disbursement/Teller Officers assigned yet." var="warningNoDisbursementOfficers" />
@@ -3098,51 +2043,33 @@
             });
         });
 
-        function requiredAttachmentRow(name, maxSizeMb) {
-            const row = document.createElement('div');
-            row.className = 'grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]';
-            row.setAttribute('data-required-attachment-row', 'true');
-            row.innerHTML =
-                '<label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Name' +
-                '<input name="requiredAttachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
-                '<label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Max MB' +
-                '<input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
-                '<button type="button" class="app-btn btn-neutral self-end" data-remove-required-attachment>Remove</button>';
-            row.querySelector('[name="requiredAttachmentName"]').value = name || '';
-            row.querySelector('[name="requiredAttachmentMaxSizeMb"]').value = maxSizeMb || '5.00';
-            return row;
-        }
-
         function syncRequiredAttachmentPanel(form) {
             const toggle = form.querySelector('[data-required-attachments-toggle]');
             const panel = form.querySelector('[data-required-attachments-panel]');
-            const list = form.querySelector('[data-required-attachments-list]');
-            if (!toggle || !panel || !list) {
+            const addButton = form.querySelector('[data-required-attachment-add]');
+            const attachmentForm = form.querySelector('[data-required-attachment-form]');
+            const cancelButton = form.querySelector('[data-required-attachment-cancel]');
+            if (!toggle || !panel) {
                 return;
             }
+            const hideEntryForm = () => {
+                attachmentForm?.classList.add('hidden');
+                addButton?.classList.remove('hidden');
+            };
             const render = () => {
-                const enabled = toggle.checked;
-                panel.classList.toggle('hidden', !enabled);
-                if (enabled && !list.querySelector('[data-required-attachment-row]')) {
-                    list.appendChild(requiredAttachmentRow('', '5.00'));
+                panel.classList.toggle('hidden', !toggle.checked);
+                if (!toggle.checked) {
+                    hideEntryForm();
                 }
             };
+            addButton?.addEventListener('click', () => {
+                attachmentForm?.classList.remove('hidden');
+                addButton.classList.add('hidden');
+                attachmentForm?.querySelector('input[name="attachmentName"]')?.focus();
+            });
+            cancelButton?.addEventListener('click', hideEntryForm);
+            document.getElementById('requiredAttachmentCreateForm')?.addEventListener('submit', hideEntryForm);
             toggle.addEventListener('change', render);
-            form.querySelectorAll('[data-add-required-attachment]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    list.appendChild(requiredAttachmentRow('', '5.00'));
-                });
-            });
-            list.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-remove-required-attachment]');
-                if (!button) {
-                    return;
-                }
-                const row = button.closest('[data-required-attachment-row]');
-                if (row) {
-                    row.remove();
-                }
-            });
             render();
         }
 
@@ -3202,4 +2129,7 @@
     })();
 </script>
 
+
+
+<%@ include file="../fragments/confirm-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

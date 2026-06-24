@@ -112,6 +112,7 @@ public class RepaymentScheduleService {
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("disbursedPrincipal", app.getAmount());
+        summary.put("depositAmount", app.getDepositAmount());
         summary.put("disbursementDate", disbursementDate.toString());
         summary.put("firstRepaymentDate", firstRepaymentDate.toString());
         summary.put("finalDueDate", finalDueDate.toString());

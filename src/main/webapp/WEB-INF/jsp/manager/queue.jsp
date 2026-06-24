@@ -65,26 +65,8 @@
         <div>
             <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
-            <c:if test="${currentFilterKey eq 'DISBURSED'}">
-                <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.queue.activeLoansHelp" text="Displayed loans are the current active loans." /></p>
-            </c:if>
-        </div>
-        <div class="erp-filter-row">
-            <a href="/manager/loan-applications?filter=READY_FOR_MANAGER"
-               class="erp-filter-tab ${currentFilterKey eq 'READY_FOR_MANAGER' ? 'is-active' : ''}">
-                <spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" />
-            </a>
-            <a href="/manager/loan-applications?filter=AWAITING_BOARD"
-               class="erp-filter-tab ${currentFilterKey eq 'AWAITING_BOARD' ? 'is-active' : ''}">
-                <spring:message code="loan.status.AWAITING_BOARD" text="On Review By Board" />
-            </a>
-            <a href="/manager/loan-applications?filter=DISBURSED"
-               class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                <spring:message code="manager.queue.disbursedLoans" text="Disbursed Loans" />
-            </a>
         </div>
         <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form">
-            <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
                 <input type="search"
@@ -108,9 +90,6 @@
     <thead>
     <tr>
         <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
-        <c:if test="${currentFilterKey eq 'DISBURSED'}">
-            <th><spring:message code="loan.loanId" text="Loan ID" /></th>
-        </c:if>
         <th><spring:message code="common.applicant" text="Applicant" /></th>
         <th><spring:message code="common.amount" text="Amount" /></th>
         <th><spring:message code="common.status" text="Status" /></th>
@@ -122,9 +101,6 @@
     <c:forEach items="${apps}" var="app">
         <tr>
             <td class="px-3 py-2">${app.applicationNumber}</td>
-            <c:if test="${currentFilterKey eq 'DISBURSED'}">
-                <td class="px-3 py-2">${empty app.loanId ? '-' : app.loanId}</td>
-            </c:if>
             <td class="px-3 py-2">
                 <c:choose>
                     <c:when test="${not empty applicantNames[app.applicantMemberId]}">${applicantNames[app.applicantMemberId]}</c:when>
@@ -148,7 +124,7 @@
     </c:forEach>
     <c:if test="${empty apps}">
         <tr>
-            <td colspan="${currentFilterKey eq 'DISBURSED' ? 7 : 6}" class="px-3 py-8 text-center text-slate-500">
+            <td colspan="6" class="px-3 py-8 text-center text-slate-500">
                 <c:choose>
                     <c:when test="${not empty queueSearchValue}">
                         No loan applications found for <span class="font-semibold text-slate-700">${fn:toLowerCase(queueSearchLabel)}</span>

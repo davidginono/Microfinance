@@ -41,34 +41,7 @@ public class LoanAttachmentService {
         String normalizedCategory = normalizeCategory(attachmentCategory);
         try {
             for (MultipartFile file : files) {
-                if (file == null || file.isEmpty()) {
-                    continue;
-                }
-                String attachmentId = UUID.randomUUID().toString();
-                String cleanedName = StringUtils.cleanPath(file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename());
-                String extension = StringUtils.getFilenameExtension(cleanedName);
-                String storedName = extension == null || extension.isBlank()
-                    ? attachmentId
-                    : attachmentId + "." + extension;
-                storedUploadStorageService.store(
-                    UUID.fromString(attachmentId),
-                    StoredUploadStorageService.OWNER_LOAN_APPLICATION,
-                    loanId.toString(),
-                    normalizedCategory,
-                    cleanedName,
-                    file.getContentType(),
-                    file.getBytes()
-                );
-
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("id", attachmentId);
-                item.put("originalName", cleanedName);
-                item.put("storedName", storedName);
-                item.put("contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType());
-                item.put("size", file.getSize());
-                item.put("uploadedAt", OffsetDateTime.now().toString());
-                item.put("attachmentCategory", normalizedCategory);
-                attachments.add(item);
+                storeOne(loanId, attachments, file, normalizedCategory, null, null);
             }
         } catch (IOException e) {
             adminAlertService.alertAllAdmins(
@@ -80,6 +53,81 @@ public class LoanAttachmentService {
             throw new IllegalArgumentException("Failed to store attachments", e);
         }
         return writeJson(attachments);
+    }
+
+    public String storeRequired(UUID loanId, List<RequiredAttachmentUpload> uploads, String existingJson) {
+        List<Map<String, Object>> attachments = parse(existingJson);
+        if (uploads == null || uploads.isEmpty()) {
+            return writeJson(attachments);
+        }
+        try {
+            for (RequiredAttachmentUpload upload : uploads) {
+                if (upload == null || upload.files() == null) {
+                    continue;
+                }
+                for (MultipartFile file : upload.files()) {
+                    storeOne(
+                        loanId,
+                        attachments,
+                        file,
+                        CATEGORY_APPLICATION_ATTACHMENT,
+                        upload.requiredAttachmentId(),
+                        upload.requiredAttachmentName()
+                    );
+                }
+            }
+        } catch (IOException e) {
+            adminAlertService.alertAllAdmins(
+                "Attachment Storage",
+                "Attachment upload failed",
+                "One or more required loan attachments could not be stored.",
+                Map.of("loanId", loanId.toString(), "error", e.getMessage() == null ? "Attachment storage error" : e.getMessage())
+            );
+            throw new IllegalArgumentException("Failed to store attachments", e);
+        }
+        return writeJson(attachments);
+    }
+
+    private void storeOne(UUID loanId,
+                          List<Map<String, Object>> attachments,
+                          MultipartFile file,
+                          String attachmentCategory,
+                          UUID requiredAttachmentId,
+                          String requiredAttachmentName) throws IOException {
+        if (file == null || file.isEmpty()) {
+            return;
+        }
+        String attachmentId = UUID.randomUUID().toString();
+        String cleanedName = StringUtils.cleanPath(file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename());
+        String extension = StringUtils.getFilenameExtension(cleanedName);
+        String storedName = extension == null || extension.isBlank()
+            ? attachmentId
+            : attachmentId + "." + extension;
+        storedUploadStorageService.store(
+            UUID.fromString(attachmentId),
+            StoredUploadStorageService.OWNER_LOAN_APPLICATION,
+            loanId.toString(),
+            attachmentCategory,
+            cleanedName,
+            file.getContentType(),
+            file.getBytes()
+        );
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", attachmentId);
+        item.put("originalName", cleanedName);
+        item.put("storedName", storedName);
+        item.put("contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType());
+        item.put("size", file.getSize());
+        item.put("uploadedAt", OffsetDateTime.now().toString());
+        item.put("attachmentCategory", attachmentCategory);
+        if (requiredAttachmentId != null) {
+            item.put("requiredAttachmentId", requiredAttachmentId.toString());
+        }
+        if (requiredAttachmentName != null && !requiredAttachmentName.isBlank()) {
+            item.put("requiredAttachmentName", requiredAttachmentName.trim());
+        }
+        attachments.add(item);
     }
 
     private String normalizeCategory(String attachmentCategory) {
@@ -141,5 +189,10 @@ public class LoanAttachmentService {
             this.originalName = originalName;
             this.contentType = contentType;
         }
+    }
+
+    public record RequiredAttachmentUpload(UUID requiredAttachmentId,
+                                           String requiredAttachmentName,
+                                           List<MultipartFile> files) {
     }
 }

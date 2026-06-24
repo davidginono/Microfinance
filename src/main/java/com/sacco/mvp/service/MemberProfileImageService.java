@@ -8,12 +8,15 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -24,9 +27,12 @@ public class MemberProfileImageService {
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("png", "jpg", "jpeg");
     private static final long MAX_FILE_SIZE_BYTES = 2L * 1024L * 1024L;
     private static final int TARGET_WIDTH = 600;
-    private static final int TARGET_HEIGHT = 750;
+    private static final int TARGET_HEIGHT = 600;
     private static final int MIN_WIDTH = 240;
-    private static final int MIN_HEIGHT = 300;
+    private static final int MIN_HEIGHT = 240;
+    private static final int MAX_WIDTH = 3000;
+    private static final int MAX_HEIGHT = 3000;
+    private static final long MAX_PIXELS = 9_000_000L;
 
     private final StoredUploadStorageService storedUploadStorageService;
 
@@ -35,7 +41,7 @@ public class MemberProfileImageService {
             throw new IllegalStateException("Member account is required before uploading a profile image.");
         }
         if (imageFile == null || imageFile.isEmpty()) {
-            throw new IllegalStateException("Choose a passport photo to upload.");
+            throw new IllegalStateException("Choose a profile photo to upload.");
         }
 
         resolveAllowedExtension(imageFile);
@@ -43,7 +49,7 @@ public class MemberProfileImageService {
             throw new IllegalStateException("Profile image must be 2 MB or smaller.");
         }
 
-        byte[] normalized = normalizeToPassportJpeg(readBytes(imageFile));
+        byte[] normalized = normalizeToProfileJpeg(readBytes(imageFile));
         storedUploadStorageService.replaceCategory(
             StoredUploadStorageService.OWNER_MEMBER,
             memberId.toString(),
@@ -81,24 +87,29 @@ public class MemberProfileImageService {
         }
     }
 
-    private byte[] normalizeToPassportJpeg(byte[] source) {
+    private byte[] normalizeToProfileJpeg(byte[] source) {
         try {
+            ImageDimensions dimensions = inspectDimensions(source);
+            validateDimensions(dimensions.width(), dimensions.height());
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(source));
             if (image == null) {
                 throw new IllegalStateException("Upload a valid PNG or JPEG profile image.");
             }
-            if (image.getWidth() < MIN_WIDTH || image.getHeight() < MIN_HEIGHT) {
-                throw new IllegalStateException("Profile image must be at least 240x300 pixels.");
-            }
 
-            BufferedImage cropped = cropToAspectRatio(image, TARGET_WIDTH, TARGET_HEIGHT);
             BufferedImage resized = new BufferedImage(TARGET_WIDTH, TARGET_HEIGHT, BufferedImage.TYPE_INT_RGB);
             Graphics2D graphics = resized.createGraphics();
             try {
                 graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
                 graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                graphics.drawImage(cropped, 0, 0, TARGET_WIDTH, TARGET_HEIGHT, null);
+                graphics.setColor(java.awt.Color.WHITE);
+                graphics.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+                double scale = Math.max((double) TARGET_WIDTH / image.getWidth(), (double) TARGET_HEIGHT / image.getHeight());
+                int drawWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
+                int drawHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
+                int x = (TARGET_WIDTH - drawWidth) / 2;
+                int y = (TARGET_HEIGHT - drawHeight) / 2;
+                graphics.drawImage(image, x, y, drawWidth, drawHeight, null);
             } finally {
                 graphics.dispose();
             }
@@ -111,19 +122,35 @@ public class MemberProfileImageService {
         }
     }
 
-    private BufferedImage cropToAspectRatio(BufferedImage image, int targetWidth, int targetHeight) {
-        double targetRatio = (double) targetWidth / (double) targetHeight;
-        int cropWidth = image.getWidth();
-        int cropHeight = image.getHeight();
-        double sourceRatio = (double) cropWidth / (double) cropHeight;
-        if (sourceRatio > targetRatio) {
-            cropWidth = (int) Math.round(cropHeight * targetRatio);
-        } else if (sourceRatio < targetRatio) {
-            cropHeight = (int) Math.round(cropWidth / targetRatio);
+    private ImageDimensions inspectDimensions(byte[] source) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(source))) {
+            if (input == null) {
+                throw new IllegalStateException("Upload a valid PNG or JPEG profile image.");
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new IllegalStateException("Upload a valid PNG or JPEG profile image.");
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
+            } finally {
+                reader.dispose();
+            }
         }
-        int x = Math.max((image.getWidth() - cropWidth) / 2, 0);
-        int y = Math.max((image.getHeight() - cropHeight) / 2, 0);
-        return image.getSubimage(x, y, cropWidth, cropHeight);
+    }
+
+    private void validateDimensions(int width, int height) {
+        if (width < MIN_WIDTH || height < MIN_HEIGHT) {
+            throw new IllegalStateException("Profile image must be at least 240x240 pixels.");
+        }
+        if (width > MAX_WIDTH || height > MAX_HEIGHT || (long) width * (long) height > MAX_PIXELS) {
+            throw new IllegalStateException("Profile image dimensions are too large. Upload an image up to 3000x3000 pixels.");
+        }
+    }
+
+    private record ImageDimensions(int width, int height) {
     }
 
     public record ProfileImageResource(byte[] content, MediaType contentType) {

@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.InterestMethod;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
@@ -17,6 +18,7 @@ import com.sacco.mvp.service.AdminService;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
+import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.SmsUsageManagementService;
@@ -60,6 +62,7 @@ public class AdminController {
     private final DatabaseUtilizationService databaseUtilizationService;
     private final AppUsageAnalyticsService appUsageAnalyticsService;
     private final NotificationInboxService notificationInboxService;
+    private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final SmsUsageManagementService smsUsageManagementService;
     private final StationOtpSettingsService stationOtpSettingsService;
 
@@ -638,7 +641,10 @@ public class AdminController {
                                @RequestParam(required = false) String modal,
                                Model model) {
         String saccoId = adminScopeService.currentSaccoId(principal);
-        model.addAttribute("products", adminService.loanProducts(saccoId));
+        List<LoanProductSetting> products = adminService.loanProducts(saccoId);
+        model.addAttribute("products", products);
+        model.addAttribute("requiredAttachmentsByProductId", requiredAttachmentService.activeByProduct(
+            products.stream().map(LoanProductSetting::getId).toList()));
         model.addAttribute("productVersionsByProductId", adminService.loanProductVersions(saccoId));
         model.addAttribute("loanProductsVersions", adminService.loanProductsVersionHistory(saccoId));
         model.addAttribute("customizedProductExists", adminService.customizedLoanProductExists(saccoId));
@@ -663,8 +669,11 @@ public class AdminController {
         model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
         model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
+        model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
+        model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
+        model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
         model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
         model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
@@ -702,11 +711,14 @@ public class AdminController {
                                     @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                     @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
                                     @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                    @RequestParam(defaultValue = "false") boolean boardReviewRequired,
+                                    @RequestParam(required = false) Integer boardPriority,
+                                    @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
                                     @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
                                     @RequestParam(required = false) Integer committeePriority,
                                     @RequestParam(required = false) Integer committeeMinimumVotes,
                                     @RequestParam(required = false) Integer committeeApprovalThreshold,
-                                    @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
+                                    @RequestParam(name = "creditCommitteeReviewerIds", required = false) java.util.List<UUID> creditCommitteeReviewerIds,
                                     @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                     @RequestParam(required = false) Integer accountantPriority,
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
@@ -736,14 +748,89 @@ public class AdminController {
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
-                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, committeeReviewRequired, committeePriority, committeeMinimumVotes,
-                committeeApprovalThreshold, boardReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
+                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, boardReviewRequired, boardPriority, boardReviewerIds,
+                committeeReviewRequired, committeePriority, committeeMinimumVotes,
+                committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
                 disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
         }
-        return loanSettingsRedirect(resolvedModalKey);
+        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
+    }
+
+    @GetMapping("/settings-controls/loan-products/{id}/edit")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    public String editLoanProduct(@PathVariable UUID id,
+                                  @AuthenticationPrincipal AppUserPrincipal principal,
+                                  Model model) {
+        String saccoId = adminScopeService.currentSaccoId(principal);
+        LoanProductSetting product = adminService.loanProduct(saccoId, id);
+        var settings = adminService.settings(saccoId);
+        model.addAttribute("product", product);
+        model.addAttribute("settings", settings);
+        model.addAttribute("requiredAttachments", requiredAttachmentService.activeForProduct(id));
+        model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
+        model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
+        model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
+        model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
+        model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
+        model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
+        model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
+        model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
+        model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
+        model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
+        model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
+        return "admin/loan-product-edit";
+    }
+
+    @PostMapping("/settings-controls/loan-products/{id}/required-attachments")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String createRequiredAttachment(@PathVariable UUID id,
+                                           @AuthenticationPrincipal AppUserPrincipal principal,
+                                           @RequestParam(required = false) String attachmentName,
+                                           @RequestParam(required = false) BigDecimal maxSizeMb,
+                                           RedirectAttributes ra) {
+        try {
+            String saccoId = adminScopeService.currentSaccoId(principal);
+            adminService.loanProduct(saccoId, id);
+            adminService.updateApplicantAttachmentRequired(saccoId, principal.getMemberId(), id, true);
+            requiredAttachmentService.createForProduct(id, attachmentName, maxSizeMb);
+            ra.addFlashAttribute("message", "Required attachment created.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
+    }
+
+    @PostMapping("/settings-controls/loan-products/{id}/required-attachments/{requirementId}/delete")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteRequiredAttachment(@PathVariable UUID id,
+                                           @PathVariable UUID requirementId,
+                                           @AuthenticationPrincipal AppUserPrincipal principal,
+                                           RedirectAttributes ra) {
+        try {
+            adminService.loanProduct(adminScopeService.currentSaccoId(principal), id);
+            requiredAttachmentService.deleteForProduct(id, requirementId);
+            ra.addFlashAttribute("message", "Required attachment deleted.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
+    }
+
+    @PostMapping("/settings-controls/loan-products/{id}/delete")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteLoanProduct(@PathVariable UUID id,
+                                    @AuthenticationPrincipal AppUserPrincipal principal,
+                                    RedirectAttributes ra) {
+        try {
+            adminService.archiveLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id);
+            ra.addFlashAttribute("message", "Loan product deleted from active settings. Historical loans remain preserved.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/settings-controls?section=loan";
     }
 
     @PostMapping({"/loan-products/customized-product", "/settings-controls/customized-product"})
@@ -769,16 +856,21 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                               @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
                                               @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                              @RequestParam(defaultValue = "false") boolean boardReviewRequired,
+                                              @RequestParam(required = false) Integer boardPriority,
+                                              @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
                                               @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
                                               @RequestParam(required = false) Integer committeePriority,
                                               @RequestParam(required = false) Integer committeeMinimumVotes,
                                               @RequestParam(required = false) Integer committeeApprovalThreshold,
-                                              @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
+                                              @RequestParam(name = "creditCommitteeReviewerIds", required = false) java.util.List<UUID> creditCommitteeReviewerIds,
                                               @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
                                               @RequestParam(required = false) Integer accountantPriority,
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                               @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
                                               @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
+                                              @RequestParam(name = "requiredAttachmentName", required = false) List<String> requiredAttachmentNames,
+                                              @RequestParam(name = "requiredAttachmentMaxSizeMb", required = false) List<BigDecimal> requiredAttachmentMaxSizeMb,
                                               @RequestParam(defaultValue = "1") Integer managerPriority,
                                               @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
                                               @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
@@ -795,7 +887,7 @@ public class AdminController {
                 managerPriority,
                 loanOfficerPriority
             );
-            adminService.createCustomizedLoanProduct(
+            LoanProductSetting product = adminService.createCustomizedLoanProduct(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
                 productCode,
@@ -820,11 +912,14 @@ public class AdminController {
                 resolvedWorkflowStartStage,
                 managerPriority,
                 loanOfficerPriority,
+                boardReviewRequired,
+                boardPriority,
+                boardReviewerIds,
                 committeeReviewRequired,
                 committeePriority,
                 committeeMinimumVotes,
                 committeeApprovalThreshold,
-                boardReviewerIds,
+                creditCommitteeReviewerIds,
                 accountantReviewRequired,
                 accountantPriority,
                 disbursementOfficerRequired,
@@ -834,6 +929,7 @@ public class AdminController {
                 guarantorMinimumSavings,
                 productStatus
             );
+            requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Customized loan product added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -968,11 +1064,11 @@ public class AdminController {
                                                                        Integer loanOfficerPriority) {
         int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
         int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
-        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 4) {
-            throw new IllegalStateException("Manager priority must be between 1 and 4.");
+        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 6) {
+            throw new IllegalStateException("Manager priority must be between 1 and 6.");
         }
-        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 4) {
-            throw new IllegalStateException("Loan Officer priority must be between 1 and 4.");
+        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 6) {
+            throw new IllegalStateException("Loan Officer priority must be between 1 and 6.");
         }
         if (!managerReviewRequired && loanOfficerReviewRequired) {
             return ApprovalWorkflowStage.LOAN_OFFICER;
@@ -1053,10 +1149,15 @@ public class AdminController {
             case "Maximum amount must be greater than zero.",
                  "Maximum amount cannot be lower than the minimum amount." ->
                 fieldErrors.put("maximumAmount", message);
-            case "Savings ratio must be greater than zero." ->
-                fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple must be greater than zero.");
+            case "Savings ratio cannot be negative." ->
+                fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple cannot be negative.");
             case "Savings ratio cannot exceed ten times savings." ->
                 fieldErrors.put("maxLoanSavingsPercent", "Loan savings multiple cannot be more than 10x savings.");
+            case "Attachment maximum size must be greater than zero.",
+                 "Attachment maximum size cannot be more than 100 MB." ->
+                fieldErrors.put("requiredAttachmentMaxSizeMb", message);
+            case "Attachment name must be 120 characters or fewer." ->
+                fieldErrors.put("requiredAttachmentName", message);
             case "Guarantors required cannot be negative." ->
                 fieldErrors.put("guarantorsRequired", "Guarantors required cannot be negative.");
             case "Guarantors required must be between 0 and 15." ->
@@ -1079,21 +1180,38 @@ public class AdminController {
             case "Loan Officer must be enabled before it can be selected as the start stage.",
                  "No active loan officers are configured for this SACCO yet." ->
                 fieldErrors.put("loanOfficerReviewRequired", "Assign at least one active Loan Officer before using this stage.");
-            case "Manager priority must be between 1 and 4." ->
-                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 4.");
-            case "Loan Officer priority must be between 1 and 4." ->
-                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 4.");
-            case "Review priority must be between 1 and 4." -> {
-                fieldErrors.put("managerPriority", "Review priority must be between 1 and 4.");
-                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 4.");
+            case "Manager priority must be between 1 and 6." ->
+                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 6.");
+            case "Loan Officer priority must be between 1 and 6." ->
+                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 6.");
+            case "Review priority must be between 1 and 6." -> {
+                fieldErrors.put("managerPriority", "Review priority must be between 1 and 6.");
+                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 6.");
             }
             case "Manager and Loan Officer cannot share the same priority slot." -> {
                 fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer.");
                 fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer.");
             }
-            case "Stage priority must be between 1 and 4." -> {
-                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 4.");
-                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 4.");
+            case "Stage priority must be between 1 and 6." -> {
+                fieldErrors.put("boardPriority", "Stage priority must be between 1 and 6.");
+                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 6.");
+                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 6.");
+            }
+            case "Board Member and Credit Committee cannot share the same priority slot." -> {
+                fieldErrors.put("boardPriority", message);
+                fieldErrors.put("committeePriority", message);
+            }
+            case "Board Member and Accountant cannot share the same priority slot." -> {
+                fieldErrors.put("boardPriority", message);
+                fieldErrors.put("accountantPriority", message);
+            }
+            case "Manager and Board Member cannot share the same priority slot." -> {
+                fieldErrors.put("managerPriority", message);
+                fieldErrors.put("boardPriority", message);
+            }
+            case "Loan Officer and Board Member cannot share the same priority slot." -> {
+                fieldErrors.put("loanOfficerPriority", message);
+                fieldErrors.put("boardPriority", message);
             }
             case "Committee and Accountant cannot share the same priority slot." -> {
                 fieldErrors.put("committeePriority", "Committee and Accountant cannot share the same priority slot.");
@@ -1120,22 +1238,31 @@ public class AdminController {
             case "Maximum repayment period must be at least 1 month.",
                  "Maximum repayment period cannot be lower than the minimum repayment period." ->
                 fieldErrors.put("maxRepaymentMonths", message);
-            case "Assign at least one board reviewer before using committee review.",
-                 "Selected board reviewers must be active board members in this SACCO.",
-                 "Board reviewers assigned must be between 1 and 15.",
-                 "Committee minimum votes must be at least 1 when committee review is required.",
+            case "No active board members are configured for this SACCO yet.",
+                 "Assign at least one active board member before using this stage." ->
+                fieldErrors.put("boardReviewerIds", "Assign at least one active board member for this product.");
+            case "No active credit committee members are configured for this SACCO yet.",
+                 "Assign at least one active credit committee member before using this stage." ->
+                fieldErrors.put("creditCommitteeReviewerIds", "Assign at least one active credit committee member for this product.");
+            case "Selected reviewer is not active in the required role for this SACCO." -> {
+                fieldErrors.put("boardReviewerIds", "Only active reviewers in the selected role can be assigned.");
+                fieldErrors.put("creditCommitteeReviewerIds", "Only active reviewers in the selected role can be assigned.");
+            }
+            case "Reviewers assigned must be between 1 and 15." -> {
+                fieldErrors.put("boardReviewerIds", "Reviewers assigned must be between 1 and 15.");
+                fieldErrors.put("creditCommitteeReviewerIds", "Reviewers assigned must be between 1 and 15.");
+            }
+            case "Committee minimum votes must be at least 1 when committee review is required.",
                  "Committee minimum votes must be between 1 and 15.",
                  "Committee minimum votes cannot exceed the number of active board members.",
                  "Committee approval threshold must be at least 1 when committee review is required.",
                  "Committee approval threshold must be between 1 and 15.",
                  "Committee approval threshold cannot exceed the number of active board members.",
                  "Committee approval threshold cannot be greater than committee minimum votes." ->
-                fieldErrors.put("boardReviewerIds", "Assign at least one active board reviewer for this product.");
-            case "No active board members are configured for this SACCO yet." ->
-                fieldErrors.put("boardReviewerIds", "Add an active board member before using this stage.");
-            case "Add at least one active Disbursement Officer before requiring that workflow role." ->
-                fieldErrors.put("disbursementOfficerRequired", "Assign at least one active Disbursement Officer before requiring this role.");
-            case "Grant disbursement queue and release claims to at least one active staff user before removing the Disbursement Officer requirement." ->
+                fieldErrors.put("creditCommitteeReviewerIds", "Assign at least one active credit committee member for this product.");
+            case "Add at least one active Disbursement/Teller Officer before requiring that workflow role." ->
+                fieldErrors.put("disbursementOfficerRequired", "Assign at least one active Disbursement/Teller Officer before requiring this role.");
+            case "Grant disbursement queue and release claims to at least one active staff user before removing the Disbursement/Teller Officer requirement." ->
                 fieldErrors.put("disbursementOfficerRequired", "Grant both disbursement claims to at least one active staff user before removing this role requirement.");
             default -> {
             }

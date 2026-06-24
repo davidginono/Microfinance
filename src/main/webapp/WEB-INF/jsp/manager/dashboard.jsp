@@ -242,29 +242,22 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 
 <spring:message code="manager.dashboard.breadcrumb" text="Manager Panel / Dashboard" var="dashboardDefaultBreadcrumb" />
 <spring:message code="manager.dashboard.title" text="Manager Dashboard" var="dashboardDefaultTitle" />
-<spring:message code="manager.dashboard.subtitle" text="Track disbursed loans quickly and keep an eye on how applications are distributed across workflow statuses." var="dashboardDefaultSubtitle" />
 <spring:message code="loan.status.READY_FOR_MANAGER" text="On Review By Manager" var="dashboardDefaultQueueLabel" />
-<spring:message code="manager.dashboard.queueMeta" text="Applications currently waiting for your action." var="dashboardDefaultQueueMeta" />
 <spring:message code="manager.dashboard.queueWaiting" text="Queue waiting" var="dashboardDefaultQueueFooter" />
 <spring:message code="manager.dashboard.statusPieTitle" text="Application Status Pie Chart" var="dashboardDefaultChartTitle" />
-<spring:message code="manager.dashboard.statusPieHelp" text="A clearer view of how applications are spread across each workflow stage." var="dashboardDefaultChartHelp" />
 <c:set var="dashboardBreadcrumbValue" value="${empty dashboardBreadcrumb ? dashboardDefaultBreadcrumb : dashboardBreadcrumb}" />
 <c:set var="dashboardPageTitleValue" value="${empty dashboardPageTitle ? dashboardDefaultTitle : dashboardPageTitle}" />
-<c:set var="dashboardSubtitleValue" value="${empty dashboardSubtitle ? dashboardDefaultSubtitle : dashboardSubtitle}" />
 <c:set var="dashboardQueueLabelValue" value="${empty dashboardQueueLabel ? dashboardDefaultQueueLabel : dashboardQueueLabel}" />
 <c:set var="dashboardQueueValueValue" value="${empty dashboardQueueValue ? dashboardOnReviewByManagerLoans : dashboardQueueValue}" />
-<c:set var="dashboardQueueMetaValue" value="${empty dashboardQueueMeta ? dashboardDefaultQueueMeta : dashboardQueueMeta}" />
 <c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? dashboardDefaultQueueFooter : dashboardQueueFooterLabel}" />
 <c:set var="dashboardQueueIconValue" value="${empty dashboardQueueIcon ? 'M' : dashboardQueueIcon}" />
 <c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
 <c:set var="dashboardChartTitleValue" value="${empty dashboardChartTitle ? dashboardDefaultChartTitle : dashboardChartTitle}" />
-<c:set var="dashboardChartHelpValue" value="${empty dashboardChartHelp ? dashboardDefaultChartHelp : dashboardChartHelp}" />
 <fmt:formatNumber value="${dashboardDisbursementYear}" groupingUsed="false" var="dashboardDisbursementYearLabel" />
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
     <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
-    <p class="erp-page-subtitle">${dashboardSubtitleValue}</p>
 </div>
 
 <section class="erp-stat-grid">
@@ -273,7 +266,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label"><spring:message code="manager.dashboard.totalDisbursed" text="Total Loans Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardTotalDisbursedLoans}</p>
-                <p class="erp-stat-meta"><spring:message code="manager.dashboard.disbursedIn" arguments="${dashboardDisbursementYearLabel}" text="Disbursed in this year." /></p>
             </div>
             <span class="erp-stat-icon">D</span>
         </div>
@@ -284,7 +276,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label"><spring:message code="manager.dashboard.activeDisbursed" text="Active Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardActiveDisbursedLoans}</p>
-                <p class="erp-stat-meta"><spring:message code="manager.dashboard.activeDisbursedMeta" text="Still waiting for repayment confirmation." /></p>
             </div>
             <span class="erp-stat-icon">A</span>
         </div>
@@ -295,7 +286,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label">${dashboardQueueLabelValue}</p>
                 <p class="erp-stat-value">${dashboardQueueValueValue}</p>
-                <p class="erp-stat-meta">${dashboardQueueMetaValue}</p>
             </div>
             <span class="erp-stat-icon">${dashboardQueueIconValue}</span>
         </div>
@@ -306,7 +296,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
             <div>
                 <p class="erp-stat-label"><spring:message code="archive.defaultedLoans" text="Defaulted Loans" /></p>
                 <p class="erp-stat-value">${dashboardDefaultedLoans}</p>
-                <p class="erp-stat-meta"><spring:message code="manager.dashboard.defaultedIn" arguments="${dashboardDisbursementYearLabel}" text="Defaulted in this year." /></p>
             </div>
             <span class="erp-stat-icon">F</span>
         </div>
@@ -318,7 +307,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-panel-header">
         <div>
             <p class="erp-panel-title">${dashboardChartTitleValue}</p>
-            <p class="mt-1 text-sm text-slate-500">${dashboardChartHelpValue}</p>
         </div>
     </div>
     <div class="erp-panel-body">
@@ -414,7 +402,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-panel-header">
         <div>
             <p class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" text="Recent Disbursements" /></p>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="manager.dashboard.recentDisbursementsHelp" arguments="${dashboardRecentDisbursementDays}" text="Loans disbursed within the recent period." /></p>
         </div>
     </div>
     <div class="erp-panel-body">

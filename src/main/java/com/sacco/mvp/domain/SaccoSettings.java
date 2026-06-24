@@ -100,7 +100,7 @@ public class SaccoSettings {
             flow.add(ApprovalWorkflowStage.LOAN_OFFICER);
         }
         if (isBoardReviewRequired()) {
-            flow.add(ApprovalWorkflowStage.BOARD);
+            flow.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
         }
         flow.add(ApprovalWorkflowStage.ACCOUNTANT);
         flow.add(ApprovalWorkflowStage.DISBURSEMENT_OFFICER);

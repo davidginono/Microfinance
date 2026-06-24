@@ -9,7 +9,9 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
+import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -50,9 +52,10 @@ import java.util.List;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/board")
-@PreAuthorize("hasRole('BOARD') and @userClaims.has(principal, 'REVIEW_BOARD_QUEUE')")
+@PreAuthorize("@authz.isBoardReviewer(principal)")
 public class BoardController {
     private final BoardService boardService;
+    private final BoardReviewRepository boardReviewRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
@@ -85,11 +88,9 @@ public class BoardController {
 
         model.addAttribute("dashboardBreadcrumb", "Board Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Board Dashboard");
-        model.addAttribute("dashboardSubtitle", "Track board review decisions and keep an eye on loans waiting for board action.");
         model.addAttribute("dashboardQueueLabel", "On Review By Board");
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD));
-        model.addAttribute("dashboardQueueMeta", "Applications currently waiting for your action.");
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
         model.addAttribute("dashboardQueueIcon", "B");
         model.addAttribute("dashboardDetailBasePath", "/board/loan-applications");
@@ -99,7 +100,6 @@ public class BoardController {
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
         model.addAttribute("dashboardChartTitle", "Board Decision Chart");
-        model.addAttribute("dashboardChartHelp", "A board-focused view of applications waiting for board review, approved by board, and rejected by board.");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildBoardDashboardChartRows(
                 dashboard.statusBreakdown(),
@@ -127,8 +127,8 @@ public class BoardController {
     public String queue(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam(required = false) String searchId,
                         Model model) {
-        applyBoardUi(model);
-        List<BoardReview> myReviews = boardService.assignedAll(principal.getMemberId()).stream()
+        applyBoardUi(model, principal);
+        List<BoardReview> myReviews = assignedReviews(principal).stream()
             .filter(review -> review.getDecision() == BoardDecision.PENDING)
             .toList();
         return populateListing(
@@ -136,9 +136,9 @@ public class BoardController {
             model,
             myReviews,
             true,
-            "Board Panel / Queue",
-            "Board Queue",
-            "No applications are currently waiting in your board queue.",
+            reviewPanelLabel(principal) + " Panel / Queue",
+            reviewPanelLabel(principal) + " Queue",
+            "No applications are currently waiting in your review queue.",
             "/board/queue",
             searchId
         );
@@ -147,22 +147,48 @@ public class BoardController {
     @GetMapping("/archive")
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(required = false) String filter,
+                          @RequestParam(defaultValue = "0") int page,
                           Model model) {
-        applyBoardUi(model);
-        List<BoardReview> myReviews = boardService.assignedAll(principal.getMemberId()).stream()
+        applyBoardUi(model, principal);
+        ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        String normalizedSearch = normalizeBoardSearch(searchId);
+        List<BoardReview> archiveReviews = assignedReviews(principal).stream()
             .filter(review -> review.getDecision() != BoardDecision.PENDING)
+            .filter(review -> currentFilter.decision() == null || review.getDecision() == currentFilter.decision())
+            .filter(review -> currentFilter.statuses().isEmpty()
+                || loanApplicationRepository.findById(review.getLoanApplicationId())
+                    .map(app -> currentFilter.statuses().contains(app.getStatus()))
+                    .orElse(false))
+            .filter(review -> loanApplicationRepository.findById(review.getLoanApplicationId())
+                .map(app -> matchesBoardSearch(app, normalizedSearch))
+                .orElse(false))
             .toList();
-        return populateListing(
+        org.springframework.data.domain.PageRequest archivePageRequest =
+            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50);
+        int fromIndex = Math.min((int) archivePageRequest.getOffset(), archiveReviews.size());
+        int toIndex = Math.min(fromIndex + archivePageRequest.getPageSize(), archiveReviews.size());
+        org.springframework.data.domain.Page<BoardReview> archivePage = new org.springframework.data.domain.PageImpl<>(
+            archiveReviews.subList(fromIndex, toIndex),
+            archivePageRequest,
+            archiveReviews.size()
+        );
+        String view = populateListing(
             principal,
             model,
-            myReviews,
+            archivePage.getContent(),
             false,
-            "Board Panel / Archive",
-            "Board Archive",
+            reviewPanelLabel(principal) + " Panel / Archive",
+            reviewPanelLabel(principal) + " Archive",
             "No reviewed applications are available in your archive yet.",
             "/board/archive",
             searchId
         );
+        model.addAttribute("archiveView", true);
+        model.addAttribute("archivePage", archivePage);
+        model.addAttribute("currentFilterKey", currentFilter.key());
+        model.addAttribute("currentFilterLabel", currentFilter.label());
+        return view;
     }
 
     @GetMapping("/reports")
@@ -177,9 +203,10 @@ public class BoardController {
             model.addAttribute("error", "From date cannot be after to date.");
             effectiveFrom = effectiveTo.withDayOfMonth(1);
         }
+        ApprovalWorkflowStage reportStage = primaryReviewStage(principal);
         LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
-            ApprovalWorkflowStage.BOARD, effectiveFrom, effectiveTo, decisionFilter);
+            reportStage, effectiveFrom, effectiveTo, decisionFilter);
         Map<UUID, String> applicantNames = report.applicantMap().values().stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
 
@@ -208,17 +235,17 @@ public class BoardController {
     }
 
     @GetMapping("/loan-applications/{id}")
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     public String detail(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
-        applyBoardUi(model);
+        applyBoardUi(model, principal);
         LoanApplication app = loanApplicationRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberRepository.findById(app.getApplicantMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
-        BoardReview myReview = boardService.getMyReview(id, principal.getMemberId());
-        List<BoardReview> boardReviews = boardService.reviewsForLoan(id);
+        BoardReview myReview = resolveMyReview(id, principal);
+        List<BoardReview> boardReviews = boardService.reviewsForLoan(id, myReview.getReviewStage());
         List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
         List<Member> guarantorMembers = memberRepository.findAllById(
             guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
@@ -313,11 +340,11 @@ public class BoardController {
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
     @ResponseBody
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#loanId, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#loanId, principal)")
     public ResponseEntity<Map<String, Object>> guarantorFinancialStatus(@PathVariable UUID loanId,
                                                                         @PathVariable UUID guarantorId,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
-        boardService.getMyReview(loanId, principal.getMemberId());
+        resolveMyReview(loanId, principal);
         boolean guarantorAssigned = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
             .anyMatch(request -> guarantorId.equals(request.getGuarantorMemberId()));
         if (!guarantorAssigned) {
@@ -336,10 +363,10 @@ public class BoardController {
 
     @GetMapping("/loan-applications/{id}/applicant-financial-status")
     @ResponseBody
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
-        boardService.getMyReview(id, principal.getMemberId());
+        resolveMyReview(id, principal);
         LoanApplication app = loanApplicationRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
@@ -348,10 +375,10 @@ public class BoardController {
 
     @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
     @ResponseBody
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
                                                                              @AuthenticationPrincipal AppUserPrincipal principal) {
-        boardService.getMyReview(id, principal.getMemberId());
+        resolveMyReview(id, principal);
         LoanApplication app = loanApplicationRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
@@ -369,7 +396,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestBoardSignatureOtp(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -379,7 +406,7 @@ public class BoardController {
             if (app.getStatus() != com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD) {
                 throw new IllegalStateException("This application is no longer waiting for board approval.");
             }
-            BoardReview myReview = boardService.getMyReview(id, principal.getMemberId());
+            BoardReview myReview = resolveMyReview(id, principal);
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your board decision.");
             }
@@ -404,7 +431,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-signature-otp")
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyBoardSignatureOtp(@PathVariable UUID id,
                                                                        @AuthenticationPrincipal AppUserPrincipal principal,
@@ -415,7 +442,7 @@ public class BoardController {
             if (app.getStatus() != com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD) {
                 throw new IllegalStateException("This application is no longer waiting for board approval.");
             }
-            BoardReview myReview = boardService.getMyReview(id, principal.getMemberId());
+            BoardReview myReview = resolveMyReview(id, principal);
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your board decision.");
             }
@@ -434,7 +461,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam BoardDecision decision,
@@ -443,6 +470,7 @@ public class BoardController {
                          RedirectAttributes ra) {
         try {
             Member boardMember = requireMemberWithEmail(principal.getMemberId());
+            BoardReview myReview = resolveMyReview(id, principal);
             UUID otpTokenId = emailOtpService.validateOtp(
                 boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
             if (decision == BoardDecision.APPROVED) {
@@ -450,14 +478,14 @@ public class BoardController {
                 boardService.decide(
                     id,
                     principal.getMemberId(),
-                    com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD,
+                    myReview.getReviewStage(),
                     decision,
                     comment,
                     boardMember.getSignatureText(),
                     OffsetDateTime.now()
                 );
             } else {
-                boardService.decide(id, principal.getMemberId(), decision, comment);
+                boardService.decide(id, principal.getMemberId(), myReview.getReviewStage(), decision, comment, null, null);
             }
             emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", "Board decision submitted");
@@ -468,7 +496,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/undo")
-    @PreAuthorize("hasRole('BOARD') and @authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
     public String undo(@PathVariable UUID id,
                        @AuthenticationPrincipal AppUserPrincipal principal,
                        RedirectAttributes ra) {
@@ -482,13 +510,12 @@ public class BoardController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('BOARD')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        applyBoardUi(model);
-        model.addAttribute("notificationBreadcrumb", "Board Panel / Notifications");
-        model.addAttribute("notificationSubtitle", "Workflow updates and alerts for the board queue in one place.");
+        applyBoardUi(model, principal);
+        model.addAttribute("notificationBreadcrumb", reviewPanelLabel(principal) + " Panel / Notifications");
+        model.addAttribute("notificationSubtitle", "Workflow updates and alerts for your review queue in one place.");
         model.addAttribute("notifications", notificationInboxService.allViews(
             principal.getMemberId(), principal.getGrantedPositions()));
         model.addAttribute("highlightNotificationId", highlight);
@@ -496,7 +523,6 @@ public class BoardController {
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("hasRole('BOARD')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
@@ -511,7 +537,6 @@ public class BoardController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("hasRole('BOARD')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -523,22 +548,100 @@ public class BoardController {
         return "redirect:/board/notifications";
     }
 
-    private void applyBoardUi(Model model) {
+    private void applyBoardUi(Model model, AppUserPrincipal principal) {
         model.addAttribute("reviewBasePath", "/board");
-        model.addAttribute("reviewRoleLabel", message("review.board.role"));
-        model.addAttribute("reviewRoleLabelLower", message("review.board.roleLower"));
-        model.addAttribute("reviewPanelBreadcrumb", message("review.board.breadcrumb"));
-        model.addAttribute("reviewPanelTitle", message("review.board.title"));
-        model.addAttribute("reviewPanelSubtitle", message("review.board.subtitle"));
-        model.addAttribute("reviewDecisionLabel", message("review.board.decision"));
-        model.addAttribute("reviewAssessorTitle", message("review.board.assessors"));
-        model.addAttribute("reviewAssessorDescription", message("review.board.assessorsHelp"));
+        String label = reviewPanelLabel(principal);
+        model.addAttribute("reviewRoleLabel", label);
+        model.addAttribute("reviewRoleLabelLower", label.toLowerCase(java.util.Locale.ENGLISH));
+        model.addAttribute("reviewPanelBreadcrumb", label + " Panel / Review Detail");
+        model.addAttribute("reviewPanelTitle", label + " Review");
+        model.addAttribute("reviewPanelSubtitle", "Inspect applicant details and submit your assigned decision.");
+        model.addAttribute("reviewDecisionLabel", label + " Decision");
+        model.addAttribute("reviewAssessorTitle", label + " Assessors");
+        model.addAttribute("reviewAssessorDescription", "Assigned reviewers and decisions for this stage.");
         model.addAttribute("reviewApprovalOtpEnabled", true);
         model.addAttribute("reviewAwaitingStatus", "AWAITING_BOARD");
     }
 
+    private List<ApprovalWorkflowStage> reviewerStages(AppUserPrincipal principal) {
+        List<ApprovalWorkflowStage> stages = new java.util.ArrayList<>();
+        if (principal != null
+            && principal.hasRole(Position.BOARD)
+            && principal.getClaims().contains("REVIEW_BOARD_QUEUE")) {
+            stages.add(ApprovalWorkflowStage.BOARD);
+        }
+        if (principal != null
+            && principal.hasRole(Position.CREDIT_COMMITTEE)
+            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")) {
+            stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
+        }
+        return stages;
+    }
+
+    private List<BoardReview> assignedReviews(AppUserPrincipal principal) {
+        return reviewerStages(principal).stream()
+            .flatMap(stage -> boardService.assignedAll(principal.getMemberId(), stage).stream())
+            .sorted(java.util.Comparator.comparing(
+                BoardReview::getCreatedAt,
+                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+            ))
+            .toList();
+    }
+
+    private ApprovalWorkflowStage primaryReviewStage(AppUserPrincipal principal) {
+        return reviewerStages(principal).stream()
+            .findFirst()
+            .orElse(ApprovalWorkflowStage.BOARD);
+    }
+
+    private BoardReview resolveMyReview(UUID loanId, AppUserPrincipal principal) {
+        List<BoardReview> reviews = reviewerStages(principal).stream()
+            .map(stage -> boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
+                loanId, principal.getMemberId(), stage))
+            .flatMap(java.util.Optional::stream)
+            .toList();
+        return reviews.stream()
+            .filter(review -> review.getDecision() == BoardDecision.PENDING)
+            .findFirst()
+            .or(() -> reviews.stream().findFirst())
+            .orElseThrow(() -> new IllegalArgumentException("Review assignment not found"));
+    }
+
+    private String reviewPanelLabel(AppUserPrincipal principal) {
+        boolean board = principal != null
+            && principal.hasRole(Position.BOARD)
+            && principal.getClaims().contains("REVIEW_BOARD_QUEUE");
+        boolean credit = principal != null
+            && principal.hasRole(Position.CREDIT_COMMITTEE)
+            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE");
+        if (board && credit) {
+            return "Board / Credit Committee";
+        }
+        if (credit) {
+            return "Credit Committee";
+        }
+        return "Board Member";
+    }
+
     private String message(String code) {
         return messageSource.getMessage(code, null, code, LocaleContextHolder.getLocale());
+    }
+
+    private ArchiveFilter resolveArchiveFilter(String filter) {
+        String key = filter == null || filter.isBlank() ? "ALL" : filter.trim().toUpperCase(java.util.Locale.ENGLISH);
+        return switch (key) {
+            case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
+            case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
+            case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
+                List.of(com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID));
+            default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
+        };
+    }
+
+    private record ArchiveFilter(String key,
+                                 String label,
+                                 BoardDecision decision,
+                                 List<com.sacco.mvp.domain.LoanStatus> statuses) {
     }
 
     private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
@@ -572,6 +675,7 @@ public class BoardController {
         List<LoanApplication> apps = new java.util.ArrayList<>();
         Map<UUID, BoardDecision> myDecisions = new java.util.LinkedHashMap<>();
         Map<UUID, java.time.OffsetDateTime> myDecisionDates = new java.util.LinkedHashMap<>();
+        Map<UUID, String> myDecisionReasons = new java.util.LinkedHashMap<>();
         String normalizedSearchId = normalizeBoardSearch(searchId);
         for (BoardReview review : reviews) {
             loanApplicationRepository.findById(review.getLoanApplicationId())
@@ -583,6 +687,11 @@ public class BoardController {
                     apps.add(app);
                     myDecisions.put(app.getId(), review.getDecision());
                     myDecisionDates.put(app.getId(), review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt());
+                    myDecisionReasons.put(app.getId(), review.getDecision() == BoardDecision.REJECTED
+                        && review.getComment() != null
+                        && !review.getComment().isBlank()
+                        ? review.getComment()
+                        : "-");
                 });
         }
         Map<UUID, String> applicantNames = memberRepository.findAllById(
@@ -594,6 +703,7 @@ public class BoardController {
         model.addAttribute("applicantNames", applicantNames);
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);
+        model.addAttribute("myDecisionReasons", myDecisionReasons);
         model.addAttribute("boardListBreadcrumb", breadcrumb);
         model.addAttribute("boardListTitle", pageTitle);
         model.addAttribute("boardListEmptyState", emptyState);

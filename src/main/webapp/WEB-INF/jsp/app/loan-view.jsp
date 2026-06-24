@@ -87,6 +87,12 @@
         font-size: 0.94rem;
         color: #64748b;
     }
+
+    .loan-submit-to-review-button {
+        min-height: 3.25rem;
+        padding-top: 0.9rem !important;
+        padding-bottom: 0.9rem !important;
+    }
 </style>
 
 <div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
@@ -204,9 +210,17 @@
 </div>
 
 <div class="mt-4 space-y-4">
-    <c:if test="${not empty managerReason}">
+    <c:if test="${not empty decisionFeedback}">
         <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
-            <strong><spring:message code="review.managerReason" text="Manager Reason:" /></strong> ${managerReason}
+            <p class="font-semibold"><spring:message code="review.decisionFeedback" text="Decision Feedback" /></p>
+            <div class="mt-2 space-y-2">
+                <c:forEach items="${decisionFeedback}" var="feedback">
+                    <div>
+                        <strong><c:out value="${feedback.role}" />:</strong>
+                        <c:out value="${feedback.reason}" />
+                    </div>
+                </c:forEach>
+            </div>
         </div>
     </c:if>
 </div>
@@ -217,11 +231,39 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" />
-    </h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
+<c:choose>
+    <c:when test="${not empty financialFieldSections}">
+        <div class="grid gap-3 md:grid-cols-2">
+            <c:forEach items="${financialFieldSections}" var="section">
+                <div class="erp-table-wrap overflow-hidden">
+                    <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
+                    </div>
+                    <table class="erp-table">
+                        <thead>
+                        <tr>
+                            <th><spring:message code="newloan.table.section" text="Section" /></th>
+                            <th><spring:message code="newloan.table.value" text="Value" /></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <c:forEach items="${section.value}" var="entry">
+                            <tr>
+                                <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
+                                <td class="px-3 py-2">${entry.value}</td>
+                            </tr>
+                        </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
+            </c:forEach>
+        </div>
+    </c:when>
+    <c:otherwise>
+        <div class="erp-table-wrap overflow-x-auto">
+            <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" /></h5>
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="newloan.table.section" text="Section" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="newloan.table.value" text="Value" /></th>
@@ -239,9 +281,11 @@
                     <td colspan="2" class="px-3 py-3 text-slate-500"><spring:message code="loan.view.noFinancialDetails" text="Financial details have not been loaded for this application yet." /></td>
                 </tr>
             </c:if>
-        </tbody>
-    </table>
-</div>
+                </tbody>
+            </table>
+        </div>
+    </c:otherwise>
+</c:choose>
 
 <c:if test="${not empty loanDetailRepaymentPreviewRows}">
     <div class="erp-table-wrap erp-table-scroll">
@@ -752,7 +796,7 @@
             </div>
             <button id="submitApplicantToReview"
                     type="submit"
-                    class="app-btn btn-approve action-button-disabled w-full"
+                    class="app-btn btn-approve action-button-disabled loan-submit-to-review-button w-full"
                     disabled>
                 <c:out value="${loanFinalSubmitLabel}" />
             </button>
@@ -1027,7 +1071,7 @@
             renderSubmitState();
 
             requestButton?.addEventListener("click", async function () {
-                otpRequested = false;
+                const previousOtpRequested = otpRequested;
                 activeVerification += 1;
                 verifiedCode = "";
                 setSubmitEnabled(false);
@@ -1056,8 +1100,10 @@
                     window.SaccosOtp?.focusBoxes(input);
                     renderSubmitState();
                 } catch (error) {
+                    otpRequested = previousOtpRequested;
                     setFeedback("error", error.message || "${unableSendOtpLabel}");
                     setOtpButtonState(requestButton, "idle", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
+                    renderSubmitState();
                 }
             });
         })();
@@ -1157,6 +1203,9 @@
 
         document.querySelectorAll("form[action$='/submit'], form[data-confirm-title]").forEach(function (form) {
             form.addEventListener("submit", function () {
+                if (form.dataset.confirmTitle) {
+                    return;
+                }
                 const submitButton = form.querySelector("button[type='submit']");
                 if (!submitButton || submitButton.disabled) {
                     return;

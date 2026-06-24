@@ -29,7 +29,7 @@
     <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
 </div>
 
-<div class="loan-view-hero-summary">
+<div class="loan-view-hero-summary loan-staff-review-template">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="loan-hero-with-photo">
         <div class="min-w-0">
@@ -87,20 +87,51 @@
     <div class="px-5 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
         <div class="space-y-3"
              data-live-account-status-url="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status">
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div class="loan-view-summary-card px-4 py-4">
+            <div class="loan-staff-kpi-grid">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7h15a3 3 0 0 1 3 3v8H6a3 3 0 0 1-3-3V7Z"/>
+                            <path d="M3 7a3 3 0 0 1 3-3h11v3"/>
+                            <path d="M16 13h2"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
                     <div class="loan-stat-value">${app.amount}</div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 2v4"/>
+                            <path d="M16 2v4"/>
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <path d="M3 10h18"/>
+                            <path d="M8 14h.01"/>
+                            <path d="M12 14h.01"/>
+                            <path d="M16 14h.01"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
                     <div class="loan-stat-value">${app.tenorMonths} Month<c:if test="${app.tenorMonths ne 1}">s</c:if></div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/>
+                            <path d="M9 9V6a3 3 0 0 1 5.5-1.7"/>
+                            <path d="M18 12h.01"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
                     <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
-                <div class="loan-view-summary-card px-4 py-4">
+                <div class="loan-view-summary-card loan-staff-kpi-card">
+                    <span class="loan-staff-kpi-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-9-9v9h9Z"/>
+                            <path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"/>
+                        </svg>
+                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
@@ -116,8 +147,20 @@
             <div class="loan-simple-progress-list">
                 <c:forEach items="${loanProgressItems}" var="item">
                     <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
-                        <span class="loan-simple-progress-dot"></span>
-                        <span>${item.label}</span>
+                        <span class="loan-simple-progress-dot" aria-hidden="true"></span>
+                        <span class="loan-simple-progress-content">
+                            <span class="loan-simple-progress-label">${item.label}</span>
+                            <span class="loan-simple-progress-state">
+                                <c:choose>
+                                    <c:when test="${item.current}"><spring:message code="loan.progress.inProgress" text="In Progress" /></c:when>
+                                    <c:when test="${item.active}"><spring:message code="loan.progress.completed" text="Completed" /></c:when>
+                                    <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
+                                </c:choose>
+                            </span>
+                            <c:if test="${item.current}">
+                                <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
+                            </c:if>
+                        </span>
                     </div>
                 </c:forEach>
             </div>
@@ -712,7 +755,6 @@
                     return;
                 }
 
-                otpUi.reset();
                 setOtpButtonState(button, "loading", otpMessages.send, otpMessages.sending, otpMessages.sent);
                 try {
                     const response = await fetch(requestUrl, {
@@ -730,6 +772,7 @@
                     showOtpFeedback(feedback, "success", payload.message || otpMessages.approvalCodeSent);
                     setOtpButtonState(button, "sent", otpMessages.send, otpMessages.sending, otpMessages.sent);
                     window.SaccosOtp?.startCooldown(button, payload, { idle: otpMessages.send });
+                    otpUi.reset();
                     otpUi.markRequested();
                     if (input) {
                         window.SaccosOtp?.focusBoxes(input);

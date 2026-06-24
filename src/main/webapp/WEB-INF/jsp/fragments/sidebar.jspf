@@ -258,7 +258,7 @@
             </sec:authorize>
 
             <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showBoardPanel" value="${pageContext.request.isUserInRole('ROLE_BOARD') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')) and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
@@ -355,10 +355,10 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="hasRole('BOARD') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_BOARD_QUEUE')">
+            <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
                 <c:set var="boardOfficeActive" value="${requestUri eq '/board/dashboard' || requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || requestUri eq '/board/reports' || fn:startsWith(requestUri, '/board/loan-applications')}" />
                 <div class="px-3 pb-1 pt-3">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.board" text="Board" /></p>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.boardOffice" text="Review Office" /></p>
                 </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
