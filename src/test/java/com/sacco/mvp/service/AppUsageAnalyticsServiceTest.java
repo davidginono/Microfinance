@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.repository.AppUsageEventRepository;
+import com.sacco.mvp.repository.AppUsagePageMetricRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import org.junit.jupiter.api.Test;
@@ -27,29 +28,60 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppUsageAnalyticsServiceTest {
     @Mock private AppUsageEventRepository usageEventRepository;
+    @Mock private AppUsagePageMetricRepository pageMetricRepository;
     @Mock private RegisteredSaccoRepository registeredSaccoRepository;
 
     @Test
-    void recordsLoginAndPageViewForFirstAuthenticatedPageRequest() {
+    void recordsLoginAuditEventAndRollsUpPageViewForFirstAuthenticatedPageRequest() {
         AppUsageAnalyticsService service = service();
         MockHttpServletRequest request = htmlRequest("/admin/dashboard");
 
         service.recordAuthenticatedRequest(principal("SACCO-1", "ST-1", Position.MINOR_ADMIN), request);
 
         ArgumentCaptor<AppUsageEvent> eventCaptor = ArgumentCaptor.forClass(AppUsageEvent.class);
-        verify(usageEventRepository, org.mockito.Mockito.times(2)).save(eventCaptor.capture());
-        assertThat(eventCaptor.getAllValues())
-            .extracting(AppUsageEvent::getEventType)
-            .containsExactly(AppUsageEventType.LOGIN, AppUsageEventType.PAGE_VIEW);
-        assertThat(eventCaptor.getAllValues().get(1).getPagePath()).isEqualTo("/admin/dashboard");
-        assertThat(eventCaptor.getAllValues().get(1).getDeviceType()).isEqualTo("Desktop");
-        assertThat(eventCaptor.getAllValues().get(1).getBrowserFamily()).isEqualTo("Chrome");
+        verify(usageEventRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(AppUsageEventType.LOGIN);
+        verify(pageMetricRepository).incrementPageView(
+            any(),
+            any(),
+            eq("SACCO-1"),
+            eq("ST-1"),
+            eq("/admin/dashboard"),
+            eq("Desktop"),
+            eq("Chrome"),
+            any()
+        );
+    }
+
+    @Test
+    void repeatedPageHitsDoNotAppendRawPageViewEvents() {
+        AppUsageAnalyticsService service = service();
+        AppUserPrincipal principal = principal("SACCO-1", "ST-1", Position.MINOR_ADMIN);
+        MockHttpServletRequest request = htmlRequest("/admin/dashboard");
+
+        service.recordAuthenticatedRequest(principal, request);
+        service.recordAuthenticatedRequest(principal, request);
+
+        ArgumentCaptor<AppUsageEvent> eventCaptor = ArgumentCaptor.forClass(AppUsageEvent.class);
+        verify(usageEventRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(AppUsageEventType.LOGIN);
+        verify(pageMetricRepository, times(2)).incrementPageView(
+            any(),
+            any(),
+            eq("SACCO-1"),
+            eq("ST-1"),
+            eq("/admin/dashboard"),
+            eq("Desktop"),
+            eq("Chrome"),
+            any()
+        );
     }
 
     @Test
@@ -59,6 +91,7 @@ class AppUsageAnalyticsServiceTest {
         service.recordAuthenticatedRequest(principal("SACCO-1", "ST-1", Position.MINOR_ADMIN), htmlRequest("/admin/dashboard/usage-activity"));
 
         verify(usageEventRepository, never()).save(any());
+        verify(pageMetricRepository, never()).incrementPageView(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -83,15 +116,15 @@ class AppUsageAnalyticsServiceTest {
         DateTimeFormatter keyFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         String yesterday = keyFormatter.format(LocalDate.now().minusDays(1));
         String today = keyFormatter.format(LocalDate.now());
-        when(usageEventRepository.countScoped(eq(AppUsageEventType.PAGE_VIEW), any(), any(), eq(null), eq(null))).thenReturn(54L);
+        when(pageMetricRepository.countPageViews(any(), any(), eq(null), eq(null))).thenReturn(54L);
         when(usageEventRepository.countScoped(eq(AppUsageEventType.LOGIN), any(), any(), eq(null), eq(null))).thenReturn(7L);
         when(usageEventRepository.countEventsByBucket(eq(AppUsageEventType.LOGIN.name()), any(), any(), eq(null), eq(null), eq("YYYY-MM-DD"), any()))
             .thenReturn(List.of(row(yesterday, 12), row(today, 18)));
-        when(usageEventRepository.topPages(any(), any(), eq(null), eq(null)))
+        when(pageMetricRepository.topPages(any(), any(), eq(null), eq(null)))
             .thenReturn(List.of(topPage("/admin/dashboard", "SACCO-1", 20)));
-        when(usageEventRepository.deviceBreakdown(any(), any(), eq(null), eq(null)))
+        when(pageMetricRepository.deviceBreakdown(any(), any(), eq(null), eq(null)))
             .thenReturn(List.of(row("Mobile", 3), row("Desktop", 1)));
-        when(usageEventRepository.browserBreakdown(any(), any(), eq(null), eq(null)))
+        when(pageMetricRepository.browserBreakdown(any(), any(), eq(null), eq(null)))
             .thenReturn(List.of(row("Chrome", 4)));
         when(registeredSaccoRepository.findBySaccoIdIn(any())).thenReturn(List.of(registeredSacco("SACCO-1", "Arusha Central SACCO")));
 
@@ -116,19 +149,20 @@ class AppUsageAnalyticsServiceTest {
         ArgumentCaptor<OffsetDateTime> cutoffCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
         verify(usageEventRepository).deleteByOccurredAtBefore(cutoffCaptor.capture());
         assertThat(cutoffCaptor.getValue()).isBefore(new ApplicationClock("Africa/Nairobi").now().minusDays(89));
+        verify(pageMetricRepository).deleteByBucketStartBefore(any());
     }
 
     private AppUsageAnalyticsService service() {
-        return new AppUsageAnalyticsService(usageEventRepository, registeredSaccoRepository, new ApplicationClock("Africa/Nairobi"));
+        return new AppUsageAnalyticsService(usageEventRepository, pageMetricRepository, registeredSaccoRepository, new ApplicationClock("Africa/Nairobi"));
     }
 
     private void stubDashboardQueries() {
-        when(usageEventRepository.countScoped(eq(AppUsageEventType.PAGE_VIEW), any(), any(), any(), any())).thenReturn(0L);
+        when(pageMetricRepository.countPageViews(any(), any(), any(), any())).thenReturn(0L);
         when(usageEventRepository.countScoped(eq(AppUsageEventType.LOGIN), any(), any(), any(), any())).thenReturn(0L);
         when(usageEventRepository.countEventsByBucket(any(), any(), any(), any(), any(), any(), any())).thenReturn(List.of());
-        when(usageEventRepository.topPages(any(), any(), any(), any())).thenReturn(List.of());
-        when(usageEventRepository.deviceBreakdown(any(), any(), any(), any())).thenReturn(List.of());
-        when(usageEventRepository.browserBreakdown(any(), any(), any(), any())).thenReturn(List.of());
+        when(pageMetricRepository.topPages(any(), any(), any(), any())).thenReturn(List.of());
+        when(pageMetricRepository.deviceBreakdown(any(), any(), any(), any())).thenReturn(List.of());
+        when(pageMetricRepository.browserBreakdown(any(), any(), any(), any())).thenReturn(List.of());
     }
 
     private MockHttpServletRequest htmlRequest(String path) {

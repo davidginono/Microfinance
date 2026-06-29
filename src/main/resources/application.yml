@@ -126,6 +126,7 @@ app:
     cleanup-cron: "${APP_RETENTION_CLEANUP_CRON:0 30 2 * * *}"
     audit-log-days: ${APP_RETENTION_AUDIT_LOG_DAYS:70}
     outbox-days: ${APP_RETENTION_OUTBOX_DAYS:70}
+    read-notification-days: ${APP_RETENTION_READ_NOTIFICATION_DAYS:180}
   auth:
     google-sso:
       enabled: ${APP_AUTH_GOOGLE_SSO_ENABLED:false}

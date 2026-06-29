@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -46,4 +47,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     @Modifying
     @Query("update Notification n set n.readAt = CURRENT_TIMESTAMP where n.recipientMemberId = :memberId and n.type in :types and n.readAt is null")
     int markAllAsReadForMemberAndTypes(@Param("memberId") UUID memberId, @Param("types") Collection<String> types);
+
+    @Modifying
+    long deleteByReadAtIsNotNullAndCreatedAtBefore(OffsetDateTime cutoff);
 }

@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.AppUsageEventType;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.repository.AppUsageEventRepository;
+import com.sacco.mvp.repository.AppUsagePageMetricRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,10 +37,14 @@ public class AppUsageAnalyticsService {
     private static final Duration ACTIVE_WINDOW = Duration.ofMinutes(5);
     private static final Duration SESSION_STALE_AFTER = Duration.ofMinutes(45);
     private static final int RETENTION_DAYS = 90;
+    private static final int PAGE_METRIC_RETENTION_DAYS = 400;
     private static final int MAX_ACTIVE_USERS = 12;
+    private static final String PLATFORM_SCOPE = "Platform";
+    private static final String UNASSIGNED_STATION_SCOPE = "NO_STATION";
     private static final DateTimeFormatter TIME_LABEL = DateTimeFormatter.ofPattern("HH:mm");
 
     private final AppUsageEventRepository usageEventRepository;
+    private final AppUsagePageMetricRepository pageMetricRepository;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final ApplicationClock applicationClock;
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
@@ -65,7 +70,16 @@ public class AppUsageAnalyticsService {
         }
 
         if (isPageViewRequest(request, path)) {
-            usageEventRepository.save(toEvent(AppUsageEventType.PAGE_VIEW, session, path, now));
+            pageMetricRepository.incrementPageView(
+                UUID.randomUUID(),
+                hourlyBucket(now),
+                metricScope(session.saccoId(), PLATFORM_SCOPE),
+                metricScope(session.stationId(), UNASSIGNED_STATION_SCOPE),
+                path,
+                deviceType,
+                browserFamily,
+                now
+            );
         }
         pruneStaleSessions(now);
     }
@@ -88,10 +102,10 @@ public class AppUsageAnalyticsService {
         OffsetDateTime from = usageRange.start(now, zoneId);
         String normalizedSaccoId = normalizeScope(saccoId);
         String normalizedStationId = normalizeScope(stationId);
-        long pageViews = usageEventRepository.countScoped(AppUsageEventType.PAGE_VIEW, from, now, normalizedSaccoId, normalizedStationId);
+        long pageViews = pageMetricRepository.countPageViews(from, now, normalizedSaccoId, normalizedStationId);
         long logins = usageEventRepository.countScoped(AppUsageEventType.LOGIN, from, now, normalizedSaccoId, normalizedStationId);
         List<ActiveUserRow> activeUsers = activeUsers(now, normalizedSaccoId, normalizedStationId);
-        List<AppUsageEventRepository.TopPageRow> topPages = usageEventRepository.topPages(from, now, normalizedSaccoId, normalizedStationId);
+        List<AppUsageEventRepository.TopPageRow> topPages = pageMetricRepository.topPages(from, now, normalizedSaccoId, normalizedStationId);
         Map<String, String> saccoNamesById = saccoNamesById(topPages, activeUsers);
         List<ActiveUserRow> displayActiveUsers = activeUserRows(activeUsers, saccoNamesById);
         long activeUserCount = activeUsers.stream().map(ActiveUserRow::memberId).distinct().count();
@@ -110,8 +124,8 @@ public class AppUsageAnalyticsService {
                 zoneId
             ),
             topPageRows(topPages, saccoNamesById),
-            percentRows(usageEventRepository.deviceBreakdown(from, now, normalizedSaccoId, normalizedStationId)),
-            percentRows(usageEventRepository.browserBreakdown(from, now, normalizedSaccoId, normalizedStationId)),
+            percentRows(pageMetricRepository.deviceBreakdown(from, now, normalizedSaccoId, normalizedStationId)),
+            percentRows(pageMetricRepository.browserBreakdown(from, now, normalizedSaccoId, normalizedStationId)),
             displayActiveUsers,
             TIME_LABEL.format(now.atZoneSameInstant(zoneId))
         );
@@ -121,6 +135,11 @@ public class AppUsageAnalyticsService {
     @Transactional
     public void deleteExpiredUsageEvents() {
         usageEventRepository.deleteByOccurredAtBefore(applicationClock.now().minusDays(RETENTION_DAYS));
+        pageMetricRepository.deleteByBucketStartBefore(applicationClock.now().minusDays(PAGE_METRIC_RETENTION_DAYS));
+    }
+
+    private OffsetDateTime hourlyBucket(OffsetDateTime now) {
+        return now.withMinute(0).withSecond(0).withNano(0);
     }
 
     private List<ActiveUserRow> activeUsers(OffsetDateTime now, String saccoId, String stationId) {
@@ -385,6 +404,11 @@ public class AppUsageAnalyticsService {
 
     private String normalizeScope(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String metricScope(String value, String fallback) {
+        String normalized = normalizeScope(value);
+        return normalized == null ? fallback : normalized;
     }
 
     private String nullToEmpty(String value) {
