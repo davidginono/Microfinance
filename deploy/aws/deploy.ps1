@@ -6,6 +6,7 @@ param(
     [string]$DbInstanceClass = "db.t4g.micro",
     [string]$DbEngineVersion = "16.3",
     [int]$DbBackupRetentionDays = 1,
+    [string]$PublicDomain = $env:APP_PUBLIC_DOMAIN,
     [switch]$OverwriteExistingConfig
 )
 
@@ -379,7 +380,8 @@ if ($addresses.Addresses.Count -gt 0) {
     $allocationId = $address.AllocationId
     $publicIp = $address.PublicIp
 }
-$domain = "$($publicIp.Replace('.', '-')).sslip.io"
+$fallbackDomain = "$($publicIp.Replace('.', '-')).sslip.io"
+$domain = if ([string]::IsNullOrWhiteSpace($PublicDomain)) { $fallbackDomain } else { $PublicDomain.Trim().ToLowerInvariant() }
 $baseUrl = "https://$domain"
 
 $secretNames = @(

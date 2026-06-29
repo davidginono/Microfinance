@@ -15,6 +15,13 @@ Run from the repository root:
 .\deploy\aws\deploy.ps1
 ```
 
+For a custom Cloudflare hostname, pass the public domain so Caddy and
+`APP_BASE_URL` use the same host that Cloudflare sends in SNI:
+
+```powershell
+.\deploy\aws\deploy.ps1 -PublicDomain lms.foresight.co.tz
+```
+
 The script keeps existing SSM parameters by default, then force-updates only the
 cloud-derived values such as the RDS URL, RDS credentials, app base URL, and
 production safety overrides. Use `-OverwriteExistingConfig` only when you want
