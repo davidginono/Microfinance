@@ -5,9 +5,9 @@
 <%@ include file="../fragments/alerts.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="board.reports.breadcrumb" text="Board Panel / Loan Reports" /></p>
-    <h1 class="erp-page-title"><spring:message code="board.reports.title" text="Board Review Reports" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="board.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then export the report when needed." /></p>
+    <p class="erp-breadcrumb">${boardReportsBreadcrumb}</p>
+    <h1 class="erp-page-title">${boardReportsTitle}</h1>
+    <p class="erp-page-subtitle">${boardReportsSubtitle}</p>
 </div>
 
 <form method="get" action="/documents/reports/board-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
@@ -47,7 +47,7 @@
             <th><spring:message code="common.applicant" text="Applicant" /></th>
             <th><spring:message code="loan.type" text="Loan Type" /></th>
             <th><spring:message code="common.amount" text="Amount" /></th>
-            <th><spring:message code="review.board.decision" text="Board Decision" /></th>
+            <th>${boardReportsDecisionLabel}</th>
             <th><spring:message code="review.reviewedAt" text="Reviewed At" /></th>
             <th><spring:message code="review.currentStatus" text="Current Status" /></th>
             <th></th>
@@ -70,7 +70,7 @@
         <c:if test="${empty reportRows}">
             <tr>
                 <td colspan="9" class="px-3 py-8 text-center text-slate-500">
-                    <spring:message code="board.reports.empty" text="No board-reviewed loans matched the selected period." />
+                    ${boardReportsEmptyState}
                 </td>
             </tr>
         </c:if>

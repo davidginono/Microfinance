@@ -86,20 +86,21 @@ public class BoardController {
             .stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
 
-        model.addAttribute("dashboardBreadcrumb", "Board Panel / Dashboard");
-        model.addAttribute("dashboardPageTitle", "Board Dashboard");
-        model.addAttribute("dashboardQueueLabel", "On Review By Board");
+        String workspaceLabel = reviewWorkspaceLabel(principal);
+        model.addAttribute("dashboardBreadcrumb", workspaceLabel + " Panel / Dashboard");
+        model.addAttribute("dashboardPageTitle", workspaceLabel + " Dashboard");
+        model.addAttribute("dashboardQueueLabel", "On Review By " + workspaceLabel);
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", "B");
+        model.addAttribute("dashboardQueueIcon", workspaceLabel.startsWith("Credit") ? "C" : "B");
         model.addAttribute("dashboardDetailBasePath", "/board/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
         model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
         model.addAttribute("dashboardActiveDisbursedLoans", dashboard.activeDisbursedLoans());
         model.addAttribute("dashboardDefaultedLoans", dashboard.defaultedLoansCurrentYear());
-        model.addAttribute("dashboardChartTitle", "Board Decision Chart");
+        model.addAttribute("dashboardChartTitle", workspaceLabel + " Decision Chart");
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildBoardDashboardChartRows(
                 dashboard.statusBreakdown(),
@@ -211,6 +212,12 @@ public class BoardController {
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
 
         model.addAttribute("report", report);
+        String workspaceLabel = reviewWorkspaceLabel(principal);
+        model.addAttribute("boardReportsBreadcrumb", workspaceLabel + " Panel / Loan Reports");
+        model.addAttribute("boardReportsTitle", workspaceLabel + " Review Reports");
+        model.addAttribute("boardReportsSubtitle", "Filter the loans you reviewed by date range and decision, then export the report when needed.");
+        model.addAttribute("boardReportsDecisionLabel", workspaceLabel + " Decision");
+        model.addAttribute("boardReportsEmptyState", "No " + workspaceLabel.toLowerCase(java.util.Locale.ENGLISH) + "-reviewed loans matched the selected period.");
         model.addAttribute("applicantNames", applicantNames);
         model.addAttribute("fromDateValue", report.fromDate().toString());
         model.addAttribute("toDateValue", report.toDate().toString());
@@ -621,6 +628,11 @@ public class BoardController {
             return "Credit Committee";
         }
         return "Board Member";
+    }
+
+    private String reviewWorkspaceLabel(AppUserPrincipal principal) {
+        String label = reviewPanelLabel(principal);
+        return "Board Member".equals(label) ? "Board" : label;
     }
 
     private String message(String code) {

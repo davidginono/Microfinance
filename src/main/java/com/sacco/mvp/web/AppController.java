@@ -294,7 +294,6 @@ public class AppController {
         model.addAttribute("loanArchiveFilter", safeArchiveFilter(loanArchiveFilter));
         model.addAttribute("guarantorArchiveQuery", safeArchiveQuery(guarantorArchiveQuery));
         model.addAttribute("guarantorArchiveFilter", safeArchiveFilter(guarantorArchiveFilter));
-        model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(archives));
         addGuaranteeContext(guarantorArchives, model);
         return "app/archives";
     }

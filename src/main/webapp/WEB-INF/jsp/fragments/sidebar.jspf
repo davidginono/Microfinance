@@ -258,7 +258,8 @@
             </sec:authorize>
 
             <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')) and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
             <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
@@ -293,7 +294,12 @@
                     <a href="${staffDashboardHref}"
                        class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffDashboardActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${staffDashboardActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 011-1h2a1 1 0 011 1v14H4a1 1 0 01-1-1V3zm5 6a1 1 0 011-1h2a1 1 0 011 1v8H8V9zm5-4a1 1 0 011-1h2a1 1 0 011 1v12h-4V5z"/></svg></span>
-                        <span class="min-w-0 flex-1"><spring:message code="menu.staffDashboard" text="Staff Dashboard" /></span>
+                        <span class="min-w-0 flex-1">
+                            <c:choose>
+                                <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/board/dashboard'}"><spring:message code="menu.creditCommitteeDashboard" text="Credit Committee Dashboard" /></c:when>
+                                <c:otherwise><spring:message code="menu.staffDashboard" text="Staff Dashboard" /></c:otherwise>
+                            </c:choose>
+                        </span>
                     </a>
                 </div>
                 <c:if test="${showStaffAnalyticsPanel}">
@@ -301,7 +307,12 @@
                         <a href="/staff/analytics"
                            class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffReportsActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${staffReportsActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 6L14 3.293A1 1 0 0013.293 3H4zm2 9h2v3H6v-3zm3-4h2v7H9V8zm3 2h2v5h-2v-5z"/></svg></span>
-                            <span class="min-w-0 flex-1"><spring:message code="menu.staffReportsAnalytics" text="Staff Reports and Analytics" /></span>
+                            <span class="min-w-0 flex-1">
+                                <c:choose>
+                                    <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/board/dashboard'}"><spring:message code="menu.creditCommitteeReportsAnalytics" text="Credit Committee Reports and Analytics" /></c:when>
+                                    <c:otherwise><spring:message code="menu.staffReportsAnalytics" text="Staff Reports and Analytics" /></c:otherwise>
+                                </c:choose>
+                            </span>
                         </a>
                     </div>
                 </c:if>
@@ -357,8 +368,14 @@
             </sec:authorize>
             <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
                 <c:set var="boardOfficeActive" value="${requestUri eq '/board/dashboard' || requestUri eq '/board/queue' || requestUri eq '/board/assigned' || requestUri eq '/board/archive' || requestUri eq '/board/reports' || fn:startsWith(requestUri, '/board/loan-applications')}" />
+                <c:set var="creditCommitteeOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')}" />
                 <div class="px-3 pb-1 pt-3">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.boardOffice" text="Review Office" /></p>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        <c:choose>
+                            <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeOffice" text="Credit Committee Office" /></c:when>
+                            <c:otherwise><spring:message code="menu.boardOffice" text="Board Office" /></c:otherwise>
+                        </c:choose>
+                    </p>
                 </div>
                 <div class="shell-sidebar-group space-y-1">
                     <button type="button"
@@ -366,17 +383,42 @@
                             class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${boardOfficeActive ? 'border-green-200 bg-green-50 text-sacco-green shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-sacco-green'}"
                             aria-expanded="${boardOfficeActive ? 'true' : 'false'}"
                             aria-controls="boardOfficePanel">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border ${boardOfficeActive ? 'border-green-200 bg-green-100 text-sacco-green' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v3H2V4zm0 5h16v7a2 2 0 01-2 2H4a2 2 0 01-2-2V9zm3 2v2h4v-2H5z"/></svg></span>
-                        <span class="min-w-0 flex-1"><spring:message code="menu.boardOffice" text="Board Office" /></span>
-                        <svg id="boardOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 ${boardOfficeActive ? 'text-green-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center border ${boardOfficeActive ? 'border-green-200 bg-green-100 text-sacco-green' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v3H2V4zm0 5h16v7a2 2 0 01-2 2H4a2 2 0 01-2-2V9zm3 2v2h4v-2H5z"/></svg></span>
+                        <span class="min-w-0 flex-1 truncate">
+                            <c:choose>
+                                <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeOffice" text="Credit Committee Office" /></c:when>
+                                <c:otherwise><spring:message code="menu.boardOffice" text="Board Office" /></c:otherwise>
+                            </c:choose>
+                        </span>
+                        <svg id="boardOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform duration-200 ${boardOfficeActive ? 'text-green-600' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
                         </svg>
                     </button>
                     <div id="boardOfficePanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                        <a href="/board/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/dashboard' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardDashboard" text="Board Dashboard" /></a>
-                        <a href="/board/queue" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications')) ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardQueue" text="Board Queue" /></a>
-                        <a href="/board/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/archive' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardArchive" text="Board Archive" /></a>
-                        <a href="/board/reports" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/reports' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.boardReports" text="Loan Reports" /></a>
+                        <a href="/board/dashboard" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/dashboard' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <c:choose>
+                                <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeDashboard" text="Credit Committee Dashboard" /></c:when>
+                                <c:otherwise><spring:message code="menu.boardDashboard" text="Board Dashboard" /></c:otherwise>
+                            </c:choose>
+                        </a>
+                        <a href="/board/queue" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${(requestUri eq '/board/queue' || requestUri eq '/board/assigned' || fn:startsWith(requestUri, '/board/loan-applications')) ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <c:choose>
+                                <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeQueue" text="Credit Committee Queue" /></c:when>
+                                <c:otherwise><spring:message code="menu.boardQueue" text="Board Queue" /></c:otherwise>
+                            </c:choose>
+                        </a>
+                        <a href="/board/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/archive' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <c:choose>
+                                <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeArchive" text="Credit Committee Archive" /></c:when>
+                                <c:otherwise><spring:message code="menu.boardArchive" text="Board Archive" /></c:otherwise>
+                            </c:choose>
+                        </a>
+                        <a href="/board/reports" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/board/reports' ? 'bg-white text-green-800 ring-1 ring-green-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+                            <c:choose>
+                                <c:when test="${creditCommitteeOfficeActive}"><spring:message code="menu.creditCommitteeReports" text="Credit Committee Reports" /></c:when>
+                                <c:otherwise><spring:message code="menu.boardReports" text="Loan Reports" /></c:otherwise>
+                            </c:choose>
+                        </a>
                     </div>
                 </div>
             </sec:authorize>

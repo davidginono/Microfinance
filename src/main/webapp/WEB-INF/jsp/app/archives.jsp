@@ -134,7 +134,6 @@
                         <th><spring:message code="loan.type" text="Loan Type" /></th>
                         <th><spring:message code="common.amount" text="Amount" /></th>
                         <th><spring:message code="common.status" text="Status" /></th>
-                        <th><spring:message code="archives.archiveNote" text="Archive Note" /></th>
                         <th><spring:message code="loan.date" text="Date" /></th>
                         <th></th>
                     </tr>
@@ -147,15 +146,6 @@
                             <td><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></td>
                             <td>${app.amount}</td>
                             <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
-                            <td>
-                                <c:choose>
-                                    <c:when test="${app.status eq 'FINAL_APPROVED'}"><spring:message code="archives.note.disbursed" text="Disbursed loan moved to archive" /></c:when>
-                                    <c:when test="${app.status eq 'DEFAULTED'}"><spring:message code="archives.note.defaulted" text="Loan passed the final due date and remains unpaid" /></c:when>
-                                    <c:when test="${app.status eq 'PAID'}"><spring:message code="archives.note.paid" text="Manager confirmed repayment completed" /></c:when>
-                                    <c:when test="${not empty managerReasons[app.id]}">${managerReasons[app.id]}</c:when>
-                                    <c:otherwise><spring:message code="loan.status.${app.status}" text="${app.status}" /></c:otherwise>
-                                </c:choose>
-                            </td>
                             <td>
                                 <c:choose>
                                     <c:when test="${app.status eq 'PAID' and not empty app.paidAt}">${fn:replace(fn:substring(app.paidAt, 0, 16), 'T', ' ')}</c:when>
