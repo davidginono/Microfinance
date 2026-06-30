@@ -503,10 +503,10 @@ cat > Caddyfile <<CADDY
 }
 CADDY
 
-cat > docker-compose.yml <<COMPOSE
+cat > docker-compose.yml <<'COMPOSE'
 services:
   app:
-    image: `$IMAGE_URI
+    image: $imageUri
     restart: unless-stopped
     mem_limit: 700m
     depends_on:
@@ -659,10 +659,10 @@ cat > Caddyfile <<CADDY
 }
 CADDY
 
-cat > docker-compose.yml <<COMPOSE
+cat > docker-compose.yml <<'COMPOSE'
 services:
   app:
-    image: `$IMAGE_URI
+    image: $imageUri
     restart: unless-stopped
     mem_limit: 700m
     depends_on:
