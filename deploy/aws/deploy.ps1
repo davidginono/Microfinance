@@ -535,6 +535,7 @@ services:
     restart: unless-stopped
     depends_on:
       - app
+      - mailpit
     ports:
       - "80:80"
       - "443:443"
@@ -599,6 +600,147 @@ if ($addressState.Addresses[0].InstanceId -ne $instanceId) {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to associate Elastic IP"
     }
+}
+
+$ecrRegistry = $repositoryUri.Split("/")[0]
+$remoteUpdate = @"
+set -euo pipefail
+
+REGION="$Region"
+PARAMETER_PREFIX="$parameterPrefix"
+IMAGE_URI="$imageUri"
+APP_DOMAIN="$domain"
+ECR_REGISTRY="$ecrRegistry"
+
+if ! command -v docker >/dev/null 2>&1; then
+  dnf install -y docker awscli
+  systemctl enable --now docker
+fi
+
+systemctl start docker
+mkdir -p /opt/saccos-lms/caddy_data /opt/saccos-lms/caddy_config
+cd /opt/saccos-lms
+
+aws ecr get-login-password --region "`$REGION" | docker login --username AWS --password-stdin "`$ECR_REGISTRY"
+
+tmp_env="`$(mktemp)"
+aws ssm get-parameters-by-path \
+  --region "`$REGION" \
+  --path "`$PARAMETER_PREFIX" \
+  --with-decryption \
+  --recursive \
+  --query 'Parameters[*].[Name,Value]' \
+  --output text > "`$tmp_env"
+
+: > .env
+while IFS=`$'\t' read -r name value; do
+  key="`$(basename "`$name")"
+  escaped="`$(printf "%s" "`$value" | sed "s/'/'\"'\"'/g")"
+  printf "%s='%s'\n" "`$key" "`$escaped" >> .env
+done < "`$tmp_env"
+rm -f "`$tmp_env"
+chmod 600 .env
+
+cat > Caddyfile <<CADDY
+{
+  email davidginono625@gmail.com
+}
+
+`$APP_DOMAIN {
+  encode zstd gzip
+
+  handle /mailpit* {
+    reverse_proxy mailpit:8025
+  }
+
+  handle {
+    reverse_proxy app:8080
+  }
+}
+CADDY
+
+cat > docker-compose.yml <<COMPOSE
+services:
+  app:
+    image: `$IMAGE_URI
+    restart: unless-stopped
+    mem_limit: 700m
+    depends_on:
+      - mailpit
+    env_file:
+      - .env
+    expose:
+      - "8080"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MP_WEBROOT: /mailpit
+      MP_UI_AUTH: `"`${SPRING_MAIL_USERNAME}:`${SPRING_MAIL_PASSWORD}`"
+      MP_SMTP_AUTH: `"`${SPRING_MAIL_USERNAME}:`${SPRING_MAIL_PASSWORD}`"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    expose:
+      - "1025"
+      - "8025"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+      - mailpit
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+COMPOSE
+
+docker compose version >/dev/null 2>&1 || {
+  mkdir -p /usr/local/lib/docker/cli-plugins
+  curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+}
+
+docker compose pull
+docker compose up -d --remove-orphans
+"@
+
+$ssmPayload = @{
+    DocumentName = "AWS-RunShellScript"
+    InstanceIds = @($instanceId)
+    Comment = "Deploy $imageUri"
+    TimeoutSeconds = 900
+    Parameters = @{
+        commands = @($remoteUpdate)
+    }
+} | ConvertTo-Json -Depth 8
+$ssmPayloadFile = New-TemporaryFile
+Set-Content -LiteralPath $ssmPayloadFile -Value $ssmPayload -NoNewline
+try {
+    $sendCommand = Invoke-AwsJson @("ssm", "send-command", "--region", $Region, "--cli-input-json", "file://$ssmPayloadFile")
+} finally {
+    Remove-Item -LiteralPath $ssmPayloadFile -Force
+}
+$commandId = $sendCommand.Command.CommandId
+Write-Host "Updating EC2 runtime via SSM command $commandId"
+& aws ssm wait command-executed --region $Region --command-id $commandId --instance-id $instanceId
+if ($LASTEXITCODE -ne 0) {
+    $invocation = Invoke-AwsJson @("ssm", "get-command-invocation", "--region", $Region, "--command-id", $commandId, "--instance-id", $instanceId)
+    Write-Host $invocation.StandardOutputContent
+    Write-Host $invocation.StandardErrorContent
+    throw "EC2 runtime update did not complete successfully"
+}
+$invocation = Invoke-AwsJson @("ssm", "get-command-invocation", "--region", $Region, "--command-id", $commandId, "--instance-id", $instanceId)
+if ($invocation.Status -ne "Success") {
+    Write-Host $invocation.StandardOutputContent
+    Write-Host $invocation.StandardErrorContent
+    throw "EC2 runtime update failed with status $($invocation.Status)"
 }
 
 $snapshotId = "$dbIdentifier-initial-$(Get-Date -Format 'yyyyMMddHHmmss')"
