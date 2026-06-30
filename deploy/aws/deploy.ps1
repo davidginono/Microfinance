@@ -492,7 +492,14 @@ cat > Caddyfile <<CADDY
 
 `$APP_DOMAIN {
   encode zstd gzip
-  reverse_proxy app:8080
+
+  handle /mailpit* {
+    reverse_proxy mailpit:8025
+  }
+
+  handle {
+    reverse_proxy app:8080
+  }
 }
 CADDY
 
@@ -502,10 +509,26 @@ services:
     image: `$IMAGE_URI
     restart: unless-stopped
     mem_limit: 700m
+    depends_on:
+      - mailpit
     env_file:
       - .env
     expose:
       - "8080"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MP_WEBROOT: /mailpit
+      MP_UI_AUTH: `"`${SPRING_MAIL_USERNAME}:`${SPRING_MAIL_PASSWORD}`"
+      MP_SMTP_AUTH: `"`${SPRING_MAIL_USERNAME}:`${SPRING_MAIL_PASSWORD}`"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    expose:
+      - "1025"
+      - "8025"
 
   caddy:
     image: caddy:2-alpine
