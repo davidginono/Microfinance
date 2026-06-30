@@ -37,9 +37,7 @@ public class BoardService {
         List<LoanApplication> apps = new ArrayList<>();
         for (BoardReview review : reviews) {
             loanApplicationRepository.findById(review.getLoanApplicationId())
-                .filter(app -> app.getStatus() == (stage == ApprovalWorkflowStage.LOAN_OFFICER
-                    ? LoanStatus.AWAITING_LOAN_OFFICER
-                    : LoanStatus.AWAITING_BOARD))
+                .filter(app -> app.getStatus() == pendingStatusFor(stage))
                 .ifPresent(apps::add);
         }
         return apps;
@@ -105,9 +103,7 @@ public class BoardService {
 
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        LoanStatus expectedStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
-            ? LoanStatus.AWAITING_LOAN_OFFICER
-            : LoanStatus.AWAITING_BOARD;
+        LoanStatus expectedStatus = pendingStatusFor(stage);
         if (app.getStatus() != expectedStatus) {
             throw new IllegalStateException("Application not in " + stage.getDisplayLabel().toLowerCase() + " stage");
         }
@@ -167,9 +163,7 @@ public class BoardService {
             return;
         }
 
-        LoanStatus nextStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
-            ? LoanStatus.AWAITING_LOAN_OFFICER
-            : LoanStatus.AWAITING_BOARD;
+        LoanStatus nextStatus = pendingStatusFor(stage);
         if (rejections >= rejectionThreshold || (totalDecisions >= minimumVotes && approvals < approvalThreshold)) {
             nextStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
                 ? LoanStatus.LOAN_OFFICER_REJECTED
@@ -194,5 +188,16 @@ public class BoardService {
         }
         String normalized = comment.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case LOAN_OFFICER -> LoanStatus.AWAITING_LOAN_OFFICER;
+            case CREDIT_COMMITTEE -> LoanStatus.AWAITING_CREDIT_COMMITTEE;
+            case BOARD -> LoanStatus.AWAITING_BOARD;
+            case ACCOUNTANT -> LoanStatus.AWAITING_ACCOUNTANT;
+            case MANAGER -> LoanStatus.READY_FOR_MANAGER;
+            case DISBURSEMENT_OFFICER -> LoanStatus.READY_FOR_DISBURSEMENT;
+        };
     }
 }

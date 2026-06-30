@@ -28,42 +28,30 @@
         color: #cbd5e1;
         opacity: 1;
     }
+
+    #guarantorHint:empty {
+        display: none;
+    }
 </style>
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="newloan.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
-    <p class="erp-page-subtitle"><c:out value="${loanProductDescription}" /></p>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
 <div class="mb-4 erp-section-muted">
-    <h5 class="erp-panel-title"><spring:message code="newloan.eligibilityGuide.title" /></h5>
-    <div class="mt-3 grid gap-3 md:grid-cols-2">
-        <div class="erp-section">
-            <div class="flex flex-wrap items-center gap-2">
-                <p class="font-semibold text-slate-800"><spring:message code="newloan.applicationRules.title" /></p>
-                <span id="eligibilityExternalInlineStatus" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
-                    <span id="eligibilityExternalSpinner" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                    <span id="eligibilityExternalStatusText"><spring:message code="newloan.applicationRules.loading" /></span>
-                </span>
-            </div>
-            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
-                <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
-                <li><spring:message code="newloan.applicationRules.amountRange" /> <strong>${minimumAmountLabel}</strong> <spring:message code="common.to" text="to" /> <strong>${maximumAmountLabel}</strong></li>
-            </ul>
-        </div>
-        <div class="erp-section">
-            <p class="font-semibold text-slate-800"><spring:message code="newloan.beforeSubmit.title" /></p>
-            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li><spring:message code="newloan.beforeSubmit.item1" /></li>
-                <li><spring:message code="newloan.beforeSubmit.item2" /></li>
-                <li><spring:message code="newloan.beforeSubmit.item3" /></li>
-                <li><spring:message code="newloan.beforeSubmit.item4" arguments="${requiredGuarantors}" /></li>
-                <li><spring:message code="newloan.beforeSubmit.item5" arguments="${product.minimumRepaymentMonths},${product.maxRepaymentMonths}" /></li>
-            </ul>
-        </div>
+    <div class="flex flex-wrap items-center gap-2">
+        <h5 class="erp-panel-title"><spring:message code="newloan.eligibilityGuide.title" /></h5>
+        <span id="eligibilityExternalInlineStatus" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
+            <span id="eligibilityExternalSpinner" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+            <span id="eligibilityExternalStatusText"><spring:message code="newloan.applicationRules.loading" /></span>
+        </span>
     </div>
+    <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
+        <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+        <li><spring:message code="newloan.applicationRules.amountRange" /> <strong>${minimumAmountLabel}</strong> <spring:message code="common.to" text="to" /> <strong>${maximumAmountLabel}</strong></li>
+    </ul>
 </div>
 
 <form id="loanApplicationForm" method="post" action="/app/loan-applications" enctype="multipart/form-data" class="erp-form-wrap space-y-5">
@@ -130,7 +118,6 @@
                   data-loan-purpose
                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                   placeholder="<spring:message code='newloan.purpose.placeholder' />">${formValues['purpose']}</textarea>
-        <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.purpose.helper" /></p>
     </div>
 
     <c:forEach items="${formModel.fields}" var="field">
@@ -173,7 +160,6 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h5 class="erp-panel-title"><spring:message code="newloan.loanDetails.title" /></h5>
-                    <p class="text-sm text-slate-500"><spring:message code="newloan.loanDetails.helper" arguments="${annualInterestPercentLabel}" /></p>
                 </div>
             <button id="loadFinancialDetailsButton" type="button" class="app-btn btn-primary">
                 <spring:message code="newloan.loanDetails.button" />
@@ -229,7 +215,6 @@
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
-                <p class="text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
             </div>
         </div>
         <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm">
@@ -266,8 +251,12 @@
         <div class="erp-section-muted">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h5 class="erp-panel-title"><spring:message code="newloan.guarantors.title" arguments="${requiredGuarantors}" /></h5>
-                    <p class="text-sm text-slate-500"><spring:message code="newloan.guarantors.help" /></p>
+                    <h5 class="erp-panel-title">
+                        <c:choose>
+                            <c:when test="${requiredGuarantors eq 1}"><spring:message code="newloan.guarantors.titleSingular" arguments="${requiredGuarantors}" text="Select {0} Guarantor" /></c:when>
+                            <c:otherwise><spring:message code="newloan.guarantors.titlePlural" arguments="${requiredGuarantors}" text="Select {0} Guarantors" /></c:otherwise>
+                        </c:choose>
+                    </h5>
                 </div>
                 <span id="guarantorSelectedCount" class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">
                     <spring:message code="newloan.guarantors.counter" arguments="${requiredGuarantors}" />
@@ -277,17 +266,17 @@
             <div class="relative flex flex-col gap-2 sm:flex-row sm:items-center ">
                 <select id="guarantorSearchMode"
                         class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none">
-                    <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
                     <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
+                    <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
                 </select>
-                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
+                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.namePlaceholder' />"
                        class="w-full sm:flex-1 rounded-lg border border-slate-300 bg-white px-3 py-3.5 text-sm focus:border-sacco-blue focus:outline-none" />
                 <button id="guarantorSearchButton" type="button" class="shrink-0 rounded-md bg-white border-slate-300 px-5 py-3.5 text-sm font-semibold text-gray hover:bg-sacco-blue/90"><spring:message code="common.search" /></button>
                 <div id="guarantorDropdown" class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
             </div>
 
            
-            <p id="guarantorHint" class="mt-2 text-sm text-slate-500"><spring:message code="newloan.guarantors.hint" /></p>
+            <p id="guarantorHint" class="mt-2 text-sm text-slate-500"></p>
 
             <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
                 <c:forEach items="${selectedGuarantorItems}" var="item">
@@ -315,9 +304,6 @@
         <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
-                <c:if test="${product.applicantAttachmentRequired and not empty requiredAttachmentDefinitions}">
-                    <p class="text-sm text-slate-500">Upload each required document listed below.</p>
-                </c:if>
             </div>
             <span class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${product.applicantAttachmentRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
                 <c:choose>
@@ -349,7 +335,7 @@
                                 <input type="file" name="requiredAttachmentFiles_${requirement.id}" class="attachment-dropzone-input" data-attachment-input />
                                 <span class="attachment-dropzone-main">
                                     <span class="attachment-dropzone-copy">
-                                        <span class="attachment-dropzone-title">Drop <c:out value="${requirement.attachmentName}" /> here or choose from device</span>
+                                        <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.titleOne" text="Drop file here" /></span>
                                         <span class="attachment-dropzone-files" data-attachment-files data-existing-attachment-files="${fn:escapeXml(existingAttachmentNames)}">
                                             <c:choose>
                                                 <c:when test="${not empty existingAttachmentNames}"><c:out value="${existingAttachmentNames}" /></c:when>
@@ -369,7 +355,7 @@
                     <input type="file" name="attachments" multiple class="attachment-dropzone-input" data-attachment-input />
                     <span class="attachment-dropzone-main">
                         <span class="attachment-dropzone-copy">
-                            <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here or choose from device" /></span>
+                            <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here" /></span>
                             <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
                         </span>
                         <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>

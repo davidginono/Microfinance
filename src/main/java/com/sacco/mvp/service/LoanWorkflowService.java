@@ -35,6 +35,7 @@ public class LoanWorkflowService {
         LoanStatus.AWAITING_LOAN_OFFICER,
         LoanStatus.LOAN_OFFICER_APPROVED,
         LoanStatus.AWAITING_BOARD,
+        LoanStatus.AWAITING_CREDIT_COMMITTEE,
         LoanStatus.BOARD_APPROVED,
         LoanStatus.AWAITING_ACCOUNTANT,
         LoanStatus.ACCOUNTANT_APPROVED,
@@ -50,6 +51,7 @@ public class LoanWorkflowService {
         LoanStatus.AWAITING_LOAN_OFFICER,
         LoanStatus.LOAN_OFFICER_APPROVED,
         LoanStatus.AWAITING_BOARD,
+        LoanStatus.AWAITING_CREDIT_COMMITTEE,
         LoanStatus.BOARD_APPROVED,
         LoanStatus.AWAITING_ACCOUNTANT,
         LoanStatus.ACCOUNTANT_APPROVED,
@@ -156,7 +158,11 @@ public class LoanWorkflowService {
     }
 
     public Optional<LoanApplication> findActiveDisbursedLoan(UUID memberId) {
-        return loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
+        return findActiveDisbursedLoans(memberId).stream().findFirst();
+    }
+
+    public List<LoanApplication> findActiveDisbursedLoans(UUID memberId) {
+        return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
             memberId,
             ACTIVE_LOAN_LOCK_STATUSES
         );
@@ -184,14 +190,12 @@ public class LoanWorkflowService {
                         + " (" + humanizeApplicationLockStatus(application.getStatus()) + "). Continue or complete it before applying again."
                 );
             });
-        findActiveDisbursedLoan(memberId).ifPresent(activeLoan -> {
+        List<LoanApplication> activeLoans = findActiveDisbursedLoans(memberId);
+        if (!activeLoans.isEmpty()) {
             if (!product.isApplicationWithActiveLoanAllowed()) {
-                throw new IllegalStateException(
-                    "You already have active loan " + loanReference(activeLoan)
-                        + ". This product does not allow a new application while an active loan is still open."
-                );
+                throw new IllegalStateException(activeLoanAwarenessMessage(activeLoans));
             }
-        });
+        }
     }
 
     public boolean canRequestTopUp(LoanApplication app) {
@@ -552,6 +556,7 @@ public class LoanWorkflowService {
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case AWAITING_BOARD, BOARD_APPROVED -> "On Review By Board";
+            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT, ACCOUNTANT_APPROVED -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             default -> status.name().replace('_', ' ');
@@ -1303,6 +1308,39 @@ public class LoanWorkflowService {
             return app.getApplicationNumber().toString();
         }
         return app.getId().toString().substring(0, 8);
+    }
+
+    public String activeLoanAwarenessMessage(List<LoanApplication> activeLoans) {
+        List<String> loanIds = activeLoans.stream()
+            .map(this::loanIdReference)
+            .filter(reference -> reference != null && !reference.isBlank())
+            .toList();
+        if (loanIds.isEmpty()) {
+            return "";
+        }
+        if (loanIds.size() == 1) {
+            return "Be aware that you have an active loan with the Loan ID " + loanIds.get(0) + ".";
+        }
+        return "Be aware that you have active loans with the Loan IDs " + joinLoanIds(loanIds) + ".";
+    }
+
+    private String loanIdReference(LoanApplication app) {
+        if (app.getLoanId() != null && !app.getLoanId().isBlank()) {
+            return app.getLoanId();
+        }
+        return loanReference(app);
+    }
+
+    private String joinLoanIds(List<String> loanIds) {
+        if (loanIds.size() <= 1) {
+            return loanIds.isEmpty() ? "" : loanIds.get(0);
+        }
+        if (loanIds.size() == 2) {
+            return loanIds.get(0) + " and " + loanIds.get(1);
+        }
+        return String.join(", ", loanIds.subList(0, loanIds.size() - 1))
+            + " and "
+            + loanIds.get(loanIds.size() - 1);
     }
 
     public record MemberDashboardData(

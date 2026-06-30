@@ -188,13 +188,17 @@ class LoanWorkflowServiceTest {
             .status(LoanStatus.FINAL_APPROVED)
             .build();
         when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
-            .thenReturn(Optional.of(currentLoan), Optional.of(activeLoan));
+            .thenReturn(Optional.of(currentLoan));
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(List.of(activeLoan));
 
         assertThat(loanWorkflowService.findApplicationInProgress(memberId)).contains(currentLoan);
         assertThat(loanWorkflowService.findActiveDisbursedLoan(memberId)).contains(activeLoan);
 
-        verify(loanApplicationRepository, times(2))
+        verify(loanApplicationRepository)
             .findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any());
+        verify(loanApplicationRepository)
+            .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any());
     }
 
     @Test

@@ -33,6 +33,7 @@ public class WorkflowStatusPresentationService {
                                                                   boolean includeDisbursementPortfolio) {
         List<DashboardSlice> slices = new java.util.ArrayList<>(List.of(
             slice("AWAITING_BOARD", "Waiting for Board Review", "#6366F1", LoanStatus.AWAITING_BOARD),
+            slice("AWAITING_CREDIT_COMMITTEE", "Waiting for Credit Committee Review", "#8B5CF6", LoanStatus.AWAITING_CREDIT_COMMITTEE),
             slice("BOARD_APPROVED", "Approved by Board", "#22C55E", LoanStatus.BOARD_APPROVED),
             slice("BOARD_REJECTED", "Rejected by Board", "#F43F5E", LoanStatus.BOARD_REJECTED)
         ));
@@ -89,6 +90,7 @@ public class WorkflowStatusPresentationService {
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case AWAITING_BOARD -> "On Review By Board";
+            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
             case FINAL_APPROVED -> "Final Approved and Disbursed";
@@ -118,6 +120,7 @@ public class WorkflowStatusPresentationService {
             case READY_FOR_MANAGER -> "#14B8A6";
             case AWAITING_LOAN_OFFICER -> "#7C3AED";
             case AWAITING_BOARD -> "#6366F1";
+            case AWAITING_CREDIT_COMMITTEE -> "#8B5CF6";
             case AWAITING_ACCOUNTANT -> "#0F766E";
             case BOARD_APPROVED -> "#2F348D";
             case LOAN_OFFICER_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";

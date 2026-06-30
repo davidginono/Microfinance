@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -107,7 +108,7 @@
                         <c:otherwise>#${fn:substring(entry.loan.applicantMemberId, 0, 8)}</c:otherwise>
                     </c:choose>
                 </td>
-                <td>${entry.loan.amount}</td>
+                <td><fmt:formatNumber value="${entry.loan.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>
                     <c:choose>
                         <c:when test="${entry.review.decision eq 'ACCEPT'}"><spring:message code="archive.approvedForDisbursement" text="Ready for Disbursement" /></c:when>

@@ -2209,6 +2209,7 @@ public class LoanReportService {
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case AWAITING_BOARD -> "On Review By Board";
+            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             case MANAGER_REJECTED -> "Manager Rejected";
@@ -2825,6 +2826,7 @@ public class LoanReportService {
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case LOAN_OFFICER_APPROVED -> "Loan Officer Approved";
             case AWAITING_BOARD -> "On Review By Board";
+            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case BOARD_REJECTED -> "Board Rejected";
             case BOARD_APPROVED -> "Reviewed";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";

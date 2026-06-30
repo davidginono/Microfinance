@@ -22,6 +22,7 @@ import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.MemberProfileImageService;
+import com.sacco.mvp.service.SaccoLogoStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -56,6 +57,7 @@ public class LoanDocumentController {
     private final LoanAttachmentService loanAttachmentService;
     private final LoanReportService loanReportService;
     private final MemberProfileImageService memberProfileImageService;
+    private final SaccoLogoStorageService saccoLogoStorageService;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
@@ -107,6 +109,7 @@ public class LoanDocumentController {
             resolvePrintableSaccoName(app.getSaccoId()),
             applicant,
             applicantProfileImage(applicant.getId()),
+            saccoLogoImage(app.getSaccoId()),
             loanPresentationService.parseFormFields(app.getFormData()),
             loanPresentationService.parseFinancialFields(app),
             guarantorRequests,
@@ -131,6 +134,14 @@ public class LoanDocumentController {
         try {
             return memberProfileImageService.load(applicantId).content();
         } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private byte[] saccoLogoImage(String saccoId) {
+        try {
+            return saccoLogoStorageService.load(saccoId).content();
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             return null;
         }
     }

@@ -266,11 +266,16 @@ public class LoanOfficerController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,
-            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
-            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
+            repaymentTransactions,
+            paymentSummary));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
+        model.addAttribute("previousApprovedReviews", loanPresentationService.previousApprovedReviews(app, STAGE));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("guarantorRequests", guarantorRequests);
@@ -677,7 +682,7 @@ public class LoanOfficerController {
     private String boardLoanStatusBadgeClass(LoanApplication app) {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_ACCEPTED, AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case MANAGER_ACCEPTED, AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";

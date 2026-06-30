@@ -8,6 +8,7 @@ import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
@@ -91,7 +92,7 @@ public class BoardController {
         model.addAttribute("dashboardPageTitle", workspaceLabel + " Dashboard");
         model.addAttribute("dashboardQueueLabel", "On Review By " + workspaceLabel);
         model.addAttribute("dashboardQueueValue",
-            workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD));
+            workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), awaitingStatusFor(principal)));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
         model.addAttribute("dashboardQueueIcon", workspaceLabel.startsWith("Credit") ? "C" : "B");
         model.addAttribute("dashboardDetailBasePath", "/board/loan-applications");
@@ -274,6 +275,8 @@ public class BoardController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
+        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app));
+        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
@@ -320,6 +323,8 @@ public class BoardController {
                 .map(LoanApplication::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        model.addAttribute("previousApprovedReviews",
+            loanPresentationService.previousApprovedReviews(app, myReview.getReviewStage()));
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
@@ -410,25 +415,27 @@ public class BoardController {
         try {
             LoanApplication app = loanApplicationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-            if (app.getStatus() != com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD) {
-                throw new IllegalStateException("This application is no longer waiting for board approval.");
-            }
             BoardReview myReview = resolveMyReview(id, principal);
-            if (myReview.getDecision() != BoardDecision.PENDING) {
-                throw new IllegalStateException("You have already submitted your board decision.");
+            if (app.getStatus() != pendingStatusFor(myReview.getReviewStage())) {
+                throw new IllegalStateException("This application is no longer waiting for "
+                    + myReview.getReviewStage().getDisplayLabel().toLowerCase(java.util.Locale.ENGLISH)
+                    + " approval.");
             }
-            Member boardMember = requireMemberWithEmail(principal.getMemberId());
+            if (myReview.getDecision() != BoardDecision.PENDING) {
+                throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
+            }
+            Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 boardMember.getEmail(),
                 EmailOtpPurpose.BOARD_SIGNATURE,
                 boardMember.getId(),
-                "Your SACCO MVP board decision code",
-                "Use this OTP code to confirm your assigned board review decision.",
+                reviewOtpSubject(myReview.getReviewStage()),
+                reviewOtpBody(myReview.getReviewStage()),
                 app.getSaccoId(),
                 app.getStationId(),
                 boardMember.getPhone()
             );
-            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a board decision code using the station OTP delivery policy."));
+            return ResponseEntity.ok(otpIssueResponse(otp, reviewOtpSentMessage(myReview.getReviewStage())));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -446,14 +453,16 @@ public class BoardController {
         try {
             LoanApplication app = loanApplicationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-            if (app.getStatus() != com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD) {
-                throw new IllegalStateException("This application is no longer waiting for board approval.");
-            }
             BoardReview myReview = resolveMyReview(id, principal);
-            if (myReview.getDecision() != BoardDecision.PENDING) {
-                throw new IllegalStateException("You have already submitted your board decision.");
+            if (app.getStatus() != pendingStatusFor(myReview.getReviewStage())) {
+                throw new IllegalStateException("This application is no longer waiting for "
+                    + myReview.getReviewStage().getDisplayLabel().toLowerCase(java.util.Locale.ENGLISH)
+                    + " approval.");
             }
-            Member boardMember = requireMemberWithEmail(principal.getMemberId());
+            if (myReview.getDecision() != BoardDecision.PENDING) {
+                throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
+            }
+            Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             emailOtpService.validateOtp(boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -476,12 +485,12 @@ public class BoardController {
                          @RequestParam(required = false) String boardSignatureOtpCode,
                          RedirectAttributes ra) {
         try {
-            Member boardMember = requireMemberWithEmail(principal.getMemberId());
             BoardReview myReview = resolveMyReview(id, principal);
+            Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             UUID otpTokenId = emailOtpService.validateOtp(
                 boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
             if (decision == BoardDecision.APPROVED) {
-                requireSavedSignature(boardMember);
+                requireSavedSignature(boardMember, myReview.getReviewStage());
                 boardService.decide(
                     id,
                     principal.getMemberId(),
@@ -495,7 +504,7 @@ public class BoardController {
                 boardService.decide(id, principal.getMemberId(), myReview.getReviewStage(), decision, comment, null, null);
             }
             emailOtpService.consumeOtpById(otpTokenId);
-            ra.addFlashAttribute("message", "Board decision submitted");
+            ra.addFlashAttribute("message", reviewOtpAudienceLabel(myReview.getReviewStage()) + " decision submitted");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -567,7 +576,7 @@ public class BoardController {
         model.addAttribute("reviewAssessorTitle", label + " Assessors");
         model.addAttribute("reviewAssessorDescription", "Assigned reviewers and decisions for this stage.");
         model.addAttribute("reviewApprovalOtpEnabled", true);
-        model.addAttribute("reviewAwaitingStatus", "AWAITING_BOARD");
+        model.addAttribute("reviewAwaitingStatus", awaitingStatusFor(principal).name());
     }
 
     private List<ApprovalWorkflowStage> reviewerStages(AppUserPrincipal principal) {
@@ -599,6 +608,16 @@ public class BoardController {
         return reviewerStages(principal).stream()
             .findFirst()
             .orElse(ApprovalWorkflowStage.BOARD);
+    }
+
+    private LoanStatus awaitingStatusFor(AppUserPrincipal principal) {
+        return pendingStatusFor(primaryReviewStage(principal));
+    }
+
+    private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {
+        return stage == ApprovalWorkflowStage.CREDIT_COMMITTEE
+            ? LoanStatus.AWAITING_CREDIT_COMMITTEE
+            : LoanStatus.AWAITING_BOARD;
     }
 
     private BoardReview resolveMyReview(UUID loanId, AppUserPrincipal principal) {
@@ -645,7 +664,7 @@ public class BoardController {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
             case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
-                List.of(com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID));
+                List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID));
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
         };
     }
@@ -653,7 +672,7 @@ public class BoardController {
     private record ArchiveFilter(String key,
                                  String label,
                                  BoardDecision decision,
-                                 List<com.sacco.mvp.domain.LoanStatus> statuses) {
+                                 List<LoanStatus> statuses) {
     }
 
     private Map<String, Object> otpIssueResponse(EmailOtpService.OtpIssueResult otp, String fallbackMessage) {
@@ -693,7 +712,7 @@ public class BoardController {
             loanApplicationRepository.findById(review.getLoanApplicationId())
                 .filter(app -> principal.getSaccoId().equals(app.getSaccoId()))
                 .filter(app -> matchesApplicantStation(app, principal.getStationId()))
-                .filter(app -> !awaitingBoardOnly || app.getStatus() == com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD)
+                .filter(app -> !awaitingBoardOnly || app.getStatus() == pendingStatusFor(review.getReviewStage()))
                 .filter(app -> matchesBoardSearch(app, normalizedSearchId))
                 .ifPresent(app -> {
                     apps.add(app);
@@ -794,7 +813,7 @@ public class BoardController {
             return "-";
         }
         java.text.DecimalFormat format = new java.text.DecimalFormat(
-            "#,##0.00", new java.text.DecimalFormatSymbols(java.util.Locale.US));
+            "#,##0.##", new java.text.DecimalFormatSymbols(java.util.Locale.US));
         return "TSh " + format.format(amount);
     }
 
@@ -806,19 +825,43 @@ public class BoardController {
         return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
     }
 
-    private Member requireMemberWithEmail(UUID memberId) {
+    private Member requireMemberWithEmail(UUID memberId, ApprovalWorkflowStage reviewStage) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
-            throw new IllegalStateException("Add an email address to your member profile before requesting a board OTP.");
+            throw new IllegalStateException("Add an email address to your member profile before requesting a "
+                + reviewOtpAudienceLabel(reviewStage) + " OTP.");
         }
         return member;
     }
 
-    private void requireSavedSignature(Member member) {
+    private void requireSavedSignature(Member member, ApprovalWorkflowStage reviewStage) {
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
-            throw new IllegalStateException("Register your signature first before approving board reviews.");
+            throw new IllegalStateException("Register your signature first before approving "
+                + reviewOtpAudienceLabel(reviewStage) + " reviews.");
         }
+    }
+
+    private String reviewOtpSubject(ApprovalWorkflowStage reviewStage) {
+        return "Loan Application Portal: OTP code for the " + reviewOtpAudienceLabel(reviewStage);
+    }
+
+    private String reviewOtpBody(ApprovalWorkflowStage reviewStage) {
+        return "Use this OTP code to confirm your assigned "
+            + reviewOtpAudienceLabel(reviewStage) + " review decision.";
+    }
+
+    private String reviewOtpSentMessage(ApprovalWorkflowStage reviewStage) {
+        return "We sent an OTP code for the " + reviewOtpAudienceLabel(reviewStage)
+            + " using the station OTP delivery policy.";
+    }
+
+    private String reviewDecisionAlreadySubmittedMessage(ApprovalWorkflowStage reviewStage) {
+        return "You have already submitted your " + reviewOtpAudienceLabel(reviewStage) + " decision.";
+    }
+
+    private String reviewOtpAudienceLabel(ApprovalWorkflowStage reviewStage) {
+        return reviewStage == ApprovalWorkflowStage.CREDIT_COMMITTEE ? "Credit Committee" : "Board";
     }
 
     private String resolveSavedSignatureText(UUID memberId) {
@@ -835,7 +878,7 @@ public class BoardController {
     private String boardLoanStatusBadgeClass(LoanApplication app) {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_ACCEPTED, AWAITING_BOARD -> "bg-blue-50 text-blue-700";
+            case MANAGER_ACCEPTED, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
             case BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";

@@ -771,7 +771,7 @@
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
                             ${product.interestMethod}
-                            <span class="block text-sm font-medium text-slate-600"><fmt:formatNumber value="${product.interestRate * 100}" minFractionDigits="2" maxFractionDigits="2" />%</span>
+                            <span class="block text-sm font-medium text-slate-600"><fmt:formatNumber value="${(product.interestRate ne null ? product.interestRate : 0) * 100}" maxFractionDigits="4" />%</span>
                         </p>
                     </div>
 
@@ -903,7 +903,7 @@
                             <fmt:formatNumber value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" minFractionDigits="2" maxFractionDigits="2" />
                             <span class="block text-sm font-medium text-slate-600">
                                 <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />:
-                                <fmt:formatNumber value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" minFractionDigits="2" maxFractionDigits="2" />%
+                                <fmt:formatNumber value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" maxFractionDigits="4" />%
                             </span>
                         </p>
                     </div>
@@ -952,9 +952,9 @@
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Application Fee
                         <input name="applicationFee"
-                               type="number"
-                               min="0"
-                               step="0.01"
+                               type="text"
+                               inputmode="decimal"
+                               data-money-input="true"
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                                value="${settings.resolvedApplicationFee}" />
                         <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
@@ -1129,12 +1129,12 @@
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                                <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
+                                <input name="minimumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                                <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank for no product cap" />' />
+                                <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank for no product cap" />' />
                             </label>
 
                             <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
@@ -1177,22 +1177,22 @@
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
-                                <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${settings.resolvedApplicationFee}" />
+                                <input name="applicationFee" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${settings.resolvedApplicationFee}" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
-                                <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.50" />
+                                <input name="insurancePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.5" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
-                                <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
+                                <input name="processingFeePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
-                                <input name="annualInterestPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="10.00" />
+                                <input name="annualInterestPercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="10" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1642,12 +1642,12 @@
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                            <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
+                            <input name="minimumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                            <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
+                            <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
                         </label>
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
@@ -1690,22 +1690,22 @@
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
-                            <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
+                            <input name="applicationFee" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
-                            <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.insuranceRate * 100}" />
+                            <input name="insurancePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.insuranceRate ne null ? product.insuranceRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
-                            <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
+                            <input name="processingFeePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
-                            <input name="annualInterestPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.interestRate * 100}" />
+                            <input name="annualInterestPercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.interestRate ne null ? product.interestRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -2168,10 +2168,26 @@
             input.value = formatMoneyValue(input.value);
         }
 
+        function trimDecimalZeros(value) {
+            const raw = String(value || '').trim();
+            if (raw === '') {
+                return '';
+            }
+            const numericValue = Number(raw);
+            return Number.isFinite(numericValue) ? String(numericValue) : raw;
+        }
+
         document.querySelectorAll('[data-money-input="true"]').forEach((input) => {
             syncMoneyInput(input);
             input.addEventListener('input', () => syncMoneyInput(input));
             input.addEventListener('blur', () => syncMoneyInput(input));
+        });
+
+        document.querySelectorAll('[data-trim-decimal-input="true"]').forEach((input) => {
+            input.value = trimDecimalZeros(input.value);
+            input.addEventListener('blur', () => {
+                input.value = trimDecimalZeros(input.value);
+            });
         });
 
         document.querySelectorAll('form').forEach((form) => {

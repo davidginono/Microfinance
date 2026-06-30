@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,6 @@ public class MinorAdminInvitationService {
     private final MinorAdminInvitationRepository invitationRepository;
     private final MemberRepository memberRepository;
     private final EmailOtpService emailOtpService;
-    private final PhoneOtpService phoneOtpService;
     private final NotificationEmailService notificationEmailService;
     private final PasswordEncoder passwordEncoder;
 
@@ -71,7 +71,7 @@ public class MinorAdminInvitationService {
         return invitation;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(noRollbackFor = ExpiredInvitationException.class)
     public ClaimContext loadClaimContext(String rawToken) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
@@ -82,26 +82,25 @@ public class MinorAdminInvitationService {
         return new ClaimContext(invitation, member);
     }
 
-    @Transactional
-    public void requestOtp(String rawToken) {
+    @Transactional(noRollbackFor = ExpiredInvitationException.class)
+    public StationOtpDeliveryService.DeliveryReceipt requestOtp(String rawToken) {
         ClaimContext ctx = loadClaimContext(rawToken);
         Member member = ctx.member();
-        if (TanzaniaPhoneNumber.normalizeOptional(member.getPhone()) == null) {
-            throw new IllegalStateException("A valid phone number is required before this account can be activated.");
-        }
-        emailOtpService.issueOtp(
+        return emailOtpService.issueOtp(
             member.getEmail(),
             EmailOtpPurpose.CLAIM_ACCOUNT,
             member.getId(),
             "Activate your SACCO admin account",
             "Use the code below to complete the activation of your Minor Admin account for "
-                + member.getSaccoId() + "."
+                + member.getSaccoId() + ".",
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getPhone()
         );
-        phoneOtpService.issueClaimOtp(member.getPhone(), member.getId());
     }
 
-    @Transactional
-    public Member claimInvitation(String rawToken, String otpCode, String phoneOtpCode, String password) {
+    @Transactional(noRollbackFor = ExpiredInvitationException.class)
+    public Member claimInvitation(String rawToken, String otpCode, String password) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
@@ -112,7 +111,6 @@ public class MinorAdminInvitationService {
             throw new IllegalStateException("Password must be at least 8 characters.");
         }
         emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.CLAIM_ACCOUNT, otpCode);
-        phoneOtpService.consumeClaimOtp(member.getPhone(), member.getId(), phoneOtpCode);
 
         OffsetDateTime now = OffsetDateTime.now();
         member.setStatus(MemberStatus.ACTIVE);
@@ -155,6 +153,15 @@ public class MinorAdminInvitationService {
         return issueInvitation(member, invitedBy);
     }
 
+    @Scheduled(fixedDelayString = "${app.auth.invitation.cleanup-delay-ms:60000}",
+        initialDelayString = "${app.auth.invitation.cleanup-initial-delay-ms:60000}")
+    @Transactional
+    public void cleanupExpiredInvitations() {
+        OffsetDateTime now = OffsetDateTime.now();
+        invitationRepository.findByClaimedAtIsNullAndRevokedAtIsNullAndExpiresAtBefore(now)
+            .forEach(invitation -> cleanupExpiredInvitation(invitation, now));
+    }
+
     private MinorAdminInvitation requirePendingInvitation(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             throw new IllegalStateException("This activation link is missing its token.");
@@ -165,9 +172,24 @@ public class MinorAdminInvitationService {
             .orElseThrow(() -> new IllegalStateException("This activation link is invalid or has already been used."));
         OffsetDateTime now = OffsetDateTime.now();
         if (invitation.getExpiresAt() == null || invitation.getExpiresAt().isBefore(now)) {
-            throw new IllegalStateException("This activation link has expired. Ask your Super Admin to resend the invitation.");
+            cleanupExpiredInvitation(invitation, now);
+            throw new ExpiredInvitationException("This activation link has expired. Ask your Super Admin to create the staff account again.");
         }
         return invitation;
+    }
+
+    private void cleanupExpiredInvitation(MinorAdminInvitation invitation, OffsetDateTime now) {
+        if (invitation == null || invitation.getMemberId() == null) {
+            return;
+        }
+        memberRepository.findById(invitation.getMemberId())
+            .filter(member -> member.getStatus() == MemberStatus.INVITED)
+            .ifPresent(member -> {
+                invitationRepository.delete(invitation);
+                memberRepository.delete(member);
+                log.info("Removed expired unclaimed staff invitation memberId={} memberNo={} expiredAt={} cleanupAt={}",
+                    member.getId(), member.getMemberNo(), invitation.getExpiresAt(), now);
+            });
     }
 
     private void sendInviteEmail(Member member, String rawToken, int ttlHours) {
@@ -210,5 +232,11 @@ public class MinorAdminInvitationService {
     }
 
     public record ClaimContext(MinorAdminInvitation invitation, Member member) {
+    }
+
+    private static class ExpiredInvitationException extends IllegalStateException {
+        private ExpiredInvitationException(String message) {
+            super(message);
+        }
     }
 }

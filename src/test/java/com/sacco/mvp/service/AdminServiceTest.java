@@ -128,7 +128,6 @@ class AdminServiceTest {
             memberRepository,
             null,
             null,
-            null,
             null
         ) {
             @Override
@@ -358,6 +357,7 @@ class AdminServiceTest {
             "Minor Admin",
             "minor@example.com",
             null,
+            "Minor Admin",
             List.of(Position.MINOR_ADMIN)
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -381,6 +381,7 @@ class AdminServiceTest {
             "Mary Manager",
             " Existing@Example.com ",
             null,
+            "Mary Manager",
             List.of(Position.MANAGER)
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -615,7 +616,8 @@ class AdminServiceTest {
             "MINOR001",
             "Minor Admin",
             "minor@example.com",
-            null
+            null,
+            "Minor Admin"
         ))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
@@ -672,7 +674,8 @@ class AdminServiceTest {
             "MINOR002",
             "Minor Admin Two",
             "minor2@example.com",
-            "255712345679"
+            "255712345679",
+            "Minor Admin Two"
         );
 
         assertThat(member.getStationId()).isEqualTo("ST-2");
@@ -906,6 +909,7 @@ class AdminServiceTest {
             "Mary Manager",
             "manager@example.com",
             null,
+            "Mary Manager",
             List.of(Position.MANAGER)
         );
 
@@ -948,7 +952,8 @@ class AdminServiceTest {
             "MINOR001",
             "Minor Admin",
             "minor@example.com",
-            "255712345678"
+            "255712345678",
+            "Minor Admin"
         );
 
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
@@ -1119,6 +1124,7 @@ class AdminServiceTest {
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_LOAN", productId)).thenReturn(false);
         when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
         UUID boardReviewerId = UUID.randomUUID();
+        UUID creditCommitteeReviewerId = UUID.randomUUID();
         stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
@@ -1133,10 +1139,19 @@ class AdminServiceTest {
                 .id(boardReviewerId)
                 .saccoId("SACCO-01")
                 .memberNo("BOARD-1")
-                .fullName("Committee Reviewer")
+                .fullName("Board Reviewer")
                 .status(MemberStatus.ACTIVE)
                 .position(Position.BOARD)
                 .staffRoles(new LinkedHashSet<>(List.of(Position.BOARD)))
+                .build(),
+            Member.builder()
+                .id(creditCommitteeReviewerId)
+                .saccoId("SACCO-01")
+                .memberNo("CC-1")
+                .fullName("Credit Committee Reviewer")
+                .status(MemberStatus.ACTIVE)
+                .position(Position.CREDIT_COMMITTEE)
+                .staffRoles(new LinkedHashSet<>(List.of(Position.CREDIT_COMMITTEE)))
                 .build(),
             Member.builder()
                 .id(UUID.randomUUID())
@@ -1185,13 +1200,13 @@ class AdminServiceTest {
             4,
             3,
             true,
-            1,
+            5,
             List.of(boardReviewerId),
             true,
             1,
             1,
             1,
-            List.of(),
+            List.of(creditCommitteeReviewerId),
             true,
             2,
             true,
@@ -1208,7 +1223,12 @@ class AdminServiceTest {
         assertThat(product.getAccountantPriority()).isEqualTo(2);
         assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.LOAN_OFFICER);
         InOrder reviewerReplacement = inOrder(loanProductBoardReviewerRepository);
-        reviewerReplacement.verify(loanProductBoardReviewerRepository).deleteByLoanProductSettingId(productId);
+        reviewerReplacement.verify(loanProductBoardReviewerRepository)
+            .deleteByLoanProductSettingIdAndReviewStage(productId, ApprovalWorkflowStage.BOARD);
+        reviewerReplacement.verify(loanProductBoardReviewerRepository).flush();
+        reviewerReplacement.verify(loanProductBoardReviewerRepository).save(any());
+        reviewerReplacement.verify(loanProductBoardReviewerRepository)
+            .deleteByLoanProductSettingIdAndReviewStage(productId, ApprovalWorkflowStage.CREDIT_COMMITTEE);
         reviewerReplacement.verify(loanProductBoardReviewerRepository).flush();
         reviewerReplacement.verify(loanProductBoardReviewerRepository).save(any());
     }

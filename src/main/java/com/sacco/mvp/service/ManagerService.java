@@ -86,6 +86,7 @@ public class ManagerService {
             LoanStatus.LOAN_OFFICER_APPROVED,
             LoanStatus.LOAN_OFFICER_REJECTED,
             LoanStatus.AWAITING_BOARD,
+            LoanStatus.AWAITING_CREDIT_COMMITTEE,
             LoanStatus.BOARD_APPROVED,
             LoanStatus.AWAITING_ACCOUNTANT,
             LoanStatus.ACCOUNTANT_APPROVED,

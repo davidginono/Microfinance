@@ -39,7 +39,8 @@ public class ApprovalFlowService {
         return switch (stage) {
             case MANAGER -> LoanStatus.READY_FOR_MANAGER;
             case LOAN_OFFICER -> LoanStatus.AWAITING_LOAN_OFFICER;
-            case BOARD, CREDIT_COMMITTEE -> LoanStatus.AWAITING_BOARD;
+            case BOARD -> LoanStatus.AWAITING_BOARD;
+            case CREDIT_COMMITTEE -> LoanStatus.AWAITING_CREDIT_COMMITTEE;
             case ACCOUNTANT -> LoanStatus.AWAITING_ACCOUNTANT;
             case DISBURSEMENT_OFFICER -> LoanStatus.READY_FOR_DISBURSEMENT;
         };

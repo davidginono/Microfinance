@@ -283,11 +283,17 @@ public class AccountantController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,
-            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
-            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
+            repaymentTransactions,
+            paymentSummary));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
+        model.addAttribute("previousApprovedReviews",
+            loanPresentationService.previousApprovedReviews(app, ApprovalWorkflowStage.ACCOUNTANT));
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
@@ -560,7 +566,7 @@ public class AccountantController {
             return "-";
         }
         java.text.DecimalFormat format = new java.text.DecimalFormat(
-            "#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
+            "#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
         return "TSh " + format.format(amount);
     }
 
@@ -608,7 +614,7 @@ public class AccountantController {
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
         model.addAttribute("managerStatusBadgeClass", switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED,
                 READY_FOR_DISBURSEMENT, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";

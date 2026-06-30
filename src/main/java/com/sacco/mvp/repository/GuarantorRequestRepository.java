@@ -94,6 +94,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
             com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER
           )
@@ -156,6 +157,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
             com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER
           )

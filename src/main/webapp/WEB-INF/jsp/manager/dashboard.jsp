@@ -422,7 +422,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
                         <c:if test="${not empty loan.loanId}">
                             <span><spring:message code="loan.loanId" text="Loan ID" />: ${loan.loanId}</span>
                         </c:if>
-                        <span><spring:message code="common.amount" text="Amount" />: ${loan.amount}</span>
+                        <span><spring:message code="common.amount" text="Amount" />: <fmt:formatNumber value="${loan.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
                         <span><spring:message code="analytics.disbursed" text="Disbursed" />: ${loan.disbursementDate}</span>
                     </div>
                 </a>

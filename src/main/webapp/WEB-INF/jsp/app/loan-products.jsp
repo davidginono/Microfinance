@@ -180,9 +180,7 @@
 
 <c:if test="${empty applicationLockApp and not empty activeDisbursedLoanApp}">
         <div class="erp-section mb-4 text-sm text-slate-700">
-        <spring:message code="products.activeLoan.intro" />
-        <strong>${activeDisbursedLoanApp.applicationNumber}</strong>.
-        <spring:message code="products.activeLoan.followup" />
+        <c:out value="${activeLoanAwarenessMessage}" />
     </div>
 </c:if>
 

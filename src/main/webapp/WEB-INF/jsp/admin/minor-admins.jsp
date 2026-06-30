@@ -69,6 +69,11 @@
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <spring:message code="register.member.signature" text="Signature" />
+                    <input name="signatureText" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. James M Juma" />
+                </label>
+
+                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="register.member.email" text="Email" />
                     <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                 </label>
@@ -255,6 +260,11 @@
                     <label class="block text-sm font-semibold text-slate-700">
                         <spring:message code="member.fullName" text="Full Name" />
                         <input name="fullName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.fullName}" />
+                    </label>
+
+                    <label class="block text-sm font-semibold text-slate-700">
+                        <spring:message code="register.member.signature" text="Signature" />
+                        <input name="signatureText" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.signatureText}" />
                     </label>
 
                     <label class="block text-sm font-semibold text-slate-700">

@@ -157,6 +157,7 @@ public class AdminService {
                              String fullName,
                              String email,
                              String phone,
+                             String signatureText,
                              List<Position> positions) {
         LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
         return createStaffAccount(
@@ -167,6 +168,7 @@ public class AdminService {
             fullName,
             email,
             phone,
+            signatureText,
             staffRoles,
             "ADMIN_CREATE_STAFF_USER"
         );
@@ -245,7 +247,8 @@ public class AdminService {
                                      String memberNo,
                                      String fullName,
                                      String email,
-                                     String phone) {
+                                     String phone,
+                                     String signatureText) {
         String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
         String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
         return createStaffAccount(
@@ -256,6 +259,7 @@ public class AdminService {
             fullName,
             email,
             phone,
+            signatureText,
             new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)),
             "ADMIN_CREATE_MINOR_ADMIN"
         );
@@ -269,7 +273,8 @@ public class AdminService {
                                  String memberNo,
                                  String fullName,
                                  String email,
-                                 String phone) {
+                                 String phone,
+                                 String signatureText) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
@@ -283,6 +288,7 @@ public class AdminService {
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
+        String normalizedSignatureText = normalizeStaffSignatureText(signatureText);
         if (normalizedPhone == null) {
             throw new IllegalStateException("Enter the Minor Admin phone number.");
         }
@@ -308,6 +314,10 @@ public class AdminService {
             member.setPhoneVerifiedAt(member.getStatus() == MemberStatus.ACTIVE ? OffsetDateTime.now() : null);
         }
         member.setPhone(normalizedPhone);
+        if (!java.util.Objects.equals(member.getSignatureText(), normalizedSignatureText)) {
+            member.setSignatureRegisteredAt(OffsetDateTime.now());
+        }
+        member.setSignatureText(normalizedSignatureText);
         member.setPosition(Position.MINOR_ADMIN);
         member.setStaffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)));
         if (saccoChanged || member.getRank() == null) {
@@ -334,6 +344,7 @@ public class AdminService {
                     member.getEmail(),
                     member.getPhone(),
                     member.getPhoneVerifiedAt() != null,
+                    member.getSignatureText(),
                     member.getSaccoId(),
                     member.getStationId(),
                     member.getStatus(),
@@ -2148,6 +2159,7 @@ public class AdminService {
                                       String fullName,
                                       String email,
                                       String phone,
+                                      String signatureText,
                                       LinkedHashSet<Position> staffRoles,
                                       String auditAction) {
         Position primaryRole = Position.primaryRole(staffRoles, false);
@@ -2159,6 +2171,7 @@ public class AdminService {
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
+        String normalizedSignatureText = normalizeStaffSignatureText(signatureText);
         if (staffRoles.contains(Position.MINOR_ADMIN) && normalizedPhone == null) {
             throw new IllegalStateException("Enter the Minor Admin phone number.");
         }
@@ -2187,6 +2200,8 @@ public class AdminService {
             .fullName(normalizedFullName)
             .email(normalizedEmail)
             .phone(normalizedPhone)
+            .signatureText(normalizedSignatureText)
+            .signatureRegisteredAt(now)
             .memberAccount(false)
             .status(requiresClaim ? MemberStatus.INVITED : MemberStatus.ACTIVE)
             .position(primaryRole)
@@ -2381,6 +2396,14 @@ public class AdminService {
         BigDecimal normalized = ratio.setScale(4, java.math.RoundingMode.HALF_UP);
         if (normalized.compareTo(MAX_LOAN_SAVINGS_RATIO) > 0) {
             throw new IllegalStateException("Savings ratio cannot exceed ten times savings.");
+        }
+        return normalized;
+    }
+
+    private String normalizeStaffSignatureText(String value) {
+        String normalized = requireValue(value, "Enter the staff member's signature.");
+        if (normalized.length() > 120) {
+            normalized = normalized.substring(0, 120).trim();
         }
         return normalized;
     }
@@ -2770,6 +2793,7 @@ public class AdminService {
         private String email;
         private String phone;
         private boolean phoneVerified;
+        private String signatureText;
         private String saccoId;
         private String stationId;
         private MemberStatus status;
@@ -3320,7 +3344,8 @@ public class AdminService {
         }
 
         public long getAwaitingBoardCount() {
-            return applicationCounts.getOrDefault(LoanStatus.AWAITING_BOARD, 0L);
+            return applicationCounts.getOrDefault(LoanStatus.AWAITING_BOARD, 0L)
+                + applicationCounts.getOrDefault(LoanStatus.AWAITING_CREDIT_COMMITTEE, 0L);
         }
 
         public long getOutboxNewCount() {

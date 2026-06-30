@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -49,7 +50,7 @@
                     <td class="px-3 py-2">
                         <spring:message code="loan.type.${app.loanType}" />
                     </td>
-                    <td class="px-3 py-2">${app.amount}</td>
+                    <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                     <td class="px-3 py-2">
                         <spring:message code="loan.status.${app.status}" text="${app.status}" />
                         <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">

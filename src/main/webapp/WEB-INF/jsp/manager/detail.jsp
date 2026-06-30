@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -94,7 +95,7 @@
                         </svg>
                     </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value" data-disbursement-loan-amount-display>${app.amount}</div>
+                    <div class="loan-stat-value" data-disbursement-loan-amount-display><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
                     <span class="loan-staff-kpi-icon" aria-hidden="true">
@@ -172,6 +173,7 @@
             <strong><spring:message code="review.currentRejectionReason" text="Current Rejection Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
+    <%@ include file="../fragments/previous-approved-reviews.jspf" %>
     <div class="loan-view-summary-card px-5 py-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -573,10 +575,10 @@
                        placeholder="100,000.00" />
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <button type="button"
-                            class="app-btn btn-neutral"
+                            class="app-btn btn-neutral ${empty deductibleFeeRows ? 'opacity-60 cursor-not-allowed' : ''}"
                             data-deduct-fees
                             data-loan-amount="${app.amount}"
-                            data-total-fees="${totalDeductions}">
+                            ${empty deductibleFeeRows ? 'disabled' : ''}>
                         <spring:message code="loan.disbursement.deductFees" text="Deduct fees" />
                     </button>
                     <button type="button"
@@ -585,6 +587,46 @@
                             data-loan-amount="${app.amount}">
                         <spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" />
                     </button>
+                    <c:if test="${not empty deductibleFeeRows}">
+                        <div class="hidden w-full rounded-md border border-slate-200 bg-white px-4 py-4 shadow-sm"
+                             data-fee-deduction-card>
+                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <p class="text-sm font-semibold text-sacco-ink"><spring:message code="loan.disbursement.selectFees" text="Select fees to deduct" /></p>
+                                <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue"
+                                           data-fee-select-all />
+                                    <span><spring:message code="loan.disbursement.includeAllFees" text="Include all fees" /></span>
+                                </label>
+                            </div>
+                            <div class="mt-3 space-y-2">
+                                <c:forEach items="${deductibleFeeRows}" var="fee">
+                                    <label class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                        <span class="inline-flex min-w-0 items-center gap-2">
+                                            <input type="checkbox"
+                                                   class="h-4 w-4 shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue"
+                                                   data-fee-option
+                                                   data-fee-amount="${fee.amount}" />
+                                            <span class="truncate font-semibold text-slate-700"><c:out value="${fee.label}" /></span>
+                                        </span>
+                                        <span class="shrink-0 font-semibold text-sacco-ink"><c:out value="${fee.amountLabel}" /></span>
+                                    </label>
+                                </c:forEach>
+                            </div>
+                            <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                <p class="text-xs font-semibold text-slate-500">
+                                    <spring:message code="loan.disbursement.selectedFees" text="Selected fees" />:
+                                    <span data-selected-fees-amount>TSh 0.00</span>
+                                </p>
+                                <button type="button"
+                                        class="app-btn btn-primary"
+                                        data-apply-fee-deduction
+                                        disabled>
+                                    <spring:message code="loan.disbursement.deductSelectedFees" text="Deduct" />
+                                </button>
+                            </div>
+                        </div>
+                    </c:if>
                     <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.cashOrDepositHelp" text="This is the amount the applicant will receive in cash/bank, while the required loan to be returned by the applicant remains the approved amount." /></p>
                 </div>
             </div>
@@ -593,7 +635,7 @@
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.approvedLoanAmount" text="Approved Loan Amount" /></span>
-                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-requested-amount>${app.amount}</span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-disbursement-requested-amount><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
                         </div>
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.totalFees" text="Total Fees" /></span>
@@ -601,7 +643,7 @@
                         </div>
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /></span>
-                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount>${app.depositAmount ne null ? app.depositAmount : app.amount}</span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
                         </div>
                     </div>
                     <p class="mt-3 text-xs text-slate-600"><spring:message code="loan.disbursement.depositPreviewHelp" text="Repayment and principal use the approved loan amount. Deposit amount only records what reaches the applicant after any fee deduction." /></p>
@@ -856,6 +898,11 @@
         const depositPreviewAmount = document.querySelector("[data-deposit-preview-amount]");
         const deductFeesButton = document.querySelector("[data-deduct-fees]");
         const approvedAmountButton = document.querySelector("[data-approved-amount]");
+        const feeDeductionCard = document.querySelector("[data-fee-deduction-card]");
+        const feeSelectAll = feeDeductionCard?.querySelector("[data-fee-select-all]");
+        const feeOptions = Array.from(feeDeductionCard?.querySelectorAll("[data-fee-option]") || []);
+        const selectedFeesAmount = feeDeductionCard?.querySelector("[data-selected-fees-amount]");
+        const applyFeeDeductionButton = feeDeductionCard?.querySelector("[data-apply-fee-deduction]");
         function refreshDepositAmountPreview() {
             if (!depositAmountInput) {
                 return;
@@ -885,14 +932,55 @@
         depositAmountInput?.form?.addEventListener("submit", () => {
             depositAmountInput.value = normalizeDisbursementAmount(depositAmountInput.value);
         });
+        function selectedFeeTotal() {
+            return feeOptions.reduce((total, option) => {
+                if (!option.checked) {
+                    return total;
+                }
+                const amount = Number(normalizeDisbursementAmount(option.dataset.feeAmount || "0"));
+                return total + (Number.isFinite(amount) ? amount : 0);
+            }, 0);
+        }
+        function refreshFeeDeductionState() {
+            const checkedCount = feeOptions.filter((option) => option.checked).length;
+            const total = selectedFeeTotal();
+            if (feeSelectAll) {
+                feeSelectAll.checked = feeOptions.length > 0 && checkedCount === feeOptions.length;
+                feeSelectAll.indeterminate = checkedCount > 0 && checkedCount < feeOptions.length;
+            }
+            if (selectedFeesAmount) {
+                selectedFeesAmount.textContent = formatDisbursementAmount(String(total.toFixed(2)));
+            }
+            if (applyFeeDeductionButton) {
+                applyFeeDeductionButton.disabled = total <= 0;
+                applyFeeDeductionButton.classList.toggle("opacity-60", total <= 0);
+                applyFeeDeductionButton.classList.toggle("cursor-not-allowed", total <= 0);
+            }
+        }
         deductFeesButton?.addEventListener("click", () => {
+            if (!feeDeductionCard || feeOptions.length === 0) {
+                return;
+            }
+            feeDeductionCard.classList.toggle("hidden");
+            refreshFeeDeductionState();
+        });
+        feeSelectAll?.addEventListener("change", () => {
+            feeOptions.forEach((option) => {
+                option.checked = feeSelectAll.checked;
+            });
+            refreshFeeDeductionState();
+        });
+        feeOptions.forEach((option) => {
+            option.addEventListener("change", refreshFeeDeductionState);
+        });
+        applyFeeDeductionButton?.addEventListener("click", () => {
             if (!depositAmountInput) {
                 return;
             }
-            const loanAmount = Number(normalizeDisbursementAmount(deductFeesButton.dataset.loanAmount || "0"));
-            const feesAmount = Number(normalizeDisbursementAmount(deductFeesButton.dataset.totalFees || "0"));
-            const depositAmount = Math.max(0, (Number.isFinite(loanAmount) ? loanAmount : 0) - (Number.isFinite(feesAmount) ? feesAmount : 0));
+            const loanAmount = Number(normalizeDisbursementAmount(deductFeesButton?.dataset.loanAmount || "0"));
+            const depositAmount = Math.max(0, (Number.isFinite(loanAmount) ? loanAmount : 0) - selectedFeeTotal());
             depositAmountInput.value = formatDisbursementInputAmount(String(depositAmount.toFixed(2)), true);
+            feeDeductionCard?.classList.add("hidden");
             refreshDepositAmountPreview();
         });
         approvedAmountButton?.addEventListener("click", () => {
@@ -904,6 +992,7 @@
             depositAmountInput.value = formatDisbursementInputAmount(String(approvedAmount.toFixed(2)), true);
             refreshDepositAmountPreview();
         });
+        refreshFeeDeductionState();
         refreshDepositAmountPreview();
         if (depositAmountInput) {
             depositAmountInput.value = formatDisbursementInputAmount(depositAmountInput.value, true);

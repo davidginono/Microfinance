@@ -217,9 +217,11 @@ public class AppController {
             model.addAttribute("applicationLockApp", app);
             model.addAttribute("applicationLockStatusLabel", dashboardStatusLabel(app.getStatus()));
         });
-        loanWorkflowService.findActiveDisbursedLoan(principal.getMemberId()).ifPresent(app ->
-            model.addAttribute("activeDisbursedLoanApp", app)
-        );
+        List<LoanApplication> activeDisbursedLoans = loanWorkflowService.findActiveDisbursedLoans(principal.getMemberId());
+        if (!activeDisbursedLoans.isEmpty()) {
+            model.addAttribute("activeDisbursedLoanApp", activeDisbursedLoans.get(0));
+            model.addAttribute("activeLoanAwarenessMessage", loanWorkflowService.activeLoanAwarenessMessage(activeDisbursedLoans));
+        }
         return "app/loan-products";
     }
 
@@ -509,6 +511,7 @@ public class AppController {
             LoanStatus.ALL_GUARANTORS_APPROVED,
             LoanStatus.READY_FOR_MANAGER,
             LoanStatus.AWAITING_BOARD,
+            LoanStatus.AWAITING_CREDIT_COMMITTEE,
             LoanStatus.FINAL_APPROVED
         );
         long maxCount = statusOrder.stream()
@@ -612,7 +615,7 @@ public class AppController {
             case ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED,
                 AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED,
-                AWAITING_BOARD, BOARD_REJECTED,
+                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED -> 4;
             case READY_FOR_DISBURSEMENT, FORFEITED, FINAL_REJECTED -> 4;
@@ -628,6 +631,7 @@ public class AppController {
             case READY_FOR_MANAGER, MANAGER_REJECTED -> ApprovalWorkflowStage.MANAGER;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED -> ApprovalWorkflowStage.LOAN_OFFICER;
             case AWAITING_BOARD, BOARD_REJECTED -> ApprovalWorkflowStage.BOARD;
+            case AWAITING_CREDIT_COMMITTEE -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
             case AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> ApprovalWorkflowStage.ACCOUNTANT;
             default -> null;
         };
@@ -1120,15 +1124,18 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("decisionFeedback", isRejectedStatus(app.getStatus()) ? loanPresentationService.rejectionFeedback(id) : List.of());
-        model.addAttribute("loanDetailRepaymentPreviewRows", loanDetailRepaymentPreview(app));
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary",
             loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
             app.getRepaymentScheduleJson(),
-            loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId()),
-            loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson())));
+            repaymentTransactions,
+            paymentSummary));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("repaymentDaysLeft",
             app.getFinalDueDate() == null ? null : java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), app.getFinalDueDate()));
@@ -1146,7 +1153,7 @@ public class AppController {
                 && guarantorRequests.stream().filter(req -> req.getStatus() == GuarantorRequestStatus.APPROVED).count() >= app.getRequiredGuarantors());
         model.addAttribute("statusTimeline", List.of(
             LoanStatus.DRAFT, LoanStatus.AWAITING_GUARANTORS, LoanStatus.ALL_GUARANTORS_APPROVED, LoanStatus.READY_FOR_MANAGER,
-            LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.BOARD_APPROVED,
+            LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.AWAITING_CREDIT_COMMITTEE, LoanStatus.BOARD_APPROVED,
             LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FORFEITED, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
@@ -1199,7 +1206,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
-                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
             case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
@@ -1214,7 +1221,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 35;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
-                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
             case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
         };
@@ -1229,7 +1236,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, DEFAULTED -> "bg-rose-50 text-rose-700";
-            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
                 FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case FINAL_REJECTED -> "bg-rose-50 text-rose-700";
@@ -1267,7 +1274,7 @@ public class AppController {
                 ra.addFlashAttribute("message", "Application submitted and sent for manager review.");
                 return "redirect:/app/loan-applications/" + id;
             }
-            if (app.getStatus() == LoanStatus.AWAITING_BOARD) {
+            if (app.getStatus() == LoanStatus.AWAITING_BOARD || app.getStatus() == LoanStatus.AWAITING_CREDIT_COMMITTEE) {
                 ra.addFlashAttribute("message", "Application submitted and sent for committee review.");
                 return "redirect:/app/loan-applications/" + id;
             }
@@ -2135,26 +2142,6 @@ public class AppController {
         }
     }
 
-    private List<Map<String, String>> loanDetailRepaymentPreview(LoanApplication app) {
-        if (app == null
-            || app.getFinancialSnapshot() == null
-            || app.getFinancialSnapshot().isBlank()
-            || app.getStatus() == LoanStatus.FINAL_APPROVED
-            || app.getStatus() == LoanStatus.DEFAULTED
-            || app.getStatus() == LoanStatus.PAID) {
-            return Collections.emptyList();
-        }
-        try {
-            Map<String, Object> snapshot = objectMapper.readValue(
-                app.getFinancialSnapshot(),
-                new TypeReference<Map<String, Object>>() {}
-            );
-            return previewRepaymentSchedule(app.getAmount(), app.getTenorMonths(), snapshot);
-        } catch (Exception ex) {
-            return Collections.emptyList();
-        }
-    }
-
     private List<Map<String, String>> draftRepaymentSchedulePreview(Map<String, String> formValues) {
         if (formValues == null || formValues.get("financialSnapshotJson") == null || formValues.get("financialSnapshotJson").isBlank()) {
             return Collections.emptyList();
@@ -2715,7 +2702,8 @@ public class AppController {
         return status == LoanStatus.AWAITING_GUARANTORS
             || status == LoanStatus.ALL_GUARANTORS_APPROVED
             || status == LoanStatus.READY_FOR_MANAGER
-            || status == LoanStatus.AWAITING_BOARD;
+            || status == LoanStatus.AWAITING_BOARD
+            || status == LoanStatus.AWAITING_CREDIT_COMMITTEE;
     }
 
     private boolean isArchivedStatus(LoanStatus status) {
@@ -2810,6 +2798,7 @@ public class AppController {
             || status == LoanStatus.ALL_GUARANTORS_APPROVED
             || status == LoanStatus.READY_FOR_MANAGER
             || status == LoanStatus.AWAITING_BOARD
+            || status == LoanStatus.AWAITING_CREDIT_COMMITTEE
             || status == LoanStatus.FINAL_APPROVED
             || status == LoanStatus.DEFAULTED;
     }
@@ -2837,6 +2826,9 @@ public class AppController {
         }
         if (status == LoanStatus.AWAITING_BOARD) {
             return "#6366F1";
+        }
+        if (status == LoanStatus.AWAITING_CREDIT_COMMITTEE) {
+            return "#8B5CF6";
         }
         if (status == LoanStatus.FINAL_APPROVED) {
             return "#22C55E";

@@ -1,0 +1,38 @@
+<c:if test="${not empty previousApprovedReviews}">
+    <div class="loan-view-summary-card mt-5 px-5 py-5">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.previousApprovals" text="Previous Review Decisions" /></p>
+            <p class="mt-2 text-base text-slate-600"><spring:message code="review.previousApprovalsHelp" text="Approved decisions from earlier workflow stages." /></p>
+        </div>
+        <div class="mt-5 erp-table-wrap overflow-x-auto">
+            <table class="erp-table">
+                <thead>
+                <tr>
+                    <th class="px-3 py-2 text-left"><spring:message code="review.stage" text="Stage" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="review.reviewer" text="Reviewer" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="review.decision" text="Decision" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="review.note" text="Note" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="review.submitted" text="Submitted" /></th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                <c:forEach items="${previousApprovedReviews}" var="previousReview">
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-slate-900"><c:out value="${previousReview.stageLabel}" /></td>
+                        <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.reviewerName}" /></td>
+                        <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.reviewerMemberNo}" /></td>
+                        <td class="px-3 py-2">
+                            <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                <c:out value="${previousReview.decisionLabel}" />
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.note}" /></td>
+                        <td class="px-3 py-2 text-slate-700"><c:out value="${previousReview.decidedAtLabel}" /></td>
+                    </tr>
+                </c:forEach>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</c:if>

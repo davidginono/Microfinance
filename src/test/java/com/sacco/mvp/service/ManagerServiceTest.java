@@ -81,7 +81,7 @@ class ManagerServiceTest {
     }
 
     @Test
-    void disburseLoanUsesOverrideAmountAsReleasedPrincipal() {
+    void disburseLoanStoresDepositAmountSeparatelyFromApprovedPrincipal() {
         UUID loanId = UUID.randomUUID();
         UUID officerId = UUID.randomUUID();
         LoanApplication app = LoanApplication.builder()
@@ -123,9 +123,10 @@ class ManagerServiceTest {
             eq(null),
             eq("Release notes")
         )).thenAnswer(invocation -> {
-            org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("125000.00");
+            org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("150000.00");
+            org.assertj.core.api.Assertions.assertThat(app.getDepositAmount()).isEqualByComparingTo("125000.00");
             return new RepaymentScheduleService.ScheduleResult(
-                "{\"disbursedPrincipal\":125000.00,\"schedule\":[]}",
+                "{\"disbursedPrincipal\":150000.00,\"schedule\":[]}",
                 LocalDate.of(2026, 12, 3),
                 new BigDecimal("20833.33"),
                 6
@@ -148,9 +149,10 @@ class ManagerServiceTest {
             proof
         );
 
-        org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("125000.00");
+        org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("150000.00");
+        org.assertj.core.api.Assertions.assertThat(app.getDepositAmount()).isEqualByComparingTo("125000.00");
         org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.FINAL_APPROVED);
-        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).contains("125000.00");
+        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).contains("150000.00");
         verify(loanApplicationRepository).save(app);
     }
 

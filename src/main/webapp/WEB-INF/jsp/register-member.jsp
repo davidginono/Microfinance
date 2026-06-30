@@ -185,6 +185,11 @@
             border-color: #1f9ec8;
             background: #1f9ec8;
         }
+        .registration-primary:disabled {
+            border-color: #d7e1ef;
+            background: #ffffff;
+            color: #6b7280;
+        }
         .registration-section-label {
             color: #334155;
             font-size: 0.88rem;
@@ -287,6 +292,7 @@
                                     required="required"
                                     cssClass="registration-field"
                                     placeholder="255712345678" />
+                        <p class="mt-1 text-xs text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></p>
                         <form:errors path="phone" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
 

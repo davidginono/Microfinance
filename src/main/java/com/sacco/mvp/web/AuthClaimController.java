@@ -1,7 +1,9 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.service.MinorAdminInvitationService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.TanzaniaPhoneNumber;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class AuthClaimController {
     private final MinorAdminInvitationService invitationService;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping
     public String showClaim(@RequestParam(value = "token", required = false) String token,
@@ -39,6 +42,11 @@ public class AuthClaimController {
             model.addAttribute("maskedEmail", maskEmail(member.getEmail()));
             model.addAttribute("maskedPhone", maskPhone(member.getPhone()));
             model.addAttribute("invitationExpiresAt", ctx.invitation().getExpiresAt());
+            OtpDeliveryChannel channel = stationOtpSettingsService.channel(member.getSaccoId(), member.getStationId());
+            model.addAttribute("otpDeliveryChannel", channel.name());
+            model.addAttribute("otpDeliveryText", otpDeliveryText(channel, member));
+            model.addAttribute("otpFieldLabel", channel == OtpDeliveryChannel.EMAIL ? "Email verification code" : "Verification code");
+            model.addAttribute("otpFieldPlaceholder", channel == OtpDeliveryChannel.EMAIL ? "6-digit email code" : "6-digit code");
         } catch (IllegalStateException ex) {
             model.addAttribute("claimError", ex.getMessage());
             model.addAttribute("claimToken", "");
@@ -51,8 +59,8 @@ public class AuthClaimController {
     public String requestOtp(@RequestParam("token") String token,
                              RedirectAttributes ra) {
         try {
-            invitationService.requestOtp(token);
-            ra.addFlashAttribute("claimMessage", "Verification codes were sent to the email and phone number on file.");
+            var receipt = invitationService.requestOtp(token);
+            ra.addFlashAttribute("claimMessage", receipt.userMessage());
         } catch (IllegalStateException ex) {
             ra.addFlashAttribute("claimError", ex.getMessage());
         }
@@ -61,11 +69,10 @@ public class AuthClaimController {
 
     @PostMapping("/verify")
     public String verify(@RequestParam("token") String token,
-                         @RequestParam("otpCode") String otpCode,
-                         @RequestParam("phoneOtpCode") String phoneOtpCode,
-                         @RequestParam("password") String password,
-                         @RequestParam("confirmPassword") String confirmPassword,
-                         RedirectAttributes ra) {
+                          @RequestParam("otpCode") String otpCode,
+                          @RequestParam("password") String password,
+                          @RequestParam("confirmPassword") String confirmPassword,
+                          RedirectAttributes ra) {
         try {
             if (password == null || password.length() < 8) {
                 throw new IllegalStateException("Password must be at least 8 characters.");
@@ -73,7 +80,7 @@ public class AuthClaimController {
             if (!password.equals(confirmPassword)) {
                 throw new IllegalStateException("Passwords do not match.");
             }
-            Member member = invitationService.claimInvitation(token, otpCode, phoneOtpCode, password);
+            Member member = invitationService.claimInvitation(token, otpCode, password);
             log.info("Staff account activated memberNo={}", member.getMemberNo());
             ra.addFlashAttribute("loginMessage",
                 "Your account is now active. Sign in using your staff member number and password or request an email code.");
@@ -106,5 +113,14 @@ public class AuthClaimController {
             return "";
         }
         return normalized.substring(0, 5) + "****" + normalized.substring(normalized.length() - 3);
+    }
+
+    private String otpDeliveryText(OtpDeliveryChannel channel, Member member) {
+        return switch (channel) {
+            case EMAIL -> "A code will be sent to " + maskEmail(member.getEmail()) + ".";
+            case SMS -> "A code will be sent to " + maskPhone(member.getPhone()) + ".";
+            case SMS_WITH_EMAIL_FALLBACK -> "A code will be sent to " + maskPhone(member.getPhone()) + ", or to "
+                + maskEmail(member.getEmail()) + " if SMS is unavailable.";
+        };
     }
 }

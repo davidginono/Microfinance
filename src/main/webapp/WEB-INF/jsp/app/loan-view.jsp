@@ -330,11 +330,10 @@
     </c:otherwise>
 </c:choose>
 
-<c:if test="${not empty loanDetailRepaymentPreviewRows}">
+<c:if test="${not empty calculatedRepaymentRows}">
     <div class="erp-table-wrap erp-table-scroll">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="text-sm font-semibold text-slate-900"><spring:message code="repayment.estimatedSchedule" text="Estimated Repayment Schedule" /></div>
-            <div class="mt-1 text-sm text-slate-500"><spring:message code="repayment.loadedScheduleHelp" text="Monthly installments based on the loaded loan calculations, including interest and remaining balance." /></div>
+            <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></div>
         </div>
         <table class="erp-table">
             <thead>
@@ -349,7 +348,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                <c:forEach items="${loanDetailRepaymentPreviewRows}" var="row">
+                <c:forEach items="${calculatedRepaymentRows}" var="row">
                     <tr>
                         <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
                         <td class="px-3 py-2">${row.month}</td>
@@ -496,11 +495,10 @@
             </div>
         </div>
         <c:choose>
-            <c:when test="${not empty repaymentRows}">
+            <c:when test="${not empty generatedRepaymentRows}">
                 <div class="mt-5 erp-table-wrap overflow-x-auto">
                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                        <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.schedule" text="Installment Schedule" /></div>
-                        <div class="mt-1 text-sm text-slate-500"><spring:message code="loan.repayment.scheduleHelp" text="A quick view of each expected repayment in order." /></div>
+                        <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.generatedSchedule" text="Generated Repayment Schedule" /></div>
                     </div>
                     <table class="erp-table">
                         <thead>
@@ -516,7 +514,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <c:forEach items="${repaymentRows}" var="row">
+                            <c:forEach items="${generatedRepaymentRows}" var="row">
                                 <tr>
                                     <td class="px-3 py-2 font-medium text-slate-700">${row.installment}</td>
                                     <td class="px-3 py-2">${row.dueDate}</td>

@@ -30,7 +30,7 @@
                 </c:forEach>
             </div>
 
-            <c:if test="${not empty repaymentRows}">
+            <c:if test="${not empty generatedRepaymentRows or not empty calculatedRepaymentRows}">
                 <c:if test="${allowPaymentSync and not empty app.loanId}">
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <c:if test="${app.status eq 'DEFAULTED'}">
@@ -49,71 +49,79 @@
                         </form>
                     </div>
                 </c:if>
+                <c:if test="${not empty generatedRepaymentRows}">
                 <div class="erp-table-wrap erp-table-scroll">
+                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.generatedSchedule" text="Generated Repayment Schedule" /></div>
+                    </div>
                     <table class="erp-table">
                         <thead>
-                        <c:choose>
-                            <c:when test="${repaymentSummaryEstimated}">
-                                <tr>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.month" text="Month" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.amount.label" text="Loan Amount" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.interest" text="Interest" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
-                                </tr>
-                            </c:when>
-                            <c:otherwise>
-                                <tr>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
-                                </tr>
-                            </c:otherwise>
-                        </c:choose>
+                            <tr>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
+                            </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                        <c:forEach items="${repaymentRows}" var="row">
-                            <c:choose>
-                                <c:when test="${repaymentSummaryEstimated}">
-                                    <tr>
-                                        <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
-                                        <td class="px-3 py-2">${row.month}</td>
-                                        <td class="px-3 py-2">${row.beginningBalance}</td>
-                                        <td class="px-3 py-2 font-medium text-slate-900">${row.payment}</td>
-                                        <td class="px-3 py-2">${row.loanAmount}</td>
-                                        <td class="px-3 py-2">${row.interest}</td>
-                                        <td class="px-3 py-2">${row.endingBalance}</td>
-                                    </tr>
-                                </c:when>
-                                <c:otherwise>
-                                    <tr>
-                                        <td class="px-3 py-2">${row.installment}</td>
-                                        <td class="px-3 py-2">${row.dueDate}</td>
-                                        <td class="px-3 py-2">
-                                            <div>${row.amount}</div>
-                                            <c:if test="${not empty row.scheduledBreakdown}">
-                                                <div class="mt-1 text-xs text-slate-500">${row.scheduledBreakdown}</div>
-                                            </c:if>
-                                        </td>
-                                        <td class="px-3 py-2">${row.outstandingBalance}</td>
-                                        <td class="px-3 py-2">${row.principalPaid}</td>
-                                        <td class="px-3 py-2">${row.interestPaid}</td>
-                                        <td class="px-3 py-2">${row.totalPaid}</td>
-                                        <td class="px-3 py-2">${row.paymentDate}</td>
-                                    </tr>
-                                </c:otherwise>
-                            </c:choose>
+                        <c:forEach items="${generatedRepaymentRows}" var="row">
+                            <tr>
+                                <td class="px-3 py-2">${row.installment}</td>
+                                <td class="px-3 py-2">${row.dueDate}</td>
+                                <td class="px-3 py-2">
+                                    <div>${row.amount}</div>
+                                    <c:if test="${not empty row.scheduledBreakdown}">
+                                        <div class="mt-1 text-xs text-slate-500">${row.scheduledBreakdown}</div>
+                                    </c:if>
+                                </td>
+                                <td class="px-3 py-2">${row.outstandingBalance}</td>
+                                <td class="px-3 py-2">${row.principalPaid}</td>
+                                <td class="px-3 py-2">${row.interestPaid}</td>
+                                <td class="px-3 py-2">${row.totalPaid}</td>
+                                <td class="px-3 py-2">${row.paymentDate}</td>
+                            </tr>
                         </c:forEach>
                         </tbody>
                     </table>
                 </div>
+                </c:if>
+                <c:if test="${not empty calculatedRepaymentRows}">
+                <div class="erp-table-wrap erp-table-scroll">
+                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></div>
+                    </div>
+                    <table class="erp-table">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.month" text="Month" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.interest" text="Interest" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                        <c:forEach items="${calculatedRepaymentRows}" var="row">
+                            <tr>
+                                <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                                <td class="px-3 py-2">${row.month}</td>
+                                <td class="px-3 py-2">${row.beginningBalance}</td>
+                                <td class="px-3 py-2 font-medium text-slate-900">${row.payment}</td>
+                                <td class="px-3 py-2">${row.loanAmount}</td>
+                                <td class="px-3 py-2">${row.interest}</td>
+                                <td class="px-3 py-2">${row.endingBalance}</td>
+                            </tr>
+                        </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
+                </c:if>
             </c:if>
         </div>
     </section>

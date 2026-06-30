@@ -105,7 +105,7 @@ class WorkflowRoutingServiceTest {
     }
 
     @Test
-    void moveToBoardStageUsesProductAssignedReviewers() {
+    void moveToCreditCommitteeStageUsesProductAssignedReviewers() {
         UUID appId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
@@ -124,8 +124,8 @@ class WorkflowRoutingServiceTest {
 
         when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(
             new LoanProductWorkflowService.WorkflowDefinition(
-                List.of(ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.DISBURSEMENT_OFFICER),
-                ApprovalWorkflowStage.BOARD,
+                List.of(ApprovalWorkflowStage.CREDIT_COMMITTEE, ApprovalWorkflowStage.DISBURSEMENT_OFFICER),
+                ApprovalWorkflowStage.CREDIT_COMMITTEE,
                 false,
                 false,
                 true,
@@ -142,23 +142,26 @@ class WorkflowRoutingServiceTest {
                 .saccoId("SACCO-1")
                 .loanType(LoanType.LOAN_ADVANCE)
                 .build()));
-        when(loanProductBoardReviewerRepository.findByLoanProductSettingIdOrderByCreatedAtAsc(productId))
+        when(loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(productId, ApprovalWorkflowStage.CREDIT_COMMITTEE))
             .thenReturn(List.of(
                 LoanProductBoardReviewer.builder().boardMemberId(reviewerOne).build(),
                 LoanProductBoardReviewer.builder().boardMemberId(reviewerTwo).build()
             ));
-        when(roleDirectoryService.hasActiveRoleInSacco(reviewerOne, "SACCO-1", Position.BOARD)).thenReturn(true);
-        when(roleDirectoryService.hasActiveRoleInSacco(reviewerTwo, "SACCO-1", Position.BOARD)).thenReturn(true);
+        when(roleDirectoryService.hasActiveRoleInSacco(reviewerOne, "SACCO-1", Position.CREDIT_COMMITTEE)).thenReturn(true);
+        when(roleDirectoryService.hasActiveRoleInSacco(reviewerTwo, "SACCO-1", Position.CREDIT_COMMITTEE)).thenReturn(true);
 
         workflowRoutingService.moveToFirstReviewStage(app, actorId);
 
-        assertThat(app.getStatus()).isEqualTo(LoanStatus.AWAITING_BOARD);
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.AWAITING_CREDIT_COMMITTEE);
         ArgumentCaptor<com.sacco.mvp.domain.BoardReview> captor = ArgumentCaptor.forClass(com.sacco.mvp.domain.BoardReview.class);
         verify(boardReviewRepository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(com.sacco.mvp.domain.BoardReview::getBoardMemberId)
             .containsExactly(reviewerOne, reviewerTwo);
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("BOARD_REVIEW_ASSIGNED"), eq(reviewerOne), eq("SACCO-1"), eq("AR704"), any());
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("BOARD_REVIEW_ASSIGNED"), eq(reviewerTwo), eq("SACCO-1"), eq("AR704"), any());
+        assertThat(captor.getAllValues())
+            .extracting(com.sacco.mvp.domain.BoardReview::getReviewStage)
+            .containsOnly(ApprovalWorkflowStage.CREDIT_COMMITTEE);
+        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerOne), eq("SACCO-1"), eq("AR704"), any());
+        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerTwo), eq("SACCO-1"), eq("AR704"), any());
     }
 }

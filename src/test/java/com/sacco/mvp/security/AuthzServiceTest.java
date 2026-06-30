@@ -38,8 +38,10 @@ class AuthzServiceTest {
         UUID reqId = UUID.randomUUID();
 
         Member member = Member.builder().id(memberId).saccoId(saccoId).memberNo("MEM1").fullName("A")
-            .status(MemberStatus.ACTIVE).position(Position.MEMBER).passwordHash("x").createdAt(OffsetDateTime.now()).build();
-        AppUserPrincipal principal = new AppUserPrincipal(member, Collections.emptySet());
+            .status(MemberStatus.ACTIVE).position(Position.BOARD)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.BOARD)))
+            .passwordHash("x").createdAt(OffsetDateTime.now()).build();
+        AppUserPrincipal principal = new AppUserPrincipal(member, java.util.Set.of(UserClaim.REVIEW_BOARD_QUEUE));
 
         LoanApplication app = LoanApplication.builder().id(loanId).saccoId(saccoId).applicantMemberId(memberId)
             .loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN).tenorMonths(1).status(LoanStatus.DRAFT)

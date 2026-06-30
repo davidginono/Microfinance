@@ -595,6 +595,7 @@ public class AdminController {
                              @RequestParam String fullName,
                              @RequestParam String email,
                              @RequestParam(required = false) String phone,
+                             @RequestParam String signatureText,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
         adminService.createUser(
@@ -606,6 +607,7 @@ public class AdminController {
             fullName,
             email,
             phone,
+            signatureText,
             positions
         );
         ra.addFlashAttribute("message", "User created.");
@@ -1530,7 +1532,8 @@ public class AdminController {
                 registrationForm.getMemberNo(),
                 registrationForm.getFullName(),
                 registrationForm.getEmail(),
-                registrationForm.getPhone()
+                registrationForm.getPhone(),
+                registrationForm.getSignatureText()
             );
             ra.addFlashAttribute("message", "Minor Admin invited. A password setup link has been emailed to them.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -1549,6 +1552,7 @@ public class AdminController {
                                    @RequestParam String fullName,
                                    @RequestParam String email,
                                    @RequestParam(required = false) String phone,
+                                   @RequestParam String signatureText,
                                    RedirectAttributes ra) {
         try {
             adminService.updateMinorAdmin(
@@ -1559,7 +1563,8 @@ public class AdminController {
                 memberNo,
                 fullName,
                 email,
-                phone
+                phone,
+                signatureText
             );
             ra.addFlashAttribute("message", "Minor Admin details updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {

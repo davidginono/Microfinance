@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -104,7 +105,7 @@
                 <td>${row.applicationNumber}</td>
                 <td><c:out value="${row.loanId}" /></td>
                 <td>${row.applicantName}</td>
-                <td>${row.amount}</td>
+                <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${row.decisionLabel}</td>
                 <td><c:out value="${row.reason}" /></td>
                 <td>${row.reviewedAt}</td>

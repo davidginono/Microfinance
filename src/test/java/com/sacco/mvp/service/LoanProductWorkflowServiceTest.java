@@ -42,7 +42,7 @@ class LoanProductWorkflowServiceTest {
             .containsExactly(ApprovalWorkflowStage.LOAN_OFFICER, ApprovalWorkflowStage.MANAGER, ApprovalWorkflowStage.DISBURSEMENT_OFFICER);
 
         assertThat(service.resolveForProduct("SACCO-01", product(false, false, true, true, ApprovalWorkflowStage.MANAGER)).stages())
-            .containsExactly(ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.ACCOUNTANT, ApprovalWorkflowStage.DISBURSEMENT_OFFICER);
+            .containsExactly(ApprovalWorkflowStage.CREDIT_COMMITTEE, ApprovalWorkflowStage.ACCOUNTANT, ApprovalWorkflowStage.DISBURSEMENT_OFFICER);
     }
 
     @Test
@@ -103,7 +103,7 @@ class LoanProductWorkflowServiceTest {
 
         assertThat(service.resolveForProduct("SACCO-01", product).stages())
             .containsExactly(
-                ApprovalWorkflowStage.BOARD,
+                ApprovalWorkflowStage.CREDIT_COMMITTEE,
                 ApprovalWorkflowStage.ACCOUNTANT,
                 ApprovalWorkflowStage.LOAN_OFFICER,
                 ApprovalWorkflowStage.MANAGER,

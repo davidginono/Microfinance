@@ -553,12 +553,12 @@
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                            <input name="minimumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
+                            <input name="minimumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                            <input name="maximumAmount" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
+                            <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
                         </label>
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
@@ -601,22 +601,22 @@
                     <div class="product-builder-section-body product-builder-grid two-up">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
-                            <input name="applicationFee" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
+                            <input name="applicationFee" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
-                            <input name="insurancePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.insuranceRate * 100}" />
+                            <input name="insurancePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.insuranceRate ne null ? product.insuranceRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
-                            <input name="processingFeePercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
+                            <input name="processingFeePercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
-                            <input name="annualInterestPercent" type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.interestRate * 100}" />
+                            <input name="annualInterestPercent" type="number" min="0" step="0.01" data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.interestRate ne null ? product.interestRate : 0) * 100}" />
                         </label>
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1113,10 +1113,26 @@
             input.value = formatMoneyValue(input.value);
         }
 
+        function trimDecimalZeros(value) {
+            const raw = String(value || '').trim();
+            if (raw === '') {
+                return '';
+            }
+            const numericValue = Number(raw);
+            return Number.isFinite(numericValue) ? String(numericValue) : raw;
+        }
+
         document.querySelectorAll('[data-money-input="true"]').forEach((input) => {
             syncMoneyInput(input);
             input.addEventListener('input', () => syncMoneyInput(input));
             input.addEventListener('blur', () => syncMoneyInput(input));
+        });
+
+        document.querySelectorAll('[data-trim-decimal-input="true"]').forEach((input) => {
+            input.value = trimDecimalZeros(input.value);
+            input.addEventListener('blur', () => {
+                input.value = trimDecimalZeros(input.value);
+            });
         });
 
         document.querySelectorAll('form').forEach((form) => {

@@ -1,4 +1,5 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
@@ -97,7 +98,7 @@
                         </svg>
                     </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value">${app.amount}</div>
+                    <div class="loan-stat-value"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
                     <span class="loan-staff-kpi-icon" aria-hidden="true">
@@ -175,6 +176,7 @@
             <strong><spring:message code="review.managerReason" text="Manager Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
+    <%@ include file="../fragments/previous-approved-reviews.jspf" %>
     <div class="loan-view-summary-card px-5 py-5">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>

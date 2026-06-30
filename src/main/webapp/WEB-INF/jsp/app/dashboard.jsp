@@ -3,7 +3,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -649,17 +648,17 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 <section class="space-y-4">
     <div class="erp-page-header">
         <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
-        <p class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="dashboard.welcome" />,
+        <p class="mt-1 text-lg font-semibold text-sacco-ink">
+            <spring:message code="dashboard.welcome" text="Welcome" />,
             <c:choose>
                 <c:when test="${not empty currentMember and not empty currentMember.fullName}">
-                    ${currentMember.fullName}
+                    <c:out value="${currentMember.fullName}" />
                 </c:when>
                 <c:otherwise>
-                    <sec:authentication property="principal.username" />
+                    <c:out value="${pageContext.request.userPrincipal.name}" />
                 </c:otherwise>
             </c:choose>
         </p>
-        <p class="erp-page-subtitle"><spring:message code="dashboard.subtitle" /></p>
     </div>
 
     <div class="erp-stat-grid">
@@ -673,9 +672,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 7L13 3.293A1 1 0 0012.293 3H4z"/></svg>
                 </span>
             </div>
-            <div class="erp-stat-footer">
-                <span><spring:message code="dashboard.stat.applications.footer" /> ${loansAwaitingDecision}</span>
-            </div>
         </div>
         <div class="erp-stat-card erp-stat-green">
             <div class="erp-stat-main">
@@ -686,9 +682,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v3H4V4zm0 5h12v7H4V9zm2 2v3h4v-3H6z"/></svg>
                 </span>
-            </div>
-            <div class="erp-stat-footer">
-                <span><spring:message code="dashboard.stat.activeLoans.footer" /> ${archivedApplicationCount}</span>
             </div>
         </div>
         <div class="erp-stat-card erp-stat-amber">
@@ -701,9 +694,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v5a3 3 0 003 3h8a3 3 0 003-3v-5a2 2 0 00-2-2h-1V6a4 4 0 00-4-4z"/></svg>
                 </span>
             </div>
-            <div class="erp-stat-footer">
-                <span><spring:message code="dashboard.stat.guarantorRequests.footer" /> ${pendingGuaranteeApprovals}</span>
-            </div>
         </div>
         <div class="erp-stat-card erp-stat-red">
             <div class="erp-stat-main">
@@ -715,9 +705,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-10.293l-4 4a1 1 0 01-1.414 0l-2-2 1.414-1.414L9 9.586l3.293-3.293 1.414 1.414z"/></svg>
                 </span>
             </div>
-            <div class="erp-stat-footer">
-                <span><spring:message code="dashboard.stat.archivedRejections.footer" /> ${currentApplicationCount}</span>
-            </div>
         </div>
     </div>
 
@@ -728,8 +715,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         <div class="erp-panel-body">
             <div>
                 <div>
-                    <p class="erp-widget-title"><spring:message code="dashboard.widget.memberBalances" /></p>
-                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.savingsSharesOverview" /></h2>
+                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Balances" /></h2>
                 </div>
             </div>
 
@@ -753,11 +739,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
             </div>
             <div class="erp-panel-body min-w-0">
-                <div class="erp-toolbar">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="dashboard.workflowProgress" text="Workflow Progress" /></p>
-                        <h2 class="erp-widget-heading"><spring:message code="dashboard.trackCurrentLoan" text="Track The Status Of Your Current Loan" /></h2>
-                    </div>
+                <div class="erp-toolbar justify-end">
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
                         ${currentApplicationCount} current record(s)
                     </div>
@@ -1016,7 +998,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             <div class="erp-panel-body min-w-0">
                 <div class="erp-toolbar gap-3">
                     <div>
-                        <p class="erp-widget-title">Repayment Progress</p>
                         <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.timeLeftEachActiveLoan" /></h2>
                     </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-600">
@@ -1153,11 +1134,9 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                             <c:choose>
                                 <c:when test="${activeLoanCount gt 0}">
                                     <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.repaymentTimers.empty.title" /></p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="dashboard.repaymentTimers.empty.subtitle" /></p>
                                 </c:when>
                                 <c:otherwise>
                                     <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.activeLoans.empty.title" /></p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="dashboard.activeLoans.empty.subtitle" /></p>
                                 </c:otherwise>
                             </c:choose>
                         </div>

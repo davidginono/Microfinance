@@ -42,6 +42,7 @@ public class PhoneOtpService {
             .codeHash(passwordEncoder.encode(code))
             .createdAt(now)
             .expiresAt(now.plusMinutes(Math.max(1, otpTtlMinutes)))
+            .resendCount(0)
             .build());
 
         SmsSendResult result = smsGateway.send(normalizedPhone,

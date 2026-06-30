@@ -44,6 +44,7 @@ class LoanPresentationServiceTest {
 
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
+    @Mock private com.sacco.mvp.repository.MemberRepository memberRepository;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
 
@@ -65,10 +66,90 @@ class LoanPresentationServiceTest {
             JsonMapper.builder().findAndAddModules().build(),
             managerReviewRepository,
             boardReviewRepository,
+            memberRepository,
             loanAttachmentService,
             loanProductWorkflowService,
             messageSource
         );
+    }
+
+    @Test
+    void previousApprovedReviewsShowsOnlyApprovedEarlierStages() {
+        UUID loanId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        UUID boardMemberId = UUID.randomUUID();
+        UUID pendingLoanOfficerId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-1")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .status(LoanStatus.AWAITING_ACCOUNTANT)
+            .build();
+        org.mockito.Mockito.when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(
+            workflow(ApprovalWorkflowStage.MANAGER, ApprovalWorkflowStage.LOAN_OFFICER,
+                ApprovalWorkflowStage.BOARD, ApprovalWorkflowStage.ACCOUNTANT,
+                ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+        );
+        org.mockito.Mockito.when(managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId)).thenReturn(List.of(
+            ManagerReview.builder()
+                .id(UUID.randomUUID())
+                .loanApplicationId(loanId)
+                .managerMemberId(managerId)
+                .reviewStage(ApprovalWorkflowStage.MANAGER)
+                .decision(ManagerDecision.ACCEPT)
+                .reasons("Manager checks passed.")
+                .createdAt(OffsetDateTime.parse("2026-06-10T09:00:00+03:00"))
+                .build()
+        ));
+        org.mockito.Mockito.when(boardReviewRepository.findByLoanApplicationId(loanId)).thenReturn(List.of(
+            BoardReview.builder()
+                .id(UUID.randomUUID())
+                .loanApplicationId(loanId)
+                .boardMemberId(pendingLoanOfficerId)
+                .reviewStage(ApprovalWorkflowStage.LOAN_OFFICER)
+                .decision(BoardDecision.PENDING)
+                .createdAt(OffsetDateTime.parse("2026-06-10T10:00:00+03:00"))
+                .build(),
+            BoardReview.builder()
+                .id(UUID.randomUUID())
+                .loanApplicationId(loanId)
+                .boardMemberId(boardMemberId)
+                .reviewStage(ApprovalWorkflowStage.BOARD)
+                .decision(BoardDecision.APPROVED)
+                .comment("Board approved.")
+                .createdAt(OffsetDateTime.parse("2026-06-11T10:00:00+03:00"))
+                .decidedAt(OffsetDateTime.parse("2026-06-11T11:00:00+03:00"))
+                .build()
+        ));
+        org.mockito.Mockito.when(memberRepository.findAllById(org.mockito.ArgumentMatchers.anyIterable())).thenReturn(List.of(
+            Member.builder().id(managerId).fullName("Branch Manager").memberNo("M-001").build(),
+            Member.builder().id(boardMemberId).fullName("Board Member").memberNo("B-001").build()
+        ));
+
+        List<LoanPresentationService.ApprovedReviewSummary> rows =
+            loanPresentationService.previousApprovedReviews(app, ApprovalWorkflowStage.ACCOUNTANT);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows).extracting(LoanPresentationService.ApprovedReviewSummary::getStageLabel)
+            .containsExactly("Branch Manager", "Board Member");
+        assertThat(rows).extracting(LoanPresentationService.ApprovedReviewSummary::getReviewerName)
+            .containsExactly("Branch Manager", "Board Member");
+    }
+
+    @Test
+    void previousApprovedReviewsIsEmptyAtFirstWorkflowStage() {
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        org.mockito.Mockito.when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(
+            workflow(ApprovalWorkflowStage.MANAGER, ApprovalWorkflowStage.BOARD,
+                ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
+        );
+
+        assertThat(loanPresentationService.previousApprovedReviews(app, ApprovalWorkflowStage.MANAGER)).isEmpty();
     }
 
     @Test
@@ -411,6 +492,218 @@ class LoanPresentationServiceTest {
             .containsEntry("outstandingBalance", "")
             .containsEntry("principalPaid", "-")
             .containsEntry("paymentDate", "-");
+    }
+
+    @Test
+    void printablePdfIncludesCalculatedRepaymentScheduleWhenStoredScheduleIsMissing() throws IOException {
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicationNumber(501L)
+            .saccoId("SACCO-1")
+            .stationId("AR704")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("2000000.00"))
+            .tenorMonths(12)
+            .requiredGuarantors(1)
+            .financialSnapshot("""
+                {
+                  "interestRate": 0.10,
+                  "interestMethod": "FLAT_RATE",
+                  "interestAmount": 200000.00,
+                  "monthlyRepaymentAmount": 183333.33,
+                  "principalPlusInterest": 2200000.00
+                }
+                """)
+            .applicantSignatureText("D. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-30T04:57:00+03:00"))
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        Member applicant = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("David Wankyo")
+            .memberNo("1145")
+            .signatureText("D. Applicant")
+            .build();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .contains("Loan Calculation Details")
+                .contains("Repayment Schedule")
+                .contains("No.")
+                .contains("Beginning")
+                .contains("Balance")
+                .contains("Amount to Pay")
+                .contains("Monthly Repayment Amount (TZS)")
+                .contains("Month 1")
+                .contains("TSh 2,000,000.00")
+                .doesNotContain("Financial Details")
+                .doesNotContain("Repayment Timetable")
+                .doesNotContain("No repayment schedule available.");
+        }
+    }
+
+    @Test
+    void printablePdfIncludesGeneratedAndCalculatedSchedulesForDisbursedLoan() throws IOException {
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicationNumber(502L)
+            .saccoId("SACCO-1")
+            .stationId("AR704")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("2000000.00"))
+            .tenorMonths(2)
+            .requiredGuarantors(1)
+            .financialSnapshot("""
+                {
+                  "interestRate": 0.10,
+                  "interestMethod": "FLAT_RATE",
+                  "interestAmount": 33333.34,
+                  "monthlyRepaymentAmount": 1016666.67,
+                  "principalPlusInterest": 2033333.34,
+                  "applicationFee": 15000.00,
+                  "insuranceRate": 0.015,
+                  "insuranceFee": 30000.00,
+                  "processingFeeRate": 0.015,
+                  "processingFee": 30000.00,
+                  "totalDeductions": 75000.00
+                }
+                """)
+            .repaymentScheduleJson("""
+                {
+                  "schedule": [
+                    {
+                      "installmentNumber": 1,
+                      "dueDate": "2026-07-31",
+                      "amount": 1016666.67,
+                      "principalComponent": 1000000.00,
+                      "interestComponent": 16666.67
+                    }
+                  ]
+                }
+                """)
+            .applicantSignatureText("D. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-30T04:57:00+03:00"))
+            .status(LoanStatus.FINAL_APPROVED)
+            .build();
+        Member applicant = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("David Wankyo")
+            .memberNo("1145")
+            .signatureText("D. Applicant")
+            .build();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .contains("Loan Calculation Details")
+                .contains("Application Fee (TZS)")
+                .contains("Total Fees (TZS)")
+                .contains("Generated Repayment Schedule")
+                .contains("Calculated Repayment Schedule")
+                .doesNotContain("Financial Details")
+                .doesNotContain("Repayment Timetable");
+        }
+    }
+
+    @Test
+    void printablePdfDrawsSaccoLogoWhenLogoBytesAreSupplied() throws IOException {
+        LoanApplication app = basicPrintableApplication();
+        Member applicant = basicApplicant();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            null,
+            sampleLogoPng(),
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            int imageCount = 0;
+            for (org.apache.pdfbox.cos.COSName name : document.getPage(0).getResources().getXObjectNames()) {
+                if (document.getPage(0).getResources().getXObject(name) instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                    imageCount++;
+                }
+            }
+            assertThat(imageCount).isGreaterThanOrEqualTo(2);
+        }
+    }
+
+    @Test
+    void printablePdfStillRendersWhenSaccoLogoBytesAreInvalid() throws IOException {
+        LoanApplication app = basicPrintableApplication();
+        Member applicant = basicApplicant();
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            null,
+            "not-an-image".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(new PDFTextStripper().getText(document))
+                .contains("Loan Application")
+                .contains("IAA SACCOS LTD");
+        }
     }
 
     @Test
@@ -757,5 +1050,77 @@ class LoanPresentationServiceTest {
                 .contains("Review Stage")
                 .doesNotContain("B. Reviewer Board Member");
         }
+    }
+
+    private LoanApplication basicPrintableApplication() {
+        return LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .applicationNumber(503L)
+            .saccoId("SACCO-1")
+            .stationId("AR704")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("2000000.00"))
+            .tenorMonths(2)
+            .requiredGuarantors(1)
+            .financialSnapshot("""
+                {
+                  "interestRate": 0.10,
+                  "interestMethod": "FLAT_RATE",
+                  "interestAmount": 33333.34,
+                  "monthlyRepaymentAmount": 1016666.67,
+                  "principalPlusInterest": 2033333.34
+                }
+                """)
+            .applicantSignatureText("D. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-30T04:57:00+03:00"))
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+    }
+
+    private Member basicApplicant() {
+        return Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("David Wankyo")
+            .memberNo("1145")
+            .signatureText("D. Applicant")
+            .build();
+    }
+
+    private byte[] sampleLogoPng() throws IOException {
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(80, 80, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D graphics = image.createGraphics();
+        try {
+            graphics.setColor(java.awt.Color.WHITE);
+            graphics.fillRect(0, 0, 80, 80);
+            graphics.setColor(new java.awt.Color(41, 52, 127));
+            graphics.fillOval(8, 8, 64, 64);
+            graphics.setColor(java.awt.Color.WHITE);
+            graphics.fillRect(34, 18, 12, 44);
+        } finally {
+            graphics.dispose();
+        }
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(image, "png", output);
+        return output.toByteArray();
+    }
+
+    private LoanProductWorkflowService.WorkflowDefinition workflow(ApprovalWorkflowStage... stages) {
+        return new LoanProductWorkflowService.WorkflowDefinition(
+            List.of(stages),
+            stages[0],
+            true,
+            1,
+            true,
+            2,
+            true,
+            3,
+            false,
+            4,
+            0,
+            0,
+            true,
+            5,
+            true
+        );
     }
 }
