@@ -39,9 +39,17 @@
         height: 3.5rem;
     }
     .savings-ratio-grid {
-        display: grid;
-        gap: 0.75rem;
-        max-width: 34rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: flex-end;
+    }
+    .savings-ratio-field {
+        flex: 0 1 18rem;
+        min-width: 13rem;
+    }
+    .savings-ratio-grid .settings-checkbox-card {
+        flex: 1 1 22rem;
     }
     .savings-multiplier-control {
         display: flex;
@@ -67,6 +75,15 @@
     }
     .settings-checkbox-card {
         min-height: 3.5rem;
+    }
+    @media (max-width: 640px) {
+        .savings-ratio-grid {
+            align-items: stretch;
+        }
+        .savings-ratio-field,
+        .savings-ratio-grid .settings-checkbox-card {
+            flex-basis: 100%;
+        }
     }
     .product-builder-form input:not([type="checkbox"]):not([type="radio"]),
     .product-builder-form select {
@@ -527,6 +544,13 @@
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
                             <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
+                            <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
+                                <div class="savings-multiplier-control mt-1">
+                                    <input type="number" min="0" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
+                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
+                                </div>
+                            </div>
                             <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                 <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${product.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
                                 <span>
@@ -534,13 +558,6 @@
                                     <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
                                 </span>
                             </label>
-                            <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
-                                <div class="savings-multiplier-control mt-1">
-                                    <input type="number" min="0" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
-                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
-                                </div>
-                            </div>
                         </div>
                         <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <input name="freshFinancialDataRequired" type="checkbox" value="true" ${product.freshFinancialDataRequired ? 'checked' : ''} data-workflow-loaded-financial />
