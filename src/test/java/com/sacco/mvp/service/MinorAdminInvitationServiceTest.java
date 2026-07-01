@@ -120,10 +120,12 @@ class MinorAdminInvitationServiceTest {
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(passwordEncoder.encode("strong-password")).thenReturn("encoded-password");
 
-        Member activated = invitationService.claimInvitation(rawToken, "123456", "strong-password");
+        Member activated = invitationService.claimInvitation(rawToken, "123456", "strong-password", "Juma Mabula");
 
         org.assertj.core.api.Assertions.assertThat(activated.getStatus()).isEqualTo(MemberStatus.ACTIVE);
         org.assertj.core.api.Assertions.assertThat(activated.getPasswordHash()).isEqualTo("encoded-password");
+        org.assertj.core.api.Assertions.assertThat(activated.getSignatureText()).isEqualTo("Juma Mabula");
+        org.assertj.core.api.Assertions.assertThat(activated.getSignatureRegisteredAt()).isNotNull();
         org.assertj.core.api.Assertions.assertThat(invitation.getClaimedAt()).isNotNull();
         verify(emailOtpService).consumeOtp(
             "ginonodavid625@gmail.com",

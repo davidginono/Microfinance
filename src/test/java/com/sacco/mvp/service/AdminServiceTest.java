@@ -357,7 +357,6 @@ class AdminServiceTest {
             "Minor Admin",
             "minor@example.com",
             null,
-            "Minor Admin",
             List.of(Position.MINOR_ADMIN)
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -381,7 +380,6 @@ class AdminServiceTest {
             "Mary Manager",
             " Existing@Example.com ",
             null,
-            "Mary Manager",
             List.of(Position.MANAGER)
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -616,8 +614,7 @@ class AdminServiceTest {
             "MINOR001",
             "Minor Admin",
             "minor@example.com",
-            null,
-            "Minor Admin"
+            null
         ))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
@@ -674,8 +671,7 @@ class AdminServiceTest {
             "MINOR002",
             "Minor Admin Two",
             "minor2@example.com",
-            "255712345679",
-            "Minor Admin Two"
+            "255712345679"
         );
 
         assertThat(member.getStationId()).isEqualTo("ST-2");
@@ -909,7 +905,6 @@ class AdminServiceTest {
             "Mary Manager",
             "manager@example.com",
             null,
-            "Mary Manager",
             List.of(Position.MANAGER)
         );
 
@@ -952,8 +947,7 @@ class AdminServiceTest {
             "MINOR001",
             "Minor Admin",
             "minor@example.com",
-            "255712345678",
-            "Minor Admin"
+            "255712345678"
         );
 
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
@@ -1185,6 +1179,7 @@ class AdminServiceTest {
             new BigDecimal("1000000.00"),
             2,
             new BigDecimal("0.3333"),
+            true,
             new BigDecimal("15000.00"),
             new BigDecimal("0.0150"),
             BigDecimal.ZERO,
@@ -1199,6 +1194,9 @@ class AdminServiceTest {
             ApprovalWorkflowStage.LOAN_OFFICER,
             4,
             3,
+            false,
+            3,
+            List.of(),
             true,
             5,
             List.of(boardReviewerId),

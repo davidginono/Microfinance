@@ -102,6 +102,9 @@ public class EligibilityService {
     }
 
     public record EligibilityResult(boolean eligible, BigDecimal ratio, BigDecimal savings, BigDecimal maxAllowed, boolean savingsLimitCheckRequired) {
+        public EligibilityResult(boolean eligible, BigDecimal ratio, BigDecimal savings, BigDecimal maxAllowed) {
+            this(eligible, ratio, savings, maxAllowed, true);
+        }
     }
 }
 

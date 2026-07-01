@@ -328,8 +328,6 @@ public class LoanProductWorkflowService {
                                   int managerPriority,
                                   boolean loanOfficerReviewRequired,
                                   int loanOfficerPriority,
-                                  boolean chairpersonReviewRequired,
-                                  int chairpersonPriority,
                                   boolean committeeReviewRequired,
                                   int committeePriority,
                                   int committeeMinimumVotes,
@@ -343,8 +341,8 @@ public class LoanProductWorkflowService {
                 managerPriority,
                 loanOfficerReviewRequired,
                 loanOfficerPriority,
-                chairpersonReviewRequired,
-                chairpersonPriority,
+                false,
+                3,
                 false,
                 3,
                 committeeReviewRequired,
@@ -356,5 +354,77 @@ public class LoanProductWorkflowService {
                 true
             );
         }
+
+        public WorkflowDefinition(List<ApprovalWorkflowStage> stages,
+                                  ApprovalWorkflowStage startStage,
+                                  boolean managerReviewRequired,
+                                  int managerPriority,
+                                  boolean loanOfficerReviewRequired,
+                                  int loanOfficerPriority,
+                                  boolean boardReviewRequired,
+                                  int boardPriority,
+                                  boolean committeeReviewRequired,
+                                  int committeePriority,
+                                  int committeeMinimumVotes,
+                                  int committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  int accountantPriority) {
+            this(
+                stages,
+                startStage,
+                managerReviewRequired,
+                managerPriority,
+                loanOfficerReviewRequired,
+                loanOfficerPriority,
+                false,
+                3,
+                boardReviewRequired,
+                boardPriority,
+                committeeReviewRequired,
+                committeePriority,
+                committeeMinimumVotes,
+                committeeApprovalThreshold,
+                accountantReviewRequired,
+                accountantPriority,
+                true
+            );
+        }
+
+        public WorkflowDefinition(List<ApprovalWorkflowStage> stages,
+                                  ApprovalWorkflowStage startStage,
+                                  boolean managerReviewRequired,
+                                  int managerPriority,
+                                  boolean loanOfficerReviewRequired,
+                                  int loanOfficerPriority,
+                                  boolean boardReviewRequired,
+                                  int boardPriority,
+                                  boolean committeeReviewRequired,
+                                  int committeePriority,
+                                  int committeeMinimumVotes,
+                                  int committeeApprovalThreshold,
+                                  boolean accountantReviewRequired,
+                                  int accountantPriority,
+                                  boolean disbursementOfficerRequired) {
+            this(
+                stages,
+                startStage,
+                managerReviewRequired,
+                managerPriority,
+                loanOfficerReviewRequired,
+                loanOfficerPriority,
+                false,
+                3,
+                boardReviewRequired,
+                boardPriority,
+                committeeReviewRequired,
+                committeePriority,
+                committeeMinimumVotes,
+                committeeApprovalThreshold,
+                accountantReviewRequired,
+                accountantPriority,
+                disbursementOfficerRequired
+            );
+        }
+
     }
 }

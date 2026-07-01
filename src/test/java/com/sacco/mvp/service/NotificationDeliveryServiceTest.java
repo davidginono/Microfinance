@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.repository.MemberRepository;
 import org.junit.jupiter.api.Test;
@@ -16,19 +17,28 @@ import static org.mockito.Mockito.when;
 class NotificationDeliveryServiceTest {
 
     @Test
-    void deliversEveryNotificationThroughEmailAndSms() {
+    void deliversSmsWhenStationUsesSmsFallbackAndSmsSucceeds() {
         MemberRepository memberRepository = mock(MemberRepository.class);
         NotificationEmailService emailService = mock(NotificationEmailService.class);
         SmsGateway smsGateway = mock(SmsGateway.class);
         SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);
         SmsUsageAlertService alertService = mock(SmsUsageAlertService.class);
-        NotificationDeliveryService service = new NotificationDeliveryService(memberRepository, emailService, smsGateway, unitService, alertService);
+        StationOtpSettingsService stationOtpSettingsService = mock(StationOtpSettingsService.class);
+        NotificationDeliveryService service = new NotificationDeliveryService(
+            memberRepository,
+            emailService,
+            smsGateway,
+            unitService,
+            alertService,
+            stationOtpSettingsService
+        );
         UUID memberId = UUID.randomUUID();
         UUID notificationId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
         UUID ledgerId = UUID.randomUUID();
         Member member = Member.builder().id(memberId).phone("0673054445").build();
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.channel("SACCO-1", "STN001")).thenReturn(OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK);
         when(unitService.reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS"))
             .thenReturn(new SmsUnitTransactionService.ReservationResult(true, accountId, ledgerId, null, false, null, 9));
         when(smsGateway.send("0673054445", "Loan update: Approved")).thenReturn(SmsSendResult.sent("message-id"));
@@ -37,7 +47,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Approved");
+        verify(emailService, never()).sendNotificationEmail(memberId, "Loan update", "Approved");
         verify(unitService).reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS");
         verify(smsGateway).send("0673054445", "Loan update: Approved");
     }
@@ -49,10 +59,19 @@ class NotificationDeliveryServiceTest {
         SmsGateway smsGateway = mock(SmsGateway.class);
         SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);
         SmsUsageAlertService alertService = mock(SmsUsageAlertService.class);
-        NotificationDeliveryService service = new NotificationDeliveryService(memberRepository, emailService, smsGateway, unitService, alertService);
+        StationOtpSettingsService stationOtpSettingsService = mock(StationOtpSettingsService.class);
+        NotificationDeliveryService service = new NotificationDeliveryService(
+            memberRepository,
+            emailService,
+            smsGateway,
+            unitService,
+            alertService,
+            stationOtpSettingsService
+        );
         UUID memberId = UUID.randomUUID();
         UUID notificationId = UUID.randomUUID();
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(Member.builder().id(memberId).phone("0673054445").build()));
+        when(stationOtpSettingsService.channel("SACCO-1", "STN001")).thenReturn(OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK);
         when(unitService.reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS"))
             .thenReturn(new SmsUnitTransactionService.ReservationResult(false, null, null, "SMS units depleted", false, SmsUnitStatus.DEPLETED, 0));
 
