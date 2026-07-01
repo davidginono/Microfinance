@@ -49,7 +49,9 @@
     </div>
     <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
         <li><spring:message code="newloan.applicationRules.savings" /> <strong id="eligibilitySavingsValue">${savingsLabel}</strong></li>
-        <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+        <c:if test="${savingsLimitCheckRequired}">
+            <li><spring:message code="newloan.applicationRules.maximumAllowed" /> <strong id="eligibilityMaxAllowedValue">${maxAllowedLabel}</strong></li>
+        </c:if>
         <li><spring:message code="newloan.applicationRules.amountRange" /> <strong>${minimumAmountLabel}</strong> <spring:message code="common.to" text="to" /> <strong>${maximumAmountLabel}</strong></li>
     </ul>
 </div>
@@ -1034,7 +1036,7 @@
                 if (payload.savingsLabel) {
                     eligibilitySavingsValue.textContent = payload.savingsLabel;
                 }
-                if (payload.maxAllowedLabel) {
+                if (eligibilityMaxAllowedValue && payload.maxAllowedLabel && payload.savingsLimitCheckRequired !== false) {
                     eligibilityMaxAllowedValue.textContent = payload.maxAllowedLabel;
                 }
                 if (eligibilityExternalSpinner) {

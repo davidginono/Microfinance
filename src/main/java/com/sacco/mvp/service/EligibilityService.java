@@ -33,15 +33,20 @@ public class EligibilityService {
     public EligibilityResult check(String saccoId, UUID memberId, LoanType loanType, BigDecimal amount) {
         BigDecimal savings = resolveSavings(memberId);
 
-        BigDecimal ratio = resolveRatio(saccoId, loanType);
+        LoanProductSetting product = resolveProduct(saccoId, loanType);
+        BigDecimal ratio = resolveRatio(saccoId, product);
         BigDecimal maxAllowed = savings.multiply(ratio).setScale(2, RoundingMode.DOWN);
-        boolean eligible = amount.compareTo(maxAllowed) <= 0;
-        return new EligibilityResult(eligible, ratio, savings, maxAllowed);
+        boolean savingsLimitCheckRequired = product.isSavingsLimitCheckRequired();
+        boolean eligible = !savingsLimitCheckRequired || amount.compareTo(maxAllowed) <= 0;
+        return new EligibilityResult(eligible, ratio, savings, maxAllowed, savingsLimitCheckRequired);
     }
 
-    private BigDecimal resolveRatio(String saccoId, LoanType loanType) {
-        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, loanType)
+    private LoanProductSetting resolveProduct(String saccoId, LoanType loanType) {
+        return loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, loanType)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
+    }
+
+    private BigDecimal resolveRatio(String saccoId, LoanProductSetting product) {
         if (product.getMaxLoanSavingsRatio() != null) {
             return product.getMaxLoanSavingsRatio();
         }
@@ -84,6 +89,7 @@ public class EligibilityService {
         snapshot.put("ratio", result.ratio());
         snapshot.put("savings", result.savings());
         snapshot.put("maxAllowed", result.maxAllowed());
+        snapshot.put("savingsLimitCheckRequired", result.savingsLimitCheckRequired());
         snapshot.put("guarantorsRequired", guarantorsRequired);
         if (extraData != null && !extraData.isEmpty()) {
             snapshot.putAll(extraData);
@@ -95,7 +101,7 @@ public class EligibilityService {
         }
     }
 
-    public record EligibilityResult(boolean eligible, BigDecimal ratio, BigDecimal savings, BigDecimal maxAllowed) {
+    public record EligibilityResult(boolean eligible, BigDecimal ratio, BigDecimal savings, BigDecimal maxAllowed, boolean savingsLimitCheckRequired) {
     }
 }
 

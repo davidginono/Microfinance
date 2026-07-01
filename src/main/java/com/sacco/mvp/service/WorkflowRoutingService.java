@@ -111,9 +111,11 @@ public class WorkflowRoutingService {
     }
 
     private java.util.List<UUID> productReviewerIds(LoanApplication app, ApprovalWorkflowStage stage) {
-        Position requiredRole = stage == ApprovalWorkflowStage.CREDIT_COMMITTEE
-            ? Position.CREDIT_COMMITTEE
-            : Position.BOARD;
+        Position requiredRole = switch (stage) {
+            case CREDIT_COMMITTEE -> Position.CREDIT_COMMITTEE;
+            case CHAIRPERSON -> Position.CHAIRPERSON;
+            default -> Position.BOARD;
+        };
         return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
             .map(product -> loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(product.getId(), stage).stream()
                 .map(com.sacco.mvp.domain.LoanProductBoardReviewer::getBoardMemberId)
@@ -139,6 +141,8 @@ public class WorkflowRoutingService {
     }
 
     private boolean isAssignedReviewerStage(ApprovalWorkflowStage stage) {
-        return stage == ApprovalWorkflowStage.BOARD || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE;
+        return stage == ApprovalWorkflowStage.CHAIRPERSON
+            || stage == ApprovalWorkflowStage.BOARD
+            || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE;
     }
 }

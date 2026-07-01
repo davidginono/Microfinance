@@ -20,7 +20,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class LoanProductSetting {
-    private static final int MAX_WORKFLOW_PRIORITY = 6;
+    private static final int MAX_WORKFLOW_PRIORITY = 7;
     @Id
     private UUID id;
 
@@ -54,6 +54,9 @@ public class LoanProductSetting {
 
     @Column(name = "max_loan_savings_ratio", precision = 6, scale = 4)
     private BigDecimal maxLoanSavingsRatio;
+
+    @Column(name = "savings_limit_check_required")
+    private Boolean savingsLimitCheckRequired;
 
     @Column(name = "insurance_rate", precision = 6, scale = 4)
     private BigDecimal insuranceRate;
@@ -116,6 +119,12 @@ public class LoanProductSetting {
 
     @Column(name = "board_priority")
     private Integer boardPriority;
+
+    @Column(name = "chairperson_review_required")
+    private Boolean chairpersonReviewRequired;
+
+    @Column(name = "chairperson_priority")
+    private Integer chairpersonPriority;
 
     @Column(name = "accountant_review_required")
     private Boolean accountantReviewRequired;
@@ -195,6 +204,10 @@ public class LoanProductSetting {
         return Boolean.TRUE.equals(freshFinancialDataRequired);
     }
 
+    public boolean isSavingsLimitCheckRequired() {
+        return savingsLimitCheckRequired == null || savingsLimitCheckRequired;
+    }
+
     public boolean isManagerReviewRequired() {
         return managerReviewRequired == null || managerReviewRequired;
     }
@@ -205,6 +218,10 @@ public class LoanProductSetting {
 
     public boolean isBoardReviewRequired() {
         return Boolean.TRUE.equals(boardReviewRequired);
+    }
+
+    public boolean isChairpersonReviewRequired() {
+        return Boolean.TRUE.equals(chairpersonReviewRequired);
     }
 
     public ApprovalWorkflowStage getResolvedWorkflowStartStage() {
@@ -246,6 +263,12 @@ public class LoanProductSetting {
     public int getResolvedBoardPriority() {
         return boardPriority != null && boardPriority >= 1 && boardPriority <= MAX_WORKFLOW_PRIORITY
             ? boardPriority
+            : 3;
+    }
+
+    public int getResolvedChairpersonPriority() {
+        return chairpersonPriority != null && chairpersonPriority >= 1 && chairpersonPriority <= MAX_WORKFLOW_PRIORITY
+            ? chairpersonPriority
             : 3;
     }
 

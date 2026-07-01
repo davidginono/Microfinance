@@ -182,11 +182,6 @@
             </label>
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Signature
-                <input name="signatureText" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. James M Juma" />
-            </label>
-
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Email
                 <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
             </label>

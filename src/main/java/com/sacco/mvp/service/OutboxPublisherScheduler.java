@@ -23,7 +23,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "app.outbox.scheduler-enabled", havingValue = "true")
+@ConditionalOnProperty(name = "app.outbox.scheduler-enabled", havingValue = "true", matchIfMissing = true)
 public class OutboxPublisherScheduler {
     private final OutboxEventRepository outboxEventRepository;
     private final NotificationRepository notificationRepository;

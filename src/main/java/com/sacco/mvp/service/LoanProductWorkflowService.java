@@ -34,12 +34,14 @@ public class LoanProductWorkflowService {
         boolean loanOfficerReviewRequired = product.getLoanOfficerReviewRequired() != null
             ? Boolean.TRUE.equals(product.getLoanOfficerReviewRequired())
             : settings != null && settings.isLoanOfficerReviewRequired();
+        boolean chairpersonReviewRequired = product.isChairpersonReviewRequired();
         boolean boardReviewRequired = product.isBoardReviewRequired();
         boolean committeeReviewRequired = product.isCommitteeReviewRequired();
         boolean accountantReviewRequired = product.isAccountantReviewRequired();
         boolean disbursementOfficerRequired = product.isDisbursementOfficerRequired();
         int managerPriority = product.getResolvedManagerPriority();
         int loanOfficerPriority = product.getResolvedLoanOfficerPriority();
+        int chairpersonPriority = product.getResolvedChairpersonPriority();
         int boardPriority = product.getResolvedBoardPriority();
         int committeePriority = product.getResolvedCommitteePriority();
         int accountantPriority = product.getResolvedAccountantPriority();
@@ -54,6 +56,8 @@ public class LoanProductWorkflowService {
             managerPriority,
             loanOfficerReviewRequired,
             loanOfficerPriority,
+            chairpersonReviewRequired,
+            chairpersonPriority,
             boardReviewRequired,
             boardPriority,
             committeeReviewRequired,
@@ -69,6 +73,8 @@ public class LoanProductWorkflowService {
             managerPriority,
             loanOfficerReviewRequired,
             loanOfficerPriority,
+            chairpersonReviewRequired,
+            chairpersonPriority,
             boardReviewRequired,
             boardPriority,
             committeeReviewRequired,
@@ -105,6 +111,8 @@ public class LoanProductWorkflowService {
         data.put("managerPriority", definition.managerPriority());
         data.put("loanOfficerReviewRequired", definition.loanOfficerReviewRequired());
         data.put("loanOfficerPriority", definition.loanOfficerPriority());
+        data.put("chairpersonReviewRequired", definition.chairpersonReviewRequired());
+        data.put("chairpersonPriority", definition.chairpersonPriority());
         data.put("boardReviewRequired", definition.boardReviewRequired());
         data.put("boardPriority", definition.boardPriority());
         data.put("committeeReviewRequired", definition.committeeReviewRequired());
@@ -143,6 +151,8 @@ public class LoanProductWorkflowService {
             int managerPriority = intValue(data.get("managerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 2 : 1);
             boolean loanOfficerReviewRequired = booleanValue(data.get("loanOfficerReviewRequired"));
             int loanOfficerPriority = intValue(data.get("loanOfficerPriority"), snapshotStartStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2);
+            boolean chairpersonReviewRequired = booleanValue(data.get("chairpersonReviewRequired"));
+            int chairpersonPriority = intValue(data.get("chairpersonPriority"), 3);
             return new WorkflowDefinition(
                 List.copyOf(stages),
                 firstWorkflowStage(stages),
@@ -150,6 +160,8 @@ public class LoanProductWorkflowService {
                 managerPriority,
                 loanOfficerReviewRequired,
                 loanOfficerPriority,
+                chairpersonReviewRequired,
+                chairpersonPriority,
                 booleanValue(data.getOrDefault("boardReviewRequired", false)),
                 intValue(data.get("boardPriority"), 3),
                 booleanValue(data.getOrDefault("committeeReviewRequired", false)),
@@ -172,12 +184,14 @@ public class LoanProductWorkflowService {
             ? 1
             : Math.max(settings.getBoardQuorum(), 1);
         return new WorkflowDefinition(
-            orderedStages(true, 1, loanOfficerReviewRequired, 2, false, 3, committeeReviewRequired, 4, true, 5),
+            orderedStages(true, 1, loanOfficerReviewRequired, 2, false, 3, false, 3, committeeReviewRequired, 4, true, 5),
             ApprovalWorkflowStage.MANAGER,
             true,
             1,
             loanOfficerReviewRequired,
             2,
+            false,
+            3,
             false,
             3,
             committeeReviewRequired,
@@ -194,6 +208,8 @@ public class LoanProductWorkflowService {
                                                       int managerPriority,
                                                       boolean loanOfficerReviewRequired,
                                                       int loanOfficerPriority,
+                                                      boolean chairpersonReviewRequired,
+                                                      int chairpersonPriority,
                                                       boolean boardReviewRequired,
                                                       int boardPriority,
                                                       boolean committeeReviewRequired,
@@ -207,6 +223,9 @@ public class LoanProductWorkflowService {
         if (loanOfficerReviewRequired) {
             stages.add(new StagePriority(loanOfficerPriority, ApprovalWorkflowStage.LOAN_OFFICER));
         }
+        if (chairpersonReviewRequired) {
+            stages.add(new StagePriority(chairpersonPriority, ApprovalWorkflowStage.CHAIRPERSON));
+        }
         if (boardReviewRequired) {
             stages.add(new StagePriority(boardPriority, ApprovalWorkflowStage.BOARD));
         }
@@ -216,7 +235,7 @@ public class LoanProductWorkflowService {
         if (accountantReviewRequired) {
             stages.add(new StagePriority(accountantPriority, ApprovalWorkflowStage.ACCOUNTANT));
         }
-        stages.add(new StagePriority(6, ApprovalWorkflowStage.DISBURSEMENT_OFFICER));
+        stages.add(new StagePriority(7, ApprovalWorkflowStage.DISBURSEMENT_OFFICER));
         return stages.stream()
             .sorted(Comparator.comparingInt(StagePriority::priority))
             .map(StagePriority::stage)
@@ -260,6 +279,8 @@ public class LoanProductWorkflowService {
         int managerPriority,
         boolean loanOfficerReviewRequired,
         int loanOfficerPriority,
+        boolean chairpersonReviewRequired,
+        int chairpersonPriority,
         boolean boardReviewRequired,
         int boardPriority,
         boolean committeeReviewRequired,
@@ -289,6 +310,8 @@ public class LoanProductWorkflowService {
                 startStage == ApprovalWorkflowStage.LOAN_OFFICER ? 1 : 2,
                 false,
                 3,
+                false,
+                3,
                 committeeReviewRequired,
                 committeePriority,
                 committeeMinimumVotes,
@@ -305,6 +328,8 @@ public class LoanProductWorkflowService {
                                   int managerPriority,
                                   boolean loanOfficerReviewRequired,
                                   int loanOfficerPriority,
+                                  boolean chairpersonReviewRequired,
+                                  int chairpersonPriority,
                                   boolean committeeReviewRequired,
                                   int committeePriority,
                                   int committeeMinimumVotes,
@@ -318,6 +343,8 @@ public class LoanProductWorkflowService {
                 managerPriority,
                 loanOfficerReviewRequired,
                 loanOfficerPriority,
+                chairpersonReviewRequired,
+                chairpersonPriority,
                 false,
                 3,
                 committeeReviewRequired,

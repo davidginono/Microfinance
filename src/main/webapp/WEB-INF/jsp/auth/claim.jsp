@@ -70,6 +70,13 @@
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="register.member.signature" text="Signature" />
+                        <input name="signatureText" type="text" maxlength="120" required
+                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
+                               placeholder="e.g. James M Juma" />
+                    </label>
+
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Password
                         <input name="password" type="password" autocomplete="new-password" minlength="8" required
                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"

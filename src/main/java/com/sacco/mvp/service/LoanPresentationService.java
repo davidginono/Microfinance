@@ -291,6 +291,12 @@ public class LoanPresentationService {
                 currentIndex = labels.size() - 1;
             }
             case LOAN_OFFICER_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Loan Officer");
+            case AWAITING_CHAIRPERSON -> currentIndex = indexOfLabel(labels, "On Review By Chairperson");
+            case CHAIRPERSON_REJECTED -> {
+                labels.add("Chairperson Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            case CHAIRPERSON_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Chairperson");
             case AWAITING_BOARD -> currentIndex = indexOfLabel(labels, "On Review By Board");
             case AWAITING_CREDIT_COMMITTEE -> currentIndex = indexOfLabel(labels, "On Review By Credit Committee");
             case BOARD_REJECTED -> {
@@ -784,6 +790,7 @@ public class LoanPresentationService {
         return switch (stage) {
             case MANAGER -> "On Review By Manager";
             case LOAN_OFFICER -> "On Review By Loan Officer";
+            case CHAIRPERSON -> "On Review By Chairperson";
             case BOARD -> "On Review By Board";
             case CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case ACCOUNTANT -> "On Review By Accountant";
@@ -800,6 +807,8 @@ public class LoanPresentationService {
             case "Manager Rejected" -> message("loan.status.MANAGER_REJECTED");
             case "On Review By Loan Officer" -> message("loan.status.AWAITING_LOAN_OFFICER");
             case "Loan Officer Rejected" -> message("loan.status.LOAN_OFFICER_REJECTED");
+            case "On Review By Chairperson" -> message("loan.status.AWAITING_CHAIRPERSON");
+            case "Chairperson Rejected" -> message("loan.status.CHAIRPERSON_REJECTED");
             case "On Review By Board" -> message("loan.status.AWAITING_BOARD");
             case "On Review By Credit Committee" -> message("loan.status.AWAITING_CREDIT_COMMITTEE");
             case "Board Rejected" -> message("loan.status.BOARD_REJECTED");
@@ -1070,6 +1079,7 @@ public class LoanPresentationService {
     private boolean isRejectedStatus(com.sacco.mvp.domain.LoanStatus status) {
         return status == com.sacco.mvp.domain.LoanStatus.MANAGER_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.LOAN_OFFICER_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.CHAIRPERSON_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.BOARD_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.ACCOUNTANT_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.FINAL_REJECTED;
@@ -1962,7 +1972,11 @@ public class LoanPresentationService {
                 .map(ManagerReview::getReviewStage)
                 .distinct()
                 .count()
-                + (boardReviews.isEmpty() ? 0 : 1);
+                + boardReviews.stream()
+                .filter(review -> review.getReviewStage() != null)
+                .map(BoardReview::getReviewStage)
+                .distinct()
+                .count();
         }
 
         private void drawApplicationSummary() throws IOException {
@@ -2354,8 +2368,8 @@ public class LoanPresentationService {
                 return;
             }
             for (ApprovalWorkflowStage stage : stages) {
-                if (stage == ApprovalWorkflowStage.BOARD) {
-                    drawBoardSignOffPanel();
+                if (boardStyleReviewStage(stage)) {
+                    drawBoardSignOffPanel(stage);
                 } else {
                     drawStaffSignOffPanel(stage);
                 }
@@ -2365,11 +2379,15 @@ public class LoanPresentationService {
         private void drawSystemSignedReviewTable(List<ApprovalWorkflowStage> stages) throws IOException {
             List<String[]> rows = new ArrayList<>();
             for (ApprovalWorkflowStage stage : stages) {
-                if (stage == ApprovalWorkflowStage.BOARD) {
-                    if (boardReviews.isEmpty()) {
+                if (boardStyleReviewStage(stage)) {
+                    List<BoardReview> stageReviews = boardReviewsForStage(stage);
+                    if (stageReviews.isEmpty()) {
+                        if (completedApplication()) {
+                            continue;
+                        }
                         rows.add(new String[]{stage.getDisplayLabel(), "-", "Pending", "-", "-", "-"});
                     } else {
-                        for (BoardReview review : boardReviews) {
+                        for (BoardReview review : stageReviews) {
                             Member boardMember = boardMembers.get(review.getBoardMemberId());
                             rows.add(new String[]{
                                 stage.getDisplayLabel(),
@@ -2384,6 +2402,9 @@ public class LoanPresentationService {
                     continue;
                 }
                 ManagerReview review = latestStaffReview(stage);
+                if (review == null && completedApplication()) {
+                    continue;
+                }
                 Member reviewer = review == null ? null : staffReviewers.get(review.getManagerMemberId());
                 rows.add(new String[]{
                     stage.getDisplayLabel(),
@@ -2486,10 +2507,11 @@ public class LoanPresentationService {
             y -= height + 10f;
         }
 
-        private void drawBoardSignOffPanel() throws IOException {
-            if (boardReviews.isEmpty()) {
+        private void drawBoardSignOffPanel(ApprovalWorkflowStage stage) throws IOException {
+            List<BoardReview> stageReviews = boardReviewsForStage(stage);
+            if (stageReviews.isEmpty()) {
                 drawRoleSignOffCard(
-                    ApprovalWorkflowStage.BOARD.getDisplayLabel(),
+                    stage.getDisplayLabel(),
                     "PENDING REVIEW",
                     null,
                     "________________________________",
@@ -2500,10 +2522,10 @@ public class LoanPresentationService {
                 );
                 return;
             }
-            for (BoardReview review : boardReviews) {
+            for (BoardReview review : stageReviews) {
                 Member boardMember = boardMembers.get(review.getBoardMemberId());
                 drawRoleSignOffCard(
-                    ApprovalWorkflowStage.BOARD.getDisplayLabel(),
+                    stage.getDisplayLabel(),
                     "REVIEW RECORDED",
                     boardMember == null ? shortId(review.getBoardMemberId()) : sanitizePdfText(boardMember.getFullName()),
                     sanitizePdfText(review.getComment()),
@@ -2513,6 +2535,26 @@ public class LoanPresentationService {
                     BRAND_NAVY
                 );
             }
+        }
+
+        private boolean boardStyleReviewStage(ApprovalWorkflowStage stage) {
+            return stage == ApprovalWorkflowStage.LOAN_OFFICER
+                || stage == ApprovalWorkflowStage.CHAIRPERSON
+                || stage == ApprovalWorkflowStage.BOARD
+                || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE;
+        }
+
+        private List<BoardReview> boardReviewsForStage(ApprovalWorkflowStage stage) {
+            return boardReviews.stream()
+                .filter(review -> review.getReviewStage() == stage)
+                .toList();
+        }
+
+        private boolean completedApplication() {
+            return app.getStatus() == com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT
+                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
+                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAID;
         }
 
         private ManagerReview latestStaffReview(ApprovalWorkflowStage stage) {

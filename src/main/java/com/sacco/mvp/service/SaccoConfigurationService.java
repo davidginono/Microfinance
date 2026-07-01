@@ -38,6 +38,7 @@ public class SaccoConfigurationService {
                                                 BigDecimal maximumAmount,
                                                 Integer guarantorsRequired,
                                                 BigDecimal maxLoanSavingsRatio,
+                                                boolean savingsLimitCheckRequired,
                                                 BigDecimal applicationFee,
                                                 BigDecimal insuranceRate,
                                                 BigDecimal processingFeeRate,
@@ -52,6 +53,8 @@ public class SaccoConfigurationService {
                                                 ApprovalWorkflowStage workflowStartStage,
                                                 Integer managerPriority,
                                                 Integer loanOfficerPriority,
+                                                boolean chairpersonReviewRequired,
+                                                Integer chairpersonPriority,
                                                 boolean boardReviewRequired,
                                                 Integer boardPriority,
                                                 boolean committeeReviewRequired,
@@ -82,6 +85,7 @@ public class SaccoConfigurationService {
             maximumAmount,
             guarantorsRequired,
             maxLoanSavingsRatio == null ? DEFAULT_RATIO : maxLoanSavingsRatio,
+            savingsLimitCheckRequired,
             applicationFee == null ? DEFAULT_APPLICATION_FEE : applicationFee,
             insuranceRate == null ? DEFAULT_INSURANCE_RATE : insuranceRate,
             processingFeeRate == null ? DEFAULT_PROCESSING_FEE_RATE : processingFeeRate,
@@ -96,6 +100,8 @@ public class SaccoConfigurationService {
             workflowStartStage,
             managerPriority,
             loanOfficerPriority,
+            chairpersonReviewRequired,
+            chairpersonPriority,
             boardReviewRequired,
             boardPriority,
             committeeReviewRequired,
@@ -125,6 +131,7 @@ public class SaccoConfigurationService {
                                               BigDecimal maximumAmount,
                                               Integer guarantorsRequired,
                                               BigDecimal maxLoanSavingsRatio,
+                                              boolean savingsLimitCheckRequired,
                                               BigDecimal applicationFee,
                                               BigDecimal insuranceRate,
                                               BigDecimal processingFeeRate,
@@ -139,6 +146,8 @@ public class SaccoConfigurationService {
                                               ApprovalWorkflowStage workflowStartStage,
                                               Integer managerPriority,
                                               Integer loanOfficerPriority,
+                                              boolean chairpersonReviewRequired,
+                                              Integer chairpersonPriority,
                                               boolean boardReviewRequired,
                                               Integer boardPriority,
                                               boolean committeeReviewRequired,
@@ -167,6 +176,7 @@ public class SaccoConfigurationService {
             .maximumAmount(maximumAmount)
             .guarantorsRequired(guarantorsRequired)
             .maxLoanSavingsRatio(maxLoanSavingsRatio)
+            .savingsLimitCheckRequired(savingsLimitCheckRequired)
             .applicationFee(applicationFee == null ? DEFAULT_APPLICATION_FEE : applicationFee)
             .insuranceRate(insuranceRate)
             .processingFeeRate(processingFeeRate == null ? DEFAULT_PROCESSING_FEE_RATE : processingFeeRate)
@@ -181,6 +191,8 @@ public class SaccoConfigurationService {
             .loanOfficerReviewRequired(loanOfficerReviewRequired)
             .loanOfficerPriority(loanOfficerPriority == null ? 2 : loanOfficerPriority)
             .workflowStartStage(workflowStartStage == null ? ApprovalWorkflowStage.MANAGER : workflowStartStage)
+            .chairpersonReviewRequired(chairpersonReviewRequired)
+            .chairpersonPriority(chairpersonPriority)
             .boardReviewRequired(boardReviewRequired)
             .boardPriority(boardPriority)
             .committeeReviewRequired(committeeReviewRequired)

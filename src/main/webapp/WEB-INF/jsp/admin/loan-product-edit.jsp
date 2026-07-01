@@ -43,30 +43,6 @@
         gap: 0.75rem;
         max-width: 34rem;
     }
-    .savings-ratio-mode-toggle {
-        display: inline-flex;
-        width: fit-content;
-        overflow: hidden;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.375rem;
-        background: #ffffff;
-    }
-    .savings-ratio-mode-toggle button {
-        min-height: 2.4rem;
-        border: 0;
-        background: transparent;
-        padding: 0 0.9rem;
-        color: #475569;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-    .savings-ratio-mode-toggle button.is-active {
-        background: #e0f2fe;
-        color: #075985;
-        box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.12);
-    }
     .savings-multiplier-control {
         display: flex;
         flex-wrap: wrap;
@@ -76,23 +52,10 @@
     .savings-multiplier-control input {
         flex: 0 1 10rem;
     }
-    .savings-fraction-control {
-        display: inline-grid;
-        width: fit-content;
-        grid-template-columns: 6.5rem auto 6.5rem auto;
-        gap: 0.35rem;
-        align-items: center;
-    }
-    .savings-fraction-control input {
-        min-height: 3rem !important;
-        padding-inline: 0.75rem;
-    }
-    .savings-multiplier-control.hidden,
-    .savings-fraction-control.hidden {
+    .savings-multiplier-control.hidden {
         display: none !important;
     }
-    .savings-multiplier-label,
-    .savings-fraction-divider {
+    .savings-multiplier-label {
         min-height: 3rem;
         display: inline-flex;
         align-items: center;
@@ -485,6 +448,7 @@
                   data-product-workflow-builder="true"
                   data-product-edit-mode="true"
                   data-active-loan-officers="${activeLoanOfficerCount}"
+                  data-active-chairpersons="${activeChairpersonCount}"
                   data-active-board-members="${activeBoardMemberCount}"
                   data-active-credit-committee-members="${activeCreditCommitteeMemberCount}"
                   data-active-accountants="${activeAccountantCount}"
@@ -563,21 +527,18 @@
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
                             <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
+                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                <input name="savingsLimitCheckRequired" type="checkbox" value="true" ${product.savingsLimitCheckRequired ? 'checked' : ''} data-savings-limit-check />
+                                <span>
+                                    <span class="block font-semibold text-slate-800"><spring:message code="admin.settings.loanProducts.savingsLimitCheck" text="Check savings against loan amount" /></span>
+                                    <span class="block text-xs font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.settings.loanProducts.savingsLimitCheckHelp" text="When unchecked, only the product minimum and maximum amount range is enforced." /></span>
+                                </span>
+                            </label>
                             <div class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.savingsMultiple" text="Loan Amount Limit By Savings" />
-                                <div class="savings-ratio-mode-toggle mt-2" data-savings-ratio-mode-toggle>
-                                    <button type="button" class="is-active" data-savings-ratio-mode="multiple"><spring:message code="admin.settings.loanProducts.savingsMultipleMode" text="Multiple" /></button>
-                                    <button type="button" data-savings-ratio-mode="fraction"><spring:message code="admin.settings.loanProducts.savingsFractionMode" text="Fraction" /></button>
-                                </div>
                                 <div class="savings-multiplier-control mt-1">
                                     <input type="number" min="0" max="10" step="0.01" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Loan savings multiplier" data-savings-multiplier />
                                     <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></span>
-                                </div>
-                                <div class="savings-fraction-control mt-1 hidden" data-savings-fraction-control>
-                                    <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction numerator" data-savings-fraction-numerator />
-                                    <span class="savings-fraction-divider">/</span>
-                                    <input type="number" min="1" max="10" step="1" maxlength="2" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" aria-label="Savings fraction denominator" data-savings-fraction-denominator />
-                                    <span class="savings-multiplier-label"><spring:message code="admin.settings.loanProducts.savingsFractionSuffix" text="times savings" /></span>
                                 </div>
                             </div>
                         </div>
@@ -662,12 +623,12 @@
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="managerPriority" class="workflow-priority-select" data-workflow-manager-priority>
-                                            <c:forEach begin="1" end="6" var="priorityOption">
+                                            <c:forEach begin="1" end="7" var="priorityOption">
                                                 <option value="${priorityOption}" ${product.resolvedManagerPriority eq priorityOption ? 'selected' : ''}>${priorityOption}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
-                                    <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'><spring:message code="admin.settings.workflow.managerLoanOfficerPriorityNote" text="Choose any open priority from 1 to 6." /></div>
+                                    <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'><spring:message code="admin.settings.workflow.managerLoanOfficerPriorityNote" text="Choose any open priority from 1 to 7." /></div>
                                 </div>
                                 <div class="workflow-table-row">
                                     <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.loanOfficer" text="Loan Officer" /></div>
@@ -676,7 +637,7 @@
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="loanOfficerPriority" class="workflow-priority-select" data-workflow-loan-officer-priority>
-                                            <c:forEach begin="1" end="6" var="priorityOption">
+                                            <c:forEach begin="1" end="7" var="priorityOption">
                                                 <option value="${priorityOption}" ${product.resolvedLoanOfficerPriority eq priorityOption ? 'selected' : ''}>${priorityOption}</option>
                                             </c:forEach>
                                         </select>
@@ -684,12 +645,28 @@
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
                                         <c:choose>
                                             <c:when test="${product.loanOfficerReviewRequired == true || (product.loanOfficerReviewRequired == null && settings.loanOfficerReviewRequired)}">
-                                                <spring:message code="admin.settings.workflow.loanOfficerPriorityNote" text="Choose any open priority from 1 to 6." />
+                                                <spring:message code="admin.settings.workflow.loanOfficerPriorityNote" text="Choose any open priority from 1 to 7." />
                                             </c:when>
                                             <c:otherwise>
                                                 <spring:message code="admin.settings.workflow.enableLoanOfficerNote" text="Enable Loan Officer review in tenant approval flow settings to use this stage." />
                                             </c:otherwise>
                                         </c:choose>
+                                    </div>
+                                </div>
+                                <div class="workflow-table-row">
+                                    <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.chairperson" text="Chairperson" /></div>
+                                    <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
+                                        <label class="workflow-checkbox-lock"><input name="chairpersonReviewRequired" type="checkbox" value="true" ${product.chairpersonReviewRequired ? 'checked' : ''} data-workflow-chairperson aria-label="Chairperson required" /></label>
+                                    </div>
+                                    <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
+                                        <select name="chairpersonPriority" class="workflow-priority-select" data-workflow-chairperson-priority>
+                                            <c:forEach begin="1" end="7" var="priorityOption">
+                                                <option value="${priorityOption}" ${product.resolvedChairpersonPriority == priorityOption ? 'selected' : ''}>${priorityOption}</option>
+                                            </c:forEach>
+                                        </select>
+                                    </div>
+                                    <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
+                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 7." />
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
@@ -699,13 +676,13 @@
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority>
-                                            <c:forEach begin="1" end="6" var="priorityOption">
+                                            <c:forEach begin="1" end="7" var="priorityOption">
                                                 <option value="${priorityOption}" ${product.resolvedBoardPriority == priorityOption ? 'selected' : ''}>${priorityOption}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
+                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 7." />
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
@@ -715,13 +692,13 @@
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="committeePriority" class="workflow-priority-select" data-workflow-committee-priority>
-                                            <c:forEach begin="1" end="6" var="priorityOption">
+                                            <c:forEach begin="1" end="7" var="priorityOption">
                                                 <option value="${priorityOption}" ${product.resolvedCommitteePriority == priorityOption ? 'selected' : ''}>${priorityOption}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
+                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 7." />
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
@@ -732,13 +709,13 @@
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
                                         <select name="accountantPriority" class="workflow-priority-select" data-workflow-accountant-priority>
-                                            <c:forEach begin="1" end="6" var="priorityOption">
+                                            <c:forEach begin="1" end="7" var="priorityOption">
                                                 <option value="${priorityOption}" ${product.resolvedAccountantPriority == priorityOption ? 'selected' : ''}>${priorityOption}</option>
                                             </c:forEach>
                                         </select>
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 6." />
+                                        <spring:message code="admin.settings.workflow.openPriorityNote" text="Choose any open priority from 1 to 7." />
                                     </div>
                                 </div>
                                 <div class="workflow-table-row">
@@ -748,12 +725,39 @@
                                         <input type="hidden" name="disbursementOfficerRequired" value="false" />
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                        <select class="workflow-priority-select" disabled><option selected>6</option></select>
+                                        <select class="workflow-priority-select" disabled><option selected>7</option></select>
                                     </div>
                                     <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
                                         <spring:message code="admin.settings.workflow.disbursementOfficerNote" text="Role requirement for final manual release." />
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-subsection">
+                            <p class="workflow-subsection-title"><spring:message code="role.chairperson" text="Chairperson" /></p>
+                            <div class="grid gap-3">
+                                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Chairperson Assigned
+                                    <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search chairpersons..." data-chairperson-reviewer-search />
+                                </label>
+                                <c:set var="assignedChairpersonReviewerTokens" value="${productChairpersonReviewerIdTokens[product.id]}" />
+                                <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-chairperson-reviewer-list>
+                                    <c:forEach items="${chairpersonReviewerOptions}" var="reviewer">
+                                        <c:set var="reviewerToken" value="|${reviewer.id}|" />
+                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-chairperson-reviewer-option data-chairperson-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                            <input name="chairpersonReviewerIds" type="checkbox" value="${reviewer.id}" ${fn:contains(assignedChairpersonReviewerTokens, reviewerToken) ? 'checked' : ''} />
+                                            <span>
+                                                <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
+                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                            </span>
+                                        </label>
+                                    </c:forEach>
+                                    <c:if test="${empty chairpersonReviewerOptions}">
+                                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active chairpersons are available.</div>
+                                    </c:if>
+                                </div>
+                                <p class="text-xs text-slate-500">Every selected chairperson will be assigned and notified for this product.</p>
                             </div>
                         </div>
 
@@ -944,8 +948,9 @@
 <spring:message code="admin.settings.workflow.warning.noReviewStage" text="At least one review or approval stage must be enabled before disbursement." var="warningNoReviewStage" />
 <spring:message code="admin.settings.workflow.warning.noLoanOfficers" text="Loan Officer review is enabled for this product, but there are no active Loan Officers assigned yet." var="warningNoLoanOfficers" />
 <spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
-<spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority from 1 to 6." var="warningDuplicatePriorities" />
+<spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority from 1 to 7." var="warningDuplicatePriorities" />
 <spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Board Member review is configured, but there are no active board members available for assignment." var="warningNoBoardReviewers" />
+<spring:message code="admin.settings.workflow.warning.noChairpersons" text="Chairperson review is configured, but there are no active chairpersons available for assignment." var="warningNoChairpersons" />
 <spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Committee review is configured, but there are no active board members available for assignment." var="warningNoCommitteeReviewers" />
 <spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
 <spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
@@ -964,6 +969,7 @@
 <spring:message code="admin.settings.workflow.runtime.disbursementRelease" text="Disbursement Release" var="runtimeDisbursementRelease" />
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
+<spring:message code="role.chairperson" text="Chairperson" var="runtimeChairperson" />
 <spring:message code="role.boardMember" text="Board Member" var="runtimeBoardMember" />
 <spring:message code="role.committee" text="Credit Committee" var="runtimeCommittee" />
 <spring:message code="role.accountant" text="Accountant" var="runtimeAccountant" />
@@ -985,11 +991,12 @@
 <spring:message code="admin.settings.validation.countRange" text="Enter a number from 0 to 15." var="validationCountRange" />
 <spring:message code="admin.settings.validation.committeeCountRange" text="Enter a number from 1 to 15." var="validationCommitteeCountRange" />
 <spring:message code="admin.settings.validation.noReviewStage" text="Enable at least one review or approval stage before disbursement." var="validationNoReviewStage" />
-<spring:message code="admin.settings.validation.managerPriority" text="Manager priority must be between 1 and 6." var="validationManagerPriority" />
-<spring:message code="admin.settings.validation.loanOfficerPriority" text="Loan Officer priority must be between 1 and 6." var="validationLoanOfficerPriority" />
-<spring:message code="admin.settings.validation.openPriority" text="Choose any open priority from 1 to 6." var="validationOpenPriority" />
+<spring:message code="admin.settings.validation.managerPriority" text="Manager priority must be between 1 and 7." var="validationManagerPriority" />
+<spring:message code="admin.settings.validation.loanOfficerPriority" text="Loan Officer priority must be between 1 and 7." var="validationLoanOfficerPriority" />
+<spring:message code="admin.settings.validation.openPriority" text="Choose any open priority from 1 to 7." var="validationOpenPriority" />
 <spring:message code="admin.settings.validation.managerLoanOfficerDifferentPriority" text="Choose different priorities for Manager and Loan Officer." var="validationManagerLoanOfficerDifferentPriority" />
 <spring:message code="admin.settings.validation.assignLoanOfficer" text="Assign at least one active Loan Officer before using this stage." var="validationAssignLoanOfficer" />
+<spring:message code="admin.settings.validation.assignChairperson" text="Assign at least one active Chairperson before using this stage." var="validationAssignChairperson" />
 <spring:message code="admin.settings.validation.assignBoardReviewer" text="Assign at least one active board member before using this stage." var="validationAssignBoardReviewer" />
 <spring:message code="admin.settings.validation.assignCommitteeReviewer" text="Assign at least one active credit committee member before using this stage." var="validationAssignCommitteeReviewer" />
 <spring:message code="admin.settings.validation.committeeAccountantDifferentPriority" text="Committee and Accountant cannot share the same priority slot." var="validationCommitteeAccountantDifferentPriority" />
@@ -1007,6 +1014,7 @@
             warningManagerLoanOfficerSamePriority: "${warningManagerLoanOfficerSamePriority}",
             warningDuplicatePriorities: "${warningDuplicatePriorities}",
             warningNoBoardReviewers: "${warningNoBoardReviewers}",
+            warningNoChairpersons: "${warningNoChairpersons}",
             warningNoCommitteeReviewers: "${warningNoCommitteeReviewers}",
             warningCommitteeAccountantSamePriority: "${warningCommitteeAccountantSamePriority}",
             warningNoAccountants: "${warningNoAccountants}",
@@ -1024,6 +1032,7 @@
             runtimeFixManagerLoanOfficerPriority: "${runtimeFixManagerLoanOfficerPriority}",
             runtimeManager: "${runtimeManager}",
             runtimeLoanOfficer: "${runtimeLoanOfficer}",
+            runtimeChairperson: "${runtimeChairperson}",
             runtimeBoardMember: "${runtimeBoardMember}",
             runtimeCommittee: "${runtimeCommittee}",
             runtimeAccountant: "${runtimeAccountant}",
@@ -1051,6 +1060,7 @@
             validationOpenPriority: "${validationOpenPriority}",
             validationManagerLoanOfficerDifferentPriority: "${validationManagerLoanOfficerDifferentPriority}",
             validationAssignLoanOfficer: "${validationAssignLoanOfficer}",
+            validationAssignChairperson: "${validationAssignChairperson}",
             validationAssignBoardReviewer: "${validationAssignBoardReviewer}",
             validationAssignCommitteeReviewer: "${validationAssignCommitteeReviewer}",
             validationCommitteeMinimumVotes: "${validationCommitteeMinimumVotes}",
@@ -1351,7 +1361,11 @@
 
             const committeeToggle = form.querySelector('[data-workflow-committee]');
             const boardToggle = form.querySelector('[data-workflow-board]');
+            const chairpersonToggle = form.querySelector('[data-workflow-chairperson]');
             const loanOfficerToggle = form.querySelector('[data-workflow-loan-officer]');
+            const chairpersonReviewerSearch = form.querySelector('[data-chairperson-reviewer-search]');
+            const chairpersonReviewerOptions = Array.from(form.querySelectorAll('[data-chairperson-reviewer-option]'));
+            const chairpersonReviewerInputs = Array.from(form.querySelectorAll('[name="chairpersonReviewerIds"]'));
             const boardReviewerSearch = form.querySelector('[data-board-reviewer-search]');
             const boardReviewerOptions = Array.from(form.querySelectorAll('[data-board-reviewer-option]'));
             const boardReviewerInputs = Array.from(form.querySelectorAll('[name="boardReviewerIds"]'));
@@ -1359,6 +1373,7 @@
             const creditCommitteeReviewerOptions = Array.from(form.querySelectorAll('[data-credit-committee-reviewer-option]'));
             const creditCommitteeReviewerInputs = Array.from(form.querySelectorAll('[name="creditCommitteeReviewerIds"]'));
             const boardPriority = form.querySelector('[data-workflow-board-priority]');
+            const chairpersonPriority = form.querySelector('[data-workflow-chairperson-priority]');
             const committeePriority = form.querySelector('[data-workflow-committee-priority]');
             const guarantorsInput = form.querySelector('[data-workflow-guarantors]');
             const loadedFinancialInput = form.querySelector('[data-workflow-loaded-financial]');
@@ -1377,12 +1392,8 @@
             const productCodeField = form.querySelector('[data-product-code-field][data-product-code-generated="true"]');
             const savingsPercentInput = form.querySelector('[data-savings-percent]');
             const savingsMultiplierInput = form.querySelector('[data-savings-multiplier]');
-            const savingsFractionNumerator = form.querySelector('[data-savings-fraction-numerator]');
-            const savingsFractionDenominator = form.querySelector('[data-savings-fraction-denominator]');
+            const savingsLimitCheckInput = form.querySelector('[data-savings-limit-check]');
             const savingsMultiplierControl = form.querySelector('.savings-multiplier-control');
-            const savingsFractionControl = form.querySelector('[data-savings-fraction-control]');
-            const savingsModeToggle = form.querySelector('[data-savings-ratio-mode-toggle]');
-            let savingsRatioMode = 'multiple';
             let syncingSavingsRatio = false;
 
             if (!committeeToggle || !warningsRoot || !runtimeRoot) {
@@ -1392,11 +1403,16 @@
             const tenantLoanOfficerEnabled = form.dataset.tenantLoanOfficerEnabled === 'true';
             const tenantBoardEnabled = form.dataset.tenantBoardEnabled === 'true';
             const activeLoanOfficers = Number(form.dataset.activeLoanOfficers || '0');
+            const activeChairpersons = Number(form.dataset.activeChairpersons || '0');
             const activeBoardMembers = Number(form.dataset.activeBoardMembers || '0');
             const activeCreditCommitteeMembers = Number(form.dataset.activeCreditCommitteeMembers || '0');
             const activeAccountants = Number(form.dataset.activeAccountants || '0');
             const activeDisbursementOfficers = Number(form.dataset.activeDisbursementOfficers || '0');
             const activeDisbursementClaimHolders = Number(form.dataset.activeDisbursementClaimHolders || '0');
+
+            function selectedChairpersonReviewerCount() {
+                return chairpersonReviewerInputs.filter((input) => input.checked).length;
+            }
 
             function selectedBoardReviewerCount() {
                 return boardReviewerInputs.filter((input) => input.checked).length;
@@ -1404,6 +1420,17 @@
 
             function selectedCreditCommitteeReviewerCount() {
                 return creditCommitteeReviewerInputs.filter((input) => input.checked).length;
+            }
+
+            function filterChairpersonReviewers() {
+                if (!chairpersonReviewerSearch) {
+                    return;
+                }
+                const query = chairpersonReviewerSearch.value.trim().toLowerCase();
+                chairpersonReviewerOptions.forEach((option) => {
+                    const text = option.dataset.chairpersonReviewerText || '';
+                    option.classList.toggle('hidden', query !== '' && !text.includes(query));
+                });
             }
 
             function filterBoardReviewers() {
@@ -1428,10 +1455,11 @@
                 });
             }
 
-            function priorityEntries(managerEnabled, loanOfficerEnabled, boardEnabled, committeeEnabled, accountantEnabled, managerValue, loanOfficerValue, boardValue, committeeValue, accountantValue) {
+            function priorityEntries(managerEnabled, loanOfficerEnabled, chairpersonEnabled, boardEnabled, committeeEnabled, accountantEnabled, managerValue, loanOfficerValue, chairpersonValue, boardValue, committeeValue, accountantValue) {
                 return [
                     { key: 'managerPriority', label: productSettingsText.runtimeManager, enabled: managerEnabled, field: managerPriority, value: managerValue },
                     { key: 'loanOfficerPriority', label: productSettingsText.runtimeLoanOfficer, enabled: loanOfficerEnabled, field: loanOfficerPriority, value: loanOfficerValue },
+                    { key: 'chairpersonPriority', label: productSettingsText.runtimeChairperson, enabled: chairpersonEnabled, field: chairpersonPriority, value: chairpersonValue },
                     { key: 'boardPriority', label: productSettingsText.runtimeBoardMember, enabled: boardEnabled, field: boardPriority, value: boardValue },
                     { key: 'committeePriority', label: productSettingsText.runtimeCommittee, enabled: committeeEnabled, field: committeePriority, value: committeeValue },
                     { key: 'accountantPriority', label: productSettingsText.runtimeAccountant, enabled: accountantEnabled, field: accountantPriority, value: accountantValue }
@@ -1450,7 +1478,7 @@
 
             function clearLivePriorityErrors() {
                 form.querySelectorAll('.field-error-text[data-live-priority-error]').forEach((node) => node.remove());
-                [managerPriority, loanOfficerPriority, boardPriority, committeePriority, accountantPriority].filter(Boolean).forEach((field) => {
+                [managerPriority, loanOfficerPriority, chairpersonPriority, boardPriority, committeePriority, accountantPriority].filter(Boolean).forEach((field) => {
                     if (field.dataset.livePriorityField === 'true') {
                         field.classList.remove('field-error-input');
                         field.removeAttribute('aria-invalid');
@@ -1490,37 +1518,6 @@
                 productCodeField.value = generateProductCode(productNameField.value);
             }
 
-            function approximateFraction(ratio) {
-                if (!Number.isFinite(ratio) || ratio < 0) {
-                    return { numerator: 1, denominator: 1 };
-                }
-                let bestNumerator = 1;
-                let bestDenominator = 1;
-                let bestError = Math.abs(ratio - 1);
-                for (let denominator = 1; denominator <= 10; denominator += 1) {
-                    const numerator = Math.max(1, Math.min(10, Math.round(ratio * denominator)));
-                    const error = Math.abs(ratio - numerator / denominator);
-                    if (error < bestError) {
-                        bestNumerator = numerator;
-                        bestDenominator = denominator;
-                        bestError = error;
-                    }
-                }
-                return { numerator: bestNumerator, denominator: bestDenominator };
-            }
-
-            function renderSavingsRatioMode() {
-                if (savingsMultiplierControl) {
-                    savingsMultiplierControl.classList.toggle('hidden', savingsRatioMode !== 'multiple');
-                }
-                if (savingsFractionControl) {
-                    savingsFractionControl.classList.toggle('hidden', savingsRatioMode !== 'fraction');
-                }
-                savingsModeToggle?.querySelectorAll('[data-savings-ratio-mode]').forEach((button) => {
-                    button.classList.toggle('is-active', button.dataset.savingsRatioMode === savingsRatioMode);
-                });
-            }
-
             function syncSavingsMultiplierFromPercent() {
                 if (!savingsPercentInput || !savingsMultiplierInput || syncingSavingsRatio) {
                     return;
@@ -1531,11 +1528,6 @@
                 }
                 syncingSavingsRatio = true;
                 savingsMultiplierInput.value = (percent / 100).toFixed(2);
-                if (savingsFractionNumerator && savingsFractionDenominator) {
-                    const fraction = approximateFraction(percent / 100);
-                    savingsFractionNumerator.value = String(fraction.numerator);
-                    savingsFractionDenominator.value = String(fraction.denominator);
-                }
                 syncingSavingsRatio = false;
             }
 
@@ -1549,46 +1541,6 @@
                 }
                 syncingSavingsRatio = true;
                 savingsPercentInput.value = (multiplier * 100).toFixed(2);
-                if (savingsFractionNumerator && savingsFractionDenominator) {
-                    const fraction = approximateFraction(multiplier);
-                    savingsFractionNumerator.value = String(fraction.numerator);
-                    savingsFractionDenominator.value = String(fraction.denominator);
-                }
-                syncingSavingsRatio = false;
-            }
-
-            function clampSavingsFractionField(field) {
-                if (!field) {
-                    return null;
-                }
-                const rawDigits = String(field.value || '').replace(/\D/g, '');
-                const fractionValue = rawDigits ? Number(rawDigits.slice(0, 2)) : null;
-                const clamped = fractionValue == null || !Number.isFinite(fractionValue)
-                    ? null
-                    : Math.max(1, Math.min(10, fractionValue));
-                if (clamped == null) {
-                    field.value = '';
-                    return null;
-                }
-                field.value = String(clamped);
-                return clamped;
-            }
-
-            function syncSavingsPercentFromFraction() {
-                if (!savingsPercentInput || !savingsFractionNumerator || !savingsFractionDenominator || syncingSavingsRatio) {
-                    return;
-                }
-                const numerator = clampSavingsFractionField(savingsFractionNumerator);
-                const denominator = clampSavingsFractionField(savingsFractionDenominator);
-                if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) {
-                    return;
-                }
-                const ratio = numerator / denominator;
-                syncingSavingsRatio = true;
-                savingsPercentInput.value = (ratio * 100).toFixed(2);
-                if (savingsMultiplierInput) {
-                    savingsMultiplierInput.value = ratio.toFixed(2);
-                }
                 syncingSavingsRatio = false;
             }
 
@@ -1671,23 +1623,36 @@
             function applyRules() {
                 const managerEnabled = !managerToggle || managerToggle.checked;
                 const loanOfficerEnabled = loanOfficerToggle && loanOfficerToggle.checked;
+                const chairpersonEnabled = chairpersonToggle && chairpersonToggle.checked;
                 const boardEnabled = boardToggle && boardToggle.checked;
                 const committeeEnabled = committeeToggle.checked;
                 const accountantEnabled = accountantToggle && accountantToggle.checked;
                 const disbursementOfficerRequired = !disbursementOfficerToggle || disbursementOfficerToggle.checked;
                 const guarantors = Math.max(0, numericValue(guarantorsInput, 0));
+                const assignedChairpersonReviewers = selectedChairpersonReviewerCount();
                 const assignedBoardReviewers = selectedBoardReviewerCount();
                 const assignedCreditCommitteeReviewers = selectedCreditCommitteeReviewerCount();
                 const loadedFinancialRequired = loadedFinancialInput && loadedFinancialInput.checked;
 
                 syncProductCode();
                 syncReviewPriorities();
+                if (savingsMultiplierInput) {
+                    savingsMultiplierInput.disabled = savingsLimitCheckInput && !savingsLimitCheckInput.checked;
+                }
+                if (savingsMultiplierControl) {
+                    savingsMultiplierControl.classList.toggle('opacity-60', savingsLimitCheckInput && !savingsLimitCheckInput.checked);
+                }
 
-                const managerPriorityValue = Math.max(1, Math.min(6, numericValue(managerPriority, 1)));
-                const loanOfficerPriorityValue = Math.max(1, Math.min(6, numericValue(loanOfficerPriority, 2)));
-                const boardPriorityValue = Math.max(1, Math.min(6, numericValue(boardPriority, 3)));
-                const committeePriorityValue = Math.max(1, Math.min(6, numericValue(committeePriority, 4)));
-                const accountantPriorityValue = Math.max(1, Math.min(6, numericValue(accountantPriority, 5)));
+                const managerPriorityValue = Math.max(1, Math.min(7, numericValue(managerPriority, 1)));
+                const loanOfficerPriorityValue = Math.max(1, Math.min(7, numericValue(loanOfficerPriority, 2)));
+                const chairpersonPriorityValue = Math.max(1, Math.min(7, numericValue(chairpersonPriority, 3)));
+                const boardPriorityValue = Math.max(1, Math.min(7, numericValue(boardPriority, 4)));
+                const committeePriorityValue = Math.max(1, Math.min(7, numericValue(committeePriority, 5)));
+                const accountantPriorityValue = Math.max(1, Math.min(7, numericValue(accountantPriority, 6)));
+                if (chairpersonPriority) {
+                    chairpersonPriority.value = String(chairpersonPriorityValue);
+                    chairpersonPriority.disabled = !chairpersonEnabled;
+                }
                 if (boardPriority) {
                     boardPriority.value = String(boardPriorityValue);
                     boardPriority.disabled = !boardEnabled;
@@ -1703,11 +1668,13 @@
                 const activePriorityEntries = priorityEntries(
                     managerEnabled,
                     loanOfficerEnabled,
+                    chairpersonEnabled,
                     boardEnabled,
                     committeeEnabled,
                     accountantEnabled,
                     managerPriorityValue,
                     loanOfficerPriorityValue,
+                    chairpersonPriorityValue,
                     boardPriorityValue,
                     committeePriorityValue,
                     accountantPriorityValue
@@ -1717,7 +1684,7 @@
                 duplicatePriorities.forEach((entry) => markLivePriorityError(entry.field, productSettingsText.validationOpenPriority));
 
                 const warnings = [];
-                if (!managerEnabled && !loanOfficerEnabled && !boardEnabled && !committeeEnabled && !accountantEnabled) {
+                if (!managerEnabled && !loanOfficerEnabled && !chairpersonEnabled && !boardEnabled && !committeeEnabled && !accountantEnabled) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningNoReviewStage));
                 }
                 if (loanOfficerEnabled && activeLoanOfficers <= 0) {
@@ -1725,6 +1692,13 @@
                 }
                 if (duplicatePriorities.length > 0) {
                     warnings.push(workflowWarning('danger', productSettingsText.warningDuplicatePriorities));
+                }
+
+                if (chairpersonEnabled && activeChairpersons <= 0) {
+                    warnings.push(workflowWarning('danger', productSettingsText.warningNoChairpersons));
+                }
+                if (chairpersonEnabled && assignedChairpersonReviewers <= 0) {
+                    warnings.push(workflowWarning('danger', productSettingsText.validationAssignChairperson));
                 }
 
                 if (boardEnabled && activeBoardMembers <= 0) {
@@ -1795,11 +1769,13 @@
                 const guarantorsRequired = numberOrNull(form.querySelector('[name="guarantorsRequired"]'));
                 const managerPriorityValue = numberOrNull(managerPriority);
                 const loanOfficerPriorityValue = numberOrNull(loanOfficerPriority);
+                const chairpersonPriorityValue = numberOrNull(chairpersonPriority);
                 const boardPriorityValue = numberOrNull(boardPriority);
                 const committeePriorityValue = numberOrNull(committeePriority);
                 const accountantPriorityValue = numberOrNull(accountantPriority);
                 const managerEnabled = !managerToggle || managerToggle.checked;
                 const loanOfficerEnabled = loanOfficerToggle && loanOfficerToggle.checked;
+                const chairpersonEnabled = chairpersonToggle && chairpersonToggle.checked;
                 const boardEnabled = boardToggle && boardToggle.checked;
                 const committeeEnabled = committeeToggle && committeeToggle.checked;
                 const accountantEnabled = accountantToggle && accountantToggle.checked;
@@ -1853,34 +1829,38 @@
                     addValidationError(errors, 'guarantorsRequired', productSettingsText.validationCountRange);
                 }
 
-                if (!managerEnabled && !loanOfficerEnabled && !boardEnabled && !committeeEnabled && !accountantEnabled) {
+                if (!managerEnabled && !loanOfficerEnabled && !chairpersonEnabled && !boardEnabled && !committeeEnabled && !accountantEnabled) {
                     addValidationError(errors, 'managerReviewRequired', productSettingsText.validationNoReviewStage);
                 }
 
                 priorityEntries(
                     managerEnabled,
                     loanOfficerEnabled,
+                    chairpersonEnabled,
                     boardEnabled,
                     committeeEnabled,
                     accountantEnabled,
                     managerPriorityValue,
                     loanOfficerPriorityValue,
+                    chairpersonPriorityValue,
                     boardPriorityValue,
                     committeePriorityValue,
                     accountantPriorityValue
                 ).forEach((entry) => {
-                    if (entry.value < 1 || entry.value > 6) {
+                    if (entry.value < 1 || entry.value > 7) {
                         addValidationError(errors, entry.key, productSettingsText.validationOpenPriority);
                     }
                 });
                 duplicatePriorityEntries(priorityEntries(
                     managerEnabled,
                     loanOfficerEnabled,
+                    chairpersonEnabled,
                     boardEnabled,
                     committeeEnabled,
                     accountantEnabled,
                     managerPriorityValue,
                     loanOfficerPriorityValue,
+                    chairpersonPriorityValue,
                     boardPriorityValue,
                     committeePriorityValue,
                     accountantPriorityValue
@@ -1889,14 +1869,23 @@
                 });
 
                 if (loanOfficerEnabled) {
-                    if (managerPriorityValue === null || Number.isNaN(managerPriorityValue) || managerPriorityValue < 1 || managerPriorityValue > 6) {
+                    if (managerPriorityValue === null || Number.isNaN(managerPriorityValue) || managerPriorityValue < 1 || managerPriorityValue > 7) {
                         addValidationError(errors, 'managerPriority', productSettingsText.validationManagerPriority);
                     }
-                    if (loanOfficerPriorityValue === null || Number.isNaN(loanOfficerPriorityValue) || loanOfficerPriorityValue < 1 || loanOfficerPriorityValue > 6) {
+                    if (loanOfficerPriorityValue === null || Number.isNaN(loanOfficerPriorityValue) || loanOfficerPriorityValue < 1 || loanOfficerPriorityValue > 7) {
                         addValidationError(errors, 'loanOfficerPriority', productSettingsText.validationLoanOfficerPriority);
                     }
                     if (activeLoanOfficers <= 0) {
                         addValidationError(errors, 'loanOfficerReviewRequired', productSettingsText.validationAssignLoanOfficer);
+                    }
+                }
+
+                if (chairpersonEnabled) {
+                    if (activeChairpersons <= 0) {
+                        addValidationError(errors, 'chairpersonReviewRequired', productSettingsText.validationAssignChairperson);
+                    }
+                    if (selectedChairpersonReviewerCount() <= 0) {
+                        addValidationError(errors, 'chairpersonReviewerIds', productSettingsText.validationAssignChairperson);
                     }
                 }
 
@@ -1932,18 +1921,24 @@
                 return errors;
             }
 
-            [managerToggle, loanOfficerToggle, boardToggle, boardPriority, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, boardReviewerSearch, creditCommitteeReviewerSearch]
+            [managerToggle, loanOfficerToggle, chairpersonToggle, chairpersonPriority, boardToggle, boardPriority, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, savingsLimitCheckInput, chairpersonReviewerSearch, boardReviewerSearch, creditCommitteeReviewerSearch]
                 .filter(Boolean)
                 .forEach((field) => {
                     field.addEventListener('change', applyRules);
                     field.addEventListener('input', applyRules);
                 });
+            chairpersonReviewerInputs.forEach((field) => {
+                field.addEventListener('change', applyRules);
+            });
             boardReviewerInputs.forEach((field) => {
                 field.addEventListener('change', applyRules);
             });
             creditCommitteeReviewerInputs.forEach((field) => {
                 field.addEventListener('change', applyRules);
             });
+            if (chairpersonReviewerSearch) {
+                chairpersonReviewerSearch.addEventListener('input', filterChairpersonReviewers);
+            }
             if (boardReviewerSearch) {
                 boardReviewerSearch.addEventListener('input', filterBoardReviewers);
             }
@@ -1962,42 +1957,11 @@
                         applyRules();
                     });
                 });
-            [savingsFractionNumerator, savingsFractionDenominator]
-                .filter(Boolean)
-                .forEach((field) => {
-                    field.addEventListener('change', () => {
-                        syncSavingsPercentFromFraction();
-                        applyRules();
-                    });
-                    field.addEventListener('input', () => {
-                        syncSavingsPercentFromFraction();
-                        applyRules();
-                    });
-                });
-            savingsModeToggle?.querySelectorAll('[data-savings-ratio-mode]').forEach((button) => {
-                button.addEventListener('click', () => {
-                    const nextMode = button.dataset.savingsRatioMode === 'fraction' ? 'fraction' : 'multiple';
-                    if (nextMode === savingsRatioMode) {
-                        return;
-                    }
-                    if (savingsRatioMode === 'fraction') {
-                        syncSavingsPercentFromFraction();
-                    } else {
-                        syncSavingsPercentFromMultiplier();
-                    }
-                    savingsRatioMode = nextMode;
-                    syncSavingsMultiplierFromPercent();
-                    renderSavingsRatioMode();
-                    applyRules();
-                });
-            });
             if (savingsPercentInput) {
                 savingsPercentInput.addEventListener('change', syncSavingsMultiplierFromPercent);
                 savingsPercentInput.addEventListener('input', syncSavingsMultiplierFromPercent);
                 syncSavingsMultiplierFromPercent();
             }
-            renderSavingsRatioMode();
-
             [managerStartRadio, loanOfficerStartRadio].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {
                     syncReviewPriorities(field.dataset.workflowStartRadio === 'loanOfficer' ? 'loan-officer-radio' : 'manager-radio');

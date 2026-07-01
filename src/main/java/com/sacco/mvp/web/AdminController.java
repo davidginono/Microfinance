@@ -595,7 +595,6 @@ public class AdminController {
                              @RequestParam String fullName,
                              @RequestParam String email,
                              @RequestParam(required = false) String phone,
-                             @RequestParam String signatureText,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
         adminService.createUser(
@@ -607,7 +606,6 @@ public class AdminController {
             fullName,
             email,
             phone,
-            signatureText,
             positions
         );
         ra.addFlashAttribute("message", "User created.");
@@ -672,8 +670,11 @@ public class AdminController {
         model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
+        model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
+        model.addAttribute("chairpersonReviewerOptions", adminService.activeChairpersonReviewerOptions(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
+        model.addAttribute("productChairpersonReviewerIdTokens", adminService.loanProductChairpersonReviewerIdTokens(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
@@ -701,6 +702,7 @@ public class AdminController {
                                     @RequestParam(required = false) BigDecimal maximumAmount,
                                     @RequestParam Integer guarantorsRequired,
                                     @RequestParam BigDecimal maxLoanSavingsPercent,
+                                    @RequestParam(defaultValue = "true") boolean savingsLimitCheckRequired,
                                     @RequestParam BigDecimal applicationFee,
                                     @RequestParam BigDecimal insurancePercent,
                                     @RequestParam BigDecimal processingFeePercent,
@@ -713,6 +715,9 @@ public class AdminController {
                                     @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                     @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
                                     @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                    @RequestParam(defaultValue = "false") boolean chairpersonReviewRequired,
+                                    @RequestParam(required = false) Integer chairpersonPriority,
+                                    @RequestParam(name = "chairpersonReviewerIds", required = false) java.util.List<UUID> chairpersonReviewerIds,
                                     @RequestParam(defaultValue = "false") boolean boardReviewRequired,
                                     @RequestParam(required = false) Integer boardPriority,
                                     @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
@@ -748,9 +753,10 @@ public class AdminController {
             );
             adminService.updateLoanProduct(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
-                maxLoanSavingsRatio, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
+                maxLoanSavingsRatio, savingsLimitCheckRequired, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
-                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, boardReviewRequired, boardPriority, boardReviewerIds,
+                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, chairpersonReviewRequired, chairpersonPriority, chairpersonReviewerIds,
+                boardReviewRequired, boardPriority, boardReviewerIds,
                 committeeReviewRequired, committeePriority, committeeMinimumVotes,
                 committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
                 disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus);
@@ -775,8 +781,11 @@ public class AdminController {
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
+        model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
+        model.addAttribute("chairpersonReviewerOptions", adminService.activeChairpersonReviewerOptions(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
+        model.addAttribute("productChairpersonReviewerIdTokens", adminService.loanProductChairpersonReviewerIdTokens(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
@@ -846,6 +855,7 @@ public class AdminController {
                                               @RequestParam(required = false) BigDecimal maximumAmount,
                                               @RequestParam Integer guarantorsRequired,
                                               @RequestParam BigDecimal maxLoanSavingsPercent,
+                                              @RequestParam(defaultValue = "true") boolean savingsLimitCheckRequired,
                                               @RequestParam BigDecimal applicationFee,
                                               @RequestParam BigDecimal insurancePercent,
                                               @RequestParam BigDecimal processingFeePercent,
@@ -858,6 +868,9 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean managerReviewRequired,
                                               @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
                                               @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
+                                              @RequestParam(defaultValue = "false") boolean chairpersonReviewRequired,
+                                              @RequestParam(required = false) Integer chairpersonPriority,
+                                              @RequestParam(name = "chairpersonReviewerIds", required = false) java.util.List<UUID> chairpersonReviewerIds,
                                               @RequestParam(defaultValue = "false") boolean boardReviewRequired,
                                               @RequestParam(required = false) Integer boardPriority,
                                               @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
@@ -900,6 +913,7 @@ public class AdminController {
                 maximumAmount,
                 guarantorsRequired,
                 percentToRatio(maxLoanSavingsPercent),
+                savingsLimitCheckRequired,
                 applicationFee,
                 percentToRatio(insurancePercent),
                 percentToRatio(processingFeePercent),
@@ -914,6 +928,9 @@ public class AdminController {
                 resolvedWorkflowStartStage,
                 managerPriority,
                 loanOfficerPriority,
+                chairpersonReviewRequired,
+                chairpersonPriority,
+                chairpersonReviewerIds,
                 boardReviewRequired,
                 boardPriority,
                 boardReviewerIds,
@@ -1066,11 +1083,11 @@ public class AdminController {
                                                                        Integer loanOfficerPriority) {
         int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
         int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
-        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 6) {
-            throw new IllegalStateException("Manager priority must be between 1 and 6.");
+        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 7) {
+            throw new IllegalStateException("Manager priority must be between 1 and 7.");
         }
-        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 6) {
-            throw new IllegalStateException("Loan Officer priority must be between 1 and 6.");
+        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 7) {
+            throw new IllegalStateException("Loan Officer priority must be between 1 and 7.");
         }
         if (!managerReviewRequired && loanOfficerReviewRequired) {
             return ApprovalWorkflowStage.LOAN_OFFICER;
@@ -1182,22 +1199,22 @@ public class AdminController {
             case "Loan Officer must be enabled before it can be selected as the start stage.",
                  "No active loan officers are configured for this SACCO yet." ->
                 fieldErrors.put("loanOfficerReviewRequired", "Assign at least one active Loan Officer before using this stage.");
-            case "Manager priority must be between 1 and 6." ->
-                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 6.");
-            case "Loan Officer priority must be between 1 and 6." ->
-                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 6.");
-            case "Review priority must be between 1 and 6." -> {
-                fieldErrors.put("managerPriority", "Review priority must be between 1 and 6.");
-                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 6.");
+            case "Manager priority must be between 1 and 7." ->
+                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 7.");
+            case "Loan Officer priority must be between 1 and 7." ->
+                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 7.");
+            case "Review priority must be between 1 and 7." -> {
+                fieldErrors.put("managerPriority", "Review priority must be between 1 and 7.");
+                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 7.");
             }
             case "Manager and Loan Officer cannot share the same priority slot." -> {
                 fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer.");
                 fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer.");
             }
-            case "Stage priority must be between 1 and 6." -> {
-                fieldErrors.put("boardPriority", "Stage priority must be between 1 and 6.");
-                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 6.");
-                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 6.");
+            case "Stage priority must be between 1 and 7." -> {
+                fieldErrors.put("boardPriority", "Stage priority must be between 1 and 7.");
+                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 7.");
+                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 7.");
             }
             case "Board Member and Credit Committee cannot share the same priority slot." -> {
                 fieldErrors.put("boardPriority", message);
@@ -1235,6 +1252,18 @@ public class AdminController {
                 fieldErrors.put("loanOfficerPriority", "Loan Officer and Accountant cannot share the same priority slot.");
                 fieldErrors.put("accountantPriority", "Loan Officer and Accountant cannot share the same priority slot.");
             }
+            case "Chairperson and Board Member cannot share the same priority slot." -> {
+                fieldErrors.put("chairpersonPriority", "Chairperson and Board Member cannot share the same priority slot.");
+                fieldErrors.put("boardPriority", "Chairperson and Board Member cannot share the same priority slot.");
+            }
+            case "Chairperson and Credit Committee cannot share the same priority slot." -> {
+                fieldErrors.put("chairpersonPriority", "Chairperson and Credit Committee cannot share the same priority slot.");
+                fieldErrors.put("committeePriority", "Chairperson and Credit Committee cannot share the same priority slot.");
+            }
+            case "Chairperson and Accountant cannot share the same priority slot." -> {
+                fieldErrors.put("chairpersonPriority", "Chairperson and Accountant cannot share the same priority slot.");
+                fieldErrors.put("accountantPriority", "Chairperson and Accountant cannot share the same priority slot.");
+            }
             case "Minimum repayment period must be at least 1 month." ->
                 fieldErrors.put("minRepaymentMonths", "Minimum repayment period must be at least 1 month.");
             case "Maximum repayment period must be at least 1 month.",
@@ -1243,14 +1272,19 @@ public class AdminController {
             case "No active board members are configured for this SACCO yet.",
                  "Assign at least one active board member before using this stage." ->
                 fieldErrors.put("boardReviewerIds", "Assign at least one active board member for this product.");
+            case "No active chairpersons are configured for this SACCO yet.",
+                 "Assign at least one active chairperson before using this stage." ->
+                fieldErrors.put("chairpersonReviewerIds", "Assign at least one active chairperson for this product.");
             case "No active credit committee members are configured for this SACCO yet.",
                  "Assign at least one active credit committee member before using this stage." ->
                 fieldErrors.put("creditCommitteeReviewerIds", "Assign at least one active credit committee member for this product.");
             case "Selected reviewer is not active in the required role for this SACCO." -> {
+                fieldErrors.put("chairpersonReviewerIds", "Only active reviewers in the selected role can be assigned.");
                 fieldErrors.put("boardReviewerIds", "Only active reviewers in the selected role can be assigned.");
                 fieldErrors.put("creditCommitteeReviewerIds", "Only active reviewers in the selected role can be assigned.");
             }
             case "Reviewers assigned must be between 1 and 15." -> {
+                fieldErrors.put("chairpersonReviewerIds", "Reviewers assigned must be between 1 and 15.");
                 fieldErrors.put("boardReviewerIds", "Reviewers assigned must be between 1 and 15.");
                 fieldErrors.put("creditCommitteeReviewerIds", "Reviewers assigned must be between 1 and 15.");
             }
@@ -1532,8 +1566,7 @@ public class AdminController {
                 registrationForm.getMemberNo(),
                 registrationForm.getFullName(),
                 registrationForm.getEmail(),
-                registrationForm.getPhone(),
-                registrationForm.getSignatureText()
+                registrationForm.getPhone()
             );
             ra.addFlashAttribute("message", "Minor Admin invited. A password setup link has been emailed to them.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -1552,7 +1585,6 @@ public class AdminController {
                                    @RequestParam String fullName,
                                    @RequestParam String email,
                                    @RequestParam(required = false) String phone,
-                                   @RequestParam String signatureText,
                                    RedirectAttributes ra) {
         try {
             adminService.updateMinorAdmin(
@@ -1563,8 +1595,7 @@ public class AdminController {
                 memberNo,
                 fullName,
                 email,
-                phone,
-                signatureText
+                phone
             );
             ra.addFlashAttribute("message", "Minor Admin details updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {

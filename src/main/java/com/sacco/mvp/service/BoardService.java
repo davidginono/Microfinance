@@ -143,7 +143,7 @@ public class BoardService {
         long assignedReviewers = boardReviewRepository.countByLoanApplicationIdAndReviewStage(loanId, stage);
         int minimumVotes;
         int approvalThreshold;
-        if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
+        if (stage == ApprovalWorkflowStage.LOAN_OFFICER || stage == ApprovalWorkflowStage.CHAIRPERSON) {
             minimumVotes = 1;
             approvalThreshold = 1;
         } else if (stage == ApprovalWorkflowStage.BOARD) {
@@ -165,9 +165,7 @@ public class BoardService {
 
         LoanStatus nextStatus = pendingStatusFor(stage);
         if (rejections >= rejectionThreshold || (totalDecisions >= minimumVotes && approvals < approvalThreshold)) {
-            nextStatus = stage == ApprovalWorkflowStage.LOAN_OFFICER
-                ? LoanStatus.LOAN_OFFICER_REJECTED
-                : LoanStatus.BOARD_REJECTED;
+            nextStatus = rejectionStatusFor(stage);
         }
 
         if (app.getStatus() == nextStatus) {
@@ -193,11 +191,23 @@ public class BoardService {
     private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {
         return switch (stage) {
             case LOAN_OFFICER -> LoanStatus.AWAITING_LOAN_OFFICER;
+            case CHAIRPERSON -> LoanStatus.AWAITING_CHAIRPERSON;
             case CREDIT_COMMITTEE -> LoanStatus.AWAITING_CREDIT_COMMITTEE;
             case BOARD -> LoanStatus.AWAITING_BOARD;
             case ACCOUNTANT -> LoanStatus.AWAITING_ACCOUNTANT;
             case MANAGER -> LoanStatus.READY_FOR_MANAGER;
             case DISBURSEMENT_OFFICER -> LoanStatus.READY_FOR_DISBURSEMENT;
+        };
+    }
+
+    private LoanStatus rejectionStatusFor(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case LOAN_OFFICER -> LoanStatus.LOAN_OFFICER_REJECTED;
+            case CHAIRPERSON -> LoanStatus.CHAIRPERSON_REJECTED;
+            case ACCOUNTANT -> LoanStatus.ACCOUNTANT_REJECTED;
+            case DISBURSEMENT_OFFICER -> LoanStatus.FINAL_REJECTED;
+            case MANAGER -> LoanStatus.MANAGER_REJECTED;
+            case BOARD, CREDIT_COMMITTEE -> LoanStatus.BOARD_REJECTED;
         };
     }
 }

@@ -24,7 +24,7 @@ import java.util.UUID;
 public class NotificationInboxService {
     private static final EnumSet<Position> MEMBER_SIDE_POSITIONS = EnumSet.of(
         Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER,
-        Position.BOARD, Position.CREDIT_COMMITTEE, Position.LOAN_OFFICER
+        Position.CHAIRPERSON, Position.BOARD, Position.CREDIT_COMMITTEE, Position.LOAN_OFFICER
     );
     private static final List<String> MEMBER_SIDE_HIDDEN_TYPES = List.of("SYSTEM_ALERT", "SUPPORT_MESSAGE");
 
@@ -167,6 +167,7 @@ public class NotificationInboxService {
                 case MANAGER -> "/manager/loan-applications/" + applicationId;
                 case ACCOUNTANT -> "/accountant/loan-applications/" + applicationId;
                 case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications/" + applicationId;
+                case CHAIRPERSON -> "/chairperson/loan-applications/" + applicationId;
                 case BOARD, CREDIT_COMMITTEE -> "/board/loan-applications/" + applicationId;
                 case LOAN_OFFICER -> "/loan-officer/loan-applications/" + applicationId;
                 case MEMBER -> "/app/loan-applications/" + applicationId;

@@ -615,9 +615,10 @@ public class AppController {
             case ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED,
                 AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED,
+                AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED,
                 AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
-            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED -> 4;
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED -> 4;
             case READY_FOR_DISBURSEMENT, FORFEITED, FINAL_REJECTED -> 4;
             case FINAL_APPROVED, DEFAULTED, PAID -> 5;
         };
@@ -630,6 +631,7 @@ public class AppController {
         return switch (status) {
             case READY_FOR_MANAGER, MANAGER_REJECTED -> ApprovalWorkflowStage.MANAGER;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED -> ApprovalWorkflowStage.LOAN_OFFICER;
+            case AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED -> ApprovalWorkflowStage.CHAIRPERSON;
             case AWAITING_BOARD, BOARD_REJECTED -> ApprovalWorkflowStage.BOARD;
             case AWAITING_CREDIT_COMMITTEE -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
             case AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> ApprovalWorkflowStage.ACCOUNTANT;
@@ -644,6 +646,7 @@ public class AppController {
         return switch (status) {
             case MANAGER_ACCEPTED -> ApprovalWorkflowStage.MANAGER;
             case LOAN_OFFICER_APPROVED -> ApprovalWorkflowStage.LOAN_OFFICER;
+            case CHAIRPERSON_APPROVED -> ApprovalWorkflowStage.CHAIRPERSON;
             case BOARD_APPROVED -> ApprovalWorkflowStage.BOARD;
             case ACCOUNTANT_APPROVED -> ApprovalWorkflowStage.ACCOUNTANT;
             default -> null;
@@ -685,6 +688,7 @@ public class AppController {
         return switch (stage) {
             case MANAGER -> "Manager";
             case LOAN_OFFICER -> "Loan Officer";
+            case CHAIRPERSON -> "Chairperson";
             case BOARD -> "Board Member";
             case CREDIT_COMMITTEE -> "Credit Committee";
             case ACCOUNTANT -> "Accountant";
@@ -1190,6 +1194,7 @@ public class AppController {
         return switch (stage) {
             case MANAGER -> "Manager";
             case LOAN_OFFICER -> "Loan Officer";
+            case CHAIRPERSON -> "Chairperson";
             case BOARD -> "Board Member";
             case CREDIT_COMMITTEE -> "Credit Committee";
             case ACCOUNTANT -> "Accountant";
@@ -1206,6 +1211,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 2;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
+                AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
                 AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
             case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
@@ -1221,6 +1227,7 @@ public class AppController {
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 35;
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
+                AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
                 AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
             case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
@@ -1235,9 +1242,9 @@ public class AppController {
             case DRAFT -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, DEFAULTED -> "bg-rose-50 text-rose-700";
-            case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
-            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, DEFAULTED -> "bg-rose-50 text-rose-700";
+            case AWAITING_LOAN_OFFICER, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
                 FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case FINAL_REJECTED -> "bg-rose-50 text-rose-700";
         };
@@ -1490,6 +1497,7 @@ public class AppController {
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
             eligibilityMap.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+            eligibilityMap.put("savingsLimitCheckRequired", eligibility.savingsLimitCheckRequired());
             eligibilityMap.put("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
             eligibilityMap.put("ratioPercentLabel",
                 eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
@@ -1523,6 +1531,7 @@ public class AppController {
         response.put("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
         response.put("ratioPercentLabel", eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");
         response.put("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+        response.put("savingsLimitCheckRequired", eligibility.savingsLimitCheckRequired());
         response.put("exampleAmountLabel", formatTzs(exampleAmount(eligibility.maxAllowed())));
         response.put("memberNumber", member.getMemberNo());
         response.put("stationId", member.getStationId());
@@ -2047,6 +2056,7 @@ public class AppController {
         model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds));
         model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
         model.addAttribute("maxAllowedLabel", formatTzs(eligibility.maxAllowed()));
+        model.addAttribute("savingsLimitCheckRequired", eligibility.savingsLimitCheckRequired());
         model.addAttribute("savingsMultipleLabel", formatSavingsMultiple(eligibility.ratio()));
         model.addAttribute("ratioPercentLabel",
             eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%");

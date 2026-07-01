@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class LoanApplicationStatusConstraintInitializer implements ApplicationRunner {
     private static final String CONSTRAINT_NAME = "loan_applications_status_check";
-    private static final String REQUIRED_STATUS = "AWAITING_CREDIT_COMMITTEE";
+    private static final String REQUIRED_STATUS = "AWAITING_CHAIRPERSON";
 
     private final DataSource dataSource;
     private final JdbcTemplate jdbcTemplate;
@@ -41,7 +41,7 @@ public class LoanApplicationStatusConstraintInitializer implements ApplicationRu
             ADD CONSTRAINT loan_applications_status_check
             CHECK (status IN (%s))
             """.formatted(loanStatusSqlValues()));
-        log.info("Updated loan_applications status check constraint to include credit committee review status.");
+        log.info("Updated loan_applications status check constraint to include configured review statuses.");
     }
 
     private boolean isPostgres() {

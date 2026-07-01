@@ -33,9 +33,11 @@ public class WorkflowStatusPresentationService {
                                                                   boolean includeDisbursementPortfolio) {
         List<DashboardSlice> slices = new java.util.ArrayList<>(List.of(
             slice("AWAITING_BOARD", "Waiting for Board Review", "#6366F1", LoanStatus.AWAITING_BOARD),
+            slice("AWAITING_CHAIRPERSON", "Waiting for Chairperson Review", "#0D9488", LoanStatus.AWAITING_CHAIRPERSON),
             slice("AWAITING_CREDIT_COMMITTEE", "Waiting for Credit Committee Review", "#8B5CF6", LoanStatus.AWAITING_CREDIT_COMMITTEE),
             slice("BOARD_APPROVED", "Approved by Board", "#22C55E", LoanStatus.BOARD_APPROVED),
-            slice("BOARD_REJECTED", "Rejected by Board", "#F43F5E", LoanStatus.BOARD_REJECTED)
+            slice("BOARD_REJECTED", "Rejected by Board", "#F43F5E", LoanStatus.BOARD_REJECTED),
+            slice("CHAIRPERSON_REJECTED", "Rejected by Chairperson", "#E11D48", LoanStatus.CHAIRPERSON_REJECTED)
         ));
         addDisbursementPortfolioSlices(slices, includeDisbursementPortfolio);
         return buildRows(slices, statusBreakdown);
@@ -89,6 +91,7 @@ public class WorkflowStatusPresentationService {
             case SUBMITTED -> "Submitted";
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
+            case AWAITING_CHAIRPERSON -> "On Review By Chairperson";
             case AWAITING_BOARD -> "On Review By Board";
             case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
@@ -98,6 +101,7 @@ public class WorkflowStatusPresentationService {
             case PAID -> "Paid";
             case MANAGER_REJECTED -> "Manager Rejected";
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
+            case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
             case BOARD_REJECTED -> "Board Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case FORFEITED -> "Forfeited";
@@ -105,6 +109,7 @@ public class WorkflowStatusPresentationService {
             case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
             case AWAITING_GUARANTORS -> "Awaiting Guarantors";
             case BOARD_APPROVED -> "Reviewed By Board";
+            case CHAIRPERSON_APPROVED -> "Reviewed By Chairperson";
             case LOAN_OFFICER_APPROVED -> "Reviewed By Loan Officer";
             case ACCOUNTANT_APPROVED -> "Reviewed By Accountant";
             case DRAFT -> "Draft";
@@ -119,15 +124,16 @@ public class WorkflowStatusPresentationService {
             case ALL_GUARANTORS_APPROVED -> "#0F766E";
             case READY_FOR_MANAGER -> "#14B8A6";
             case AWAITING_LOAN_OFFICER -> "#7C3AED";
+            case AWAITING_CHAIRPERSON -> "#0D9488";
             case AWAITING_BOARD -> "#6366F1";
             case AWAITING_CREDIT_COMMITTEE -> "#8B5CF6";
             case AWAITING_ACCOUNTANT -> "#0F766E";
             case BOARD_APPROVED -> "#2F348D";
-            case LOAN_OFFICER_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";
+            case LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";
             case FINAL_APPROVED -> "#22C55E";
             case DEFAULTED -> "#DC2626";
             case PAID -> "#16A34A";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, FINAL_REJECTED -> "#F43F5E";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, FINAL_REJECTED -> "#F43F5E";
         };
     }
 

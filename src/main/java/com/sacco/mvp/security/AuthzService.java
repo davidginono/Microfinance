@@ -37,6 +37,7 @@ public class AuthzService {
                 || principal.hasRole(Position.MANAGER)
                 || principal.hasRole(Position.ACCOUNTANT)
                 || principal.hasRole(Position.DISBURSEMENT_OFFICER)
+                || principal.hasRole(Position.CHAIRPERSON)
                 || principal.hasRole(Position.BOARD)
                 || principal.hasRole(Position.CREDIT_COMMITTEE));
     }
@@ -76,7 +77,10 @@ public class AuthzService {
         if (principal == null) {
             return false;
         }
-        return (principal.hasRole(Position.BOARD)
+        return (principal.hasRole(Position.CHAIRPERSON)
+                && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")
+                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.CHAIRPERSON))
+            || (principal.hasRole(Position.BOARD)
                 && principal.getClaims().contains("REVIEW_BOARD_QUEUE")
                 && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD))
             || (principal.hasRole(Position.CREDIT_COMMITTEE)
@@ -86,7 +90,8 @@ public class AuthzService {
 
     public boolean isBoardReviewer(AppUserPrincipal principal) {
         return principal != null
-            && ((principal.hasRole(Position.BOARD) && principal.getClaims().contains("REVIEW_BOARD_QUEUE"))
+            && ((principal.hasRole(Position.CHAIRPERSON) && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE"))
+                || (principal.hasRole(Position.BOARD) && principal.getClaims().contains("REVIEW_BOARD_QUEUE"))
                 || (principal.hasRole(Position.CREDIT_COMMITTEE)
                     && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")));
     }

@@ -1014,6 +1014,7 @@ public class LoanReportService {
             case MANAGER -> "Manager";
             case ACCOUNTANT -> "Accountant";
             case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
+            case CHAIRPERSON -> "Chairperson";
             case BOARD -> "Board";
             case CREDIT_COMMITTEE -> "Credit Committee";
             case LOAN_OFFICER -> "Loan Officer";
@@ -2208,12 +2209,14 @@ public class LoanReportService {
         return switch (status) {
             case READY_FOR_MANAGER -> "On Review By Manager";
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
+            case AWAITING_CHAIRPERSON -> "On Review By Chairperson";
             case AWAITING_BOARD -> "On Review By Board";
             case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             case MANAGER_REJECTED -> "Manager Rejected";
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
+            case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
             case BOARD_REJECTED -> "Board Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case FORFEITED -> "Forfeited";
@@ -2223,6 +2226,7 @@ public class LoanReportService {
             case PAID -> "Paid";
             case MANAGER_ACCEPTED -> "Manager Approved";
             case LOAN_OFFICER_APPROVED -> "Loan Officer Approved";
+            case CHAIRPERSON_APPROVED -> "Chairperson Approved";
             case BOARD_APPROVED -> "Board Approved";
             case ACCOUNTANT_APPROVED -> "Accountant Approved";
             case AWAITING_GUARANTORS -> "Awaiting Guarantors";
@@ -2825,6 +2829,9 @@ public class LoanReportService {
             case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case LOAN_OFFICER_APPROVED -> "Loan Officer Approved";
+            case AWAITING_CHAIRPERSON -> "On Review By Chairperson";
+            case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
+            case CHAIRPERSON_APPROVED -> "Chairperson Approved";
             case AWAITING_BOARD -> "On Review By Board";
             case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case BOARD_REJECTED -> "Board Rejected";

@@ -65,7 +65,7 @@
                 <td>${row.decisionLabel}</td>
                 <td>${row.reviewedAt}</td>
                 <td>${row.currentStatusLabel}</td>
-                <td><a href="/board/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
+                <td><a href="${reviewBasePath}/loan-applications/${row.id}" class="app-btn btn-primary"><spring:message code="common.open" text="Open" /></a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty reportRows}">

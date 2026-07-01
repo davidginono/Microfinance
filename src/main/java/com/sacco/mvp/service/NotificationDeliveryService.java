@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ public class NotificationDeliveryService {
     private final SmsGateway smsGateway;
     private final SmsUnitTransactionService smsUnitTransactionService;
     private final SmsUsageAlertService smsUsageAlertService;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     public void deliver(String saccoId,
                         String stationId,
@@ -32,7 +34,25 @@ public class NotificationDeliveryService {
         if (recipient == null) {
             return;
         }
-        notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+        OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
+        if (channel == OtpDeliveryChannel.EMAIL) {
+            notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+            return;
+        }
+
+        boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, subject, message);
+        if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
+            notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+        }
+    }
+
+    private boolean sendSms(String saccoId,
+                            String stationId,
+                            UUID notificationId,
+                            Member recipient,
+                            String eventType,
+                            String subject,
+                            String message) {
         SmsUnitTransactionService.ReservationResult reservation =
             smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
         if (reservation.alertStatus() != null) {
@@ -42,8 +62,8 @@ public class NotificationDeliveryService {
             if (reservation.invalidScope()) {
                 smsUsageAlertService.alertInvalidScope(saccoId, stationId, eventType, reservation.reason());
             }
-            log.info("SMS notification blocked for member {} and event {}: {}", recipientId, eventType, reservation.reason());
-            return;
+            log.info("SMS notification blocked for member {} and event {}: {}", recipient.getId(), eventType, reservation.reason());
+            return false;
         }
 
         SmsSendResult result;
@@ -51,7 +71,7 @@ public class NotificationDeliveryService {
             result = smsGateway.send(recipient.getPhone(), smsMessage(subject, message));
         } catch (RuntimeException ex) {
             result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
-            log.warn("SMS gateway call ended unexpectedly for member {} and event {}", recipientId, eventType, ex);
+            log.warn("SMS gateway call ended unexpectedly for member {} and event {}", recipient.getId(), eventType, ex);
         }
         SmsUnitTransactionService.CompletionResult completion =
             smsUnitTransactionService.complete(reservation.accountId(), reservation.ledgerId(), result);
@@ -59,8 +79,9 @@ public class NotificationDeliveryService {
             smsUsageAlertService.alertStatus(saccoId, stationId, completion.alertStatus(), completion.availableUnits());
         }
         if (!result.sent()) {
-            log.info("SMS notification outcome for member {} and event {}: {}", recipientId, eventType, result.message());
+            log.info("SMS notification outcome for member {} and event {}: {}", recipient.getId(), eventType, result.message());
         }
+        return result.sent();
     }
 
     private String smsMessage(String subject, String message) {

@@ -100,7 +100,7 @@ public class MinorAdminInvitationService {
     }
 
     @Transactional(noRollbackFor = ExpiredInvitationException.class)
-    public Member claimInvitation(String rawToken, String otpCode, String password) {
+    public Member claimInvitation(String rawToken, String otpCode, String password, String signatureText) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
@@ -110,12 +110,15 @@ public class MinorAdminInvitationService {
         if (password == null || password.length() < 8) {
             throw new IllegalStateException("Password must be at least 8 characters.");
         }
+        String normalizedSignature = normalizeSignatureText(signatureText);
         emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.CLAIM_ACCOUNT, otpCode);
 
         OffsetDateTime now = OffsetDateTime.now();
         member.setStatus(MemberStatus.ACTIVE);
         member.setPhoneVerifiedAt(now);
         member.setPasswordHash(passwordEncoder.encode(password));
+        member.setSignatureText(normalizedSignature);
+        member.setSignatureRegisteredAt(now);
         memberRepository.save(member);
 
         invitation.setClaimedAt(now);
@@ -229,6 +232,14 @@ public class MinorAdminInvitationService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 not available", ex);
         }
+    }
+
+    private String normalizeSignatureText(String value) {
+        if (value == null || value.trim().isBlank()) {
+            throw new IllegalStateException("Enter your signature.");
+        }
+        String normalized = value.trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120).trim() : normalized;
     }
 
     public record ClaimContext(MinorAdminInvitation invitation, Member member) {

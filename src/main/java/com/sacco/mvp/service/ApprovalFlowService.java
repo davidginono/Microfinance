@@ -39,6 +39,7 @@ public class ApprovalFlowService {
         return switch (stage) {
             case MANAGER -> LoanStatus.READY_FOR_MANAGER;
             case LOAN_OFFICER -> LoanStatus.AWAITING_LOAN_OFFICER;
+            case CHAIRPERSON -> LoanStatus.AWAITING_CHAIRPERSON;
             case BOARD -> LoanStatus.AWAITING_BOARD;
             case CREDIT_COMMITTEE -> LoanStatus.AWAITING_CREDIT_COMMITTEE;
             case ACCOUNTANT -> LoanStatus.AWAITING_ACCOUNTANT;
@@ -50,6 +51,7 @@ public class ApprovalFlowService {
         return switch (stage) {
             case MANAGER -> LoanStatus.MANAGER_REJECTED;
             case LOAN_OFFICER -> LoanStatus.LOAN_OFFICER_REJECTED;
+            case CHAIRPERSON -> LoanStatus.CHAIRPERSON_REJECTED;
             case BOARD, CREDIT_COMMITTEE -> LoanStatus.BOARD_REJECTED;
             case ACCOUNTANT -> LoanStatus.ACCOUNTANT_REJECTED;
             case DISBURSEMENT_OFFICER -> LoanStatus.FINAL_REJECTED;
@@ -60,6 +62,7 @@ public class ApprovalFlowService {
         return switch (stage) {
             case MANAGER -> "LOAN_READY_FOR_MANAGER";
             case LOAN_OFFICER -> "LOAN_OFFICER_REVIEW_ASSIGNED";
+            case CHAIRPERSON -> "CHAIRPERSON_REVIEW_ASSIGNED";
             case BOARD -> "BOARD_REVIEW_ASSIGNED";
             case CREDIT_COMMITTEE -> "CREDIT_COMMITTEE_REVIEW_ASSIGNED";
             case ACCOUNTANT -> "LOAN_READY_FOR_ACCOUNTANT";

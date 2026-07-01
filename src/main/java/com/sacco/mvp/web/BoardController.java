@@ -52,7 +52,7 @@ import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/board")
+@RequestMapping({"/board", "/chairperson"})
 @PreAuthorize("@authz.isBoardReviewer(principal)")
 public class BoardController {
     private final BoardService boardService;
@@ -94,8 +94,8 @@ public class BoardController {
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), awaitingStatusFor(principal)));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", workspaceLabel.startsWith("Credit") ? "C" : "B");
-        model.addAttribute("dashboardDetailBasePath", "/board/loan-applications");
+        model.addAttribute("dashboardQueueIcon", workspaceLabel.startsWith("Credit") ? "C" : (workspaceLabel.startsWith("Chair") ? "P" : "B"));
+        model.addAttribute("dashboardDetailBasePath", reviewBasePath(principal) + "/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
         model.addAttribute("dashboardDisbursementYear", LocalDate.now().getYear());
@@ -141,7 +141,7 @@ public class BoardController {
             reviewPanelLabel(principal) + " Panel / Queue",
             reviewPanelLabel(principal) + " Queue",
             "No applications are currently waiting in your review queue.",
-            "/board/queue",
+            reviewBasePath(principal) + "/queue",
             searchId
         );
     }
@@ -183,7 +183,7 @@ public class BoardController {
             reviewPanelLabel(principal) + " Panel / Archive",
             reviewPanelLabel(principal) + " Archive",
             "No reviewed applications are available in your archive yet.",
-            "/board/archive",
+            reviewBasePath(principal) + "/archive",
             searchId
         );
         model.addAttribute("archiveView", true);
@@ -214,6 +214,7 @@ public class BoardController {
 
         model.addAttribute("report", report);
         String workspaceLabel = reviewWorkspaceLabel(principal);
+        model.addAttribute("reviewBasePath", reviewBasePath(principal));
         model.addAttribute("boardReportsBreadcrumb", workspaceLabel + " Panel / Loan Reports");
         model.addAttribute("boardReportsTitle", workspaceLabel + " Review Reports");
         model.addAttribute("boardReportsSubtitle", "Filter the loans you reviewed by date range and decision, then export the report when needed.");
@@ -565,7 +566,7 @@ public class BoardController {
     }
 
     private void applyBoardUi(Model model, AppUserPrincipal principal) {
-        model.addAttribute("reviewBasePath", "/board");
+        model.addAttribute("reviewBasePath", reviewBasePath(principal));
         String label = reviewPanelLabel(principal);
         model.addAttribute("reviewRoleLabel", label);
         model.addAttribute("reviewRoleLabelLower", label.toLowerCase(java.util.Locale.ENGLISH));
@@ -581,6 +582,11 @@ public class BoardController {
 
     private List<ApprovalWorkflowStage> reviewerStages(AppUserPrincipal principal) {
         List<ApprovalWorkflowStage> stages = new java.util.ArrayList<>();
+        if (principal != null
+            && principal.hasRole(Position.CHAIRPERSON)
+            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")) {
+            stages.add(ApprovalWorkflowStage.CHAIRPERSON);
+        }
         if (principal != null
             && principal.hasRole(Position.BOARD)
             && principal.getClaims().contains("REVIEW_BOARD_QUEUE")) {
@@ -615,9 +621,11 @@ public class BoardController {
     }
 
     private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {
-        return stage == ApprovalWorkflowStage.CREDIT_COMMITTEE
-            ? LoanStatus.AWAITING_CREDIT_COMMITTEE
-            : LoanStatus.AWAITING_BOARD;
+        return switch (stage) {
+            case CHAIRPERSON -> LoanStatus.AWAITING_CHAIRPERSON;
+            case CREDIT_COMMITTEE -> LoanStatus.AWAITING_CREDIT_COMMITTEE;
+            default -> LoanStatus.AWAITING_BOARD;
+        };
     }
 
     private BoardReview resolveMyReview(UUID loanId, AppUserPrincipal principal) {
@@ -637,11 +645,17 @@ public class BoardController {
         boolean board = principal != null
             && principal.hasRole(Position.BOARD)
             && principal.getClaims().contains("REVIEW_BOARD_QUEUE");
+        boolean chairperson = principal != null
+            && principal.hasRole(Position.CHAIRPERSON)
+            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE");
         boolean credit = principal != null
             && principal.hasRole(Position.CREDIT_COMMITTEE)
             && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE");
-        if (board && credit) {
-            return "Board / Credit Committee";
+        if ((chairperson && board) || (chairperson && credit) || (board && credit)) {
+            return "Review";
+        }
+        if (chairperson) {
+            return "Chairperson";
         }
         if (credit) {
             return "Credit Committee";
@@ -652,6 +666,14 @@ public class BoardController {
     private String reviewWorkspaceLabel(AppUserPrincipal principal) {
         String label = reviewPanelLabel(principal);
         return "Board Member".equals(label) ? "Board" : label;
+    }
+
+    private String reviewBasePath(AppUserPrincipal principal) {
+        return principal != null
+            && principal.hasRole(Position.CHAIRPERSON)
+            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")
+            ? "/chairperson"
+            : "/board";
     }
 
     private String message(String code) {
@@ -861,7 +883,11 @@ public class BoardController {
     }
 
     private String reviewOtpAudienceLabel(ApprovalWorkflowStage reviewStage) {
-        return reviewStage == ApprovalWorkflowStage.CREDIT_COMMITTEE ? "Credit Committee" : "Board";
+        return switch (reviewStage) {
+            case CHAIRPERSON -> "Chairperson";
+            case CREDIT_COMMITTEE -> "Credit Committee";
+            default -> "Board";
+        };
     }
 
     private String resolveSavedSignatureText(UUID memberId) {
@@ -878,10 +904,10 @@ public class BoardController {
     private String boardLoanStatusBadgeClass(LoanApplication app) {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_ACCEPTED, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
-            case BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case MANAGER_ACCEPTED, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
+            case CHAIRPERSON_APPROVED, BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
-            case MANAGER_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         };
     }
