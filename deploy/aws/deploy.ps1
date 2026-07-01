@@ -12,6 +12,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ([string]::IsNullOrWhiteSpace($PublicDomain)) {
+    $PublicDomain = "lms.foresight.co.tz"
+}
+
 function Invoke-AwsJson {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
     $output = & aws @Arguments --output json
@@ -223,6 +227,7 @@ function Add-IngressIfMissing {
 
 $stackSlug = "$AppName-$Environment"
 $parameterPrefix = "/$AppName/$Environment"
+$foresightBaseUrl = "https://api.foresightfin.app"
 $repositoryName = $AppName
 $roleName = "$stackSlug-ec2-role"
 $profileName = "$stackSlug-instance-profile"
@@ -416,6 +421,8 @@ if ($dbCreated -or $OverwriteExistingConfig) {
     Put-Parameter -Name "$parameterPrefix/SPRING_DATASOURCE_PASSWORD" -Value $dbPassword -Type "SecureString"
 }
 Put-Parameter -Name "$parameterPrefix/APP_BASE_URL" -Value $baseUrl -Type "String" -Force
+Put-Parameter -Name "$parameterPrefix/EXTERNAL_FORESIGHT_BASE_URL" -Value $foresightBaseUrl -Type "String" -Force
+Put-Parameter -Name "$parameterPrefix/EXTERNAL_MEMBERPORTAL_BASE_URL" -Value $foresightBaseUrl -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_SERVLET_SESSION_COOKIE_SECURE" -Value "true" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_FORWARD_HEADERS_STRATEGY" -Value "framework" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_SERVLET_JSP_DEVELOPMENT" -Value "false" -Type "String" -Force

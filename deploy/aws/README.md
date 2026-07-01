@@ -5,7 +5,7 @@ shape used by SACCOS LMS:
 
 - one EC2 Docker host
 - one private RDS PostgreSQL database
-- Caddy HTTPS using `<elastic-ip>.sslip.io`
+- Caddy HTTPS using `lms.foresight.co.tz`
 - configuration in AWS Systems Manager Parameter Store under
   `/saccos-lms/prod/`
 
@@ -15,11 +15,11 @@ Run from the repository root:
 .\deploy\aws\deploy.ps1
 ```
 
-For a custom Cloudflare hostname, pass the public domain so Caddy and
-`APP_BASE_URL` use the same host that Cloudflare sends in SNI:
+Redeploys default to `lms.foresight.co.tz` so Caddy and `APP_BASE_URL`
+stay aligned with the production hostname:
 
 ```powershell
-.\deploy\aws\deploy.ps1 -PublicDomain lms.foresight.co.tz
+.\deploy\aws\deploy.ps1
 ```
 
 The script keeps existing SSM parameters by default, then force-updates only the
