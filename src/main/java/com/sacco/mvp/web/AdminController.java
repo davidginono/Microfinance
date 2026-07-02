@@ -671,10 +671,8 @@ public class AdminController {
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
         model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
-        model.addAttribute("chairpersonReviewerOptions", adminService.activeChairpersonReviewerOptions(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
-        model.addAttribute("productChairpersonReviewerIdTokens", adminService.loanProductChairpersonReviewerIdTokens(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
@@ -782,10 +780,8 @@ public class AdminController {
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
         model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
-        model.addAttribute("chairpersonReviewerOptions", adminService.activeChairpersonReviewerOptions(saccoId));
         model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
         model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
-        model.addAttribute("productChairpersonReviewerIdTokens", adminService.loanProductChairpersonReviewerIdTokens(saccoId));
         model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
         model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
@@ -1083,11 +1079,11 @@ public class AdminController {
                                                                        Integer loanOfficerPriority) {
         int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
         int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
-        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 7) {
-            throw new IllegalStateException("Manager priority must be between 1 and 7.");
+        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 6) {
+            throw new IllegalStateException("Manager priority must be between 1 and 6.");
         }
-        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 7) {
-            throw new IllegalStateException("Loan Officer priority must be between 1 and 7.");
+        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 6) {
+            throw new IllegalStateException("Loan Officer priority must be between 1 and 6.");
         }
         if (!managerReviewRequired && loanOfficerReviewRequired) {
             return ApprovalWorkflowStage.LOAN_OFFICER;
@@ -1099,7 +1095,9 @@ public class AdminController {
             return ApprovalWorkflowStage.MANAGER;
         }
         if (resolvedManagerPriority == resolvedLoanOfficerPriority) {
-            throw new IllegalStateException("Manager and Loan Officer cannot share the same priority slot.");
+            return workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER
+                ? ApprovalWorkflowStage.LOAN_OFFICER
+                : ApprovalWorkflowStage.MANAGER;
         }
         return resolvedLoanOfficerPriority < resolvedManagerPriority ? ApprovalWorkflowStage.LOAN_OFFICER : ApprovalWorkflowStage.MANAGER;
     }
@@ -1159,6 +1157,8 @@ public class AdminController {
                 fieldErrors.put("productName", "Loan product name must be 120 characters or fewer.");
             case "That loan product code already exists in this SACCO." ->
                 fieldErrors.put("productName", "Use a more distinct loan product name. This one creates a duplicate product code.");
+            case "Enter a loan product description." ->
+                fieldErrors.put("productDescription", "Enter a product description.");
             case "Loan product description must be 500 characters or fewer." ->
                 fieldErrors.put("productDescription", "Keep the description within 500 characters.");
             case "Display order must be at least 1." ->
@@ -1199,22 +1199,22 @@ public class AdminController {
             case "Loan Officer must be enabled before it can be selected as the start stage.",
                  "No active loan officers are configured for this SACCO yet." ->
                 fieldErrors.put("loanOfficerReviewRequired", "Assign at least one active Loan Officer before using this stage.");
-            case "Manager priority must be between 1 and 7." ->
-                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 7.");
-            case "Loan Officer priority must be between 1 and 7." ->
-                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 7.");
-            case "Review priority must be between 1 and 7." -> {
-                fieldErrors.put("managerPriority", "Review priority must be between 1 and 7.");
-                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 7.");
+            case "Manager priority must be between 1 and 6." ->
+                fieldErrors.put("managerPriority", "Manager priority must be between 1 and 6.");
+            case "Loan Officer priority must be between 1 and 6." ->
+                fieldErrors.put("loanOfficerPriority", "Loan Officer priority must be between 1 and 6.");
+            case "Review priority must be between 1 and 6." -> {
+                fieldErrors.put("managerPriority", "Review priority must be between 1 and 6.");
+                fieldErrors.put("loanOfficerPriority", "Review priority must be between 1 and 6.");
             }
             case "Manager and Loan Officer cannot share the same priority slot." -> {
                 fieldErrors.put("managerPriority", "Choose different priorities for Manager and Loan Officer.");
                 fieldErrors.put("loanOfficerPriority", "Choose different priorities for Manager and Loan Officer.");
             }
-            case "Stage priority must be between 1 and 7." -> {
-                fieldErrors.put("boardPriority", "Stage priority must be between 1 and 7.");
-                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 7.");
-                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 7.");
+            case "Stage priority must be between 1 and 6." -> {
+                fieldErrors.put("boardPriority", "Stage priority must be between 1 and 6.");
+                fieldErrors.put("committeePriority", "Stage priority must be between 1 and 6.");
+                fieldErrors.put("accountantPriority", "Stage priority must be between 1 and 6.");
             }
             case "Board Member and Credit Committee cannot share the same priority slot." -> {
                 fieldErrors.put("boardPriority", message);
@@ -1274,7 +1274,9 @@ public class AdminController {
                 fieldErrors.put("boardReviewerIds", "Assign at least one active board member for this product.");
             case "No active chairpersons are configured for this SACCO yet.",
                  "Assign at least one active chairperson before using this stage." ->
-                fieldErrors.put("chairpersonReviewerIds", "Assign at least one active chairperson for this product.");
+                fieldErrors.put("chairpersonReviewRequired", "Assign one active Chairperson before using this stage.");
+            case "Only one active Chairperson can be configured for this SACCO." ->
+                fieldErrors.put("chairpersonReviewRequired", "Only one active Chairperson can be configured for this SACCO.");
             case "No active credit committee members are configured for this SACCO yet.",
                  "Assign at least one active credit committee member before using this stage." ->
                 fieldErrors.put("creditCommitteeReviewerIds", "Assign at least one active credit committee member for this product.");

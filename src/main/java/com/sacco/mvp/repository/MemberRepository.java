@@ -182,6 +182,28 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         """)
     List<Member> findAllWithRole(@Param("position") Position position);
 
+    @Query("""
+        select count(m)
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and (m.position = :position or staffRole = :position)
+        """)
+    long countBySaccoIdAndRole(@Param("saccoId") String saccoId,
+                               @Param("position") Position position);
+
+    @Query("""
+        select count(m)
+        from Member m
+        left join m.staffRoles staffRole
+        where m.saccoId = :saccoId
+          and (m.position = :position or staffRole = :position)
+          and m.id <> :existingAccountId
+        """)
+    long countBySaccoIdAndRoleAndIdNot(@Param("saccoId") String saccoId,
+                                       @Param("position") Position position,
+                                       @Param("existingAccountId") UUID existingAccountId);
+
     boolean existsBySaccoIdAndPosition(String saccoId, Position position);
 
     boolean existsBySaccoIdAndPositionAndIdNot(String saccoId, Position position, UUID id);

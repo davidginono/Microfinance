@@ -408,6 +408,9 @@ public class AdminService {
             String slotStationId = normalizedStationId != null ? normalizedStationId : member.getStationId();
             ensureMinorAdminSlotAvailable(saccoId, slotStationId, accountId);
         }
+        if (staffRoles.contains(Position.CHAIRPERSON)) {
+            ensureChairpersonSlotAvailable(saccoId, accountId);
+        }
         List<UserClaim> normalizedClaims = normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
@@ -611,10 +614,6 @@ public class AdminService {
         return activeReviewerOptions(saccoId, Position.BOARD);
     }
 
-    public List<BoardReviewerOption> activeChairpersonReviewerOptions(String saccoId) {
-        return activeReviewerOptions(saccoId, Position.CHAIRPERSON);
-    }
-
     public List<BoardReviewerOption> activeCreditCommitteeReviewerOptions(String saccoId) {
         return activeReviewerOptions(saccoId, Position.CREDIT_COMMITTEE);
     }
@@ -636,10 +635,6 @@ public class AdminService {
 
     public Map<UUID, String> loanProductCreditCommitteeReviewerIdTokens(String saccoId) {
         return loanProductReviewerIdTokens(saccoId, ApprovalWorkflowStage.CREDIT_COMMITTEE);
-    }
-
-    public Map<UUID, String> loanProductChairpersonReviewerIdTokens(String saccoId) {
-        return loanProductReviewerIdTokens(saccoId, ApprovalWorkflowStage.CHAIRPERSON);
     }
 
     private Map<UUID, String> loanProductReviewerIdTokens(String saccoId, ApprovalWorkflowStage stage) {
@@ -983,10 +978,10 @@ public class AdminService {
         saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_UPDATE");
         product.setProductCode(normalizeProductCode(saccoId, product.getLoanType(), productCode, product.getId(), productName));
         product.setProductName(normalizeProductName(product.getLoanType(), productName));
-        product.setProductDescription(normalizeProductDescription(productDescription));
+        product.setProductDescription(normalizeRequiredProductDescription(productDescription));
         product.setDisplayOrder(normalizeDisplayOrder(displayOrder));
         product.setMinimumAmount(normalizeMinimumAmount(minimumAmount));
-        product.setMaximumAmount(normalizeMaximumAmount(product.getMinimumAmount(), maximumAmount));
+        product.setMaximumAmount(normalizeRequiredMaximumAmount(product.getMinimumAmount(), maximumAmount));
         product.setGuarantorsRequired(normalizeGuarantorCount(guarantorsRequired));
         product.setMaxLoanSavingsRatio(normalizeRatio(ratio));
         product.setSavingsLimitCheckRequired(savingsLimitCheckRequired);
@@ -999,16 +994,14 @@ public class AdminService {
         product.setMaxRepaymentMonths(normalizeMaximumRepaymentMonths(product.getMinimumRepaymentMonths(), maxRepaymentMonths));
         product.setAllowApplicationWithActiveLoan(allowApplicationWithActiveLoan);
         product.setFreshFinancialDataRequired(freshFinancialDataRequired);
-        List<UUID> normalizedChairpersonReviewerIds = normalizeReviewerIds(saccoId, chairpersonReviewerIds, Position.CHAIRPERSON);
+        List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
         List<UUID> normalizedBoardReviewerIds = normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD);
         List<UUID> normalizedCreditCommitteeReviewerIds = normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE);
         Integer assignedCreditCommitteeReviewerCount = committeeReviewRequired ? normalizedCreditCommitteeReviewerIds.size() : 0;
-        validateWorkflowConfiguration(
-            saccoId,
+        WorkflowPriorityPlan priorityPlan = normalizeWorkflowPriorities(
             managerReviewRequired,
-            loanOfficerReviewRequired,
-            workflowStartStage,
             managerPriority,
+            loanOfficerReviewRequired,
             loanOfficerPriority,
             chairpersonReviewRequired,
             chairpersonPriority,
@@ -1016,30 +1009,45 @@ public class AdminService {
             boardPriority,
             committeeReviewRequired,
             committeePriority,
+            accountantReviewRequired,
+            accountantPriority,
+            workflowStartStage
+        );
+        validateWorkflowConfiguration(
+            saccoId,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            priorityPlan.workflowStartStage(),
+            priorityPlan.managerPriority(),
+            priorityPlan.loanOfficerPriority(),
+            chairpersonReviewRequired,
+            priorityPlan.chairpersonPriority(),
+            boardReviewRequired,
+            priorityPlan.boardPriority(),
+            committeeReviewRequired,
+            priorityPlan.committeePriority(),
             assignedCreditCommitteeReviewerCount,
             assignedCreditCommitteeReviewerCount,
             accountantReviewRequired,
-            accountantPriority,
+            priorityPlan.accountantPriority(),
             disbursementOfficerRequired
         );
         boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired);
-        int normalizedManagerPriority = normalizeReviewPriority(managerReviewRequired, managerPriority, 1);
-        int normalizedLoanOfficerPriority = normalizeReviewPriority(loanOfficerReviewRequired, loanOfficerPriority, 2);
         product.setManagerReviewRequired(normalizedManagerReviewRequired);
-        product.setManagerPriority(normalizedManagerPriority);
+        product.setManagerPriority(priorityPlan.managerPriority());
         product.setLoanOfficerReviewRequired(loanOfficerReviewRequired);
-        product.setLoanOfficerPriority(normalizedLoanOfficerPriority);
-        product.setWorkflowStartStage(normalizeWorkflowStartStage(workflowStartStage, normalizedManagerReviewRequired, loanOfficerReviewRequired));
+        product.setLoanOfficerPriority(priorityPlan.loanOfficerPriority());
+        product.setWorkflowStartStage(priorityPlan.workflowStartStage());
         product.setChairpersonReviewRequired(chairpersonReviewRequired);
-        product.setChairpersonPriority(normalizeStagePriority(chairpersonReviewRequired, chairpersonPriority, 3));
+        product.setChairpersonPriority(priorityPlan.chairpersonPriority());
         product.setBoardReviewRequired(boardReviewRequired);
-        product.setBoardPriority(normalizeStagePriority(boardReviewRequired, boardPriority, 3));
+        product.setBoardPriority(priorityPlan.boardPriority());
         product.setCommitteeReviewRequired(committeeReviewRequired);
-        product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, committeePriority, 4));
+        product.setCommitteePriority(priorityPlan.committeePriority());
         product.setCommitteeMinimumVotes(committeeReviewRequired ? assignedCreditCommitteeReviewerCount : 0);
         product.setCommitteeApprovalThreshold(committeeReviewRequired ? assignedCreditCommitteeReviewerCount : 0);
         product.setAccountantReviewRequired(accountantReviewRequired);
-        product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, accountantPriority, 5));
+        product.setAccountantPriority(priorityPlan.accountantPriority());
         product.setDisbursementOfficerRequired(disbursementOfficerRequired);
         product.setDisbursementProofRequired(disbursementProofRequired);
         product.setApplicantAttachmentRequired(applicantAttachmentRequired);
@@ -1235,16 +1243,14 @@ public class AdminService {
                                                           BigDecimal guarantorMinimumSavings,
                                                           LoanProductStatus productStatus) {
         LoanProductStatus normalizedStatus = normalizeProductStatus(productStatus);
-        List<UUID> normalizedChairpersonReviewerIds = normalizeReviewerIds(saccoId, chairpersonReviewerIds, Position.CHAIRPERSON);
+        List<UUID> normalizedChairpersonReviewerIds = singleChairpersonReviewerIds(saccoId, chairpersonReviewRequired);
         List<UUID> normalizedBoardReviewerIds = normalizeReviewerIds(saccoId, boardReviewerIds, Position.BOARD);
         List<UUID> normalizedCreditCommitteeReviewerIds = normalizeReviewerIds(saccoId, creditCommitteeReviewerIds, Position.CREDIT_COMMITTEE);
         Integer assignedCreditCommitteeReviewerCount = committeeReviewRequired ? normalizedCreditCommitteeReviewerIds.size() : 0;
-        validateWorkflowConfiguration(
-            saccoId,
+        WorkflowPriorityPlan priorityPlan = normalizeWorkflowPriorities(
             managerReviewRequired,
-            loanOfficerReviewRequired,
-            workflowStartStage,
             managerPriority,
+            loanOfficerReviewRequired,
             loanOfficerPriority,
             chairpersonReviewRequired,
             chairpersonPriority,
@@ -1252,15 +1258,30 @@ public class AdminService {
             boardPriority,
             committeeReviewRequired,
             committeePriority,
+            accountantReviewRequired,
+            accountantPriority,
+            workflowStartStage
+        );
+        validateWorkflowConfiguration(
+            saccoId,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            priorityPlan.workflowStartStage(),
+            priorityPlan.managerPriority(),
+            priorityPlan.loanOfficerPriority(),
+            chairpersonReviewRequired,
+            priorityPlan.chairpersonPriority(),
+            boardReviewRequired,
+            priorityPlan.boardPriority(),
+            committeeReviewRequired,
+            priorityPlan.committeePriority(),
             assignedCreditCommitteeReviewerCount,
             assignedCreditCommitteeReviewerCount,
             accountantReviewRequired,
-            accountantPriority,
+            priorityPlan.accountantPriority(),
             disbursementOfficerRequired
         );
         boolean normalizedManagerReviewRequired = normalizeManagerReviewRequired(managerReviewRequired);
-        int normalizedManagerPriority = normalizeReviewPriority(managerReviewRequired, managerPriority, 1);
-        int normalizedLoanOfficerPriority = normalizeReviewPriority(loanOfficerReviewRequired, loanOfficerPriority, 2);
         validateStageReviewerConfiguration(saccoId, Position.CHAIRPERSON, normalizedChairpersonReviewerIds.size(), chairpersonReviewRequired, "chairperson");
         validateStageReviewerConfiguration(saccoId, Position.BOARD, normalizedBoardReviewerIds.size(), boardReviewRequired, "board member");
         validateStageReviewerConfiguration(saccoId, Position.CREDIT_COMMITTEE, normalizedCreditCommitteeReviewerIds.size(), committeeReviewRequired, "credit committee member");
@@ -1270,10 +1291,10 @@ public class AdminService {
             LoanType.CUSTOMIZED_LOAN,
             normalizeProductCode(saccoId, LoanType.CUSTOMIZED_LOAN, productCode, null, productName),
             normalizeProductName(LoanType.CUSTOMIZED_LOAN, productName),
-            normalizeProductDescription(productDescription),
+            normalizeRequiredProductDescription(productDescription),
             normalizeDisplayOrder(displayOrder),
             normalizeMinimumAmount(minimumAmount),
-            normalizeMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
+            normalizeRequiredMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
             normalizeGuarantorCount(guarantorsRequired),
             normalizeRatio(ratio),
             savingsLimitCheckRequired,
@@ -1288,19 +1309,19 @@ public class AdminService {
             freshFinancialDataRequired,
             normalizedManagerReviewRequired,
             loanOfficerReviewRequired,
-            normalizeWorkflowStartStage(workflowStartStage, normalizedManagerReviewRequired, loanOfficerReviewRequired),
-            normalizedManagerPriority,
-            normalizedLoanOfficerPriority,
+            priorityPlan.workflowStartStage(),
+            priorityPlan.managerPriority(),
+            priorityPlan.loanOfficerPriority(),
             chairpersonReviewRequired,
-            normalizeStagePriority(chairpersonReviewRequired, chairpersonPriority, 3),
+            priorityPlan.chairpersonPriority(),
             boardReviewRequired,
-            normalizeStagePriority(boardReviewRequired, boardPriority, 3),
+            priorityPlan.boardPriority(),
             committeeReviewRequired,
-            normalizeStagePriority(committeeReviewRequired, committeePriority, 4),
+            priorityPlan.committeePriority(),
             assignedCreditCommitteeReviewerCount,
             assignedCreditCommitteeReviewerCount,
             accountantReviewRequired,
-            normalizeStagePriority(accountantReviewRequired, accountantPriority, 5),
+            priorityPlan.accountantPriority(),
             disbursementOfficerRequired,
             disbursementProofRequired,
             applicantAttachmentRequired,
@@ -2195,6 +2216,15 @@ public class AdminService {
         }
     }
 
+    private void ensureChairpersonSlotAvailable(String saccoId, UUID existingAccountId) {
+        long existingChairpersons = existingAccountId == null
+            ? memberRepository.countBySaccoIdAndRole(saccoId, Position.CHAIRPERSON)
+            : memberRepository.countBySaccoIdAndRoleAndIdNot(saccoId, Position.CHAIRPERSON, existingAccountId);
+        if (existingChairpersons > 0) {
+            throw new IllegalStateException("Each SACCO can only have one Chairperson account. Update the existing one instead.");
+        }
+    }
+
     private Member createStaffAccount(String saccoId,
                                       String stationId,
                                       UUID adminId,
@@ -2208,6 +2238,9 @@ public class AdminService {
         String normalizedStationId = normalizeOptional(stationId);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
             ensureMinorAdminSlotAvailable(saccoId, normalizedStationId, null);
+        }
+        if (staffRoles.contains(Position.CHAIRPERSON)) {
+            ensureChairpersonSlotAvailable(saccoId, null);
         }
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
@@ -2401,6 +2434,14 @@ public class AdminService {
         return normalized;
     }
 
+    private String normalizeRequiredProductDescription(String productDescription) {
+        String normalized = normalizeProductDescription(productDescription);
+        if (normalized == null) {
+            throw new IllegalStateException("Enter a loan product description.");
+        }
+        return normalized;
+    }
+
     private Integer normalizeDisplayOrder(Integer displayOrder) {
         if (displayOrder == null || displayOrder <= 0) {
             throw new IllegalStateException("Display order must be at least 1.");
@@ -2428,6 +2469,13 @@ public class AdminService {
             throw new IllegalStateException("Maximum amount cannot be lower than the minimum amount.");
         }
         return normalized;
+    }
+
+    private BigDecimal normalizeRequiredMaximumAmount(BigDecimal minimumAmount, BigDecimal maximumAmount) {
+        if (maximumAmount == null) {
+            throw new IllegalStateException("Maximum amount must be greater than zero.");
+        }
+        return normalizeMaximumAmount(minimumAmount, maximumAmount);
     }
 
     private BigDecimal normalizeRatio(BigDecimal ratio) {
@@ -2575,7 +2623,7 @@ public class AdminService {
             return fallbackPriority;
         }
         if (priority < 1 || priority > MAX_WORKFLOW_PRIORITY) {
-            throw new IllegalStateException("Stage priority must be between 1 and 7.");
+            throw new IllegalStateException("Stage priority must be between 1 and 6.");
         }
         return priority;
     }
@@ -2588,9 +2636,82 @@ public class AdminService {
             return fallbackPriority;
         }
         if (priority < 1 || priority > MAX_WORKFLOW_PRIORITY) {
-            throw new IllegalStateException("Review priority must be between 1 and 7.");
+            throw new IllegalStateException("Review priority must be between 1 and 6.");
         }
         return priority;
+    }
+
+    private WorkflowPriorityPlan normalizeWorkflowPriorities(boolean managerReviewRequired,
+                                                             Integer managerPriority,
+                                                             boolean loanOfficerReviewRequired,
+                                                             Integer loanOfficerPriority,
+                                                             boolean chairpersonReviewRequired,
+                                                             Integer chairpersonPriority,
+                                                             boolean boardReviewRequired,
+                                                             Integer boardPriority,
+                                                             boolean committeeReviewRequired,
+                                                             Integer committeePriority,
+                                                             boolean accountantReviewRequired,
+                                                             Integer accountantPriority,
+                                                             ApprovalWorkflowStage workflowStartStage) {
+        List<WorkflowPriorityEntry> entries = new ArrayList<>();
+        addWorkflowPriorityEntry(entries, "manager", managerReviewRequired, managerPriority, 1, 1);
+        addWorkflowPriorityEntry(entries, "loanOfficer", loanOfficerReviewRequired, loanOfficerPriority, 2, 2);
+        addWorkflowPriorityEntry(entries, "chairperson", chairpersonReviewRequired, chairpersonPriority, 3, 3);
+        addWorkflowPriorityEntry(entries, "board", boardReviewRequired, boardPriority, 4, 4);
+        addWorkflowPriorityEntry(entries, "committee", committeeReviewRequired, committeePriority, 5, 5);
+        addWorkflowPriorityEntry(entries, "accountant", accountantReviewRequired, accountantPriority, 6, 6);
+
+        Map<String, Integer> compact = entries.stream()
+            .filter(WorkflowPriorityEntry::enabled)
+            .sorted(Comparator.comparingInt(WorkflowPriorityEntry::requestedPriority)
+                .thenComparingInt(WorkflowPriorityEntry::defaultOrder))
+            .collect(LinkedHashMap::new,
+                (map, entry) -> map.put(entry.key(), map.size() + 1),
+                Map::putAll);
+
+        int normalizedManagerPriority = compact.getOrDefault("manager", 1);
+        int normalizedLoanOfficerPriority = compact.getOrDefault("loanOfficer", 2);
+        ApprovalWorkflowStage normalizedStartStage = normalizeWorkflowStartStage(workflowStartStage, managerReviewRequired, loanOfficerReviewRequired);
+        if (managerReviewRequired && loanOfficerReviewRequired) {
+            normalizedStartStage = normalizedLoanOfficerPriority < normalizedManagerPriority
+                ? ApprovalWorkflowStage.LOAN_OFFICER
+                : ApprovalWorkflowStage.MANAGER;
+        }
+
+        return new WorkflowPriorityPlan(
+            normalizedManagerPriority,
+            normalizedLoanOfficerPriority,
+            compact.getOrDefault("chairperson", 3),
+            compact.getOrDefault("board", 4),
+            compact.getOrDefault("committee", 5),
+            compact.getOrDefault("accountant", 6),
+            normalizedStartStage
+        );
+    }
+
+    private void addWorkflowPriorityEntry(List<WorkflowPriorityEntry> entries,
+                                          String key,
+                                          boolean enabled,
+                                          Integer priority,
+                                          int fallbackPriority,
+                                          int defaultOrder) {
+        int requestedPriority = enabled
+            ? normalizeReviewPriority(true, priority, fallbackPriority)
+            : fallbackPriority;
+        entries.add(new WorkflowPriorityEntry(key, enabled, requestedPriority, defaultOrder));
+    }
+
+    private record WorkflowPriorityEntry(String key, boolean enabled, int requestedPriority, int defaultOrder) {
+    }
+
+    private record WorkflowPriorityPlan(int managerPriority,
+                                        int loanOfficerPriority,
+                                        int chairpersonPriority,
+                                        int boardPriority,
+                                        int committeePriority,
+                                        int accountantPriority,
+                                        ApprovalWorkflowStage workflowStartStage) {
     }
 
     private void validateUniquePriority(String firstLabel,
@@ -2767,6 +2888,20 @@ public class AdminService {
             throw new IllegalStateException("Reviewers assigned must be between 1 and 15.");
         }
         return List.copyOf(uniqueIds);
+    }
+
+    private List<UUID> singleChairpersonReviewerIds(String saccoId, boolean reviewRequired) {
+        if (!reviewRequired) {
+            return List.of();
+        }
+        List<RoleDirectoryService.RoleAccountRef> activeChairpersons = roleDirectoryService.activeByRole(saccoId, Position.CHAIRPERSON);
+        if (activeChairpersons.isEmpty()) {
+            return List.of();
+        }
+        if (activeChairpersons.size() > 1) {
+            throw new IllegalStateException("Only one active Chairperson can be configured for this SACCO.");
+        }
+        return List.of(activeChairpersons.get(0).getId());
     }
 
     private List<UUID> reviewerIds(UUID productId, ApprovalWorkflowStage stage) {

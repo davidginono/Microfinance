@@ -1232,7 +1232,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void createCustomizedLoanProductRejectsDuplicateManagerAndLoanOfficerPriorities() {
+    void createCustomizedLoanProductCompactsDuplicateManagerAndLoanOfficerPriorities() {
         stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
@@ -1254,7 +1254,30 @@ class AdminServiceTest {
                 .build()
         ));
 
-        assertThatThrownBy(() -> adminService.createCustomizedLoanProduct(
+        SaccoSettings settings = SaccoSettings.builder()
+            .saccoId("SACCO-01")
+            .applicationFee(new BigDecimal("15000.00"))
+            .requiredGuarantors(1)
+            .boardSize(3)
+            .boardQuorum(2)
+            .defaultLanguage("en")
+            .createdAt(OffsetDateTime.now().minusDays(2))
+            .updatedAt(OffsetDateTime.now().minusDays(1))
+            .build();
+
+        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
+        when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
+        when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(loanProductSettingRepository.existsBySaccoIdAndLoanType("SACCO-01", LoanType.CUSTOMIZED_LOAN)).thenReturn(false);
+        AtomicReference<LoanProductSetting> savedProduct = new AtomicReference<>();
+        when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> {
+            LoanProductSetting product = invocation.getArgument(0);
+            savedProduct.set(product);
+            return product;
+        });
+
+        adminService.createCustomizedLoanProduct(
             "SACCO-01",
             UUID.randomUUID(),
             "CUSTOM_PRIORITY",
@@ -1289,12 +1312,15 @@ class AdminServiceTest {
             false,
             BigDecimal.ZERO,
             LoanProductStatus.ACTIVE
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Manager and Loan Officer cannot share the same priority slot.");
+        );
 
-        verify(loanProductsVersionRepository, never()).save(any(com.sacco.mvp.domain.LoanProductsVersion.class));
-        verify(loanProductSettingRepository, never()).save(any(LoanProductSetting.class));
+        LoanProductSetting product = savedProduct.get();
+        assertThat(product).isNotNull();
+        assertThat(product.getManagerPriority()).isEqualTo(1);
+        assertThat(product.getLoanOfficerPriority()).isEqualTo(2);
+        assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.MANAGER);
+        verify(loanProductsVersionRepository).save(any(com.sacco.mvp.domain.LoanProductsVersion.class));
+        verify(loanProductSettingRepository).save(any(LoanProductSetting.class));
     }
 
     @Test
