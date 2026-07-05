@@ -137,13 +137,13 @@
 <c:if test="${isPlatformAdminIdentity}">
     <section class="grid gap-4 xl:grid-cols-2">
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Reply To Minor Admin</h5>
+            <h5 class="erp-panel-title">Reply To SACCOS Admin</h5>
             <form action="/admin/incidents/reply-minor-admin" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Recipient</label>
                     <select name="memberId" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required>
-                        <option value="">Select minor admin</option>
+                        <option value="">Select SACCOS admin</option>
                         <c:forEach items="${minorAdmins}" var="admin">
                             <option value="${admin.accountId}">${admin.loginId} - ${admin.fullName} (${admin.saccoId} / ${admin.stationId})</option>
                         </c:forEach>
@@ -162,7 +162,7 @@
         </div>
 
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Broadcast To Minor Admins</h5>
+            <h5 class="erp-panel-title">Broadcast To SACCOS Admins</h5>
             <form action="/admin/incidents/broadcast-minor-admins" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>

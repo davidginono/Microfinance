@@ -7,9 +7,9 @@
 <%@ include file="../fragments/modal-shell.jspf" %>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / SACCO Registration / Minor Admins Registration" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.minorAdmins.title" text="Minor Admins Registration" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.minorAdmins.subtitle" text="Register SACCO-specific Minor Admin accounts under the correct station." /></p>
+    <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / SACCO Registration / SACCOS Admins Registration" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.minorAdmins.title" text="SACCOS Admins Registration" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="admin.minorAdmins.subtitle" text="Register SACCOS Admin accounts under the correct station." /></p>
 </div>
 
 <c:choose>
@@ -19,7 +19,7 @@
                 <p class="erp-panel-title"><spring:message code="admin.minorAdmins.registerSaccoFirst" text="Register A SACCO First" /></p>
             </div>
             <div class="erp-panel-body space-y-4">
-                <p class="text-sm text-slate-600"><spring:message code="admin.minorAdmins.registerSaccoFirstHelp" text="Minor Admin accounts need a SACCO and station assignment. Register the SACCO from the sidebar first, then return here to register the account." /></p>
+                <p class="text-sm text-slate-600"><spring:message code="admin.minorAdmins.registerSaccoFirstHelp" text="SACCOS Admin accounts need a SACCO and station assignment. Register the SACCO from the sidebar first, then return here to register the account." /></p>
             </div>
         </div>
     </c:when>
@@ -28,7 +28,7 @@
             <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
                 <div>
                     <p class="erp-widget-title"><spring:message code="admin.minorAdmins.registrationForm" text="Registration Form" /></p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.minorAdmins.create" text="Create Minor Admin" /></h2>
+                    <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.minorAdmins.create" text="Create SACCOS Admin" /></h2>
                     <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.minorAdmins.createHelp" text="Assign the account to one SACCO and one active station. They will receive an email to set their password." /></p>
                 </div>
             </div>
@@ -80,7 +80,7 @@
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3">
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="admin.minorAdmins.register" text="Register Minor Admin" /></button>
+                    <button type="submit" class="app-btn btn-primary"><spring:message code="admin.minorAdmins.register" text="Register SACCOS Admin" /></button>
                 </div>
             </form>
         </div>
@@ -91,7 +91,7 @@
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <p class="erp-panel-title"><spring:message code="admin.minorAdmins.registered" text="Registered Minor Admins" /></p>
+                <p class="erp-panel-title"><spring:message code="admin.minorAdmins.registered" text="Registered SACCOS Admins" /></p>
                 <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.minorAdmins.manageHelp" text="Use Users &amp; Roles for status changes or broader role updates." /></p>
             </div>
             <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="admin.minorAdmins.manageUsers" text="Manage In Users &amp; Roles" /></a>
@@ -115,7 +115,7 @@
             <c:choose>
                 <c:when test="${empty minorAdmins}">
                     <tr>
-                        <td colspan="7" class="text-slate-500"><spring:message code="admin.minorAdmins.empty" text="No Minor Admins have been registered yet." /></td>
+                        <td colspan="7" class="text-slate-500"><spring:message code="admin.minorAdmins.empty" text="No SACCOS Admins have been registered yet." /></td>
                     </tr>
                 </c:when>
                 <c:otherwise>
@@ -177,7 +177,7 @@
                                             </form>
                                     </c:when>
                                     <c:when test="${minorAdmin.status == 'ACTIVE'}">
-                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/deactivate" method="post" class="inline" onsubmit="return confirm('<spring:message code='admin.minorAdmins.confirmDeactivate' text='Deactivate this Minor Admin? They will no longer be able to sign in.' javaScriptEscape='true' />');">
+                                            <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/deactivate" method="post" class="inline" onsubmit="return confirm('<spring:message code='admin.minorAdmins.confirmDeactivate' text='Deactivate this SACCOS Admin? They will no longer be able to sign in.' javaScriptEscape='true' />');">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                                 <button type="submit" class="app-btn btn-reject px-3 py-2 text-[0.74rem]"><spring:message code="common.deactivate" text="Deactivate" /></button>
                                             </form>
@@ -206,7 +206,7 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-panel-title"><spring:message code="admin.minorAdmins.edit" text="Edit Minor Admin" /></p>
+                        <p class="erp-panel-title"><spring:message code="admin.minorAdmins.edit" text="Edit SACCOS Admin" /></p>
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.minorAdmins.editHelp" text="Update the assigned workspace and contact details." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-minor-admin-modal-close="edit-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">

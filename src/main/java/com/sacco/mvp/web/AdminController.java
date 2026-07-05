@@ -439,7 +439,7 @@ public class AdminController {
                                          @RequestParam String message,
                                          RedirectAttributes ra) {
         adminService.broadcastToMinorAdmins(principal.getMemberId(), subject, message);
-        ra.addFlashAttribute("message", "Broadcast sent to minor admins.");
+        ra.addFlashAttribute("message", "Broadcast sent to SACCOS admins.");
         return "redirect:/admin/incidents";
     }
 
@@ -451,7 +451,7 @@ public class AdminController {
                                     @RequestParam String message,
                                     RedirectAttributes ra) {
         adminService.replyToMinorAdmin(principal.getMemberId(), memberId, subject, message);
-        ra.addFlashAttribute("message", "Reply sent to the minor admin.");
+        ra.addFlashAttribute("message", "Reply sent to the SACCOS admin.");
         return "redirect:/admin/incidents";
     }
 
@@ -597,18 +597,22 @@ public class AdminController {
                              @RequestParam(required = false) String phone,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
-        adminService.createUser(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
-            principal.getMemberId(),
-            principal.getGrantedPositions(),
-            memberNo,
-            fullName,
-            email,
-            phone,
-            positions
-        );
-        ra.addFlashAttribute("message", "User created.");
+        try {
+            adminService.createUser(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                principal.getMemberId(),
+                principal.getGrantedPositions(),
+                memberNo,
+                fullName,
+                email,
+                phone,
+                positions
+            );
+            ra.addFlashAttribute("message", "User created.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
         return "redirect:/admin/users";
     }
 
@@ -1574,7 +1578,7 @@ public class AdminController {
                 registrationForm.getEmail(),
                 registrationForm.getPhone()
             );
-            ra.addFlashAttribute("message", "Minor Admin invited. A password setup link has been emailed to them.");
+            ra.addFlashAttribute("message", "SACCOS Admin invited. A password setup link has been emailed to them.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1603,7 +1607,7 @@ public class AdminController {
                 email,
                 phone
             );
-            ra.addFlashAttribute("message", "Minor Admin details updated.");
+            ra.addFlashAttribute("message", "SACCOS Admin details updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1645,7 +1649,7 @@ public class AdminController {
                                        RedirectAttributes ra) {
         try {
             adminService.deactivateMinorAdmin(principal.getMemberId(), accountId);
-            ra.addFlashAttribute("message", "Minor Admin deactivated.");
+            ra.addFlashAttribute("message", "SACCOS Admin deactivated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

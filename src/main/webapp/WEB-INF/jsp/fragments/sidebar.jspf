@@ -163,7 +163,7 @@
                                     <spring:message code="admin.saccoRegistry.registration" text="Registration" />
                                 </a>
                                 <a href="/admin/saccos/minor-admins" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/admin/saccos/minor-admins') ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                                    <spring:message code="admin.minorAdmins.title" text="Minor Admins Registration" />
+                                    <spring:message code="admin.minorAdmins.title" text="SACCOS Admins Registration" />
                                 </a>
                             </div>
                         </div>
@@ -257,16 +257,16 @@
                 </c:choose>
             </sec:authorize>
 
-            <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel or showChairpersonPanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
-            <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel or showChairpersonPanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+            <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
             <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
                 <c:set var="hasDisbursementQueueClaim" value="true" />
             </sec:authorize>
-            <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and not pageContext.request.isUserInRole('ROLE_MINOR_ADMIN') and currentMember ne null}" />
+            <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
             <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}">
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.reviewPanels" text="Review Panels" /></p>
@@ -347,7 +347,7 @@
                     </div>
                 </div>
             </c:if>
-            <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
+            <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
                 <c:set var="managerOfficeActive" value="${fn:startsWith(requestUri, '/manager')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.manager" text="Manager" /></p>
@@ -372,7 +372,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CHAIRPERSON') and principal.claims.contains('REVIEW_CHAIRPERSON_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
+            <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CHAIRPERSON') and principal.claims.contains('REVIEW_CHAIRPERSON_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN')">
                 <c:set var="chairpersonOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON')}" />
                 <c:set var="reviewOfficeBasePath" value="${chairpersonOfficeActive ? '/chairperson' : '/board'}" />
                 <c:set var="reviewDashboardPath" value="${reviewOfficeBasePath}/dashboard" />
@@ -442,7 +442,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="hasRole('LOAN_OFFICER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_LOAN_OFFICER_QUEUE')">
+            <sec:authorize access="hasRole('LOAN_OFFICER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_LOAN_OFFICER_QUEUE')">
                 <c:set var="loanOfficerOfficeActive" value="${fn:startsWith(requestUri, '/loan-officer')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.loanOfficer" text="Loan Officer" /></p>
@@ -467,7 +467,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="hasRole('ACCOUNTANT') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('REVIEW_ACCOUNTANT_QUEUE')">
+            <sec:authorize access="hasRole('ACCOUNTANT') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_ACCOUNTANT_QUEUE')">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>
@@ -492,7 +492,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="!hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
+            <sec:authorize access="!hasRole('ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
                 <c:set var="disbursementOfficeActive" value="${fn:startsWith(requestUri, '/disbursement')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.disbursement" text="Disbursement" /></p>

@@ -1008,18 +1008,7 @@ public class LoanReportService {
         if (principal == null || principal.getPosition() == null) {
             return "-";
         }
-        return switch (principal.getPosition()) {
-            case MEMBER -> "Member";
-            case MINOR_ADMIN -> "Minor Admin";
-            case MANAGER -> "Manager";
-            case ACCOUNTANT -> "Accountant";
-            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
-            case CHAIRPERSON -> "Chairperson";
-            case BOARD -> "Board";
-            case CREDIT_COMMITTEE -> "Credit Committee";
-            case LOAN_OFFICER -> "Loan Officer";
-            case ADMIN -> "Admin";
-        };
+        return principal.getPosition().getDisplayName();
     }
 
     private String loanProductLabel(com.sacco.mvp.domain.LoanType loanType) {

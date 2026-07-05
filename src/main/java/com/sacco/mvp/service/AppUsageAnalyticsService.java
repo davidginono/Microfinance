@@ -261,13 +261,7 @@ public class AppUsageAnalyticsService {
         if (role == null) {
             return "User";
         }
-        return switch (role) {
-            case ADMIN -> "Super Admin";
-            case MINOR_ADMIN -> "Minor Admin";
-            case LOAN_OFFICER -> "Loan Officer";
-            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
-            default -> titleCase(role.name().replace('_', ' '));
-        };
+        return role.getDisplayName();
     }
 
     private List<UsageCountRow> rows(List<AppUsageEventRepository.CountRow> rows) {

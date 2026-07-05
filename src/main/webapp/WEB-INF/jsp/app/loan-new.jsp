@@ -120,6 +120,7 @@
                   data-loan-purpose
                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                   placeholder="<spring:message code='newloan.purpose.placeholder' />">${formValues['purpose']}</textarea>
+        <p class="mt-2 text-xs text-slate-500"><spring:message code="newloan.purpose.help" /></p>
     </div>
 
     <c:forEach items="${formModel.fields}" var="field">

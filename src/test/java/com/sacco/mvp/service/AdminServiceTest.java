@@ -354,13 +354,13 @@ class AdminServiceTest {
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
             "MINOR001",
-            "Minor Admin",
+            "SACCOS Admin",
             "minor@example.com",
             null,
             List.of(Position.MINOR_ADMIN)
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
+            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
 
         verify(memberRepository).existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN);
         verify(memberRepository, never()).save(any(Member.class));
@@ -420,13 +420,13 @@ class AdminServiceTest {
             MemberStatus.ACTIVE
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
+            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
 
         verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
-    void updateUserKeepsAdminClassClaimsLimitedToAdminDefaults() {
+    void updateUserAllowsSaccosAdminToOverlapWithEveryStaffRoleAndDefaultClaims() {
         UUID accountId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
         Member member = Member.builder()
@@ -434,7 +434,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .status(MemberStatus.ACTIVE)
             .position(Position.MINOR_ADMIN)
@@ -456,23 +456,78 @@ class AdminServiceTest {
         when(userSettingsRepository.findById(accountId)).thenReturn(Optional.of(settings));
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        List<Position> staffRoles = List.of(
+            Position.MINOR_ADMIN,
+            Position.MANAGER,
+            Position.CHAIRPERSON,
+            Position.BOARD,
+            Position.CREDIT_COMMITTEE,
+            Position.LOAN_OFFICER,
+            Position.ACCOUNTANT,
+            Position.DISBURSEMENT_OFFICER
+        );
+
         adminService.updateUser(
             "SACCO-01",
             "ST-1",
             adminId,
             Set.of(Position.MINOR_ADMIN),
             accountId,
-            List.of(Position.MINOR_ADMIN),
+            staffRoles,
             MemberStatus.ACTIVE,
-            List.of(UserClaim.ACCESS_ADMIN_SETTINGS, UserClaim.ACCESS_DISBURSEMENT_QUEUE, UserClaim.DISBURSE_LOAN)
+            List.of(UserClaim.ACCESS_ADMIN_SETTINGS)
         );
 
+        verify(memberRepository).save(argThat(saved ->
+            saved.getStaffRolesResolved().containsAll(staffRoles)
+                && saved.getPosition() == Position.MINOR_ADMIN
+        ));
         verify(userSettingsRepository).save(argThat(saved ->
             saved.getNotificationPrefs().contains("ACCESS_ADMIN_SETTINGS")
                 && saved.getNotificationPrefs().contains("ACCESS_OUTBOX_MONITOR")
-                && !saved.getNotificationPrefs().contains("ACCESS_DISBURSEMENT_QUEUE")
-                && !saved.getNotificationPrefs().contains("DISBURSE_LOAN")
+                && saved.getNotificationPrefs().contains("REVIEW_MANAGER_QUEUE")
+                && saved.getNotificationPrefs().contains("REVIEW_CHAIRPERSON_QUEUE")
+                && saved.getNotificationPrefs().contains("REVIEW_BOARD_QUEUE")
+                && saved.getNotificationPrefs().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")
+                && saved.getNotificationPrefs().contains("REVIEW_LOAN_OFFICER_QUEUE")
+                && saved.getNotificationPrefs().contains("REVIEW_ACCOUNTANT_QUEUE")
+                && saved.getNotificationPrefs().contains("ACCESS_DISBURSEMENT_QUEUE")
+                && saved.getNotificationPrefs().contains("DISBURSE_LOAN")
         ));
+    }
+
+    @Test
+    void updateUserRejectsSuperAdminOverlappingWithOtherRoles() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("ADMIN001")
+            .fullName("Super Admin")
+            .email("admin@example.com")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.ADMIN)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
+            .memberAccount(false)
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            accountId,
+            List.of(Position.ADMIN, Position.MANAGER),
+            MemberStatus.ACTIVE
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Super Admin accounts cannot be combined with any other staff role.");
+
+        verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
@@ -532,7 +587,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -577,7 +632,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -612,12 +667,12 @@ class AdminServiceTest {
             "SACCO-01",
             "ST-2",
             "MINOR001",
-            "Minor Admin",
+            "SACCOS Admin",
             "minor@example.com",
             null
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
+            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
 
         verify(memberRepository, never()).save(any(Member.class));
     }
@@ -630,7 +685,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -669,7 +724,7 @@ class AdminServiceTest {
             "SACCO-01",
             "ST-2",
             "MINOR002",
-            "Minor Admin Two",
+            "SACCOS Admin Two",
             "minor2@example.com",
             "255712345679"
         );
@@ -731,7 +786,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -761,7 +816,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -788,7 +843,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -802,7 +857,7 @@ class AdminServiceTest {
 
         assertThatThrownBy(() -> adminService.resendMinorAdminInvitation(UUID.randomUUID(), accountId))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
+            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
 
         assertThat(issuedInvitationCount.get()).isZero();
     }
@@ -816,7 +871,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -845,7 +900,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -871,7 +926,7 @@ class AdminServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("MINOR001")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .email("minor@example.com")
             .position(Position.MINOR_ADMIN)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -945,7 +1000,7 @@ class AdminServiceTest {
             "SACCO-01",
             "ST-1",
             "MINOR001",
-            "Minor Admin",
+            "SACCOS Admin",
             "minor@example.com",
             "255712345678"
         );

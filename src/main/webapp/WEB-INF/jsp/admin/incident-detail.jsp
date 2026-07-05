@@ -86,7 +86,7 @@
 
         <c:if test="${isPlatformAdminIdentity}">
         <div class="erp-form-wrap">
-            <h5 class="erp-panel-title">Broadcast To Minor Admins</h5>
+            <h5 class="erp-panel-title">Broadcast To SACCOS Admins</h5>
             <form action="/admin/incidents/broadcast-minor-admins" method="post" class="mt-4 space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div>

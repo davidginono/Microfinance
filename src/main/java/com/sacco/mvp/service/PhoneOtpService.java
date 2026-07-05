@@ -46,7 +46,7 @@ public class PhoneOtpService {
             .build());
 
         SmsSendResult result = smsGateway.send(normalizedPhone,
-            "Your SACCO Minor Admin phone verification code is " + code + ". It expires in "
+            "Your SACCOS Admin phone verification code is " + code + ". It expires in "
                 + Math.max(1, otpTtlMinutes) + " minutes.");
         if (!result.consumesUnit()) {
             throw new IllegalStateException("The phone verification code could not be sent. Confirm the phone number and try again.");

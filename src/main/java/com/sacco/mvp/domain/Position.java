@@ -30,6 +30,21 @@ public enum Position {
         return this == ADMIN;
     }
 
+    public String getDisplayName() {
+        return switch (this) {
+            case MEMBER -> "Member";
+            case MINOR_ADMIN -> "SACCOS Admin";
+            case MANAGER -> "Manager";
+            case ACCOUNTANT -> "Accountant";
+            case DISBURSEMENT_OFFICER -> "Disbursement/Teller Officer";
+            case CHAIRPERSON -> "Chairperson";
+            case BOARD -> "Board";
+            case CREDIT_COMMITTEE -> "Credit Committee";
+            case LOAN_OFFICER -> "Loan Officer";
+            case ADMIN -> "Super Admin";
+        };
+    }
+
     public static List<Position> staffAssignableRoles() {
         return List.of(ADMIN, MINOR_ADMIN, LOAN_OFFICER, MANAGER, ACCOUNTANT, DISBURSEMENT_OFFICER, CHAIRPERSON, BOARD, CREDIT_COMMITTEE);
     }

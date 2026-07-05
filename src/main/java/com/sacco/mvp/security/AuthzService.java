@@ -32,7 +32,7 @@ public class AuthzService {
     }
 
     public boolean staffAnalyticsAccess(AppUserPrincipal principal) {
-        return notAdminClass(principal)
+        return notSuperAdmin(principal)
             && (principal.hasRole(Position.LOAN_OFFICER)
                 || principal.hasRole(Position.MANAGER)
                 || principal.hasRole(Position.ACCOUNTANT)
@@ -53,8 +53,8 @@ public class AuthzService {
     }
 
     /**
-     * Separation of Duties: Minor Admins (MINOR_ADMIN) MUST NOT touch platform-wide
-     * controls (registering SACCOs, creating other Minor Admins, switching tenant scope).
+     * Separation of Duties: SACCOS Admins (MINOR_ADMIN) MUST NOT touch platform-wide
+     * controls (registering SACCOs, creating other SACCOS Admins, switching tenant scope).
      */
     public boolean platformAdminOnly(AppUserPrincipal principal) {
         return principal != null

@@ -384,7 +384,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/disbursement-loans.pdf")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
     public ResponseEntity<byte[]> downloadDisbursementLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {

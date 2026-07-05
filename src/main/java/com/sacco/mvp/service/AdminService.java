@@ -177,7 +177,7 @@ public class AdminService {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
-            throw new IllegalStateException("That account is not a Minor Admin.");
+            throw new IllegalStateException("That account is not a SACCOS Admin.");
         }
         if (member.getStatus() != MemberStatus.INVITED) {
             throw new IllegalStateException("Only accounts awaiting activation can be resent.");
@@ -192,7 +192,7 @@ public class AdminService {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
-            throw new IllegalStateException("That account is not a Minor Admin.");
+            throw new IllegalStateException("That account is not a SACCOS Admin.");
         }
         if (member.getStatus() != MemberStatus.ACTIVE) {
             throw new IllegalStateException("Only active accounts can be deactivated.");
@@ -208,7 +208,7 @@ public class AdminService {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
-            throw new IllegalStateException("That account is not a Minor Admin.");
+            throw new IllegalStateException("That account is not a SACCOS Admin.");
         }
         if (member.getStatus() == MemberStatus.ACTIVE) {
             throw new IllegalStateException("That account is already active.");
@@ -227,7 +227,7 @@ public class AdminService {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
-            throw new IllegalStateException("That account is not a Minor Admin.");
+            throw new IllegalStateException("That account is not a SACCOS Admin.");
         }
         if (member.getStatus() != MemberStatus.INVITED) {
             throw new IllegalStateException("Only pending invitations can be revoked.");
@@ -273,7 +273,7 @@ public class AdminService {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Minor admin account not found."));
         if (!member.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
-            throw new IllegalStateException("That account is not a Minor Admin.");
+            throw new IllegalStateException("That account is not a SACCOS Admin.");
         }
 
         String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
@@ -284,7 +284,7 @@ public class AdminService {
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
         if (normalizedPhone == null) {
-            throw new IllegalStateException("Enter the Minor Admin phone number.");
+            throw new IllegalStateException("Enter the SACCOS Admin phone number.");
         }
 
         if (memberRepository.existsByMemberNoIgnoreCaseAndIdNot(normalizedMemberNo, accountId)) {
@@ -1771,7 +1771,7 @@ public class AdminService {
             List.of(Position.MINOR_ADMIN)
         );
         if (admins.isEmpty()) {
-            throw new IllegalStateException("No active minor admin is configured for your station");
+            throw new IllegalStateException("No active SACCOS Admin is configured for your station");
         }
         adminAlertService.openSupportIncidentForAdmins(
             admins,
@@ -2015,21 +2015,20 @@ public class AdminService {
         if (staffRoles.contains(Position.ADMIN) && !actorIsSuperAdmin) {
             throw new IllegalStateException("Only super admins can assign Super Admin access.");
         }
-        long adminRoleCount = staffRoles.stream().filter(Position::isAdminRole).count();
-        if (adminRoleCount > 1) {
-            throw new IllegalStateException("Choose either Super Admin or Minor Admin, not both.");
+        if (staffRoles.contains(Position.ADMIN) && staffRoles.contains(Position.MINOR_ADMIN)) {
+            throw new IllegalStateException("Choose either Super Admin or SACCOS Admin, not both.");
         }
-        if (Position.containsAdminRole(staffRoles) && staffRoles.size() > 1) {
-            throw new IllegalStateException("Admin-class accounts cannot be combined with any other staff role.");
+        if (staffRoles.contains(Position.ADMIN) && staffRoles.size() > 1) {
+            throw new IllegalStateException("Super Admin accounts cannot be combined with any other staff role.");
         }
         return staffRoles;
     }
 
     private List<UserClaim> normalizeAssignableClaims(Set<Position> staffRoles,
                                                       boolean memberAccess,
-                                                      List<UserClaim> requestedClaims) {
+        List<UserClaim> requestedClaims) {
         Set<UserClaim> defaults = userClaimService.defaultClaims(staffRoles, memberAccess);
-        if (Position.containsAdminRole(staffRoles)) {
+        if (staffRoles.contains(Position.ADMIN)) {
             return new ArrayList<>(defaults);
         }
         LinkedHashSet<UserClaim> normalized = new LinkedHashSet<>(defaults);
@@ -2053,7 +2052,7 @@ public class AdminService {
             return "MEMBER";
         }
         return Position.normalizeStaffRoles(staffRoles).stream()
-            .map(Enum::name)
+            .map(Position::getDisplayName)
             .collect(Collectors.joining(", "));
     }
 
@@ -2212,7 +2211,7 @@ public class AdminService {
             ? memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition(saccoId, normalizedStationId, Position.MINOR_ADMIN)
             : memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(saccoId, normalizedStationId, Position.MINOR_ADMIN, existingAccountId);
         if (occupied) {
-            throw new IllegalStateException("Each SACCO station can only have one Minor Admin account. Update the existing one instead.");
+            throw new IllegalStateException("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
         }
     }
 
@@ -2247,7 +2246,7 @@ public class AdminService {
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
         if (staffRoles.contains(Position.MINOR_ADMIN) && normalizedPhone == null) {
-            throw new IllegalStateException("Enter the Minor Admin phone number.");
+            throw new IllegalStateException("Enter the SACCOS Admin phone number.");
         }
 
         if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {

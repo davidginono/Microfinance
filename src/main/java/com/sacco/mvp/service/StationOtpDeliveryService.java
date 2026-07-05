@@ -89,7 +89,7 @@ public class StationOtpDeliveryService {
         if (result.consumesUnit()) {
             return SmsAttempt.sent();
         }
-        return SmsAttempt.failed("The SMS OTP provider rejected the request. Try again or contact your Minor Admin.");
+        return SmsAttempt.failed("The SMS OTP provider rejected the request. Try again or contact your SACCOS Admin.");
     }
 
     private void sendEmail(String email, String subject, String message) {

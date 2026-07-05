@@ -81,7 +81,7 @@ class MinorAdminInvitationServiceTest {
             com.sacco.mvp.domain.EmailOtpPurpose.CLAIM_ACCOUNT,
             memberId,
             "Activate your SACCO admin account",
-            "Use the code below to complete the activation of your Minor Admin account for SACCO-01.",
+            "Use the code below to complete the activation of your SACCOS Admin account for SACCO-01.",
             "SACCO-01",
             "AR704",
             "255746359369"

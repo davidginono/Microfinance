@@ -202,7 +202,7 @@
                                        value="${position}"
                                        data-staff-role-checkbox="create-user"
                                        class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span>${position}</span>
+                                <span>${position.displayName}</span>
                             </label>
                         </c:forEach>
                     </div>
@@ -248,7 +248,7 @@
                                        data-staff-role-checkbox="user-${user.accountId}"
                                        ${user.staffRoles.contains(position) ? 'checked' : ''}
                                        class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span>${position}</span>
+                                <span>${position.displayName}</span>
                             </label>
                         </c:forEach>
                     </div>
@@ -311,24 +311,20 @@
             document.body.appendChild(modal);
         });
 
-        function syncAdminOnlyRoleGroup(groupKey) {
+        function syncSuperAdminRoleGroup(groupKey) {
             const checkboxes = Array.from(document.querySelectorAll('[data-staff-role-checkbox="' + groupKey + '"]'));
             if (!checkboxes.length) {
                 return;
             }
-            const adminClassCheckboxes = checkboxes.filter((checkbox) => checkbox.value === 'ADMIN' || checkbox.value === 'MINOR_ADMIN');
-            if (!adminClassCheckboxes.length) {
+            const superAdminCheckbox = checkboxes.find((checkbox) => checkbox.value === 'ADMIN');
+            if (!superAdminCheckbox) {
                 return;
             }
-            const checkedAdminClass = adminClassCheckboxes.find((checkbox) => checkbox.checked);
             checkboxes.forEach((checkbox) => {
-                const isAdminClass = checkbox.value === 'ADMIN' || checkbox.value === 'MINOR_ADMIN';
-                if (checkedAdminClass && checkbox !== checkedAdminClass) {
-                    if (isAdminClass || !isAdminClass) {
-                        checkbox.checked = false;
-                    }
+                if (superAdminCheckbox.checked && checkbox !== superAdminCheckbox) {
+                    checkbox.checked = false;
                 }
-                checkbox.disabled = Boolean(checkedAdminClass && checkbox !== checkedAdminClass);
+                checkbox.disabled = Boolean(superAdminCheckbox.checked && checkbox !== superAdminCheckbox);
             });
         }
 
@@ -390,12 +386,12 @@
         document.querySelectorAll('[data-staff-role-checkbox]').forEach((checkbox) => {
             const groupKey = checkbox.getAttribute('data-staff-role-checkbox');
             checkbox.addEventListener('change', () => {
-                syncAdminOnlyRoleGroup(groupKey);
+                syncSuperAdminRoleGroup(groupKey);
                 applyDefaultClaimsForRole(checkbox);
             });
             if (!initializedRoleGroups.has(groupKey)) {
                 initializedRoleGroups.add(groupKey);
-                syncAdminOnlyRoleGroup(groupKey);
+                syncSuperAdminRoleGroup(groupKey);
             }
         });
 

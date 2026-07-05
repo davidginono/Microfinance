@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/disbursement")
-@PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+@PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
 public class DisbursementController {
     private final ManagerService managerService;
     private final ManagerReviewRepository managerReviewRepository;
@@ -396,7 +396,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/finalize")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
     public String finalize(@PathVariable UUID id,
                            @AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disbursementDate,
@@ -481,7 +481,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/request-disbursement-otp")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestDisbursementOtp(@PathVariable UUID id,
                                                                       @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -511,7 +511,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-disbursement-otp")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyDisbursementOtp(@PathVariable UUID id,
                                                                      @AuthenticationPrincipal AppUserPrincipal principal,
@@ -535,7 +535,7 @@ public class DisbursementController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
@@ -546,7 +546,7 @@ public class DisbursementController {
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
@@ -561,7 +561,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("@authz.notAdminClass(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());

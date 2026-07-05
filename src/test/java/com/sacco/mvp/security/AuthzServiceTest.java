@@ -76,7 +76,7 @@ class AuthzServiceTest {
             .saccoId(saccoId)
             .stationId("ST-1")
             .memberNo("ADM1")
-            .fullName("Minor Admin")
+            .fullName("SACCOS Admin")
             .status(MemberStatus.ACTIVE)
             .position(Position.MINOR_ADMIN)
             .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
@@ -115,6 +115,8 @@ class AuthzServiceTest {
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.ACCOUNTANT, false))).isTrue();
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.DISBURSEMENT_OFFICER, false))).isTrue();
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.BOARD, false))).isTrue();
+        assertThat(authzService.staffAnalyticsAccess(principalWithRoles(List.of(Position.MINOR_ADMIN, Position.MANAGER), false))).isTrue();
+        assertThat(authzService.staffAnalyticsAccess(principalWithRoles(List.of(Position.MINOR_ADMIN, Position.DISBURSEMENT_OFFICER), false))).isTrue();
 
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MEMBER, true))).isFalse();
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.ADMIN, false))).isFalse();
@@ -145,6 +147,17 @@ class AuthzServiceTest {
         if (position != null && position.isStaffRole()) {
             staffRoles.add(position);
         }
+        return principalWithRoles(staffRoles.stream().toList(), memberAccess);
+    }
+
+    private AppUserPrincipal principalWithRoles(List<Position> positions, boolean memberAccess) {
+        java.util.LinkedHashSet<Position> staffRoles = new java.util.LinkedHashSet<>();
+        if (positions != null) {
+            positions.stream()
+                .filter(position -> position != null && position.isStaffRole())
+                .forEach(staffRoles::add);
+        }
+        Position position = Position.primaryRole(staffRoles, memberAccess);
         Member member = Member.builder()
             .id(UUID.randomUUID())
             .saccoId("CIRCLE-1001")

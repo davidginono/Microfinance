@@ -66,7 +66,7 @@ public class MinorAdminInvitationService {
         invitationRepository.save(invitation);
 
         sendInviteEmail(member, rawToken, ttl);
-        log.info("Issued minor admin invitation for memberId={} invitedBy={} expiresAt={}",
+        log.info("Issued SACCOS admin invitation for memberId={} invitedBy={} expiresAt={}",
             member.getId(), invitedBy, invitation.getExpiresAt());
         return invitation;
     }
@@ -91,7 +91,7 @@ public class MinorAdminInvitationService {
             EmailOtpPurpose.CLAIM_ACCOUNT,
             member.getId(),
             "Activate your SACCO admin account",
-            "Use the code below to complete the activation of your Minor Admin account for "
+            "Use the code below to complete the activation of your SACCOS Admin account for "
                 + member.getSaccoId() + ".",
             member.getSaccoId(),
             member.getStationId(),

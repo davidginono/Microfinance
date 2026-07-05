@@ -26,7 +26,7 @@
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
     <div class="claim-card w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8">
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCO Minor Admin Activation</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCOS Admin Activation</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900" style="font-family:'Sora',ui-sans-serif,system-ui;">Activate your staff account</h1>
             <p class="mt-1 text-sm text-slate-500">Verify your staff account, then create your password.</p>
         </div>

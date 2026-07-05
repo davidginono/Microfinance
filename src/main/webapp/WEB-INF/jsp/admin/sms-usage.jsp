@@ -154,7 +154,7 @@
         <section class="erp-stat-grid">
             <div class="erp-stat-card erp-stat-blue"><div class="erp-stat-main"><div><p class="erp-stat-label">Available Units</p><p class="erp-stat-value">${selectedAccount.availableUnits}</p><p class="erp-stat-meta">${selectedAccount.saccoId} / ${selectedAccount.stationId}</p></div><span class="erp-stat-icon">U</span></div></div>
             <div class="erp-stat-card erp-stat-amber"><div class="erp-stat-main"><div><p class="erp-stat-label">Alert Reserve</p><p class="erp-stat-value">${selectedAccount.alertReservedUnits} / 3</p><p class="erp-stat-meta">Reserved for LOW, CRITICAL, and DEPLETED alerts</p></div><span class="erp-stat-icon">A</span></div></div>
-            <div class="erp-stat-card erp-stat-blue"><div class="erp-stat-main"><div><p class="erp-stat-label">Depleted Alerts Sent</p><p class="erp-stat-value">${selectedAccount.depletedAlertSmsSentCount}</p><p class="erp-stat-meta">SMS alerts sent to verified Minor Admins</p></div><span class="erp-stat-icon">D</span></div></div>
+            <div class="erp-stat-card erp-stat-blue"><div class="erp-stat-main"><div><p class="erp-stat-label">Depleted Alerts Sent</p><p class="erp-stat-value">${selectedAccount.depletedAlertSmsSentCount}</p><p class="erp-stat-meta">SMS alerts sent to verified SACCOS Admins</p></div><span class="erp-stat-icon">D</span></div></div>
             <div class="erp-stat-card ${selectedAccount.status eq 'DEPLETED' ? 'erp-stat-red' : selectedAccount.status eq 'HEALTHY' ? 'erp-stat-green' : 'erp-stat-amber'}"><div class="erp-stat-main"><div><p class="erp-stat-label">SMS Status</p><p class="erp-stat-value text-2xl">${selectedAccount.status}</p><p class="erp-stat-meta">Warning baseline: ${selectedAccount.warningBaseline}</p></div><span class="erp-stat-icon">S</span></div></div>
         </section>
     </c:otherwise>
@@ -170,7 +170,7 @@
         </div>
         <div class="erp-panel-body">
             <p class="font-semibold text-slate-900">${selectedOtpDeliveryChannel}</p>
-            <p class="mt-1 text-sm text-slate-500">Minor Admins configure this policy in Settings & Controls. OTP SMS uses available units, not alert-reserve units.</p>
+            <p class="mt-1 text-sm text-slate-500">SACCOS Admins configure this policy in Settings & Controls. OTP SMS uses available units, not alert-reserve units.</p>
         </div>
     </section>
 </c:if>

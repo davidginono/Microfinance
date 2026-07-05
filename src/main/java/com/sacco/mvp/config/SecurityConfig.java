@@ -74,7 +74,7 @@ public class SecurityConfig {
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/accountant/**").hasRole("ACCOUNTANT")
                 .requestMatchers("/disbursement/**").access(new WebExpressionAuthorizationManager(
-                    "isAuthenticated() and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"))
+                    "isAuthenticated() and !hasRole('ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"))
                 .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
                 .requestMatchers("/board/**").hasAnyRole("BOARD", "CREDIT_COMMITTEE", "CHAIRPERSON")
                 .requestMatchers("/staff/**").access((authentication, context) -> {
