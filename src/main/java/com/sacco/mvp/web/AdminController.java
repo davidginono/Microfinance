@@ -620,17 +620,21 @@ public class AdminController {
                              @RequestParam(name = "claims", required = false) java.util.List<UserClaim> claims,
                              @RequestParam MemberStatus status,
                              RedirectAttributes ra) {
-        adminService.updateUser(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
-            principal.getMemberId(),
-            principal.getGrantedPositions(),
-            id,
-            positions,
-            status,
-            claims
-        );
-        ra.addFlashAttribute("message", "User updated.");
+        try {
+            adminService.updateUser(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                principal.getMemberId(),
+                principal.getGrantedPositions(),
+                id,
+                positions,
+                status,
+                claims
+            );
+            ra.addFlashAttribute("message", "User updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
         return "redirect:/admin/users";
     }
 

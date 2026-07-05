@@ -259,17 +259,17 @@
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${availableClaims}" var="claim">
                             <c:set var="memberOnlyClaimDisabled" value="${(claim eq 'APPLY_LOANS' or claim eq 'APPROVE_GUARANTOR_REQUESTS') and not user.memberAccess}" />
-                            <label class="flex items-start gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
+                            <label class="flex min-w-0 items-start gap-3 overflow-hidden rounded border border-slate-200 bg-slate-50 px-3 py-2 font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
                                 <input type="checkbox"
                                        name="claims"
                                        value="${claim}"
                                        ${user.claims.contains(claim) ? 'checked' : ''}
                                        ${memberOnlyClaimDisabled ? 'disabled' : ''}
                                        class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span class="min-w-0 flex-1 leading-5">
-                                    <span class="[overflow-wrap:anywhere]">${claim}</span>
+                                <span class="min-w-0 flex-1 text-[12px] leading-4 sm:text-[13px] sm:leading-5">
+                                    <span class="block max-w-full break-words [overflow-wrap:anywhere]">${claim}</span>
                                     <c:if test="${memberOnlyClaimDisabled}">
-                                        <span class="ml-2 inline-flex whitespace-nowrap text-xs font-normal text-slate-400">Members only</span>
+                                        <span class="mt-0.5 block whitespace-normal text-[11px] font-normal leading-4 text-slate-400 sm:mt-0 sm:inline sm:whitespace-nowrap">Members only</span>
                                     </c:if>
                                 </span>
                             </label>
