@@ -3352,9 +3352,10 @@ public class AdminService {
 
     private String formatMoney(BigDecimal amount) {
         if (amount == null) {
-            return "0.00";
+            return "0";
         }
-        return amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(java.util.Locale.US));
+        return format.format(amount.setScale(2, java.math.RoundingMode.HALF_UP));
     }
 
     private String formatPercent(BigDecimal ratio) {

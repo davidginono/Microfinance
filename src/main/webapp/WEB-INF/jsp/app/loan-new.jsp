@@ -79,7 +79,7 @@
             <input id="loanAmountInput" type="hidden" name="amount" value="${formValues['amount']}" />
             <input id="loanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                    value="${formValues['amount']}"
-                   placeholder="100,000.00"
+                   placeholder="100,000"
                    data-min-amount="${product.minimumAmount}"
                    data-max-amount="${product.maximumAmount}"
                    class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
@@ -545,12 +545,20 @@
             return integerPart;
         }
 
-        function formatMoneyInputValue(value) {
+        function trimMoneyDecimalZeros(value) {
+            if (!value || !value.includes(".")) {
+                return value || "";
+            }
+            return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        }
+
+        function formatMoneyInputValue(value, trimDecimals) {
             const normalized = normalizeMoneyInput(value);
             if (!normalized) {
                 return "";
             }
-            const pieces = normalized.split(".");
+            const displayValue = trimDecimals ? trimMoneyDecimalZeros(normalized) : normalized;
+            const pieces = displayValue.split(".");
             const whole = pieces[0].replace(/^0+(?=\d)/, "") || "0";
             const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
             return pieces.length > 1 ? withCommas + "." + pieces[1] : withCommas;
@@ -583,13 +591,13 @@
             return formattedValue.length;
         }
 
-        function syncAmountInput(preserveCaret) {
+        function syncAmountInput(preserveCaret, trimDecimals) {
             const rawValue = amountDisplayInput.value;
             const rawCaret = typeof amountDisplayInput.selectionStart === "number"
                 ? amountDisplayInput.selectionStart
                 : rawValue.length;
             const normalized = normalizeMoneyInput(amountDisplayInput.value);
-            const formatted = formatMoneyInputValue(normalized);
+            const formatted = formatMoneyInputValue(normalized, trimDecimals);
             amountInput.value = normalized;
             amountDisplayInput.value = formatted;
             if (preserveCaret && document.activeElement === amountDisplayInput) {
@@ -1063,10 +1071,10 @@
         }
 
         amountDisplayInput.addEventListener("input", function () {
-            syncAmountInput(true);
+            syncAmountInput(true, false);
         });
         amountDisplayInput.addEventListener("change", function () {
-            syncAmountInput();
+            syncAmountInput(false, true);
             resetFinancialPreview();
         });
         tenorDisplayInput?.addEventListener("input", syncTenorInput);
@@ -1081,7 +1089,7 @@
                 tenorDisplayInput?.focus();
             });
         });
-        syncAmountInput();
+        syncAmountInput(false, true);
         setTenureUnit("MONTHS");
         loadExternalEligibilitySummary();
         const applicantOtpUi = bindOtpLiveStatus(

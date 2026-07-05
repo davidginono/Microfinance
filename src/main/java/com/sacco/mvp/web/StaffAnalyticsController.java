@@ -206,7 +206,7 @@ public class StaffAnalyticsController {
 
     private String moneyLabel(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, java.math.RoundingMode.HALF_UP);
-        DecimalFormat format = new DecimalFormat("#,##0.00", new DecimalFormatSymbols(Locale.US));
+        DecimalFormat format = new DecimalFormat("#,##0.##", new DecimalFormatSymbols(Locale.US));
         return format.format(safe);
     }
 

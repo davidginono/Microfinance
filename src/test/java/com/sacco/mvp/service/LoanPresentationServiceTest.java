@@ -205,10 +205,10 @@ class LoanPresentationServiceTest {
         Map<String, Object> fields = loanPresentationService.parseFinancialFields(app);
 
         assertThat(fields)
-            .containsEntry("Insurance Fee (1.5%)", "TSh 2,250.00")
-            .containsEntry("Loan Processing Fee (2.5%)", "TSh 3,750.00")
-            .containsEntry("Loan Amount (TZS)", "TSh 125,000.00")
-            .containsEntry("Loan Amount + Interest (TZS)", "TSh 137,000.00");
+            .containsEntry("Insurance Fee (1.5%)", "TSh 2,250")
+            .containsEntry("Loan Processing Fee (2.5%)", "TSh 3,750")
+            .containsEntry("Loan Amount (TZS)", "TSh 125,000")
+            .containsEntry("Loan Amount + Interest (TZS)", "TSh 137,000");
     }
 
     @Test
@@ -231,12 +231,12 @@ class LoanPresentationServiceTest {
 
         assertThat(loanPresentationService.isEstimatedReviewRepaymentSummary(app)).isTrue();
         assertThat(summary)
-            .containsEntry("Loan Amount", "TSh 120,000.00")
+            .containsEntry("Loan Amount", "TSh 120,000")
             .containsEntry("Annual Interest Rate", "12.00%")
             .containsEntry("Loan Period in Years", "1 year")
             .containsEntry("Number of Payments", 12)
-            .containsEntry("Estimated Installment", "TSh 11,200.00")
-            .containsEntry("Estimated Total Repayment", "TSh 134,400.00");
+            .containsEntry("Estimated Installment", "TSh 11,200")
+            .containsEntry("Estimated Total Repayment", "TSh 134,400");
     }
 
     @Test
@@ -262,14 +262,14 @@ class LoanPresentationServiceTest {
             .containsEntry("installment", "Installment 1")
             .containsEntry("pmtNo", "1")
             .containsEntry("month", "Month 1")
-            .containsEntry("beginningBalance", "TSh 120,000.00")
-            .containsEntry("payment", "TSh 44,800.00")
-            .containsEntry("loanAmount", "TSh 40,000.00")
-            .containsEntry("interest", "TSh 4,800.00")
-            .containsEntry("endingBalance", "TSh 80,000.00");
+            .containsEntry("beginningBalance", "TSh 120,000")
+            .containsEntry("payment", "TSh 44,800")
+            .containsEntry("loanAmount", "TSh 40,000")
+            .containsEntry("interest", "TSh 4,800")
+            .containsEntry("endingBalance", "TSh 80,000");
         assertThat(rows.getFirst().get("scheduledBreakdown").toString())
-            .contains("Loan Amount: TSh 40,000.00")
-            .contains("Interest: TSh 4,800.00");
+            .contains("Loan Amount: TSh 40,000")
+            .contains("Interest: TSh 4,800");
     }
 
     @Test
@@ -432,11 +432,11 @@ class LoanPresentationServiceTest {
             LocalDate.of(2026, 7, 10),
             "2026-07-10",
             new BigDecimal("60000.00"),
-            "TSh 60,000.00",
-            "TSh 60,000.00",
-            "TSh 0.00",
-            "TSh 30,000.00",
-            "TSh 5,000.00"
+            "TSh 60,000",
+            "TSh 60,000",
+            "TSh 0",
+            "TSh 30,000",
+            "TSh 5,000"
         );
 
         List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson, transactions, paymentSummary);
@@ -445,23 +445,23 @@ class LoanPresentationServiceTest {
         assertThat(rows.get(0))
             .containsEntry("installmentNumber", "1")
             .containsEntry("pmtNo", "1")
-            .containsEntry("payment", "TSh 30,000.00")
-            .containsEntry("loanAmount", "TSh 24,000.00")
-            .containsEntry("interest", "TSh 6,000.00")
-            .containsEntry("scheduledBreakdown", "Principal: TSh 24,000.00\nInterest: TSh 6,000.00")
+            .containsEntry("payment", "TSh 30,000")
+            .containsEntry("loanAmount", "TSh 24,000")
+            .containsEntry("interest", "TSh 6,000")
+            .containsEntry("scheduledBreakdown", "Principal: TSh 24,000\nInterest: TSh 6,000")
             .containsEntry("outstandingBalance", "")
-            .containsEntry("principalPaid", "TSh 12,000.00")
-            .containsEntry("interestPaid", "TSh 3,000.00")
-            .containsEntry("totalPaid", "TSh 15,000.00")
+            .containsEntry("principalPaid", "TSh 12,000")
+            .containsEntry("interestPaid", "TSh 3,000")
+            .containsEntry("totalPaid", "TSh 15,000")
             .containsEntry("paymentDate", "2026-05-15");
         assertThat(rows.get(1))
-            .containsEntry("scheduledBreakdown", "Principal: TSh 25,000.00\nInterest: TSh 5,000.00")
+            .containsEntry("scheduledBreakdown", "Principal: TSh 25,000\nInterest: TSh 5,000")
             .containsEntry("outstandingBalance", "")
             .containsEntry("principalPaid", "-");
         assertThat(rows.get(2))
-            .containsEntry("scheduledBreakdown", "Principal: TSh 26,000.00\nInterest: TSh 4,000.00")
-            .containsEntry("outstandingBalance", "TSh 60,000.00")
-            .containsEntry("principalPaid", "TSh 18,000.00")
+            .containsEntry("scheduledBreakdown", "Principal: TSh 26,000\nInterest: TSh 4,000")
+            .containsEntry("outstandingBalance", "TSh 60,000")
+            .containsEntry("principalPaid", "TSh 18,000")
             .containsEntry("paymentDate", "2026-07-10");
         assertThat(rows.get(0)).doesNotContainKey("status");
     }
@@ -553,7 +553,7 @@ class LoanPresentationServiceTest {
                 .contains("Amount to Pay")
                 .contains("Monthly Repayment Amount (TZS)")
                 .contains("Month 1")
-                .contains("TSh 2,000,000.00")
+                .contains("TSh 2,000,000")
                 .doesNotContain("Financial Details")
                 .doesNotContain("Repayment Timetable")
                 .doesNotContain("No repayment schedule available.");
@@ -763,13 +763,16 @@ class LoanPresentationServiceTest {
             .signatureText("S. Loan Officer")
             .signatureRegisteredAt(OffsetDateTime.parse("2026-06-01T08:00:00+03:00"))
             .build();
-        ManagerReview loanOfficerReview = ManagerReview.builder()
+        BoardReview loanOfficerReview = BoardReview.builder()
             .id(UUID.randomUUID())
             .loanApplicationId(loanId)
-            .managerMemberId(reviewerId)
+            .boardMemberId(reviewerId)
             .reviewStage(ApprovalWorkflowStage.LOAN_OFFICER)
-            .decision(ManagerDecision.ACCEPT)
-            .reasons("Eligibility checks completed.")
+            .decision(BoardDecision.APPROVED)
+            .comment("Eligibility checks completed.")
+            .boardSignatureText("S. Loan Officer")
+            .boardSignatureVerifiedAt(OffsetDateTime.parse("2026-06-13T10:24:00+03:00"))
+            .decidedAt(OffsetDateTime.parse("2026-06-13T10:24:00+03:00"))
             .createdAt(OffsetDateTime.parse("2026-06-13T10:24:00+03:00"))
             .build();
 
@@ -799,10 +802,10 @@ class LoanPresentationServiceTest {
             List.of(),
             Map.of(),
             Map.of(),
+            List.<ManagerReview>of(),
+            Map.of(),
             List.of(loanOfficerReview),
             Map.of(reviewerId, loanOfficer),
-            List.of(),
-            Map.of(),
             null,
             true
         );
@@ -823,9 +826,9 @@ class LoanPresentationServiceTest {
                 .contains("Review Note")
                 .contains("Verified At")
                 .contains("Monthly Amount")
-                .contains("Principal: TSh 24,000.00")
-                .contains("Interest: TSh 6,000.00")
-                .contains("Interest: TSh 5,000.00")
+                .contains("Principal: TSh 24,000")
+                .contains("Interest: TSh 6,000")
+                .contains("Interest: TSh 5,000")
                 .doesNotContain("Loan Application Review Copy")
                 .doesNotContain("Signed staff record copy")
                 .doesNotContain("Key details not repeated in the summary")
@@ -849,10 +852,10 @@ class LoanPresentationServiceTest {
             List.of(),
             Map.of(),
             Map.of(),
+            List.<ManagerReview>of(),
+            Map.of(),
             List.of(loanOfficerReview),
             Map.of(reviewerId, loanOfficer),
-            List.of(),
-            Map.of(),
             null,
             false
         );
@@ -863,7 +866,7 @@ class LoanPresentationServiceTest {
                 .contains("Signature")
                 .contains("Sample Loan Officer")
                 .contains("S. Applicant")
-                .contains("LOAN OFFICER REVIEW COMPLETED")
+                .contains("LOAN OFFICER REVIEW RECORDED")
                 .doesNotContain("Signature copy")
                 .doesNotContain("Signed staff record copy")
                 .doesNotContain("S. Loan Officer")
@@ -873,6 +876,7 @@ class LoanPresentationServiceTest {
         }
 
         loanOfficer.setSignatureRegisteredAt(null);
+        loanOfficerReview.setBoardSignatureVerifiedAt(null);
         byte[] unverifiedStaffSignaturePdf = loanPresentationService.buildPrintablePdf(
             app,
             "IAA SACCOS LTD",
@@ -882,10 +886,10 @@ class LoanPresentationServiceTest {
             List.of(),
             Map.of(),
             Map.of(),
+            List.<ManagerReview>of(),
+            Map.of(),
             List.of(loanOfficerReview),
             Map.of(reviewerId, loanOfficer),
-            List.of(),
-            Map.of(),
             null,
             true
         );

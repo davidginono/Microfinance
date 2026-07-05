@@ -718,11 +718,11 @@
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.amountRangeHelp" text="Minimum and maximum loan amount allowed for this product." /></p>
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
-                            <fmt:formatNumber value="${product.minimumAmount}" minFractionDigits="2" maxFractionDigits="2" />
+                            <fmt:formatNumber value="${product.minimumAmount}" minFractionDigits="0" maxFractionDigits="2" />
                             <spring:message code="common.to" text="to" />
                             <c:choose>
                                 <c:when test="${product.maximumAmount ne null}">
-                                    <fmt:formatNumber value="${product.maximumAmount}" minFractionDigits="2" maxFractionDigits="2" />
+                                    <fmt:formatNumber value="${product.maximumAmount}" minFractionDigits="0" maxFractionDigits="2" />
                                 </c:when>
                                 <c:otherwise><spring:message code="common.notSet" text="Not set" /></c:otherwise>
                             </c:choose>
@@ -880,7 +880,7 @@
                         </div>
                         <p class="text-right text-base font-semibold text-slate-900">
                             <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />:
-                            <fmt:formatNumber value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" minFractionDigits="2" maxFractionDigits="2" />
+                            <fmt:formatNumber value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" minFractionDigits="0" maxFractionDigits="2" />
                             <span class="block text-sm font-medium text-slate-600">
                                 <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />:
                                 <fmt:formatNumber value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" maxFractionDigits="4" />%
@@ -1110,7 +1110,7 @@
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                                <input name="minimumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
+                                <input name="minimumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
                             </label>
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1334,13 +1334,13 @@
                                         Board Members Assigned
                                         <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
                                     </label>
-                                    <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-board-reviewer-list>
+                                    <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-board-reviewer-list>
                                         <c:forEach items="${boardReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
                                                 <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" />
                                                 <span>
                                                     <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
                                                 </span>
                                             </label>
                                         </c:forEach>
@@ -1359,13 +1359,13 @@
                                         Credit Committee Assigned
                                         <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search credit committee..." data-credit-committee-reviewer-search />
                                     </label>
-                                    <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-credit-committee-reviewer-list>
+                                    <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-credit-committee-reviewer-list>
                                         <c:forEach items="${creditCommitteeReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
                                                 <input name="creditCommitteeReviewerIds" type="checkbox" value="${reviewer.id}" />
                                                 <span>
                                                     <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
                                                 </span>
                                             </label>
                                         </c:forEach>
@@ -1415,7 +1415,7 @@
                                     </label>
                                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         Minimum Guarantor Savings
-                                        <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0.00" />
+                                        <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
                                     </label>
                                     <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                         <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
@@ -1862,14 +1862,14 @@
                                     <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search board members..." data-board-reviewer-search />
                                 </label>
                                 <c:set var="assignedBoardReviewerTokens" value="${productBoardReviewerIdTokens[product.id]}" />
-                                <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-board-reviewer-list>
+                                <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-board-reviewer-list>
                                     <c:forEach items="${boardReviewerOptions}" var="reviewer">
                                         <c:set var="reviewerToken" value="|${reviewer.id}|" />
-                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
                                             <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" ${fn:contains(assignedBoardReviewerTokens, reviewerToken) ? 'checked' : ''} />
                                             <span>
                                                 <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
                                             </span>
                                         </label>
                                     </c:forEach>
@@ -1889,14 +1889,14 @@
                                     <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search credit committee..." data-credit-committee-reviewer-search />
                                 </label>
                                 <c:set var="assignedCreditCommitteeReviewerTokens" value="${productCreditCommitteeReviewerIdTokens[product.id]}" />
-                                <div class="grid max-h-40 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-48" data-credit-committee-reviewer-list>
+                                <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-credit-committee-reviewer-list>
                                     <c:forEach items="${creditCommitteeReviewerOptions}" var="reviewer">
                                         <c:set var="reviewerToken" value="|${reviewer.id}|" />
-                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)} ${fn:toLowerCase(empty reviewer.stationId ? '' : reviewer.stationId)}">
+                                        <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
                                             <input name="creditCommitteeReviewerIds" type="checkbox" value="${reviewer.id}" ${fn:contains(assignedCreditCommitteeReviewerTokens, reviewerToken) ? 'checked' : ''} />
                                             <span>
                                                 <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}<c:if test="${not empty reviewer.stationId}"> | ${reviewer.stationId}</c:if></span>
+                                                <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
                                             </span>
                                         </label>
                                     </c:forEach>
@@ -2170,18 +2170,26 @@
                 .replace(/(\..*)\./g, '$1');
         }
 
-        function formatMoneyValue(value) {
+        function trimMoneyDecimalZeros(value) {
+            if (!value || !value.includes('.')) {
+                return value || '';
+            }
+            return value.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+        }
+
+        function formatMoneyValue(value, trimDecimals) {
             const raw = normalizeMoneyValue(value);
             if (raw === '') {
                 return '';
             }
-            const parts = raw.split('.');
+            const normalized = trimDecimals ? trimMoneyDecimalZeros(raw) : raw;
+            const parts = normalized.split('.');
             const grouped = parts[0].replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             return parts.length > 1 ? grouped + '.' + parts.slice(1).join('') : grouped;
         }
 
-        function syncMoneyInput(input) {
-            input.value = formatMoneyValue(input.value);
+        function syncMoneyInput(input, trimDecimals) {
+            input.value = formatMoneyValue(input.value, trimDecimals);
         }
 
         function trimDecimalZeros(value) {
@@ -2194,9 +2202,9 @@
         }
 
         document.querySelectorAll('[data-money-input="true"]').forEach((input) => {
-            syncMoneyInput(input);
-            input.addEventListener('input', () => syncMoneyInput(input));
-            input.addEventListener('blur', () => syncMoneyInput(input));
+            syncMoneyInput(input, true);
+            input.addEventListener('input', () => syncMoneyInput(input, false));
+            input.addEventListener('blur', () => syncMoneyInput(input, true));
         });
 
         document.querySelectorAll('[data-trim-decimal-input="true"]').forEach((input) => {

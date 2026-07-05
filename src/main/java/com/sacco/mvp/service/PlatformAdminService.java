@@ -447,7 +447,8 @@ public class PlatformAdminService {
     }
 
     private static String formatFullMoney(BigDecimal amount) {
-        return "TZS " + String.format(Locale.US, "%,.0f", safeAmount(amount));
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
+        return "TZS " + format.format(safeAmount(amount).setScale(2, RoundingMode.HALF_UP));
     }
 
     private static String formatPercent(BigDecimal percent) {

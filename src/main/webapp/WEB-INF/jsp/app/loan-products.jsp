@@ -60,7 +60,7 @@
                     <input id="productsLoanAmount" type="hidden" />
                     <input id="productsLoanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                            class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                           placeholder="100,000.00" />
+                           placeholder="100,000" />
                 </div>
                 <div>
                     <label id="productsTenorDisplayLabel" class="mb-1 block text-sm font-medium text-slate-700"
@@ -213,14 +213,14 @@
                 <td>
                     <div class="text-sm text-slate-700">
                         <spring:message code="products.amount.min" />:
-                        <strong><fmt:formatNumber value="${p.minimumAmount}" minFractionDigits="2" maxFractionDigits="2" /></strong>
+                        <strong><fmt:formatNumber value="${p.minimumAmount}" minFractionDigits="0" maxFractionDigits="2" /></strong>
                     </div>
                     <div class="mt-1 text-sm text-slate-700">
                         <spring:message code="products.amount.max" />:
                         <strong>
                             <c:choose>
                                 <c:when test="${p.maximumAmount ne null}">
-                                    <fmt:formatNumber value="${p.maximumAmount}" minFractionDigits="2" maxFractionDigits="2" />
+                                    <fmt:formatNumber value="${p.maximumAmount}" minFractionDigits="0" maxFractionDigits="2" />
                                 </c:when>
                                 <c:otherwise><spring:message code="products.amount.notSet" /></c:otherwise>
                             </c:choose>
@@ -348,21 +348,29 @@
             return decimalPart ? integerPart + "." + decimalPart : integerPart;
         }
 
-        function formatMoneyInputValue(value) {
+        function trimMoneyDecimalZeros(value) {
+            if (!value || !value.includes(".")) {
+                return value || "";
+            }
+            return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        }
+
+        function formatMoneyInputValue(value, trimDecimals) {
             const normalized = normalizeMoneyInput(value);
             if (!normalized) {
                 return "";
             }
-            const pieces = normalized.split(".");
+            const displayValue = trimDecimals ? trimMoneyDecimalZeros(normalized) : normalized;
+            const pieces = displayValue.split(".");
             const whole = pieces[0].replace(/^0+(?=\d)/, "") || "0";
             const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
             return pieces.length > 1 ? withCommas + "." + pieces[1] : withCommas;
         }
 
-        function syncAmountInput() {
+        function syncAmountInput(trimDecimals) {
             const normalized = normalizeMoneyInput(amountDisplayInput.value);
             amountInput.value = normalized;
-            amountDisplayInput.value = formatMoneyInputValue(normalized);
+            amountDisplayInput.value = formatMoneyInputValue(normalized, trimDecimals);
         }
 
         function selectedProductOption() {
@@ -593,14 +601,14 @@
             });
         });
         amountDisplayInput.addEventListener("input", function () {
-            syncAmountInput();
+            syncAmountInput(false);
             clearPreview();
         });
         amountDisplayInput.addEventListener("change", function () {
-            syncAmountInput();
+            syncAmountInput(true);
             clearPreview();
         });
-        syncAmountInput();
+        syncAmountInput(true);
         refreshTenureConstraints();
         syncTenorInput();
 

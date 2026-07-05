@@ -1355,7 +1355,7 @@ public class LoanReportService {
 
     private String moneyPlain(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
         return format.format(safe);
     }
 
@@ -2839,7 +2839,7 @@ public class LoanReportService {
 
     private String formatMoney(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
         return "TSh " + format.format(safe);
     }
 
@@ -3164,7 +3164,7 @@ public class LoanReportService {
             section("4. RISK / ELIGIBILITY SUMMARY");
             table(MARGIN, y, new float[]{132, 80, 134, 88, 88, 128},
                 new String[]{"Current Active Loan Amount", "Defaulted Loans", "Forfeited Loan Applications", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
-                List.of(new String[]{moneyPlain(report.financialSummary().activeLoanAmount()), String.valueOf(report.analytics().defaultedLoans()), String.valueOf(report.analytics().forfeitedLoans()), "0.00", "Yes", "Yes"},
+                List.of(new String[]{moneyPlain(report.financialSummary().activeLoanAmount()), String.valueOf(report.analytics().defaultedLoans()), String.valueOf(report.analytics().forfeitedLoans()), moneyPlain(BigDecimal.ZERO), "Yes", "Yes"},
                     new String[]{"Eligibility Reason", report.remarks(), "", "", "", ""}), SMALL, 20f);
             y -= 60;
 
@@ -3226,7 +3226,7 @@ public class LoanReportService {
                     moneyPlain(report.financialSummary().activeLoanAmount()),
                     String.valueOf(report.analytics().defaultedLoans()),
                     String.valueOf(report.analytics().forfeitedLoans()),
-                    "0.00",
+                    moneyPlain(BigDecimal.ZERO),
                     "Yes",
                     "Yes"
                 }), SMALL, 30f);
@@ -4107,13 +4107,13 @@ public class LoanReportService {
 
     private static String formatMoneyStatic(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
         return "TSh " + format.format(safe);
     }
 
     private static String formatMoneyPlainStatic(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.00", new java.text.DecimalFormatSymbols(Locale.US));
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
         return format.format(safe);
     }
 

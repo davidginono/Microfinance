@@ -572,7 +572,7 @@
                        autocomplete="off"
                        required
                        class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
-                       placeholder="100,000.00" />
+                       placeholder="100,000" />
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <button type="button"
                             class="app-btn btn-neutral ${empty deductibleFeeRows ? 'opacity-60 cursor-not-allowed' : ''}"
@@ -616,7 +616,7 @@
                             <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                                 <p class="text-xs font-semibold text-slate-500">
                                     <spring:message code="loan.disbursement.selectedFees" text="Selected fees" />:
-                                    <span data-selected-fees-amount>TSh 0.00</span>
+                                    <span data-selected-fees-amount>TSh 0</span>
                                 </p>
                                 <button type="button"
                                         class="app-btn btn-primary"
@@ -824,7 +824,7 @@
                 return "-";
             }
             return "TSh " + new Intl.NumberFormat("en-US", {
-                minimumFractionDigits: 2,
+                minimumFractionDigits: 0,
                 maximumFractionDigits: 2
             }).format(amount);
         }
@@ -851,7 +851,8 @@
                 maximumFractionDigits: 0
             }).format(Number(whole));
             if (forceDecimals) {
-                return formattedWhole + "." + decimals.padEnd(2, "0").slice(0, 2);
+                const trimmedDecimals = decimals.replace(/0+$/, "");
+                return trimmedDecimals ? formattedWhole + "." + trimmedDecimals : formattedWhole;
             }
             if (hasDecimal) {
                 return formattedWhole + "." + decimals;

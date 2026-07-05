@@ -903,7 +903,7 @@ public class LoanPresentationService {
         if (!hasPrincipal && !hasInterest) {
             return "";
         }
-        if (!hasInterest || "TSh 0.00".equals(interest)) {
+        if (!hasInterest || "TSh 0".equals(interest)) {
             return "Principal: " + principal;
         }
         return "Principal: " + principal + "\nInterest: " + interest;
@@ -1533,7 +1533,7 @@ public class LoanPresentationService {
     }
 
     private String formatMoney(BigDecimal amount) {
-        DecimalFormat format = new DecimalFormat("#,##0.00", new DecimalFormatSymbols(Locale.US));
+        DecimalFormat format = new DecimalFormat("#,##0.##", new DecimalFormatSymbols(Locale.US));
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
         return "TSh " + format.format(safe);
     }

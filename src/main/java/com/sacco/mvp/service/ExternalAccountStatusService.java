@@ -55,7 +55,7 @@ public class ExternalAccountStatusService {
     private String formatMoney(BigDecimal amount) {
         BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.DOWN);
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
-        DecimalFormat format = new DecimalFormat("#,##0.00", symbols);
+        DecimalFormat format = new DecimalFormat("#,##0.##", symbols);
         return "TSh " + format.format(safeAmount);
     }
 

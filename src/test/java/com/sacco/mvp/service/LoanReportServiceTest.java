@@ -133,7 +133,7 @@ class LoanReportServiceTest {
             assertThat(workbook.getSheet("Financial Summary")).isNotNull();
             assertThat(workbook.getSheet("Activity Log")).isNotNull();
             assertThat(sheetContains(workbook, "Summary", "17 Jun 2025 - 17 Jun 2026")).isTrue();
-            assertThat(sheetContains(workbook, "Product Performance", "15,000.00")).isTrue();
+            assertThat(sheetContains(workbook, "Product Performance", "15,000")).isTrue();
         }
     }
 
@@ -188,9 +188,9 @@ class LoanReportServiceTest {
             assertThat(sheetContains(workbook, "Summary", "LOAN PRODUCT FINANCIAL BREAKDOWN")).isTrue();
             assertThat(sheetContains(workbook, "Summary", "Total Interest Paid")).isTrue();
             assertThat(sheetContains(workbook, "Summary", "Total Interest Unpaid Yet")).isTrue();
-            assertThat(sheetContains(workbook, "Summary", "15,000.00")).isTrue();
-            assertThat(sheetContains(workbook, "Summary", "13,000.00")).isTrue();
-            assertThat(sheetContains(workbook, "Product Performance", "772,000.00")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "15,000")).isTrue();
+            assertThat(sheetContains(workbook, "Summary", "13,000")).isTrue();
+            assertThat(sheetContains(workbook, "Product Performance", "772,000")).isTrue();
             assertThat(sheetContains(workbook, "Summary", "Customized Loan Product")).isFalse();
         }
     }
@@ -258,10 +258,10 @@ class LoanReportServiceTest {
         assertThat(rows).hasSize(1);
         assertThat(rows.getFirst().loanId()).isEqualTo("LN-1001");
         assertThat(rows.getFirst().loanProduct()).isEqualTo("Loan Advance (Mkopo wa Chapchap)");
-        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("28,000.00");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("28,000.00");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("15,000.00");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("13,000.00");
+        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("28,000");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("28,000");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("15,000");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("13,000");
     }
 
     @Test
@@ -436,8 +436,8 @@ class LoanReportServiceTest {
                 Map.of("x", 1748736000000L, "y", 0L),
                 Map.of("x", 1780272000000L, "y", 5L)
             ))),
-            List.of(new LoanReportService.ActivityRow("17 Jun 2026", "Application Submitted", "Loan Advance", "772,000.00", "Applied")),
-            List.of(new LoanReportService.ActiveLoanDetailRow("LN-1001", "Loan Advance", "800,000.00", "772,000.00", "28,000.00", "28,000.00", "15,000.00", "13,000.00")),
+            List.of(new LoanReportService.ActivityRow("17 Jun 2026", "Application Submitted", "Loan Advance", "772,000", "Applied")),
+            List.of(new LoanReportService.ActiveLoanDetailRow("LN-1001", "Loan Advance", "800,000", "772,000", "28,000", "28,000", "15,000", "13,000")),
             new LoanReportService.FinancialSummary(new BigDecimal("772000.00"), new BigDecimal("772000.00"), BigDecimal.ZERO, new BigDecimal("772000.00"), BigDecimal.ZERO),
             List.of("Total loan applications increased by 100%.", "No defaults recorded during the reporting period."),
             "This report summarizes the loan performance and status within the selected period."
