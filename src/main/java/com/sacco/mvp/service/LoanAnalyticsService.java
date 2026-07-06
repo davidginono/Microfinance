@@ -44,15 +44,15 @@ public class LoanAnalyticsService {
         LoanStatus.LOAN_OFFICER_REJECTED,
         LoanStatus.BOARD_REJECTED,
         LoanStatus.ACCOUNTANT_REJECTED,
-        LoanStatus.FINAL_REJECTED
+        LoanStatus.REJECTED
     );
     private static final EnumSet<LoanStatus> DISBURSED_STATUSES = EnumSet.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
     private static final EnumSet<LoanStatus> ACTIVE_STATUSES = EnumSet.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED
     );
 
@@ -121,7 +121,6 @@ public class LoanAnalyticsService {
             trendSeries("Disbursed", "#059669", months, loans, app -> DISBURSED_STATUSES.contains(app.getStatus())),
             trendSeries("Paid", "#7c3aed", months, loans, app -> app.getStatus() == LoanStatus.PAID),
             trendSeries("Defaulted", "#dc2626", months, loans, app -> app.getStatus() == LoanStatus.DEFAULTED),
-            trendSeries("Forfeited", "#f97316", months, loans, app -> app.getStatus() == LoanStatus.FORFEITED),
             trendSeries("Rejected", "#475569", months, loans, app -> REJECTED_STATUSES.contains(app.getStatus()))
         );
     }
@@ -142,7 +141,6 @@ public class LoanAnalyticsService {
             staffTrendSeries("Disbursed", "#059669", months, events, event -> event.disbursed() || DISBURSED_STATUSES.contains(event.loan().getStatus())),
             staffTrendSeries("Paid", "#7c3aed", months, events, event -> event.loan().getStatus() == LoanStatus.PAID),
             staffTrendSeries("Defaulted", "#dc2626", months, events, event -> event.loan().getStatus() == LoanStatus.DEFAULTED),
-            staffTrendSeries("Forfeited", "#f97316", months, events, event -> event.loan().getStatus() == LoanStatus.FORFEITED),
             staffTrendSeries("Rejected", "#475569", months, events, event -> event.rejected() || REJECTED_STATUSES.contains(event.loan().getStatus()))
         );
     }
@@ -164,7 +162,6 @@ public class LoanAnalyticsService {
             trendSeries("Disbursed", "#059669", months, loans, app -> DISBURSED_STATUSES.contains(app.getStatus())),
             trendSeries("Paid", "#7c3aed", months, loans, app -> app.getStatus() == LoanStatus.PAID),
             trendSeries("Defaulted", "#dc2626", months, loans, app -> app.getStatus() == LoanStatus.DEFAULTED),
-            trendSeries("Forfeited", "#f97316", months, loans, app -> app.getStatus() == LoanStatus.FORFEITED),
             trendSeries("Rejected", "#475569", months, loans, app -> REJECTED_STATUSES.contains(app.getStatus()))
         );
     }
@@ -230,7 +227,6 @@ public class LoanAnalyticsService {
             new MetricDelta("disbursed", percentChange(current.disbursedLoans(), previous.disbursedLoans()), false),
             new MetricDelta("paid", percentChange(current.paidLoans(), previous.paidLoans()), false),
             new MetricDelta("defaulted", percentChange(current.defaultedLoans(), previous.defaultedLoans()), true),
-            new MetricDelta("forfeited", percentChange(current.forfeitedLoans(), previous.forfeitedLoans()), true),
             new MetricDelta("rejected", percentChange(current.rejectedLoans(), previous.rejectedLoans()), true)
         );
     }
@@ -343,7 +339,6 @@ public class LoanAnalyticsService {
         long defaulted = counts.getOrDefault(LoanStatus.DEFAULTED, 0L);
         long active = ACTIVE_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
         long paid = counts.getOrDefault(LoanStatus.PAID, 0L);
-        long forfeited = counts.getOrDefault(LoanStatus.FORFEITED, 0L);
         long applied = counts.entrySet().stream()
             .filter(entry -> entry.getKey() != LoanStatus.DRAFT)
             .mapToLong(Map.Entry::getValue)
@@ -352,7 +347,7 @@ public class LoanAnalyticsService {
         long rejected = REJECTED_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
         BigDecimal activeAmount = loanApplicationRepository.sumAmountForApplicantScopeAndStatuses(
             memberId, saccoId, stationId, ACTIVE_STATUSES);
-        return new MemberLoanAnalytics(defaulted, active, paid, forfeited, applied, disbursed, rejected, activeAmount);
+        return new MemberLoanAnalytics(defaulted, active, paid, applied, disbursed, rejected, activeAmount);
     }
 
     public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
@@ -641,7 +636,6 @@ public class LoanAnalyticsService {
         long defaulted = count(loans, LoanStatus.DEFAULTED);
         long active = loans.stream().filter(app -> ACTIVE_STATUSES.contains(app.getStatus())).count();
         long paid = count(loans, LoanStatus.PAID);
-        long forfeited = count(loans, LoanStatus.FORFEITED);
         long applied = loans.stream().filter(app -> app.getStatus() != LoanStatus.DRAFT).count();
         long disbursed = loans.stream().filter(app -> DISBURSED_STATUSES.contains(app.getStatus())).count();
         long rejected = loans.stream().filter(app -> REJECTED_STATUSES.contains(app.getStatus())).count();
@@ -650,7 +644,7 @@ public class LoanAnalyticsService {
             .map(LoanApplication::getAmount)
             .filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new MemberLoanAnalytics(defaulted, active, paid, forfeited, applied, disbursed, rejected, activeAmount);
+        return new MemberLoanAnalytics(defaulted, active, paid, applied, disbursed, rejected, activeAmount);
     }
 
     private long count(List<LoanApplication> loans, LoanStatus status) {
@@ -736,7 +730,6 @@ public class LoanAnalyticsService {
         long defaultedLoans,
         long activeLoans,
         long paidLoans,
-        long forfeitedLoans,
         long appliedLoans,
         long disbursedLoans,
         long rejectedLoans,
@@ -752,10 +745,6 @@ public class LoanAnalyticsService {
 
         public long getPaidLoans() {
             return paidLoans;
-        }
-
-        public long getForfeitedLoans() {
-            return forfeitedLoans;
         }
 
         public long getAppliedLoans() {

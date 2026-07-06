@@ -151,7 +151,7 @@ class ManagerServiceTest {
 
         org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("150000.00");
         org.assertj.core.api.Assertions.assertThat(app.getDepositAmount()).isEqualByComparingTo("125000.00");
-        org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.FINAL_APPROVED);
+        org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).contains("150000.00");
         verify(loanApplicationRepository).save(app);
     }
@@ -196,7 +196,7 @@ class ManagerServiceTest {
             null
         );
 
-        org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.FINAL_APPROVED);
+        org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         verify(loanAttachmentService, never()).store(eq(loanId), any(), any(), eq(LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
         verify(loanApplicationRepository).save(app);
     }

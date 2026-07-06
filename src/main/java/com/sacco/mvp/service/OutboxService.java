@@ -34,6 +34,11 @@ public class OutboxService {
     public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
                         String saccoId, String stationId,
                         Map<String, Object> details) {
+        if (isDuplicate(aggregateType, aggregateId, eventType, recipientId)) {
+            log.info("Skipping duplicate outbox event: aggregateType={}, aggregateId={}, eventType={}, recipientId={}",
+                aggregateType, aggregateId, eventType, recipientId);
+            return;
+        }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("recipientId", recipientId);
         payload.put("eventType", eventType);
@@ -66,6 +71,18 @@ public class OutboxService {
                     "error", e.getMessage() == null ? "Unknown persistence error" : e.getMessage()
                 )
             );
+        }
+    }
+
+    private boolean isDuplicate(String aggregateType, UUID aggregateId, String eventType, UUID recipientId) {
+        if (aggregateType == null || aggregateId == null || eventType == null || recipientId == null) {
+            return false;
+        }
+        try {
+            return outboxEventRepository.existsActiveDuplicate(aggregateType, aggregateId, eventType, recipientId);
+        } catch (Exception ex) {
+            log.warn("Outbox duplicate check failed for {} on {}: {}", eventType, aggregateId, ex.getMessage());
+            return false;
         }
     }
 }

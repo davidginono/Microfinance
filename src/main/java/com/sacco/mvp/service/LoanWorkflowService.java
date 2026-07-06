@@ -25,6 +25,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class LoanWorkflowService {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
+    private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
+    private static final String GUARANTOR_APPROVAL_MODE_DIRECT_OTP = "DIRECT_OTP";
+    private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
     private static final List<LoanStatus> APPLICATION_IN_PROGRESS_LOCK_STATUSES = List.of(
         LoanStatus.DRAFT,
         LoanStatus.SUBMITTED,
@@ -42,20 +45,8 @@ public class LoanWorkflowService {
         LoanStatus.READY_FOR_DISBURSEMENT
     );
     private static final List<LoanStatus> ACTIVE_LOAN_LOCK_STATUSES = List.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED
-    );
-    private static final Set<LoanStatus> MEMBER_FORFEITABLE_REVIEW_STATUSES = EnumSet.of(
-        LoanStatus.READY_FOR_MANAGER,
-        LoanStatus.MANAGER_ACCEPTED,
-        LoanStatus.AWAITING_LOAN_OFFICER,
-        LoanStatus.LOAN_OFFICER_APPROVED,
-        LoanStatus.AWAITING_BOARD,
-        LoanStatus.AWAITING_CREDIT_COMMITTEE,
-        LoanStatus.BOARD_APPROVED,
-        LoanStatus.AWAITING_ACCOUNTANT,
-        LoanStatus.ACCOUNTANT_APPROVED,
-        LoanStatus.READY_FOR_DISBURSEMENT
     );
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
@@ -103,7 +94,7 @@ public class LoanWorkflowService {
             .findFirst()
             .orElse(null);
         long unacknowledgedDisbursedApplicationCount = loanApplicationRepository
-            .countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(memberId, LoanStatus.FINAL_APPROVED);
+            .countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(memberId, LoanStatus.DISBURSED);
         long pendingGuaranteeCount = guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId);
         return new MemberDashboardData(
             statusCounts,
@@ -117,11 +108,16 @@ public class LoanWorkflowService {
     public MemberApplicationListData memberApplicationList(UUID memberId) {
         List<LoanApplication> currentApplications = loanApplicationRepository
             .findVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES);
+        LoanApplication latestCurrentApplication = loanApplicationRepository
+            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, PageRequest.of(0, 1))
+            .stream()
+            .findFirst()
+            .orElse(null);
         long archiveCount = loanApplicationRepository.countByStatusForApplicant(memberId).stream()
             .filter(row -> !APPLICATION_IN_PROGRESS_LOCK_STATUSES.contains(row.getStatus()))
             .mapToLong(LoanApplicationRepository.StatusCountProjection::getTotal)
             .sum();
-        return new MemberApplicationListData(currentApplications, archiveCount);
+        return new MemberApplicationListData(currentApplications, latestCurrentApplication, archiveCount);
     }
 
     public LoanApplication getMine(UUID appId, UUID memberId) {
@@ -132,7 +128,7 @@ public class LoanWorkflowService {
     @Transactional
     public void acknowledgeDisbursement(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
-        if (app.getStatus() != LoanStatus.FINAL_APPROVED) {
+        if (app.getStatus() != LoanStatus.DISBURSED) {
             throw new IllegalStateException("Only disbursed loans can be acknowledged.");
         }
         if (app.getApplicantDisbursementAcknowledgedAt() == null) {
@@ -207,10 +203,6 @@ public class LoanWorkflowService {
             && !app.getFinalDueDate().isBefore(LocalDate.now());
     }
 
-    public boolean canForfeitReviewApplication(LoanApplication app) {
-        return app != null && MEMBER_FORFEITABLE_REVIEW_STATUSES.contains(app.getStatus());
-    }
-
     public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId) {
         if (topUpSourceLoanId == null) {
             return null;
@@ -255,6 +247,10 @@ public class LoanWorkflowService {
         validateRepaymentPeriod(product, tenorMonths);
         requireLoadedFinancialDataForDraft(product, financialSnapshotJson);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
+        formData.put(
+            GUARANTOR_APPROVAL_MODE_FIELD,
+            normalizeGuarantorApprovalMode(requestParams.get(GUARANTOR_APPROVAL_MODE_FIELD))
+        );
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
         appendLoanPurpose(formData, requestParams.get("purpose"));
         List<LoanProductRequiredAttachment> requiredAttachmentDefinitions = validateApplicantAttachmentRequirement(
@@ -424,7 +420,7 @@ public class LoanWorkflowService {
 
     private boolean isTopUpBlockedFor(LoanApplication app) {
         LoanStatus status = app.getStatus();
-        return status == LoanStatus.FINAL_APPROVED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     @Transactional
@@ -805,20 +801,6 @@ public class LoanWorkflowService {
     }
 
     @Transactional
-    public void forfeitReviewApplication(UUID appId, UUID applicantId) {
-        LoanApplication app = getMine(appId, applicantId);
-        if (!canForfeitReviewApplication(app)) {
-            throw new IllegalStateException("This application cannot be forfeited at its current stage.");
-        }
-        app.setStatus(LoanStatus.FORFEITED);
-        app.setUpdatedAt(OffsetDateTime.now());
-        loanApplicationRepository.save(app);
-        outboxService.enqueue("LOAN", appId, "LOAN_FORFEITED", app.getApplicantMemberId(),
-            app.getSaccoId(), app.getStationId(),
-            Map.of("loanId", app.getId().toString()));
-    }
-
-    @Transactional
     public void deleteApplication(UUID appId, UUID applicantId) {
         LoanApplication app = getMine(appId, applicantId);
         if (app.getStatus() != LoanStatus.DRAFT
@@ -881,6 +863,27 @@ public class LoanWorkflowService {
             return objectMapper.writeValueAsString(values);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to save selected guarantors", e);
+        }
+    }
+
+    private String normalizeGuarantorApprovalMode(String value) {
+        if (GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equalsIgnoreCase(String.valueOf(value).trim())) {
+            return GUARANTOR_APPROVAL_MODE_DIRECT_OTP;
+        }
+        return GUARANTOR_APPROVAL_MODE_LOGIN;
+    }
+
+    private boolean isDirectOtpGuarantorApproval(LoanApplication app) {
+        if (app == null || app.getFormData() == null || app.getFormData().isBlank()) {
+            return false;
+        }
+        try {
+            Map<String, Object> formData = objectMapper.readValue(app.getFormData(), new TypeReference<Map<String, Object>>() {});
+            return GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(
+                normalizeGuarantorApprovalMode(String.valueOf(formData.get(GUARANTOR_APPROVAL_MODE_FIELD)))
+            );
+        } catch (Exception ex) {
+            return false;
         }
     }
 
@@ -1108,9 +1111,11 @@ public class LoanWorkflowService {
             request.setDecidedAt(null);
             guarantorRequestRepository.save(request);
 
-            outboxService.enqueue("GUARANTOR_REQUEST", app.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
-                app.getSaccoId(), app.getStationId(),
-                Map.of("loanId", app.getId().toString()));
+            if (!isDirectOtpGuarantorApproval(app)) {
+                outboxService.enqueue("GUARANTOR_REQUEST", app.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
+                    app.getSaccoId(), app.getStationId(),
+                    Map.of("loanId", app.getId().toString()));
+            }
         }
     }
 
@@ -1354,6 +1359,7 @@ public class LoanWorkflowService {
 
     public record MemberApplicationListData(
         List<LoanApplication> currentApplications,
+        LoanApplication latestCurrentApplication,
         long archiveCount
     ) {
     }

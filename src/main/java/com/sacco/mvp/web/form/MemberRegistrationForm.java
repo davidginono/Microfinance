@@ -30,13 +30,6 @@ public class MemberRegistrationForm {
     @NotBlank(message = "Select a station ID.")
     private String stationId;
 
-    @NotBlank(message = "Enter the signature you want to use on your loan forms.")
-    @Pattern(
-        regexp = "^[A-Z][a-z]+(?: [A-Z])?(?: [A-Z][a-z]+)+$",
-        message = "Enter your signature like James M Juma."
-    )
-    private String signatureText;
-
     @NotBlank(message = "Enter your password.")
     @Size(min = 8, message = "Password must be at least 8 characters.")
     private String password;

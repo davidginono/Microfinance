@@ -3,7 +3,6 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,67 +14,58 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * Layer 2a — Step-up MFA for privileged staff logins.
- *
- * After a successful password authentication, privileged staff accounts
- * (MINOR_ADMIN, ADMIN) must present an email OTP before the SecurityContext
- * is installed. Password alone never grants access to the admin workspace.
+ * Step-up MFA for station-configured password logins.
  */
 @Service
 @RequiredArgsConstructor
 public class StaffMfaService {
-    public static final String PENDING_MEMBER_ID_ATTR = "staffMfa.pendingMemberId";
-    public static final String PENDING_EMAIL_ATTR = "staffMfa.pendingEmail";
-    public static final String PENDING_LANDING_ATTR = "staffMfa.pendingLanding";
-
-    private static final Set<Position> PRIVILEGED_ROLES = Set.of(Position.ADMIN, Position.MINOR_ADMIN);
+    public static final String PENDING_MEMBER_ID_ATTR = "loginMfa.pendingMemberId";
+    public static final String PENDING_EMAIL_ATTR = "loginMfa.pendingEmail";
+    public static final String PENDING_LANDING_ATTR = "loginMfa.pendingLanding";
+    public static final String PENDING_LOGIN_TYPE_ATTR = "loginMfa.pendingLoginType";
+    public static final String PENDING_DELIVERY_MESSAGE_ATTR = "loginMfa.pendingDeliveryMessage";
 
     private final MemberRepository memberRepository;
     private final EmailOtpService emailOtpService;
     private final UserClaimService userClaimService;
 
-    public static boolean requiresMfa(Set<Position> staffRoles) {
-        if (staffRoles == null || staffRoles.isEmpty()) {
-            return false;
-        }
-        for (Position role : staffRoles) {
-            if (PRIVILEGED_ROLES.contains(role)) {
-                return true;
-            }
-        }
-        return false;
+    public void startChallenge(AppUserPrincipal principal, String landingUrl, HttpServletRequest request) {
+        startChallenge(principal, landingUrl, null, request);
     }
 
-    public void startChallenge(AppUserPrincipal principal, String landingUrl, HttpServletRequest request) {
+    public void startChallenge(AppUserPrincipal principal,
+                               String landingUrl,
+                               String loginType,
+                               HttpServletRequest request) {
         Member member = memberRepository.findById(principal.getMemberId())
-            .orElseThrow(() -> new IllegalStateException("Your staff account could not be located. Contact the administrator."));
+            .orElseThrow(() -> new IllegalStateException("Your account could not be located. Contact the administrator."));
         if (member.getStatus() != MemberStatus.ACTIVE) {
             throw new IllegalStateException("This account is not active.");
         }
-        String email = member.getEmail();
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException("This staff account has no email on file. Contact the administrator to enable sign-in.");
-        }
+
+        StationOtpDeliveryService.DeliveryReceipt delivery = emailOtpService.issueOtp(
+            member.getEmail(),
+            EmailOtpPurpose.LOGIN_MFA,
+            member.getId(),
+            "Your Loan Application Portal sign-in verification code",
+            "We received a sign-in attempt for this account. Enter the verification code below to finish signing in. "
+                + "If you did not initiate this sign-in, ignore this message and change your password immediately.",
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getPhone()
+        );
 
         HttpSession session = request.getSession(true);
         session.setAttribute(PENDING_MEMBER_ID_ATTR, member.getId());
-        session.setAttribute(PENDING_EMAIL_ATTR, email);
+        session.setAttribute(PENDING_EMAIL_ATTR, member.getEmail());
+        session.setAttribute(PENDING_LOGIN_TYPE_ATTR, loginType == null ? "" : loginType);
         if (landingUrl != null) {
             session.setAttribute(PENDING_LANDING_ATTR, landingUrl);
         }
-
-        emailOtpService.issueOtp(
-            email,
-            EmailOtpPurpose.STAFF_LOGIN_MFA,
-            member.getId(),
-            "Your Loan Application Portal admin sign-in verification code",
-            "We received an admin sign-in attempt for this account. Enter the verification code below to finish signing in. "
-                + "If you did not initiate this sign-in, ignore this message and change your password immediately."
-        );
+        session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, "We sent a one-time verification code using the station delivery policy."));
     }
 
     public boolean hasPendingChallenge(HttpSession session) {
@@ -106,6 +96,14 @@ public class StaffMfaService {
         return value instanceof String landing ? landing : null;
     }
 
+    public String pendingDeliveryMessage(HttpSession session) {
+        if (session == null) {
+            return null;
+        }
+        Object value = session.getAttribute(PENDING_DELIVERY_MESSAGE_ATTR);
+        return value instanceof String message ? message : null;
+    }
+
     public void resendChallenge(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         UUID memberId = pendingMemberId(session);
@@ -113,38 +111,41 @@ public class StaffMfaService {
             throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
         }
         Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalStateException("Your staff account could not be located. Contact the administrator."));
+            .orElseThrow(() -> new IllegalStateException("Your account could not be located. Contact the administrator."));
         if (member.getStatus() != MemberStatus.ACTIVE) {
             clear(request);
             throw new IllegalStateException("This account is not active.");
         }
-        String email = member.getEmail();
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException("This staff account has no email on file. Contact the administrator to enable sign-in.");
-        }
-        emailOtpService.issueOtp(
-            email,
-            EmailOtpPurpose.STAFF_LOGIN_MFA,
+
+        StationOtpDeliveryService.DeliveryReceipt delivery = emailOtpService.issueOtp(
+            member.getEmail(),
+            EmailOtpPurpose.LOGIN_MFA,
             member.getId(),
-            "Your Loan Application Portal admin sign-in verification code",
-            "We received an admin sign-in attempt for this account. Enter the verification code below to finish signing in."
+            "Your Loan Application Portal sign-in verification code",
+            "We received a sign-in attempt for this account. Enter the verification code below to finish signing in.",
+            member.getSaccoId(),
+            member.getStationId(),
+            member.getPhone()
         );
+        if (session != null) {
+            session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, "We sent a new verification code."));
+        }
     }
 
     public AppUserPrincipal completeChallenge(String otpCode, HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         UUID memberId = pendingMemberId(session);
         String email = pendingEmail(session);
-        if (memberId == null || email == null) {
+        if (memberId == null) {
             throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
         }
 
-        emailOtpService.consumeOtp(email, EmailOtpPurpose.STAFF_LOGIN_MFA, otpCode);
+        emailOtpService.consumeOtp(email, EmailOtpPurpose.LOGIN_MFA, memberId, otpCode);
 
         Member member = memberRepository.findById(memberId)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> !existing.getStaffRolesResolved().isEmpty())
-            .orElseThrow(() -> new IllegalStateException("Your staff account is no longer active. Contact the administrator."));
+            .filter(existing -> existing.isMemberAccess() || !existing.getStaffRolesResolved().isEmpty())
+            .orElseThrow(() -> new IllegalStateException("Your account is no longer active. Contact the administrator."));
 
         AppUserPrincipal principal = new AppUserPrincipal(
             member,
@@ -160,6 +161,12 @@ public class StaffMfaService {
         clearPending(session);
     }
 
+    private String deliveryMessage(StationOtpDeliveryService.DeliveryReceipt delivery, String fallback) {
+        return delivery == null || delivery.userMessage() == null || delivery.userMessage().isBlank()
+            ? fallback
+            : delivery.userMessage();
+    }
+
     private void clearPending(HttpSession session) {
         if (session == null) {
             return;
@@ -167,6 +174,8 @@ public class StaffMfaService {
         session.removeAttribute(PENDING_MEMBER_ID_ATTR);
         session.removeAttribute(PENDING_EMAIL_ATTR);
         session.removeAttribute(PENDING_LANDING_ATTR);
+        session.removeAttribute(PENDING_LOGIN_TYPE_ATTR);
+        session.removeAttribute(PENDING_DELIVERY_MESSAGE_ATTR);
     }
 
     private void installSecurityContext(AppUserPrincipal principal, HttpServletRequest request) {

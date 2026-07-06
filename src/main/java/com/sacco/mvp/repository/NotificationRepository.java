@@ -30,6 +30,22 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     @Query(
         value = """
+            select exists (
+                select 1
+                from notifications n
+                where n.recipient_member_id = :recipientId
+                  and n.type = :type
+                  and n.payload = cast(:payload as jsonb)
+            )
+            """,
+        nativeQuery = true
+    )
+    boolean existsDeliveredDuplicate(@Param("recipientId") UUID recipientId,
+                                     @Param("type") String type,
+                                     @Param("payload") String payload);
+
+    @Query(
+        value = """
             select distinct cast(n.payload -> 'details' ->> 'incidentId' as uuid)
             from notifications n
             where n.type = 'SUPPORT_MESSAGE'

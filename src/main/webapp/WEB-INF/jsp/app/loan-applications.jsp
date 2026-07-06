@@ -5,10 +5,11 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
+<%@ include file="../fragments/member-application-progress-styles.jspf" %>
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Applications" /></p>
+    <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Application Progress" /></p>
     <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="apps.subtitle" text="Review every loan application, its current workflow stage, and any manager feedback." /></p>
+    <p class="erp-page-subtitle"><spring:message code="apps.subtitle" text="Review your loan applications and track the current workflow progress." /></p>
 </div>
 <c:set var="hasAwaitingGuarantors" value="false" />
 <c:forEach items="${apps}" var="a">
@@ -53,7 +54,7 @@
                     <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                     <td class="px-3 py-2">
                         <spring:message code="loan.status.${app.status}" text="${app.status}" />
-                        <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+                        <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
                             <div class="mt-1 text-xs font-semibold text-emerald-700"><spring:message code="loan.disbursement.awaitingAcknowledgement" text="Awaiting your acknowledgement" /></div>
                         </c:if>
                     </td>
@@ -70,7 +71,7 @@
                                class="app-btn btn-primary">
                                 <spring:message code="common.view" />
                             </a>
-                            <c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+                            <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
                                 <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                     <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
@@ -83,5 +84,23 @@
         </tbody>
     </table>
 </div>
+
+<section class="erp-panel mt-4">
+    <div class="erp-panel-header">
+        <p class="erp-panel-title"><spring:message code="apps.progress.title" text="Current Application Progress" /></p>
+    </div>
+    <div class="erp-panel-body min-w-0">
+        <c:choose>
+            <c:when test="${not empty currentWorkflowApplication}">
+                <%@ include file="../fragments/member-application-progress.jspf" %>
+            </c:when>
+            <c:otherwise>
+                <div class="erp-section text-center text-sm text-slate-500">
+                    <spring:message code="apps.progress.empty" text="There is no current loan application to track right now." />
+                </div>
+            </c:otherwise>
+        </c:choose>
+    </div>
+</section>
 
 <%@ include file="../fragments/footer.jspf" %>

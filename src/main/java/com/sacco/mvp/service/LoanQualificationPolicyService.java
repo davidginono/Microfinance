@@ -1,22 +1,17 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
-import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStationPolicy;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,7 +20,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LoanQualificationPolicyService {
     private final SaccoSettingsRepository saccoSettingsRepository;
-    private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final MemberRepository memberRepository;
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
@@ -49,13 +43,6 @@ public class LoanQualificationPolicyService {
         Integer maxDefaulted = positive(policy.applicantMaxDefaultedLoans());
         if (maxDefaulted != null && analytics.defaultedLoans() >= maxDefaulted) {
             return Optional.of("You cannot apply because your defaulted loan count has reached the station policy limit.");
-        }
-        Integer waitDays = positive(applicantForfeitedWaitDays(policy));
-        if (waitDays != null) {
-            Optional<ForfeitedApplicationRestriction> restriction = forfeitedApplicationRestriction(saccoId, memberId, stationId, waitDays);
-            if (restriction.isPresent()) {
-                return Optional.of(formatForfeitedApplicationRestriction(restriction.get()));
-            }
         }
         return Optional.empty();
     }
@@ -151,55 +138,11 @@ public class LoanQualificationPolicyService {
             : saccoStationPolicyRepository.findBySaccoIdAndStationId(settings.getSaccoId(), stationId).orElse(null);
         return new ResolvedQualificationPolicy(
             firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantMaxDefaultedLoans(), settings.getApplicantMaxDefaultedLoans()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantMaxForfeitedLoans(), settings.getApplicantMaxForfeitedLoans()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantForfeitedLookbackDays(), settings.getApplicantForfeitedLookbackDays()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getApplicantForfeitedWaitDays(), settings.getApplicantForfeitedWaitDays()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()) == null
                 || firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxGuaranteedLoanAmount(), settings.getGuarantorMaxGuaranteedLoanAmount()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxDefaultedLoans(), settings.getGuarantorMaxDefaultedLoans())
         );
-    }
-
-    public Optional<Integer> applicantForfeitedWaitDays(String saccoId, UUID memberId) {
-        SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
-        if (settings == null) {
-            return Optional.empty();
-        }
-        String stationId = resolveMemberStationId(memberId);
-        return Optional.ofNullable(positive(applicantForfeitedWaitDays(resolvePolicy(settings, stationId))));
-    }
-
-    private Integer applicantForfeitedWaitDays(ResolvedQualificationPolicy policy) {
-        return firstNonNull(policy.applicantForfeitedWaitDays(), policy.applicantForfeitedLookbackDays());
-    }
-
-    private Optional<ForfeitedApplicationRestriction> forfeitedApplicationRestriction(String saccoId,
-                                                                                      UUID memberId,
-                                                                                      String stationId,
-                                                                                      int waitDays) {
-        LocalDate today = LocalDate.now();
-        return loanApplicationRepository
-            .findLatestForfeitedForScope(memberId, saccoId, stationId, PageRequest.of(0, 1))
-            .stream()
-            .map(this::forfeitedApplicationDate)
-            .map(date -> date.plusDays(waitDays))
-            .filter(releaseDate -> releaseDate.isAfter(today))
-            .max(LocalDate::compareTo)
-            .map(releaseDate -> new ForfeitedApplicationRestriction(
-                Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(today, releaseDate)),
-                releaseDate
-            ));
-    }
-
-    private LocalDate forfeitedApplicationDate(LoanApplication app) {
-        return firstNonNull(app.getUpdatedAt(), app.getCreatedAt()).toLocalDate();
-    }
-
-    private String formatForfeitedApplicationRestriction(ForfeitedApplicationRestriction restriction) {
-        String dayLabel = restriction.daysLeft() == 1 ? "day" : "days";
-        return "You cannot apply because your last forfeited loan application is still within the station waiting period. You can apply again in "
-            + restriction.daysLeft() + " " + dayLabel + ", on " + restriction.releaseDate() + ".";
     }
 
     private String resolveMemberStationId(UUID memberId) {
@@ -236,18 +179,9 @@ public class LoanQualificationPolicyService {
 
     private record ResolvedQualificationPolicy(
         Integer applicantMaxDefaultedLoans,
-        Integer applicantMaxForfeitedLoans,
-        Integer applicantForfeitedLookbackDays,
-        Integer applicantForfeitedWaitDays,
         boolean guarantorWithActiveLoanAllowed,
         BigDecimal guarantorMaxGuaranteedLoanAmount,
         Integer guarantorMaxDefaultedLoans
-    ) {
-    }
-
-    private record ForfeitedApplicationRestriction(
-        long daysLeft,
-        LocalDate releaseDate
     ) {
     }
 

@@ -168,7 +168,8 @@ public class NotificationInboxService {
                 case ACCOUNTANT -> "/accountant/loan-applications/" + applicationId;
                 case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications/" + applicationId;
                 case CHAIRPERSON -> "/chairperson/loan-applications/" + applicationId;
-                case BOARD, CREDIT_COMMITTEE -> "/board/loan-applications/" + applicationId;
+                case CREDIT_COMMITTEE -> "/credit-committee/loan-applications/" + applicationId;
+                case BOARD -> "/board/loan-applications/" + applicationId;
                 case LOAN_OFFICER -> "/loan-officer/loan-applications/" + applicationId;
                 case MEMBER -> "/app/loan-applications/" + applicationId;
             };

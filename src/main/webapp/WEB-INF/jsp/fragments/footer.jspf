@@ -236,6 +236,74 @@
         restoreLastClickedSidebarLink();
     })();
 </script>
+<div id="sessionInactivityPrompt" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/45 px-4">
+    <div class="w-full max-w-md rounded-md border border-slate-200 bg-white p-5 shadow-xl">
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Session Check</p>
+        <h2 class="mt-2 text-lg font-bold text-sacco-ink">Are you still there?</h2>
+        <p class="mt-2 text-sm text-slate-600">Your session will be closed if there is no response.</p>
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+            <form id="sessionInactivityLogoutForm" action="/logout" method="post">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                <button type="submit" class="app-btn btn-neutral">Logout</button>
+            </form>
+            <button id="sessionInactivityStayButton" type="button" class="app-btn btn-primary">Stay Logged In</button>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const promptMs = Number("${sessionInactivityPromptMs}");
+        const graceMs = Number("${sessionInactivityGraceMs}");
+        if (!Number.isFinite(promptMs) || promptMs <= 0 || !document.body) {
+            return;
+        }
+        const prompt = document.getElementById("sessionInactivityPrompt");
+        const stayButton = document.getElementById("sessionInactivityStayButton");
+        const logoutForm = document.getElementById("sessionInactivityLogoutForm");
+        if (!prompt || !stayButton || !logoutForm) {
+            return;
+        }
+        let promptTimer = null;
+        let logoutTimer = null;
+        const activityEvents = ["click", "keydown", "mousemove", "touchstart", "scroll"];
+
+        function hidePrompt() {
+            prompt.classList.add("hidden");
+            prompt.classList.remove("flex");
+            if (logoutTimer) {
+                window.clearTimeout(logoutTimer);
+                logoutTimer = null;
+            }
+        }
+
+        function schedulePrompt() {
+            if (promptTimer) {
+                window.clearTimeout(promptTimer);
+            }
+            promptTimer = window.setTimeout(() => {
+                prompt.classList.remove("hidden");
+                prompt.classList.add("flex");
+                logoutTimer = window.setTimeout(() => logoutForm.submit(), Math.max(graceMs, 15000));
+            }, Math.max(promptMs, 60000));
+        }
+
+        function resetTimer() {
+            if (!prompt.classList.contains("hidden")) {
+                return;
+            }
+            schedulePrompt();
+        }
+
+        activityEvents.forEach((eventName) => {
+            window.addEventListener(eventName, resetTimer, { passive: true });
+        });
+        stayButton.addEventListener("click", () => {
+            hidePrompt();
+            schedulePrompt();
+        });
+        schedulePrompt();
+    })();
+</script>
 </div>
 </body>
 </html>

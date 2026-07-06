@@ -23,6 +23,7 @@ import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +85,7 @@ class StaffAnalyticsControllerSecurityTest {
         AppUserPrincipal principal = principal(Position.MANAGER, false);
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
         when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any()))
-            .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO));
+            .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO));
         when(loanAnalyticsService.statusTrendForStation(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.productPerformanceForStation(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
         when(loanAnalyticsService.productChartSeries(any())).thenReturn(List.of());
@@ -231,6 +232,7 @@ class StaffAnalyticsControllerSecurityTest {
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }
         @Bean AdminScopeService adminScopeService() { return Mockito.mock(AdminScopeService.class); }
         @Bean StaffMfaService staffMfaService() { return Mockito.mock(StaffMfaService.class); }
+        @Bean StationOtpSettingsService stationOtpSettingsService() { return Mockito.mock(StationOtpSettingsService.class); }
         @Bean UserClaimService userClaimService() { return Mockito.mock(UserClaimService.class); }
         @Bean AppUserDetailsService appUserDetailsService() { return Mockito.mock(AppUserDetailsService.class); }
         @Bean LoanApplicationRepository loanApplicationRepository() { return Mockito.mock(LoanApplicationRepository.class); }

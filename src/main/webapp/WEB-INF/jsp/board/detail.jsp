@@ -98,7 +98,7 @@
                         </svg>
                     </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
+                    <div class="loan-stat-value">TSh <fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
                     <span class="loan-staff-kpi-icon" aria-hidden="true">
@@ -343,7 +343,7 @@
 
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
-<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap mt-5 overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -534,8 +534,8 @@
                 </c:otherwise>
             </c:choose>
             <div class="grid gap-3 sm:grid-cols-2 loan-final-action-row">
-                <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit action-button-disabled" disabled><spring:message code="review.approveReview" text="Approve Review" /></button>
-                <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit action-button-disabled" disabled><spring:message code="review.rejectReview" text="Reject Review" /></button>
+                <button type="submit" name="decision" value="APPROVED" class="app-btn btn-primary board-approve-submit ${reviewApprovalOtpEnabled ? 'action-button-disabled' : ''}" ${reviewApprovalOtpEnabled ? 'disabled' : ''}><spring:message code="review.approveReview" text="Approve Review" /></button>
+                <button type="submit" name="decision" value="REJECTED" class="app-btn btn-reject board-reject-submit ${reviewApprovalOtpEnabled ? 'action-button-disabled' : ''}" ${reviewApprovalOtpEnabled ? 'disabled' : ''}><spring:message code="review.rejectReview" text="Reject Review" /></button>
             </div>
         </form>
     </c:when>

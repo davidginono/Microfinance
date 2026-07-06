@@ -102,7 +102,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
           and (
             l.status in :statuses
             or (
-              l.status = com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+              l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
               and l.applicantDisbursementAcknowledgedAt is null
             )
           )
@@ -118,7 +118,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
           and (
             l.status in :statuses
             or (
-              l.status = com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+              l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
               and l.applicantDisbursementAcknowledgedAt is null
             )
           )
@@ -148,12 +148,12 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     @Query("""
         select l.saccoId as saccoId,
-               sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
+               sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
                sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then 1 else 0 end) as paidLoanCount,
                sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then 1 else 0 end) as overdueLoanCount,
-               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
                coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then l.amount else 0 end), 0) as paidPrincipal,
-               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
                coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then l.amount else 0 end), 0) as overduePrincipal
         from LoanApplication l
         where l.saccoId in :saccoIds
@@ -163,12 +163,12 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
 
     @Query("""
         select l.saccoId as saccoId,
-               sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
+               sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then 1 else 0 end) as activeLoanCount,
                sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then 1 else 0 end) as paidLoanCount,
                sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then 1 else 0 end) as overdueLoanCount,
-               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID) then l.amount else 0 end), 0) as totalDisbursedPrincipal,
                coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.PAID then l.amount else 0 end), 0) as paidPrincipal,
-               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
+               coalesce(sum(case when l.status in (com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED) then l.amount else 0 end), 0) as activeExposure,
                coalesce(sum(case when l.status = com.sacco.mvp.domain.LoanStatus.DEFAULTED then l.amount else 0 end), 0) as overduePrincipal
         from LoanApplication l
         where l.saccoId = :saccoId
@@ -264,20 +264,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                                @Param("saccoId") String saccoId,
                                                                @Param("stationId") String stationId,
                                                                @Param("statuses") Collection<LoanStatus> statuses);
-
-    @Query("""
-        select l
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and l.status = com.sacco.mvp.domain.LoanStatus.FORFEITED
-          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
-          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-        order by coalesce(l.updatedAt, l.createdAt) desc
-        """)
-    List<LoanApplication> findLatestForfeitedForScope(@Param("applicantMemberId") UUID applicantMemberId,
-                                                      @Param("saccoId") String saccoId,
-                                                      @Param("stationId") String stationId,
-                                                      Pageable pageable);
 
     @Query("""
         select count(l)

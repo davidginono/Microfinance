@@ -13,9 +13,11 @@ import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,12 +65,13 @@ public class SecurityConfig {
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
                                                    StaffMfaService staffMfaService,
+                                                   StationOtpSettingsService stationOtpSettingsService,
                                                    UserClaimService userClaimService,
                                                    AppUsageAnalyticsService appUsageAnalyticsService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/error", "/error/**").permitAll()
+                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/error", "/error/**").permitAll()
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MINOR_ADMIN")
                 .requestMatchers("/loan-officer/**").hasRole("LOAN_OFFICER")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
@@ -76,7 +79,8 @@ public class SecurityConfig {
                 .requestMatchers("/disbursement/**").access(new WebExpressionAuthorizationManager(
                     "isAuthenticated() and !hasRole('ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"))
                 .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
-                .requestMatchers("/board/**").hasAnyRole("BOARD", "CREDIT_COMMITTEE", "CHAIRPERSON")
+                .requestMatchers("/credit-committee/**").hasRole("CREDIT_COMMITTEE")
+                .requestMatchers("/board/**").hasRole("BOARD")
                 .requestMatchers("/staff/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
@@ -144,33 +148,23 @@ public class SecurityConfig {
                     // persisted. Password alone cannot grant admin access.
                     // Super admins now bypass this challenge; only MINOR_ADMIN can still
                     // be routed through staff MFA when the local dev bypass is off.
-                    boolean requireStaffMfa = isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled;
-                    if (staffPasswordLogin && requireStaffMfa) {
+                    boolean requireLoginMfa = requiresPasswordLoginMfa(principal, staffPasswordLogin, isMinorAdmin, stationOtpSettingsService);
+                    if (requireLoginMfa) {
                         if (principal != null) {
-                            String landing = WorkspaceLanding.staffDashboard(principal);
+                            String landing = landingFor(principal, staffPasswordLogin);
                             try {
-                                staffMfaService.startChallenge(principal, landing, request);
+                                staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
-                                SecurityContextHolder.clearContext();
-                                jakarta.servlet.http.HttpSession failed = request.getSession(false);
-                                if (failed != null) {
-                                    failed.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-                                }
+                                clearAuthenticationContext(request);
                                 request.getSession(true).setAttribute("loginErrorMessage", ex.getMessage());
-                                response.sendRedirect("/login?error");
+                                response.sendRedirect("/login?error" + (staffPasswordLogin ? "&tab=staff" : ""));
                                 return;
                             }
-                            // Strip the authenticated context so the user must clear MFA
-                            // before any admin route becomes reachable.
-                            SecurityContextHolder.clearContext();
-                            jakarta.servlet.http.HttpSession existing = request.getSession(false);
-                            if (existing != null) {
-                                existing.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-                            }
+                            clearAuthenticationContext(request);
                             if (isSuperAdmin) {
                                 adminScopeService.clearScope();
                             }
-                            response.sendRedirect("/login/staff/mfa");
+                            response.sendRedirect("/login/mfa");
                             return;
                         }
                     }
@@ -326,6 +320,44 @@ public class SecurityConfig {
             return "This station workspace has been suspended. Contact the platform administrator.";
         }
         return "This station workspace has been suspended: " + reason.trim();
+    }
+
+    private boolean requiresPasswordLoginMfa(AppUserPrincipal principal,
+                                             boolean staffPasswordLogin,
+                                             boolean isMinorAdmin,
+                                             StationOtpSettingsService stationOtpSettingsService) {
+        if (principal == null) {
+            return false;
+        }
+        if (hasStationScope(principal)) {
+            return stationOtpSettingsService.requiresLoginMfa(principal.getSaccoId(), principal.getStationId());
+        }
+        return staffPasswordLogin && isMinorAdmin && !localDevMinorAdminPasswordLoginEnabled;
+    }
+
+    private boolean hasStationScope(AppUserPrincipal principal) {
+        return principal.getSaccoId() != null
+            && !principal.getSaccoId().isBlank()
+            && principal.getStationId() != null
+            && !principal.getStationId().isBlank();
+    }
+
+    private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {
+        if (!staffPasswordLogin && principal.isMemberAccess()) {
+            return WorkspaceLanding.memberDashboard();
+        }
+        if (staffPasswordLogin || !principal.getStaffRoles().isEmpty()) {
+            return WorkspaceLanding.staffDashboard(principal);
+        }
+        return WorkspaceLanding.memberDashboard();
+    }
+
+    private void clearAuthenticationContext(HttpServletRequest request) {
+        SecurityContextHolder.clearContext();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        }
     }
 
     private boolean isGoogleSsoConfigured() {

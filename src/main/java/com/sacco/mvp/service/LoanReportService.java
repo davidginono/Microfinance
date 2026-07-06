@@ -90,7 +90,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LoanReportService {
     private static final List<LoanStatus> DISBURSED_STATUSES = List.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
@@ -99,10 +99,10 @@ public class LoanReportService {
         LoanStatus.LOAN_OFFICER_REJECTED,
         LoanStatus.BOARD_REJECTED,
         LoanStatus.ACCOUNTANT_REJECTED,
-        LoanStatus.FINAL_REJECTED
+        LoanStatus.REJECTED
     );
     private static final List<LoanStatus> ACTIVE_STATUSES = List.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED
     );
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -1290,9 +1290,6 @@ public class LoanReportService {
         if (REJECTED_STATUSES.contains(loan.getStatus())) {
             return "Application Rejected";
         }
-        if (loan.getStatus() == LoanStatus.FORFEITED) {
-            return "Application Forfeited";
-        }
         return "Application Submitted";
     }
 
@@ -1326,7 +1323,6 @@ public class LoanReportService {
             statusRow(report, "Disbursed", analytics.disbursedLoans()),
             statusRow(report, "Paid", analytics.paidLoans()),
             statusRow(report, "Defaulted", analytics.defaultedLoans()),
-            statusRow(report, "Forfeited", analytics.forfeitedLoans()),
             statusRow(report, "Rejected", analytics.rejectedLoans())
         );
     }
@@ -1467,9 +1463,9 @@ public class LoanReportService {
             addTrendChart(sheet, tableStart, rows.size(), new int[]{1, 2, 3, 4}, new String[]{"Reviewed", "Approved", "Rejected", "Pending"});
         } else {
             writeTable(sheet, tableStart, "LOAN TREND OVER TIME",
-                new String[]{"Period", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Forfeited", "Rejected"},
+                new String[]{"Period", "Applied", "Active", "Disbursed", "Paid", "Defaulted", "Rejected"},
                 rows, styles);
-            makeTrendValuesNumeric(sheet, tableStart, rows.size(), 7);
+            makeTrendValuesNumeric(sheet, tableStart, rows.size(), 6);
             addTrendChart(sheet, tableStart, rows.size(), new int[]{1, 3, 4, 5}, new String[]{"Applied", "Disbursed", "Paid", "Defaulted"});
         }
         autosize(sheet, 8);
@@ -1535,8 +1531,7 @@ public class LoanReportService {
             new String[]{"Disbursed Loans", String.valueOf(report.analytics().disbursedLoans())},
             new String[]{"Paid Loans", String.valueOf(report.analytics().paidLoans())},
             new String[]{"Defaulted Loans", String.valueOf(report.analytics().defaultedLoans())},
-            new String[]{"Rejected Loans", String.valueOf(report.analytics().rejectedLoans())},
-            new String[]{"Forfeited Loan Applications", String.valueOf(report.analytics().forfeitedLoans())}
+            new String[]{"Rejected Loans", String.valueOf(report.analytics().rejectedLoans())}
         ), styles);
     }
 
@@ -1872,7 +1867,6 @@ public class LoanReportService {
                     String.valueOf(values.getOrDefault("Disbursed", 0L)),
                     String.valueOf(values.getOrDefault("Paid", 0L)),
                     String.valueOf(values.getOrDefault("Defaulted", 0L)),
-                    String.valueOf(values.getOrDefault("Forfeited", 0L)),
                     String.valueOf(values.getOrDefault("Rejected", 0L))
                 };
             })
@@ -1963,7 +1957,7 @@ public class LoanReportService {
     private LoanSummary summarize(Collection<LoanApplication> loans) {
         long paidCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
         long ongoingCount = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.FINAL_APPROVED || loan.getStatus() == LoanStatus.DEFAULTED)
+            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED || loan.getStatus() == LoanStatus.DEFAULTED)
             .count();
         BigDecimal disbursedAmount = loans.stream().map(LoanApplication::getAmount).filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -1982,7 +1976,6 @@ public class LoanReportService {
         long disbursedCount = safeLoans.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count();
         long paidCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
         long defaultedCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
-        long forfeitedCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.FORFEITED).count();
         long rejectedCount = safeLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count();
         BigDecimal activeAmount = safeLoans.stream()
             .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
@@ -1995,7 +1988,6 @@ public class LoanReportService {
             disbursedCount,
             paidCount,
             defaultedCount,
-            forfeitedCount,
             rejectedCount,
             activeAmount
         );
@@ -2207,16 +2199,17 @@ public class LoanReportService {
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
             case BOARD_REJECTED -> "Board Rejected";
+            case CREDIT_COMMITTEE_REJECTED -> "Credit Committee Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
-            case FORFEITED -> "Forfeited";
-            case FINAL_REJECTED -> "Final Rejected";
-            case FINAL_APPROVED -> "Final Approved and Disbursed";
+            case REJECTED -> "Rejected";
+            case DISBURSED -> "Disbursed";
             case DEFAULTED -> "Defaulted";
             case PAID -> "Paid";
             case MANAGER_ACCEPTED -> "Manager Approved";
             case LOAN_OFFICER_APPROVED -> "Loan Officer Approved";
             case CHAIRPERSON_APPROVED -> "Chairperson Approved";
             case BOARD_APPROVED -> "Board Approved";
+            case CREDIT_COMMITTEE_APPROVED -> "Credit Committee Approved";
             case ACCOUNTANT_APPROVED -> "Accountant Approved";
             case AWAITING_GUARANTORS -> "Awaiting Guarantors";
             case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
@@ -2519,8 +2512,7 @@ public class LoanReportService {
             stationStatusRow("Disbursed Loans", loans, loan -> DISBURSED_STATUSES.contains(loan.getStatus())),
             stationStatusRow("Paid Loans", loans, loan -> loan.getStatus() == LoanStatus.PAID),
             stationStatusRow("Defaulted Loans", loans, loan -> loan.getStatus() == LoanStatus.DEFAULTED),
-            stationStatusRow("Rejected Loans", loans, loan -> REJECTED_STATUSES.contains(loan.getStatus())),
-            stationStatusRow("Forfeited Loan Applications", loans, loan -> loan.getStatus() == LoanStatus.FORFEITED)
+            stationStatusRow("Rejected Loans", loans, loan -> REJECTED_STATUSES.contains(loan.getStatus()))
         );
     }
 
@@ -2825,13 +2817,14 @@ public class LoanReportService {
             case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case BOARD_REJECTED -> "Board Rejected";
             case BOARD_APPROVED -> "Reviewed";
+            case CREDIT_COMMITTEE_REJECTED -> "Credit Committee Rejected";
+            case CREDIT_COMMITTEE_APPROVED -> "Reviewed";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case ACCOUNTANT_APPROVED -> "Accountant Approved";
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
-            case FORFEITED -> "Forfeited";
-            case FINAL_REJECTED -> "Final Rejected";
-            case FINAL_APPROVED -> "Final Approved and Disbursed";
+            case REJECTED -> "Rejected";
+            case DISBURSED -> "Disbursed";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
         };
@@ -3162,9 +3155,9 @@ public class LoanReportService {
             y -= 136;
 
             section("4. RISK / ELIGIBILITY SUMMARY");
-            table(MARGIN, y, new float[]{132, 80, 134, 88, 88, 128},
-                new String[]{"Current Active Loan Amount", "Defaulted Loans", "Forfeited Loan Applications", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
-                List.of(new String[]{moneyPlain(report.financialSummary().activeLoanAmount()), String.valueOf(report.analytics().defaultedLoans()), String.valueOf(report.analytics().forfeitedLoans()), moneyPlain(BigDecimal.ZERO), "Yes", "Yes"},
+            table(MARGIN, y, new float[]{142, 86, 104, 88, 88, 120},
+                new String[]{"Current Active Loan Amount", "Defaulted Loans", "Rejected Loans", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
+                List.of(new String[]{moneyPlain(report.financialSummary().activeLoanAmount()), String.valueOf(report.analytics().defaultedLoans()), String.valueOf(report.analytics().rejectedLoans()), moneyPlain(BigDecimal.ZERO), "Yes", "Yes"},
                     new String[]{"Eligibility Reason", report.remarks(), "", "", "", ""}), SMALL, 20f);
             y -= 60;
 
@@ -3220,12 +3213,12 @@ public class LoanReportService {
             right("Generated: " + humanDate(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y, regular, SMALL);
             y -= 34;
             section("6. RISK / ELIGIBILITY SUMMARY");
-            table(MARGIN, y, new float[]{112, 66, 118, 102, 55, 72},
-                new String[]{"Current Active Loan Amount", "Defaulted Loans", "Forfeited Loan Applications", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
+            table(MARGIN, y, new float[]{122, 72, 88, 108, 55, 72},
+                new String[]{"Current Active Loan Amount", "Defaulted Loans", "Rejected Loans", "Total Guaranteed Amount", "Can Apply", "Can Guarantee"},
                 java.util.Collections.singletonList(new String[]{
                     moneyPlain(report.financialSummary().activeLoanAmount()),
                     String.valueOf(report.analytics().defaultedLoans()),
-                    String.valueOf(report.analytics().forfeitedLoans()),
+                    String.valueOf(report.analytics().rejectedLoans()),
                     moneyPlain(BigDecimal.ZERO),
                     "Yes",
                     "Yes"
@@ -3387,8 +3380,7 @@ public class LoanReportService {
                 new String[]{"Disbursed Loans", String.valueOf(report.analytics().disbursedLoans())},
                 new String[]{"Paid Loans", String.valueOf(report.analytics().paidLoans())},
                 new String[]{"Defaulted Loans", String.valueOf(report.analytics().defaultedLoans())},
-                new String[]{"Rejected Loans", String.valueOf(report.analytics().rejectedLoans())},
-                new String[]{"Forfeited Loan Applications", String.valueOf(report.analytics().forfeitedLoans())}
+                new String[]{"Rejected Loans", String.valueOf(report.analytics().rejectedLoans())}
             );
         }
 
@@ -3401,7 +3393,6 @@ public class LoanReportService {
                 new String[]{"Paid Loans", String.valueOf(report.analytics().paidLoans())},
                 new String[]{"Defaulted Loans", String.valueOf(report.analytics().defaultedLoans())},
                 new String[]{"Rejected Loans", String.valueOf(report.analytics().rejectedLoans())},
-                new String[]{"Forfeited Applications", String.valueOf(report.analytics().forfeitedLoans())},
                 new String[]{"Portfolio Risk Level", totalRiskLevel(report)}
             );
         }
@@ -3852,7 +3843,6 @@ public class LoanReportService {
         long disbursedCount,
         long paidCount,
         long defaultedCount,
-        long forfeitedCount,
         long rejectedCount,
         BigDecimal activeAmount
     ) {
@@ -5000,7 +4990,6 @@ public class LoanReportService {
                 new String[]{"Disbursed Loans", String.valueOf(analytics.disbursedCount())},
                 new String[]{"Paid Loans", String.valueOf(analytics.paidCount())},
                 new String[]{"Defaulted Loans", String.valueOf(analytics.defaultedCount())},
-                new String[]{"Forfeited Loan Applications", String.valueOf(analytics.forfeitedCount())},
                 new String[]{"Rejected Loans", String.valueOf(analytics.rejectedCount())},
                 new String[]{"Active Loan Amount", sanitizePdfText(analytics.getActiveAmountLabel())}
             );

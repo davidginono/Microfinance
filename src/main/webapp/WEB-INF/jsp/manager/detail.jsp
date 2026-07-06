@@ -8,6 +8,40 @@
 <%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/attachment-dropzone.jspf" %>
+<style>
+    .disbursement-collapsible-trigger {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        padding: 0.95rem 1rem;
+        color: #172033;
+        font-size: 1rem;
+        font-weight: 800;
+        text-align: left;
+    }
+    .disbursement-collapsible-trigger:hover,
+    .disbursement-collapsible-trigger:focus-visible {
+        border-color: #d7e1ea;
+        background: #f8fafc;
+        outline: none;
+    }
+    .disbursement-collapsible-chevron {
+        flex: 0 0 auto;
+        color: #64748b;
+        transition: transform 180ms ease;
+    }
+    .disbursement-collapsible-trigger[aria-expanded="true"] .disbursement-collapsible-chevron {
+        transform: rotate(180deg);
+    }
+    .disbursement-collapsible-content[hidden] {
+        display: none !important;
+    }
+</style>
 
 <c:set var="isDisbursementReview" value="${reviewBasePath eq '/disbursement'}" />
 <c:set var="hideDisbursementSupportSections" value="${isDisbursementReview and app.status eq 'READY_FOR_DISBURSEMENT'}" />
@@ -95,7 +129,7 @@
                         </svg>
                     </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value" data-disbursement-loan-amount-display><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
+                    <div class="loan-stat-value" data-disbursement-loan-amount-display>TSh <fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
                     <span class="loan-staff-kpi-icon" aria-hidden="true">
@@ -173,61 +207,63 @@
             <strong><spring:message code="review.currentRejectionReason" text="Current Rejection Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
-    <%@ include file="../fragments/previous-approved-reviews.jspf" %>
-    <div class="loan-view-summary-card px-5 py-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>
-                <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantDetailsHelp" text="Key applicant information for review before making a decision." /></p>
+    <c:if test="${not isDisbursementReview}">
+        <%@ include file="../fragments/previous-approved-reviews.jspf" %>
+        <div class="loan-view-summary-card px-5 py-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantDetails" text="Applicant Details" /></p>
+                    <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantDetailsHelp" text="Key applicant information for review before making a decision." /></p>
+                </div>
+                <c:if test="${not empty repaymentCountdown}">
+                    <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">${repaymentCountdown}</span>
+                </c:if>
             </div>
-            <c:if test="${not empty repaymentCountdown}">
-                <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">${repaymentCountdown}</span>
-            </c:if>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.fullName" text="Full Name" /></div>
+                    <div class="applicant-info-value">${applicant.fullName}</div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="member.memberNumber" text="Member Number" /></div>
+                    <div class="applicant-info-value">${applicant.memberNo}</div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="register.member.email" text="Email" /></div>
+                    <div class="applicant-info-value">
+                        <c:choose>
+                            <c:when test="${not empty applicant.email}">${applicant.email}</c:when>
+                            <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="register.member.phone" text="Phone" /></div>
+                    <div class="applicant-info-value">
+                        <c:choose>
+                            <c:when test="${not empty applicant.phone}">${applicant.phone}</c:when>
+                            <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Station" /></div>
+                    <div class="applicant-info-value">
+                        <c:choose>
+                            <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
+                            <c:otherwise><spring:message code="common.notAvailable" text="Not available" /></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="applicant-info-card">
+                    <div class="applicant-info-label"><spring:message code="review.quickContext" text="Quick Context" /></div>
+                    <div class="applicant-info-value">
+                        <spring:message code="review.quickContextCounts" arguments="${fn:length(attachments)},${fn:length(guarantorRequests)}" text="${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)" />
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="member.fullName" text="Full Name" /></div>
-                <div class="applicant-info-value">${applicant.fullName}</div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="member.memberNumber" text="Member Number" /></div>
-                <div class="applicant-info-value">${applicant.memberNo}</div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="register.member.email" text="Email" /></div>
-                <div class="applicant-info-value">
-                    <c:choose>
-                        <c:when test="${not empty applicant.email}">${applicant.email}</c:when>
-                        <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
-                    </c:choose>
-                </div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="register.member.phone" text="Phone" /></div>
-                <div class="applicant-info-value">
-                    <c:choose>
-                        <c:when test="${not empty applicant.phone}">${applicant.phone}</c:when>
-                        <c:otherwise><spring:message code="common.notProvided" text="Not provided" /></c:otherwise>
-                    </c:choose>
-                </div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="admin.saccoRegistry.station" text="Station" /></div>
-                <div class="applicant-info-value">
-                    <c:choose>
-                        <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
-                        <c:otherwise><spring:message code="common.notAvailable" text="Not available" /></c:otherwise>
-                    </c:choose>
-                </div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="review.quickContext" text="Quick Context" /></div>
-                <div class="applicant-info-value">
-                    <spring:message code="review.quickContextCounts" arguments="${fn:length(attachments)},${fn:length(guarantorRequests)}" text="${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)" />
-                </div>
-            </div>
-        </div>
-    </div>
+    </c:if>
 </div>
 
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
@@ -308,9 +344,30 @@
 </div>
 </c:if>
 
-<%@ include file="../fragments/financial-field-sections.jspf" %>
+<c:choose>
+    <c:when test="${isDisbursementReview}">
+        <div class="mt-5">
+            <button type="button"
+                    class="disbursement-collapsible-trigger"
+                    data-disbursement-toggle="disbursementFinancialDetailsPanel"
+                    aria-expanded="false"
+                    aria-controls="disbursementFinancialDetailsPanel">
+                <span><spring:message code="loan.disbursement.calculationsAndFees" text="Loan Calculations and Fees" /></span>
+                <svg class="disbursement-collapsible-chevron h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="disbursementFinancialDetailsPanel" class="disbursement-collapsible-content" hidden>
+                <%@ include file="../fragments/financial-field-sections.jspf" %>
+            </div>
+        </div>
+    </c:when>
+    <c:otherwise>
+        <%@ include file="../fragments/financial-field-sections.jspf" %>
+    </c:otherwise>
+</c:choose>
 
-<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap mt-5 overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -446,42 +503,51 @@
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
         <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
-                    <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your review decision." /></p>
+        <c:choose>
+            <c:when test="${staffDecisionOtpEnabled}">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your review decision." /></p>
+                        </div>
+                        <button type="button"
+                                class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
+                                data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp"
+                                data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-decision-otp">
+                            <span class="otp-button-spinner hidden"></span>
+                            <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
+                        </button>
+                    </div>
+                    <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                    <div class="mt-3">
+                        <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
+                        <input type="text"
+                               name="managerDecisionOtpCode"
+                               inputmode="numeric"
+                               maxlength="6"
+                               autocomplete="one-time-code"
+                               data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.decisionCode' text='Decision OTP code' />"
+                               required
+                               class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                               placeholder="123456" />
+                        <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.decisionCodeHelp" text="Enter the 6-digit code sent to your email before approving or rejecting." /></p>
+                        <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                            <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            <span data-otp-text>Enter the code to verify it.</span>
+                        </div>
+                    </div>
                 </div>
-                <button type="button"
-                        class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
-                        data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp"
-                        data-verify-url="${reviewBasePath}/loan-applications/${app.id}/verify-decision-otp">
-                    <span class="otp-button-spinner hidden"></span>
-                    <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
-                </button>
-            </div>
-            <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
-            <div class="mt-3">
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
-                <input type="text"
-                       name="managerDecisionOtpCode"
-                       inputmode="numeric"
-                       maxlength="6"
-                       autocomplete="one-time-code"
-                       data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.decisionCode' text='Decision OTP code' />"
-                       required
-                       class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                       placeholder="123456" />
-                <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.decisionCodeHelp" text="Enter the 6-digit code sent to your email before approving or rejecting." /></p>
-                <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                    <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                    <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    <span data-otp-text>Enter the code to verify it.</span>
+            </c:when>
+            <c:otherwise>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                    <spring:message code="otp.approvalDisabledHelp" text="OTP confirmation is disabled for this approval." />
                 </div>
-            </div>
-        </div>
+            </c:otherwise>
+        </c:choose>
         <div class="flex flex-wrap gap-2">
             <button type="submit" name="decision" value="ACCEPT" class="app-btn btn-primary">${approveActionLabel}</button>
             <button type="submit" name="decision" value="REJECT" class="app-btn btn-reject">${rejectActionLabel}</button>
@@ -765,6 +831,20 @@
 <script>
     (() => {
         const csrfToken = "${_csrf.token}";
+        document.querySelectorAll("[data-disbursement-toggle]").forEach((trigger) => {
+            const target = document.getElementById(trigger.dataset.disbursementToggle || "");
+            if (!target) {
+                return;
+            }
+            const setExpanded = (expanded) => {
+                trigger.setAttribute("aria-expanded", expanded ? "true" : "false");
+                target.hidden = !expanded;
+            };
+            setExpanded(trigger.getAttribute("aria-expanded") === "true");
+            trigger.addEventListener("click", () => {
+                setExpanded(trigger.getAttribute("aria-expanded") !== "true");
+            });
+        });
         const otpMessages = {
             send: "<spring:message code='loan.otp.sendCode' text='Send OTP Code' javaScriptEscape='true' />",
             sending: "<spring:message code='loan.otp.sending' text='Sending...' javaScriptEscape='true' />",

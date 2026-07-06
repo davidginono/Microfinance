@@ -1,16 +1,12 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
-import com.sacco.mvp.domain.LoanStatus;
-import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStationPolicy;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
@@ -19,11 +15,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,7 +30,6 @@ class LoanQualificationPolicyServiceTest {
     private static final String STATION_ID = "AR704";
 
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
-    @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private SaccoStationPolicyRepository saccoStationPolicyRepository;
@@ -49,7 +42,6 @@ class LoanQualificationPolicyServiceTest {
     void setUp() {
         service = new LoanQualificationPolicyService(
             saccoSettingsRepository,
-            loanApplicationRepository,
             guarantorRequestRepository,
             memberRepository,
             saccoStationPolicyRepository,
@@ -239,59 +231,6 @@ class LoanQualificationPolicyServiceTest {
         assertThat(reason).isEmpty();
     }
 
-    @Test
-    void applicantForfeitedWaitingPeriodDoesNotBlockWhenNoWaitingPeriodIsConfigured() {
-        UUID applicantId = UUID.randomUUID();
-        givenApplicantForfeitedPolicy(applicantId, null, null, null, 2);
-
-        Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
-
-        assertThat(reason).isEmpty();
-    }
-
-    @Test
-    void applicantForfeitedWaitingPeriodAllowsApplicantWhenLastForfeitureHasExpired() {
-        UUID applicantId = UUID.randomUUID();
-        givenApplicantForfeitedPolicy(applicantId, null, null, 1, 2);
-        givenForfeitedApplications(applicantId, OffsetDateTime.now().minusDays(2));
-
-        Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
-
-        assertThat(reason).isEmpty();
-    }
-
-    @Test
-    void applicantForfeitedWaitingPeriodBlocksApplicantInsideWaitingPeriodWithReleaseDate() {
-        UUID applicantId = UUID.randomUUID();
-        OffsetDateTime forfeitedAt = OffsetDateTime.now().minusDays(2);
-        givenApplicantForfeitedPolicy(applicantId, null, null, 30, 2);
-        givenForfeitedApplications(applicantId, forfeitedAt);
-
-        Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
-
-        assertThat(reason)
-            .hasValueSatisfying(message -> assertThat(message)
-                .contains("last forfeited loan application is still within the station waiting period")
-                .contains("You can apply again in")
-                .contains(forfeitedAt.toLocalDate().plusDays(30).toString()));
-    }
-
-    @Test
-    void applicantForfeitedWaitingPeriodUsesOnlyTheLatestForfeiture() {
-        UUID applicantId = UUID.randomUUID();
-        OffsetDateTime oldForfeiture = OffsetDateTime.now().minusDays(40);
-        OffsetDateTime latestForfeiture = OffsetDateTime.now().minusDays(3);
-        givenApplicantForfeitedPolicy(applicantId, null, null, 10, 2);
-        givenForfeitedApplications(applicantId, oldForfeiture, latestForfeiture);
-
-        Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
-
-        assertThat(reason)
-            .hasValueSatisfying(message -> assertThat(message)
-                .contains(latestForfeiture.toLocalDate().plusDays(10).toString())
-                .doesNotContain(oldForfeiture.toLocalDate().plusDays(10).toString()));
-    }
-
     private void givenPolicy(UUID guarantorId, String maxGuarantees) {
         when(saccoSettingsRepository.findById(SACCO_ID))
             .thenReturn(Optional.of(SaccoSettings.builder()
@@ -336,51 +275,11 @@ class LoanQualificationPolicyServiceTest {
             defaultedLoans,
             0,
             0,
-            0,
             defaultedLoans,
             0,
             0,
             BigDecimal.ZERO
         );
-    }
-
-    private void givenApplicantForfeitedPolicy(UUID applicantId,
-                                               Integer maxForfeitedLoans,
-                                               Integer forfeitedLookbackDays,
-                                               Integer forfeitedWaitDays,
-                                               long allTimeForfeitedLoans) {
-        when(saccoSettingsRepository.findById(SACCO_ID))
-            .thenReturn(Optional.of(SaccoSettings.builder()
-                .saccoId(SACCO_ID)
-                .applicantMaxForfeitedLoans(maxForfeitedLoans)
-                .applicantForfeitedLookbackDays(forfeitedLookbackDays)
-                .applicantForfeitedWaitDays(forfeitedWaitDays)
-                .build()));
-        when(memberRepository.findById(applicantId))
-            .thenReturn(Optional.of(Member.builder()
-                .id(applicantId)
-                .saccoId(SACCO_ID)
-                .stationId(STATION_ID)
-                .memberNo("MEM-002")
-                .fullName("Test Applicant")
-                .memberAccount(true)
-                .status(MemberStatus.ACTIVE)
-                .position(Position.MEMBER)
-                .createdAt(OffsetDateTime.now())
-                .build()));
-        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
-            .thenReturn(Optional.empty());
-        when(loanAnalyticsService.summarizeAllTime(applicantId, SACCO_ID, STATION_ID))
-            .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(
-                0,
-                0,
-                0,
-                allTimeForfeitedLoans,
-                allTimeForfeitedLoans,
-                0,
-                0,
-                BigDecimal.ZERO
-            ));
     }
 
     private void givenGuarantorSavingsPolicy(UUID guarantorId, String currentSavings) {
@@ -404,31 +303,6 @@ class LoanQualificationPolicyServiceTest {
             .thenReturn(Optional.empty());
         when(eligibilityService.resolveSavings(guarantorId))
             .thenReturn(new BigDecimal(currentSavings));
-    }
-
-    private void givenForfeitedApplications(UUID applicantId, OffsetDateTime... dates) {
-        LoanApplication latest = java.util.Arrays.stream(dates)
-            .max(OffsetDateTime::compareTo)
-            .map(date -> LoanApplication.builder()
-                .id(UUID.randomUUID())
-                .saccoId(SACCO_ID)
-                .stationId(STATION_ID)
-                .applicantMemberId(applicantId)
-                .loanType(LoanType.LOAN_ADVANCE)
-                .amount(new BigDecimal("100000.00"))
-                .tenorMonths(12)
-                .status(LoanStatus.FORFEITED)
-                .formData("{}")
-                .requiredGuarantors(1)
-                .policySnapshot("{}")
-                .createdAt(date)
-                .updatedAt(date)
-                .version(0)
-                .build())
-            .orElseThrow();
-        when(loanApplicationRepository.findLatestForfeitedForScope(
-            applicantId, SACCO_ID, STATION_ID, PageRequest.of(0, 1)
-        )).thenReturn(List.of(latest));
     }
 
 }

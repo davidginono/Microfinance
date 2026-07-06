@@ -229,7 +229,7 @@ public class LoanPaymentTransactionSyncService {
     private boolean shouldMarkDefaulted(LoanApplication loan,
                                         LoanPaymentSummaryDto summary,
                                         LocalDate today) {
-        return loan.getStatus() == LoanStatus.FINAL_APPROVED
+        return loan.getStatus() == LoanStatus.DISBURSED
             && hasOutstanding(summary.totalOutstanding())
             && isPastFinalDueDate(loan, today);
     }

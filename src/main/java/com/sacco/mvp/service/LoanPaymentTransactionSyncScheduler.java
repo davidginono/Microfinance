@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class LoanPaymentTransactionSyncScheduler {
 
     private static final List<LoanStatus> SYNC_STATUSES = List.of(
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );

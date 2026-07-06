@@ -435,6 +435,7 @@ Put-Parameter -Name "$parameterPrefix/SERVER_TOMCAT_THREADS_MIN_SPARE" -Value "5
 Put-Parameter -Name "$parameterPrefix/SERVER_TOMCAT_MAX_CONNECTIONS" -Value "1000" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SERVER_TOMCAT_ACCEPT_COUNT" -Value "100" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/SPRING_WEB_RESOURCES_CACHE_PERIOD" -Value "365d" -Type "String" -Force
+Put-Parameter -Name "$parameterPrefix/JAVA_TOOL_OPTIONS" -Value "-XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=20.0 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom" -Type "String" -Force
 Put-Parameter -Name "$parameterPrefix/CATALINA_OPTS" -Value "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseG1GC" -Type "String" -Force
 
 $amiId = Invoke-AwsText @(

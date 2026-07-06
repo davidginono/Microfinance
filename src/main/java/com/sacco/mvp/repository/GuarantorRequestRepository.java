@@ -89,7 +89,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.guarantorMemberId = :guarantorMemberId
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
-            com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED,
+            com.sacco.mvp.domain.LoanStatus.DISBURSED,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
@@ -152,7 +152,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.guarantorMemberId = :guarantorMemberId
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
-            com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED,
+            com.sacco.mvp.domain.LoanStatus.DISBURSED,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
@@ -175,7 +175,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.guarantorMemberId = :guarantorMemberId
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
-            com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED,
+            com.sacco.mvp.domain.LoanStatus.DISBURSED,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED
           )
           and (cast(:saccoId as string) is null or l.saccoId = :saccoId)

@@ -34,7 +34,7 @@ public class ApprovalFlowService {
 
     public LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {
         if (stage == null) {
-            return LoanStatus.FINAL_APPROVED;
+            return LoanStatus.DISBURSED;
         }
         return switch (stage) {
             case MANAGER -> LoanStatus.READY_FOR_MANAGER;
@@ -52,9 +52,10 @@ public class ApprovalFlowService {
             case MANAGER -> LoanStatus.MANAGER_REJECTED;
             case LOAN_OFFICER -> LoanStatus.LOAN_OFFICER_REJECTED;
             case CHAIRPERSON -> LoanStatus.CHAIRPERSON_REJECTED;
-            case BOARD, CREDIT_COMMITTEE -> LoanStatus.BOARD_REJECTED;
+            case BOARD -> LoanStatus.BOARD_REJECTED;
+            case CREDIT_COMMITTEE -> LoanStatus.CREDIT_COMMITTEE_REJECTED;
             case ACCOUNTANT -> LoanStatus.ACCOUNTANT_REJECTED;
-            case DISBURSEMENT_OFFICER -> LoanStatus.FINAL_REJECTED;
+            case DISBURSEMENT_OFFICER -> LoanStatus.REJECTED;
         };
     }
 

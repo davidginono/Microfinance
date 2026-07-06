@@ -205,9 +205,10 @@ public class BoardService {
             case LOAN_OFFICER -> LoanStatus.LOAN_OFFICER_REJECTED;
             case CHAIRPERSON -> LoanStatus.CHAIRPERSON_REJECTED;
             case ACCOUNTANT -> LoanStatus.ACCOUNTANT_REJECTED;
-            case DISBURSEMENT_OFFICER -> LoanStatus.FINAL_REJECTED;
+            case DISBURSEMENT_OFFICER -> LoanStatus.REJECTED;
             case MANAGER -> LoanStatus.MANAGER_REJECTED;
-            case BOARD, CREDIT_COMMITTEE -> LoanStatus.BOARD_REJECTED;
+            case BOARD -> LoanStatus.BOARD_REJECTED;
+            case CREDIT_COMMITTEE -> LoanStatus.CREDIT_COMMITTEE_REJECTED;
         };
     }
 }

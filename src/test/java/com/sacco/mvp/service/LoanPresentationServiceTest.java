@@ -601,7 +601,7 @@ class LoanPresentationServiceTest {
                 """)
             .applicantSignatureText("D. Applicant")
             .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-30T04:57:00+03:00"))
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .build();
         Member applicant = Member.builder()
             .id(UUID.randomUUID())

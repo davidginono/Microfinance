@@ -79,7 +79,7 @@ class LoanWorkflowServiceTest {
         LoanApplication activeLoan = LoanApplication.builder()
             .id(UUID.randomUUID())
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .build();
         LoanApplication currentLoan = LoanApplication.builder()
             .id(UUID.randomUUID())
@@ -125,7 +125,7 @@ class LoanWorkflowServiceTest {
         when(currentCount.getStatus()).thenReturn(LoanStatus.READY_FOR_MANAGER);
         when(paidCount.getStatus()).thenReturn(LoanStatus.PAID);
         when(paidCount.getTotal()).thenReturn(3L);
-        when(rejectedCount.getStatus()).thenReturn(LoanStatus.FINAL_REJECTED);
+        when(rejectedCount.getStatus()).thenReturn(LoanStatus.REJECTED);
         when(rejectedCount.getTotal()).thenReturn(2L);
         when(loanApplicationRepository.findVisibleCurrentForApplicant(eq(memberId), any()))
             .thenReturn(List.of(currentLoan));
@@ -146,7 +146,7 @@ class LoanWorkflowServiceTest {
         LoanApplication app = LoanApplication.builder()
             .id(appId)
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .updatedAt(OffsetDateTime.now().minusDays(1))
             .build();
         when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
@@ -185,7 +185,7 @@ class LoanWorkflowServiceTest {
             .build();
         LoanApplication activeLoan = LoanApplication.builder()
             .id(UUID.randomUUID())
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .build();
         when(loanApplicationRepository.findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
             .thenReturn(Optional.of(currentLoan));
@@ -693,7 +693,7 @@ class LoanWorkflowServiceTest {
             .id(sourceLoanId)
             .saccoId(saccoId)
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build();

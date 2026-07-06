@@ -8,6 +8,7 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
+import com.sacco.mvp.domain.OtpRequirementMode;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.UserClaim;
@@ -663,15 +664,15 @@ public class AdminController {
             "stationOtpDeliveryChannel",
             stationOtpSettingsService.channel(saccoId, adminScopeService.currentStationId(principal))
         );
+        model.addAttribute(
+            "stationOtpRequirementMode",
+            stationOtpSettingsService.requirementMode(saccoId, adminScopeService.currentStationId(principal))
+        );
         model.addAttribute("otpDeliveryChannels", OtpDeliveryChannel.values());
+        model.addAttribute("otpRequirementModes", OtpRequirementMode.values());
         model.addAttribute("currentStationPolicy", stationPolicy);
         model.addAttribute("policyStationId", adminScopeService.currentStationId(principal));
         model.addAttribute("policyApplicantMaxDefaultedLoans", stationPolicy == null ? settings.getApplicantMaxDefaultedLoans() : stationPolicy.getApplicantMaxDefaultedLoans());
-        model.addAttribute("policyApplicantMaxForfeitedLoans", stationPolicy == null ? settings.getApplicantMaxForfeitedLoans() : stationPolicy.getApplicantMaxForfeitedLoans());
-        model.addAttribute("policyApplicantForfeitedLookbackDays", stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays());
-        Integer applicantForfeitedWaitDays = stationPolicy == null ? settings.getApplicantForfeitedWaitDays() : stationPolicy.getApplicantForfeitedWaitDays();
-        Integer applicantForfeitedLookbackDays = stationPolicy == null ? settings.getApplicantForfeitedLookbackDays() : stationPolicy.getApplicantForfeitedLookbackDays();
-        model.addAttribute("policyApplicantForfeitedWaitDays", applicantForfeitedWaitDays == null ? applicantForfeitedLookbackDays : applicantForfeitedWaitDays);
         Boolean guarantorWithActiveLoanAllowed = stationPolicy == null ? settings.getGuarantorWithActiveLoanAllowed() : stationPolicy.getGuarantorWithActiveLoanAllowed();
         model.addAttribute("policyGuarantorWithActiveLoanAllowed", guarantorWithActiveLoanAllowed == null || guarantorWithActiveLoanAllowed);
         model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
@@ -1002,15 +1003,17 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam OtpDeliveryChannel otpDeliveryChannel,
+                                    @RequestParam(defaultValue = "LOGIN_MFA_ONLY") OtpRequirementMode otpRequirementMode,
                                     RedirectAttributes ra) {
         try {
             stationOtpSettingsService.update(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 otpDeliveryChannel,
+                otpRequirementMode,
                 principal.getMemberId()
             );
-            ra.addFlashAttribute("message", "OTP delivery setting updated for this station.");
+            ra.addFlashAttribute("message", "OTP settings updated for this station.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1021,9 +1024,6 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
-                                              @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
-                                              @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
-                                              @RequestParam(required = false) Integer applicantForfeitedWaitDays,
                                               @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                               @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                               @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
@@ -1034,9 +1034,6 @@ public class AdminController {
                 adminScopeService.currentStationId(principal),
                 principal.getMemberId(),
                 applicantMaxDefaultedLoans,
-                applicantMaxForfeitedLoans,
-                applicantForfeitedLookbackDays,
-                applicantForfeitedWaitDays,
                 guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
                 guarantorMaxDefaultedLoans
@@ -1053,9 +1050,6 @@ public class AdminController {
     public String updateStationQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                                      @RequestParam String stationId,
                                                      @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
-                                                     @RequestParam(required = false) Integer applicantMaxForfeitedLoans,
-                                                     @RequestParam(required = false) Integer applicantForfeitedLookbackDays,
-                                                     @RequestParam(required = false) Integer applicantForfeitedWaitDays,
                                                      @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                                      @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                                      @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
@@ -1066,9 +1060,6 @@ public class AdminController {
                 stationId,
                 principal.getMemberId(),
                 applicantMaxDefaultedLoans,
-                applicantMaxForfeitedLoans,
-                applicantForfeitedLookbackDays,
-                applicantForfeitedWaitDays,
                 guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
                 guarantorMaxDefaultedLoans

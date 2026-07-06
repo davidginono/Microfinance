@@ -97,7 +97,7 @@ class WorkflowRoutingServiceTest {
             eq("LOAN"),
             eq(appId),
             eq("LOAN_OFFICER_REVIEW_ASSIGNED"),
-            eq(actorId),
+            eq(loanOfficerId),
             eq("SACCO-1"),
             eq((String) null),
             any()

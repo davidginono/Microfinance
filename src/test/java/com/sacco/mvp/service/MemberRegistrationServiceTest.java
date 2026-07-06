@@ -79,7 +79,6 @@ class MemberRegistrationServiceTest {
         form.setFullName("Jane Member");
         form.setSaccoId("sacco-1");
         form.setStationId("stn001");
-        form.setSignatureText("Jane Member");
 
         when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(
             RegisteredSacco.builder()

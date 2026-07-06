@@ -72,7 +72,7 @@ public final class WorkspaceLanding {
             case DISBURSEMENT_OFFICER -> "/disbursement/dashboard";
             case CHAIRPERSON -> "/chairperson/dashboard";
             case BOARD -> "/board/dashboard";
-            case CREDIT_COMMITTEE -> "/board/dashboard";
+            case CREDIT_COMMITTEE -> "/credit-committee/dashboard";
             case MEMBER -> memberDashboard();
         };
     }
@@ -89,7 +89,7 @@ public final class WorkspaceLanding {
             case DISBURSEMENT_OFFICER -> hasClaim(principal, DISBURSEMENT_ACCESS_CLAIM) ? "/disbursement/dashboard" : null;
             case CHAIRPERSON -> hasClaim(principal, CHAIRPERSON_REVIEW_CLAIM) ? "/chairperson/dashboard" : null;
             case BOARD -> hasClaim(principal, BOARD_REVIEW_CLAIM) ? "/board/dashboard" : null;
-            case CREDIT_COMMITTEE -> hasClaim(principal, CREDIT_COMMITTEE_REVIEW_CLAIM) ? "/board/dashboard" : null;
+            case CREDIT_COMMITTEE -> hasClaim(principal, CREDIT_COMMITTEE_REVIEW_CLAIM) ? "/credit-committee/dashboard" : null;
             case MEMBER -> memberDashboard();
         };
     }

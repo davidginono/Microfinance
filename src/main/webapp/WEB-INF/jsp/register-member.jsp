@@ -219,7 +219,6 @@
         <div class="mb-6 sm:mb-7">
             <div class="auth-title-stack min-w-0">
                 <h1 class="auth-heading"><spring:message code="register.member.title" /></h1>
-                <p class="auth-subheading mt-3"><spring:message code="register.member.subtitle" /></p>
             </div>
         </div>
 
@@ -331,18 +330,6 @@
                             </div>
                         </div>
                         <p class="registration-note text-sm">Use at least 8 characters. This password will be saved after your details and OTP are verified.</p>
-                    </div>
-
-                    <div class="auth-form-card">
-                        <spring:bind path="registrationForm.signatureText">
-                            <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">Signature</label>
-                        </spring:bind>
-                        <form:input path="signatureText"
-                                    id="registrationSignatureInput"
-                                    cssClass="registration-field"
-                                    placeholder="Example: James M Juma" />
-                        <p class="registration-note mt-2 text-sm">Type your signature in a simple name style like <strong>James M Juma</strong>.</p>
-                        <form:errors path="signatureText" cssClass="mt-1 block text-xs text-rose-600" />
                     </div>
 
                     <div id="registrationOtpBlock" class="auth-form-card ${not empty registrationForm.otpCode ? '' : 'hidden'}">
@@ -464,11 +451,10 @@
         const otpBlock = document.getElementById("registrationOtpBlock");
         const otpInput = form ? form.querySelector('[name="otpCode"]') : null;
         const otpLiveStatus = document.getElementById("registrationOtpLiveStatus");
-        const signatureInput = document.getElementById("registrationSignatureInput");
         const saccoSelect = form.querySelector('[name="saccoId"]');
         const stationSelect = document.getElementById("registrationStationSelect");
         const registrationSaccosData = document.getElementById("registrationSaccosData");
-        if (!form || !requestOtpButton || !submitButton || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !signatureInput || !saccoSelect || !stationSelect || !registrationSaccosData) {
+        if (!form || !requestOtpButton || !submitButton || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData) {
             return;
         }
 

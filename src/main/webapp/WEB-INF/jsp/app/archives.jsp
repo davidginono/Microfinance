@@ -69,7 +69,7 @@
                                     <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
                                 </c:if>
                             </td>
-                            <td>${guaranteeLoanAmounts[req.loanApplicationId]}</td>
+                            <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
                             <td>${req.status}</td>
                             <td>
                                 <c:choose>
@@ -116,7 +116,6 @@
                             <option value="DISBURSED" ${loanArchiveFilter eq 'DISBURSED' ? 'selected' : ''}><spring:message code="archives.loan.disbursedOnly" text="Disbursed only" /></option>
                             <option value="DEFAULTED" ${loanArchiveFilter eq 'DEFAULTED' ? 'selected' : ''}><spring:message code="archives.loan.defaultedOnly" text="Defaulted only" /></option>
                             <option value="PAID" ${loanArchiveFilter eq 'PAID' ? 'selected' : ''}><spring:message code="archives.loan.paidOnly" text="Paid only" /></option>
-                            <option value="FORFEITED" ${loanArchiveFilter eq 'FORFEITED' ? 'selected' : ''}><spring:message code="archives.loan.forfeitedOnly" text="Forfeited only" /></option>
                             <option value="REJECTED" ${loanArchiveFilter eq 'REJECTED' ? 'selected' : ''}><spring:message code="archives.loan.rejectedOnly" text="Rejected only" /></option>
                         </select>
                     </label>

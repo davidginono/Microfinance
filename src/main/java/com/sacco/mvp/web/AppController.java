@@ -22,6 +22,7 @@ import com.sacco.mvp.service.LoanProductWorkflowService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.ReversalRequestService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.service.dto.FormModel;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -63,16 +64,20 @@ public class AppController {
     private static final List<LoanStatus> ARCHIVED_LOAN_STATUSES = List.of(
         LoanStatus.MANAGER_REJECTED,
         LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.CHAIRPERSON_REJECTED,
         LoanStatus.BOARD_REJECTED,
+        LoanStatus.CREDIT_COMMITTEE_REJECTED,
         LoanStatus.ACCOUNTANT_REJECTED,
-        LoanStatus.FORFEITED,
-        LoanStatus.FINAL_REJECTED,
-        LoanStatus.FINAL_APPROVED,
+        LoanStatus.REJECTED,
+        LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
     private static final DateTimeFormatter REVERSAL_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
     private static final String DISMISSED_ACTIVE_LOAN_CHARTS_KEY = "dismissedActiveLoanCharts";
+    private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
+    private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
+    private static final String GUARANTOR_APPROVAL_MODE_DIRECT_OTP = "DIRECT_OTP";
     private final LoanWorkflowService loanWorkflowService;
     private final LoanAnalyticsService loanAnalyticsService;
     private final LoanQualificationPolicyService loanQualificationPolicyService;
@@ -103,6 +108,7 @@ public class AppController {
     private final ObjectMapper objectMapper;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
     private final MessageSource messageSource;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -190,7 +196,7 @@ public class AppController {
                                                  RedirectAttributes ra) {
         LoanApplication app = loanApplicationRepository.findByIdAndApplicantMemberId(loanId, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan not found"));
-        if (app.getStatus() != LoanStatus.FINAL_APPROVED && app.getStatus() != LoanStatus.DEFAULTED) {
+        if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.DEFAULTED) {
             ra.addFlashAttribute("error", "Only active or defaulted disbursed loans can be removed from the repayment timeline.");
             return "redirect:/app/dashboard";
         }
@@ -230,7 +236,12 @@ public class AppController {
     public String listMyApps(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(principal.getMemberId());
         List<LoanApplication> apps = applications.currentApplications();
+        LoanApplication currentWorkflowApplication = applications.latestCurrentApplication();
         model.addAttribute("apps", apps);
+        model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
+        model.addAttribute("currentWorkflowSteps", currentWorkflowApplication == null
+            ? List.of()
+            : buildDashboardWorkflowSteps(currentWorkflowApplication));
         model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(apps));
         model.addAttribute("archiveCount", applications.archiveCount());
         return "app/loan-applications";
@@ -367,7 +378,6 @@ public class AppController {
             memberMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed", deltas),
             memberMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid", deltas),
             memberMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted", deltas),
-            memberMetricCard("forfeited", "Forfeited Loan Applications", analytics.forfeitedLoans(), "rose", "Forfeited", deltas),
             memberMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected", deltas)
         );
     }
@@ -436,6 +446,7 @@ public class AppController {
                 row.put("loanProductName", loanProductName(app.getLoanType(), loanProductNames));
                 row.put("applicantReason", applicantReason(app));
                 row.put("amountLabel", loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("disbursementDate", app.getDisbursementDate() == null ? "-" : app.getDisbursementDate());
                 row.put("startDate", resolveRepaymentTimerStartDate(app));
                 row.put("daysLeft", daysLeft);
                 row.put("elapsedDays", elapsedDays);
@@ -451,6 +462,8 @@ public class AppController {
                 row.put("loanDescription", paymentSummary.loanDescription());
                 row.put("lastPaymentDate", paymentSummary.lastPaymentDateLabel());
                 row.put("totalOutstanding", paymentSummary.totalOutstandingLabel());
+                row.put("paidAmount", paymentSummary.totalPrincipalPaidLabel());
+                row.put("currentBalance", paymentSummary.totalOutstandingLabel());
                 row.put("outstandingPrincipal", paymentSummary.outstandingPrincipalLabel());
                 row.put("outstandingInterest", paymentSummary.outstandingInterestLabel());
                 row.put("totalPrincipalPaid", paymentSummary.totalPrincipalPaidLabel());
@@ -512,7 +525,7 @@ public class AppController {
             LoanStatus.READY_FOR_MANAGER,
             LoanStatus.AWAITING_BOARD,
             LoanStatus.AWAITING_CREDIT_COMMITTEE,
-            LoanStatus.FINAL_APPROVED
+            LoanStatus.DISBURSED
         );
         long maxCount = statusOrder.stream()
             .map(status -> statusCounts.getOrDefault(status, 0L))
@@ -616,11 +629,12 @@ public class AppController {
             case READY_FOR_MANAGER, MANAGER_REJECTED,
                 AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED,
                 AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED,
-                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED,
+                AWAITING_BOARD, BOARD_REJECTED,
+                AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
-            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED -> 4;
-            case READY_FOR_DISBURSEMENT, FORFEITED, FINAL_REJECTED -> 4;
-            case FINAL_APPROVED, DEFAULTED, PAID -> 5;
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED -> 4;
+            case READY_FOR_DISBURSEMENT, REJECTED -> 4;
+            case DISBURSED, DEFAULTED, PAID -> 5;
         };
     }
 
@@ -633,7 +647,7 @@ public class AppController {
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED -> ApprovalWorkflowStage.LOAN_OFFICER;
             case AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED -> ApprovalWorkflowStage.CHAIRPERSON;
             case AWAITING_BOARD, BOARD_REJECTED -> ApprovalWorkflowStage.BOARD;
-            case AWAITING_CREDIT_COMMITTEE -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
+            case AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
             case AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> ApprovalWorkflowStage.ACCOUNTANT;
             default -> null;
         };
@@ -648,6 +662,7 @@ public class AppController {
             case LOAN_OFFICER_APPROVED -> ApprovalWorkflowStage.LOAN_OFFICER;
             case CHAIRPERSON_APPROVED -> ApprovalWorkflowStage.CHAIRPERSON;
             case BOARD_APPROVED -> ApprovalWorkflowStage.BOARD;
+            case CREDIT_COMMITTEE_APPROVED -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
             case ACCOUNTANT_APPROVED -> ApprovalWorkflowStage.ACCOUNTANT;
             default -> null;
         };
@@ -788,7 +803,7 @@ public class AppController {
         if (app == null) {
             return false;
         }
-        return app.getStatus() == LoanStatus.FINAL_APPROVED
+        return app.getStatus() == LoanStatus.DISBURSED
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID;
     }
@@ -878,7 +893,7 @@ public class AppController {
             return "";
         }
         if (app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT
-            || app.getStatus() == LoanStatus.FINAL_APPROVED
+            || app.getStatus() == LoanStatus.DISBURSED
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
@@ -893,7 +908,7 @@ public class AppController {
         if (app.getDisbursementDate() != null) {
             return formatDashboardWorkflowDate(app.getDisbursementDate());
         }
-        if (app.getStatus() == LoanStatus.FINAL_APPROVED || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
+        if (app.getStatus() == LoanStatus.DISBURSED || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
         }
         return "";
@@ -1028,7 +1043,11 @@ public class AppController {
                     requiredAttachmentFiles
                 );
                 if (submitted.getStatus() == LoanStatus.AWAITING_GUARANTORS) {
-                    ra.addFlashAttribute("message", "Application sent to guarantors successfully. Current status: " + submitted.getStatus());
+                    if (isDirectOtpGuarantorApproval(submitted)) {
+                        addDirectGuarantorOtpFlash(ra, issueApplicantGuarantorConfirmationOtps(submitted));
+                    } else {
+                        ra.addFlashAttribute("message", "Application sent to guarantors successfully. Current status: " + submitted.getStatus());
+                    }
                 } else if (submitted.getRequiredGuarantors() <= 0) {
                     Member signingMember = requireMemberWithSavedSignature(principal.getMemberId());
                     loanWorkflowService.recordApplicantSignature(
@@ -1044,7 +1063,7 @@ public class AppController {
                 } else {
                     ra.addFlashAttribute("message", "Application updated successfully. Current status: " + submitted.getStatus());
                 }
-                return "redirect:/app/loan-applications";
+                return "redirect:/app/loan-applications/" + submitted.getId();
             }
 
             LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), loanType,
@@ -1100,9 +1119,6 @@ public class AppController {
             app.getTopUpSourceLoanId() == null ? null
                 : loanApplicationRepository.findByIdAndApplicantMemberId(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
         model.addAttribute("canRequestTopUp", loanWorkflowService.canRequestTopUp(app));
-        model.addAttribute("canForfeitApplication", loanWorkflowService.canForfeitReviewApplication(app));
-        model.addAttribute("forfeitWaitDays",
-            loanQualificationPolicyService.applicantForfeitedWaitDays(app.getSaccoId(), app.getApplicantMemberId()).orElse(null));
         model.addAttribute("loanFinalSubmitLabel", finalSubmitLabel(app));
         model.addAttribute("formFields", loanPresentationService.parseFormFields(app.getFormData()));
         model.addAttribute("guarantorRequests", guarantorRequests);
@@ -1117,6 +1133,17 @@ public class AppController {
         }
         model.addAttribute("pendingGuarantorUndoRequests", pendingGuarantorUndoRequests);
         model.addAttribute("pendingGuarantorRemovalRequest", !pendingGuarantorUndoRequests.isEmpty());
+        String guarantorApprovalMode = guarantorApprovalMode(app);
+        List<GuarantorRequest> pendingDirectOtpGuarantorRequests = guarantorRequests.stream()
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING)
+            .toList();
+        model.addAttribute("guarantorApprovalMode", guarantorApprovalMode);
+        model.addAttribute("directOtpGuarantorApproval", GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(guarantorApprovalMode));
+        model.addAttribute("directOtpGuarantorRequests", pendingDirectOtpGuarantorRequests);
+        model.addAttribute("directOtpGuarantorPanelVisible",
+            GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(guarantorApprovalMode)
+                && app.getStatus() == LoanStatus.AWAITING_GUARANTORS
+                && !pendingDirectOtpGuarantorRequests.isEmpty());
         model.addAttribute("pendingManagerStageWithdrawal", reversalRequestService.pendingManagerStageWithdrawal(id));
         OffsetDateTime memberReversalReferenceAt = app.getStatus() == LoanStatus.READY_FOR_MANAGER
             ? app.getUpdatedAt()
@@ -1148,6 +1175,8 @@ public class AppController {
         model.addAttribute("repaymentMonthsLeft",
             app.getFinalDueDate() == null ? null : Math.max(0, java.time.temporal.ChronoUnit.MONTHS.between(java.time.LocalDate.now().withDayOfMonth(1), app.getFinalDueDate().withDayOfMonth(1))));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(app.getApplicantMemberId()));
+        model.addAttribute("applicantApprovalOtpEnabled",
+            stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
         model.addAttribute("canPrint",
             app.getFinancialSnapshot() != null
                 && !app.getFinancialSnapshot().isBlank()
@@ -1158,7 +1187,7 @@ public class AppController {
         model.addAttribute("statusTimeline", List.of(
             LoanStatus.DRAFT, LoanStatus.AWAITING_GUARANTORS, LoanStatus.ALL_GUARANTORS_APPROVED, LoanStatus.READY_FOR_MANAGER,
             LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.AWAITING_CREDIT_COMMITTEE, LoanStatus.BOARD_APPROVED,
-            LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.FORFEITED, LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID
+            LoanStatus.CREDIT_COMMITTEE_APPROVED, LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
     }
@@ -1212,9 +1241,10 @@ public class AppController {
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
                 AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
-                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED, CREDIT_COMMITTEE_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
-            case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 5;
+            case REJECTED, DISBURSED, DEFAULTED, PAID -> 5;
         };
     }
 
@@ -1228,9 +1258,10 @@ public class AppController {
             case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
             case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
                 AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
-                AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
+                AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED, CREDIT_COMMITTEE_APPROVED,
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
-            case FORFEITED, FINAL_REJECTED, FINAL_APPROVED, DEFAULTED, PAID -> 100;
+            case REJECTED, DISBURSED, DEFAULTED, PAID -> 100;
         };
     }
 
@@ -1242,11 +1273,11 @@ public class AppController {
             case DRAFT -> "bg-slate-100 text-slate-700";
             case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> "bg-cyan-50 text-cyan-700";
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, DEFAULTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
             case AWAITING_LOAN_OFFICER, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
-            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
-                FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
-            case FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
+                DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
+            case REJECTED -> "bg-rose-50 text-rose-700";
         };
     }
 
@@ -1264,7 +1295,11 @@ public class AppController {
             UUID applicantSignatureOtpTokenId = validateApplicantSignatureOtpIfRequired(current, principal.getMemberId(), applicantSignatureOtpCode);
             LoanApplication app = loanWorkflowService.submit(id, principal.getMemberId());
             if (app.getStatus() == LoanStatus.AWAITING_GUARANTORS) {
-                ra.addFlashAttribute("message", "Application sent to guarantors successfully.");
+                if (isDirectOtpGuarantorApproval(app)) {
+                    addDirectGuarantorOtpFlash(ra, issueApplicantGuarantorConfirmationOtps(app));
+                } else {
+                    ra.addFlashAttribute("message", "Application sent to guarantors successfully.");
+                }
                 return "redirect:/app/loan-applications/" + id;
             }
             if (app.getStatus() == LoanStatus.READY_FOR_MANAGER) {
@@ -1325,24 +1360,6 @@ public class AppController {
             }
             loanWorkflowService.cancelSubmission(id, principal.getMemberId());
             ra.addFlashAttribute("message", "Application moved back to draft.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/app/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/forfeit")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
-    public String forfeitApplication(@PathVariable UUID id,
-                                     @AuthenticationPrincipal AppUserPrincipal principal,
-                                     @RequestParam String forfeitOtpCode,
-                                     RedirectAttributes ra) {
-        try {
-            Member member = requireMemberWithEmail(principal.getMemberId());
-            UUID otpTokenId = emailOtpService.validateOtp(member.getEmail(), EmailOtpPurpose.LOAN_APPLICATION_FORFEIT, forfeitOtpCode);
-            loanWorkflowService.forfeitReviewApplication(id, principal.getMemberId());
-            emailOtpService.consumeOtpById(otpTokenId);
-            ra.addFlashAttribute("message", "Application forfeited successfully.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1544,8 +1561,28 @@ public class AppController {
         List<GuarantorRequest> requests = loanWorkflowService.myActiveGuarantorRequests(principal.getMemberId());
         model.addAttribute("requests", requests);
         addGuaranteeActionContext(requests, model);
+        model.addAttribute("guarantorRequestOtpEnabled", guarantorRequestOtpEnabled(requests));
         model.addAttribute("guarantorSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
         return "app/guarantee-requests";
+    }
+
+    private Map<UUID, Boolean> guarantorRequestOtpEnabled(List<GuarantorRequest> requests) {
+        Map<UUID, Boolean> enabled = new LinkedHashMap<>();
+        if (requests == null || requests.isEmpty()) {
+            return enabled;
+        }
+        Set<UUID> loanIds = requests.stream()
+            .map(GuarantorRequest::getLoanApplicationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<UUID, LoanApplication> loans = loanApplicationRepository.findAllById(loanIds).stream()
+            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan));
+        for (GuarantorRequest request : requests) {
+            LoanApplication loan = loans.get(request.getLoanApplicationId());
+            enabled.put(request.getId(), loan == null
+                || stationOtpSettingsService.requiresApprovalOtp(loan.getSaccoId(), loan.getStationId()));
+        }
+        return enabled;
     }
 
     @GetMapping("/guaranteed-loans")
@@ -1587,15 +1624,22 @@ public class AppController {
                 "Add an email address to your member profile before requesting a guarantor OTP.",
                 "Register your signature first before approving guarantor requests."
             );
-            UUID otpTokenId = emailOtpService.validateOtp(
-                guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantorSignatureOtpCode);
+            GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())
+                ? emailOtpService.validateOtp(guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantorSignatureOtpCode)
+                : null;
             loanWorkflowService.approveGuarantorRequest(
                 requestId,
                 principal.getMemberId(),
                 guarantor.getSignatureText(),
                 OffsetDateTime.now()
             );
-            emailOtpService.consumeOtpById(otpTokenId);
+            if (otpTokenId != null) {
+                emailOtpService.consumeOtpById(otpTokenId);
+            }
             ra.addFlashAttribute("message", "Guarantee request approved");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -1626,6 +1670,9 @@ public class AppController {
             }
             String otpSaccoId = workflowApplication == null ? member.getSaccoId() : workflowApplication.getSaccoId();
             String otpStationId = workflowApplication == null ? member.getStationId() : workflowApplication.getStationId();
+            if (!stationOtpSettingsService.requiresApprovalOtp(otpSaccoId, otpStationId)) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            }
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
                 EmailOtpPurpose.GUARANTOR_SIGNATURE,
@@ -1657,6 +1704,14 @@ public class AppController {
             if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                 throw new IllegalStateException("Request already decided");
             }
+            LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+                return ResponseEntity.ok(Map.of(
+                    "valid", true,
+                    "message", "OTP verification is disabled for approval actions at this station."
+                ));
+            }
             Member guarantor = requireMemberWithSavedSignature(
                 principal.getMemberId(),
                 "Add an email address to your member profile before verifying a guarantor OTP.",
@@ -1684,6 +1739,9 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
+            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            }
             Member member = requireMemberWithSavedSignature(principal.getMemberId());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 member.getEmail(),
@@ -1713,6 +1771,12 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
             assertApplicantSignatureOtpAllowed(application);
+            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+                return ResponseEntity.ok(Map.of(
+                    "valid", true,
+                    "message", "OTP verification is disabled for approval actions at this station."
+                ));
+            }
             validateApplicantSignatureOtp(principal.getMemberId(), otpCode);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
@@ -1726,34 +1790,132 @@ public class AppController {
         }
     }
 
-    @PostMapping("/loan-applications/request-forfeit-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> requestForfeitOtp(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                                 @RequestParam UUID applicationId) {
+    @PostMapping("/loan-applications/{loanId}/guarantors/{requestId}/request-confirmation-otp")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    public String requestApplicantGuarantorConfirmationOtp(@PathVariable UUID loanId,
+                                                           @PathVariable UUID requestId,
+                                                           @AuthenticationPrincipal AppUserPrincipal principal,
+                                                           RedirectAttributes ra) {
         try {
-            LoanApplication application = loanWorkflowService.getMine(applicationId, principal.getMemberId());
-            if (!loanWorkflowService.canForfeitReviewApplication(application)) {
-                throw new IllegalStateException("This application cannot be forfeited at its current stage.");
-            }
-            Member member = requireMemberWithEmail(principal.getMemberId());
-            EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
-                member.getEmail(),
-                EmailOtpPurpose.LOAN_APPLICATION_FORFEIT,
-                member.getId(),
-                "Your loan application forfeit code",
-                "Use this OTP code to confirm that you want to forfeit this loan application.",
-                application.getSaccoId(),
-                application.getStationId(),
-                member.getPhone()
+            LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
+            assertDirectOtpGuarantorApproval(application);
+            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+                .filter(item -> loanId.equals(item.getLoanApplicationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            Member guarantor = requireMemberWithEmail(
+                request.getGuarantorMemberId(),
+                "The selected guarantor must have an email address before receiving a confirmation OTP."
             );
-            return ResponseEntity.ok(otpIssueResponse(otp, "We sent a forfeit confirmation code using the station OTP delivery policy."));
+            issueApplicantGuarantorConfirmationOtp(application, request, guarantor);
+            ra.addFlashAttribute("message", "Guarantor OTP sent to " + guarantor.getFullName() + ".");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + loanId;
+    }
+
+    @PostMapping(value = "/loan-applications/{loanId}/guarantors/{requestId}/request-confirmation-otp-json", produces = "application/json")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestApplicantGuarantorConfirmationOtpJson(@PathVariable UUID loanId,
+                                                                                             @PathVariable UUID requestId,
+                                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
+        try {
+            LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
+            assertDirectOtpGuarantorApproval(application);
+            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+                .filter(item -> loanId.equals(item.getLoanApplicationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            Member guarantor = requireMemberWithEmail(
+                request.getGuarantorMemberId(),
+                "The selected guarantor must have an email address before receiving a confirmation OTP."
+            );
+            EmailOtpService.OtpIssueResult otp = issueApplicantGuarantorConfirmationOtp(application, request, guarantor);
+            return ResponseEntity.ok(otpIssueResponse(otp, "Guarantor OTP sent to " + guarantor.getFullName() + "."));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
                 "message", ex.getMessage()
             ));
         }
+    }
+
+    @PostMapping(value = "/loan-applications/{loanId}/guarantors/{requestId}/verify-confirmation-otp", produces = "application/json")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyApplicantGuarantorConfirmationOtp(@PathVariable UUID loanId,
+                                                                                       @PathVariable UUID requestId,
+                                                                                       @AuthenticationPrincipal AppUserPrincipal principal,
+                                                                                       @RequestParam String otpCode) {
+        try {
+            LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
+            assertDirectOtpGuarantorApproval(application);
+            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+                .filter(item -> loanId.equals(item.getLoanApplicationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+                throw new IllegalStateException("This guarantor request has already been decided.");
+            }
+            Member guarantor = requireMemberWithEmail(
+                request.getGuarantorMemberId(),
+                "The selected guarantor must have an email address before confirming by OTP."
+            );
+            emailOtpService.validateOtp(
+                guarantor.getEmail(),
+                EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+                guarantor.getId(),
+                otpCode
+            );
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "Verified"
+            ));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/loan-applications/{loanId}/guarantors/{requestId}/confirm-with-otp")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    public String confirmApplicantGuarantorOtp(@PathVariable UUID loanId,
+                                               @PathVariable UUID requestId,
+                                               @AuthenticationPrincipal AppUserPrincipal principal,
+                                               @RequestParam String otpCode,
+                                               RedirectAttributes ra) {
+        try {
+            LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
+            assertDirectOtpGuarantorApproval(application);
+            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+                .filter(item -> loanId.equals(item.getLoanApplicationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+            if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+                throw new IllegalStateException("This guarantor request has already been decided.");
+            }
+            Member guarantor = requireMemberWithEmail(
+                request.getGuarantorMemberId(),
+                "The selected guarantor must have an email address before confirming by OTP."
+            );
+            UUID otpTokenId = emailOtpService.validateOtp(
+                guarantor.getEmail(),
+                EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+                guarantor.getId(),
+                otpCode
+            );
+            loanWorkflowService.approveGuarantorRequest(
+                requestId,
+                guarantor.getId(),
+                "Approved by guarantor OTP",
+                OffsetDateTime.now()
+            );
+            emailOtpService.consumeOtpById(otpTokenId);
+            ra.addFlashAttribute("message", "Guarantor approval confirmed.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + loanId;
     }
 
     @PostMapping("/guarantee-requests/{requestId}/reject")
@@ -2052,6 +2214,9 @@ public class AppController {
         model.addAttribute("loanProductDescription", schema.getDisplayDescription());
         model.addAttribute("requiredGuarantors", requiredGuarantors);
         model.addAttribute("formValues", formValues == null ? Collections.emptyMap() : formValues);
+        model.addAttribute("guarantorApprovalMode", normalizeGuarantorApprovalMode(
+            formValues == null ? null : formValues.get(GUARANTOR_APPROVAL_MODE_FIELD)
+        ));
         model.addAttribute("selectedGuarantorLookup", toLookupMap(guarantorIds));
         model.addAttribute("selectedGuarantorItems", selectedGuarantorItems(guarantorIds));
         model.addAttribute("savingsLabel", formatTzs(eligibility.savings()));
@@ -2314,7 +2479,9 @@ public class AppController {
     }
 
     private String humanizeLoanFormError(String message, AppUserPrincipal principal, LoanType loanType) {
-        if (message != null && message.contains("Amount exceeds eligibility cap")) {
+        if (message != null
+            && (message.contains("Amount exceeds eligibility cap")
+                || message.contains("Loan amount exceeds the applicant savings limit"))) {
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
                 principal.getSaccoId(), principal.getMemberId(), loanType, BigDecimal.ZERO);
             return "Amount exceeds your eligibility. Maximum allowed now is " + formatTzs(eligibility.maxAllowed())
@@ -2364,6 +2531,7 @@ public class AppController {
         }
         boolean requiresOtp = app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED
             || (app.getStatus() == LoanStatus.DRAFT && (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0));
+        requiresOtp = requiresOtp && stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId());
         if (!requiresOtp) {
             return null;
         }
@@ -2390,6 +2558,83 @@ public class AppController {
         response.put("maxResends", otp.maxResends());
         response.put("resendAttemptsRemaining", otp.resendAttemptsRemaining());
         return response;
+    }
+
+    private DirectGuarantorOtpIssueSummary issueApplicantGuarantorConfirmationOtps(LoanApplication application) {
+        List<GuarantorRequest> pendingRequests = guarantorRequestRepository.findByLoanApplicationId(application.getId()).stream()
+            .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING)
+            .toList();
+        int sent = 0;
+        List<String> warnings = new ArrayList<>();
+        for (GuarantorRequest request : pendingRequests) {
+            try {
+                Member guarantor = requireMemberWithEmail(
+                    request.getGuarantorMemberId(),
+                    "The selected guarantor must have an email address before receiving a confirmation OTP."
+                );
+                issueApplicantGuarantorConfirmationOtp(application, request, guarantor);
+                sent += 1;
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                warnings.add(ex.getMessage());
+            }
+        }
+        return new DirectGuarantorOtpIssueSummary(sent, warnings);
+    }
+
+    private EmailOtpService.OtpIssueResult issueApplicantGuarantorConfirmationOtp(LoanApplication application,
+                                                                                  GuarantorRequest request,
+                                                                                  Member guarantor) {
+        if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+            throw new IllegalStateException("This guarantor request has already been decided.");
+        }
+        return emailOtpService.issueOtpWithMetadata(
+            guarantor.getEmail(),
+            EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+            guarantor.getId(),
+            "Your SACCO guarantor confirmation code",
+            "Share this OTP with the applicant only if you approve being listed as guarantor for this loan application.",
+            application.getSaccoId(),
+            application.getStationId(),
+            guarantor.getPhone()
+        );
+    }
+
+    private void addDirectGuarantorOtpFlash(RedirectAttributes ra, DirectGuarantorOtpIssueSummary summary) {
+        if (summary.sent() > 0) {
+            ra.addFlashAttribute("message", "Application sent to guarantors. Direct OTP codes sent to " + summary.sent() + " guarantor(s).");
+        } else {
+            ra.addFlashAttribute("message", "Application sent to guarantors.");
+        }
+        if (!summary.warnings().isEmpty()) {
+            ra.addFlashAttribute("error", String.join(" ", summary.warnings()));
+        }
+    }
+
+    private boolean isDirectOtpGuarantorApproval(LoanApplication application) {
+        return GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(guarantorApprovalMode(application));
+    }
+
+    private void assertDirectOtpGuarantorApproval(LoanApplication application) {
+        if (!isDirectOtpGuarantorApproval(application)) {
+            throw new IllegalStateException("Direct OTP approval is not enabled for this application.");
+        }
+    }
+
+    private String guarantorApprovalMode(LoanApplication application) {
+        if (application == null) {
+            return GUARANTOR_APPROVAL_MODE_LOGIN;
+        }
+        return normalizeGuarantorApprovalMode(parseJsonAsStringMap(application.getFormData()).get(GUARANTOR_APPROVAL_MODE_FIELD));
+    }
+
+    private String normalizeGuarantorApprovalMode(String value) {
+        if (GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equalsIgnoreCase(String.valueOf(value).trim())) {
+            return GUARANTOR_APPROVAL_MODE_DIRECT_OTP;
+        }
+        return GUARANTOR_APPROVAL_MODE_LOGIN;
+    }
+
+    private record DirectGuarantorOtpIssueSummary(int sent, List<String> warnings) {
     }
 
     private boolean requiresApplicantOtpBeforeImmediateSubmission(String saccoId, LoanType loanType) {
@@ -2506,17 +2751,20 @@ public class AppController {
         Map<UUID, String> guaranteeNames = new HashMap<>();
         Map<UUID, LoanType> guaranteeLoanTypes = new HashMap<>();
         Map<UUID, BigDecimal> guaranteeLoanAmounts = new HashMap<>();
+        Map<UUID, String> guaranteeLoanAmountLabels = new HashMap<>();
         for (Map.Entry<UUID, LoanApplication> entry : applicationById.entrySet()) {
             LoanApplication application = entry.getValue();
             guaranteeNames.put(entry.getKey(),
                 applicantNames.getOrDefault(application.getApplicantMemberId(), message("member.unknown")));
             guaranteeLoanTypes.put(entry.getKey(), application.getLoanType());
             guaranteeLoanAmounts.put(entry.getKey(), application.getAmount());
+            guaranteeLoanAmountLabels.put(entry.getKey(), formatTzs(application.getAmount()));
         }
 
         model.addAttribute("guaranteeNames", guaranteeNames);
         model.addAttribute("guaranteeLoanTypes", guaranteeLoanTypes);
         model.addAttribute("guaranteeLoanAmounts", guaranteeLoanAmounts);
+        model.addAttribute("guaranteeLoanAmountLabels", guaranteeLoanAmountLabels);
     }
 
     private void addGuaranteeActionContext(List<GuarantorRequest> requests, Model model) {
@@ -2571,16 +2819,17 @@ public class AppController {
 
     private List<LoanStatus> loanArchiveStatuses(String filter) {
         return switch (safeArchiveFilter(filter)) {
-            case "DISBURSED" -> List.of(LoanStatus.FINAL_APPROVED);
+            case "DISBURSED" -> List.of(LoanStatus.DISBURSED);
             case "DEFAULTED" -> List.of(LoanStatus.DEFAULTED);
             case "PAID" -> List.of(LoanStatus.PAID);
-            case "FORFEITED" -> List.of(LoanStatus.FORFEITED);
             case "REJECTED" -> List.of(
                 LoanStatus.MANAGER_REJECTED,
                 LoanStatus.LOAN_OFFICER_REJECTED,
+                LoanStatus.CHAIRPERSON_REJECTED,
                 LoanStatus.BOARD_REJECTED,
+                LoanStatus.CREDIT_COMMITTEE_REJECTED,
                 LoanStatus.ACCOUNTANT_REJECTED,
-                LoanStatus.FINAL_REJECTED
+                LoanStatus.REJECTED
             );
             default -> ARCHIVED_LOAN_STATUSES;
         };
@@ -2718,8 +2967,7 @@ public class AppController {
 
     private boolean isArchivedStatus(LoanStatus status) {
         return isRejectedStatus(status)
-            || status == LoanStatus.FORFEITED
-            || status == LoanStatus.FINAL_APPROVED
+            || status == LoanStatus.DISBURSED
             || status == LoanStatus.DEFAULTED
             || status == LoanStatus.PAID;
     }
@@ -2789,7 +3037,7 @@ public class AppController {
             || status == LoanStatus.LOAN_OFFICER_REJECTED
             || status == LoanStatus.BOARD_REJECTED
             || status == LoanStatus.ACCOUNTANT_REJECTED
-            || status == LoanStatus.FINAL_REJECTED;
+            || status == LoanStatus.REJECTED;
     }
 
     private Map<String, Object> externalAccountStatusPayload(ExternalAccountStatusService.ExternalAccountStatusView status) {
@@ -2809,7 +3057,7 @@ public class AppController {
             || status == LoanStatus.READY_FOR_MANAGER
             || status == LoanStatus.AWAITING_BOARD
             || status == LoanStatus.AWAITING_CREDIT_COMMITTEE
-            || status == LoanStatus.FINAL_APPROVED
+            || status == LoanStatus.DISBURSED
             || status == LoanStatus.DEFAULTED;
     }
 
@@ -2840,7 +3088,7 @@ public class AppController {
         if (status == LoanStatus.AWAITING_CREDIT_COMMITTEE) {
             return "#8B5CF6";
         }
-        if (status == LoanStatus.FINAL_APPROVED) {
+        if (status == LoanStatus.DISBURSED) {
             return "#22C55E";
         }
         if (status == LoanStatus.DEFAULTED) {
@@ -2848,9 +3096,6 @@ public class AppController {
         }
         if (status == LoanStatus.PAID) {
             return "#0F766E";
-        }
-        if (status == LoanStatus.FORFEITED) {
-            return "#F43F5E";
         }
         return "#94A3B8";
     }

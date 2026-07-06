@@ -23,7 +23,7 @@ public class WorkflowStatusPresentationService {
             slice("READY_FOR_MANAGER", "Waiting for Manager Review", "#14B8A6", LoanStatus.READY_FOR_MANAGER),
             slice("MANAGER_ACCEPTED", "Approved by Manager", "#0EA5E9", LoanStatus.MANAGER_ACCEPTED),
             slice("MANAGER_REJECTED", "Rejected by Manager", "#F43F5E", LoanStatus.MANAGER_REJECTED),
-            slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.FINAL_APPROVED),
+            slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED),
             slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID),
             slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED)
         ), statusBreakdown);
@@ -69,7 +69,7 @@ public class WorkflowStatusPresentationService {
     public List<Map<String, Object>> buildDisbursementDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown) {
         return buildRows(List.of(
             slice("READY_FOR_DISBURSEMENT", "Ready for Disbursement", "#0EA5E9", LoanStatus.READY_FOR_DISBURSEMENT),
-            slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.FINAL_APPROVED),
+            slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED),
             slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID),
             slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED)
         ), statusBreakdown);
@@ -96,19 +96,20 @@ public class WorkflowStatusPresentationService {
             case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
-            case FINAL_APPROVED -> "Final Approved and Disbursed";
+            case DISBURSED -> "Disbursed";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
             case MANAGER_REJECTED -> "Manager Rejected";
             case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
             case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
             case BOARD_REJECTED -> "Board Rejected";
+            case CREDIT_COMMITTEE_REJECTED -> "Credit Committee Rejected";
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
-            case FORFEITED -> "Forfeited";
-            case FINAL_REJECTED -> "Final Rejected";
+            case REJECTED -> "Rejected";
             case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
             case AWAITING_GUARANTORS -> "Awaiting Guarantors";
             case BOARD_APPROVED -> "Reviewed By Board";
+            case CREDIT_COMMITTEE_APPROVED -> "Reviewed By Credit Committee";
             case CHAIRPERSON_APPROVED -> "Reviewed By Chairperson";
             case LOAN_OFFICER_APPROVED -> "Reviewed By Loan Officer";
             case ACCOUNTANT_APPROVED -> "Reviewed By Accountant";
@@ -128,12 +129,12 @@ public class WorkflowStatusPresentationService {
             case AWAITING_BOARD -> "#6366F1";
             case AWAITING_CREDIT_COMMITTEE -> "#8B5CF6";
             case AWAITING_ACCOUNTANT -> "#0F766E";
-            case BOARD_APPROVED -> "#2F348D";
+            case BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED -> "#2F348D";
             case LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";
-            case FINAL_APPROVED -> "#22C55E";
+            case DISBURSED -> "#22C55E";
             case DEFAULTED -> "#DC2626";
             case PAID -> "#16A34A";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FORFEITED, FINAL_REJECTED -> "#F43F5E";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "#F43F5E";
         };
     }
 
@@ -141,7 +142,7 @@ public class WorkflowStatusPresentationService {
         if (!includeDisbursementPortfolio) {
             return;
         }
-        slices.add(slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.FINAL_APPROVED));
+        slices.add(slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED));
         slices.add(slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID));
         slices.add(slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED));
     }

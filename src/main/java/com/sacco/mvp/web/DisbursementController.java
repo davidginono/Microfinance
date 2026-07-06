@@ -580,7 +580,7 @@ public class DisbursementController {
     private LoanApplication requireVisibleApplication(UUID id, String saccoId, String stationId) {
         LoanApplication app = managerService.get(id, saccoId, stationId);
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT
-            && app.getStatus() != LoanStatus.FINAL_APPROVED
+            && app.getStatus() != LoanStatus.DISBURSED
             && app.getStatus() != LoanStatus.DEFAULTED
             && app.getStatus() != LoanStatus.PAID) {
             throw new IllegalArgumentException("This loan is not available in the disbursement panel.");
@@ -686,9 +686,9 @@ public class DisbursementController {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED,
-                READY_FOR_DISBURSEMENT, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+                READY_FOR_DISBURSEMENT, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         });
     }
@@ -713,7 +713,7 @@ public class DisbursementController {
         return switch (key) {
             case "PAID" -> new ArchiveFilter("PAID", "Paid Loans", LoanStatus.PAID);
             case "DEFAULTED" -> new ArchiveFilter("DEFAULTED", "Defaulted Loans", LoanStatus.DEFAULTED);
-            case "DISBURSED" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", LoanStatus.FINAL_APPROVED);
+            case "DISBURSED" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", LoanStatus.DISBURSED);
             default -> new ArchiveFilter("ALL", "All Disbursed Loans", null);
         };
     }

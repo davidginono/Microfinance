@@ -266,6 +266,32 @@
                 </span>
             </div>
 
+            <div class="mb-3 rounded-md border border-slate-200 bg-white p-3">
+                <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <spring:message code="newloan.guarantors.approvalMode" text="Guarantor approval mode" />
+                </div>
+                <input type="hidden"
+                       id="guarantorApprovalMode"
+                       name="guarantorApprovalMode"
+                       value="${guarantorApprovalMode eq 'DIRECT_OTP' ? 'DIRECT_OTP' : 'LOGIN'}" />
+                <div class="inline-flex max-w-full rounded-md border border-slate-200 bg-slate-50 p-1"
+                     role="group"
+                     aria-label="Guarantor approval mode">
+                    <button type="button"
+                            class="guarantor-approval-mode-option rounded px-3 py-2 text-sm font-semibold transition ${guarantorApprovalMode ne 'DIRECT_OTP' ? 'bg-white text-sacco-blue shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                            data-guarantor-approval-mode-option="LOGIN"
+                            aria-pressed="${guarantorApprovalMode ne 'DIRECT_OTP'}">
+                        <spring:message code="newloan.guarantors.loginApproval" text="Login approval" />
+                    </button>
+                    <button type="button"
+                            class="guarantor-approval-mode-option rounded px-3 py-2 text-sm font-semibold transition ${guarantorApprovalMode eq 'DIRECT_OTP' ? 'bg-white text-sacco-blue shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                            data-guarantor-approval-mode-option="DIRECT_OTP"
+                            aria-pressed="${guarantorApprovalMode eq 'DIRECT_OTP'}">
+                        <spring:message code="newloan.guarantors.directOtp" text="Direct OTP" />
+                    </button>
+                </div>
+            </div>
+
             <div class="relative flex flex-col gap-2 sm:flex-row sm:items-center ">
                 <select id="guarantorSearchMode"
                         class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none">
@@ -1271,6 +1297,8 @@
             const counter = document.getElementById("guarantorSelectedCount");
             const selectedContainer = document.getElementById("selectedGuarantors");
             const hiddenInputs = document.getElementById("selectedGuarantorInputs");
+            const approvalModeInput = document.getElementById("guarantorApprovalMode");
+            const approvalModeButtons = Array.from(document.querySelectorAll("[data-guarantor-approval-mode-option]"));
             const validationMarker = document.getElementById("guarantorValidationErrorMarker");
             const serverGuarantorErrorId = validationMarker ? validationMarker.dataset.guarantorId : "";
             const serverGuarantorErrorMessage = validationMarker ? validationMarker.dataset.message : "";
@@ -1289,6 +1317,29 @@
             const namePlaceholder = "<spring:message code='newloan.guarantors.namePlaceholder' />";
             const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
             const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
+
+            function setApprovalMode(mode) {
+                const normalized = mode === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
+                if (approvalModeInput) {
+                    approvalModeInput.value = normalized;
+                }
+                approvalModeButtons.forEach(function (button) {
+                    const selectedMode = button.dataset.guarantorApprovalModeOption === normalized;
+                    button.setAttribute("aria-pressed", selectedMode ? "true" : "false");
+                    button.classList.toggle("bg-white", selectedMode);
+                    button.classList.toggle("text-sacco-blue", selectedMode);
+                    button.classList.toggle("shadow-sm", selectedMode);
+                    button.classList.toggle("text-slate-600", !selectedMode);
+                    button.classList.toggle("hover:text-slate-900", !selectedMode);
+                });
+            }
+
+            approvalModeButtons.forEach(function (button) {
+                button.addEventListener("click", function () {
+                    setApprovalMode(button.dataset.guarantorApprovalModeOption);
+                });
+            });
+            setApprovalMode(approvalModeInput ? approvalModeInput.value : "LOGIN");
 
             function updateCounter() {
                 counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;

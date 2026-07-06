@@ -53,7 +53,7 @@ class LoanPaymentTransactionSyncSchedulerTest {
     private LoanApplication loan(String loanId) {
         return LoanApplication.builder()
             .id(UUID.randomUUID())
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .loanId(loanId)
             .build();
     }

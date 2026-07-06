@@ -632,7 +632,6 @@
                         <c:when test="${card.key eq 'disbursed'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10h18"/><path d="M5 10l7-5 7 5"/><path d="M6 10v8"/><path d="M10 10v8"/><path d="M14 10v8"/><path d="M18 10v8"/><path d="M4 18h16"/><path d="M3 22h18"/></svg></c:when>
                         <c:when test="${card.key eq 'paid'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16.5 9"/></svg></c:when>
                         <c:when test="${card.key eq 'defaulted'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.3 4.2 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></c:when>
-                        <c:when test="${card.key eq 'forfeited'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6"/><path d="M15 9l-6 6"/></svg></c:when>
                         <c:otherwise><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></c:otherwise>
                     </c:choose>
                 </span>
@@ -1127,7 +1126,7 @@ function bucketCount(series, interval) {
 
 function visibleTrendSeries(series) {
     const staffNames = ['Reviewed', 'Approved', 'Rejected', 'Pending'];
-    const stationNames = ['Applied', 'Active', 'Disbursed', 'Paid', 'Defaulted', 'Forfeited', 'Rejected'];
+    const stationNames = ['Applied', 'Active', 'Disbursed', 'Paid', 'Defaulted', 'Rejected'];
     const staffOnlyNames = ['Reviewed', 'Approved', 'Pending'];
     const hasStaffSeries = series.some(function (item) { return staffOnlyNames.indexOf(item.name) >= 0; });
     const names = hasStaffSeries ? staffNames : stationNames;

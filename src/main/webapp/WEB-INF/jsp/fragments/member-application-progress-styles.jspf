@@ -1,0 +1,369 @@
+<style>
+    .member-dashboard-flow-shell {
+        overflow-x: auto;
+        max-width: 100%;
+        padding-bottom: 0.45rem;
+        overscroll-behavior-x: contain;
+    }
+    .member-dashboard-flow-track {
+        width: fit-content;
+        min-width: 100%;
+        padding: 0.85rem 0 0.5rem;
+    }
+    .member-dashboard-flow-list {
+        display: flex;
+        align-items: flex-start;
+    }
+    .member-dashboard-flow-step-wrap {
+        display: flex;
+        min-width: max-content;
+    }
+    .member-dashboard-flow-step {
+        width: 9.35rem;
+        flex: 0 0 9.35rem;
+        text-align: center;
+    }
+    .member-dashboard-flow-node-wrap {
+        position: relative;
+        display: flex;
+        justify-content: center;
+    }
+    .member-dashboard-flow-node {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 6.25rem;
+        height: 6.25rem;
+        margin: 0 auto;
+        border-width: 3px;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7);
+    }
+    .member-dashboard-flow-node::after,
+    .member-dashboard-mobile-node::after {
+        content: "\2713";
+        font-size: 3.3rem;
+        line-height: 1;
+        font-weight: 800;
+    }
+    .member-dashboard-mobile-node::after {
+        font-size: 2.15rem;
+    }
+    .member-dashboard-flow-node--completed {
+        border-color: #6ee7a0;
+        background: radial-gradient(circle at top, #f4fff7 0%, #e8faee 100%);
+        color: #16a34a;
+    }
+    .member-dashboard-flow-node--current {
+        border-color: #2563eb;
+        background: radial-gradient(circle at top, #f8fbff 0%, #eaf3ff 100%);
+        color: #2563eb;
+    }
+    .member-dashboard-flow-node--pending {
+        border-color: #d1d5db;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        color: #9ca3af;
+    }
+    .member-dashboard-flow-connector {
+        width: 2.7rem;
+        flex: 0 0 2.7rem;
+        height: 0.25rem;
+        border-radius: 9999px;
+        margin-top: 3rem;
+    }
+    .member-dashboard-flow-connector--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-flow-connector--current {
+        background: #2563eb;
+    }
+    .member-dashboard-flow-connector--pending {
+        background: #d1d5db;
+    }
+    .member-dashboard-flow-number {
+        margin-top: 1rem;
+        font-size: 2.55rem;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+    }
+    .member-dashboard-flow-number--completed {
+        color: #16a34a;
+    }
+    .member-dashboard-flow-number--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-number--pending {
+        color: #4b5563;
+    }
+    .member-dashboard-flow-label {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        line-height: 1.2;
+        font-weight: 800;
+        color: #172033;
+        min-height: 2.15rem;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-flow-detail {
+        margin-top: 0.25rem;
+        font-size: 0.72rem;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #64748b;
+        min-height: 0.9rem;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-flow-text--completed {
+        color: #15803d;
+    }
+    .member-dashboard-flow-text--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-text--pending {
+        color: #f59e0b;
+    }
+    .member-dashboard-flow-text--not-started {
+        color: #94a3b8;
+    }
+    .member-dashboard-flow-status {
+        margin-top: 0.65rem;
+        font-size: 0.88rem;
+        line-height: 1.2;
+        font-weight: 700;
+        min-height: 1.15rem;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-flow-meta {
+        margin-top: 0.45rem;
+        font-size: 0.82rem;
+        line-height: 1.2;
+        font-weight: 600;
+    }
+    .member-dashboard-flow-meta--current {
+        color: #2563eb;
+    }
+    .member-dashboard-flow-date {
+        margin-top: 0.45rem;
+        font-size: 0.82rem;
+        line-height: 1.2;
+        color: #6b7280;
+        min-height: 1.05rem;
+    }
+    .member-dashboard-flow-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.4rem;
+    }
+    .member-dashboard-flow-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .member-dashboard-flow-dot {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 9999px;
+        display: inline-block;
+    }
+    .member-dashboard-flow-dot--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-flow-dot--current {
+        background: #2563eb;
+    }
+    .member-dashboard-flow-dot--pending {
+        background: #f59e0b;
+    }
+    .member-dashboard-flow-dot--not-started {
+        background: #d1d5db;
+    }
+    .member-dashboard-mobile-flow {
+        display: none;
+    }
+    .member-dashboard-mobile-step {
+        display: grid;
+        grid-template-columns: 3.75rem minmax(0, 1fr);
+        gap: 0.9rem;
+        align-items: flex-start;
+    }
+    .member-dashboard-mobile-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .member-dashboard-mobile-node {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.75rem;
+        height: 3.75rem;
+        border-width: 3px;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .member-dashboard-mobile-line {
+        width: 0.2rem;
+        min-height: 2.9rem;
+        margin-top: 0.45rem;
+        border-radius: 9999px;
+        background: #d1d5db;
+    }
+    .member-dashboard-mobile-line--completed {
+        background: #22c55e;
+    }
+    .member-dashboard-mobile-line--current {
+        background: #2563eb;
+    }
+    .member-dashboard-mobile-body {
+        min-width: 0;
+        padding-top: 0.2rem;
+    }
+    .member-dashboard-mobile-step-number {
+        font-size: 0.8rem;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+    }
+    .member-dashboard-mobile-title {
+        margin-top: 0.4rem;
+        font-size: 1.02rem;
+        line-height: 1.25;
+        font-weight: 800;
+        color: #172033;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-mobile-detail {
+        margin-top: 0.18rem;
+        font-size: 0.82rem;
+        line-height: 1.25;
+        font-weight: 700;
+        color: #64748b;
+        overflow-wrap: anywhere;
+    }
+    .member-dashboard-mobile-status {
+        margin-top: 0.45rem;
+        font-size: 0.95rem;
+        line-height: 1.2;
+        font-weight: 700;
+    }
+    .member-dashboard-mobile-meta {
+        margin-top: 0.25rem;
+        font-size: 0.84rem;
+        line-height: 1.2;
+        font-weight: 600;
+        color: #2563eb;
+    }
+    .member-dashboard-mobile-date {
+        margin-top: 0.35rem;
+        font-size: 0.84rem;
+        line-height: 1.25;
+        color: #64748b;
+    }
+    @media (min-width: 1024px) {
+        .member-dashboard-flow-shell {
+            overflow-x: visible;
+        }
+        .member-dashboard-flow-track {
+            width: 100%;
+            min-width: 0;
+            padding-top: 0.7rem;
+        }
+        .member-dashboard-flow-list {
+            width: 100%;
+            min-width: 0;
+            justify-content: space-between;
+        }
+        .member-dashboard-flow-step-wrap {
+            flex: 1 1 0;
+            min-width: 0;
+            align-items: flex-start;
+        }
+        .member-dashboard-flow-step {
+            width: auto;
+            flex: 1 1 0;
+            min-width: 0;
+        }
+        .member-dashboard-flow-connector {
+            width: clamp(1rem, 1.6vw, 1.8rem);
+            flex: 0 0 clamp(1rem, 1.6vw, 1.8rem);
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.82rem;
+        }
+        .member-dashboard-flow-status {
+            font-size: 0.8rem;
+        }
+        .member-dashboard-flow-date,
+        .member-dashboard-flow-meta,
+        .member-dashboard-flow-detail {
+            font-size: 0.72rem;
+        }
+    }
+    @media (max-width: 768px) {
+        .member-dashboard-mobile-flow {
+            display: block;
+        }
+        .member-dashboard-flow-shell--desktop {
+            display: none;
+        }
+        .member-dashboard-flow-track {
+            padding-top: 0.55rem;
+        }
+        .member-dashboard-flow-step {
+            width: 7.25rem;
+            flex-basis: 7.25rem;
+        }
+        .member-dashboard-flow-node {
+            width: 4.55rem;
+            height: 4.55rem;
+        }
+        .member-dashboard-flow-connector {
+            width: 1.55rem;
+            flex-basis: 1.55rem;
+            margin-top: 2.15rem;
+        }
+        .member-dashboard-flow-number {
+            font-size: 2rem;
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.8rem;
+            min-height: 1.95rem;
+        }
+        .member-dashboard-flow-status,
+        .member-dashboard-flow-date,
+        .member-dashboard-flow-meta,
+        .member-dashboard-flow-detail {
+            font-size: 0.76rem;
+        }
+    }
+    @media (min-width: 769px) and (max-width: 1023px) {
+        .member-dashboard-flow-step {
+            width: 8.2rem;
+            flex-basis: 8.2rem;
+        }
+        .member-dashboard-flow-node {
+            width: 5.3rem;
+            height: 5.3rem;
+        }
+        .member-dashboard-flow-connector {
+            width: 1.9rem;
+            flex-basis: 1.9rem;
+            margin-top: 2.55rem;
+        }
+        .member-dashboard-flow-number {
+            font-size: 2.25rem;
+        }
+        .member-dashboard-flow-label {
+            font-size: 0.82rem;
+        }
+    }
+</style>

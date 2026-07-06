@@ -18,33 +18,41 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Hosts the Step-up MFA challenge after a privileged staff password login.
- * Until this OTP is consumed, no SecurityContext is persisted — the user
- * cannot reach any authenticated route.
+ * Hosts the MFA challenge after a station-configured password login.
  */
 @Controller
 @RequiredArgsConstructor
 public class StaffMfaController {
     private final StaffMfaService staffMfaService;
 
-    @GetMapping("/login/staff/mfa")
+    @GetMapping("/login/mfa")
     public String challenge(HttpServletRequest request, Model model) {
         HttpSession session = request.getSession(false);
         if (!staffMfaService.hasPendingChallenge(session)) {
             return "redirect:/login";
         }
         model.addAttribute("maskedEmail", maskEmail(staffMfaService.pendingEmail(session)));
+        model.addAttribute("deliveryMessage", staffMfaService.pendingDeliveryMessage(session));
         return "auth/staff-mfa";
     }
 
-    @PostMapping("/login/staff/mfa/resend")
+    @GetMapping("/login/staff/mfa")
+    public String legacyChallenge() {
+        return "redirect:/login/mfa";
+    }
+
+    @PostMapping({"/login/mfa/resend", "/login/staff/mfa/resend"})
     @ResponseBody
     public ResponseEntity<Map<String, Object>> resend(HttpServletRequest request) {
         try {
             staffMfaService.resendChallenge(request);
+            HttpSession session = request.getSession(false);
+            String deliveryMessage = staffMfaService.pendingDeliveryMessage(session);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "message", "We sent a new verification code."
+                "message", deliveryMessage == null || deliveryMessage.isBlank()
+                    ? "We sent a new verification code."
+                    : deliveryMessage
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -54,14 +62,14 @@ public class StaffMfaController {
         }
     }
 
-    @PostMapping("/login/staff/mfa/verify")
+    @PostMapping({"/login/mfa/verify", "/login/staff/mfa/verify"})
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verify(@RequestParam String otpCode,
                                                       HttpServletRequest request) {
         if (otpCode == null || otpCode.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
-                "message", "Enter the verification code from your email."
+                "message", "Enter the verification code."
             ));
         }
         try {
@@ -70,7 +78,7 @@ public class StaffMfaController {
             AppUserPrincipal principal = staffMfaService.completeChallenge(otpCode.trim(), request);
             String redirectUrl = landing != null && !landing.isBlank()
                 ? landing
-                : WorkspaceLanding.staffDashboard(principal);
+                : WorkspaceLanding.authenticatedDefault(principal);
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("valid", true);
             payload.put("redirectUrl", redirectUrl);
@@ -83,7 +91,7 @@ public class StaffMfaController {
         }
     }
 
-    @PostMapping("/login/staff/mfa/cancel")
+    @PostMapping({"/login/mfa/cancel", "/login/staff/mfa/cancel"})
     public String cancel(HttpServletRequest request) {
         staffMfaService.clear(request);
         return "redirect:/login";
@@ -91,7 +99,7 @@ public class StaffMfaController {
 
     private String maskEmail(String email) {
         if (email == null || email.isBlank()) {
-            return "your email on file";
+            return "your registered contact";
         }
         int at = email.indexOf('@');
         if (at <= 1) {

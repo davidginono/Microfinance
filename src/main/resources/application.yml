@@ -91,6 +91,9 @@ logging:
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
   time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
+  session:
+    inactivity-prompt-ms: ${APP_SESSION_INACTIVITY_PROMPT_MS:600000}
+    inactivity-grace-ms: ${APP_SESSION_INACTIVITY_GRACE_MS:60000}
   mail:
     override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:

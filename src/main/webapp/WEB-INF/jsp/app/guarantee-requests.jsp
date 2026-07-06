@@ -44,7 +44,7 @@
                     <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
                 </c:if>
             </td>
-            <td>${guaranteeLoanAmounts[req.loanApplicationId]}</td>
+            <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
             <td>${req.status}</td>
             <td>
                 <c:choose>
@@ -59,7 +59,7 @@
                                 class="app-btn ${policyEligible ? 'btn-approve' : 'btn-neutral action-button-disabled'}"
                                 data-guarantee-modal-open="approve-${req.id}"
                                 ${policyEligible ? '' : 'disabled'}>
-                            <spring:message code="review.approved" text="Approved" />
+                            <spring:message code="common.approve" text="Approve" />
                         </button>
                         <c:if test="${not policyEligible}">
                             <p class="max-w-xs text-xs leading-5 text-rose-600">${policyReason}</p>
@@ -67,7 +67,7 @@
                         <button type="button"
                                 class="app-btn btn-reject"
                                 data-guarantee-modal-open="reject-${req.id}">
-                            <spring:message code="review.rejected" text="Rejected" />
+                            <spring:message code="common.reject" text="Reject" />
                         </button>
                     </div>
                 </c:if>
@@ -131,7 +131,7 @@
                             <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
                                 | <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
                             </c:if>
-                            | ${guaranteeLoanAmounts[req.loanApplicationId]}
+                            | ${guaranteeLoanAmountLabels[req.loanApplicationId]}
                         </p>
                     </div>
                     <button type="button"
@@ -172,6 +172,8 @@
                                required />
                         <span><spring:message code="guaranteeRequests.acceptDeclaration" text="I confirm that I agree to the guarantor declaration above before approving this request." /></span>
                     </label>
+                    <c:set var="guarantorOtpEnabled" value="${guarantorRequestOtpEnabled[req.id]}" />
+                    <c:if test="${guarantorOtpEnabled}">
                     <div class="app-modal-section">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
@@ -215,6 +217,7 @@
                             </div>
                         </div>
                     </div>
+                    </c:if>
                     <div class="flex flex-wrap justify-end gap-3">
                         <button type="button"
                                 class="app-btn btn-neutral"
@@ -222,8 +225,8 @@
                             <spring:message code="common.cancel" text="Cancel" />
                         </button>
                         <button type="submit"
-                                class="app-btn btn-approve action-button-disabled"
-                                disabled>
+                                class="app-btn btn-approve ${guarantorOtpEnabled ? 'action-button-disabled' : ''}"
+                                ${guarantorOtpEnabled ? 'disabled' : ''}>
                             <spring:message code="guaranteeRequests.confirmApproval" text="Confirm Approval" />
                         </button>
                     </div>

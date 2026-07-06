@@ -187,16 +187,15 @@ public class NotificationViewService {
             case "BOARD_APPROVED" -> "Board Approved";
             case "BOARD_REJECTED" -> "Board Rejected";
             case "ACCOUNTANT_REJECTED" -> "Accountant Rejected";
-            case "FINAL_APPROVED" -> "Final Approved and Disbursed";
+            case "DISBURSED" -> "Disbursed";
             case "DEFAULTED" -> "Loan Defaulted";
             case "PAID" -> "Loan Marked As Paid";
-            case "LOAN_FORFEITED" -> "Loan Forfeited";
-            case "FINAL_REJECTED" -> "Loan Rejected";
-            case "LOAN_READY_FOR_MANAGER" -> "On Review By Manager";
-            case "LOAN_READY_FOR_ACCOUNTANT" -> "On Review By Accountant";
+            case "REJECTED" -> "Loan Rejected";
+            case "LOAN_READY_FOR_MANAGER" -> "Manager Review Assigned";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "Accountant Review Assigned";
             case "LOAN_READY_FOR_BOARD" -> "On Review By Board";
             case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "Credit Committee Review Assigned";
-            case "LOAN_READY_FOR_DISBURSEMENT" -> "Ready for Disbursement";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "Disbursement Assigned";
             case "LOAN_GUARANTORS_APPROVED" -> "All Guarantors Approved";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "Guarantor Request";
             case "BOARD_REVIEW_ASSIGNED" -> "Board Review Assigned";
@@ -221,12 +220,12 @@ public class NotificationViewService {
             case "BOARD_APPROVED" -> "Your application has passed board review.";
             case "BOARD_REJECTED" -> "Your application was rejected at board review.";
             case "ACCOUNTANT_REJECTED" -> "Your application was rejected during accountant review.";
-            case "FINAL_APPROVED" -> {
+            case "DISBURSED" -> {
                 String finalDueDate = stringValue(details.get("finalDueDate"));
                 String firstRepaymentDate = stringValue(details.get("firstRepaymentDate"));
                 yield finalDueDate.isBlank()
-                    ? "Your loan application is Final Approved and Disbursed."
-                    : "Your loan is Final Approved and Disbursed. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
+                    ? "Your loan application has been disbursed."
+                    : "Your loan has been disbursed. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
             }
             case "PAID" -> {
                 String source = stringValue(details.get("source"));
@@ -235,12 +234,11 @@ public class NotificationViewService {
                     : "Your manager marked this disbursed loan as fully paid.";
             }
             case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
-            case "LOAN_FORFEITED" -> "The applicant forfeited this loan application during review.";
-            case "FINAL_REJECTED" -> "Your loan application has been finally rejected.";
-            case "LOAN_READY_FOR_MANAGER" -> "Your application is now on review by manager.";
-            case "LOAN_READY_FOR_ACCOUNTANT" -> "Your application is now on review by accountant.";
-            case "LOAN_READY_FOR_BOARD" -> "Your application is now on review by committee.";
-            case "LOAN_READY_FOR_DISBURSEMENT" -> "Your application completed the configured review path and is now ready for disbursement.";
+            case "REJECTED" -> "Your loan application has been rejected.";
+            case "LOAN_READY_FOR_MANAGER" -> "A loan application requires your manager review.";
+            case "LOAN_READY_FOR_ACCOUNTANT" -> "A loan application requires your accountant review.";
+            case "LOAN_READY_FOR_BOARD" -> "A loan application requires committee review.";
+            case "LOAN_READY_FOR_DISBURSEMENT" -> "A loan application is ready for disbursement.";
             case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
             case "BOARD_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for board review.";
@@ -292,8 +290,9 @@ public class NotificationViewService {
     private String formatDetailLabel(String notificationType, String key, Object value) {
         return switch (key) {
             case "managerId" -> "Manager";
+            case "reviewerMemberId" -> "Reviewer";
             case "applicationId" -> "Loan Application ID";
-            case "loanId" -> isUuidText(value) && !"FINAL_APPROVED".equals(notificationType) && !"PAID".equals(notificationType) && !"DEFAULTED".equals(notificationType)
+            case "loanId" -> isUuidText(value) && !"DISBURSED".equals(notificationType) && !"PAID".equals(notificationType) && !"DEFAULTED".equals(notificationType)
                 ? "Loan Application ID"
                 : "Loan ID";
             case "finalDueDate" -> "Final Due Date";
@@ -326,7 +325,7 @@ public class NotificationViewService {
         }
         String text = String.valueOf(value);
         return switch (key) {
-            case "managerId", "senderId", "boardMemberId", "recipientMemberId" -> resolveMemberLabel(text);
+            case "managerId", "senderId", "boardMemberId", "recipientMemberId", "reviewerMemberId" -> resolveMemberLabel(text);
             case "loanId", "incidentId" -> shortenUuid(text);
             case "disbursementAmount", "depositAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
             case "repaymentFrequency" -> humanizeKey(text);

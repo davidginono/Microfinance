@@ -59,7 +59,7 @@ public class MemberRegistrationService {
             .fullName(verified.fullName())
             .phone(normalizedPhone)
             .email(verified.email())
-            .signatureText(normalizeSignatureText(form.getSignatureText()))
+            .signatureText(signatureFromFullName(verified.fullName()))
             .signatureRegisteredAt(now)
             .memberAccount(true)
             .status(MemberStatus.ACTIVE)
@@ -252,6 +252,37 @@ public class MemberRegistrationService {
             normalized = normalized.substring(0, 120).trim();
         }
         return normalized;
+    }
+
+    private String signatureFromFullName(String fullName) {
+        String normalized = normalizeSpaces(fullName);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        String[] parts = normalized.split(" ");
+        if (parts.length == 1) {
+            return normalizeSignatureText(toNameCase(parts[0]));
+        }
+        StringBuilder signature = new StringBuilder(toNameCase(parts[0]));
+        for (int i = 1; i < parts.length - 1; i++) {
+            String initial = parts[i].isBlank() ? "" : parts[i].substring(0, 1).toUpperCase();
+            if (!initial.isBlank()) {
+                signature.append(' ').append(initial);
+            }
+        }
+        signature.append(' ').append(toNameCase(parts[parts.length - 1]));
+        return normalizeSignatureText(signature.toString());
+    }
+
+    private String toNameCase(String value) {
+        String normalized = normalizeSpaces(value);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        if (normalized.length() == 1) {
+            return normalized.toUpperCase();
+        }
+        return normalized.substring(0, 1).toUpperCase() + normalized.substring(1).toLowerCase();
     }
 
     private String normalizeSpaces(String value) {

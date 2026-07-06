@@ -63,7 +63,8 @@ public class HeaderNotificationController {
             case ACCOUNTANT -> "/accountant/notifications";
             case DISBURSEMENT_OFFICER -> "/disbursement/notifications";
             case CHAIRPERSON -> "/chairperson/notifications";
-            case BOARD, CREDIT_COMMITTEE -> "/board/notifications";
+            case CREDIT_COMMITTEE -> "/credit-committee/notifications";
+            case BOARD -> "/board/notifications";
             case LOAN_OFFICER -> "/loan-officer/notifications";
             case MEMBER -> "/app/notifications";
         };

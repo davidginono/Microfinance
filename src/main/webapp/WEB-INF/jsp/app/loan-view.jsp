@@ -119,9 +119,9 @@
         <spring:message code="loan.view.guarantorsApproved" text="All guarantors have approved this application. You can now submit it for review." />
     </div>
 </c:if>
-<c:if test="${app.status eq 'FINAL_APPROVED' and empty app.applicantDisbursementAcknowledgedAt}">
+<c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
     <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-        <span><spring:message code="loan.disbursement.memberReadyAck" text="Your loan is Final Approved and Disbursed." /></span>
+        <span><spring:message code="loan.disbursement.memberReadyAck" text="Your loan has been disbursed." /></span>
         <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <input type="hidden" name="returnTo" value="detail" />
@@ -180,7 +180,7 @@
                         </svg>
                     </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
-                    <div class="loan-stat-value"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
+                    <div class="loan-stat-value">TSh <fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
                     <span class="loan-staff-kpi-icon" aria-hidden="true">
@@ -364,7 +364,7 @@
     </div>
 </c:if>
 
-<c:if test="${app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+<c:if test="${app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div id="repayment-plan" class="erp-section">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -551,7 +551,7 @@
     </div>
 </c:if>
 
-<c:if test="${not empty disbursementProofAttachments or app.status eq 'FINAL_APPROVED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
+<c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
     <div class="erp-table-wrap overflow-x-auto">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h5>
         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -624,11 +624,11 @@
     <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
             <tr>
-                <th class="w-1/4 px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
-                <th class="w-1/6 px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
-                <th class="w-1/5 px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
-                <th class="w-1/6 px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th class="w-1/4 px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
+                <th class="w-[18%] px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
+                <th class="w-[12%] px-3 py-2 text-left"><spring:message code="member.memberNo" text="Member No" /></th>
+                <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.status" text="Status" /></th>
+                <th class="w-[14%] px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
+                <th class="w-[42%] px-3 py-2 text-left"><spring:message code="loan.removalRequest" text="Removal Request" /></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -704,12 +704,97 @@
     </table>
 </div>
 
+<c:if test="${directOtpGuarantorPanelVisible}">
+    <details class="erp-section-muted" open>
+        <summary class="cursor-pointer list-none">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h5 class="erp-panel-title">
+                        <spring:message code="loan.guarantorOtp.directTitle" text="Direct OTP approval" />
+                    </h5>
+                    <p class="mt-1 text-sm text-slate-500">
+                        <spring:message code="loan.guarantorOtp.directHelp" text="Enter each guarantor code after they receive it and agree to guarantee this loan." />
+                    </p>
+                </div>
+                <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sacco-blue">
+                    <spring:message code="loan.guarantorOtp.pending" text="Pending OTPs" />
+                </span>
+            </div>
+        </summary>
+        <div class="mt-4 space-y-3">
+            <c:forEach items="${directOtpGuarantorRequests}" var="req">
+                <div class="rounded-md border border-slate-200 bg-white p-4"
+                     data-guarantor-direct-otp-card
+                     data-verify-url="/app/loan-applications/${app.id}/guarantors/${req.id}/verify-confirmation-otp"
+                     data-resend-url="/app/loan-applications/${app.id}/guarantors/${req.id}/request-confirmation-otp-json">
+                    <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-900">
+                                <c:choose>
+                                    <c:when test="${not empty guarantorNames[req.guarantorMemberId]}">
+                                        ${guarantorNames[req.guarantorMemberId]}
+                                    </c:when>
+                                    <c:otherwise>#${fn:substring(req.guarantorMemberId, 0, 8)}</c:otherwise>
+                                </c:choose>
+                            </div>
+                            <div class="mt-1 text-xs text-slate-500">
+                                <spring:message code="member.memberNo" text="Member No" />:
+                                <c:choose>
+                                    <c:when test="${not empty guarantorMembersById[req.guarantorMemberId] and not empty guarantorMembersById[req.guarantorMemberId].memberNo}">${guarantorMembersById[req.guarantorMemberId].memberNo}</c:when>
+                                    <c:otherwise>-</c:otherwise>
+                                </c:choose>
+                            </div>
+                        </div>
+                        <button type="button"
+                                class="app-btn btn-neutral otp-request-button"
+                                data-guarantor-otp-resend>
+                            <span class="otp-button-spinner hidden"></span>
+                            <span class="otp-button-label"><spring:message code="loan.guarantorOtp.resend" text="Resend code" /></span>
+                        </button>
+                    </div>
+                    <form action="/app/loan-applications/${app.id}/guarantors/${req.id}/confirm-with-otp"
+                          method="post"
+                          class="space-y-3"
+                          data-guarantor-otp-confirm-form>
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                        <input id="directGuarantorOtpCode-${req.id}"
+                               name="otpCode"
+                               type="text"
+                               inputmode="numeric"
+                               maxlength="6"
+                               data-otp-hidden="true"
+                               data-guarantor-otp-input
+                               data-otp-label="Guarantor OTP code"
+                               autocomplete="one-time-code"
+                               class="sr-only"
+                               placeholder="123456" />
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-h-[2.5rem]">
+                                <div class="hidden rounded-md border px-3 py-2 text-sm"
+                                     data-guarantor-otp-status>
+                                    <span data-guarantor-otp-status-text></span>
+                                </div>
+                            </div>
+                            <button type="submit"
+                                    class="app-btn btn-primary action-button-disabled"
+                                    data-guarantor-otp-confirm
+                                    disabled>
+                                <spring:message code="loan.guarantorOtp.confirm" text="Confirm" />
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </c:forEach>
+        </div>
+    </details>
+</c:if>
+
 <c:set var="showEditAction" value="${app.status eq 'DRAFT' or app.status eq 'ALL_GUARANTORS_APPROVED'}" />
 <c:set var="showDraftSendToGuarantorsAction" value="${app.status eq 'DRAFT' and app.requiredGuarantors gt 0}" />
 <c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or showTopUpAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction or canForfeitApplication}" />
+<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or showTopUpAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction}" />
 <c:set var="canSubmitApprovedGuarantorLoan" value="${app.status eq 'ALL_GUARANTORS_APPROVED' and not pendingGuarantorRemovalRequest}" />
 <spring:message code="loan.confirm.cancelSubmission.title" text="Cancel Application" var="cancelSubmissionTitle" />
 <spring:message code="loan.confirm.cancelSubmission.message" text="Move this application back to draft so you can keep editing it?" var="cancelSubmissionMessage" />
@@ -787,9 +872,6 @@
                     <button type="submit" class="app-btn btn-reject"><spring:message code="loan.actions.removeApplication" text="Remove Application" /></button>
                 </form>
             </c:if>
-            <c:if test="${canForfeitApplication}">
-                <button type="button" id="openForfeitModal" class="app-btn btn-reject"><spring:message code="loan.actions.forfeit" text="Forfeit Application" /></button>
-            </c:if>
         </div>
     </div>
 </c:if>
@@ -814,117 +896,48 @@
                 <input type="checkbox" name="termsAccepted" value="true" required class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
                 <span><spring:message code="loan.terms.accept" text="I accept the terms and conditions for this loan application." /></span>
             </label>
-            <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.code" text="OTP Code" /></div>
-                        <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.codeHelp" text="The code is sent using the station OTP delivery policy." /></p>
-                    </div>
-                    <button id="requestApplicantSubmitOtp" type="button" class="app-btn btn-primary otp-request-button inline-flex items-center justify-center gap-2">
-                        <span class="otp-button-spinner hidden"></span>
-                        <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
-                    </button>
-                </div>
-                <div id="applicantSubmitOtpFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
-                <div class="mt-3">
-                    <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
-                    <input id="applicantSubmitOtpCode"
-                           type="text"
-                           name="applicantSignatureOtpCode"
-                           inputmode="numeric"
-                           maxlength="6"
-                           autocomplete="one-time-code"
-                           data-otp-hidden="true"
-                           data-otp-label="Applicant OTP code"
-                           class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
-                           placeholder="123456" />
-                    <div id="applicantSubmitOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                        <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
-                        <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
-                        </svg>
-                        <span data-otp-text><spring:message code="loan.otp.checking" text="Checking code..." /></span>
-                    </div>
-                </div>
-            </div>
-            <button id="submitApplicantToReview"
-                    type="submit"
-                    class="app-btn btn-approve action-button-disabled loan-submit-to-review-button w-full"
-                    disabled>
-                <c:out value="${loanFinalSubmitLabel}" />
-            </button>
-        </form>
-    </div>
-</c:if>
-
-<c:if test="${canForfeitApplication}">
-    <div id="loanForfeitModal" class="app-modal-overlay" aria-hidden="true">
-        <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="loanForfeitTitle">
-            <div class="app-modal-header">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500"><spring:message code="loan.forfeit.otpConfirmation" text="OTP Confirmation" /></p>
-                    <h2 id="loanForfeitTitle" class="mt-2 text-2xl font-semibold text-sacco-ink"><spring:message code="loan.forfeit.title" text="Forfeit Application" /></h2>
-                </div>
-                <button type="button" id="closeForfeitModal" class="app-modal-close" aria-label="<spring:message code='loan.forfeit.close' text='Close forfeit confirmation' />">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
-            </div>
-            <form action="/app/loan-applications/${app.id}/forfeit"
-                  method="post"
-                  class="app-modal-body space-y-4"
-                  data-confirm-eyebrow="Confirm Forfeiture"
-                  data-confirm-title="Forfeit Application"
-                  data-confirm-message="Forfeit this application? The review will stop, this application will be recorded as forfeited, and the configured waiting-period policy may block a new application until the waiting period expires."
-                  data-confirm-proceed="Forfeit Application">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <p class="text-base leading-7 text-slate-700">
-                    <spring:message code="loan.forfeit.help" text="This will stop the review of this application. Request an OTP, then enter it to confirm." />
-                </p>
-                <c:if test="${forfeitWaitDays gt 0}">
-                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                        <c:choose>
-                            <c:when test="${forfeitWaitDays eq 1}">
-                                <spring:message code="loan.forfeit.waitNotice.one" text="After forfeiting, you must wait 1 day before you can apply for another loan." />
-                            </c:when>
-                            <c:otherwise>
-                                <spring:message code="loan.forfeit.waitNotice.many" text="After forfeiting, you must wait {0} days before you can apply for another loan." arguments="${forfeitWaitDays}" />
-                            </c:otherwise>
-                        </c:choose>
-                    </div>
-                </c:if>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <c:if test="${applicantApprovalOtpEnabled}">
+                <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.forfeit.verificationCode" text="Verification Code" /></div>
-                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.forfeit.codeHelp" text="The code is sent to the email on your member profile." /></p>
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="loan.otp.code" text="OTP Code" /></div>
+                            <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.codeHelp" text="The code is sent using the station OTP delivery policy." /></p>
                         </div>
-                        <button type="button" id="requestForfeitOtp" class="app-btn btn-primary otp-request-button inline-flex items-center justify-center gap-2">
+                        <button id="requestApplicantSubmitOtp" type="button" class="app-btn btn-primary otp-request-button inline-flex items-center justify-center gap-2">
                             <span class="otp-button-spinner hidden"></span>
                             <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                         </button>
                     </div>
-                    <div id="forfeitOtpFeedback" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                    <div id="applicantSubmitOtpFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
                     <div class="mt-3">
                         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
-                        <input id="forfeitOtpCode"
+                        <input id="applicantSubmitOtpCode"
                                type="text"
-                               name="forfeitOtpCode"
+                               name="applicantSignatureOtpCode"
                                inputmode="numeric"
                                maxlength="6"
                                autocomplete="one-time-code"
-                               data-otp-hidden="true" data-otp-label="Forfeit OTP code"
+                               data-otp-hidden="true"
+                               data-otp-label="Applicant OTP code"
                                class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                placeholder="123456" />
+                        <div id="applicantSubmitOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
+                            <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span data-otp-text><spring:message code="loan.otp.checking" text="Checking code..." /></span>
+                        </div>
                     </div>
                 </div>
-                <div class="app-modal-actions">
-                    <button type="button" id="cancelForfeitModal" class="app-btn btn-neutral"><spring:message code="common.cancel" text="Cancel" /></button>
-                    <button type="submit" id="submitForfeitApplication" class="app-btn btn-reject action-button-disabled" disabled><spring:message code="loan.forfeit.title" text="Forfeit Application" /></button>
-                </div>
-            </form>
-        </div>
+            </c:if>
+            <button id="submitApplicantToReview"
+                    type="submit"
+                    class="app-btn btn-approve ${applicantApprovalOtpEnabled ? 'action-button-disabled' : ''} loan-submit-to-review-button w-full"
+                    ${applicantApprovalOtpEnabled ? 'disabled' : ''}>
+                <c:out value="${loanFinalSubmitLabel}" />
+            </button>
+        </form>
     </div>
 </c:if>
 
@@ -1161,98 +1174,150 @@
             });
         })();
 
-        (function bindForfeitModal() {
-            const modal = document.getElementById("loanForfeitModal");
-            if (!modal) {
+        (function bindDirectGuarantorOtpApproval() {
+            const cards = Array.from(document.querySelectorAll("[data-guarantor-direct-otp-card]"));
+            if (!cards.length) {
                 return;
             }
-            const openButton = document.getElementById("openForfeitModal");
-            const closeButton = document.getElementById("closeForfeitModal");
-            const cancelButton = document.getElementById("cancelForfeitModal");
-            const requestButton = document.getElementById("requestForfeitOtp");
-            const feedback = document.getElementById("forfeitOtpFeedback");
-            const input = document.getElementById("forfeitOtpCode");
-            const submitButton = document.getElementById("submitForfeitApplication");
-            let otpRequested = false;
 
-            function closeModal() {
-                modal.classList.remove("is-open");
-                modal.setAttribute("aria-hidden", "true");
-                document.body.classList.remove("overflow-hidden");
-            }
-
-            function openModal() {
-                modal.classList.add("is-open");
-                modal.setAttribute("aria-hidden", "false");
-                document.body.classList.add("overflow-hidden");
-                requestButton?.focus({ preventScroll: true });
-            }
-
-            function setFeedback(type, message) {
-                if (!feedback) {
+            function setStatus(status, type, message) {
+                if (!status) {
                     return;
                 }
-                feedback.classList.remove("hidden", "border-emerald-200", "bg-emerald-50", "text-emerald-700", "border-sacco-brown/30", "bg-[#f7efe9]", "text-sacco-brown");
+                const text = status.querySelector("[data-guarantor-otp-status-text]");
+                status.classList.remove(
+                    "hidden",
+                    "border-slate-200",
+                    "bg-white",
+                    "text-slate-600",
+                    "border-emerald-200",
+                    "bg-emerald-50",
+                    "text-emerald-700",
+                    "border-rose-200",
+                    "bg-rose-50",
+                    "text-rose-700"
+                );
                 if (type === "success") {
-                    feedback.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                    status.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+                } else if (type === "error") {
+                    status.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
                 } else {
-                    feedback.classList.add("border-sacco-brown/30", "bg-[#f7efe9]", "text-sacco-brown");
+                    status.classList.add("border-slate-200", "bg-white", "text-slate-600");
                 }
-                feedback.textContent = message;
+                if (text) {
+                    text.textContent = message || "";
+                }
             }
 
-            function renderSubmitState() {
-                if (!input || !submitButton) {
+            function hideStatus(status) {
+                if (status) {
+                    status.classList.add("hidden");
+                }
+            }
+
+            function setConfirmEnabled(button, enabled) {
+                if (!button) {
                     return;
                 }
-                input.value = (input.value || "").replace(/\D/g, "").slice(0, 6);
-                const enabled = otpRequested && /^\d{6}$/.test(input.value);
-                submitButton.disabled = !enabled;
-                submitButton.classList.toggle("action-button-disabled", !enabled);
+                button.disabled = !enabled;
+                button.classList.toggle("action-button-disabled", !enabled);
             }
 
-            openButton?.addEventListener("click", openModal);
-            [closeButton, cancelButton].forEach(function (button) {
-                button?.addEventListener("click", closeModal);
-            });
-            modal.addEventListener("click", function (event) {
-                if (event.target === modal) {
-                    closeModal();
+            async function postForm(url, values) {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                        "Accept": "application/json"
+                    },
+                    body: new URLSearchParams(values)
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.valid === false) {
+                    throw new Error(payload.message || "${invalidOtpLabel}");
                 }
-            });
-            input?.addEventListener("input", renderSubmitState);
-            requestButton?.addEventListener("click", async function () {
-                otpRequested = false;
-                renderSubmitState();
-                setOtpButtonState(requestButton, "loading", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
-                try {
-                    const response = await fetch("/app/loan-applications/request-forfeit-otp", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json"
-                        },
-                        body: new URLSearchParams({
-                            "${_csrf.parameterName}": csrfToken,
-                            "applicationId": "${app.id}"
-                        })
-                    });
-                    const payload = await response.json();
-                    if (!response.ok || payload.valid === false) {
-                        throw new Error(payload.message || "${unableSendOtpLabel}");
+                return payload;
+            }
+
+            cards.forEach(function (card) {
+                const input = card.querySelector("[data-guarantor-otp-input]");
+                const confirmButton = card.querySelector("[data-guarantor-otp-confirm]");
+                const resendButton = card.querySelector("[data-guarantor-otp-resend]");
+                const status = card.querySelector("[data-guarantor-otp-status]");
+                let activeVerification = 0;
+                let verifiedCode = "";
+
+                function renderForInput() {
+                    if (!input) {
+                        return;
                     }
-                    otpRequested = true;
-                    setFeedback("success", payload.message || "${sentOtpEmailLabel}");
-                    setOtpButtonState(requestButton, "sent", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
-                    window.SaccosOtp?.startCooldown(requestButton, payload, { idle: "${sendOtpLabel}" });
-                    window.SaccosOtp?.focusBoxes(input);
-                    renderSubmitState();
-                } catch (error) {
-                    setFeedback("error", error.message || "${unableSendOtpLabel}");
-                    setOtpButtonState(requestButton, "idle", "${sendOtpLabel}", "${sendingOtpLabel}", "${otpSentLabel}");
+                    input.value = (input.value || "").replace(/\D/g, "").slice(0, 6);
+                    const code = input.value;
+                    if (!/^\d{6}$/.test(code)) {
+                        activeVerification += 1;
+                        verifiedCode = "";
+                        setConfirmEnabled(confirmButton, false);
+                        hideStatus(status);
+                        return;
+                    }
+                    if (verifiedCode === code) {
+                        setConfirmEnabled(confirmButton, true);
+                        setStatus(status, "success", "Verified");
+                        return;
+                    }
+                    const requestId = ++activeVerification;
+                    verifiedCode = "";
+                    setConfirmEnabled(confirmButton, false);
+                    setStatus(status, "pending", "Verifying code...");
+                    postForm(card.dataset.verifyUrl, {
+                        "${_csrf.parameterName}": csrfToken,
+                        "otpCode": code
+                    }).then(function () {
+                        if (requestId !== activeVerification || input.value !== code) {
+                            return;
+                        }
+                        verifiedCode = code;
+                        setStatus(status, "success", "Verified");
+                        setConfirmEnabled(confirmButton, true);
+                        confirmButton?.focus({ preventScroll: true });
+                    }).catch(function (error) {
+                        if (requestId !== activeVerification || input.value !== code) {
+                            return;
+                        }
+                        verifiedCode = "";
+                        setConfirmEnabled(confirmButton, false);
+                        setStatus(status, "error", error && error.message ? error.message : "${invalidOtpLabel}");
+                    });
                 }
+
+                input?.addEventListener("input", renderForInput);
+                renderForInput();
+
+                resendButton?.addEventListener("click", async function () {
+                    activeVerification += 1;
+                    verifiedCode = "";
+                    if (input) {
+                        input.value = "";
+                        input.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                    setConfirmEnabled(confirmButton, false);
+                    setOtpButtonState(resendButton, "loading", "Resend code", "${sendingOtpLabel}", "${otpSentLabel}");
+                    try {
+                        const payload = await postForm(card.dataset.resendUrl, {
+                            "${_csrf.parameterName}": csrfToken
+                        });
+                        setStatus(status, "success", payload.message || "OTP sent.");
+                        setOtpButtonState(resendButton, "sent", "Resend code", "${sendingOtpLabel}", "${otpSentLabel}");
+                        window.SaccosOtp?.startCooldown(resendButton, payload, { idle: "Resend code" });
+                        window.SaccosOtp?.focusBoxes(input);
+                    } catch (error) {
+                        setStatus(status, "error", error && error.message ? error.message : "${unableSendOtpLabel}");
+                        setOtpButtonState(resendButton, "idle", "Resend code", "${sendingOtpLabel}", "${otpSentLabel}");
+                    }
+                });
             });
         })();
+
 
         document.querySelectorAll("form[action$='/submit'], form[data-confirm-title]").forEach(function (form) {
             form.addEventListener("submit", function () {

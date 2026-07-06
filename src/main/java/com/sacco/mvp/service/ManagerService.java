@@ -63,7 +63,7 @@ public class ManagerService {
         long totalDisbursed = loanApplicationRepository.countDisbursedInYearForScope(
             saccoId,
             blankToNull(stationId),
-            List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID),
             currentYearStart,
             currentYearStartAt
         );
@@ -94,8 +94,8 @@ public class ManagerService {
             LoanStatus.READY_FOR_DISBURSEMENT,
             LoanStatus.MANAGER_REJECTED,
             LoanStatus.BOARD_REJECTED,
-            LoanStatus.FINAL_REJECTED,
-            LoanStatus.FINAL_APPROVED,
+            LoanStatus.REJECTED,
+            LoanStatus.DISBURSED,
             LoanStatus.DEFAULTED,
             LoanStatus.PAID
         )) {
@@ -105,7 +105,7 @@ public class ManagerService {
         List<LoanApplication> recentDisbursements = loanApplicationRepository.findRecentDisbursementsForScope(
             saccoId,
             blankToNull(stationId),
-            List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID),
+            List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID),
             recentCutoff,
             recentCutoff.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()),
             PageRequest.of(0, 5)
@@ -114,7 +114,7 @@ public class ManagerService {
         return new ManagerDashboard(
             totalLoans,
             totalDisbursed,
-            counts.getOrDefault(LoanStatus.FINAL_APPROVED, 0L),
+            counts.getOrDefault(LoanStatus.DISBURSED, 0L),
             defaultedLoansCurrentYear,
             counts.getOrDefault(LoanStatus.PAID, 0L),
             counts.getOrDefault(LoanStatus.READY_FOR_MANAGER, 0L),
@@ -125,7 +125,7 @@ public class ManagerService {
     }
 
     private boolean isDisbursedLoan(LoanApplication loan) {
-        return loan.getStatus() == LoanStatus.FINAL_APPROVED
+        return loan.getStatus() == LoanStatus.DISBURSED
             || loan.getStatus() == LoanStatus.DEFAULTED
             || loan.getStatus() == LoanStatus.PAID;
     }
@@ -217,7 +217,7 @@ public class ManagerService {
 
     public List<LoanApplication> activeApplicantLoans(UUID applicantMemberId, UUID excludeLoanId, String saccoId) {
         return loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
-                applicantMemberId, List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED)).stream()
+                applicantMemberId, List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED)).stream()
             .filter(loan -> loan.getSaccoId().equals(saccoId))
             .filter(loan -> excludeLoanId == null || !loan.getId().equals(excludeLoanId))
             .sorted(Comparator.comparing(
@@ -382,7 +382,7 @@ public class ManagerService {
             .reasons(blankToNull(disbursementNotes))
             .createdAt(OffsetDateTime.now())
             .build());
-        app.setStatus(LoanStatus.FINAL_APPROVED);
+        app.setStatus(LoanStatus.DISBURSED);
         app.setUpdatedAt(OffsetDateTime.now());
         loanApplicationRepository.save(app);
         Map<String, Object> details = new LinkedHashMap<>();

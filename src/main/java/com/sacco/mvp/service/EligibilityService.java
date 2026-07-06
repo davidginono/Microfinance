@@ -35,7 +35,8 @@ public class EligibilityService {
 
         LoanProductSetting product = resolveProduct(saccoId, loanType);
         BigDecimal ratio = resolveRatio(saccoId, product);
-        BigDecimal maxAllowed = savings.multiply(ratio).setScale(2, RoundingMode.DOWN);
+        BigDecimal savingsBasedMaxAllowed = savings.multiply(ratio).setScale(2, RoundingMode.DOWN);
+        BigDecimal maxAllowed = capToProductMaximum(savingsBasedMaxAllowed, product);
         boolean savingsLimitCheckRequired = product.isSavingsLimitCheckRequired();
         boolean eligible = !savingsLimitCheckRequired || amount.compareTo(maxAllowed) <= 0;
         return new EligibilityResult(eligible, ratio, savings, maxAllowed, savingsLimitCheckRequired);
@@ -53,6 +54,14 @@ public class EligibilityService {
         return saccoSettingsRepository.findById(saccoId)
             .orElseThrow(() -> new IllegalArgumentException("SACCO settings missing"))
             .getMaxLoanSavingsRatio();
+    }
+
+    private BigDecimal capToProductMaximum(BigDecimal amount, LoanProductSetting product) {
+        if (amount == null || product == null || product.getMaximumAmount() == null) {
+            return amount;
+        }
+        BigDecimal productMaximum = product.getMaximumAmount().setScale(2, RoundingMode.DOWN);
+        return amount.compareTo(productMaximum) > 0 ? productMaximum : amount;
     }
 
     public BigDecimal resolveSavings(UUID memberId) {

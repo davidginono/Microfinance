@@ -183,7 +183,6 @@ public class StaffAnalyticsController {
             metricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed", deltas),
             metricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid", deltas),
             metricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted", deltas),
-            metricCard("forfeited", "Forfeited Loan Applications", analytics.forfeitedLoans(), "rose", "Forfeited", deltas),
             metricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected", deltas)
         );
     }

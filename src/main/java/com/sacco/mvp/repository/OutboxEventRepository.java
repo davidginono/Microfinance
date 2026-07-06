@@ -30,6 +30,25 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
 
     List<OutboxEvent> findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus status);
 
+    @Query(
+        value = """
+            select exists (
+                select 1
+                from outbox_events oe
+                where oe.aggregate_type = :aggregateType
+                  and oe.aggregate_id = :aggregateId
+                  and oe.event_type = :eventType
+                  and oe.status in ('NEW', 'PUBLISHED')
+                  and oe.payload ->> 'recipientId' = cast(:recipientId as text)
+            )
+            """,
+        nativeQuery = true
+    )
+    boolean existsActiveDuplicate(@Param("aggregateType") String aggregateType,
+                                  @Param("aggregateId") UUID aggregateId,
+                                  @Param("eventType") String eventType,
+                                  @Param("recipientId") UUID recipientId);
+
     Page<OutboxEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<OutboxEvent> findByStatusOrderByCreatedAtDesc(OutboxStatus status, Pageable pageable);

@@ -542,6 +542,16 @@
                             <input name="maximumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
                         </label>
 
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
+                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
+                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
+                        </label>
+
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
                             <input name="maxLoanSavingsPercent" type="hidden" value="${product.maxLoanSavingsRatio * 100}" data-savings-percent />
                             <div class="savings-ratio-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -603,16 +613,6 @@
                                 <option value="FLAT_RATE" ${product.interestMethod eq 'FLAT_RATE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
                         </label>
                     </div>
                 </section>

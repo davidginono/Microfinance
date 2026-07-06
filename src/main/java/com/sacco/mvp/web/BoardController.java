@@ -25,6 +25,7 @@ import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -52,7 +53,7 @@ import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping({"/board", "/chairperson"})
+@RequestMapping({"/board", "/chairperson", "/credit-committee"})
 @PreAuthorize("@authz.isBoardReviewer(principal)")
 public class BoardController {
     private final BoardService boardService;
@@ -71,10 +72,11 @@ public class BoardController {
     private final MessageSource messageSource;
     private final LoanReportService loanReportService;
     private final ApplicationClock applicationClock;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/assigned")
-    public String assigned() {
-        return "redirect:/board/queue";
+    public String assigned(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return "redirect:" + reviewBasePath(principal) + "/queue";
     }
 
     @GetMapping("/dashboard")
@@ -332,6 +334,8 @@ public class BoardController {
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
         model.addAttribute("boardStatusBadgeClass", boardLoanStatusBadgeClass(app));
         model.addAttribute("boardSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
+        model.addAttribute("reviewApprovalOtpEnabled",
+            stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
         model.addAttribute("boardAssessors", boardReviews.stream()
             .map(review -> {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -425,6 +429,9 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
             }
+            if (!stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            }
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 boardMember.getEmail(),
@@ -463,6 +470,12 @@ public class BoardController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException(reviewDecisionAlreadySubmittedMessage(myReview.getReviewStage()));
             }
+            if (!stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())) {
+                return ResponseEntity.ok(Map.of(
+                    "valid", true,
+                    "message", "OTP verification is disabled for approval actions at this station."
+                ));
+            }
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
             emailOtpService.validateOtp(boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
             return ResponseEntity.ok(Map.of(
@@ -486,10 +499,15 @@ public class BoardController {
                          @RequestParam(required = false) String boardSignatureOtpCode,
                          RedirectAttributes ra) {
         try {
+            LoanApplication app = loanApplicationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             BoardReview myReview = resolveMyReview(id, principal);
             Member boardMember = requireMemberWithEmail(principal.getMemberId(), myReview.getReviewStage());
-            UUID otpTokenId = emailOtpService.validateOtp(
-                boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
+            UUID otpTokenId = null;
+            if (stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())) {
+                otpTokenId = emailOtpService.validateOtp(
+                    boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
+            }
             if (decision == BoardDecision.APPROVED) {
                 requireSavedSignature(boardMember, myReview.getReviewStage());
                 boardService.decide(
@@ -504,12 +522,14 @@ public class BoardController {
             } else {
                 boardService.decide(id, principal.getMemberId(), myReview.getReviewStage(), decision, comment, null, null);
             }
-            emailOtpService.consumeOtpById(otpTokenId);
+            if (otpTokenId != null) {
+                emailOtpService.consumeOtpById(otpTokenId);
+            }
             ra.addFlashAttribute("message", reviewOtpAudienceLabel(myReview.getReviewStage()) + " decision submitted");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/board/loan-applications/" + id;
+        return "redirect:" + reviewBasePath(principal) + "/loan-applications/" + id;
     }
 
     @PostMapping("/loan-applications/{id}/undo")
@@ -523,7 +543,7 @@ public class BoardController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/board/loan-applications/" + id;
+        return "redirect:" + reviewBasePath(principal) + "/loan-applications/" + id;
     }
 
     @GetMapping("/notifications")
@@ -546,10 +566,10 @@ public class BoardController {
         try {
             return "redirect:" + notificationInboxService.openForMember(
                 id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), "/board/notifications");
+                principal.getPosition(), reviewBasePath(principal) + "/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return "redirect:/board/notifications";
+            return "redirect:" + reviewBasePath(principal) + "/notifications";
         }
     }
 
@@ -562,7 +582,7 @@ public class BoardController {
         } else {
             ra.addFlashAttribute("message", "There were no unread notifications.");
         }
-        return "redirect:/board/notifications";
+        return "redirect:" + reviewBasePath(principal) + "/notifications";
     }
 
     private void applyBoardUi(Model model, AppUserPrincipal principal) {
@@ -669,11 +689,28 @@ public class BoardController {
     }
 
     private String reviewBasePath(AppUserPrincipal principal) {
-        return principal != null
+        if (principal != null
             && principal.hasRole(Position.CHAIRPERSON)
-            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")
-            ? "/chairperson"
-            : "/board";
+            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")) {
+            return "/chairperson";
+        }
+        if (principal != null
+            && principal.hasRole(Position.CREDIT_COMMITTEE)
+            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")) {
+            return "/credit-committee";
+        }
+        return "/board";
+    }
+
+    private String reviewBasePath(HttpServletRequest request) {
+        String uri = request == null ? "" : request.getRequestURI();
+        if (uri != null && uri.startsWith("/chairperson")) {
+            return "/chairperson";
+        }
+        if (uri != null && uri.startsWith("/credit-committee")) {
+            return "/credit-committee";
+        }
+        return "/board";
     }
 
     private String message(String code) {
@@ -686,7 +723,7 @@ public class BoardController {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
             case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
-                List.of(LoanStatus.FINAL_APPROVED, LoanStatus.DEFAULTED, LoanStatus.PAID));
+                List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID));
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
         };
     }
@@ -711,9 +748,9 @@ public class BoardController {
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    public String handleError(RuntimeException ex, RedirectAttributes ra) {
+    public String handleError(RuntimeException ex, HttpServletRequest request, RedirectAttributes ra) {
         ra.addFlashAttribute("error", ex.getMessage());
-        return "redirect:/board/queue";
+        return "redirect:" + reviewBasePath(request) + "/queue";
     }
 
     private String populateListing(AppUserPrincipal principal,
@@ -905,9 +942,9 @@ public class BoardController {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
-            case CHAIRPERSON_APPROVED, BOARD_APPROVED, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case CHAIRPERSON_APPROVED, BOARD_APPROVED, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
-            case MANAGER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         };
     }

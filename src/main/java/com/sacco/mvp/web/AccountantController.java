@@ -23,6 +23,7 @@ import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
@@ -76,6 +77,7 @@ public class AccountantController {
     private final PaymentDetailsService paymentDetailsService;
     private final MessageSource messageSource;
     private final EmailOtpService emailOtpService;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -337,6 +339,7 @@ public class AccountantController {
         model.addAttribute("approveActionLabel", message("review.accountant.approveForDisbursement"));
         model.addAttribute("rejectActionLabel", message("review.manager.rejectLoan"));
         model.addAttribute("showReviewDecisionForm", app.getStatus() == LoanStatus.AWAITING_ACCOUNTANT);
+        model.addAttribute("staffDecisionOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
         model.addAttribute("showManagerReversalRequests", false);
         model.addAttribute("showDisbursementForm", false);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
@@ -399,9 +402,14 @@ public class AccountantController {
                          @RequestParam(required = false) String managerDecisionOtpCode,
                          RedirectAttributes ra) {
         try {
-            UUID otpTokenId = validateAccountantDecisionOtp(principal.getMemberId(), managerDecisionOtpCode);
+            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
+                ? validateAccountantDecisionOtp(principal.getMemberId(), managerDecisionOtpCode)
+                : null;
             managerService.decideAccountant(id, principal.getMemberId(), decision, reasons);
-            emailOtpService.consumeOtpById(otpTokenId);
+            if (otpTokenId != null) {
+                emailOtpService.consumeOtpById(otpTokenId);
+            }
             ra.addFlashAttribute("message", decision == ManagerDecision.ACCEPT
                 ? "Accountant approved the loan for disbursement."
                 : "Accountant rejected the loan.");
@@ -419,6 +427,9 @@ public class AccountantController {
             LoanApplication application = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
             if (application.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
                 throw new IllegalStateException("This application is no longer waiting for accountant review.");
+            }
+            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
             }
             Member accountant = requireMemberWithEmail(principal.getMemberId(), "Add an email address to your member profile before requesting an accountant decision OTP.");
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
@@ -446,8 +457,15 @@ public class AccountantController {
                                                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                                                  @RequestParam String otpCode) {
         try {
-            if (requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId()).getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
+            LoanApplication application = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+            if (application.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
                 throw new IllegalStateException("This application is no longer waiting for accountant review.");
+            }
+            if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
+                return ResponseEntity.ok(Map.of(
+                    "valid", true,
+                    "message", "OTP verification is disabled for approval actions at this station."
+                ));
             }
             validateAccountantDecisionOtp(principal.getMemberId(), otpCode);
             return ResponseEntity.ok(Map.of(
@@ -510,7 +528,7 @@ public class AccountantController {
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT
             && app.getStatus() != LoanStatus.ACCOUNTANT_REJECTED
             && app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT
-            && app.getStatus() != LoanStatus.FINAL_APPROVED
+            && app.getStatus() != LoanStatus.DISBURSED
             && app.getStatus() != LoanStatus.DEFAULTED
             && app.getStatus() != LoanStatus.PAID) {
             throw new IllegalArgumentException("This loan is not available in the accountant panel.");
@@ -616,9 +634,9 @@ public class AccountantController {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED,
-                READY_FOR_DISBURSEMENT, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+                READY_FOR_DISBURSEMENT, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         });
     }

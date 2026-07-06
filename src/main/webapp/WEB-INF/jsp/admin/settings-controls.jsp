@@ -504,6 +504,32 @@
                     </span>
                 </label>
             </div>
+            <div class="mt-5 border-t border-slate-200 pt-5">
+                <p class="erp-widget-title"><spring:message code="admin.settings.otp.requirementTitle" text="OTP Requirement" /></p>
+                <div class="mt-3 grid gap-3 lg:grid-cols-3">
+                    <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                        <input name="otpRequirementMode" type="radio" value="LOGIN_MFA_ONLY" class="mt-1" ${stationOtpRequirementMode eq 'LOGIN_MFA_ONLY' ? 'checked' : ''} />
+                        <span>
+                            <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.loginMfaOnly" text="Login MFA only" /></span>
+                            <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.loginMfaOnlyHelp" text="Verify users at sign-in and skip OTP during normal approvals." /></span>
+                        </span>
+                    </label>
+                    <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                        <input name="otpRequirementMode" type="radio" value="APPROVAL_ONLY" class="mt-1" ${stationOtpRequirementMode eq 'APPROVAL_ONLY' ? 'checked' : ''} />
+                        <span>
+                            <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.approvalOnly" text="Approvals only" /></span>
+                            <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.approvalOnlyHelp" text="Require OTP when applications are submitted, approved, rejected, or disbursed." /></span>
+                        </span>
+                    </label>
+                    <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                        <input name="otpRequirementMode" type="radio" value="LOGIN_MFA_AND_APPROVAL" class="mt-1" ${stationOtpRequirementMode eq 'LOGIN_MFA_AND_APPROVAL' ? 'checked' : ''} />
+                        <span>
+                            <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.loginAndApprovals" text="Login and approvals" /></span>
+                            <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.loginAndApprovalsHelp" text="Use OTP at sign-in and again for approval actions." /></span>
+                        </span>
+                    </label>
+                </div>
+            </div>
             <div class="relative mt-5 flex flex-row items-center justify-between gap-2 flex-wrap">
                 <p class="text-sm text-slate-500"><spring:message code="admin.settings.otp.reserveNotice" text="The three reserved SMS alert units are never used for OTP codes." /></p>
                 <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.otp.save" text="Save OTP Delivery" /></button>
@@ -613,12 +639,6 @@
                                 <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
                                 <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
                             </span>
-                        </label>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Forfeited Application Waiting Period (Days)
-                            <input name="applicantForfeitedWaitDays" type="number" min="0" max="15" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyApplicantForfeitedWaitDays}" />
-                            <input name="applicantMaxForfeitedLoans" type="hidden" value="${policyApplicantMaxForfeitedLoans}" />
-                            <input name="applicantForfeitedLookbackDays" type="hidden" value="${policyApplicantForfeitedLookbackDays}" />
                         </label>
                     </div>
                 </div>
@@ -1143,6 +1163,15 @@
                                 <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" />
                                 <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
                             </label>
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
+                                <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" />
+                            </label>
+
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
+                                <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="12" />
+                            </label>
                         </div>
                     </section>
 
@@ -1179,16 +1208,6 @@
                                     <option value="FLAT_RATE" selected><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
                                     <option value="REDUCING_BALANCE"><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                                 </select>
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                                <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                                <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="12" />
                             </label>
                         </div>
                     </section>
@@ -1670,6 +1689,15 @@
                             <input name="allowApplicationWithActiveLoan" type="checkbox" value="true" ${product.applicationWithActiveLoanAllowed ? 'checked' : ''} />
                             <span><spring:message code="admin.settings.workflow.allowApplicationWithActiveLoan" text="Allow Application With Active Loan" /></span>
                         </label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
+                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
+                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
+                        </label>
                     </div>
                 </section>
 
@@ -1706,16 +1734,6 @@
                                 <option value="FLAT_RATE" ${product.interestMethod eq 'FLAT_RATE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.minRepaymentMonths" text="Min Repayment Months" />
-                            <input name="minRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumRepaymentMonths}" />
-                        </label>
-
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <spring:message code="admin.settings.loanProducts.maxRepaymentMonths" text="Max Repayment Months" />
-                            <input name="maxRepaymentMonths" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maxRepaymentMonths}" />
                         </label>
                     </div>
                 </section>

@@ -226,7 +226,7 @@ class LoanReportServiceTest {
             .loanType(LoanType.LOAN_ADVANCE)
             .loanId("LN-1001")
             .amount(new BigDecimal("800000.00"))
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-06-17T10:00:00Z"))
             .financialSnapshot("""
                 {"interestAmount":28000.00}
@@ -298,7 +298,7 @@ class LoanReportServiceTest {
             .applicantMemberId(applicantTwo)
             .loanType(LoanType.LOAN_ADVANCE)
             .amount(new BigDecimal("300000.00"))
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
             .updatedAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
             .build();
@@ -383,9 +383,9 @@ class LoanReportServiceTest {
 
     private LoanReportService.AnalyticsExportReport exportReport(LoanReportService.ReportKind kind) {
         LoanAnalyticsService.MemberLoanAnalytics analytics = new LoanAnalyticsService.MemberLoanAnalytics(
-            0, 4, 0, 0, 5, 4, 0, new BigDecimal("772000.00"));
+            0, 4, 0, 0, 5, 4, new BigDecimal("772000.00"));
         Map<String, LoanAnalyticsService.MetricDelta> deltas = new LinkedHashMap<>();
-        for (String key : List.of("applied", "active", "disbursed", "paid", "defaulted", "forfeited", "rejected")) {
+        for (String key : List.of("applied", "active", "disbursed", "paid", "defaulted", "rejected")) {
             deltas.put(key, new LoanAnalyticsService.MetricDelta(key, key.equals("applied") ? new BigDecimal("100.00") : BigDecimal.ZERO, false));
         }
         Member member = Member.builder()
@@ -410,7 +410,7 @@ class LoanReportServiceTest {
             "All Products",
             kind == LoanReportService.ReportKind.MEMBER ? member : null,
             analytics,
-            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
+            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
             deltas,
             new LoanAnalyticsService.StaffPortfolioSummary(5, 4, 0, 4, 0, BigDecimal.ZERO, "Low"),
             List.of(new LoanReportService.ProductPerformanceRow("Loan Advance", 5, 5, 4, 0, 0, 0, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),

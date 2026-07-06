@@ -36,7 +36,7 @@ public class RepaymentReminderScheduler {
     @Scheduled(fixedDelay = 3600000)
     @Transactional
     public void sendRepaymentReminders() {
-        List<LoanApplication> loans = loanApplicationRepository.findByStatusAndFinalDueDateIsNotNull(LoanStatus.FINAL_APPROVED);
+        List<LoanApplication> loans = loanApplicationRepository.findByStatusAndFinalDueDateIsNotNull(LoanStatus.DISBURSED);
         for (LoanApplication loan : loans) {
             long daysLeft = repaymentScheduleService.daysLeft(loan.getFinalDueDate());
             if (!REMINDER_DAYS.contains(daysLeft)) {

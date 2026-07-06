@@ -46,6 +46,14 @@ public class OutboxPublisherScheduler {
                 String saccoId = textOrNull(payload, "saccoId");
                 String stationId = textOrNull(payload, "stationId");
 
+                if (notificationRepository.existsDeliveredDuplicate(recipientId, event.getEventType(), event.getPayload())) {
+                    log.info("Skipping duplicate notification delivery for outbox event {}", event.getId());
+                    event.setStatus(OutboxStatus.PUBLISHED);
+                    event.setPublishedAt(OffsetDateTime.now());
+                    outboxEventRepository.save(event);
+                    continue;
+                }
+
                 Notification notification = notificationRepository.save(Notification.builder()
                     .id(UUID.randomUUID())
                     .recipientMemberId(recipientId)

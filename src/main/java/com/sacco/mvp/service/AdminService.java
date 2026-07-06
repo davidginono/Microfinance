@@ -1352,18 +1352,12 @@ public class AdminService {
     public void updateQualificationPolicies(String saccoId,
                                             UUID adminId,
                                             Integer applicantMaxDefaultedLoans,
-                                            Integer applicantMaxForfeitedLoans,
-                                            Integer applicantForfeitedLookbackDays,
-                                            Integer applicantForfeitedWaitDays,
                                             boolean guarantorWithActiveLoanAllowed,
                                             BigDecimal guarantorMaxGuaranteedLoanAmount,
                                             Integer guarantorMaxDefaultedLoans) {
         SaccoSettings settings = settings(saccoId);
         Map<String, Object> before = snapshotSettings(settings);
         settings.setApplicantMaxDefaultedLoans(limitedCount(applicantMaxDefaultedLoans, "Defaulted loan limit", 0));
-        settings.setApplicantMaxForfeitedLoans(limitedCount(applicantMaxForfeitedLoans, "Forfeited application limit", 0));
-        settings.setApplicantForfeitedLookbackDays(limitedCount(applicantForfeitedLookbackDays, "Forfeited restriction days", 0));
-        settings.setApplicantForfeitedWaitDays(limitedCount(applicantForfeitedWaitDays, "Forfeited application waiting period", 0));
         settings.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
         settings.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
         settings.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
@@ -1377,9 +1371,6 @@ public class AdminService {
                                                    String stationId,
                                                    UUID adminId,
                                                    Integer applicantMaxDefaultedLoans,
-                                                   Integer applicantMaxForfeitedLoans,
-                                                   Integer applicantForfeitedLookbackDays,
-                                                   Integer applicantForfeitedWaitDays,
                                                    boolean guarantorWithActiveLoanAllowed,
                                                    BigDecimal guarantorMaxGuaranteedLoanAmount,
                                                    Integer guarantorMaxDefaultedLoans) {
@@ -1396,9 +1387,6 @@ public class AdminService {
                 .build());
         Map<String, Object> before = snapshotStationPolicy(policy);
         policy.setApplicantMaxDefaultedLoans(limitedCount(applicantMaxDefaultedLoans, "Defaulted loan limit", 0));
-        policy.setApplicantMaxForfeitedLoans(limitedCount(applicantMaxForfeitedLoans, "Forfeited application limit", 0));
-        policy.setApplicantForfeitedLookbackDays(limitedCount(applicantForfeitedLookbackDays, "Forfeited restriction days", 0));
-        policy.setApplicantForfeitedWaitDays(limitedCount(applicantForfeitedWaitDays, "Forfeited application waiting period", 0));
         policy.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
         policy.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
         policy.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
@@ -1945,7 +1933,7 @@ public class AdminService {
         }
 
         long rejectedByManager = byStatus.getOrDefault(LoanStatus.MANAGER_REJECTED.name(), 0L);
-        long approvedFinal = byStatus.getOrDefault(LoanStatus.FINAL_APPROVED.name(), 0L);
+        long approvedFinal = byStatus.getOrDefault(LoanStatus.DISBURSED.name(), 0L);
         long totalApplications = byStatus.values().stream().mapToLong(Long::longValue).sum();
 
         return new ReportData(
@@ -3388,9 +3376,6 @@ public class AdminService {
         data.put("applicationFee", settings.getResolvedApplicationFee());
         data.put("defaultLanguage", settings.getDefaultLanguage());
         data.put("applicantMaxDefaultedLoans", settings.getApplicantMaxDefaultedLoans());
-        data.put("applicantMaxForfeitedLoans", settings.getApplicantMaxForfeitedLoans());
-        data.put("applicantForfeitedLookbackDays", settings.getApplicantForfeitedLookbackDays());
-        data.put("applicantForfeitedWaitDays", settings.getApplicantForfeitedWaitDays());
         data.put("guarantorWithActiveLoanAllowed", settings.getGuarantorWithActiveLoanAllowed());
         data.put("guarantorMaxGuaranteedLoanAmount", settings.getGuarantorMaxGuaranteedLoanAmount());
         data.put("guarantorMaxDefaultedLoans", settings.getGuarantorMaxDefaultedLoans());
@@ -3414,9 +3399,6 @@ public class AdminService {
         data.put("saccoId", policy.getSaccoId());
         data.put("stationId", policy.getStationId());
         data.put("applicantMaxDefaultedLoans", policy.getApplicantMaxDefaultedLoans());
-        data.put("applicantMaxForfeitedLoans", policy.getApplicantMaxForfeitedLoans());
-        data.put("applicantForfeitedLookbackDays", policy.getApplicantForfeitedLookbackDays());
-        data.put("applicantForfeitedWaitDays", policy.getApplicantForfeitedWaitDays());
         data.put("guarantorWithActiveLoanAllowed", policy.getGuarantorWithActiveLoanAllowed());
         data.put("guarantorMaxGuaranteedLoanAmount", policy.getGuarantorMaxGuaranteedLoanAmount());
         data.put("guarantorMaxDefaultedLoans", policy.getGuarantorMaxDefaultedLoans());

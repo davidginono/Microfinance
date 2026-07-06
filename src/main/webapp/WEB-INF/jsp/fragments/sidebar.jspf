@@ -279,6 +279,9 @@
                     <c:when test="${showChairpersonPanel}">
                         <c:set var="staffDashboardHref" value="/chairperson/dashboard" />
                     </c:when>
+                    <c:when test="${showCreditCommitteePanel}">
+                        <c:set var="staffDashboardHref" value="/credit-committee/dashboard" />
+                    </c:when>
                     <c:when test="${showBoardPanel}">
                         <c:set var="staffDashboardHref" value="/board/dashboard" />
                     </c:when>
@@ -301,7 +304,7 @@
                         <span class="min-w-0 flex-1">
                             <c:choose>
                                 <c:when test="${showChairpersonPanel and staffDashboardHref eq '/chairperson/dashboard'}"><spring:message code="menu.chairpersonDashboard" text="Chairperson Dashboard" /></c:when>
-                                <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/board/dashboard'}"><spring:message code="menu.creditCommitteeDashboard" text="Credit Committee Dashboard" /></c:when>
+                                <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/credit-committee/dashboard'}"><spring:message code="menu.creditCommitteeDashboard" text="Credit Committee Dashboard" /></c:when>
                                 <c:otherwise><spring:message code="menu.staffDashboard" text="Staff Dashboard" /></c:otherwise>
                             </c:choose>
                         </span>
@@ -315,7 +318,7 @@
                             <span class="min-w-0 flex-1">
                                 <c:choose>
                                     <c:when test="${showChairpersonPanel and staffDashboardHref eq '/chairperson/dashboard'}"><spring:message code="menu.chairpersonReportsAnalytics" text="Chairperson Reports and Analytics" /></c:when>
-                                    <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/board/dashboard'}"><spring:message code="menu.creditCommitteeReportsAnalytics" text="Credit Committee Reports and Analytics" /></c:when>
+                                    <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/credit-committee/dashboard'}"><spring:message code="menu.creditCommitteeReportsAnalytics" text="Credit Committee Reports and Analytics" /></c:when>
                                     <c:otherwise><spring:message code="menu.staffReportsAnalytics" text="Staff Reports and Analytics" /></c:otherwise>
                                 </c:choose>
                             </span>
@@ -374,7 +377,8 @@
             </sec:authorize>
             <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CHAIRPERSON') and principal.claims.contains('REVIEW_CHAIRPERSON_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN')">
                 <c:set var="chairpersonOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON')}" />
-                <c:set var="reviewOfficeBasePath" value="${chairpersonOfficeActive ? '/chairperson' : '/board'}" />
+                <c:set var="creditCommitteeOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')}" />
+                <c:set var="reviewOfficeBasePath" value="${chairpersonOfficeActive ? '/chairperson' : (creditCommitteeOfficeActive ? '/credit-committee' : '/board')}" />
                 <c:set var="reviewDashboardPath" value="${reviewOfficeBasePath}/dashboard" />
                 <c:set var="reviewQueuePath" value="${reviewOfficeBasePath}/queue" />
                 <c:set var="reviewAssignedPath" value="${reviewOfficeBasePath}/assigned" />
@@ -382,7 +386,6 @@
                 <c:set var="reviewReportsPath" value="${reviewOfficeBasePath}/reports" />
                 <c:set var="reviewLoanApplicationsPath" value="${reviewOfficeBasePath}/loan-applications" />
                 <c:set var="boardOfficeActive" value="${requestUri eq reviewDashboardPath || requestUri eq reviewQueuePath || requestUri eq reviewAssignedPath || requestUri eq reviewArchivePath || requestUri eq reviewReportsPath || fn:startsWith(requestUri, reviewLoanApplicationsPath)}" />
-                <c:set var="creditCommitteeOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
                         <c:choose>

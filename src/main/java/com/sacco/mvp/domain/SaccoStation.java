@@ -48,6 +48,11 @@ public class SaccoStation {
     private OtpDeliveryChannel otpDeliveryChannel = OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "otp_requirement_mode")
+    @Builder.Default
+    private OtpRequirementMode otpRequirementMode = OtpRequirementMode.LOGIN_MFA_ONLY;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "access_status")
     @Builder.Default
     private SaccoAccessStatus accessStatus = SaccoAccessStatus.ACTIVE;
@@ -80,5 +85,9 @@ public class SaccoStation {
 
     public OtpDeliveryChannel getResolvedOtpDeliveryChannel() {
         return otpDeliveryChannel == null ? OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK : otpDeliveryChannel;
+    }
+
+    public OtpRequirementMode getResolvedOtpRequirementMode() {
+        return otpRequirementMode == null ? OtpRequirementMode.LOGIN_MFA_ONLY : otpRequirementMode;
     }
 }

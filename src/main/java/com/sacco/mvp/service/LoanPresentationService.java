@@ -304,31 +304,32 @@ public class LoanPresentationService {
                 currentIndex = labels.size() - 1;
             }
             case BOARD_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Board");
+            case CREDIT_COMMITTEE_REJECTED -> {
+                labels.add("Credit Committee Rejected");
+                currentIndex = labels.size() - 1;
+            }
+            case CREDIT_COMMITTEE_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Credit Committee");
             case AWAITING_ACCOUNTANT -> currentIndex = indexOfLabel(labels, "On Review By Accountant");
             case ACCOUNTANT_REJECTED -> {
                 labels.add("Accountant Rejected");
                 currentIndex = labels.size() - 1;
             }
             case ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> currentIndex = indexOfLabel(labels, "Approved For Disbursement");
-            case FORFEITED -> {
-                labels.add("Forfeited");
+            case REJECTED -> {
+                labels.add("Rejected");
                 currentIndex = labels.size() - 1;
             }
-            case FINAL_REJECTED -> {
-                labels.add("Final Rejected");
-                currentIndex = labels.size() - 1;
-            }
-            case FINAL_APPROVED -> {
-                labels.add("Final Approved and Disbursed");
+            case DISBURSED -> {
+                labels.add("Disbursed");
                 currentIndex = labels.size() - 1;
             }
             case DEFAULTED -> {
-                labels.add("Final Approved and Disbursed");
+                labels.add("Disbursed");
                 labels.add("Defaulted");
                 currentIndex = labels.size() - 1;
             }
             case PAID -> {
-                labels.add("Final Approved and Disbursed");
+                labels.add("Disbursed");
                 labels.add("Paid");
                 currentIndex = labels.size() - 1;
             }
@@ -812,12 +813,12 @@ public class LoanPresentationService {
             case "On Review By Board" -> message("loan.status.AWAITING_BOARD");
             case "On Review By Credit Committee" -> message("loan.status.AWAITING_CREDIT_COMMITTEE");
             case "Board Rejected" -> message("loan.status.BOARD_REJECTED");
+            case "Credit Committee Rejected" -> message("loan.status.CREDIT_COMMITTEE_REJECTED");
             case "On Review By Accountant" -> message("loan.status.AWAITING_ACCOUNTANT");
             case "Accountant Rejected" -> message("loan.status.ACCOUNTANT_REJECTED");
             case "Approved For Disbursement" -> message("loan.status.READY_FOR_DISBURSEMENT");
-            case "Forfeited" -> message("loan.status.FORFEITED");
-            case "Final Rejected" -> message("loan.status.FINAL_REJECTED");
-            case "Final Approved and Disbursed" -> message("loan.status.FINAL_APPROVED");
+            case "Rejected" -> message("loan.status.REJECTED");
+            case "Disbursed" -> message("loan.status.DISBURSED");
             case "Defaulted" -> message("loan.status.DEFAULTED");
             case "Paid" -> message("loan.status.PAID");
             default -> label;
@@ -1082,7 +1083,7 @@ public class LoanPresentationService {
             || status == com.sacco.mvp.domain.LoanStatus.CHAIRPERSON_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.BOARD_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.ACCOUNTANT_REJECTED
-            || status == com.sacco.mvp.domain.LoanStatus.FINAL_REJECTED;
+            || status == com.sacco.mvp.domain.LoanStatus.REJECTED;
     }
 
     public record DecisionFeedback(String role, String reason, java.time.OffsetDateTime decidedAt) {
@@ -2552,7 +2553,7 @@ public class LoanPresentationService {
 
         private boolean completedApplication() {
             return app.getStatus() == com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT
-                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED
+                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DISBURSED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAID;
         }

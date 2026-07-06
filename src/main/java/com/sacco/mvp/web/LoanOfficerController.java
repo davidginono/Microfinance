@@ -25,6 +25,7 @@ import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
+import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.WorkflowStatusPresentationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -76,6 +77,7 @@ public class LoanOfficerController {
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final LoanReportService loanReportService;
     private final ApplicationClock applicationClock;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -287,6 +289,8 @@ public class LoanOfficerController {
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
         model.addAttribute("boardStatusBadgeClass", boardLoanStatusBadgeClass(app));
         model.addAttribute("boardSavedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
+        model.addAttribute("reviewApprovalOtpEnabled",
+            stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId()));
         model.addAttribute("boardAssessors", stageReviews.stream()
             .map(review -> {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -356,6 +360,9 @@ public class LoanOfficerController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your loan officer decision.");
             }
+            if (!stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())) {
+                throw new IllegalStateException("OTP verification is disabled for approval actions at this station.");
+            }
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
             EmailOtpService.OtpIssueResult otp = emailOtpService.issueOtpWithMetadata(
                 reviewer.getEmail(),
@@ -392,6 +399,12 @@ public class LoanOfficerController {
             if (myReview.getDecision() != BoardDecision.PENDING) {
                 throw new IllegalStateException("You have already submitted your loan officer decision.");
             }
+            if (!stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())) {
+                return ResponseEntity.ok(Map.of(
+                    "valid", true,
+                    "message", "OTP verification is disabled for approval actions at this station."
+                ));
+            }
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
             emailOtpService.validateOtp(reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, otpCode);
             return ResponseEntity.ok(Map.of(
@@ -415,9 +428,12 @@ public class LoanOfficerController {
                          @RequestParam(required = false) String boardSignatureOtpCode,
                          RedirectAttributes ra) {
         try {
+            LoanApplication app = loanApplicationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
-            UUID otpTokenId = emailOtpService.validateOtp(
-                reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
+            UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
+                ? emailOtpService.validateOtp(reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode)
+                : null;
             if (decision == BoardDecision.APPROVED) {
                 requireSavedSignature(reviewer);
                 boardService.decide(
@@ -432,7 +448,9 @@ public class LoanOfficerController {
             } else {
                 boardService.decide(id, principal.getMemberId(), STAGE, decision, comment, null, null);
             }
-            emailOtpService.consumeOtpById(otpTokenId);
+            if (otpTokenId != null) {
+                emailOtpService.consumeOtpById(otpTokenId);
+            }
             ra.addFlashAttribute("message", "Loan officer decision submitted");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
@@ -535,7 +553,7 @@ public class LoanOfficerController {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
             case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
-                List.of(com.sacco.mvp.domain.LoanStatus.FINAL_APPROVED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID));
+                List.of(com.sacco.mvp.domain.LoanStatus.DISBURSED, com.sacco.mvp.domain.LoanStatus.DEFAULTED, com.sacco.mvp.domain.LoanStatus.PAID));
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
         };
     }
@@ -683,9 +701,9 @@ public class LoanOfficerController {
         return switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
-            case LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, FINAL_APPROVED, PAID -> "bg-emerald-50 text-emerald-700";
+            case LOAN_OFFICER_APPROVED, BOARD_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, FINAL_REJECTED -> "bg-rose-50 text-rose-700";
+            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, BOARD_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
         };
     }

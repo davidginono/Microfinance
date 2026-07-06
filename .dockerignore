@@ -12,6 +12,7 @@
 **/.env
 **/.git
 **/.gitignore
+**/.idea
 **/.project
 **/.settings
 **/.toolstarget
@@ -28,7 +29,11 @@
 **/node_modules
 **/npm-debug.log
 **/obj
+**/output
 **/secrets.dev.yaml
+**/target
+**/tmp
 **/values.dev.yaml
+*.log
 LICENSE
 README.md

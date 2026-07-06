@@ -15,6 +15,7 @@ docs/**/*.pyc
 *.iml
 *.class
 *.argfile
+*.log
 *-response.html
 *-page.html
 *-post-body.html

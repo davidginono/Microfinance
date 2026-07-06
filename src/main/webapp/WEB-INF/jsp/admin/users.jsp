@@ -5,6 +5,39 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/modal-shell.jspf" %>
+<style>
+    .admin-user-edit-panel {
+        width: min(100%, 48rem);
+    }
+
+    .admin-claim-option {
+        min-width: 0;
+        align-items: center;
+    }
+
+    .admin-claim-text {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.76rem;
+        line-height: 1.25rem;
+    }
+
+    .admin-claim-note {
+        margin-left: 0.35rem;
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #94a3b8;
+    }
+
+    @media (min-width: 768px) {
+        .admin-claim-text {
+            font-size: 0.82rem;
+        }
+    }
+</style>
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users & Roles" /></p>
@@ -220,7 +253,7 @@
 <c:forEach items="${users}" var="user">
     <div class="app-modal-overlay hidden"
          data-user-modal="user-${user.accountId}">
-        <div class="app-modal-panel app-modal-panel--compact">
+        <div class="app-modal-panel admin-user-edit-panel">
             <div class="app-modal-scroll">
             <div class="app-modal-header">
                 <div>
@@ -259,17 +292,17 @@
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${availableClaims}" var="claim">
                             <c:set var="memberOnlyClaimDisabled" value="${(claim eq 'APPLY_LOANS' or claim eq 'APPROVE_GUARANTOR_REQUESTS') and not user.memberAccess}" />
-                            <label class="flex min-w-0 items-start gap-3 overflow-hidden rounded border border-slate-200 bg-slate-50 px-3 py-2 font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
+                            <label class="admin-claim-option flex gap-3 overflow-hidden rounded border border-slate-200 bg-slate-50 px-3 py-2 font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
                                 <input type="checkbox"
                                        name="claims"
                                        value="${claim}"
                                        ${user.claims.contains(claim) ? 'checked' : ''}
                                        ${memberOnlyClaimDisabled ? 'disabled' : ''}
-                                       class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span class="min-w-0 flex-1 text-[12px] leading-4 sm:text-[13px] sm:leading-5">
-                                    <span class="block max-w-full break-words [overflow-wrap:anywhere]">${claim}</span>
+                                       class="h-4 w-4 flex-shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                <span class="admin-claim-text flex-1" title="${claim}">
+                                    ${claim}
                                     <c:if test="${memberOnlyClaimDisabled}">
-                                        <span class="mt-0.5 block whitespace-normal text-[11px] font-normal leading-4 text-slate-400 sm:mt-0 sm:inline sm:whitespace-nowrap">Members only</span>
+                                        <span class="admin-claim-note">Members only</span>
                                     </c:if>
                                 </span>
                             </label>

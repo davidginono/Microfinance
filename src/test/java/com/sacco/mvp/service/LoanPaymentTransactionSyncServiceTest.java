@@ -74,7 +74,7 @@ class LoanPaymentTransactionSyncServiceTest {
             .saccoId("SACCO-1")
             .stationId("ST-1")
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .finalDueDate(LocalDate.of(2026, 4, 30))
             .createdAt(now)
             .updatedAt(now)
@@ -156,8 +156,8 @@ class LoanPaymentTransactionSyncServiceTest {
             .saccoId("SACCO-1")
             .stationId("ST-1")
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
-            .finalDueDate(LocalDate.of(2026, 6, 30))
+            .status(LoanStatus.DISBURSED)
+            .finalDueDate(now.toLocalDate().plusMonths(2))
             .createdAt(now)
             .updatedAt(now)
             .build();
@@ -208,7 +208,7 @@ class LoanPaymentTransactionSyncServiceTest {
         int inserted = syncService.syncMonth(loan, YearMonth.of(2026, 4));
 
         assertThat(inserted).isEqualTo(1);
-        assertThat(loan.getStatus()).isEqualTo(LoanStatus.FINAL_APPROVED);
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         assertThat(loan.getPaidAt()).isNull();
         assertThat(loan.getLoanPaymentSummaryJson()).contains("Development Loan");
         verify(loanApplicationRepository, atLeastOnce()).save(loan);
@@ -228,7 +228,7 @@ class LoanPaymentTransactionSyncServiceTest {
             .saccoId("SACCO-1")
             .stationId("ST-1")
             .applicantMemberId(memberId)
-            .status(LoanStatus.FINAL_APPROVED)
+            .status(LoanStatus.DISBURSED)
             .finalDueDate(pastDueDate)
             .createdAt(now.minusMonths(7))
             .updatedAt(now.minusDays(1))
