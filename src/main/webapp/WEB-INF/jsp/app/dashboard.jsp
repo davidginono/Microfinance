@@ -8,42 +8,6 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/member-application-progress-styles.jspf" %>
 <style>
-    .erp-stat-card {
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-        font: inherit;
-        transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
-    }
-    .erp-stat-card::after {
-        content: "";
-        position: absolute;
-        inset: -45% auto -45% -70%;
-        width: 42%;
-        transform: skewX(-18deg);
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
-        opacity: 0;
-        pointer-events: none;
-    }
-    .erp-stat-card:hover,
-    .erp-stat-card:focus-visible {
-        transform: translateY(-2px);
-        filter: brightness(1.03);
-        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
-    }
-    .erp-stat-card:hover::after,
-    .erp-stat-card:focus-visible::after {
-        opacity: 1;
-        animation: member-dashboard-shine 900ms ease;
-    }
-    @keyframes member-dashboard-shine {
-        from {
-            left: -70%;
-        }
-        to {
-            left: 125%;
-        }
-    }
     .member-dashboard-dropdown-trigger {
         display: flex;
         width: 100%;
@@ -376,7 +340,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     </div>
 
     <div class="erp-stat-grid">
-        <a href="/app/loan-applications" class="erp-stat-card erp-stat-blue block no-underline">
+        <a href="/app/loan-applications" class="erp-stat-card erp-stat-card-interactive erp-stat-blue block no-underline">
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
@@ -387,7 +351,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </span>
             </div>
         </a>
-        <button type="button" class="erp-stat-card erp-stat-green block w-full border-0 text-left" data-active-loans-card-trigger>
+        <button type="button" class="erp-stat-card erp-stat-card-interactive erp-stat-green block w-full border-0 text-left" data-active-loans-card-trigger>
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
@@ -398,7 +362,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </span>
             </div>
         </button>
-        <a href="/app/guarantee-requests" class="erp-stat-card erp-stat-amber block no-underline">
+        <a href="/app/guarantee-requests" class="erp-stat-card erp-stat-card-interactive erp-stat-amber block no-underline">
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
@@ -409,7 +373,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </span>
             </div>
         </a>
-        <a href="/app/archives?section=loans&loanArchiveFilter=REJECTED" class="erp-stat-card erp-stat-red block no-underline">
+        <a href="/app/archives?section=loans&loanArchiveFilter=REJECTED" class="erp-stat-card erp-stat-card-interactive erp-stat-red block no-underline">
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>

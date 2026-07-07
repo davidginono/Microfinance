@@ -100,7 +100,6 @@ public class LoanOfficerController {
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_LOAN_OFFICER));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", "L");
         model.addAttribute("dashboardDetailBasePath", "/loan-officer/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
@@ -452,20 +451,6 @@ public class LoanOfficerController {
                 emailOtpService.consumeOtpById(otpTokenId);
             }
             ra.addFlashAttribute("message", "Loan officer decision submitted");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/loan-officer/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/undo")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
-    public String undo(@PathVariable UUID id,
-                       @AuthenticationPrincipal AppUserPrincipal principal,
-                       RedirectAttributes ra) {
-        try {
-            boardService.undoDecision(id, principal.getMemberId());
-            ra.addFlashAttribute("message", "Loan officer decision reversed");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

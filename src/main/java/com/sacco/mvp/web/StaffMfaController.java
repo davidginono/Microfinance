@@ -91,6 +91,30 @@ public class StaffMfaController {
         }
     }
 
+    @PostMapping({"/login/mfa/check", "/login/staff/mfa/check"})
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> check(@RequestParam String otpCode,
+                                                     HttpServletRequest request) {
+        if (otpCode == null || otpCode.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", "Enter the verification code."
+            ));
+        }
+        try {
+            staffMfaService.validateChallenge(otpCode.trim(), request);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", "OTP code verified."
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
     @PostMapping({"/login/mfa/cancel", "/login/staff/mfa/cancel"})
     public String cancel(HttpServletRequest request) {
         staffMfaService.clear(request);

@@ -250,9 +250,37 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 <c:set var="dashboardQueueLabelValue" value="${empty dashboardQueueLabel ? dashboardDefaultQueueLabel : dashboardQueueLabel}" />
 <c:set var="dashboardQueueValueValue" value="${empty dashboardQueueValue ? dashboardOnReviewByManagerLoans : dashboardQueueValue}" />
 <c:set var="dashboardQueueFooterLabelValue" value="${empty dashboardQueueFooterLabel ? dashboardDefaultQueueFooter : dashboardQueueFooterLabel}" />
-<c:set var="dashboardQueueIconValue" value="${empty dashboardQueueIcon ? 'M' : dashboardQueueIcon}" />
 <c:set var="dashboardDetailBasePathValue" value="${empty dashboardDetailBasePath ? '/manager/loan-applications' : dashboardDetailBasePath}" />
 <c:set var="dashboardChartTitleValue" value="${empty dashboardChartTitle ? dashboardDefaultChartTitle : dashboardChartTitle}" />
+<c:set var="dashboardQueueHrefValue" value="${dashboardDetailBasePathValue}" />
+<c:choose>
+    <c:when test="${fn:startsWith(dashboardDetailBasePathValue, '/board/')}">
+        <c:set var="dashboardQueueHrefValue" value="/board/queue" />
+    </c:when>
+    <c:when test="${fn:startsWith(dashboardDetailBasePathValue, '/chairperson/')}">
+        <c:set var="dashboardQueueHrefValue" value="/chairperson/queue" />
+    </c:when>
+    <c:when test="${fn:startsWith(dashboardDetailBasePathValue, '/credit-committee/')}">
+        <c:set var="dashboardQueueHrefValue" value="/credit-committee/queue" />
+    </c:when>
+    <c:when test="${fn:startsWith(dashboardDetailBasePathValue, '/loan-officer/')}">
+        <c:set var="dashboardQueueHrefValue" value="/loan-officer/queue" />
+    </c:when>
+</c:choose>
+<c:set var="dashboardTotalDisbursedHrefValue" value="#recentDisbursements" />
+<c:set var="dashboardActiveDisbursedHrefValue" value="#recentDisbursements" />
+<c:set var="dashboardDefaultedHrefValue" value="#stationLoanStatusChart" />
+<c:choose>
+    <c:when test="${dashboardDetailBasePathValue eq '/manager/loan-applications'}">
+        <c:set var="dashboardTotalDisbursedHrefValue" value="/manager/archive?filter=DISBURSED" />
+        <c:set var="dashboardActiveDisbursedHrefValue" value="/manager/archive?filter=DISBURSED" />
+    </c:when>
+    <c:when test="${dashboardDetailBasePathValue eq '/disbursement/loan-applications'}">
+        <c:set var="dashboardTotalDisbursedHrefValue" value="/disbursement/archive" />
+        <c:set var="dashboardActiveDisbursedHrefValue" value="/disbursement/archive?filter=DISBURSED" />
+        <c:set var="dashboardDefaultedHrefValue" value="/disbursement/archive?filter=DEFAULTED" />
+    </c:when>
+</c:choose>
 <fmt:formatNumber value="${dashboardDisbursementYear}" groupingUsed="false" var="dashboardDisbursementYearLabel" />
 
 <div class="erp-page-header">
@@ -261,49 +289,45 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 </div>
 
 <section class="erp-stat-grid">
-    <div class="erp-stat-card erp-stat-green">
+    <a href="${dashboardTotalDisbursedHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-green block no-underline" aria-label="Open total disbursed loans">
         <div class="erp-stat-main">
             <div>
                 <p class="erp-stat-label"><spring:message code="manager.dashboard.totalDisbursed" text="Total Loans Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardTotalDisbursedLoans}</p>
             </div>
-            <span class="erp-stat-icon">D</span>
         </div>
-        <div class="erp-stat-footer"><span>${dashboardDisbursementYearLabel}</span><span>${dashboardTotalDisbursedLoans}</span></div>
-    </div>
-    <div class="erp-stat-card erp-stat-blue">
+        <div class="erp-stat-footer"><span>${dashboardDisbursementYearLabel}</span></div>
+    </a>
+    <a href="${dashboardActiveDisbursedHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-blue block no-underline" aria-label="Open active disbursed loans">
         <div class="erp-stat-main">
             <div>
                 <p class="erp-stat-label"><spring:message code="manager.dashboard.activeDisbursed" text="Active Disbursed" /></p>
                 <p class="erp-stat-value">${dashboardActiveDisbursedLoans}</p>
             </div>
-            <span class="erp-stat-icon">A</span>
         </div>
-        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentlyOngoing" text="Currently ongoing" /></span><span>${dashboardActiveDisbursedLoans}</span></div>
-    </div>
-    <div class="erp-stat-card erp-stat-amber">
+        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentlyOngoing" text="Currently ongoing" /></span></div>
+    </a>
+    <a href="${dashboardQueueHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-amber block no-underline" aria-label="Open ${dashboardQueueLabelValue} queue">
         <div class="erp-stat-main">
             <div>
                 <p class="erp-stat-label">${dashboardQueueLabelValue}</p>
                 <p class="erp-stat-value">${dashboardQueueValueValue}</p>
             </div>
-            <span class="erp-stat-icon">${dashboardQueueIconValue}</span>
         </div>
-        <div class="erp-stat-footer"><span>${dashboardQueueFooterLabelValue}</span><span>${dashboardQueueValueValue}</span></div>
-    </div>
-    <div class="erp-stat-card erp-stat-red">
+        <div class="erp-stat-footer"><span>${dashboardQueueFooterLabelValue}</span></div>
+    </a>
+    <a href="${dashboardDefaultedHrefValue}" class="erp-stat-card erp-stat-card-interactive erp-stat-red block no-underline" aria-label="Open defaulted loans">
         <div class="erp-stat-main">
             <div>
                 <p class="erp-stat-label"><spring:message code="archive.defaultedLoans" text="Defaulted Loans" /></p>
                 <p class="erp-stat-value">${dashboardDefaultedLoans}</p>
             </div>
-            <span class="erp-stat-icon">F</span>
         </div>
-        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentYear" text="Current year" /></span><span>${dashboardDefaultedLoans}</span></div>
-    </div>
+        <div class="erp-stat-footer"><span><spring:message code="manager.dashboard.currentYear" text="Current year" /></span></div>
+    </a>
 </section>
 
-<section class="erp-panel">
+<section id="stationLoanStatusChart" class="erp-panel">
     <div class="erp-panel-header">
         <div>
             <p class="erp-panel-title">${dashboardChartTitleValue}</p>
@@ -398,7 +422,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     })();
 </script>
 
-<section class="erp-panel mt-4">
+<section id="recentDisbursements" class="erp-panel mt-4">
     <div class="erp-panel-header">
         <div>
             <p class="erp-panel-title"><spring:message code="manager.dashboard.recentDisbursements" text="Recent Disbursements" /></p>

@@ -96,7 +96,6 @@ public class BoardController {
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), awaitingStatusFor(principal)));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", workspaceLabel.startsWith("Credit") ? "C" : (workspaceLabel.startsWith("Chair") ? "P" : "B"));
         model.addAttribute("dashboardDetailBasePath", reviewBasePath(principal) + "/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
@@ -526,20 +525,6 @@ public class BoardController {
                 emailOtpService.consumeOtpById(otpTokenId);
             }
             ra.addFlashAttribute("message", reviewOtpAudienceLabel(myReview.getReviewStage()) + " decision submitted");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:" + reviewBasePath(principal) + "/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/undo")
-    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
-    public String undo(@PathVariable UUID id,
-                       @AuthenticationPrincipal AppUserPrincipal principal,
-                       RedirectAttributes ra) {
-        try {
-            boardService.undoDecision(id, principal.getMemberId());
-            ra.addFlashAttribute("message", "Board decision reversed");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

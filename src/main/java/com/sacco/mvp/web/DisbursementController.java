@@ -95,7 +95,6 @@ public class DisbursementController {
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.READY_FOR_DISBURSEMENT));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", "R");
         model.addAttribute("dashboardDetailBasePath", "/disbursement/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
@@ -345,7 +344,6 @@ public class DisbursementController {
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("showUndoForm", false);
         model.addAttribute("allowPaymentSync", true);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";

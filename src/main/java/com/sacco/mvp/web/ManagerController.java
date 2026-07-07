@@ -44,7 +44,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.*;
@@ -325,12 +324,7 @@ public class ManagerController {
         model.addAttribute("disbursementNotesLabel", message("review.manager.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("showUndoForm", app.getStatus() == LoanStatus.MANAGER_REJECTED);
         model.addAttribute("allowPaymentSync", true);
-        model.addAttribute("managerUndoWindowOpen",
-            app.getStatus() == LoanStatus.MANAGER_REJECTED
-                && app.getUpdatedAt() != null
-                && app.getUpdatedAt().plusHours(24).isAfter(OffsetDateTime.now()));
         addReviewDisplayAttributes(model, app, managerReason);
         return "manager/detail";
     }
@@ -481,19 +475,6 @@ public class ManagerController {
                 "message", ex.getMessage()
             ));
         }
-    }
-
-    @PostMapping("/loan-applications/{id}/undo-decision")
-    public String undoDecision(@PathVariable UUID id,
-                               @AuthenticationPrincipal AppUserPrincipal principal,
-                               RedirectAttributes ra) {
-        try {
-            managerService.undoDecision(id, principal.getMemberId());
-            ra.addFlashAttribute("message", "Manager action reversed");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/manager/loan-applications/" + id;
     }
 
     @PostMapping("/loan-applications/{loanId}/reversal-requests/{requestId}/approve")

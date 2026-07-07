@@ -156,6 +156,16 @@ public class StaffMfaService {
         return principal;
     }
 
+    public void validateChallenge(String otpCode, HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        UUID memberId = pendingMemberId(session);
+        String email = pendingEmail(session);
+        if (memberId == null) {
+            throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
+        }
+        emailOtpService.validateOtp(email, EmailOtpPurpose.LOGIN_MFA, memberId, otpCode);
+    }
+
     public void clear(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         clearPending(session);

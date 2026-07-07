@@ -27,7 +27,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class ManagerService {
-    private static final long REVERSAL_WINDOW_HOURS = 24L;
     private static final int MAX_QUEUE_ROWS = 100;
     private static final java.util.regex.Pattern LOAN_ID_PATTERN = java.util.regex.Pattern.compile("^[0-9]{4,20}$");
     private final LoanApplicationRepository loanApplicationRepository;
@@ -400,25 +399,6 @@ public class ManagerService {
             details);
     }
 
-    @Transactional
-    public void undoDecision(UUID loanId, UUID managerId) {
-        LoanApplication app = getManagedApplication(loanId, managerId);
-        ManagerReview latestReview = managerReviewRepository.findFirstByLoanApplicationIdOrderByCreatedAtDesc(loanId)
-            .orElse(null);
-
-        if (app.getStatus() == LoanStatus.MANAGER_REJECTED) {
-            if (latestReview == null || !isWithinReversalWindow(latestReview.getCreatedAt())) {
-                throw new IllegalStateException("The 24-hour reversal window for this manager action has already closed.");
-            }
-            app.setStatus(LoanStatus.READY_FOR_MANAGER);
-            app.setUpdatedAt(OffsetDateTime.now());
-            loanApplicationRepository.save(app);
-            return;
-        }
-
-        throw new IllegalStateException("Manager actions cannot be reversed after the application leaves manager review.");
-    }
-
     /**
      * Manager-triggered on-demand refresh of payment transactions for the last
      * {@code monthsBack} calendar months. Returns the number of newly inserted
@@ -549,10 +529,6 @@ public class ManagerService {
         return loans.stream()
             .filter(loan -> stationId.equalsIgnoreCase(blankToNull(loan.getStationId())))
             .toList();
-    }
-
-    private boolean isWithinReversalWindow(OffsetDateTime referenceAt) {
-        return referenceAt != null && referenceAt.plusHours(REVERSAL_WINDOW_HOURS).isAfter(OffsetDateTime.now());
     }
 
     @Transactional

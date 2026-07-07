@@ -95,7 +95,6 @@ public class AccountantController {
         model.addAttribute("dashboardQueueValue",
             workflowStatusPresentationService.countFor(dashboard.statusBreakdown(), LoanStatus.AWAITING_ACCOUNTANT));
         model.addAttribute("dashboardQueueFooterLabel", "Queue waiting");
-        model.addAttribute("dashboardQueueIcon", "C");
         model.addAttribute("dashboardDetailBasePath", "/accountant/loan-applications");
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
@@ -344,7 +343,6 @@ public class AccountantController {
         model.addAttribute("showDisbursementForm", false);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
-        model.addAttribute("showUndoForm", false);
         model.addAttribute("allowPaymentSync", false);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";

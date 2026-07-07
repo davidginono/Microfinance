@@ -812,22 +812,6 @@
     </form>
 </c:if>
 
-<c:if test="${showUndoForm}">
-    <form action="${reviewBasePath}/loan-applications/${app.id}/undo-decision"
-          method="post"
-          class="erp-form-wrap mt-5"
-          data-confirm-title='<spring:message code="review.reverseManagerAction" text="Reverse Manager Action" />'
-          data-confirm-message="<spring:message code='review.confirm.returnToQueueMessage' text='Return this rejected application to the manager queue for another review?' />"
-          data-confirm-proceed="<spring:message code='review.confirm.returnToQueue' text='Return to Queue' />">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <button type="submit"
-                class="app-btn btn-neutral ${managerUndoWindowOpen ? '' : 'action-button-disabled'}"
-                ${managerUndoWindowOpen ? '' : 'disabled'}>
-            <spring:message code="review.reverseLastManagerAction" text="Reverse Last Manager Action" />
-        </button>
-    </form>
-</c:if>
-
 <script>
     (() => {
         const csrfToken = "${_csrf.token}";

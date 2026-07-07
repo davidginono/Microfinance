@@ -126,11 +126,6 @@ public class BoardService {
         evaluateOutcome(app, stage, boardMemberId);
     }
 
-    @Transactional
-    public void undoDecision(UUID loanId, UUID boardMemberId) {
-        throw new IllegalStateException("Board review decisions cannot be reversed.");
-    }
-
     private void evaluateOutcome(LoanApplication app,
                                  ApprovalWorkflowStage stage,
                                  UUID actorMemberId) {

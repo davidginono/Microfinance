@@ -514,6 +514,43 @@ button:active {
     color: #ffffff;
     overflow: hidden;
 }
+.erp-stat-card-interactive {
+    position: relative;
+    cursor: pointer;
+    font: inherit;
+    text-decoration: none;
+    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+.erp-stat-card-interactive::after {
+    content: "";
+    position: absolute;
+    inset: -45% auto -45% -70%;
+    width: 42%;
+    transform: skewX(-18deg);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+    opacity: 0;
+    pointer-events: none;
+}
+.erp-stat-card-interactive:hover,
+.erp-stat-card-interactive:focus-visible {
+    transform: translateY(-2px);
+    filter: brightness(1.03);
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
+    outline: none;
+}
+.erp-stat-card-interactive:hover::after,
+.erp-stat-card-interactive:focus-visible::after {
+    opacity: 1;
+    animation: erp-stat-card-shine 900ms ease;
+}
+@keyframes erp-stat-card-shine {
+    from {
+        left: -70%;
+    }
+    to {
+        left: 125%;
+    }
+}
 .erp-stat-main {
     display: flex;
     align-items: flex-start;

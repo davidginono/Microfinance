@@ -5,6 +5,21 @@
         }
     }
 
+    @keyframes otp-pop {
+        0% {
+            transform: scale(0.82);
+            opacity: 0;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .otp-checkmark-pop {
+        animation: otp-pop 180ms ease-out;
+    }
+
     .otp-button-spinner {
         position: relative;
         display: none;

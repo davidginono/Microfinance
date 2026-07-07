@@ -106,7 +106,18 @@
                        placeholder="123456" />
             </label>
 
-            <button id="staffMfaVerifyButton" type="submit" class="mfa-primary-btn w-full px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70">
+            <div id="staffMfaOtpStatus" class="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" aria-live="polite">
+                <span id="staffMfaOtpSpinner" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#14b8c4]"></span>
+                <svg id="staffMfaOtpTick" class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.2a1 1 0 01-1.41 0L3.296 9.19a1 1 0 111.408-1.42l4.044 4.018 6.548-6.5a1 1 0 011.408.002z" clip-rule="evenodd" />
+                </svg>
+                <svg id="staffMfaOtpErrorIcon" class="hidden h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+                <span id="staffMfaOtpStatusText">Enter the code to verify it.</span>
+            </div>
+
+            <button id="staffMfaVerifyButton" type="submit" class="mfa-primary-btn w-full px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70" disabled>
                 Verify and continue
             </button>
         </form>
@@ -137,6 +148,13 @@
         const resendButton = document.getElementById('staffMfaResendButton');
         const errorBox = document.getElementById('staffMfaError');
         const successBox = document.getElementById('staffMfaSuccess');
+        const otpStatus = document.getElementById('staffMfaOtpStatus');
+        const otpStatusText = document.getElementById('staffMfaOtpStatusText');
+        const otpSpinner = document.getElementById('staffMfaOtpSpinner');
+        const otpTick = document.getElementById('staffMfaOtpTick');
+        const otpErrorIcon = document.getElementById('staffMfaOtpErrorIcon');
+        let verifiedCode = '';
+        let checkSequence = 0;
 
         function setMessage(target, message) {
             if (!target) {
@@ -157,6 +175,45 @@
             }
             button.disabled = busy;
             button.textContent = busy ? busyLabel : idleLabel;
+        }
+
+        function cleanCode() {
+            return (otpInput ? otpInput.value : '').replace(/\D/g, '').slice(0, 6);
+        }
+
+        function updateVerifyButton() {
+            if (!verifyButton) {
+                return;
+            }
+            verifyButton.disabled = verifiedCode !== cleanCode();
+        }
+
+        function setOtpStatus(state, message) {
+            if (!otpStatus || !otpStatusText || !otpSpinner || !otpTick || !otpErrorIcon) {
+                return;
+            }
+            const visible = state !== 'idle';
+            otpStatus.classList.toggle('hidden', !visible);
+            otpStatus.classList.toggle('flex', visible);
+            otpStatus.classList.remove(
+                'border-slate-200', 'bg-slate-50', 'text-slate-600',
+                'border-emerald-200', 'bg-emerald-50', 'text-emerald-700',
+                'border-rose-200', 'bg-rose-50', 'text-rose-700'
+            );
+            otpSpinner.classList.toggle('hidden', state !== 'checking');
+            otpTick.classList.toggle('hidden', state !== 'valid');
+            otpErrorIcon.classList.toggle('hidden', state !== 'invalid');
+            if (state === 'valid') {
+                otpStatus.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
+                otpTick.classList.remove('otp-checkmark-pop');
+                void otpTick.offsetWidth;
+                otpTick.classList.add('otp-checkmark-pop');
+            } else if (state === 'invalid') {
+                otpStatus.classList.add('border-rose-200', 'bg-rose-50', 'text-rose-700');
+            } else {
+                otpStatus.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+            }
+            otpStatusText.textContent = message || '';
         }
 
         async function postForm(url, params) {
@@ -182,21 +239,83 @@
             return { response, payload };
         }
 
+        async function checkOtpCode(code) {
+            const sequence = ++checkSequence;
+            verifiedCode = '';
+            updateVerifyButton();
+            setOtpStatus('checking', 'Verifying code...');
+            try {
+                const result = await postForm('/login/mfa/check', { otpCode: code });
+                if (sequence !== checkSequence || code !== cleanCode()) {
+                    return;
+                }
+                if (!result.response.ok || !result.payload.valid) {
+                    setOtpStatus('invalid', result.payload.message || 'We could not verify that code.');
+                    window.SaccosOtp?.focusBoxes(otpInput);
+                    return;
+                }
+                verifiedCode = code;
+                setOtpStatus('valid', result.payload.message || 'OTP code verified.');
+            } catch (error) {
+                if (sequence === checkSequence) {
+                    setOtpStatus('invalid', 'We could not verify that code right now. Try again.');
+                }
+            } finally {
+                if (sequence === checkSequence) {
+                    updateVerifyButton();
+                }
+            }
+        }
+
+        function syncOtpVerification() {
+            setMessage(errorBox, '');
+            setMessage(successBox, '');
+            const code = cleanCode();
+            if (code !== verifiedCode) {
+                verifiedCode = '';
+            }
+            if (!code) {
+                checkSequence += 1;
+                setOtpStatus('idle', '');
+                updateVerifyButton();
+                return;
+            }
+            if (code.length < 6) {
+                checkSequence += 1;
+                setOtpStatus('pending', 'Enter all 6 digits to verify the code.');
+                updateVerifyButton();
+                return;
+            }
+            checkOtpCode(code);
+        }
+
+        otpInput?.addEventListener('input', syncOtpVerification);
+        updateVerifyButton();
+
         verifyForm?.addEventListener('submit', async function (event) {
             event.preventDefault();
             setMessage(errorBox, '');
             setMessage(successBox, '');
-            const code = otpInput ? otpInput.value.trim() : '';
+            const code = cleanCode();
             if (!/^\d{6}$/.test(code)) {
-                setMessage(errorBox, 'Enter the 6-digit verification code.');
+                setOtpStatus('invalid', 'Enter the 6-digit verification code.');
                 window.SaccosOtp?.focusBoxes(otpInput);
                 return;
+            }
+            if (verifiedCode !== code) {
+                await checkOtpCode(code);
+                if (verifiedCode !== code) {
+                    return;
+                }
             }
 
             setBusy(verifyButton, true, 'Verifying...', 'Verify and continue');
             try {
                 const result = await postForm('/login/mfa/verify', { otpCode: code });
                 if (!result.response.ok || !result.payload.valid) {
+                    verifiedCode = '';
+                    setOtpStatus('invalid', result.payload.message || 'We could not verify that code.');
+                    updateVerifyButton();
                     setMessage(errorBox, result.payload.message || 'We could not verify that code.');
                     return;
                 }
@@ -205,18 +324,27 @@
                 setMessage(errorBox, 'We could not verify that code right now. Try again.');
             } finally {
                 setBusy(verifyButton, false, 'Verifying...', 'Verify and continue');
+                updateVerifyButton();
             }
         });
 
         resendButton?.addEventListener('click', async function () {
             setMessage(errorBox, '');
             setMessage(successBox, '');
+            verifiedCode = '';
+            checkSequence += 1;
+            updateVerifyButton();
+            setOtpStatus('idle', '');
             setBusy(resendButton, true, 'Sending...', 'Resend code');
             try {
                 const result = await postForm('/login/mfa/resend');
                 if (!result.response.ok || !result.payload.valid) {
                     setMessage(errorBox, result.payload.message || 'We could not send a new code.');
                     return;
+                }
+                if (otpInput) {
+                    otpInput.value = '';
+                    otpInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 setMessage(successBox, result.payload.message || 'We sent a new verification code.');
                 window.SaccosOtp?.focusBoxes(otpInput);
