@@ -47,7 +47,7 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService, never()).sendNotificationEmail(memberId, "Loan update", "Approved");
+        verify(emailService, never()).sendNotificationEmail(memberId, "Loan update", "Approved", null);
         verify(unitService).reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS");
         verify(smsGateway).send("0673054445", "Loan update: Approved");
     }
@@ -77,8 +77,44 @@ class NotificationDeliveryServiceTest {
 
         service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", "Loan update", "Approved");
 
-        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Approved");
+        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Approved", null);
         verify(smsGateway, never()).send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(alertService).alertStatus("SACCO-1", "STN001", SmsUnitStatus.DEPLETED, 0);
+    }
+
+    @Test
+    void deliveryContentUsesSmsTextAndHtmlFallbackEmail() {
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        NotificationEmailService emailService = mock(NotificationEmailService.class);
+        SmsGateway smsGateway = mock(SmsGateway.class);
+        SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);
+        SmsUsageAlertService alertService = mock(SmsUsageAlertService.class);
+        StationOtpSettingsService stationOtpSettingsService = mock(StationOtpSettingsService.class);
+        NotificationDeliveryService service = new NotificationDeliveryService(
+            memberRepository,
+            emailService,
+            smsGateway,
+            unitService,
+            alertService,
+            stationOtpSettingsService
+        );
+        UUID memberId = UUID.randomUUID();
+        UUID notificationId = UUID.randomUUID();
+        Member member = Member.builder().id(memberId).phone("0673054445").build();
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(stationOtpSettingsService.channel("SACCO-1", "STN001")).thenReturn(OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK);
+        when(unitService.reserve("SACCO-1", "STN001", notificationId, "LOAN_STATUS"))
+            .thenReturn(new SmsUnitTransactionService.ReservationResult(false, null, null, "SMS units depleted", false, SmsUnitStatus.DEPLETED, 0));
+        NotificationDeliveryService.DeliveryContent content = new NotificationDeliveryService.DeliveryContent(
+            "Loan update",
+            "Plain email body",
+            "<p>HTML email body</p>",
+            "Compact SMS body"
+        );
+
+        service.deliver("SACCO-1", "STN001", notificationId, memberId, "LOAN_STATUS", content);
+
+        verify(emailService).sendNotificationEmail(memberId, "Loan update", "Plain email body", "<p>HTML email body</p>");
+        verify(smsGateway, never()).send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 }

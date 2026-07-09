@@ -9,6 +9,7 @@
     <title>Activate Your SACCO Admin Account</title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
+    <%@ include file="../fragments/otp-ui-styles.jspf" %>
     <style>
         body {
             font-family: 'Manrope', ui-sans-serif, system-ui;
@@ -65,15 +66,11 @@
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         ${otpFieldLabel}
                         <input name="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" required
-                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest text-slate-800"
+                               maxlength="6"
+                               data-otp-hidden="true"
+                               data-otp-label="${otpFieldLabel}"
+                               class="sr-only"
                                placeholder="${otpFieldPlaceholder}" />
-                    </label>
-
-                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <spring:message code="register.member.signature" text="Signature" />
-                        <input name="signatureText" type="text" maxlength="120" required
-                               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                               placeholder="e.g. James M Juma" />
                     </label>
 
                     <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

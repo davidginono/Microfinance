@@ -28,7 +28,7 @@
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
 <div class="erp-table-wrap erp-table-scroll">
 <table class="erp-table">
-    <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="loan.type" text="Loan Type" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
+    <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>
     <c:forEach items="${requests}" var="req">
         <c:set var="pendingRemoval" value="${guaranteePendingRemovalRequests[req.id]}" />
@@ -41,7 +41,7 @@
             <td>${guaranteeNames[req.loanApplicationId]}</td>
             <td>
                 <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
-                    <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
+                    <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
                 </c:if>
             </td>
             <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
@@ -122,14 +122,14 @@
                         <p class="guarantee-modal-subtitle-legacy mt-2 text-sm text-slate-500">
                             Loan ${fn:substring(req.loanApplicationId, 0, 8)} •
                             <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
-                                <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
+                                <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
                             </c:if>
                             • ${guaranteeLoanAmounts[req.loanApplicationId]}
                         </p>
                         <p class="mt-2 text-sm text-slate-500">
                             <spring:message code="loan.single" text="Loan" /> ${fn:substring(req.loanApplicationId, 0, 8)}
                             <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
-                                | <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
+                                | <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
                             </c:if>
                             | ${guaranteeLoanAmountLabels[req.loanApplicationId]}
                         </p>

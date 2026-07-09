@@ -5,6 +5,18 @@
 <c:set var="requestUri" value="${pageContext.request.requestURI}" />
 <aside id="appSidebar" class="shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0" style="top: var(--shell-nav-height); border-color: #d7dde3;">
     <div class="shell-sidebar-panel flex h-full flex-col overflow-hidden border-r border-slate-200/60 bg-transparent">
+        <div class="shell-sidebar-toggle-row hidden lg:flex">
+            <button id="desktopSidebarToggle" type="button" class="desktop-sidebar-toggle" aria-label="Collapse sidebar" aria-pressed="false" title="Collapse sidebar">
+                <svg class="desktop-sidebar-toggle__collapse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zM7.5 4.5v11h7.75a.25.25 0 00.25-.25V4.75a.25.25 0 00-.25-.25H7.5zm-1.5 0H4.75a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25H6v-11z" clip-rule="evenodd"/>
+                    <path d="M12.28 7.22a.75.75 0 010 1.06L10.56 10l1.72 1.72a.75.75 0 11-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06l2.25-2.25a.75.75 0 011.06 0z"/>
+                </svg>
+                <svg class="desktop-sidebar-toggle__expand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zM7.5 4.5v11h7.75a.25.25 0 00.25-.25V4.75a.25.25 0 00-.25-.25H7.5zm-1.5 0H4.75a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25H6v-11z" clip-rule="evenodd"/>
+                    <path d="M9.72 7.22a.75.75 0 011.06 0l2.25 2.25a.75.75 0 010 1.06l-2.25 2.25a.75.75 0 11-1.06-1.06L11.44 10 9.72 8.28a.75.75 0 010-1.06z"/>
+                </svg>
+            </button>
+        </div>
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
             <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
                 <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">

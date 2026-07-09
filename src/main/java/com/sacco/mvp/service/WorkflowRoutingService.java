@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanProductBoardReviewerRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,6 +53,7 @@ public class WorkflowRoutingService {
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
         enqueueReviewAssignedEvents(app, firstStage, assignedReviewers);
+        enqueueApplicantStatusChangedEvent(app, nextStatus);
         return nextStatus;
     }
 
@@ -71,6 +74,7 @@ public class WorkflowRoutingService {
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
         enqueueReviewAssignedEvents(app, nextStage, assignedReviewers);
+        enqueueApplicantStatusChangedEvent(app, nextStatus);
         return nextStatus;
     }
 
@@ -141,6 +145,18 @@ public class WorkflowRoutingService {
                 )));
     }
 
+    private void enqueueApplicantStatusChangedEvent(LoanApplication app, LoanStatus status) {
+        if (app.getApplicantMemberId() == null || status == null) {
+            return;
+        }
+        outboxService.enqueue("LOAN", app.getId(), "LOAN_STATUS_" + status.name(), app.getApplicantMemberId(),
+            app.getSaccoId(), app.getStationId(),
+            Map.of(
+                "loanId", app.getId().toString(),
+                "status", status.name()
+            ));
+    }
+
     private java.util.List<UUID> reviewNotificationRecipients(LoanApplication app,
                                                               ApprovalWorkflowStage stage,
                                                               java.util.List<UUID> assignedReviewers) {
@@ -151,10 +167,19 @@ public class WorkflowRoutingService {
         if (role == null) {
             return java.util.List.of();
         }
-        return roleDirectoryService.activeByRoleInStation(app.getSaccoId(), app.getStationId(), role).stream()
+        LinkedHashSet<UUID> recipients = new LinkedHashSet<>();
+        roleDirectoryService.activeByRoleInStation(app.getSaccoId(), app.getStationId(), role).stream()
             .map(RoleDirectoryService.RoleAccountRef::getId)
-            .distinct()
-            .toList();
+            .forEach(recipients::add);
+        if (stage == ApprovalWorkflowStage.DISBURSEMENT_OFFICER) {
+            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.ACCESS_DISBURSEMENT_QUEUE).stream()
+                .map(RoleDirectoryService.RoleAccountRef::getId)
+                .forEach(recipients::add);
+            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.DISBURSE_LOAN).stream()
+                .map(RoleDirectoryService.RoleAccountRef::getId)
+                .forEach(recipients::add);
+        }
+        return java.util.List.copyOf(recipients);
     }
 
     private Position reviewRoleFor(ApprovalWorkflowStage stage) {

@@ -19,7 +19,7 @@ public class Member {
     @Id
     private UUID id;
 
-    @Column(name = "sacco_id", nullable = false)
+    @Column(name = "sacco_id")
     private String saccoId;
 
     @ManyToOne(fetch = FetchType.LAZY)

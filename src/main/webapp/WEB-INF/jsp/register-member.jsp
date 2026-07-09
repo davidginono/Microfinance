@@ -259,7 +259,11 @@
                             <spring:bind path="registrationForm.fullName">
                                 <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}"><spring:message code="register.member.fullName" /></label>
                             </spring:bind>
-                            <form:input path="fullName" cssClass="registration-field" />
+                            <form:input path="fullName"
+                                        cssClass="registration-field uppercase"
+                                        autocapitalize="characters"
+                                        spellcheck="false"
+                                        oninput="this.value = this.value.toUpperCase();" />
                             <form:errors path="fullName" cssClass="mt-1 block text-xs text-rose-600" />
                         </div>
                         <div>
@@ -336,7 +340,13 @@
                         <spring:bind path="registrationForm.otpCode">
                             <label class="mb-1.5 block registration-section-label ${status.error ? 'text-rose-600' : ''}">OTP Code</label>
                         </spring:bind>
-                        <form:input path="otpCode" inputmode="numeric" maxlength="6" cssClass="registration-field tracking-[0.3em]" />
+                        <form:input path="otpCode"
+                                    inputmode="numeric"
+                                    autocomplete="one-time-code"
+                                    maxlength="6"
+                                    data-otp-hidden="true"
+                                    data-otp-label="Registration OTP code"
+                                    cssClass="sr-only" />
                         <p class="registration-note mt-2 text-sm">Enter the 6-digit code sent to your email to finish registration.</p>
                         <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                             <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#2F348D]"></span>
@@ -351,7 +361,7 @@
                     <div class="space-y-3 pt-2">
                         <button id="memberRegisterRequestOtp" class="otp-request-button registration-action inline-flex w-full items-center justify-center gap-2" type="button">
                             <span class="otp-button-spinner hidden"></span>
-                            <span class="otp-button-label">Send OTP Code</span>
+                            <span class="otp-button-label">Submit</span>
                         </button>
                         <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex w-full items-center justify-center" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
                             <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
@@ -503,7 +513,7 @@
                 spinner.classList.toggle("hidden", !loading);
             }
             if (label) {
-                label.textContent = loading ? "Sending..." : (sent ? "OTP Sent" : "Send OTP Code");
+                label.textContent = loading ? "Submitting..." : (sent ? "Submitted" : "Submit");
             }
             requestOtpButton.disabled = loading || sent;
             requestOtpButton.classList.toggle("is-loading", loading);
@@ -634,7 +644,7 @@
                 otpRequested = true;
                 otpVerificationComplete = false;
                 syncOtpLiveStatus();
-                otpInput.focus();
+                window.SaccosOtp?.focusBoxes(otpInput);
                 setSuccess(payload.message || "We sent an OTP code to your email.");
                 setOtpButtonState("sent");
             } catch (error) {
@@ -651,7 +661,7 @@
             }
             if (!otpInput.value.trim()) {
                 event.preventDefault();
-                otpInput.focus();
+                window.SaccosOtp?.focusBoxes(otpInput);
                 setError("Enter the OTP code sent to your email.");
                 return;
             }

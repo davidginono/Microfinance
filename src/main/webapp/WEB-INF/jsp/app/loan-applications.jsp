@@ -31,7 +31,7 @@
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
                 <th class="px-3 py-2 text-left">
-                    <spring:message code="loan.type" />
+                    <spring:message code="reports.loanProduct" text="Loan Product" />
                 </th>
                 <th class="px-3 py-2 text-left">
                     <spring:message code="loan.amount" />
@@ -49,7 +49,10 @@
                 <tr>
                     <td class="px-3 py-2">${app.applicationNumber}</td>
                     <td class="px-3 py-2">
-                        <spring:message code="loan.type.${app.loanType}" />
+                        <c:choose>
+                            <c:when test="${not empty loanProductNames[app.loanType]}"><c:out value="${loanProductNames[app.loanType]}" /></c:when>
+                            <c:otherwise><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></c:otherwise>
+                        </c:choose>
                     </td>
                     <td class="px-3 py-2"><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                     <td class="px-3 py-2">

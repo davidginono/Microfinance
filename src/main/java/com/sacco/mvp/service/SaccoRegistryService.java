@@ -8,6 +8,7 @@ import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +32,7 @@ public class SaccoRegistryService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final SmsUnitTransactionService smsUnitTransactionService;
+    private final JdbcTemplate jdbcTemplate;
     private volatile List<RegisteredSaccoView> registeredSaccoCache;
 
     public List<RegisteredSaccoView> listRegisteredSaccos() {
@@ -48,6 +50,7 @@ public class SaccoRegistryService {
 
     private List<RegisteredSaccoView> loadRegisteredSaccos() {
         return registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
+            .filter(sacco -> !"PLATFORM".equalsIgnoreCase(sacco.getSaccoId()))
             .map(sacco -> {
                 List<SaccoStation> stations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
                 return new RegisteredSaccoView(
@@ -64,7 +67,7 @@ public class SaccoRegistryService {
             .toList();
     }
 
-    private void invalidateRegisteredSaccoCache() {
+    public void invalidateRegisteredSaccoCache() {
         registeredSaccoCache = null;
     }
 
@@ -106,6 +109,14 @@ public class SaccoRegistryService {
     @Transactional
     public void registerSacco(String saccoId, String saccoName, String stationIdsText) {
         registerSacco(saccoId, saccoName, stationIdsText, null);
+    }
+
+    @Transactional
+    public RegisteredSacco registerSacco(String saccoName, String stationIdsText, MultipartFile logoFile) {
+        String generatedSaccoId = nextGeneratedSaccoId();
+        registerSacco(generatedSaccoId, saccoName, stationIdsText, logoFile);
+        return registeredSaccoRepository.findById(generatedSaccoId)
+            .orElseThrow(() -> new IllegalStateException("SACCO was not saved."));
     }
 
     @Transactional
@@ -284,6 +295,20 @@ public class SaccoRegistryService {
         }
         settings.setUpdatedAt(now);
         saccoSettingsRepository.save(settings);
+    }
+
+    private String nextGeneratedSaccoId() {
+        for (int attempts = 0; attempts < 8999; attempts++) {
+            Integer nextValue = jdbcTemplate.queryForObject("select nextval('public.sacco_numeric_id_seq')", Integer.class);
+            if (nextValue == null) {
+                throw new IllegalStateException("Unable to generate a SACCO ID.");
+            }
+            String candidate = String.format(Locale.ROOT, "%04d", nextValue);
+            if (!registeredSaccoRepository.existsById(candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("No SACCO IDs are available.");
     }
 
     private void updateStationAddressLocations(String saccoId, Map<String, String> stationAddressLocations, OffsetDateTime now) {

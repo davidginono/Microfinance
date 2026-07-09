@@ -33,7 +33,8 @@ class MemberRegistrationServiceTest {
             Mockito.mock(SavingsAccountRepository.class),
             Mockito.mock(UserSettingsRepository.class),
             Mockito.mock(PasswordEncoder.class),
-            null
+            null,
+            new NameSignatureService()
         );
 
         when(memberRepository.findByMemberNo("000001")).thenReturn(Optional.empty());
@@ -70,7 +71,8 @@ class MemberRegistrationServiceTest {
             savingsAccountRepository,
             userSettingsRepository,
             passwordEncoder,
-            null
+            null,
+            new NameSignatureService()
         );
 
         MemberRegistrationForm form = new MemberRegistrationForm();

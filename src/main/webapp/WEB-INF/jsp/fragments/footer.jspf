@@ -6,6 +6,7 @@
         const sidebar = document.getElementById("appSidebar");
         const overlay = document.getElementById("sidebarOverlay");
         const openBtn = document.getElementById("sidebarToggle");
+        const desktopToggle = document.getElementById("desktopSidebarToggle");
 
         if (!sidebar || !overlay || !openBtn) {
             return;
@@ -25,6 +26,45 @@
             overlay.classList.add("hidden");
         }
 
+        const desktopCollapseKey = "shell:desktopSidebarCollapsed";
+        const desktopSidebarMedia = window.matchMedia("(min-width: 1024px)");
+        let collapsedSidebarTooltip = null;
+
+        function storedDesktopSidebarCollapsed() {
+            try {
+                return window.localStorage.getItem(desktopCollapseKey) === "true";
+            } catch (ignored) {
+                return false;
+            }
+        }
+
+        function storeDesktopSidebarCollapsed(collapsed) {
+            try {
+                window.localStorage.setItem(desktopCollapseKey, String(collapsed));
+            } catch (ignored) {
+                // Storage can be blocked in private browsing modes.
+            }
+        }
+
+        function applyDesktopSidebarCollapsed(collapsed) {
+            const shouldCollapse = collapsed && desktopSidebarMedia.matches;
+            document.documentElement.classList.toggle("shell-sidebar-collapsed", shouldCollapse);
+            if (!shouldCollapse) {
+                hideCollapsedSidebarTooltip();
+            }
+            if (desktopToggle) {
+                desktopToggle.setAttribute("aria-pressed", shouldCollapse ? "true" : "false");
+                desktopToggle.setAttribute("aria-label", shouldCollapse ? "Expand sidebar" : "Collapse sidebar");
+                desktopToggle.setAttribute("title", shouldCollapse ? "Expand sidebar" : "Collapse sidebar");
+            }
+            window.requestAnimationFrame(function () {
+                window.dispatchEvent(new Event("resize"));
+                window.setTimeout(function () {
+                    window.dispatchEvent(new Event("resize"));
+                }, 240);
+            });
+        }
+
         openBtn.addEventListener("click", function () {
             if (isSidebarOpen()) {
                 closeSidebar();
@@ -33,6 +73,23 @@
             }
         });
         overlay.addEventListener("click", closeSidebar);
+
+        applyDesktopSidebarCollapsed(storedDesktopSidebarCollapsed());
+        if (desktopToggle) {
+            desktopToggle.addEventListener("click", function () {
+                const nextCollapsed = !document.documentElement.classList.contains("shell-sidebar-collapsed");
+                storeDesktopSidebarCollapsed(nextCollapsed);
+                applyDesktopSidebarCollapsed(nextCollapsed);
+            });
+        }
+        const handleDesktopSidebarMediaChange = function () {
+            applyDesktopSidebarCollapsed(storedDesktopSidebarCollapsed());
+        };
+        if (typeof desktopSidebarMedia.addEventListener === "function") {
+            desktopSidebarMedia.addEventListener("change", handleDesktopSidebarMediaChange);
+        } else if (typeof desktopSidebarMedia.addListener === "function") {
+            desktopSidebarMedia.addListener(handleDesktopSidebarMediaChange);
+        }
 
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
@@ -90,6 +147,62 @@
 
         const sidebarScroll = sidebar.querySelector(".shell-sidebar-scroll");
         const lastClickedSidebarKey = sidebarStateKey("lastClickedLink");
+
+        function prepareCollapsedSidebarLabels() {
+            if (!sidebarScroll) {
+                return;
+            }
+            sidebarScroll.querySelectorAll("a[href], button").forEach(function (item) {
+                const label = (item.textContent || "").replace(/\s+/g, " ").trim();
+                if (!label) {
+                    return;
+                }
+                if (!item.getAttribute("title")) {
+                    item.setAttribute("title", label);
+                }
+                if (!item.getAttribute("aria-label")) {
+                    item.setAttribute("aria-label", label);
+                }
+                item.dataset.sidebarLabel = label;
+            });
+        }
+
+        function ensureCollapsedSidebarTooltip() {
+            if (!collapsedSidebarTooltip) {
+                collapsedSidebarTooltip = document.createElement("div");
+                collapsedSidebarTooltip.className = "shell-sidebar-tooltip";
+                collapsedSidebarTooltip.setAttribute("role", "tooltip");
+                document.body.appendChild(collapsedSidebarTooltip);
+            }
+            return collapsedSidebarTooltip;
+        }
+
+        function sidebarTooltipTarget(event) {
+            const eventTarget = event.target instanceof Element ? event.target : null;
+            if (!eventTarget || !document.documentElement.classList.contains("shell-sidebar-collapsed")) {
+                return null;
+            }
+            return eventTarget.closest(".shell-sidebar-scroll a[href], .shell-sidebar-scroll button");
+        }
+
+        function showCollapsedSidebarTooltip(target) {
+            if (!target || !target.dataset.sidebarLabel) {
+                return;
+            }
+            const tooltip = ensureCollapsedSidebarTooltip();
+            tooltip.textContent = target.dataset.sidebarLabel;
+            const rect = target.getBoundingClientRect();
+            const top = Math.min(Math.max(rect.top + rect.height / 2, 36), window.innerHeight - 36);
+            tooltip.style.left = Math.round(rect.right + 10) + "px";
+            tooltip.style.top = Math.round(top) + "px";
+            tooltip.classList.add("is-visible");
+        }
+
+        function hideCollapsedSidebarTooltip() {
+            if (collapsedSidebarTooltip) {
+                collapsedSidebarTooltip.classList.remove("is-visible");
+            }
+        }
 
         function normalizeSidebarUrl(url) {
             try {
@@ -207,6 +320,34 @@
 
         if (sidebarScroll) {
             sidebarScroll.addEventListener("click", rememberSidebarClick);
+            prepareCollapsedSidebarLabels();
+            sidebarScroll.addEventListener("mouseover", function (event) {
+                const target = sidebarTooltipTarget(event);
+                if (target) {
+                    showCollapsedSidebarTooltip(target);
+                } else {
+                    hideCollapsedSidebarTooltip();
+                }
+            });
+            sidebarScroll.addEventListener("mousemove", function (event) {
+                const target = sidebarTooltipTarget(event);
+                if (target) {
+                    showCollapsedSidebarTooltip(target);
+                } else {
+                    hideCollapsedSidebarTooltip();
+                }
+            });
+            sidebarScroll.addEventListener("mouseout", function (event) {
+                const related = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+                if (!related || !sidebarScroll.contains(related)) {
+                    hideCollapsedSidebarTooltip();
+                }
+            });
+            sidebarScroll.addEventListener("focusin", function (event) {
+                showCollapsedSidebarTooltip(sidebarTooltipTarget(event));
+            });
+            sidebarScroll.addEventListener("focusout", hideCollapsedSidebarTooltip);
+            sidebarScroll.addEventListener("scroll", hideCollapsedSidebarTooltip, { passive: true });
         }
 
         if (adminScopeToggle && adminScopePanel) {
@@ -236,7 +377,11 @@
         restoreLastClickedSidebarLink();
     })();
 </script>
-<div id="sessionInactivityPrompt" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/45 px-4">
+<div id="sessionInactivityPrompt"
+     class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/45 px-4"
+     data-keepalive-url="<c:url value='/session/keepalive' />"
+     data-csrf-header="${_csrf.headerName}"
+     data-csrf-token="${_csrf.token}">
     <div class="w-full max-w-md rounded-md border border-slate-200 bg-white p-5 shadow-xl">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Session Check</p>
         <h2 class="mt-2 text-lg font-bold text-sacco-ink">Are you still there?</h2>
@@ -265,15 +410,78 @@
         }
         let promptTimer = null;
         let logoutTimer = null;
+        let promptToast = null;
+        let keepalivePending = false;
         const activityEvents = ["click", "keydown", "mousemove", "touchstart", "scroll"];
 
         function hidePrompt() {
             prompt.classList.add("hidden");
             prompt.classList.remove("flex");
+            if (promptToast && typeof promptToast.dismiss === "function") {
+                promptToast.dismiss();
+                promptToast = null;
+            }
             if (logoutTimer) {
                 window.clearTimeout(logoutTimer);
                 logoutTimer = null;
             }
+        }
+
+        function showPrompt() {
+            prompt.classList.remove("hidden");
+            prompt.classList.add("flex");
+            if (typeof window.showToast === "function") {
+                promptToast = window.showToast("info", "Are you still there? Choose Stay Logged In to keep working.", {
+                    duration: Math.max(graceMs, 15000)
+                });
+            }
+        }
+
+        function keepaliveHeaders() {
+            const headers = {
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            };
+            const csrfHeader = prompt.getAttribute("data-csrf-header");
+            const csrfToken = prompt.getAttribute("data-csrf-token");
+            if (csrfHeader && csrfToken) {
+                headers[csrfHeader] = csrfToken;
+            }
+            return headers;
+        }
+
+        function refreshSession() {
+            if (keepalivePending) {
+                return;
+            }
+            keepalivePending = true;
+            stayButton.disabled = true;
+            stayButton.classList.add("opacity-60", "cursor-not-allowed");
+            fetch(prompt.getAttribute("data-keepalive-url") || "/session/keepalive", {
+                method: "POST",
+                headers: keepaliveHeaders(),
+                credentials: "same-origin"
+            })
+                .then((response) => {
+                    if (!response.ok || response.redirected) {
+                        throw new Error("Session keepalive failed");
+                    }
+                    hidePrompt();
+                    schedulePrompt();
+                    if (typeof window.showToast === "function") {
+                        window.showToast("success", "Session refreshed.");
+                    }
+                })
+                .catch(() => {
+                    if (typeof window.showToast === "function") {
+                        window.showToast("error", "We could not refresh your session. Please sign in again if this continues.");
+                    }
+                })
+                .finally(() => {
+                    keepalivePending = false;
+                    stayButton.disabled = false;
+                    stayButton.classList.remove("opacity-60", "cursor-not-allowed");
+                });
         }
 
         function schedulePrompt() {
@@ -281,8 +489,7 @@
                 window.clearTimeout(promptTimer);
             }
             promptTimer = window.setTimeout(() => {
-                prompt.classList.remove("hidden");
-                prompt.classList.add("flex");
+                showPrompt();
                 logoutTimer = window.setTimeout(() => logoutForm.submit(), Math.max(graceMs, 15000));
             }, Math.max(promptMs, 60000));
         }
@@ -297,10 +504,7 @@
         activityEvents.forEach((eventName) => {
             window.addEventListener(eventName, resetTimer, { passive: true });
         });
-        stayButton.addEventListener("click", () => {
-            hidePrompt();
-            schedulePrompt();
-        });
+        stayButton.addEventListener("click", refreshSession);
         schedulePrompt();
     })();
 </script>

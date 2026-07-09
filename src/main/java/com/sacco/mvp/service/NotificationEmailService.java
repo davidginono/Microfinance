@@ -8,8 +8,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import jakarta.mail.internet.MimeMessage;
 import java.util.UUID;
 
 @Service
@@ -48,6 +50,10 @@ public class NotificationEmailService {
     }
 
     public void sendNotificationEmail(UUID memberId, String subject, String message) {
+        sendNotificationEmail(memberId, subject, message, null);
+    }
+
+    public void sendNotificationEmail(UUID memberId, String subject, String message, String html) {
         if (memberId == null) {
             return;
         }
@@ -55,7 +61,32 @@ public class NotificationEmailService {
         if (recipient == null || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
             return;
         }
-        sendDirectEmail(recipient.getEmail(), subject, message);
+        if (html == null || html.isBlank()) {
+            sendDirectEmail(recipient.getEmail(), subject, message);
+            return;
+        }
+        sendDirectHtmlEmail(recipient.getEmail(), subject, message, html);
+    }
+
+    private void sendDirectHtmlEmail(String email, String subject, String text, String html) {
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            log.info("Mail sender not configured. HTML notification email for {}: {}", email, text);
+            return;
+        }
+
+        try {
+            MimeMessage mail = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
+            helper.setTo(resolveRecipient(email));
+            helper.setFrom(fromAddress);
+            helper.setSubject(subject);
+            helper.setText(text == null ? "" : text, html);
+            mailSender.send(mail);
+        } catch (Exception ex) {
+            log.warn("Unable to send HTML notification email to {}: {}", email, ex.getMessage());
+            sendDirectEmail(email, subject, text);
+        }
     }
 
     private String resolveRecipient(String email) {

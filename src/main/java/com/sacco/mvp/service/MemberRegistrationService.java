@@ -41,6 +41,7 @@ public class MemberRegistrationService {
     private final UserSettingsRepository userSettingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final ForesightDirectoryService foresightDirectoryService;
+    private final NameSignatureService nameSignatureService;
 
     @Transactional
     public Member register(MemberRegistrationForm form) {
@@ -59,7 +60,7 @@ public class MemberRegistrationService {
             .fullName(verified.fullName())
             .phone(normalizedPhone)
             .email(verified.email())
-            .signatureText(signatureFromFullName(verified.fullName()))
+            .signatureText(nameSignatureService.signatureFromFullName(verified.fullName()))
             .signatureRegisteredAt(now)
             .memberAccount(true)
             .status(MemberStatus.ACTIVE)
@@ -98,7 +99,7 @@ public class MemberRegistrationService {
     public VerifiedExternalMember verifyExternalMember(MemberRegistrationForm form) {
         String memberNo = normalizeMemberNo(form.getMemberNo());
         String email = normalizeEmail(form.getEmail());
-        String fullName = normalizeSpaces(form.getFullName());
+        String fullName = nameSignatureService.requireFullName(form.getFullName(), "Enter your full names.");
         String saccoId = normalizeSaccoId(form.getSaccoId());
         String stationId = normalizeStationId(form.getStationId());
         RegisteredSacco registeredSacco = resolveRegisteredSacco(saccoId);
@@ -244,45 +245,6 @@ public class MemberRegistrationService {
 
     private String normalizeStationId(String value) {
         return normalizeSpaces(value).toUpperCase();
-    }
-
-    private String normalizeSignatureText(String value) {
-        String normalized = normalizeSpaces(value);
-        if (normalized.length() > 120) {
-            normalized = normalized.substring(0, 120).trim();
-        }
-        return normalized;
-    }
-
-    private String signatureFromFullName(String fullName) {
-        String normalized = normalizeSpaces(fullName);
-        if (normalized.isBlank()) {
-            return "";
-        }
-        String[] parts = normalized.split(" ");
-        if (parts.length == 1) {
-            return normalizeSignatureText(toNameCase(parts[0]));
-        }
-        StringBuilder signature = new StringBuilder(toNameCase(parts[0]));
-        for (int i = 1; i < parts.length - 1; i++) {
-            String initial = parts[i].isBlank() ? "" : parts[i].substring(0, 1).toUpperCase();
-            if (!initial.isBlank()) {
-                signature.append(' ').append(initial);
-            }
-        }
-        signature.append(' ').append(toNameCase(parts[parts.length - 1]));
-        return normalizeSignatureText(signature.toString());
-    }
-
-    private String toNameCase(String value) {
-        String normalized = normalizeSpaces(value);
-        if (normalized.isBlank()) {
-            return "";
-        }
-        if (normalized.length() == 1) {
-            return normalized.toUpperCase();
-        }
-        return normalized.substring(0, 1).toUpperCase() + normalized.substring(1).toLowerCase();
     }
 
     private String normalizeSpaces(String value) {

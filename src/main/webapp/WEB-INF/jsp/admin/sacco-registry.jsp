@@ -105,6 +105,11 @@
                                                 data-sacco-modal-open="edit-${sacco.saccoId}">
                                             ${editSaccoLabel}
                                         </button>
+                                        <button type="button"
+                                                class="app-btn btn-reject"
+                                                data-sacco-modal-open="delete-${sacco.saccoId}">
+                                            <spring:message code="common.delete" text="Delete" />
+                                        </button>
                                     </c:when>
                                     <c:otherwise>
                                         <span class="inline-flex rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500">
@@ -144,10 +149,10 @@
             </div>
             <form action="/admin/saccos" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <label class="block text-sm font-semibold text-slate-700">
-                    SACCO ID
-                    <input name="saccoId" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. SACCO-ARUSHA-001" />
-                </label>
+                <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                    <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO ID</span>
+                    <span class="mt-1 block font-medium text-slate-700">Generated automatically after saving.</span>
+                </div>
                 <label class="block text-sm font-semibold text-slate-700">
                     <spring:message code="admin.saccoRegistry.saccoName" text="SACCO Name" />
                     <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. IAA SACCOS LTD" />
@@ -319,6 +324,37 @@
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
                         <button type="submit" class="app-btn btn-primary">${saveChangesLabel}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="app-modal-overlay hidden" data-sacco-modal="delete-${sacco.saccoId}">
+        <div class="app-modal-panel app-modal-panel--compact">
+            <div class="app-modal-scroll">
+                <div class="app-modal-header">
+                    <div>
+                        <p class="erp-panel-title"><spring:message code="common.delete" text="Delete" /> ${sacco.saccoName}</p>
+                        <p class="mt-2 text-sm text-slate-500">This permanently removes the SACCO and all related onboarding, member, staff, loan, station, SMS, upload, and workflow data.</p>
+                    </div>
+                    <button type="button" class="app-modal-close" data-sacco-modal-close="delete-${sacco.saccoId}" aria-label="Close modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
+                <form action="/admin/saccos/${sacco.saccoId}/delete" method="post" class="app-modal-body space-y-4">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        Type <span class="font-semibold">delete ${sacco.saccoName} and all its data</span> to confirm.
+                    </div>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        Confirmation
+                        <input name="confirmation" type="text" required autocomplete="off" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" />
+                    </label>
+                    <div class="app-modal-actions">
+                        <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="delete-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                        <button type="submit" class="app-btn btn-reject"><spring:message code="common.delete" text="Delete" /></button>
                     </div>
                 </form>
             </div>

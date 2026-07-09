@@ -58,6 +58,14 @@ public class RoleDirectoryService {
         return toRoleRefs(memberRepository.findActiveMembersWithAnyRoleInStation(saccoId, normalizedStationId, positions));
     }
 
+    public List<RoleAccountRef> activeByClaimInStation(String saccoId, String stationId, com.sacco.mvp.domain.UserClaim claim) {
+        if (saccoId == null || saccoId.isBlank() || claim == null) {
+            return List.of();
+        }
+        String normalizedStationId = stationId == null || stationId.isBlank() ? null : stationId.trim();
+        return toRoleRefs(memberRepository.findActiveMembersWithClaimInStation(saccoId, normalizedStationId, claim.name()));
+    }
+
     public List<RoleAccountRef> activeGlobalByRole(Position position) {
         if (position == null) {
             return List.of();

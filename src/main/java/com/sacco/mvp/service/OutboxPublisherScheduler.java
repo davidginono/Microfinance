@@ -31,6 +31,7 @@ public class OutboxPublisherScheduler {
     private final AdminAlertService adminAlertService;
     private final NotificationViewService notificationViewService;
     private final NotificationDeliveryService notificationDeliveryService;
+    private final LoanNotificationFormatter loanNotificationFormatter;
 
     @Value("${app.outbox.batch-size:250}")
     private int batchSize;
@@ -64,14 +65,18 @@ public class OutboxPublisherScheduler {
                     .sentAt(OffsetDateTime.now())
                     .build());
                 NotificationViewService.NotificationView view = notificationViewService.toView(notification);
+                NotificationDeliveryService.DeliveryContent content = loanNotificationFormatter.format(
+                    event,
+                    payload,
+                    NotificationDeliveryService.DeliveryContent.plain(view.getSubject(), view.getMessage())
+                );
                 notificationDeliveryService.deliver(
                     saccoId,
                     stationId,
                     notification.getId(),
                     recipientId,
                     event.getEventType(),
-                    view.getSubject(),
-                    view.getMessage()
+                    content
                 );
 
                 event.setStatus(OutboxStatus.PUBLISHED);

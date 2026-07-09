@@ -449,21 +449,162 @@ class LoanPresentationServiceTest {
             .containsEntry("loanAmount", "TSh 24,000")
             .containsEntry("interest", "TSh 6,000")
             .containsEntry("scheduledBreakdown", "Principal: TSh 24,000\nInterest: TSh 6,000")
-            .containsEntry("outstandingBalance", "")
-            .containsEntry("principalPaid", "TSh 12,000")
-            .containsEntry("interestPaid", "TSh 3,000")
-            .containsEntry("totalPaid", "TSh 15,000")
-            .containsEntry("paymentDate", "2026-05-15");
+            .containsEntry("outstandingBalance", "TSh 61,000")
+            .containsEntry("principalPaid", "TSh 24,000")
+            .containsEntry("interestPaid", "TSh 5,000")
+            .containsEntry("totalPaid", "TSh 29,000")
+            .containsEntry("paymentDate", "2026-07-10")
+            .containsEntry("paymentStatus", "Partially Paid");
         assertThat(rows.get(1))
             .containsEntry("scheduledBreakdown", "Principal: TSh 25,000\nInterest: TSh 5,000")
-            .containsEntry("outstandingBalance", "")
-            .containsEntry("principalPaid", "-");
+            .containsEntry("outstandingBalance", "TSh 60,000")
+            .containsEntry("principalPaid", "TSh 6,000")
+            .containsEntry("interestPaid", "-")
+            .containsEntry("totalPaid", "TSh 6,000")
+            .containsEntry("paymentDate", "2026-07-10")
+            .containsEntry("paymentStatus", "Partially Paid");
         assertThat(rows.get(2))
             .containsEntry("scheduledBreakdown", "Principal: TSh 26,000\nInterest: TSh 4,000")
             .containsEntry("outstandingBalance", "TSh 60,000")
-            .containsEntry("principalPaid", "TSh 18,000")
-            .containsEntry("paymentDate", "2026-07-10");
+            .containsEntry("principalPaid", "-")
+            .containsEntry("paymentDate", "-")
+            .containsEntry("paymentStatus", "Pending");
         assertThat(rows.get(0)).doesNotContainKey("status");
+    }
+
+    @Test
+    void parseRepaymentRowsKeepsLiveOutstandingWhenScheduleAllocationLooksFullyPaid() {
+        String scheduleJson = """
+            {
+              "schedule": [
+                {
+                  "installmentNumber": 1,
+                  "dueDate": "2026-05-30",
+                  "amount": 10000.00,
+                  "principalComponent": 8000.00,
+                  "interestComponent": 2000.00
+                },
+                {
+                  "installmentNumber": 2,
+                  "dueDate": "2026-06-30",
+                  "amount": 10000.00,
+                  "principalComponent": 8000.00,
+                  "interestComponent": 2000.00
+                }
+              ]
+            }
+            """;
+
+        List<LoanPaymentTransaction> transactions = List.of(
+            LoanPaymentTransaction.builder()
+                .id(UUID.randomUUID())
+                .loanApplicationId(UUID.randomUUID())
+                .saccoId("SACCO-1")
+                .externalLoanId("1001")
+                .receiptDate(LocalDate.of(2026, 5, 10))
+                .principalPaid(new BigDecimal("16000.00"))
+                .interestPaid(new BigDecimal("4000.00"))
+                .totalPaid(new BigDecimal("20000.00"))
+                .fetchedAt(OffsetDateTime.now())
+                .build()
+        );
+        LoanPresentationService.LoanPaymentSummaryView paymentSummary = new LoanPresentationService.LoanPaymentSummaryView(
+            true,
+            "Personal Loan",
+            LocalDate.of(2026, 5, 10),
+            "2026-05-10",
+            new BigDecimal("3500.00"),
+            "TSh 3,500",
+            "TSh 3,500",
+            "TSh 0",
+            "TSh 16,000",
+            "TSh 4,000"
+        );
+
+        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson, transactions, paymentSummary);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(1))
+            .containsEntry("principalPaid", "TSh 8,000")
+            .containsEntry("interestPaid", "TSh 2,000")
+            .containsEntry("totalPaid", "TSh 10,000")
+            .containsEntry("paymentStatus", "Prepaid")
+            .containsEntry("outstandingBalance", "TSh 3,500");
+    }
+
+    @Test
+    void generatedRepaymentRowsUseSnapshotBreakdownWhenStoredScheduleComponentsAreStale() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("700000.00"))
+            .tenorMonths(6)
+            .financialSnapshot("""
+                {
+                  "interestMethod": "FLAT_RATE",
+                  "interestRate": 0.10,
+                  "interestAmount": 66000.00,
+                  "monthlyRepaymentAmount": 127666.67
+                }
+                """)
+            .repaymentScheduleJson("""
+                {
+                  "schedule": [
+                    {
+                      "installmentNumber": 1,
+                      "dueDate": "2026-08-31",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.67,
+                      "interestComponent": 5833.33
+                    },
+                    {
+                      "installmentNumber": 2,
+                      "dueDate": "2026-09-30",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.67,
+                      "interestComponent": 5833.33
+                    },
+                    {
+                      "installmentNumber": 3,
+                      "dueDate": "2026-10-31",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.67,
+                      "interestComponent": 5833.33
+                    },
+                    {
+                      "installmentNumber": 4,
+                      "dueDate": "2026-11-30",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.67,
+                      "interestComponent": 5833.33
+                    },
+                    {
+                      "installmentNumber": 5,
+                      "dueDate": "2026-12-31",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.67,
+                      "interestComponent": 5833.33
+                    },
+                    {
+                      "installmentNumber": 6,
+                      "dueDate": "2027-01-31",
+                      "amount": 122500.00,
+                      "principalComponent": 116666.65,
+                      "interestComponent": 5833.35
+                    }
+                  ]
+                }
+                """)
+            .build();
+
+        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(app);
+
+        assertThat(rows).hasSize(6);
+        assertThat(rows.getFirst())
+            .containsEntry("amount", "TSh 127,666.67")
+            .containsEntry("loanAmount", "TSh 116,666.67")
+            .containsEntry("interest", "TSh 11,000");
+        assertThat(rows.getFirst().get("scheduledBreakdown").toString())
+            .contains("Loan Amount: TSh 116,666.67")
+            .contains("Interest: TSh 11,000");
     }
 
     @Test
@@ -489,9 +630,10 @@ class LoanPresentationServiceTest {
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0))
-            .containsEntry("outstandingBalance", "")
+            .containsEntry("outstandingBalance", "-")
             .containsEntry("principalPaid", "-")
-            .containsEntry("paymentDate", "-");
+            .containsEntry("paymentDate", "-")
+            .containsEntry("paymentStatus", "Pending");
     }
 
     @Test

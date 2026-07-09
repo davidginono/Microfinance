@@ -72,7 +72,6 @@ public class AuthClaimController {
                           @RequestParam("otpCode") String otpCode,
                           @RequestParam("password") String password,
                           @RequestParam("confirmPassword") String confirmPassword,
-                          @RequestParam("signatureText") String signatureText,
                           RedirectAttributes ra) {
         try {
             if (password == null || password.length() < 8) {
@@ -81,7 +80,7 @@ public class AuthClaimController {
             if (!password.equals(confirmPassword)) {
                 throw new IllegalStateException("Passwords do not match.");
             }
-            Member member = invitationService.claimInvitation(token, otpCode, password, signatureText);
+            Member member = invitationService.claimInvitation(token, otpCode, password);
             log.info("Staff account activated memberNo={}", member.getMemberNo());
             ra.addFlashAttribute("loginMessage",
                 "Your account is now active. Sign in using your staff member number and password or request an email code.");

@@ -59,8 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 
 @Service
 @RequiredArgsConstructor
@@ -487,10 +485,11 @@ public class LoanPresentationService {
         if (app == null) {
             return Collections.emptyList();
         }
-        return parseRepaymentRows(
+        return parseRepaymentRowsInternal(
             app.getRepaymentScheduleJson(),
             transactions,
-            paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary
+            paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary,
+            calculatedRepaymentRowsFromSnapshot(app)
         );
     }
 
@@ -508,10 +507,11 @@ public class LoanPresentationService {
         if (app == null) {
             return Collections.emptyList();
         }
-        List<Map<String, Object>> storedRows = parseRepaymentRows(
+        List<Map<String, Object>> storedRows = parseRepaymentRowsInternal(
             app.getRepaymentScheduleJson(),
             transactions,
-            paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary
+            paymentSummary == null ? LoanPaymentSummaryView.empty() : paymentSummary,
+            calculatedRepaymentRowsFromSnapshot(app)
         );
         if (!storedRows.isEmpty()) {
             return storedRows;
@@ -526,9 +526,8 @@ public class LoanPresentationService {
     }
 
     /**
-     * Builds the view rows for the installment schedule, enriched with any
-     * payment transactions whose {@code receiptDate} falls in the same
-     * calendar month as the installment's {@code dueDate}.
+     * Builds the view rows for the installment schedule, enriched with payment
+     * transactions allocated FIFO across scheduled installments.
      */
     public List<Map<String, Object>> parseRepaymentRows(String json, List<LoanPaymentTransaction> transactions) {
         return parseRepaymentRowsInternal(json, transactions, LoanPaymentSummaryView.empty());
@@ -537,6 +536,13 @@ public class LoanPresentationService {
     private List<Map<String, Object>> parseRepaymentRowsInternal(String json,
                                                                  List<LoanPaymentTransaction> transactions,
                                                                  LoanPaymentSummaryView paymentSummary) {
+        return parseRepaymentRowsInternal(json, transactions, paymentSummary, Collections.emptyList());
+    }
+
+    private List<Map<String, Object>> parseRepaymentRowsInternal(String json,
+                                                                 List<LoanPaymentTransaction> transactions,
+                                                                 LoanPaymentSummaryView paymentSummary,
+                                                                 List<Map<String, Object>> calculatedScheduleRows) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -546,11 +552,14 @@ public class LoanPresentationService {
             if (!(scheduleObject instanceof List<?> schedule)) {
                 return Collections.emptyList();
             }
-            Map<YearMonth, PaidBucket> paidByMonth = bucketTransactionsByMonth(transactions);
-            YearMonth latestTransactionMonth = latestTransactionMonth(transactions);
-            String latestOutstandingBalance = latestOutstandingBalanceLabel(transactions, paymentSummary);
+            List<Map<String, Object>> correctedScheduleRows =
+                calculatedScheduleRows != null && calculatedScheduleRows.size() == schedule.size()
+                    ? calculatedScheduleRows
+                    : Collections.emptyList();
 
             List<Map<String, Object>> rows = new java.util.ArrayList<>();
+            List<PaidBucket> paymentBuckets = new java.util.ArrayList<>();
+            int rowIndex = 0;
             for (Object entry : schedule) {
                 if (!(entry instanceof Map<?, ?> item)) {
                     continue;
@@ -567,21 +576,43 @@ public class LoanPresentationService {
                 row.put("loanAmount", formatMoneyValue(item.get("principalComponent")));
                 row.put("interest", formatMoneyValue(item.get("interestComponent")));
                 row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
+                Map<String, Object> correctedRow = !correctedScheduleRows.isEmpty() && rowIndex < correctedScheduleRows.size()
+                    ? correctedScheduleRows.get(rowIndex)
+                    : Collections.emptyMap();
+                if (!correctedScheduleRows.isEmpty() && rowIndex < correctedScheduleRows.size()) {
+                    applyCalculatedScheduleDisplay(row, correctedRow);
+                }
 
-                PaidBucket bucket = lookupBucket(paidByMonth, dueDateValue);
-                row.put("outstandingBalance",
-                    isLatestTransactionMonth(dueDateValue, latestTransactionMonth) && !latestOutstandingBalance.isBlank()
-                        ? latestOutstandingBalance
-                        : "");
-                row.put("principalPaid", bucket == null ? "-" : formatMoney(bucket.principal));
-                row.put("interestPaid", bucket == null ? "-" : formatMoney(bucket.interest));
-                row.put("totalPaid", bucket == null ? "-" : formatMoney(bucket.total));
-                row.put("paymentDate", bucket == null || bucket.lastDate == null ? "-" : bucket.lastDate.toString());
+                paymentBuckets.add(new PaidBucket(
+                    scheduledAmount(correctedRow, item, "scheduledPrincipalAmount", "principalComponent"),
+                    scheduledAmount(correctedRow, item, "scheduledInterestAmount", "interestComponent"),
+                    parseLocalDate(dueDateValue)
+                ));
                 rows.add(row);
+                rowIndex++;
             }
+            applyPaymentAllocations(rows, paymentBuckets, transactions, paymentSummary);
             return rows;
         } catch (Exception ex) {
             return Collections.emptyList();
+        }
+    }
+
+    private void applyCalculatedScheduleDisplay(Map<String, Object> row, Map<String, Object> calculatedRow) {
+        copyDisplayValue(row, calculatedRow, "amount");
+        copyDisplayValue(row, calculatedRow, "payment");
+        copyDisplayValue(row, calculatedRow, "loanAmount");
+        copyDisplayValue(row, calculatedRow, "interest");
+        copyDisplayValue(row, calculatedRow, "scheduledBreakdown");
+    }
+
+    private void copyDisplayValue(Map<String, Object> target, Map<String, Object> source, String key) {
+        if (source == null) {
+            return;
+        }
+        Object value = source.get(key);
+        if (value != null && !String.valueOf(value).isBlank()) {
+            target.put(key, value);
         }
     }
 
@@ -666,6 +697,9 @@ public class LoanPresentationService {
                 row.put("loanAmount", formatMoney(principalComponent));
                 row.put("interest", formatMoney(interestComponent));
                 row.put("scheduledBreakdown", "Loan Amount: " + formatMoney(principalComponent) + "\nInterest: " + formatMoney(interestComponent));
+                row.put("scheduledPrincipalAmount", principalComponent);
+                row.put("scheduledInterestAmount", interestComponent);
+                row.put("scheduledTotalAmount", installmentAmount);
                 row.put("outstandingBalance", formatMoney(remainingPrincipal));
                 row.put("endingBalance", formatMoney(remainingPrincipal));
                 row.put("principalPaid", "-");
@@ -702,76 +736,6 @@ public class LoanPresentationService {
         double factor = 1d - Math.pow(1d + rate, -Math.max(months, 1));
         return BigDecimal.valueOf(principal.doubleValue() * rate / factor)
             .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private YearMonth latestTransactionMonth(List<LoanPaymentTransaction> transactions) {
-        if (transactions == null || transactions.isEmpty()) {
-            return null;
-        }
-        return transactions.stream()
-            .filter(java.util.Objects::nonNull)
-            .map(LoanPaymentTransaction::getReceiptDate)
-            .filter(java.util.Objects::nonNull)
-            .max(LocalDate::compareTo)
-            .map(YearMonth::from)
-            .orElse(null);
-    }
-
-    private String latestOutstandingBalanceLabel(List<LoanPaymentTransaction> transactions,
-                                                 LoanPaymentSummaryView paymentSummary) {
-        if (transactions == null || transactions.isEmpty() || paymentSummary == null || !paymentSummary.available()) {
-            return "";
-        }
-        return paymentSummary.totalOutstandingLabel() == null || "-".equals(paymentSummary.totalOutstandingLabel())
-            ? ""
-            : paymentSummary.totalOutstandingLabel();
-    }
-
-    private boolean isLatestTransactionMonth(Object dueDateValue, YearMonth latestTransactionMonth) {
-        if (latestTransactionMonth == null || dueDateValue == null) {
-            return false;
-        }
-        String raw = String.valueOf(dueDateValue);
-        if (raw.length() < 7) {
-            return false;
-        }
-        try {
-            return latestTransactionMonth.equals(YearMonth.parse(raw.substring(0, 7)));
-        } catch (DateTimeParseException ex) {
-            return false;
-        }
-    }
-
-    private Map<YearMonth, PaidBucket> bucketTransactionsByMonth(List<LoanPaymentTransaction> transactions) {
-        if (transactions == null || transactions.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        Map<YearMonth, PaidBucket> map = new LinkedHashMap<>();
-        for (LoanPaymentTransaction txn : transactions) {
-            if (txn == null || txn.getReceiptDate() == null) {
-                continue;
-            }
-            YearMonth key = YearMonth.from(txn.getReceiptDate());
-            PaidBucket bucket = map.computeIfAbsent(key, k -> new PaidBucket());
-            bucket.add(txn);
-        }
-        return map;
-    }
-
-    private PaidBucket lookupBucket(Map<YearMonth, PaidBucket> paidByMonth, Object dueDateValue) {
-        if (paidByMonth.isEmpty() || dueDateValue == null) {
-            return null;
-        }
-        String raw = String.valueOf(dueDateValue);
-        if (raw.length() < 7) {
-            return null;
-        }
-        try {
-            YearMonth key = YearMonth.parse(raw.substring(0, 7));
-            return paidByMonth.get(key);
-        } catch (DateTimeParseException ex) {
-            return null;
-        }
     }
 
     private int indexOfLabel(List<String> labels, String target) {
@@ -910,25 +874,157 @@ public class LoanPresentationService {
         return "Principal: " + principal + "\nInterest: " + interest;
     }
 
+    private BigDecimal scheduledAmount(Map<String, Object> correctedRow, Map<?, ?> storedRow, String correctedKey, String storedKey) {
+        BigDecimal corrected = toBigDecimal(correctedRow.get(correctedKey));
+        if (corrected != null) {
+            return corrected.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal stored = toBigDecimal(storedRow.get(storedKey));
+        return stored == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : stored.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private LocalDate parseLocalDate(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(String.valueOf(value));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void applyPaymentAllocations(List<Map<String, Object>> rows,
+                                         List<PaidBucket> buckets,
+                                         List<LoanPaymentTransaction> transactions,
+                                         LoanPaymentSummaryView paymentSummary) {
+        List<LoanPaymentTransaction> orderedTransactions = transactions == null
+            ? Collections.emptyList()
+            : transactions.stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(txn -> txn.getReceiptDate() != null)
+                .sorted(java.util.Comparator.comparing(LoanPaymentTransaction::getReceiptDate))
+                .toList();
+        for (LoanPaymentTransaction txn : orderedTransactions) {
+            BigDecimal interestRemaining = nonNegative(txn.getInterestPaid());
+            BigDecimal principalRemaining = nonNegative(txn.getPrincipalPaid());
+            for (PaidBucket bucket : buckets) {
+                interestRemaining = bucket.allocateInterest(interestRemaining, txn.getReceiptDate());
+                if (interestRemaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+            }
+            for (PaidBucket bucket : buckets) {
+                principalRemaining = bucket.allocatePrincipal(principalRemaining, txn.getReceiptDate());
+                if (principalRemaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+            }
+        }
+
+        BigDecimal totalScheduledDue = buckets.stream()
+            .map(PaidBucket::scheduledTotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal actualOutstanding = actualOutstandingBalance(paymentSummary);
+        BigDecimal cumulativePaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        boolean hasAnyAllocation = buckets.stream().anyMatch(PaidBucket::hasPayment);
+        for (int index = 0; index < rows.size() && index < buckets.size(); index++) {
+            Map<String, Object> row = rows.get(index);
+            PaidBucket bucket = buckets.get(index);
+            cumulativePaid = cumulativePaid.add(bucket.total()).setScale(2, RoundingMode.HALF_UP);
+            row.put("principalPaid", bucket.hasPayment() ? formatMoney(bucket.principal) : "-");
+            row.put("interestPaid", bucket.hasPayment() ? formatMoney(bucket.interest) : "-");
+            row.put("totalPaid", bucket.hasPayment() ? formatMoney(bucket.total()) : "-");
+            row.put("paymentDate", bucket.lastDate == null ? "-" : bucket.lastDate.toString());
+            row.put("paymentStatus", bucket.statusLabel());
+            BigDecimal scheduledOutstanding = totalScheduledDue.subtract(cumulativePaid).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal displayOutstanding = hasAnyAllocation
+                ? (actualOutstanding == null ? scheduledOutstanding : scheduledOutstanding.max(actualOutstanding))
+                : actualOutstanding;
+            row.put("outstandingBalance", hasAnyAllocation || actualOutstanding != null
+                ? formatMoney(displayOutstanding)
+                : "-");
+        }
+    }
+
+    private BigDecimal actualOutstandingBalance(LoanPaymentSummaryView paymentSummary) {
+        if (paymentSummary == null || !paymentSummary.available() || paymentSummary.totalOutstanding() == null) {
+            return null;
+        }
+        return nonNegative(paymentSummary.totalOutstanding());
+    }
+
+    private BigDecimal nonNegative(BigDecimal value) {
+        return value == null || value.compareTo(BigDecimal.ZERO) < 0
+            ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
     private static final class PaidBucket {
+        final BigDecimal scheduledPrincipal;
+        final BigDecimal scheduledInterest;
+        final LocalDate dueDate;
         BigDecimal principal = BigDecimal.ZERO;
         BigDecimal interest = BigDecimal.ZERO;
-        BigDecimal total = BigDecimal.ZERO;
         LocalDate lastDate;
 
-        void add(LoanPaymentTransaction txn) {
-            if (txn.getPrincipalPaid() != null) {
-                principal = principal.add(txn.getPrincipalPaid());
+        PaidBucket(BigDecimal scheduledPrincipal, BigDecimal scheduledInterest, LocalDate dueDate) {
+            this.scheduledPrincipal = scheduledPrincipal == null ? BigDecimal.ZERO : scheduledPrincipal;
+            this.scheduledInterest = scheduledInterest == null ? BigDecimal.ZERO : scheduledInterest;
+            this.dueDate = dueDate;
+        }
+
+        BigDecimal allocateInterest(BigDecimal amount, LocalDate receiptDate) {
+            return allocate(amount, receiptDate, scheduledInterest, true);
+        }
+
+        BigDecimal allocatePrincipal(BigDecimal amount, LocalDate receiptDate) {
+            return allocate(amount, receiptDate, scheduledPrincipal, false);
+        }
+
+        private BigDecimal allocate(BigDecimal amount, LocalDate receiptDate, BigDecimal scheduled, boolean interestAllocation) {
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
             }
-            if (txn.getInterestPaid() != null) {
-                interest = interest.add(txn.getInterestPaid());
+            BigDecimal alreadyPaid = interestAllocation ? interest : principal;
+            BigDecimal remainingDue = scheduled.subtract(alreadyPaid).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            if (remainingDue.compareTo(BigDecimal.ZERO) <= 0) {
+                return amount;
             }
-            if (txn.getTotalPaid() != null) {
-                total = total.add(txn.getTotalPaid());
+            BigDecimal applied = amount.min(remainingDue).setScale(2, RoundingMode.HALF_UP);
+            if (interestAllocation) {
+                interest = interest.add(applied).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                principal = principal.add(applied).setScale(2, RoundingMode.HALF_UP);
             }
-            if (lastDate == null || txn.getReceiptDate().isAfter(lastDate)) {
-                lastDate = txn.getReceiptDate();
+            if (receiptDate != null && (lastDate == null || receiptDate.isAfter(lastDate))) {
+                lastDate = receiptDate;
             }
+            return amount.subtract(applied).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal total() {
+            return principal.add(interest).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal scheduledTotal() {
+            return scheduledPrincipal.add(scheduledInterest).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        boolean hasPayment() {
+            return total().compareTo(BigDecimal.ZERO) > 0;
+        }
+
+        String statusLabel() {
+            if (!hasPayment()) {
+                return "Pending";
+            }
+            BigDecimal scheduledTotal = scheduledTotal();
+            if (scheduledTotal.compareTo(BigDecimal.ZERO) > 0 && total().compareTo(scheduledTotal) >= 0) {
+                return dueDate != null && lastDate != null && lastDate.isBefore(dueDate) ? "Prepaid" : "Paid";
+            }
+            return "Partially Paid";
         }
     }
 

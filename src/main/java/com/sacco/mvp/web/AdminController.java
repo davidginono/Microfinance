@@ -21,6 +21,7 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
+import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.SmsUsageManagementService;
 import com.sacco.mvp.service.StationOtpSettingsService;
@@ -66,6 +67,7 @@ public class AdminController {
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final SmsUsageManagementService smsUsageManagementService;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final SaccoDataDeletionService saccoDataDeletionService;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
@@ -1537,16 +1539,15 @@ public class AdminController {
     }
 
     @PostMapping("/saccos")
-    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
-    public String registerSacco(@RequestParam String saccoId,
-                                @RequestParam String saccoName,
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String registerSacco(@RequestParam String saccoName,
                                 @RequestParam String stationIds,
                                 @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                                 @AuthenticationPrincipal AppUserPrincipal principal,
                                 RedirectAttributes ra) {
         try {
-            saccoRegistryService.registerSacco(saccoId, saccoName, stationIds, logoFile);
-            ra.addFlashAttribute("message", "SACCO details saved.");
+            var sacco = saccoRegistryService.registerSacco(saccoName, stationIds, logoFile);
+            ra.addFlashAttribute("message", "SACCO details saved with ID " + sacco.getSaccoId() + ".");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/admin/saccos/registry";
@@ -1661,6 +1662,20 @@ public class AdminController {
         return "redirect:/admin/saccos/minor-admins";
     }
 
+    @PostMapping("/saccos/minor-admins/{accountId}/delete")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteMinorAdmin(@PathVariable UUID accountId,
+                                   @RequestParam String confirmation,
+                                   RedirectAttributes ra) {
+        try {
+            saccoDataDeletionService.deleteRevokedMinorAdmin(accountId, confirmation);
+            ra.addFlashAttribute("message", "SACCOS Admin record deleted.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
     @PostMapping("/saccos/{saccoId}")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateSacco(@PathVariable String saccoId,
@@ -1693,6 +1708,20 @@ public class AdminController {
         return principal != null && principal.hasRole(Position.ADMIN)
             ? "redirect:/admin/saccos/registry"
             : "redirect:/admin/saccos";
+    }
+
+    @PostMapping("/saccos/{saccoId}/delete")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteSacco(@PathVariable String saccoId,
+                              @RequestParam String confirmation,
+                              RedirectAttributes ra) {
+        try {
+            saccoDataDeletionService.deleteSacco(saccoId, confirmation);
+            ra.addFlashAttribute("message", "SACCO and all related data deleted.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/registry";
     }
 
     @PostMapping("/saccos/{saccoId}/access/suspend")

@@ -70,6 +70,12 @@
                     <div class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
+                <c:if test="${not empty applicant.memberNo}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label"><spring:message code="member.memberNo" text="Member No" /></div>
+                        <div class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${applicant.memberNo}" /></div>
+                    </div>
+                </c:if>
                 <c:if test="${not empty disbursedLoanId}">
                     <div class="loan-hero-inline-fact">
                         <div class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></div>
@@ -91,8 +97,8 @@
                     <div class="loan-hero-fact-value"><c:out value="${applicant.fullName}" /></div>
                 </div>
                 <div class="loan-hero-fact">
-                    <div class="loan-hero-fact-label"><spring:message code="loan.type" text="Loan Type" /></div>
-                    <div class="loan-hero-fact-value"><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></div>
+                    <div class="loan-hero-fact-label"><spring:message code="reports.loanProduct" text="Loan Product" /></div>
+                    <div class="loan-hero-fact-value"><c:out value="${loanProductName}" /></div>
                 </div>
                 <c:if test="${not empty formFields['Loan Purpose']}">
                     <div class="loan-hero-fact sm:col-span-2">
@@ -221,14 +227,6 @@
             </div>
             <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="member.fullName" text="Full Name" /></div>
-                    <div class="applicant-info-value">${applicant.fullName}</div>
-                </div>
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="member.memberNumber" text="Member Number" /></div>
-                    <div class="applicant-info-value">${applicant.memberNo}</div>
-                </div>
-                <div class="applicant-info-card">
                     <div class="applicant-info-label"><spring:message code="register.member.email" text="Email" /></div>
                     <div class="applicant-info-value">
                         <c:choose>
@@ -253,12 +251,6 @@
                             <c:when test="${not empty applicant.stationId}">${applicant.stationId}</c:when>
                             <c:otherwise><spring:message code="common.notAvailable" text="Not available" /></c:otherwise>
                         </c:choose>
-                    </div>
-                </div>
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="review.quickContext" text="Quick Context" /></div>
-                    <div class="applicant-info-value">
-                        <spring:message code="review.quickContextCounts" arguments="${fn:length(attachments)},${fn:length(guarantorRequests)}" text="${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)" />
                     </div>
                 </div>
             </div>

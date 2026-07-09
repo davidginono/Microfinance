@@ -36,6 +36,7 @@ public class MinorAdminInvitationService {
     private final EmailOtpService emailOtpService;
     private final NotificationEmailService notificationEmailService;
     private final PasswordEncoder passwordEncoder;
+    private final NameSignatureService nameSignatureService;
 
     @Value("${app.auth.invitation.ttl-hours:72}")
     private int invitationTtlHours;
@@ -100,7 +101,7 @@ public class MinorAdminInvitationService {
     }
 
     @Transactional(noRollbackFor = ExpiredInvitationException.class)
-    public Member claimInvitation(String rawToken, String otpCode, String password, String signatureText) {
+    public Member claimInvitation(String rawToken, String otpCode, String password) {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
@@ -110,7 +111,7 @@ public class MinorAdminInvitationService {
         if (password == null || password.length() < 8) {
             throw new IllegalStateException("Password must be at least 8 characters.");
         }
-        String normalizedSignature = normalizeSignatureText(signatureText);
+        String normalizedSignature = nameSignatureService.signatureFromFullName(member.getFullName());
         emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.CLAIM_ACCOUNT, otpCode);
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -232,14 +233,6 @@ public class MinorAdminInvitationService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 not available", ex);
         }
-    }
-
-    private String normalizeSignatureText(String value) {
-        if (value == null || value.trim().isBlank()) {
-            throw new IllegalStateException("Enter your signature.");
-        }
-        String normalized = value.trim();
-        return normalized.length() > 120 ? normalized.substring(0, 120).trim() : normalized;
     }
 
     public record ClaimContext(MinorAdminInvitation invitation, Member member) {

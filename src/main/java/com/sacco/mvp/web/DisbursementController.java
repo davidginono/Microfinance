@@ -20,6 +20,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanPaymentTransactionSyncService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -60,7 +61,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/disbursement")
-@PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+@PreAuthorize("@authz.notSuperAdmin(principal) and (@userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') or @userClaims.has(principal, 'DISBURSE_LOAN'))")
 public class DisbursementController {
     private final ManagerService managerService;
     private final ManagerReviewRepository managerReviewRepository;
@@ -69,6 +70,7 @@ public class DisbursementController {
     private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
+    private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
@@ -143,6 +145,7 @@ public class DisbursementController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
@@ -189,6 +192,7 @@ public class DisbursementController {
         Map<UUID, String> applicantNames = loadApplicantNames(entries.stream()
             .map(entry -> entry.loan().getApplicantMemberId())
             .toList());
+        Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
 
         model.addAttribute("archiveRows", entries.stream()
             .map(entry -> {
@@ -196,6 +200,7 @@ public class DisbursementController {
                 row.put("id", entry.loan().getId().toString());
                 row.put("loanId", entry.loan().getLoanId() == null ? "-" : entry.loan().getLoanId());
                 row.put("applicationNumber", entry.loan().getApplicationNumber() == null ? "-" : entry.loan().getApplicationNumber().toString());
+                row.put("loanProductName", loanProductDisplayService.displayName(entry.loan(), loanProductNames));
                 row.put("applicantName", applicantNames.getOrDefault(entry.loan().getApplicantMemberId(), "-"));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("disbursedAt", entry.review().getCreatedAt() == null ? "-" : entry.review().getCreatedAt().toLocalDate().toString());
@@ -272,6 +277,7 @@ public class DisbursementController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
@@ -298,13 +304,14 @@ public class DisbursementController {
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
+        Map<com.sacco.mvp.domain.LoanType, String> activeLoanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
         model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
                 row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
-                row.put("loanTypeLabel", loanTypeLabel(loan.getLoanType()));
+                row.put("loanTypeLabel", loanProductDisplayService.displayName(loan, activeLoanProductNames));
                 row.put("amount", formatMoney(loan.getAmount()));
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
@@ -394,7 +401,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/finalize")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
     public String finalize(@PathVariable UUID id,
                            @AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disbursementDate,
@@ -479,7 +486,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/request-disbursement-otp")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestDisbursementOtp(@PathVariable UUID id,
                                                                       @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -509,7 +516,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-disbursement-otp")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyDisbursementOtp(@PathVariable UUID id,
                                                                      @AuthenticationPrincipal AppUserPrincipal principal,

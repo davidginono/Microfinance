@@ -21,6 +21,7 @@ import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -68,6 +69,7 @@ public class LoanOfficerController {
     private final ObjectMapper objectMapper;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final LoanPresentationService loanPresentationService;
+    private final LoanProductDisplayService loanProductDisplayService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
     private final NotificationInboxService notificationInboxService;
@@ -259,6 +261,7 @@ public class LoanOfficerController {
             .collect(Collectors.toMap(Member::getId, member -> member));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("myReview", myReview);
@@ -587,6 +590,7 @@ public class LoanOfficerController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("myDecisions", myDecisions);
         model.addAttribute("myDecisionDates", myDecisionDates);
         model.addAttribute("myDecisionReasons", myDecisionReasons);

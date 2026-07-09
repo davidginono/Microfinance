@@ -19,6 +19,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -69,6 +70,7 @@ public class AccountantController {
     private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
+    private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
@@ -146,6 +148,7 @@ public class AccountantController {
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
@@ -191,6 +194,7 @@ public class AccountantController {
 
         model.addAttribute("archiveEntries", entries);
         model.addAttribute("applicantNames", applicantNames);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
@@ -275,6 +279,7 @@ public class AccountantController {
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
+        model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("paymentDetails", paymentDetailsService.resolveForLoan(app));
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading("Loading live balances..."));
         model.addAttribute("formFields", parseJsonObject(app.getFormData()));
@@ -299,13 +304,14 @@ public class AccountantController {
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
+        Map<com.sacco.mvp.domain.LoanType, String> activeLoanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
         model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
             .map(loan -> {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("id", loan.getId().toString());
                 row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
                 row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
-                row.put("loanTypeLabel", loanTypeLabel(loan.getLoanType()));
+                row.put("loanTypeLabel", loanProductDisplayService.displayName(loan, activeLoanProductNames));
                 row.put("amount", formatMoney(loan.getAmount()));
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());

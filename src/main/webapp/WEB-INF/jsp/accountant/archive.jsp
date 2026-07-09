@@ -85,6 +85,7 @@
         <thead>
         <tr>
             <th>${archivePrimaryColumnLabel}</th>
+            <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
             <th><spring:message code="common.applicant" text="Applicant" /></th>
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="review.decision" text="Decision" /></th>
@@ -100,6 +101,12 @@
                     <c:choose>
                         <c:when test="${archiveLoanIdMode}"><c:out value="${empty entry.loan.loanId ? '-' : entry.loan.loanId}" /></c:when>
                         <c:otherwise>${entry.loan.applicationNumber}</c:otherwise>
+                    </c:choose>
+                </td>
+                <td>
+                    <c:choose>
+                        <c:when test="${not empty loanProductNames[entry.loan.loanType]}"><c:out value="${loanProductNames[entry.loan.loanType]}" /></c:when>
+                        <c:otherwise><spring:message code="loan.type.${entry.loan.loanType}" text="${entry.loan.loanType}" /></c:otherwise>
                     </c:choose>
                 </td>
                 <td>
@@ -122,7 +129,7 @@
         </c:forEach>
         <c:if test="${empty archiveEntries}">
             <tr>
-                <td colspan="7" class="px-3 py-8 text-center text-slate-500">
+                <td colspan="8" class="px-3 py-8 text-center text-slate-500">
                     <spring:message code="accountant.archive.empty" text="No accountant-reviewed loan applications matched the current filter." />
                 </td>
             </tr>

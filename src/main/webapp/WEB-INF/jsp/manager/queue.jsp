@@ -91,6 +91,7 @@
     <thead>
     <tr>
         <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+        <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
         <th><spring:message code="common.applicant" text="Applicant" /></th>
         <th><spring:message code="common.amount" text="Amount" /></th>
         <th><spring:message code="common.status" text="Status" /></th>
@@ -102,6 +103,12 @@
     <c:forEach items="${apps}" var="app">
         <tr>
             <td class="px-3 py-2">${app.applicationNumber}</td>
+            <td class="px-3 py-2">
+                <c:choose>
+                    <c:when test="${not empty loanProductNames[app.loanType]}"><c:out value="${loanProductNames[app.loanType]}" /></c:when>
+                    <c:otherwise><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></c:otherwise>
+                </c:choose>
+            </td>
             <td class="px-3 py-2">
                 <c:choose>
                     <c:when test="${not empty applicantNames[app.applicantMemberId]}">${applicantNames[app.applicantMemberId]}</c:when>
@@ -125,7 +132,7 @@
     </c:forEach>
     <c:if test="${empty apps}">
         <tr>
-            <td colspan="6" class="px-3 py-8 text-center text-slate-500">
+            <td colspan="7" class="px-3 py-8 text-center text-slate-500">
                 <c:choose>
                     <c:when test="${not empty queueSearchValue}">
                         No loan applications found for <span class="font-semibold text-slate-700">${fn:toLowerCase(queueSearchLabel)}</span>

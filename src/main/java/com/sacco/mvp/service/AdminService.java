@@ -73,6 +73,7 @@ public class AdminService {
     private final SaccoRegistryService saccoRegistryService;
     private final MinorAdminInvitationService minorAdminInvitationService;
     private final ObjectMapper objectMapper;
+    private final NameSignatureService nameSignatureService;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
         return dashboard(saccoId, null, adminId);
@@ -280,7 +281,7 @@ public class AdminService {
         String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
         ensureMinorAdminSlotAvailable(resolvedSaccoId, resolvedStationId, accountId);
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
-        String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
+        String normalizedFullName = nameSignatureService.requireFullName(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
         if (normalizedPhone == null) {
@@ -303,6 +304,10 @@ public class AdminService {
         member.setStationId(resolvedStationId);
         member.setMemberNo(normalizedMemberNo);
         member.setFullName(normalizedFullName);
+        if (member.getStatus() == MemberStatus.ACTIVE || member.getSignatureRegisteredAt() != null) {
+            member.setSignatureText(nameSignatureService.signatureFromFullName(normalizedFullName));
+            member.setSignatureRegisteredAt(OffsetDateTime.now());
+        }
         member.setEmail(normalizedEmail);
         if (!java.util.Objects.equals(member.getPhone(), normalizedPhone)) {
             member.setPhoneVerifiedAt(member.getStatus() == MemberStatus.ACTIVE ? OffsetDateTime.now() : null);
@@ -981,7 +986,7 @@ public class AdminService {
         product.setProductDescription(normalizeRequiredProductDescription(productDescription));
         product.setDisplayOrder(normalizeDisplayOrder(displayOrder));
         product.setMinimumAmount(normalizeMinimumAmount(minimumAmount));
-        product.setMaximumAmount(normalizeRequiredMaximumAmount(product.getMinimumAmount(), maximumAmount));
+        product.setMaximumAmount(normalizeMaximumAmount(product.getMinimumAmount(), maximumAmount));
         product.setGuarantorsRequired(normalizeGuarantorCount(guarantorsRequired));
         product.setMaxLoanSavingsRatio(normalizeRatio(ratio));
         product.setSavingsLimitCheckRequired(savingsLimitCheckRequired);
@@ -1294,7 +1299,7 @@ public class AdminService {
             normalizeRequiredProductDescription(productDescription),
             normalizeDisplayOrder(displayOrder),
             normalizeMinimumAmount(minimumAmount),
-            normalizeRequiredMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
+            normalizeMaximumAmount(normalizeMinimumAmount(minimumAmount), maximumAmount),
             normalizeGuarantorCount(guarantorsRequired),
             normalizeRatio(ratio),
             savingsLimitCheckRequired,
@@ -2230,7 +2235,7 @@ public class AdminService {
             ensureChairpersonSlotAvailable(saccoId, null);
         }
         String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
-        String normalizedFullName = requireValue(fullName, "Enter the user's full name.");
+        String normalizedFullName = nameSignatureService.requireFullName(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
         if (staffRoles.contains(Position.MINOR_ADMIN) && normalizedPhone == null) {
@@ -2456,13 +2461,6 @@ public class AdminService {
             throw new IllegalStateException("Maximum amount cannot be lower than the minimum amount.");
         }
         return normalized;
-    }
-
-    private BigDecimal normalizeRequiredMaximumAmount(BigDecimal minimumAmount, BigDecimal maximumAmount) {
-        if (maximumAmount == null) {
-            throw new IllegalStateException("Maximum amount must be greater than zero.");
-        }
-        return normalizeMaximumAmount(minimumAmount, maximumAmount);
     }
 
     private BigDecimal normalizeRatio(BigDecimal ratio) {

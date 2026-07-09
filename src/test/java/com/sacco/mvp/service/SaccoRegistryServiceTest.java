@@ -48,7 +48,8 @@ class SaccoRegistryServiceTest {
             saccoStationRepository,
             saccoSettingsRepository,
             saccoLogoStorageService,
-            Mockito.mock(SmsUnitTransactionService.class)
+            Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -113,7 +114,8 @@ class SaccoRegistryServiceTest {
             saccoStationRepository,
             saccoSettingsRepository,
             saccoLogoStorageService,
-            Mockito.mock(SmsUnitTransactionService.class)
+            Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -173,7 +175,8 @@ class SaccoRegistryServiceTest {
             saccoStationRepository,
             saccoSettingsRepository,
             saccoLogoStorageService,
-            Mockito.mock(SmsUnitTransactionService.class)
+            Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -236,7 +239,8 @@ class SaccoRegistryServiceTest {
             saccoStationRepository,
             saccoSettingsRepository,
             saccoLogoStorageService,
-            Mockito.mock(SmsUnitTransactionService.class)
+            Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
         OffsetDateTime now = OffsetDateTime.now();

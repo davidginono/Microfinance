@@ -23,6 +23,7 @@ body {
     --erp-amber: #f59e0b;
     --erp-red: #dc2626;
     --shell-sidebar-width: 248px;
+    --shell-sidebar-collapsed-width: 74px;
     --shell-content-gap: 14px;
     --shell-content-max: 1320px;
     --shell-nav-height: 3.6rem;
@@ -241,6 +242,45 @@ button:active {
     height: var(--shell-topbar-control-height);
     padding-top: 0;
     padding-bottom: 0;
+}
+.shell-sidebar-toggle-row {
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 2.55rem;
+    padding: 0.45rem 0.75rem 0.35rem;
+}
+.desktop-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid rgba(214, 226, 238, 0.95);
+    border-radius: 0.3rem;
+    background: rgba(255, 255, 255, 0.96);
+    color: #516680;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+.desktop-sidebar-toggle:hover,
+.desktop-sidebar-toggle:focus-visible {
+    background: #ffffff;
+    color: #193252;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+}
+.desktop-sidebar-toggle svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+.desktop-sidebar-toggle__expand {
+    display: none;
+}
+.shell-sidebar-collapsed .desktop-sidebar-toggle__collapse {
+    display: none;
+}
+.shell-sidebar-collapsed .desktop-sidebar-toggle__expand {
+    display: block;
 }
 .shell-powered-by {
     display: flex;
@@ -1045,6 +1085,7 @@ button:active {
     width: 232px;
     overflow: hidden;
     background: linear-gradient(180deg, #dff1fb 0%, #cfe8f8 100%);
+    transition: width 0.22s ease, transform 0.3s ease-out;
 }
 .shell-sidebar::before,
 .shell-sidebar::after {
@@ -1141,6 +1182,7 @@ button:active {
 .shell-sidebar-scroll > a,
 .shell-sidebar-scroll > button,
 .shell-sidebar-scroll > div > button {
+    min-width: 0;
     border-radius: 0.3rem;
     border-color: rgba(214, 226, 238, 0.95) !important;
     background: rgba(255, 255, 255, 0.96) !important;
@@ -1197,6 +1239,7 @@ button:active {
     padding-left: 1rem;
     padding-right: 1rem;
     overflow-x: clip;
+    transition: padding-left 0.22s ease;
 }
 .shell-content-frame {
     width: 100%;
@@ -1211,6 +1254,82 @@ button:active {
         padding-left: calc(var(--shell-sidebar-width) + var(--shell-content-gap)) !important;
         padding-right: 2rem !important;
     }
+    .shell-sidebar-collapsed .shell-sidebar {
+        width: var(--shell-sidebar-collapsed-width);
+    }
+    .shell-sidebar-collapsed .shell-main {
+        padding-left: calc(var(--shell-sidebar-collapsed-width) + var(--shell-content-gap)) !important;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-toggle-row {
+        justify-content: center;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-scroll {
+        padding-left: 0.55rem !important;
+        padding-right: 0.55rem !important;
+        scrollbar-gutter: auto;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
+        justify-content: center !important;
+        gap: 0 !important;
+        min-height: 2.35rem;
+        padding: 0.52rem 0.35rem !important;
+        overflow: hidden;
+        font-size: 0 !important;
+        line-height: 0 !important;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:first-child {
+        width: 1.72rem !important;
+        height: 1.72rem !important;
+        margin: 0 !important;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > :not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > :not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > :not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Chevron"],
+    .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Panel"],
+    .shell-sidebar-collapsed .shell-sidebar-section-header {
+        display: none !important;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-panel > .border-t {
+        padding: 0.75rem 0.45rem !important;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-panel > .border-t > * {
+        display: none !important;
+    }
+}
+.shell-sidebar-tooltip {
+    position: fixed;
+    z-index: 9998;
+    max-width: min(16rem, calc(100vw - 2rem));
+    padding: 0.45rem 0.62rem;
+    border: 1px solid #d7dde3;
+    border-radius: 0.32rem;
+    background: #ffffff;
+    color: #1f2937;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.25;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(0.35rem, -50%);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.shell-sidebar-tooltip.is-visible {
+    opacity: 1;
+    transform: translate(0, -50%);
 }
 @media (min-width: 2560px) {
     :root {

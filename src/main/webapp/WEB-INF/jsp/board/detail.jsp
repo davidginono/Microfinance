@@ -39,6 +39,12 @@
                     <div class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></div>
                     <div class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</div>
                 </div>
+                <c:if test="${not empty applicant.memberNo}">
+                    <div class="loan-hero-inline-fact">
+                        <div class="loan-hero-inline-label"><spring:message code="member.memberNo" text="Member No" /></div>
+                        <div class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${applicant.memberNo}" /></div>
+                    </div>
+                </c:if>
                 <c:if test="${not empty disbursedLoanId}">
                     <div class="loan-hero-inline-fact">
                         <div class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></div>
@@ -60,8 +66,8 @@
                     <div class="loan-hero-fact-value"><c:out value="${applicant.fullName}" /></div>
                 </div>
                 <div class="loan-hero-fact">
-                    <div class="loan-hero-fact-label"><spring:message code="loan.type" text="Loan Type" /></div>
-                    <div class="loan-hero-fact-value"><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></div>
+                    <div class="loan-hero-fact-label"><spring:message code="reports.loanProduct" text="Loan Product" /></div>
+                    <div class="loan-hero-fact-value"><c:out value="${loanProductName}" /></div>
                 </div>
                 <c:if test="${not empty formFields['Loan Purpose']}">
                     <div class="loan-hero-fact sm:col-span-2">
@@ -184,22 +190,8 @@
         </div>
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="member.fullName" text="Full Name" /></div>
-                <div class="applicant-info-value">${applicant.fullName}</div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="member.memberNumber" text="Member Number" /></div>
-                <div class="applicant-info-value">${applicant.memberNo}</div>
-            </div>
-            <div class="applicant-info-card">
                 <div class="applicant-info-label"><spring:message code="board.myReview" text="My Review" /></div>
                 <div class="applicant-info-value">${myReview.decision}</div>
-            </div>
-            <div class="applicant-info-card">
-                <div class="applicant-info-label"><spring:message code="review.quickContext" text="Quick Context" /></div>
-                <div class="applicant-info-value">
-                    ${fn:length(attachments)} attachment(s), ${fn:length(guarantorRequests)} guarantor request(s)
-                </div>
             </div>
         </div>
     </div>
@@ -519,17 +511,8 @@
                 </c:when>
                 <c:otherwise>
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
-                                <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalDisabledHelp" arguments="${reviewRoleLabelLower}" text="OTP confirmation is disabled for this approval." /></p>
-                            </div>
-                            <button type="button"
-                                    class="app-btn btn-primary inline-flex items-center justify-center gap-2"
-                                    disabled>
-                                <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
-                            </button>
-                        </div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
+                        <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalDisabledHelp" arguments="${reviewRoleLabelLower}" text="OTP confirmation is disabled for this approval." /></p>
                     </div>
                 </c:otherwise>
             </c:choose>

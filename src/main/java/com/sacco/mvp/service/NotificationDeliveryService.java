@@ -27,6 +27,15 @@ public class NotificationDeliveryService {
                         String eventType,
                         String subject,
                         String message) {
+        deliver(saccoId, stationId, notificationId, recipientId, eventType, DeliveryContent.plain(subject, message));
+    }
+
+    public void deliver(String saccoId,
+                        String stationId,
+                        UUID notificationId,
+                        UUID recipientId,
+                        String eventType,
+                        DeliveryContent content) {
         if (recipientId == null) {
             return;
         }
@@ -34,15 +43,26 @@ public class NotificationDeliveryService {
         if (recipient == null) {
             return;
         }
+        DeliveryContent resolvedContent = content == null ? DeliveryContent.plain("", "") : content;
         OtpDeliveryChannel channel = stationOtpSettingsService.channel(saccoId, stationId);
         if (channel == OtpDeliveryChannel.EMAIL) {
-            notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+            notificationEmailService.sendNotificationEmail(
+                recipientId,
+                resolvedContent.subject(),
+                resolvedContent.plainText(),
+                resolvedContent.html()
+            );
             return;
         }
 
-        boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, subject, message);
+        boolean smsSent = sendSms(saccoId, stationId, notificationId, recipient, eventType, resolvedContent);
         if (!smsSent && channel == OtpDeliveryChannel.SMS_WITH_EMAIL_FALLBACK) {
-            notificationEmailService.sendNotificationEmail(recipientId, subject, message);
+            notificationEmailService.sendNotificationEmail(
+                recipientId,
+                resolvedContent.subject(),
+                resolvedContent.plainText(),
+                resolvedContent.html()
+            );
         }
     }
 
@@ -51,8 +71,7 @@ public class NotificationDeliveryService {
                             UUID notificationId,
                             Member recipient,
                             String eventType,
-                            String subject,
-                            String message) {
+                            DeliveryContent content) {
         SmsUnitTransactionService.ReservationResult reservation =
             smsUnitTransactionService.reserve(saccoId, stationId, notificationId, eventType);
         if (reservation.alertStatus() != null) {
@@ -68,7 +87,7 @@ public class NotificationDeliveryService {
 
         SmsSendResult result;
         try {
-            result = smsGateway.send(recipient.getPhone(), smsMessage(subject, message));
+            result = smsGateway.send(recipient.getPhone(), smsText(content));
         } catch (RuntimeException ex) {
             result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
             log.warn("SMS gateway call ended unexpectedly for member {} and event {}", recipient.getId(), eventType, ex);
@@ -94,5 +113,19 @@ public class NotificationDeliveryService {
             return resolvedSubject;
         }
         return resolvedSubject + ": " + resolvedMessage;
+    }
+
+    private String smsText(DeliveryContent content) {
+        String smsText = content.smsText() == null ? "" : content.smsText().trim();
+        if (!smsText.isBlank()) {
+            return smsText;
+        }
+        return smsMessage(content.subject(), content.plainText());
+    }
+
+    public record DeliveryContent(String subject, String plainText, String html, String smsText) {
+        public static DeliveryContent plain(String subject, String message) {
+            return new DeliveryContent(subject, message, null, null);
+        }
     }
 }

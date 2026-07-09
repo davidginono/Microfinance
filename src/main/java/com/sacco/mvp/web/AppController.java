@@ -15,6 +15,7 @@ import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanQualificationPolicyService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
@@ -85,6 +86,7 @@ public class AppController {
     private final EligibilityService eligibilityService;
     private final FinancialDetailsService financialDetailsService;
     private final LoanPresentationService loanPresentationService;
+    private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
@@ -238,6 +240,7 @@ public class AppController {
         List<LoanApplication> apps = applications.currentApplications();
         LoanApplication currentWorkflowApplication = applications.latestCurrentApplication();
         model.addAttribute("apps", apps);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
         model.addAttribute("currentWorkflowSteps", currentWorkflowApplication == null
             ? List.of()
@@ -300,6 +303,7 @@ public class AppController {
         List<LoanApplication> archives = loanArchivePage.getContent();
         List<GuarantorRequest> guarantorArchives = guarantorArchivePage.getContent();
         model.addAttribute("archives", archives);
+        model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
         model.addAttribute("guarantorArchives", guarantorArchives);
         model.addAttribute("archiveSection", archiveSection);
         model.addAttribute("archivePage", "guarantors".equals(archiveSection) ? guarantorArchivePage : loanArchivePage);
@@ -1206,6 +1210,7 @@ public class AppController {
     private void addMemberLoanViewDisplayAttributes(Model model, LoanApplication app) {
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
+        model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
         model.addAttribute("loanStatusBadgeClass", memberLoanStatusBadgeClass(app.getStatus()));
         model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
     }
@@ -2750,6 +2755,13 @@ public class AppController {
 
         Map<UUID, String> guaranteeNames = new HashMap<>();
         Map<UUID, LoanType> guaranteeLoanTypes = new HashMap<>();
+        Map<UUID, String> guaranteeLoanProductNames = new HashMap<>();
+        Map<LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(
+            applicationById.values().stream()
+                .findFirst()
+                .map(LoanApplication::getSaccoId)
+                .orElse("")
+        );
         Map<UUID, BigDecimal> guaranteeLoanAmounts = new HashMap<>();
         Map<UUID, String> guaranteeLoanAmountLabels = new HashMap<>();
         for (Map.Entry<UUID, LoanApplication> entry : applicationById.entrySet()) {
@@ -2757,12 +2769,14 @@ public class AppController {
             guaranteeNames.put(entry.getKey(),
                 applicantNames.getOrDefault(application.getApplicantMemberId(), message("member.unknown")));
             guaranteeLoanTypes.put(entry.getKey(), application.getLoanType());
+            guaranteeLoanProductNames.put(entry.getKey(), loanProductDisplayService.displayName(application, loanProductNames));
             guaranteeLoanAmounts.put(entry.getKey(), application.getAmount());
             guaranteeLoanAmountLabels.put(entry.getKey(), formatTzs(application.getAmount()));
         }
 
         model.addAttribute("guaranteeNames", guaranteeNames);
         model.addAttribute("guaranteeLoanTypes", guaranteeLoanTypes);
+        model.addAttribute("guaranteeLoanProductNames", guaranteeLoanProductNames);
         model.addAttribute("guaranteeLoanAmounts", guaranteeLoanAmounts);
         model.addAttribute("guaranteeLoanAmountLabels", guaranteeLoanAmountLabels);
     }

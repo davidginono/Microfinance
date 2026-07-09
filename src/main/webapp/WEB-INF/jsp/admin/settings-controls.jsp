@@ -1135,7 +1135,7 @@
 
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                                <input name="maximumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Maximum product cap" />' />
+                                <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank if there is no maximum amount" />' />
                             </label>
 
                             <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
@@ -1661,7 +1661,7 @@
 
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                            <input name="maximumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" />
+                            <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank if there is no maximum amount" />' />
                         </label>
 
                         <div class="savings-ratio-grid md:col-span-2" data-savings-ratio-group>
@@ -2876,9 +2876,9 @@
                 if (minimumAmount === null || Number.isNaN(minimumAmount) || minimumAmount < 0) {
                     addValidationError(errors, 'minimumAmount', productSettingsText.validationMinimumAmount);
                 }
-                if (maximumAmount === null || Number.isNaN(maximumAmount) || maximumAmount <= 0) {
+                if (maximumAmount !== null && (Number.isNaN(maximumAmount) || maximumAmount <= 0)) {
                     addValidationError(errors, 'maximumAmount', productSettingsText.validationMaximumAmountPositive);
-                } else if (minimumAmount !== null && !Number.isNaN(minimumAmount) && maximumAmount < minimumAmount) {
+                } else if (maximumAmount !== null && minimumAmount !== null && !Number.isNaN(minimumAmount) && maximumAmount < minimumAmount) {
                     addValidationError(errors, 'maximumAmount', productSettingsText.validationMaximumBelowMinimum);
                 }
                 if (savingsPercent === null || Number.isNaN(savingsPercent) || savingsPercent < 0 || savingsPercent > 1000) {

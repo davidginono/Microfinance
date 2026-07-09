@@ -89,6 +89,7 @@
         <tr>
             <th><spring:message code="loan.loanId" text="Loan ID" /></th>
             <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
             <th><spring:message code="common.applicant" text="Applicant" /></th>
             <th><spring:message code="common.amount" text="Amount" /></th>
             <th><spring:message code="review.disbursedAt" text="Disbursed At" /></th>
@@ -101,6 +102,7 @@
             <tr>
                 <td><c:out value="${row.loanId}" /></td>
                 <td>${row.applicationNumber}</td>
+                <td><c:out value="${row.loanProductName}" /></td>
                 <td>${row.applicantName}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                 <td>${row.disbursedAt}</td>
@@ -110,7 +112,7 @@
         </c:forEach>
         <c:if test="${empty archiveRows}">
             <tr>
-                <td colspan="7" class="px-3 py-8 text-center text-slate-500">
+                <td colspan="8" class="px-3 py-8 text-center text-slate-500">
                     <spring:message code="disbursement.archive.empty" text="No disbursed loans matched the current filter." />
                 </td>
             </tr>

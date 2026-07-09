@@ -2095,7 +2095,7 @@ public class LoanReportService {
         if (loan == null || loan.getLoanType() == null) {
             return "-";
         }
-        return titleCase(humanizeLoanType(loan.getLoanType().name()));
+        return loan.getLoanType().getDisplayLabel();
     }
 
     private String blankToFallback(String value, String fallback) {
@@ -2107,6 +2107,7 @@ public class LoanReportService {
             return "-";
         }
         StringBuilder label = new StringBuilder();
+        int wordIndex = 0;
         for (String part : value.toLowerCase(Locale.ROOT).split("\\s+")) {
             if (part.isBlank()) {
                 continue;
@@ -2114,9 +2115,16 @@ public class LoanReportService {
             if (!label.isEmpty()) {
                 label.append(' ');
             }
-            label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+            label.append(wordIndex > 0 && isLowercaseConnectorWord(part)
+                ? part
+                : Character.toUpperCase(part.charAt(0)) + part.substring(1));
+            wordIndex++;
         }
         return label.isEmpty() ? value : label.toString();
+    }
+
+    private boolean isLowercaseConnectorWord(String value) {
+        return "wa".equals(value) || "ya".equals(value) || "la".equals(value) || "na".equals(value);
     }
 
     private String shortLoanRow(LoanApplication loan, Member applicant) {

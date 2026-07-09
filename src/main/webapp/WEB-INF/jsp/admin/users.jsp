@@ -211,7 +211,7 @@
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Full Name
-                <input name="fullName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
             </label>
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

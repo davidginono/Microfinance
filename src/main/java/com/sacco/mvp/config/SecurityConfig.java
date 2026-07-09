@@ -37,6 +37,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -77,7 +79,7 @@ public class SecurityConfig {
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/accountant/**").hasRole("ACCOUNTANT")
                 .requestMatchers("/disbursement/**").access(new WebExpressionAuthorizationManager(
-                    "isAuthenticated() and !hasRole('ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"))
+                    "isAuthenticated() and !hasRole('ADMIN') and (principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE') or principal.claims.contains('DISBURSE_LOAN'))"))
                 .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
                 .requestMatchers("/credit-committee/**").hasRole("CREDIT_COMMITTEE")
                 .requestMatchers("/board/**").hasRole("BOARD")
@@ -142,6 +144,7 @@ public class SecurityConfig {
                     boolean staffPasswordLogin = "staff-password".equals(loginType);
                     boolean isSuperAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.ADMIN);
                     boolean isMinorAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN);
+                    String savedTarget = savedRequestTarget(request);
 
                     // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
                     // present an email OTP before the authenticated SecurityContext is
@@ -151,7 +154,7 @@ public class SecurityConfig {
                     boolean requireLoginMfa = requiresPasswordLoginMfa(principal, staffPasswordLogin, isMinorAdmin, stationOtpSettingsService);
                     if (requireLoginMfa) {
                         if (principal != null) {
-                            String landing = landingFor(principal, staffPasswordLogin);
+                            String landing = savedTarget == null ? landingFor(principal, staffPasswordLogin) : savedTarget;
                             try {
                                 staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
@@ -169,6 +172,10 @@ public class SecurityConfig {
                         }
                     }
 
+                    if (savedTarget != null) {
+                        response.sendRedirect(savedTarget);
+                        return;
+                    }
                     if (!staffPasswordLogin && principal != null && principal.isMemberAccess()) {
                         response.sendRedirect(WorkspaceLanding.memberDashboard());
                         return;
@@ -242,6 +249,11 @@ public class SecurityConfig {
 
                     if (principal.hasRole(com.sacco.mvp.domain.Position.ADMIN)) {
                         adminScopeService.clearScope();
+                    }
+                    String savedTarget = savedRequestTarget(request);
+                    if (savedTarget != null) {
+                        response.sendRedirect(savedTarget);
+                        return;
                     }
                     response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
                 })
@@ -358,6 +370,14 @@ public class SecurityConfig {
         if (session != null) {
             session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         }
+    }
+
+    private String savedRequestTarget(HttpServletRequest request) {
+        SavedRequest savedRequest = new HttpSessionRequestCache().getRequest(request, null);
+        if (savedRequest == null || savedRequest.getRedirectUrl() == null || savedRequest.getRedirectUrl().isBlank()) {
+            return null;
+        }
+        return savedRequest.getRedirectUrl();
     }
 
     private boolean isGoogleSsoConfigured() {

@@ -164,6 +164,27 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                                        @Param("stationId") String stationId,
                                                        @Param("positions") Collection<Position> positions);
 
+    @Query(
+        value = """
+            select distinct m.*
+            from members m
+            join user_settings us on us.member_id = m.id
+            where m.sacco_id = :saccoId
+              and m.status = 'ACTIVE'
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and exists (
+                select 1
+                from jsonb_array_elements_text(coalesce(us.notification_prefs -> 'claims', '[]'::jsonb)) claim
+                where claim = :claimName
+              )
+            order by m.full_name asc
+            """,
+        nativeQuery = true
+    )
+    List<Member> findActiveMembersWithClaimInStation(@Param("saccoId") String saccoId,
+                                                     @Param("stationId") String stationId,
+                                                     @Param("claimName") String claimName);
+
     @Query("""
         select distinct m
         from Member m

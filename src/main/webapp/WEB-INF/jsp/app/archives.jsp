@@ -53,7 +53,7 @@
                     <tr>
                         <th><spring:message code="archives.loanReference" text="Loan Reference" /></th>
                         <th><spring:message code="common.applicant" text="Applicant" /></th>
-                        <th><spring:message code="loan.type" text="Loan Type" /></th>
+                        <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
                         <th><spring:message code="common.amount" text="Amount" /></th>
                         <th><spring:message code="review.decision" text="Decision" /></th>
                         <th><spring:message code="loan.date" text="Date" /></th>
@@ -66,7 +66,7 @@
                             <td>${guaranteeNames[req.loanApplicationId]}</td>
                             <td>
                                 <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
-                                    <spring:message code="loan.type.${guaranteeLoanTypes[req.loanApplicationId]}" />
+                                    <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
                                 </c:if>
                             </td>
                             <td>${guaranteeLoanAmountLabels[req.loanApplicationId]}</td>
@@ -131,7 +131,7 @@
                     <tr>
                         <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
                         <th><spring:message code="loan.loanId" text="Loan ID" /></th>
-                        <th><spring:message code="loan.type" text="Loan Type" /></th>
+                        <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
                         <th><spring:message code="common.amount" text="Amount" /></th>
                         <th><spring:message code="common.status" text="Status" /></th>
                         <th><spring:message code="loan.date" text="Date" /></th>
@@ -143,7 +143,12 @@
                         <tr>
                             <td>${app.applicationNumber}</td>
                             <td><c:out value="${empty app.loanId ? '-' : app.loanId}" /></td>
-                            <td><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></td>
+                            <td>
+                                <c:choose>
+                                    <c:when test="${not empty loanProductNames[app.loanType]}"><c:out value="${loanProductNames[app.loanType]}" /></c:when>
+                                    <c:otherwise><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></c:otherwise>
+                                </c:choose>
+                            </td>
                             <td><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
                             <td><spring:message code="loan.status.${app.status}" text="${app.status}" /></td>
                             <td>

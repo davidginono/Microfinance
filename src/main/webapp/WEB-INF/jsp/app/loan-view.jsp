@@ -154,8 +154,8 @@
             </div>
             <div class="mt-4 loan-hero-facts-grid sm:grid-cols-2">
                 <div class="loan-hero-inline-fact">
-                    <div class="loan-hero-inline-label"><spring:message code="loan.type" text="Loan Type" /></div>
-                    <div class="loan-hero-inline-value"><spring:message code="loan.type.${app.loanType}"/></div>
+                    <div class="loan-hero-inline-label"><spring:message code="reports.loanProduct" text="Loan Product" /></div>
+                    <div class="loan-hero-inline-value"><c:out value="${loanProductName}" /></div>
                 </div>
                 <c:if test="${not empty formFields['Loan Purpose']}">
                     <div class="loan-hero-inline-fact">
@@ -511,6 +511,7 @@
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentStatus" text="Payment Status" /></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -536,6 +537,7 @@
                                     <td class="px-3 py-2">${row.interestPaid}</td>
                                     <td class="px-3 py-2 font-medium text-slate-900">${row.totalPaid}</td>
                                     <td class="px-3 py-2">${row.paymentDate}</td>
+                                    <td class="px-3 py-2">${row.paymentStatus}</td>
                                 </tr>
                             </c:forEach>
                         </tbody>

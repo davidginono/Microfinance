@@ -116,19 +116,22 @@ class AdminServiceTest {
         NotificationViewService notificationViewService = new NotificationViewService(objectMapper, memberRepository);
         UserClaimService userClaimService = new UserClaimService(userSettingsRepository, objectMapper);
         SaccoConfigurationService saccoConfigurationService = new SaccoConfigurationService(loanProductSettingRepository);
+        NameSignatureService nameSignatureService = new NameSignatureService();
         SaccoRegistryService saccoRegistryService = new SaccoRegistryService(
             registeredSaccoRepository,
             saccoStationRepository,
             saccoSettingsRepository,
             null,
-            org.mockito.Mockito.mock(SmsUnitTransactionService.class)
+            org.mockito.Mockito.mock(SmsUnitTransactionService.class),
+            org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
         MinorAdminInvitationService minorAdminInvitationService = new MinorAdminInvitationService(
             null,
             memberRepository,
             null,
             null,
-            null
+            null,
+            nameSignatureService
         ) {
             @Override
             public com.sacco.mvp.domain.MinorAdminInvitation issueInvitation(Member member, UUID invitedBy) {
@@ -172,7 +175,8 @@ class AdminServiceTest {
             saccoConfigurationService,
             saccoRegistryService,
             minorAdminInvitationService,
-            objectMapper
+            objectMapper,
+            nameSignatureService
         );
     }
 

@@ -11,10 +11,20 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260707-staff-cards' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260709-sidebar-collapse-v2' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="min-h-screen font-sans text-sacco-ink antialiased" style="background: var(--page-bg); overflow-x: clip;">
+<script>
+    try {
+        if (window.localStorage.getItem("shell:desktopSidebarCollapsed") === "true"
+            && window.matchMedia("(min-width: 1024px)").matches) {
+            document.documentElement.classList.add("shell-sidebar-collapsed");
+        }
+    } catch (ignored) {
+        // Local storage can be unavailable in strict browser modes.
+    }
+</script>
 <div class="min-h-screen w-full max-w-full" style="background: var(--page-bg); overflow-x: clip;">
 <nav id="shellTopNav" class="fixed inset-x-0 top-0 z-50 border-b shadow-sm" style="min-height: var(--shell-nav-height); border-color: #8fbfdf; background: linear-gradient(145deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.24) 23%, rgba(255,255,255,0) 23%), linear-gradient(180deg, #abd5ef 0%, #8fc5e7 100%);">
     <div class="flex items-center justify-between gap-2 px-2.5 py-2 sm:gap-3 sm:px-3 lg:px-4">

@@ -174,6 +174,9 @@ public class NotificationViewService {
         if (type == null || type.isBlank()) {
             return "Notification";
         }
+        if (type.startsWith("LOAN_STATUS_")) {
+            return "Loan Status Updated";
+        }
         return switch (type) {
             case "SUPPORT_MESSAGE" -> "Support Message";
             case "ADMIN_REPLY" -> "Admin Reply";
@@ -211,14 +214,19 @@ public class NotificationViewService {
 
     private String fallbackMessage(String type, Map<String, Object> payload) {
         Map<String, Object> details = toMap(payload.get("details"));
+        if (type != null && type.startsWith("LOAN_STATUS_")) {
+            return "Your loan application status changed to " + humanizeKey(type.substring("LOAN_STATUS_".length())) + ".";
+        }
         return switch (type) {
             case "MANAGER_REJECTED" -> {
                 String reasons = stringValue(details.get("reasons"));
                 yield reasons.isBlank() ? "Your application was rejected by the manager." : "Manager reason: " + reasons;
             }
             case "LOAN_OFFICER_REJECTED" -> "Your application was rejected at loan officer review.";
+            case "CHAIRPERSON_REJECTED" -> "Your application was rejected at chairperson review.";
             case "BOARD_APPROVED" -> "Your application has passed board review.";
             case "BOARD_REJECTED" -> "Your application was rejected at board review.";
+            case "CREDIT_COMMITTEE_REJECTED" -> "Your application was rejected at credit committee review.";
             case "ACCOUNTANT_REJECTED" -> "Your application was rejected during accountant review.";
             case "DISBURSED" -> {
                 String finalDueDate = stringValue(details.get("finalDueDate"));

@@ -65,7 +65,7 @@
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="member.fullName" text="Full Name" />
-                    <input name="fullName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -187,6 +187,11 @@
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                                 <button type="submit" class="app-btn btn-primary px-3 py-2 text-[0.74rem]"><spring:message code="common.reinvite" text="Re-invite" /></button>
                                             </form>
+                                            <button type="button"
+                                                    class="app-btn btn-reject px-3 py-2 text-[0.74rem]"
+                                                    data-minor-admin-modal-open="delete-${minorAdmin.accountId}">
+                                                <spring:message code="common.delete" text="Delete" />
+                                            </button>
                                     </c:otherwise>
                                 </c:choose>
                                 </div>
@@ -254,7 +259,7 @@
 
                     <label class="block text-sm font-semibold text-slate-700">
                         <spring:message code="member.fullName" text="Full Name" />
-                        <input name="fullName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.fullName}" />
+                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm uppercase text-slate-800" value="${minorAdmin.fullName}" />
                     </label>
 
                     <label class="block text-sm font-semibold text-slate-700">
@@ -276,6 +281,42 @@
             </div>
         </div>
     </div>
+</c:forEach>
+
+<c:forEach items="${minorAdmins}" var="minorAdmin">
+    <c:if test="${minorAdmin.status != 'ACTIVE' and minorAdmin.status != 'INVITED'}">
+        <div class="app-modal-overlay hidden" data-minor-admin-modal="delete-${minorAdmin.accountId}">
+            <div class="app-modal-panel app-modal-panel--compact">
+                <div class="app-modal-scroll">
+                    <div class="app-modal-header">
+                        <div>
+                            <p class="erp-panel-title"><spring:message code="common.delete" text="Delete" /> ${minorAdmin.fullName}</p>
+                            <p class="mt-2 text-sm text-slate-500">This permanently removes the inactive SACCOS Admin record and its activation data.</p>
+                        </div>
+                        <button type="button" class="app-modal-close" data-minor-admin-modal-close="delete-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/delete" method="post" class="app-modal-body space-y-4">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                        <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                            Type <span class="font-semibold">delete ${minorAdmin.fullName}</span> to confirm.
+                        </div>
+                        <label class="block text-sm font-semibold text-slate-700">
+                            Confirmation
+                            <input name="confirmation" type="text" required autocomplete="off" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" />
+                        </label>
+                        <div class="app-modal-actions">
+                            <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-close="delete-${minorAdmin.accountId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                            <button type="submit" class="app-btn btn-reject"><spring:message code="common.delete" text="Delete" /></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </c:if>
 </c:forEach>
 
 <script>
