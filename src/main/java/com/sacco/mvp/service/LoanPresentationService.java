@@ -1963,6 +1963,7 @@ public class LoanPresentationService {
         private final List<GuarantorRequest> guarantorRequests;
         private final Map<UUID, String> guarantorNames;
         private final Map<UUID, String> guarantorMemberNumbers;
+        private final Map<UUID, Member> guarantorMembersById;
         private final List<ManagerReview> staffReviews;
         private final Map<UUID, Member> staffReviewers;
         private final List<BoardReview> boardReviews;
@@ -2010,6 +2011,7 @@ public class LoanPresentationService {
             this.guarantorRequests = guarantorRequests == null ? Collections.emptyList() : guarantorRequests;
             this.guarantorNames = guarantorNames == null ? Collections.emptyMap() : guarantorNames;
             this.guarantorMemberNumbers = guarantorMemberNumbers == null ? Collections.emptyMap() : guarantorMemberNumbers;
+            this.guarantorMembersById = loadGuarantorMembersById(this.guarantorRequests);
             this.staffReviews = staffReviews == null ? Collections.emptyList() : staffReviews;
             this.staffReviewers = staffReviewers == null ? Collections.emptyMap() : staffReviewers;
             this.boardReviews = boardReviews == null ? Collections.emptyList() : boardReviews;
@@ -2610,7 +2612,7 @@ public class LoanPresentationService {
                         sanitizePdfText(guarantorLabel),
                         sanitizePdfText(guarantorMemberNumbers.get(request.getGuarantorMemberId())),
                         humanizeValue(request.getStatus()),
-                        sanitizePdfText(request.getGuarantorSignatureText()),
+                        guarantorSignatureForPdf(request),
                         sanitizePdfText(formatTimestamp(request.getGuarantorSignatureVerifiedAt()))
                     });
                 }
@@ -2627,6 +2629,41 @@ public class LoanPresentationService {
                 BODY_SIZE,
                 14f
             );
+        }
+
+        private String guarantorSignatureForPdf(GuarantorRequest request) {
+            String signature = request == null ? null : request.getGuarantorSignatureText();
+            if (signature != null && !"Approved by guarantor OTP".equalsIgnoreCase(signature.trim())) {
+                return sanitizePdfText(signature);
+            }
+            Member guarantor = request == null ? null : guarantorMembersById.get(request.getGuarantorMemberId());
+            return sanitizePdfText(guarantor == null ? null : guarantor.getSignatureText());
+        }
+
+        private Map<UUID, Member> loadGuarantorMembersById(List<GuarantorRequest> requests) {
+            if (requests == null || requests.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (GuarantorRequest request : requests) {
+                if (request != null && request.getGuarantorMemberId() != null) {
+                    ids.add(request.getGuarantorMemberId());
+                }
+            }
+            if (ids.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            Iterable<Member> members = memberRepository.findAllById(ids);
+            if (members == null) {
+                return Collections.emptyMap();
+            }
+            Map<UUID, Member> result = new LinkedHashMap<>();
+            for (Member member : members) {
+                if (member != null && member.getId() != null) {
+                    result.put(member.getId(), member);
+                }
+            }
+            return result;
         }
 
         private void drawConfiguredReviewSignOffSection() throws IOException {

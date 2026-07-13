@@ -325,6 +325,15 @@
                     </div>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                        <c:if test="${sacco.hasLogo}">
+                            <button type="submit"
+                                    class="app-btn btn-reject"
+                                    formaction="/admin/saccos/${sacco.saccoId}/logo/delete"
+                                    formmethod="post"
+                                    formnovalidate>
+                                Remove Logo
+                            </button>
+                        </c:if>
                         <button type="submit" class="app-btn btn-primary">${saveChangesLabel}</button>
                     </div>
                 </form>
@@ -428,6 +437,15 @@
                     </div>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="logo-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
+                        <c:if test="${sacco.hasLogo}">
+                            <button type="submit"
+                                    class="app-btn btn-reject"
+                                    formaction="/admin/saccos/${sacco.saccoId}/logo/delete"
+                                    formmethod="post"
+                                    formnovalidate>
+                                Remove Logo
+                            </button>
+                        </c:if>
                         <button type="submit" class="app-btn btn-primary">Save Logo</button>
                     </div>
                 </form>

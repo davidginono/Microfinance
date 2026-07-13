@@ -55,6 +55,14 @@ public class SaccoLogoStorageService {
             );
     }
 
+    public void delete(String saccoId) {
+        storedUploadStorageService.deleteCategory(
+            StoredUploadStorageService.OWNER_SACCO,
+            requireSaccoId(saccoId),
+            StoredUploadStorageService.CATEGORY_SACCO_LOGO
+        );
+    }
+
     public String publicLogoUrl(String saccoId, OffsetDateTime updatedAt) {
         if (saccoId == null || saccoId.isBlank() || !hasLogo(saccoId)) {
             return null;

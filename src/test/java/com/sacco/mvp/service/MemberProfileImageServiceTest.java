@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class MemberProfileImageServiceTest {
 
@@ -88,6 +89,35 @@ class MemberProfileImageServiceTest {
         assertThatThrownBy(() -> service.store(UUID.randomUUID(), file))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("PNG or JPEG");
+    }
+
+    @Test
+    void reportsWhetherProfileImageExists() {
+        StoredUploadStorageService storageService = mock(StoredUploadStorageService.class);
+        MemberProfileImageService service = new MemberProfileImageService(storageService);
+        UUID memberId = UUID.randomUUID();
+        when(storageService.exists(
+            StoredUploadStorageService.OWNER_MEMBER,
+            memberId.toString(),
+            StoredUploadStorageService.CATEGORY_MEMBER_PROFILE_PHOTO
+        )).thenReturn(true);
+
+        assertThat(service.hasImage(memberId)).isTrue();
+    }
+
+    @Test
+    void deletesProfileImageCategory() {
+        StoredUploadStorageService storageService = mock(StoredUploadStorageService.class);
+        MemberProfileImageService service = new MemberProfileImageService(storageService);
+        UUID memberId = UUID.randomUUID();
+
+        service.delete(memberId);
+
+        verify(storageService).deleteCategory(
+            StoredUploadStorageService.OWNER_MEMBER,
+            memberId.toString(),
+            StoredUploadStorageService.CATEGORY_MEMBER_PROFILE_PHOTO
+        );
     }
 
     private MockMultipartFile imageFile(String name, String contentType, int width, int height) throws Exception {

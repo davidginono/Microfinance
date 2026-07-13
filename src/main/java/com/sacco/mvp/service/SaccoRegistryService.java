@@ -223,6 +223,31 @@ public class SaccoRegistryService {
     }
 
     @Transactional
+    public void removeLogoOnly(String saccoId, UUID actorMemberId) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
+            .filter(RegisteredSacco::isActive)
+            .orElseThrow(() -> new IllegalStateException("SACCO not found."));
+        Map<String, Object> before = Map.of(
+            "saccoId", sacco.getSaccoId(),
+            "hasLogo", saccoLogoStorageService.hasLogo(normalizedSaccoId),
+            "updatedAt", sacco.getUpdatedAt()
+        );
+        saccoLogoStorageService.delete(normalizedSaccoId);
+        sacco.setUpdatedAt(OffsetDateTime.now());
+        registeredSaccoRepository.save(sacco);
+        invalidateRegisteredSaccoCache();
+        auditService.log("REGISTERED_SACCO", null, "ADMIN_REMOVE_SACCO_LOGO", actorMemberId, before, Map.of(
+            "saccoId", sacco.getSaccoId(),
+            "hasLogo", false,
+            "updatedAt", sacco.getUpdatedAt()
+        ));
+    }
+
+    @Transactional
     public void addStation(String saccoId, String stationId, String addressLocation) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
         String normalizedStationId = normalizeStationId(stationId);

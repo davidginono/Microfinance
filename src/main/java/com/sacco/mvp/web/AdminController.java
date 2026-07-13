@@ -1766,6 +1766,29 @@ public class AdminController {
         return "redirect:/admin/saccos";
     }
 
+    @PostMapping("/saccos/{saccoId}/logo/delete")
+    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteWorkspaceSaccoLogo(@PathVariable String saccoId,
+                                           @AuthenticationPrincipal AppUserPrincipal principal,
+                                           RedirectAttributes ra) {
+        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        try {
+            String targetSaccoId = saccoId == null ? "" : saccoId.trim();
+            if (!superAdmin) {
+                String currentSaccoId = adminScopeService.currentSaccoId(principal);
+                if (currentSaccoId == null || !currentSaccoId.equalsIgnoreCase(targetSaccoId)) {
+                    throw new IllegalStateException("You can only remove the logo for your SACCO workspace.");
+                }
+                targetSaccoId = currentSaccoId;
+            }
+            saccoRegistryService.removeLogoOnly(targetSaccoId, principal == null ? null : principal.getMemberId());
+            ra.addFlashAttribute("message", "SACCO logo removed.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return superAdmin ? "redirect:/admin/saccos/registry" : "redirect:/admin/saccos";
+    }
+
     @PostMapping("/saccos/{saccoId}/delete")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String deleteSacco(@PathVariable String saccoId,

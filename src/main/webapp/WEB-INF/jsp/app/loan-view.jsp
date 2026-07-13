@@ -1301,6 +1301,25 @@
                 button.classList.toggle("action-button-disabled", !enabled);
             }
 
+            function setResendLimitReached(button) {
+                if (!button) {
+                    return;
+                }
+                window.clearInterval(button._otpCooldownTimer);
+                window.clearTimeout(button._otpCooldownTimeout);
+                button.disabled = true;
+                button.classList.remove("is-loading");
+                button.classList.add("is-sent");
+                const label = button.querySelector(".otp-button-label");
+                if (label) {
+                    label.textContent = "Resend limit reached";
+                }
+            }
+
+            function isResendLimitError(error) {
+                return Boolean(error && error.message && error.message.indexOf("OTP resend limit reached") >= 0);
+            }
+
             async function postForm(url, values) {
                 const response = await fetch(url, {
                     method: "POST",
@@ -1390,7 +1409,11 @@
                         window.SaccosOtp?.focusBoxes(input);
                     } catch (error) {
                         setStatus(status, "error", error && error.message ? error.message : "${unableSendOtpLabel}");
-                        setOtpButtonState(resendButton, "idle", "Resend code", "${sendingOtpLabel}", "${otpSentLabel}");
+                        if (isResendLimitError(error)) {
+                            setResendLimitReached(resendButton);
+                        } else {
+                            setOtpButtonState(resendButton, "idle", "Resend code", "${sendingOtpLabel}", "${otpSentLabel}");
+                        }
                     }
                 });
             });

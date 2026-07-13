@@ -217,6 +217,52 @@ class SaccoRegistryServiceTest {
     }
 
     @Test
+    void removeLogoOnlyDeletesLogoRefreshesSaccoAndAudits() {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class),
+            auditService,
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        );
+
+        OffsetDateTime now = OffsetDateTime.now().minusDays(1);
+        RegisteredSacco existingSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        UUID actorId = UUID.randomUUID();
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(existingSacco));
+        when(saccoLogoStorageService.hasLogo("SACCO-1")).thenReturn(true);
+
+        service.removeLogoOnly("SACCO-1", actorId);
+
+        verify(saccoLogoStorageService).delete("SACCO-1");
+        verify(registeredSaccoRepository).save(argThat(sacco -> sacco != null
+            && "SACCO-1".equals(sacco.getSaccoId())
+            && sacco.getUpdatedAt().isAfter(now)));
+        verify(auditService).log(
+            org.mockito.ArgumentMatchers.eq("REGISTERED_SACCO"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq("ADMIN_REMOVE_SACCO_LOGO"),
+            org.mockito.ArgumentMatchers.eq(actorId),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
     void updateSaccoStoresStationAddressLocation() {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);

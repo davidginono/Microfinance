@@ -18,10 +18,13 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 final class PdfWatermarkRenderer {
+    private static final String DEFAULT_WATERMARK_ASSET = "static/assets/portal-default-watermark.png";
     private static final float LOGO_ALPHA = 0.075f;
-    private static final float STAMP_ALPHA = 0.11f;
+    private static final float DEFAULT_WATERMARK_ALPHA = 0.72f;
+    private static final float GENERATED_STAMP_ALPHA = 0.24f;
 
     private PdfWatermarkRenderer() {
     }
@@ -30,7 +33,7 @@ final class PdfWatermarkRenderer {
         BufferedImage image = readImage(logoBytes);
         boolean logo = image != null;
         if (!logo) {
-            image = systemStampImage();
+            image = defaultWatermarkImage();
         }
         PDImageXObject pdfImage = LosslessFactory.createFromImage(document, image);
         PDRectangle box = page.getMediaBox();
@@ -39,7 +42,7 @@ final class PdfWatermarkRenderer {
         float y = (box.getHeight() - size) / 2f;
 
         PDExtendedGraphicsState state = new PDExtendedGraphicsState();
-        state.setNonStrokingAlphaConstant(logo ? LOGO_ALPHA : STAMP_ALPHA);
+        state.setNonStrokingAlphaConstant(logo ? LOGO_ALPHA : DEFAULT_WATERMARK_ALPHA);
         state.setAlphaSourceFlag(true);
         stream.saveGraphicsState();
         stream.setGraphicsStateParameters(state);
@@ -58,6 +61,18 @@ final class PdfWatermarkRenderer {
         }
     }
 
+    private static BufferedImage defaultWatermarkImage() {
+        try (InputStream input = PdfWatermarkRenderer.class.getClassLoader().getResourceAsStream(DEFAULT_WATERMARK_ASSET)) {
+            if (input == null) {
+                return systemStampImage();
+            }
+            BufferedImage image = ImageIO.read(input);
+            return image == null ? systemStampImage() : image;
+        } catch (IOException ex) {
+            return systemStampImage();
+        }
+    }
+
     private static BufferedImage systemStampImage() {
         int size = 1000;
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
@@ -65,7 +80,7 @@ final class PdfWatermarkRenderer {
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            Color blue = new Color(122, 164, 221, 150);
+            Color blue = new Color(122, 164, 221, Math.round(255 * GENERATED_STAMP_ALPHA));
             g.setColor(blue);
             g.setStroke(new BasicStroke(12f));
             g.drawOval(48, 48, 904, 904);

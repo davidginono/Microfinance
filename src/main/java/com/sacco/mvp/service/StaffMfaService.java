@@ -46,6 +46,8 @@ public class StaffMfaService {
             throw new IllegalStateException("This account is not active.");
         }
 
+        HttpSession session = request.getSession(true);
+        storePendingChallenge(session, member, landingUrl, loginType);
         StationOtpDeliveryService.DeliveryReceipt delivery = emailOtpService.issueOtp(
             member.getEmail(),
             EmailOtpPurpose.LOGIN_MFA,
@@ -57,14 +59,6 @@ public class StaffMfaService {
             member.getStationId(),
             member.getPhone()
         );
-
-        HttpSession session = request.getSession(true);
-        session.setAttribute(PENDING_MEMBER_ID_ATTR, member.getId());
-        session.setAttribute(PENDING_EMAIL_ATTR, member.getEmail());
-        session.setAttribute(PENDING_LOGIN_TYPE_ATTR, loginType == null ? "" : loginType);
-        if (landingUrl != null) {
-            session.setAttribute(PENDING_LANDING_ATTR, landingUrl);
-        }
         session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, "We sent a one-time verification code using the station delivery policy."));
     }
 
@@ -132,6 +126,32 @@ public class StaffMfaService {
         }
     }
 
+    public void sendChallengeToEmail(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        UUID memberId = pendingMemberId(session);
+        if (memberId == null) {
+            throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
+        }
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalStateException("Your account could not be located. Contact the administrator."));
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            clear(request);
+            throw new IllegalStateException("This account is not active.");
+        }
+
+        StationOtpDeliveryService.DeliveryReceipt delivery = emailOtpService.issueOtpToEmail(
+            member.getEmail(),
+            EmailOtpPurpose.LOGIN_MFA,
+            member.getId(),
+            "Your Loan Application Portal sign-in verification code",
+            "We received a sign-in attempt for this account. Enter the verification code below to finish signing in."
+        );
+        if (session != null) {
+            session.setAttribute(PENDING_EMAIL_ATTR, member.getEmail());
+            session.setAttribute(PENDING_DELIVERY_MESSAGE_ATTR, deliveryMessage(delivery, "We sent a new verification code to your registered email."));
+        }
+    }
+
     public AppUserPrincipal completeChallenge(String otpCode, HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         UUID memberId = pendingMemberId(session);
@@ -175,6 +195,18 @@ public class StaffMfaService {
         return delivery == null || delivery.userMessage() == null || delivery.userMessage().isBlank()
             ? fallback
             : delivery.userMessage();
+    }
+
+    private void storePendingChallenge(HttpSession session, Member member, String landingUrl, String loginType) {
+        session.setAttribute(PENDING_MEMBER_ID_ATTR, member.getId());
+        session.setAttribute(PENDING_EMAIL_ATTR, member.getEmail());
+        session.setAttribute(PENDING_LOGIN_TYPE_ATTR, loginType == null ? "" : loginType);
+        session.removeAttribute(PENDING_DELIVERY_MESSAGE_ATTR);
+        if (landingUrl != null) {
+            session.setAttribute(PENDING_LANDING_ATTR, landingUrl);
+        } else {
+            session.removeAttribute(PENDING_LANDING_ATTR);
+        }
     }
 
     private void clearPending(HttpSession session) {

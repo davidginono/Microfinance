@@ -488,9 +488,7 @@
 </div>
 </c:if>
 
-<c:if test="${not hideDisbursementSupportSections}">
-    <%@ include file="../fragments/staff-repayment-summary.jspf" %>
-</c:if>
+<%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${showReviewDecisionForm}">
     <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap mt-5 space-y-3" data-manager-decision-form="true">
@@ -706,7 +704,6 @@
                             <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
                         </div>
                     </div>
-                    <p class="mt-3 text-xs text-slate-600"><spring:message code="loan.disbursement.depositPreviewHelp" text="Repayment and principal use the approved loan amount. Deposit amount only records what reaches the applicant after any fee deduction." /></p>
                 </div>
             </div>
             <div>

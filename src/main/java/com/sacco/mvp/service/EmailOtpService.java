@@ -76,6 +76,27 @@ public class EmailOtpService {
                                                String saccoId,
                                                String stationId,
                                                String phone) {
+        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
+    }
+
+    @Transactional
+    public StationOtpDeliveryService.DeliveryReceipt issueOtpToEmail(String email,
+                                                                     EmailOtpPurpose purpose,
+                                                                     UUID memberId,
+                                                                     String subject,
+                                                                     String introMessage) {
+        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, null, null, null, true).deliveryReceipt();
+    }
+
+    private OtpIssueResult issueOtpWithMetadata(String email,
+                                                EmailOtpPurpose purpose,
+                                                UUID memberId,
+                                                String subject,
+                                                String introMessage,
+                                                String saccoId,
+                                                String stationId,
+                                                String phone,
+                                                boolean emailOnly) {
         String normalizedEmail = normalizeEmail(email);
         OffsetDateTime now = OffsetDateTime.now();
         try {
@@ -109,17 +130,25 @@ public class EmailOtpService {
                 .build();
             emailOtpTokenRepository.save(token);
 
-            StationOtpDeliveryService.DeliveryReceipt receipt = stationOtpDeliveryService.deliver(
-                saccoId,
-                stationId,
-                normalizedEmail,
-                phone,
-                purpose,
-                subject,
-                introMessage,
-                code,
-                Math.max(1, otpTtlMinutes)
-            );
+            StationOtpDeliveryService.DeliveryReceipt receipt = emailOnly
+                ? stationOtpDeliveryService.deliverEmailOnly(
+                    normalizedEmail,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes)
+                )
+                : stationOtpDeliveryService.deliver(
+                    saccoId,
+                    stationId,
+                    normalizedEmail,
+                    phone,
+                    purpose,
+                    subject,
+                    introMessage,
+                    code,
+                    Math.max(1, otpTtlMinutes)
+                );
             log.info("Issued {} OTP for {}", purpose, normalizedEmail);
             return OtpIssueResult.issued(receipt, expiresAt, secondsUntil(now, expiresAt), resendCount);
         } catch (DataAccessException ex) {

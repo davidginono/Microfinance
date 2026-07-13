@@ -31,6 +31,7 @@ public class ProfileController {
         Member member = memberRepository.findById(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Member account not found"));
         model.addAttribute("profileMember", member);
+        model.addAttribute("hasProfileImage", memberProfileImageService.hasImage(principal.getMemberId()));
         return "profile";
     }
 
@@ -41,6 +42,18 @@ public class ProfileController {
         try {
             memberProfileImageService.store(principal.getMemberId(), profileImage);
             redirectAttributes.addFlashAttribute("message", "Profile image updated.");
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/profile";
+    }
+
+    @PostMapping("/profile/image/delete")
+    public String deleteProfileImage(@AuthenticationPrincipal AppUserPrincipal principal,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            memberProfileImageService.delete(principal.getMemberId());
+            redirectAttributes.addFlashAttribute("message", "Profile image removed.");
         } catch (IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("error", ex.getMessage());
         }

@@ -62,6 +62,28 @@ public class StaffMfaController {
         }
     }
 
+    @PostMapping({"/login/mfa/send-email", "/login/staff/mfa/send-email"})
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> sendEmail(HttpServletRequest request) {
+        try {
+            staffMfaService.sendChallengeToEmail(request);
+            HttpSession session = request.getSession(false);
+            String deliveryMessage = staffMfaService.pendingDeliveryMessage(session);
+            return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "message", deliveryMessage == null || deliveryMessage.isBlank()
+                    ? "We sent a new verification code to your registered email."
+                    : deliveryMessage,
+                "redirectUrl", "/login/mfa"
+            ));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "valid", false,
+                "message", ex.getMessage()
+            ));
+        }
+    }
+
     @PostMapping({"/login/mfa/verify", "/login/staff/mfa/verify"})
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verify(@RequestParam String otpCode,

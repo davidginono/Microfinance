@@ -147,6 +147,52 @@ class EmailOtpServiceTest {
     }
 
     @Test
+    void issueOtpWithMetadataAppliesResendLimitToGuarantorApplicantConfirmation() {
+        UUID guarantorId = UUID.randomUUID();
+        EmailOtpToken activeToken = EmailOtpToken.builder()
+            .id(UUID.randomUUID())
+            .email("guarantor@example.com")
+            .purpose(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION)
+            .memberId(guarantorId)
+            .codeHash("hash")
+            .createdAt(OffsetDateTime.now().minusMinutes(1))
+            .expiresAt(OffsetDateTime.now().plusMinutes(5))
+            .resendCount(EmailOtpService.MAX_RESENDS_PER_OTP)
+            .build();
+        when(emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(
+            "guarantor@example.com",
+            EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+            guarantorId
+        )).thenReturn(List.of(activeToken));
+
+        assertThatThrownBy(() -> emailOtpService.issueOtpWithMetadata(
+            "guarantor@example.com",
+            EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
+            guarantorId,
+            "Subject",
+            "Intro",
+            "SACCO-1",
+            "ST-1",
+            "+255700000001"
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("OTP resend limit reached. Use the latest code or request a new one after it expires.");
+
+        verify(emailOtpTokenRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(stationOtpDeliveryService, never()).deliver(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyInt()
+        );
+    }
+
+    @Test
     void issueOtpWithMetadataIssuesNewCodeWhenNoActiveCodeExists() {
         UUID memberId = UUID.randomUUID();
         when(emailOtpTokenRepository.findByEmailIgnoreCaseAndPurposeAndMemberIdAndConsumedAtIsNull(

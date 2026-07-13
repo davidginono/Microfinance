@@ -267,10 +267,10 @@
         <div class="pb-1">
 
                     <c:if test="${param.error != null}">
-                        <div hidden data-toast-message="${fn:escapeXml(not empty errorMessage ? errorMessage : 'Invalid member number or password.')}" data-toast-type="error"></div>
+                        <div hidden data-toast-message="${fn:escapeXml(not empty errorMessage ? errorMessage : 'Invalid member number or password.')}" data-toast-type="error" data-mfa-email-fallback="${not empty errorMessage and fn:contains(errorMessage, 'SMS OTP')}"></div>
                     </c:if>
                     <c:if test="${not empty errorMessage and param.error == null}">
-                        <div hidden data-toast-message="${fn:escapeXml(errorMessage)}" data-toast-type="error"></div>
+                        <div hidden data-toast-message="${fn:escapeXml(errorMessage)}" data-toast-type="error" data-mfa-email-fallback="${fn:contains(errorMessage, 'SMS OTP')}"></div>
                     </c:if>
                     <c:if test="${param.logout != null}">
                         <div hidden data-toast-message="Logged out successfully." data-toast-type="success"></div>
@@ -428,14 +428,38 @@
 <script>
     (() => {
         const toastContainer = document.getElementById('authToastContainer');
+        const csrfName = '${_csrf.parameterName}';
+        const csrfToken = '${_csrf.token}';
+
+        async function sendMfaCodeToEmail() {
+            const body = new URLSearchParams();
+            if (csrfName && csrfToken) {
+                body.set(csrfName, csrfToken);
+            }
+            const response = await fetch('/login/mfa/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: body.toString()
+            });
+            const payload = await response.json().catch(() => ({
+                valid: false,
+                message: 'We could not send the code to email right now.'
+            }));
+            return { response, payload };
+        }
+
         window.showToast = function (type, message, options) {
             if (!toastContainer || !message || !String(message).trim()) {
                 return null;
             }
             const settings = options || {};
+            const offerEmailFallback = settings.mfaEmailFallback === true;
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const requestedDuration = Number(settings.duration);
-            const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (variant === 'error' ? 5200 : 3600);
+            const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (offerEmailFallback ? 0 : (variant === 'error' ? 5200 : 3600));
             const palette = variant === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : variant === 'error'
@@ -452,7 +476,16 @@
             toast.innerHTML =
                 '<div class="flex items-start gap-3">' +
                     '<div class="mt-0.5 shrink-0">' + icon + '</div>' +
-                    '<div class="min-w-0 flex-1 pr-6"><p class="text-sm font-semibold leading-5" data-toast-text></p></div>' +
+                    '<div class="min-w-0 flex-1 pr-6">' +
+                        '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
+                        '<div class="mt-3 hidden" data-toast-email-fallback>' +
+                            '<p class="text-xs font-semibold uppercase tracking-wide">Or send to email?</p>' +
+                            '<div class="mt-2 flex flex-wrap gap-2">' +
+                                '<button type="button" class="rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100" data-toast-email-yes>Yes</button>' +
+                                '<button type="button" class="rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100" data-toast-email-no>No</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
                     '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
                         '<span aria-hidden="true">&times;</span>' +
                     '</button>' +
@@ -466,9 +499,43 @@
                 toast.classList.add('app-toast-exit');
                 window.setTimeout(() => toast.remove(), 190);
             };
-            toast.querySelector('button')?.addEventListener('click', dismiss);
+            const emailFallback = toast.querySelector('[data-toast-email-fallback]');
+            const emailYes = toast.querySelector('[data-toast-email-yes]');
+            const emailNo = toast.querySelector('[data-toast-email-no]');
+            if (offerEmailFallback && emailFallback && emailYes && emailNo) {
+                emailFallback.classList.remove('hidden');
+                emailNo.addEventListener('click', dismiss);
+                emailYes.addEventListener('click', async () => {
+                    emailYes.disabled = true;
+                    emailNo.disabled = true;
+                    emailYes.textContent = 'Sending...';
+                    try {
+                        const result = await sendMfaCodeToEmail();
+                        if (!result.response.ok || !result.payload.valid) {
+                            toast.querySelector('[data-toast-text]').textContent = result.payload.message || 'We could not send the code to email right now.';
+                            emailYes.disabled = false;
+                            emailNo.disabled = false;
+                            emailYes.textContent = 'Yes';
+                            return;
+                        }
+                        dismiss();
+                        window.showToast('success', result.payload.message || 'We sent an OTP code to your registered email.');
+                        window.setTimeout(() => {
+                            window.location.href = result.payload.redirectUrl || '/login/mfa';
+                        }, 500);
+                    } catch (error) {
+                        toast.querySelector('[data-toast-text]').textContent = 'We could not send the code to email right now.';
+                        emailYes.disabled = false;
+                        emailNo.disabled = false;
+                        emailYes.textContent = 'Yes';
+                    }
+                });
+            }
+            toast.querySelector('.app-toast-close')?.addEventListener('click', dismiss);
             toastContainer.appendChild(toast);
-            window.setTimeout(dismiss, duration);
+            if (duration > 0) {
+                window.setTimeout(dismiss, duration);
+            }
             return { dismiss, element: toast };
         };
 
@@ -495,7 +562,9 @@
             document.querySelectorAll('[data-toast-message]').forEach((element) => {
                 const message = element.getAttribute('data-toast-message');
                 if (message) {
-                    window.showToast(element.getAttribute('data-toast-type') || 'info', message);
+                    window.showToast(element.getAttribute('data-toast-type') || 'info', message, {
+                        mfaEmailFallback: element.getAttribute('data-mfa-email-fallback') === 'true'
+                    });
                 }
             });
             const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find((element) =>

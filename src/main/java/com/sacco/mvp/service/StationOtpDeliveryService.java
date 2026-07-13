@@ -47,6 +47,18 @@ public class StationOtpDeliveryService {
         throw new IllegalStateException(smsAttempt.reason());
     }
 
+    public DeliveryReceipt deliverEmailOnly(String email,
+                                            String subject,
+                                            String introMessage,
+                                            String code,
+                                            int ttlMinutes) {
+        String message = introMessage + System.lineSeparator() + System.lineSeparator()
+            + "Your OTP code is: " + code + System.lineSeparator()
+            + "This code expires in " + ttlMinutes + " minutes.";
+        sendEmail(email, subject, message);
+        return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "We sent an OTP code to your registered email.");
+    }
+
     private SmsAttempt sendSms(String saccoId,
                                String stationId,
                                String phone,

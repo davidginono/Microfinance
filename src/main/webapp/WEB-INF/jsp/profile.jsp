@@ -143,6 +143,15 @@
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2">
                     <a href="javascript:history.back()" class="app-btn btn-neutral"><spring:message code="common.back" text="Back" /></a>
+                    <c:if test="${hasProfileImage}">
+                        <button type="submit"
+                                class="app-btn btn-reject"
+                                formaction="/profile/image/delete"
+                                formmethod="post"
+                                formnovalidate>
+                            <spring:message code="profile.photo.remove" text="Remove Photo" />
+                        </button>
+                    </c:if>
                     <button type="submit" class="app-btn btn-primary"><spring:message code="profile.photo.save" text="Save Photo" /></button>
                 </div>
             </form>

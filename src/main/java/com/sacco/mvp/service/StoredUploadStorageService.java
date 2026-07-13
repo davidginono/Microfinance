@@ -71,6 +71,11 @@ public class StoredUploadStorageService {
     }
 
     @Transactional
+    public void deleteCategory(String ownerType, String ownerId, String category) {
+        repository.deleteByOwnerTypeAndOwnerIdAndCategory(ownerType, ownerId, category);
+    }
+
+    @Transactional
     public void replaceCategory(String ownerType,
                                 String ownerId,
                                 String category,

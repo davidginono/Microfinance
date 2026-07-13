@@ -69,6 +69,26 @@ public class MemberProfileImageService {
         return new ProfileImageResource(upload.getContent(), MediaType.parseMediaType(upload.getContentType()));
     }
 
+    public boolean hasImage(UUID memberId) {
+        return memberId != null
+            && storedUploadStorageService.exists(
+                StoredUploadStorageService.OWNER_MEMBER,
+                memberId.toString(),
+                StoredUploadStorageService.CATEGORY_MEMBER_PROFILE_PHOTO
+            );
+    }
+
+    public void delete(UUID memberId) {
+        if (memberId == null) {
+            throw new IllegalStateException("Member account is required before removing a profile image.");
+        }
+        storedUploadStorageService.deleteCategory(
+            StoredUploadStorageService.OWNER_MEMBER,
+            memberId.toString(),
+            StoredUploadStorageService.CATEGORY_MEMBER_PROFILE_PHOTO
+        );
+    }
+
     private String resolveAllowedExtension(MultipartFile imageFile) {
         String originalName = StringUtils.cleanPath(imageFile.getOriginalFilename() == null ? "profile-photo" : imageFile.getOriginalFilename());
         String extension = StringUtils.getFilenameExtension(originalName);

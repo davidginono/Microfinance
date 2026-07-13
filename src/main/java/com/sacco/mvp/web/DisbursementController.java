@@ -451,7 +451,7 @@ public class DisbursementController {
             int changes = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
             ra.addFlashAttribute("message",
                 changes == 0
-                    ? "Payment history refreshed; it already matched the payment system."
+                    ? "Payments have already been reloaded and synchronised with the payment records"
                     : "Payment history refreshed; " + changes + " record change(s) were reconciled.");
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());

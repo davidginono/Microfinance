@@ -51,6 +51,20 @@ class SaccoLogoStorageServiceTest {
     }
 
     @Test
+    void deletesLogoCategoryFromDatabaseStorage() {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        SaccoLogoStorageService service = service(storage);
+
+        service.delete(" SACCO-ARUSHA-001 ");
+
+        verify(storage).deleteCategory(
+            StoredUploadStorageService.OWNER_SACCO,
+            "SACCO-ARUSHA-001",
+            StoredUploadStorageService.CATEGORY_SACCO_LOGO
+        );
+    }
+
+    @Test
     void rejectsLogoOutsideAllowedResolutionRange() throws IOException {
         SaccoLogoStorageService service = service(mock(StoredUploadStorageService.class));
 

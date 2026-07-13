@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LoanPresentationServiceTest {
@@ -1189,6 +1190,65 @@ class LoanPresentationServiceTest {
             assertThat(new PDFTextStripper().getText(document))
                 .contains("Member Number")
                 .containsSubsequence("Guarantor Person", "GUA-009", "Approved");
+        }
+    }
+
+    @Test
+    void printablePdfShowsSavedGuarantorSignatureInsteadOfApprovalMethod() throws IOException {
+        UUID loanId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .applicationNumber(421L)
+            .loanId("LN-00421")
+            .saccoId("SACCO-1")
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .amount(new BigDecimal("500000.00"))
+            .status(LoanStatus.AWAITING_BOARD)
+            .build();
+        Member applicant = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("Sample Applicant")
+            .memberNo("MEM-001")
+            .build();
+        Member guarantor = Member.builder()
+            .id(guarantorId)
+            .fullName("Guarantor Person")
+            .memberNo("GUA-009")
+            .signatureText("G. Saved Signature")
+            .build();
+        GuarantorRequest guarantorRequest = GuarantorRequest.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.APPROVED)
+            .guarantorSignatureText("Approved by guarantor OTP")
+            .guarantorSignatureVerifiedAt(OffsetDateTime.parse("2026-06-13T10:00:00+03:00"))
+            .build();
+        when(memberRepository.findAllById(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(List.of(guarantor));
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of(),
+            Map.of(),
+            List.of(guarantorRequest),
+            Map.of(guarantorId, "Guarantor Person"),
+            Map.of(guarantorId, "GUA-009"),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(new PDFTextStripper().getText(document))
+                .contains("G. Saved Signature")
+                .doesNotContain("Approved by guarantor OTP");
         }
     }
 
