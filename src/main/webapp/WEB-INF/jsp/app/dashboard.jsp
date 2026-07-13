@@ -505,6 +505,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 <thead>
                                     <tr>
                                         <th class="px-3 py-3 text-left">Date of Disbursement</th>
+                                        <th class="px-3 py-3 text-left">Due Date</th>
                                         <th class="px-3 py-3 text-left">Loan ID</th>
                                         <th class="px-3 py-3 text-left">Status</th>
                                         <th class="px-3 py-3 text-left">Loan Product</th>
@@ -519,6 +520,12 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     <c:forEach items="${activeLoanChartRows}" var="loanRow">
                                         <tr data-active-loans-row>
                                             <td class="px-3 py-3 text-sm font-semibold text-slate-700">${loanRow.disbursementDate}</td>
+                                            <td class="px-3 py-3 text-sm font-semibold text-slate-700">
+                                                <c:choose>
+                                                    <c:when test="${not empty loanRow.finalDueDate}">${loanRow.finalDueDate}</c:when>
+                                                    <c:otherwise>-</c:otherwise>
+                                                </c:choose>
+                                            </td>
                                             <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.loanId}</td>
                                             <td class="px-3 py-3">
                                                 <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">

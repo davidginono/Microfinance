@@ -50,6 +50,7 @@
                     <td class="px-3 py-2">${app.applicationNumber}</td>
                     <td class="px-3 py-2">
                         <c:choose>
+                            <c:when test="${not empty app.loanProductSettingId and not empty loanProductNamesById[app.loanProductSettingId]}"><c:out value="${loanProductNamesById[app.loanProductSettingId]}" /></c:when>
                             <c:when test="${not empty loanProductNames[app.loanType]}"><c:out value="${loanProductNames[app.loanType]}" /></c:when>
                             <c:otherwise><spring:message code="loan.type.${app.loanType}" text="${app.loanType}" /></c:otherwise>
                         </c:choose>

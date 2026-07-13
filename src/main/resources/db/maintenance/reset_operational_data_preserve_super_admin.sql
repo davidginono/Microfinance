@@ -85,6 +85,8 @@ WHERE id NOT IN (SELECT id FROM _reset_keep_members);
 UPDATE public.members
 SET sacco_id = NULL,
     station_id = NULL,
+    "position" = 'ADMIN',
+    status = 'ACTIVE',
     is_member = false
 WHERE id IN (SELECT id FROM _reset_keep_members);
 
@@ -95,6 +97,23 @@ DELETE FROM public.sacco_stations;
 DELETE FROM public.sacco_settings;
 
 DELETE FROM public.registered_saccos;
+
+CREATE SEQUENCE IF NOT EXISTS public.sacco_numeric_id_seq
+    AS integer
+    MINVALUE 1001
+    MAXVALUE 9999
+    START WITH 1001
+    INCREMENT BY 1
+    NO CYCLE;
+
+SELECT setval('public.sacco_numeric_id_seq', 1001, false);
+
+INSERT INTO public.platform_sms_settings (id, low_percent, critical_percent, created_at, updated_at)
+VALUES ('DEFAULT', 20, 10, now(), now())
+ON CONFLICT (id) DO UPDATE
+SET low_percent = excluded.low_percent,
+    critical_percent = excluded.critical_percent,
+    updated_at = now();
 
 DO $$
 DECLARE

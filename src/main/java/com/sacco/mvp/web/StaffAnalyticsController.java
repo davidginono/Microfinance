@@ -1,8 +1,10 @@
 package com.sacco.mvp.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.LoanAnalyticsService;
@@ -12,6 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,12 +24,8 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/staff")
@@ -36,11 +36,13 @@ public class StaffAnalyticsController {
     private final LoanReportService loanReportService;
     private final ObjectMapper objectMapper;
     private final ApplicationClock applicationClock;
+    private final LoanProductSettingRepository loanProductSettingRepository;
 
     @GetMapping("/analytics")
     public String analytics(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam(required = false) LocalDate fromDate,
                             @RequestParam(required = false) LocalDate toDate,
+                            @RequestParam(required = false) java.util.UUID loanProductId,
                             @RequestParam(required = false) LoanType loanType,
                             @RequestParam(required = false, defaultValue = "staff") String viewAs,
                             Model model) {
@@ -56,39 +58,33 @@ public class StaffAnalyticsController {
         String selectedView = "staff".equalsIgnoreCase(viewAs) && canViewStationAnalytics ? "staff" : "member";
         boolean stationWideStaffView = "staff".equals(selectedView);
         boolean staffReviewView = !stationWideStaffView;
-        DateRange previousRange = previousRange(resolvedFrom, resolvedTo);
+        LoanProductSetting selectedProduct = selectedAnalyticsProduct(principal.getSaccoId(), loanProductId, loanType);
+        LoanType resolvedLoanType = selectedProduct == null ? loanType : selectedProduct.getLoanType();
+        java.util.UUID resolvedLoanProductId = selectedProduct == null ? null : selectedProduct.getId();
         LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = staffReviewView
-            ? loanAnalyticsService.staffReviewAnalytics(principal, resolvedFrom, resolvedTo, loanType, null)
+            ? loanAnalyticsService.staffReviewAnalytics(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : null;
 
         LoanAnalyticsService.MemberLoanAnalytics analytics = staffReviewView
-            ? loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, loanType, null)
+            ? loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : stationWideStaffView
-                ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
-            : loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, loanType, null);
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics = staffReviewView
-            ? loanAnalyticsService.forStaff(principal, previousRange.fromDate(), previousRange.toDate(), loanType, null)
-            : stationWideStaffView
-                ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), previousRange.fromDate(), previousRange.toDate(), loanType, null)
-            : loanAnalyticsService.forStaff(principal, previousRange.fromDate(), previousRange.toDate(), loanType, null);
+                ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
+            : loanAnalyticsService.forStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries = staffReviewView
             ? staffReviewAnalytics.trendSeries()
             : stationWideStaffView
-                ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
-            : loanAnalyticsService.statusTrendForStaff(principal, resolvedFrom, resolvedTo, loanType, null);
+                ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
+            : loanAnalyticsService.statusTrendForStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
         List<LoanAnalyticsService.LoanProductPerformance> productPerformance = staffReviewView
-            ? loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, loanType, null)
+            ? loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : stationWideStaffView
-                ? loanAnalyticsService.productPerformanceForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
-            : loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, loanType, null);
-        Map<String, LoanAnalyticsService.MetricDelta> metricDeltas = loanAnalyticsService.metricDeltas(analytics, previousAnalytics)
-            .stream()
-            .collect(Collectors.toMap(LoanAnalyticsService.MetricDelta::key, Function.identity()));
+                ? loanAnalyticsService.productPerformanceForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
+            : loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
         BigDecimal totalInterestAccumulated = BigDecimal.ZERO;
         List<LoanReportService.ProductFinancialBreakdownRow> productFinancialRows = List.of();
         if (stationWideStaffView) {
             LoanReportService.AnalyticsExportReport interestReport =
-                loanReportService.staffAnalyticsExportReport(principal, resolvedFrom, resolvedTo, loanType, selectedView);
+                loanReportService.staffAnalyticsExportReport(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, selectedView);
             if (interestReport != null) {
                 totalInterestAccumulated = interestReport.productRows()
                     .stream()
@@ -101,14 +97,12 @@ public class StaffAnalyticsController {
         ProductFinancialTotals productFinancialTotals = productFinancialTotals(productFinancialRows);
 
         model.addAttribute("analytics", analytics);
-        model.addAttribute("metricCards", metricCards(analytics, metricDeltas));
-        model.addAttribute("metricPeriodLabel", previousPeriodLabel(resolvedFrom, resolvedTo));
-        model.addAttribute("metricComparisonLabel", comparisonLabel(resolvedFrom, resolvedTo, previousRange));
+        model.addAttribute("metricCards", metricCards(analytics));
         model.addAttribute("staffPortfolio", staffReviewView
-            ? loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, loanType, null)
+            ? loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : stationWideStaffView
-                ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, loanType, null)
-            : loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, loanType, null));
+                ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
+            : loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null));
         model.addAttribute("productPerformance", productPerformance);
         model.addAttribute("staffReviewAnalytics", staffReviewAnalytics);
         model.addAttribute("productPerformanceJson", toJson(staffReviewView
@@ -120,12 +114,14 @@ public class StaffAnalyticsController {
         model.addAttribute("totalLoanAmountPaidLabel", moneyLabel(productFinancialTotals.totalLoanAmountPaid()));
         model.addAttribute("totalLoanAmountUnpaidLabel", moneyLabel(productFinancialTotals.totalLoanAmountUnpaid()));
         model.addAttribute("productFinancialRows", productFinancialRows);
-        model.addAttribute("selectedLoanProductLabel", loanType == null ? "All Products" : loanType.getDisplayLabel());
+        List<LoanProductSetting> loanProducts = activeLoanProducts(principal.getSaccoId());
+        model.addAttribute("selectedLoanProductLabel", selectedLoanProductLabel(selectedProduct, resolvedLoanType, loanProducts));
         model.addAttribute("trendSeriesJson", toJson(trendSeries));
-        model.addAttribute("fromDate", resolvedFrom);
-        model.addAttribute("toDate", resolvedTo);
-        model.addAttribute("loanType", loanType);
-        model.addAttribute("loanTypes", LoanType.values());
+        model.addAttribute("fromDate", StrictAnalyticsLocalDateEditor.format(resolvedFrom));
+        model.addAttribute("toDate", StrictAnalyticsLocalDateEditor.format(resolvedTo));
+        model.addAttribute("loanProductId", resolvedLoanProductId);
+        model.addAttribute("loanType", resolvedLoanType);
+        model.addAttribute("loanProducts", loanProducts);
         model.addAttribute("viewAs", selectedView);
         model.addAttribute("staffReviewView", staffReviewView);
         model.addAttribute("canViewStationAnalytics", canViewStationAnalytics);
@@ -140,7 +136,8 @@ public class StaffAnalyticsController {
                 principal.getStationId(),
                 resolvedFrom,
                 resolvedTo,
-                loanType,
+                resolvedLoanType,
+                resolvedLoanProductId,
                 principal.getFullName(),
                 roleLabel(principal.getPosition())
             );
@@ -152,55 +149,53 @@ public class StaffAnalyticsController {
         return "staff/analytics";
     }
 
-    private DateRange previousRange(LocalDate fromDate, LocalDate toDate) {
-        long days = Math.max(ChronoUnit.DAYS.between(fromDate, toDate), 0);
-        LocalDate previousTo = fromDate.minusDays(1);
-        LocalDate previousFrom = previousTo.minusDays(days);
-        return new DateRange(previousFrom, previousTo);
-    }
-
-    private String previousPeriodLabel(LocalDate fromDate, LocalDate toDate) {
-        long days = Math.max(ChronoUnit.DAYS.between(fromDate, toDate) + 1, 1);
-        if (days >= 60) {
-            long months = Math.max(1, Math.round(days / 30.4375d));
-            return months == 1 ? "previous month" : "previous " + months + " months";
+    private List<LoanProductSetting> activeLoanProducts(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return List.of();
         }
-        return days == 1 ? "previous day" : "previous " + days + " days";
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(product -> product.getLoanType() != null)
+            .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .toList();
     }
 
-    private String comparisonLabel(LocalDate fromDate, LocalDate toDate, DateRange previousRange) {
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH);
-        return "All metrics compare the selected period (" + formatter.format(fromDate) + " - " + formatter.format(toDate)
-            + ") with the " + previousPeriodLabel(fromDate, toDate) + " (" + formatter.format(previousRange.fromDate())
-            + " - " + formatter.format(previousRange.toDate()) + ").";
+    private LoanProductSetting selectedAnalyticsProduct(String saccoId, java.util.UUID loanProductId, LoanType fallbackLoanType) {
+        if (loanProductId != null) {
+            return loanProductSettingRepository.findByIdAndSaccoId(loanProductId, saccoId).orElse(null);
+        }
+        if (fallbackLoanType == null) {
+            return null;
+        }
+        return activeLoanProducts(saccoId).stream()
+            .filter(product -> product.getLoanType() == fallbackLoanType)
+            .findFirst()
+            .orElse(null);
     }
 
-    private List<AnalyticsMetricCard> metricCards(LoanAnalyticsService.MemberLoanAnalytics analytics,
-                                                  Map<String, LoanAnalyticsService.MetricDelta> deltas) {
+    private String selectedLoanProductLabel(LoanProductSetting selectedProduct, LoanType loanType, List<LoanProductSetting> loanProducts) {
+        if (selectedProduct != null) {
+            return selectedProduct.getDisplayName();
+        }
+        if (loanType == null) {
+            return "All Products";
+        }
+        return loanProducts.stream()
+            .filter(product -> product.getLoanType() == loanType)
+            .map(LoanProductSetting::getDisplayName)
+            .filter(label -> label != null && !label.isBlank())
+            .findFirst()
+            .orElseGet(loanType::getDisplayLabel);
+    }
+
+    private List<AnalyticsMetricCard> metricCards(LoanAnalyticsService.MemberLoanAnalytics analytics) {
         return List.of(
-            metricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied", deltas),
-            metricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Active", deltas),
-            metricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed", deltas),
-            metricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid", deltas),
-            metricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted", deltas),
-            metricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected", deltas)
+            new AnalyticsMetricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied"),
+            new AnalyticsMetricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Active"),
+            new AnalyticsMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed"),
+            new AnalyticsMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid"),
+            new AnalyticsMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted"),
+            new AnalyticsMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected")
         );
-    }
-
-    private AnalyticsMetricCard metricCard(String key,
-                                           String label,
-                                           long value,
-                                           String tone,
-                                           String sparkName,
-                                           Map<String, LoanAnalyticsService.MetricDelta> deltas) {
-        BigDecimal percent = deltas.getOrDefault(key, new LoanAnalyticsService.MetricDelta(key, BigDecimal.ZERO, false)).percent();
-        boolean positive = percent.compareTo(BigDecimal.ZERO) >= 0;
-        return new AnalyticsMetricCard(key, label, value, tone, sparkName, formatPercent(percent), positive);
-    }
-
-    private String formatPercent(BigDecimal value) {
-        String sign = value.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
-        return sign + value.setScale(2, java.math.RoundingMode.HALF_UP) + "%";
     }
 
     private String moneyLabel(BigDecimal amount) {
@@ -264,7 +259,7 @@ public class StaffAnalyticsController {
         );
     }
 
-    public record AnalyticsMetricCard(String key, String label, long value, String tone, String sparkName, String percentLabel, boolean positive) {
+    public record AnalyticsMetricCard(String key, String label, long value, String tone, String sparkName) {
         public String getKey() {
             return key;
         }
@@ -285,16 +280,12 @@ public class StaffAnalyticsController {
             return sparkName;
         }
 
-        public String getPercentLabel() {
-            return percentLabel;
-        }
-
-        public boolean isPositive() {
-            return positive;
-        }
     }
 
-    private record DateRange(LocalDate fromDate, LocalDate toDate) {}
+    @InitBinder
+    void bindAnalyticsDates(WebDataBinder binder) {
+        binder.registerCustomEditor(LocalDate.class, new StrictAnalyticsLocalDateEditor());
+    }
 
     private record ProductFinancialTotals(
         BigDecimal totalInterestUnpaid,

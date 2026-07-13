@@ -73,6 +73,10 @@ public class BoardService {
         decide(loanId, boardMemberId, ApprovalWorkflowStage.BOARD, decision, comment, null, null);
     }
 
+    public void undoDecision(UUID loanId, UUID boardMemberId) {
+        throw new IllegalStateException("Board review decisions cannot be reversed.");
+    }
+
     @Transactional
     public void decide(UUID loanId,
                        UUID boardMemberId,

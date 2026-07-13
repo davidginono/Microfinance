@@ -360,8 +360,9 @@ public class NotificationViewService {
     }
 
     private String humanizeKey(String key) {
-        String normalized = key.replace('_', ' ');
-        String[] parts = normalized.split("(?=[A-Z])|\\s+");
+        String normalized = key.replace('_', ' ')
+            .replaceAll("(?<=[a-z0-9])(?=[A-Z])", " ");
+        String[] parts = normalized.split("\\s+");
         StringBuilder builder = new StringBuilder();
         for (String part : parts) {
             if (part == null || part.isBlank()) {

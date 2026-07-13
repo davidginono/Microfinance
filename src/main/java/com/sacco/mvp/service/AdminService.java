@@ -535,7 +535,7 @@ public class AdminService {
     }
 
     public boolean customizedLoanProductExists(String saccoId) {
-        return loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, LoanType.CUSTOMIZED_LOAN);
+        return false;
     }
 
     public SaccoSettings settings(String saccoId) {
@@ -1120,6 +1120,99 @@ public class AdminService {
     }
 
     @Transactional
+    public LoanProductSetting createLoanProduct(String saccoId,
+                                                UUID adminId,
+                                                String productCode,
+                                                String productName,
+                                                String productDescription,
+                                                Integer displayOrder,
+                                                BigDecimal minimumAmount,
+                                                BigDecimal maximumAmount,
+                                                Integer guarantorsRequired,
+                                                BigDecimal ratio,
+                                                boolean savingsLimitCheckRequired,
+                                                BigDecimal applicationFee,
+                                                BigDecimal insuranceRate,
+                                                BigDecimal processingFeeRate,
+                                                BigDecimal annualRate,
+                                                InterestMethod interestMethod,
+                                                Integer minRepaymentMonths,
+                                                Integer maxRepaymentMonths,
+                                                boolean allowApplicationWithActiveLoan,
+                                                boolean freshFinancialDataRequired,
+                                                boolean managerReviewRequired,
+                                                boolean loanOfficerReviewRequired,
+                                                ApprovalWorkflowStage workflowStartStage,
+                                                Integer managerPriority,
+                                                Integer loanOfficerPriority,
+                                                boolean chairpersonReviewRequired,
+                                                Integer chairpersonPriority,
+                                                List<UUID> chairpersonReviewerIds,
+                                                boolean boardReviewRequired,
+                                                Integer boardPriority,
+                                                List<UUID> boardReviewerIds,
+                                                boolean committeeReviewRequired,
+                                                Integer committeePriority,
+                                                Integer committeeMinimumVotes,
+                                                Integer committeeApprovalThreshold,
+                                                List<UUID> creditCommitteeReviewerIds,
+                                                boolean accountantReviewRequired,
+                                                Integer accountantPriority,
+                                                boolean disbursementOfficerRequired,
+                                                boolean disbursementProofRequired,
+                                                boolean applicantAttachmentRequired,
+                                                boolean guarantorMinSavingsCheckRequired,
+                                                BigDecimal guarantorMinimumSavings,
+                                                LoanProductStatus productStatus) {
+        return createCustomizedLoanProduct(
+            saccoId,
+            adminId,
+            productCode,
+            productName,
+            productDescription,
+            displayOrder,
+            minimumAmount,
+            maximumAmount,
+            guarantorsRequired,
+            ratio,
+            savingsLimitCheckRequired,
+            applicationFee,
+            insuranceRate,
+            processingFeeRate,
+            annualRate,
+            interestMethod,
+            minRepaymentMonths,
+            maxRepaymentMonths,
+            allowApplicationWithActiveLoan,
+            freshFinancialDataRequired,
+            managerReviewRequired,
+            loanOfficerReviewRequired,
+            workflowStartStage,
+            managerPriority,
+            loanOfficerPriority,
+            chairpersonReviewRequired,
+            chairpersonPriority,
+            chairpersonReviewerIds,
+            boardReviewRequired,
+            boardPriority,
+            boardReviewerIds,
+            committeeReviewRequired,
+            committeePriority,
+            committeeMinimumVotes,
+            committeeApprovalThreshold,
+            creditCommitteeReviewerIds,
+            accountantReviewRequired,
+            accountantPriority,
+            disbursementOfficerRequired,
+            disbursementProofRequired,
+            applicantAttachmentRequired,
+            guarantorMinSavingsCheckRequired,
+            guarantorMinimumSavings,
+            productStatus
+        );
+    }
+
+    @Transactional
     public void createCustomizedLoanProduct(String saccoId,
                                             UUID adminId,
                                             String productCode,
@@ -1338,7 +1431,7 @@ public class AdminService {
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.CHAIRPERSON, normalizedChairpersonReviewerIds);
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.BOARD, normalizedBoardReviewerIds);
         replaceLoanProductReviewers(product, ApprovalWorkflowStage.CREDIT_COMMITTEE, normalizedCreditCommitteeReviewerIds);
-        auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_CUSTOMIZED_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
+        auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CREATE_LOAN_PRODUCT", adminId, null, snapshotProduct(product));
         return product;
     }
 

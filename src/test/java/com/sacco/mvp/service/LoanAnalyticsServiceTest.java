@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.ManagerDecision;
@@ -94,6 +95,55 @@ class LoanAnalyticsServiceTest {
         assertThat(portfolio.defaultedAfterApprovalRate()).isEqualByComparingTo("50.00");
     }
 
+    @Test
+    void productPerformanceSeparatesConfiguredProductsThatShareALoanType() {
+        UUID staffId = UUID.randomUUID();
+        UUID firstProductId = UUID.randomUUID();
+        UUID secondProductId = UUID.randomUUID();
+        UUID firstLoanId = UUID.randomUUID();
+        UUID secondLoanId = UUID.randomUUID();
+        AppUserPrincipal principal = principal(staffId, Position.MANAGER);
+        OffsetDateTime now = OffsetDateTime.now();
+        LoanAnalyticsService service = new LoanAnalyticsService(
+            loanApplicationRepository,
+            managerReviewRepository,
+            boardReviewRepository,
+            loanProductSettingRepository,
+            new ApplicationClock("Africa/Nairobi")
+        );
+        when(managerReviewRepository.findForAnalytics(any(), any(), any(), any()))
+            .thenReturn(List.of(
+                review(firstLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(1)),
+                review(secondLoanId, staffId, ManagerDecision.ACCEPT, now)
+            ));
+        when(loanApplicationRepository.findAllById(any()))
+            .thenReturn(List.of(
+                loan(firstLoanId, firstProductId, LoanStatus.PAID),
+                loan(secondLoanId, secondProductId, LoanStatus.DEFAULTED)
+            ));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("SACCO-01"))
+            .thenReturn(List.of(
+                product(firstProductId, "Education Standard", 1),
+                product(secondProductId, "Education Plus", 2)
+            ));
+
+        List<LoanAnalyticsService.LoanProductPerformance> performance =
+            service.productPerformanceForStaff(principal, now.minusDays(7).toLocalDate(), now.toLocalDate(), null);
+
+        assertThat(performance).filteredOn(item -> item.label().equals("Education Standard"))
+            .singleElement().satisfies(item -> {
+                assertThat(item.totalLoans()).isEqualTo(1);
+                assertThat(item.paidLoans()).isEqualTo(1);
+                assertThat(item.defaultedLoans()).isZero();
+            });
+        assertThat(performance).filteredOn(item -> item.label().equals("Education Plus"))
+            .singleElement().satisfies(item -> {
+                assertThat(item.totalLoans()).isEqualTo(1);
+                assertThat(item.paidLoans()).isZero();
+                assertThat(item.defaultedLoans()).isEqualTo(1);
+            });
+    }
+
     private AppUserPrincipal principal(UUID memberId, Position position) {
         Member member = Member.builder()
             .id(memberId)
@@ -138,6 +188,25 @@ class LoanAnalyticsServiceTest {
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .version(0)
+            .build();
+    }
+
+    private LoanApplication loan(UUID loanId, UUID productId, LoanStatus status) {
+        LoanApplication loan = loan(loanId, LoanType.EDUCATION_LOAN, status);
+        loan.setLoanProductSettingId(productId);
+        return loan;
+    }
+
+    private LoanProductSetting product(UUID id, String name, int displayOrder) {
+        return LoanProductSetting.builder()
+            .id(id)
+            .saccoId("SACCO-01")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .productName(name)
+            .displayOrder(displayOrder)
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
             .build();
     }
 }

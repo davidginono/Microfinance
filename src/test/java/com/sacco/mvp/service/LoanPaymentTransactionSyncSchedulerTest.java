@@ -41,13 +41,13 @@ class LoanPaymentTransactionSyncSchedulerTest {
         when(loanApplicationRepository.findByStatusInAndLoanIdIsNotNull(anyCollection(), any()))
             .thenReturn(new PageImpl<>(List.of(first), PageRequest.of(0, 1), 2))
             .thenReturn(new PageImpl<>(List.of(second), PageRequest.of(1, 1), 2));
-        when(syncService.syncRecent(first, 2)).thenReturn(1);
-        when(syncService.syncRecent(second, 2)).thenReturn(0);
+        when(syncService.syncAllAndRefreshSummary(first)).thenReturn(1);
+        when(syncService.syncAllAndRefreshSummary(second)).thenReturn(0);
 
         scheduler.syncRecentPayments();
 
-        verify(syncService).syncRecent(first, 2);
-        verify(syncService).syncRecent(second, 2);
+        verify(syncService).syncAllAndRefreshSummary(first);
+        verify(syncService).syncAllAndRefreshSummary(second);
     }
 
     private LoanApplication loan(String loanId) {

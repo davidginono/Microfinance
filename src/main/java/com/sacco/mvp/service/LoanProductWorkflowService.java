@@ -95,8 +95,9 @@ public class LoanProductWorkflowService {
         if (snapshotDefinition != null) {
             return snapshotDefinition;
         }
-        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
-            .orElse(null);
+        LoanProductSetting product = app.getLoanProductSettingId() == null
+            ? loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType()).orElse(null)
+            : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId()).orElse(null);
         return resolveForProduct(app.getSaccoId(), product);
     }
 

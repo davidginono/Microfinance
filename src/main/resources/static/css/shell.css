@@ -246,8 +246,27 @@ button:active {
 .shell-sidebar-toggle-row {
     align-items: center;
     justify-content: flex-end;
-    min-height: 2.55rem;
-    padding: 0.45rem 0.75rem 0.35rem;
+    min-height: 2.32rem;
+    margin: 0.45rem 0.75rem 0.35rem;
+    padding: 0.22rem 0.35rem;
+    border: 1px solid rgba(214, 226, 238, 0.92);
+    border-radius: 0.42rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    backdrop-filter: blur(2px);
+}
+.shell-sidebar-toggle-label {
+    margin-right: auto;
+    min-width: 0;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 .desktop-sidebar-toggle {
     display: inline-flex;
@@ -1166,21 +1185,25 @@ button:active {
     box-shadow: none !important;
     backdrop-filter: none !important;
 }
-.shell-sidebar-scroll > a {
+.shell-sidebar-scroll > a,
+.shell-sidebar-scroll > div > a {
     gap: 0.68rem !important;
     padding: 0.58rem 0.72rem !important;
     font-size: 0.9rem !important;
 }
-.shell-sidebar-scroll > a > span {
+.shell-sidebar-scroll > a > span:first-child,
+.shell-sidebar-scroll > div > a > span:first-child {
     width: 1.55rem !important;
     height: 1.55rem !important;
 }
-.shell-sidebar-scroll > a > span svg {
+.shell-sidebar-scroll > a > span svg,
+.shell-sidebar-scroll > div > a > span svg {
     width: 0.92rem !important;
     height: 0.92rem !important;
 }
 .shell-sidebar-scroll > a,
 .shell-sidebar-scroll > button,
+.shell-sidebar-scroll > div > a,
 .shell-sidebar-scroll > div > button {
     min-width: 0;
     border-radius: 0.3rem;
@@ -1193,6 +1216,8 @@ button:active {
 .shell-sidebar-scroll > a:focus-visible,
 .shell-sidebar-scroll > button:hover,
 .shell-sidebar-scroll > button:focus-visible,
+.shell-sidebar-scroll > div > a:hover,
+.shell-sidebar-scroll > div > a:focus-visible,
 .shell-sidebar-scroll > div > button:hover,
 .shell-sidebar-scroll > div > button:focus-visible {
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
@@ -1200,12 +1225,14 @@ button:active {
 }
 .shell-sidebar-scroll > a:active,
 .shell-sidebar-scroll > button:active,
+.shell-sidebar-scroll > div > a:active,
 .shell-sidebar-scroll > div > button:active {
     box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
     transform: translateY(0);
 }
 .shell-sidebar-scroll > a > span:first-child,
 .shell-sidebar-scroll > button > span:first-child,
+.shell-sidebar-scroll > div > a > span:first-child,
 .shell-sidebar-scroll > div > button > span:first-child {
     border-radius: 0.25rem;
     border-color: #d7e3ef !important;
@@ -1223,12 +1250,14 @@ button:active {
     background: rgba(255, 255, 255, 0.72);
 }
 @media (min-width: 1024px) {
-    .shell-sidebar-scroll > a {
+    .shell-sidebar-scroll > a,
+    .shell-sidebar-scroll > div > a {
         gap: 0.72rem !important;
         padding: 0.6rem 0.82rem !important;
         font-size: 0.88rem !important;
     }
-    .shell-sidebar-scroll > a > span {
+    .shell-sidebar-scroll > a > span:first-child,
+    .shell-sidebar-scroll > div > a > span:first-child {
         width: 1.62rem !important;
         height: 1.62rem !important;
     }
@@ -1262,8 +1291,13 @@ button:active {
     }
     .shell-sidebar-collapsed .shell-sidebar-toggle-row {
         justify-content: center;
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
+        margin-left: 0.55rem;
+        margin-right: 0.55rem;
+        padding-left: 0.35rem;
+        padding-right: 0.35rem;
+    }
+    .shell-sidebar-collapsed .shell-sidebar-toggle-label {
+        display: none;
     }
     .shell-sidebar-collapsed .shell-sidebar-scroll {
         padding-left: 0.55rem !important;
@@ -1272,6 +1306,7 @@ button:active {
     }
     .shell-sidebar-collapsed .shell-sidebar-scroll > a,
     .shell-sidebar-collapsed .shell-sidebar-scroll > button,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a,
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
         justify-content: center !important;
         gap: 0 !important;
@@ -1283,6 +1318,7 @@ button:active {
     }
     .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:first-child,
     .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:first-child,
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:first-child {
         width: 1.72rem !important;
         height: 1.72rem !important;
@@ -1290,16 +1326,20 @@ button:active {
     }
     .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > a > :not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > button > :not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > :not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > :not(:first-child),
     .shell-sidebar-collapsed .shell-sidebar-scroll > a > svg,
     .shell-sidebar-collapsed .shell-sidebar-scroll > button > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > svg,
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > svg,
     .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Chevron"],
     .shell-sidebar-collapsed .shell-sidebar-scroll [id$="Panel"],
-    .shell-sidebar-collapsed .shell-sidebar-section-header {
+    .shell-sidebar-collapsed .shell-sidebar-section-header,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
         display: none !important;
     }
     .shell-sidebar-collapsed .shell-sidebar-panel > .border-t {
@@ -1330,6 +1370,67 @@ button:active {
 .shell-sidebar-tooltip.is-visible {
     opacity: 1;
     transform: translate(0, -50%);
+}
+.shell-sidebar-flyout {
+    position: fixed;
+    z-index: 9997;
+    width: min(14.5rem, calc(100vw - 5rem));
+    max-height: min(24rem, calc(100vh - 1.25rem));
+    overflow-y: auto;
+    padding: 0.45rem;
+    border: 1px solid #d7dde3;
+    border-radius: 0.42rem;
+    background: #ffffff;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+    color: #1f2937;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(0.35rem);
+    transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.shell-sidebar-flyout.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+.shell-sidebar-flyout-title {
+    margin: 0 0 0.28rem;
+    padding: 0.4rem 0.5rem 0.48rem;
+    border-bottom: 1px solid #e5e7eb;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+.shell-sidebar-flyout-list {
+    display: grid;
+    gap: 0.18rem;
+}
+.shell-sidebar-flyout-link {
+    display: block;
+    min-width: 0;
+    padding: 0.58rem 0.62rem;
+    border-radius: 0.3rem;
+    color: #334155;
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.25;
+    text-decoration: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.shell-sidebar-flyout-link:hover,
+.shell-sidebar-flyout-link:focus-visible {
+    background: #f8fafc;
+    color: #075985;
+    outline: none;
+}
+.shell-sidebar-flyout-link.is-active {
+    background: #eff6ff;
+    color: #075985;
+    box-shadow: inset 0 0 0 1px #bfdbfe;
 }
 @media (min-width: 2560px) {
     :root {
@@ -1396,4 +1497,14 @@ button:active {
         box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
         text-shadow: 0 0 10px rgba(8, 145, 178, 0.42);
     }
+}
+.shell-sidebar-scroll .shell-review-panel-link {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+.shell-sidebar-scroll .shell-review-panel-link.text-sacco-ink,
+.shell-sidebar-scroll .shell-review-panel-link:hover,
+.shell-sidebar-scroll .shell-review-panel-link:focus-visible {
+    background-color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
 }

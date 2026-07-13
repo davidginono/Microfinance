@@ -32,7 +32,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -207,8 +209,9 @@ public class LoanDocumentController {
     public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                           @RequestParam(required = false) UUID loanProductId,
                                                            @RequestParam(required = false) LoanType loanType) {
-        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType);
+        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
         byte[] pdf = loanReportService.buildMemberAnalyticsPdf(report);
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
@@ -222,8 +225,9 @@ public class LoanDocumentController {
     public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                @RequestParam(required = false) UUID loanProductId,
                                                                 @RequestParam(required = false) LoanType loanType) {
-        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType);
+        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
         byte[] workbook = loanReportService.buildMemberAnalyticsExcel(report);
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -237,6 +241,7 @@ public class LoanDocumentController {
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsPdf(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                @RequestParam(required = false) UUID loanProductId,
                                                                 @RequestParam(required = false) LoanType loanType,
                                                                 @RequestParam(required = false, defaultValue = "staff") String viewAs) {
         boolean stationView = "staff".equalsIgnoreCase(viewAs);
@@ -251,6 +256,7 @@ public class LoanDocumentController {
                 fromDate,
                 toDate,
                 loanType,
+                loanProductId,
                 principal.getFullName(),
                 roleLabel(principal.getPosition())
             );
@@ -260,7 +266,7 @@ public class LoanDocumentController {
             reportSlug = "station-loan-analytics";
         } else {
             LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
-                principal, fromDate, toDate, loanType, "member");
+                principal, fromDate, toDate, loanType, loanProductId, "member");
             pdf = loanReportService.buildStationAnalyticsPdf(report);
             filenameFrom = report.fromDate();
             filenameTo = report.toDate();
@@ -278,6 +284,7 @@ public class LoanDocumentController {
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsExcel(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                                                  @RequestParam(required = false) UUID loanProductId,
                                                                   @RequestParam(required = false) LoanType loanType,
                                                                   @RequestParam(required = false, defaultValue = "staff") String viewAs) {
         boolean stationView = "staff".equalsIgnoreCase(viewAs);
@@ -292,6 +299,7 @@ public class LoanDocumentController {
                 fromDate,
                 toDate,
                 loanType,
+                loanProductId,
                 principal.getFullName(),
                 roleLabel(principal.getPosition())
             );
@@ -301,7 +309,7 @@ public class LoanDocumentController {
             reportSlug = "station-loan-analytics";
         } else {
             LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
-                principal, fromDate, toDate, loanType, "member");
+                principal, fromDate, toDate, loanType, loanProductId, "member");
             workbook = loanReportService.buildStationAnalyticsExcel(report);
             filenameFrom = report.fromDate();
             filenameTo = report.toDate();
@@ -411,6 +419,11 @@ public class LoanDocumentController {
             label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
         }
         return label.toString();
+    }
+
+    @InitBinder
+    void bindReportDates(WebDataBinder binder) {
+        binder.registerCustomEditor(LocalDate.class, new StrictAnalyticsLocalDateEditor());
     }
 
 }

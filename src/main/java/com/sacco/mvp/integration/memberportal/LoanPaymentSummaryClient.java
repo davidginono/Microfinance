@@ -50,6 +50,7 @@ public class LoanPaymentSummaryClient {
             log.info("Memberportal loan-payment-summary request: {}", requestUri);
             List<LoanPaymentSummaryDto> body = client().get()
                 .uri(requestUri)
+                .header("Content-Type", "application/json")
                 .retrieve()
                 .body(RESPONSE_TYPE);
             List<LoanPaymentSummaryDto> summaries = body == null ? Collections.emptyList() : body;

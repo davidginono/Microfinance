@@ -49,7 +49,7 @@
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
                     <select id="productsLoanType" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
-                            <option value="${p.loanType}" data-min-months="${p.minimumRepaymentMonths}" data-max-months="${p.maxRepaymentMonths}">
+                            <option value="${p.id}" data-loan-type="${p.loanType}" data-min-months="${p.minimumRepaymentMonths}" data-max-months="${p.maxRepaymentMonths}">
                                 <c:out value="${p.displayName}" />
                             </option>
                         </c:forEach>
@@ -259,7 +259,7 @@
                             </button>
                         </c:when>
                         <c:otherwise>
-                            <a class="app-btn btn-primary" href="/app/loan-applications/new?loanType=${p.loanType}">
+                            <a class="app-btn btn-primary" href="/app/loan-applications/new?loanProductId=${p.id}">
                                 <spring:message code="products.apply" />
                             </a>
                         </c:otherwise>
@@ -649,7 +649,7 @@
                     },
                     body: new URLSearchParams({
                         [csrfParam]: csrfToken,
-                        loanType: loanTypeInput.value,
+                        loanProductId: loanTypeInput.value,
                         amount: amount,
                         tenorMonths: tenorMonths
                     })

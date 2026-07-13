@@ -681,13 +681,11 @@
                 <spring:message code="admin.settings.loanProducts.versions" text="Loan Products Versions" />
             </button>
         </c:if>
-        <c:if test="${not customizedProductExists}">
-            <button type="button"
-                    class="app-btn btn-primary"
-                    data-product-modal-open="create-product">
-                <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
-            </button>
-        </c:if>
+        <button type="button"
+                class="app-btn btn-primary"
+                data-product-modal-open="create-product">
+            <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
+        </button>
     </div>
 
     <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
@@ -1038,7 +1036,7 @@
     </div>
 </c:if>
 
-<c:if test="${settingsSection eq 'loan' and not customizedProductExists}">
+<c:if test="${settingsSection eq 'loan'}">
     <div class="app-modal-overlay hidden"
          data-product-modal="create-product">
         <div class="app-modal-panel max-w-6xl">
@@ -1056,7 +1054,7 @@
                     </button>
                 </div>
 
-                <form action="/admin/settings-controls/customized-product"
+                <form action="/admin/settings-controls/loan-products"
                       method="post"
                       class="app-modal-body product-builder-form"
                       data-inline-validation-form="loan-settings"

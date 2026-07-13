@@ -280,7 +280,9 @@ public class BoardController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app));
+        var generatedRepaymentRows = loanPresentationService.generatedRepaymentRows(app);
+        model.addAttribute("generatedRepaymentRows", generatedRepaymentRows);
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", !generatedRepaymentRows.isEmpty());
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));

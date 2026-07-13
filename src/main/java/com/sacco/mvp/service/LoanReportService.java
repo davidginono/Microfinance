@@ -13,6 +13,7 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
@@ -22,6 +23,7 @@ import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
@@ -110,6 +112,7 @@ public class LoanReportService {
 
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
+    private final LoanProductSettingRepository loanProductSettingRepository;
     private final MemberRepository memberRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
@@ -119,6 +122,7 @@ public class LoanReportService {
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoStationRepository saccoStationRepository;
     private final ApplicationClock applicationClock;
+    private final SaccoLogoStorageService saccoLogoStorageService;
 
     public MemberLoanReport memberReport(UUID memberId) {
         Member member = memberRepository.findById(memberId)
@@ -433,6 +437,17 @@ public class LoanReportService {
                                                                LoanType loanType,
                                                                String preparedBy,
                                                                String preparedByRole) {
+        return stationAnalyticsReport(saccoId, stationId, fromDate, toDate, loanType, null, preparedBy, preparedByRole);
+    }
+
+    public StationAnalyticsExportReport stationAnalyticsReport(String saccoId,
+                                                               String stationId,
+                                                               LocalDate fromDate,
+                                                               LocalDate toDate,
+                                                               LoanType loanType,
+                                                               UUID loanProductId,
+                                                               String preparedBy,
+                                                               String preparedByRole) {
         LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
         LocalDate effectiveFrom = fromDate == null ? effectiveTo.minusYears(1) : fromDate;
         if (effectiveFrom.isAfter(effectiveTo)) {
@@ -441,26 +456,28 @@ public class LoanReportService {
             effectiveTo = swap;
         }
 
-        List<LoanApplication> loans = loanApplicationRepository.findScopeLoansForAnalytics(
+        List<LoanApplication> loans = filterByLoanProductId(loanApplicationRepository.findScopeLoansForAnalytics(
             saccoId,
             stationId,
             applicationClock.startOfDay(effectiveFrom),
             applicationClock.dayAfter(effectiveTo),
             loanType,
             null
-        );
+        ), loanProductId);
         List<LoanApplication> appliedLoans = loans.stream()
             .filter(loan -> loan.getStatus() != LoanStatus.DRAFT)
             .toList();
-        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan = paymentTransactionsByLoan(appliedLoans, effectiveFrom, effectiveTo);
+        List<LoanApplication> financialLoans = filterByLoanProductId(stationFinancialLoans(saccoId, stationId, loanType), loanProductId);
+        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan = paymentTransactionsByLoan(financialLoans, effectiveFrom, effectiveTo);
         long activeMembers = memberRepository.countActiveMemberAccountsForScope(saccoId, stationId);
         StationParticipationSummary participation = buildStationParticipation(activeMembers, appliedLoans);
         List<StationStatusRow> statusRows = stationStatusRows(appliedLoans);
-        List<StationProductRow> productRows = stationProductRows(appliedLoans, paymentsByLoan, loanType);
-        List<StationYearlySummaryRow> yearlyRows = stationYearlyRows(appliedLoans, paymentsByLoan, effectiveFrom, effectiveTo);
+        List<StationProductRow> productRows = stationProductRows(appliedLoans, financialLoans, paymentsByLoan, loanType);
+        List<StationYearlySummaryRow> yearlyRows = stationYearlyRows(appliedLoans, financialLoans, paymentsByLoan, effectiveFrom, effectiveTo);
 
         return new StationAnalyticsExportReport(
             saccoId,
+            saccoReportTitle(saccoId),
             stationId == null || stationId.isBlank() ? "-" : stationId,
             effectiveFrom,
             effectiveTo,
@@ -477,7 +494,7 @@ public class LoanReportService {
 
     public byte[] buildStationAnalyticsPdf(StationAnalyticsExportReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            StationPdfRenderer renderer = new StationPdfRenderer(document, report);
+            StationPdfRenderer renderer = new StationPdfRenderer(document, report, saccoLogoBytes(report.saccoId()));
             renderer.render();
             document.save(output);
             return output.toByteArray();
@@ -495,17 +512,17 @@ public class LoanReportService {
             autosize(summary, 10);
 
             XSSFSheet status = workbook.createSheet("Loan Status Analysis");
-            int row = titleRows(status, "IAA SACCOS LTD", "LOAN STATUS ANALYSIS", styles);
+            int row = titleRows(status, report.saccoName(), "LOAN STATUS ANALYSIS", styles);
             writeStationStatusTable(status, row, report.statusRows(), styles);
             autosize(status, 5);
 
             XSSFSheet product = workbook.createSheet("Product Performance");
-            row = titleRows(product, "IAA SACCOS LTD", "LOAN PRODUCT PERFORMANCE", styles);
+            row = titleRows(product, report.saccoName(), "LOAN PRODUCT PERFORMANCE", styles);
             writeStationProductTable(product, row, report.productRows(), styles);
             autosize(product, 10);
 
             XSSFSheet trends = workbook.createSheet("Trends");
-            row = titleRows(trends, "IAA SACCOS LTD", "YEARLY LOAN TREND AND INTEREST SUMMARY", styles);
+            row = titleRows(trends, report.saccoName(), "YEARLY LOAN TREND AND INTEREST SUMMARY", styles);
             int tableStart = writeStationYearlySummaryTable(trends, row, report.yearlyRows(), styles);
             makeStationYearlyValuesNumeric(trends, tableStart, report.yearlyRows().size());
             addStationYearlyChart(trends, tableStart + 1, report.yearlyRows().size());
@@ -520,7 +537,12 @@ public class LoanReportService {
 
     public byte[] buildMemberPdf(MemberLoanReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            MemberPdfRenderer renderer = new MemberPdfRenderer(document, report, DATE_FORMATTER.format(applicationClock.today()));
+            MemberPdfRenderer renderer = new MemberPdfRenderer(
+                document,
+                report,
+                DATE_FORMATTER.format(applicationClock.today()),
+                saccoLogoBytes(report.member().getSaccoId())
+            );
             renderer.render();
             document.save(output);
             return output.toByteArray();
@@ -594,26 +616,32 @@ public class LoanReportService {
                                                              LocalDate fromDate,
                                                              LocalDate toDate,
                                                              com.sacco.mvp.domain.LoanType loanType) {
+        return memberAnalyticsExportReport(principal, fromDate, toDate, loanType, null);
+    }
+
+    public AnalyticsExportReport memberAnalyticsExportReport(AppUserPrincipal principal,
+                                                             LocalDate fromDate,
+                                                             LocalDate toDate,
+                                                             com.sacco.mvp.domain.LoanType loanType,
+                                                             UUID loanProductId) {
         DateRange range = resolveReportRange(fromDate, toDate);
-        DateRange previous = previousRange(range.fromDate(), range.toDate());
         Member member = memberRepository.findById(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<LoanApplication> loans = loanApplicationRepository.findMemberLoansForAnalytics(
+        List<LoanApplication> loans = filterByLoanProductId(loanApplicationRepository.findMemberLoansForAnalytics(
                 principal.getMemberId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)
             .stream()
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
+            .toList(), loanProductId);
         Map<UUID, PaymentTotals> paymentTotalsByLoanId = paymentTotalsByLoanId(loans, range);
         LoanAnalyticsService.MemberLoanAnalytics analytics =
-            loanAnalyticsService.forMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, null);
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics =
-            loanAnalyticsService.forMember(principal.getMemberId(), previous.fromDate(), previous.toDate(), loanType, null);
+            loanAnalyticsService.forMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
-            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, null);
+            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
         ExportContext context = exportContext(principal, range, loanType);
         return new AnalyticsExportReport(
             ReportKind.MEMBER,
             context.saccoName(),
+            principal.getSaccoId(),
             "MEMBER LOAN REPORT",
             context.stationId(),
             context.branchName(),
@@ -625,8 +653,6 @@ public class LoanReportService {
             loanProductLabel(loanType),
             member,
             analytics,
-            previousAnalytics,
-            metricDeltas(analytics, previousAnalytics),
             memberPortfolio(analytics),
             productRowsFromLoans(loans, paymentTotalsByLoanId),
             productFinancialRowsFromLoans(loans, paymentTotalsByLoanId),
@@ -635,7 +661,7 @@ public class LoanReportService {
             recentActivityRows(loans),
             activeLoanRowsFromLoans(loans, paymentTotalsByLoanId),
             financialSummary(loans, analytics),
-            observations(analytics, previousAnalytics),
+            observations(analytics),
             "This report summarizes the loan performance and status of the member within the selected period."
         );
     }
@@ -658,35 +684,44 @@ public class LoanReportService {
                                                             LocalDate toDate,
                                                             com.sacco.mvp.domain.LoanType loanType,
                                                             String viewAs) {
+        return staffAnalyticsExportReport(principal, fromDate, toDate, loanType, null, viewAs);
+    }
+
+    public AnalyticsExportReport staffAnalyticsExportReport(AppUserPrincipal principal,
+                                                            LocalDate fromDate,
+                                                            LocalDate toDate,
+                                                            com.sacco.mvp.domain.LoanType loanType,
+                                                            UUID loanProductId,
+                                                            String viewAs) {
         DateRange range = resolveReportRange(fromDate, toDate);
-        DateRange previous = previousRange(range.fromDate(), range.toDate());
         boolean stationWideStaffView = "staff".equalsIgnoreCase(viewAs);
         LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = stationWideStaffView
             ? null
-            : loanAnalyticsService.staffReviewAnalytics(principal, range.fromDate(), range.toDate(), loanType, null);
+            : loanAnalyticsService.staffReviewAnalytics(principal, range.fromDate(), range.toDate(), loanType, loanProductId, null);
         LoanAnalyticsService.MemberLoanAnalytics analytics = stationWideStaffView
-            ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
-            : loanAnalyticsService.forStaff(principal, range.fromDate(), range.toDate(), loanType, null);
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics = stationWideStaffView
-            ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), previous.fromDate(), previous.toDate(), loanType, null)
-            : loanAnalyticsService.forStaff(principal, previous.fromDate(), previous.toDate(), loanType, null);
+            ? loanAnalyticsService.forStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, loanProductId, null)
+            : loanAnalyticsService.forStaff(principal, range.fromDate(), range.toDate(), loanType, loanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries = stationWideStaffView
-            ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
+            ? loanAnalyticsService.statusTrendForStation(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, loanProductId, null)
             : staffReviewAnalytics.trendSeries();
         LoanAnalyticsService.StaffPortfolioSummary portfolio = stationWideStaffView
-            ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, null)
-            : loanAnalyticsService.staffPortfolio(principal, range.fromDate(), range.toDate(), loanType, null);
-        List<LoanApplication> stationLoans = stationWideStaffView
+            ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, loanProductId, null)
+            : loanAnalyticsService.staffPortfolio(principal, range.fromDate(), range.toDate(), loanType, loanProductId, null);
+        List<LoanApplication> stationLoans = filterByLoanProductId(stationWideStaffView
             ? loanApplicationRepository.findScopeLoansForAnalytics(
                 principal.getSaccoId(), principal.getStationId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)
-            : loanAnalyticsService.loansForStaffAnalytics(principal, range.fromDate(), range.toDate(), loanType, null);
-        Map<UUID, PaymentTotals> paymentTotalsByLoanId = paymentTotalsByLoanId(stationLoans, range);
-        List<ProductPerformanceRow> productRows = productRowsFromLoans(stationLoans, paymentTotalsByLoanId);
-        List<ProductFinancialBreakdownRow> productFinancialRows = productFinancialRowsFromLoans(stationLoans, paymentTotalsByLoanId);
+            : loanAnalyticsService.loansForStaffAnalytics(principal, range.fromDate(), range.toDate(), loanType, null), loanProductId);
+        List<LoanApplication> financialLoans = stationWideStaffView
+            ? filterByLoanProductId(stationFinancialLoans(principal.getSaccoId(), principal.getStationId(), loanType), loanProductId)
+            : stationLoans;
+        Map<UUID, PaymentTotals> paymentTotalsByLoanId = paymentTotalsByLoanId(financialLoans, range);
+        List<ProductPerformanceRow> productRows = productRowsFromLoans(stationLoans, financialLoans, paymentTotalsByLoanId);
+        List<ProductFinancialBreakdownRow> productFinancialRows = productFinancialRowsFromLoans(financialLoans, paymentTotalsByLoanId);
         ExportContext context = exportContext(principal, range, loanType);
         return new AnalyticsExportReport(
             stationWideStaffView ? ReportKind.STATION : ReportKind.STAFF,
             context.saccoName(),
+            principal.getSaccoId(),
             stationWideStaffView ? "STATION LOAN STATUS REPORT" : "STAFF LOAN REVIEW REPORT",
             context.stationId(),
             context.branchName(),
@@ -698,8 +733,6 @@ public class LoanReportService {
             loanProductLabel(loanType),
             null,
             analytics,
-            previousAnalytics,
-            metricDeltas(analytics, previousAnalytics),
             portfolio,
             productRows,
             productFinancialRows,
@@ -707,8 +740,8 @@ public class LoanReportService {
             trendSeries,
             stationWideStaffView ? recentActivityRows(stationLoans) : List.of(),
             List.of(),
-            stationWideStaffView ? financialSummary(stationLoans, analytics) : financialSummary(List.of(), analytics),
-            observations(analytics, previousAnalytics),
+            stationWideStaffView ? financialSummary(financialLoans, analytics) : financialSummary(List.of(), analytics),
+            observations(analytics),
             stationWideStaffView
                 ? "This report summarizes station loan performance and status within the selected period."
                 : "This report summarizes loans handled by the staff member within the selected period."
@@ -717,7 +750,7 @@ public class LoanReportService {
 
     public byte[] buildMemberAnalyticsPdf(AnalyticsExportReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            new FormalPdf(document, report, PDRectangle.A4).renderMemberTwoPage();
+            new FormalPdf(document, report, PDRectangle.A4, saccoLogoBytes(report.saccoId())).renderMemberTwoPage();
             document.save(output);
             return output.toByteArray();
         } catch (IOException ex) {
@@ -730,7 +763,7 @@ public class LoanReportService {
             return buildMemberAnalyticsPdf(report);
         }
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            FormalPdf renderer = new FormalPdf(document, report, PDRectangle.A4);
+            FormalPdf renderer = new FormalPdf(document, report, PDRectangle.A4, saccoLogoBytes(report.saccoId()));
             if (report.kind() == ReportKind.STAFF) {
                 renderer.renderStaffTwoPage();
             } else {
@@ -802,7 +835,7 @@ public class LoanReportService {
             Member applicant = report.applicantMap().get(loan.getApplicantMemberId());
             lines.add(shortLoanRow(loan, applicant));
         }
-        return renderPdf(lines);
+        return renderPdf(lines, report.saccoId());
     }
 
     public byte[] buildAccountantPdf(AccountantLoanReport report) {
@@ -972,13 +1005,6 @@ public class LoanReportService {
         return new DateRange(effectiveFrom, effectiveTo);
     }
 
-    private DateRange previousRange(LocalDate fromDate, LocalDate toDate) {
-        long days = Math.max(java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate), 0);
-        LocalDate previousTo = fromDate.minusDays(1);
-        LocalDate previousFrom = previousTo.minusDays(days);
-        return new DateRange(previousFrom, previousTo);
-    }
-
     private OffsetDateTime startOfDay(LocalDate value) {
         return applicationClock.startOfDay(value);
     }
@@ -1015,13 +1041,6 @@ public class LoanReportService {
         return loanType == null ? "All Products" : loanType.getDisplayLabel();
     }
 
-    private Map<String, LoanAnalyticsService.MetricDelta> metricDeltas(LoanAnalyticsService.MemberLoanAnalytics analytics,
-                                                                       LoanAnalyticsService.MemberLoanAnalytics previousAnalytics) {
-        return loanAnalyticsService.metricDeltas(analytics, previousAnalytics)
-            .stream()
-            .collect(Collectors.toMap(LoanAnalyticsService.MetricDelta::key, item -> item, (left, right) -> left, LinkedHashMap::new));
-    }
-
     private LoanAnalyticsService.StaffPortfolioSummary memberPortfolio(LoanAnalyticsService.MemberLoanAnalytics analytics) {
         BigDecimal defaultedRate = analytics.disbursedLoans() == 0
             ? BigDecimal.ZERO
@@ -1055,46 +1074,53 @@ public class LoanReportService {
             .findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(loanIds, range.fromDate(), range.toDate())
             .forEach(transaction -> totalsByLoanId.merge(
                 transaction.getLoanApplicationId(),
-                new PaymentTotals(
-                    transaction.getPrincipalPaid() == null ? BigDecimal.ZERO : transaction.getPrincipalPaid(),
-                    transaction.getInterestPaid() == null ? BigDecimal.ZERO : transaction.getInterestPaid(),
-                    transaction.getTotalPaid() == null ? BigDecimal.ZERO : transaction.getTotalPaid()
-                ),
+                PaymentTotals.from(transaction),
                 PaymentTotals::plus
             ));
         return totalsByLoanId;
     }
 
     private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+        return productRowsFromLoans(loans, loans, paymentTotalsByLoanId);
+    }
+
+    private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> countLoans,
+                                                             List<LoanApplication> financialLoans,
+                                                             Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+        Map<com.sacco.mvp.domain.LoanType, String> productLabels = configuredProductLabels(countLoans, financialLoans);
         Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> byType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
-        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes()) {
+        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> financialByType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
+        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes(productLabels)) {
             byType.put(type, List.of());
+            financialByType.put(type, List.of());
         }
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> grouped = loans.stream()
+        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> grouped = countLoans.stream()
             .filter(loan -> loan.getLoanType() != null)
-            .filter(loan -> loan.getLoanType() != com.sacco.mvp.domain.LoanType.CUSTOMIZED_LOAN)
             .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
         grouped.forEach(byType::put);
+        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> financialGrouped = financialLoans.stream()
+            .filter(loan -> loan.getLoanType() != null)
+            .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
+        financialGrouped.forEach(financialByType::put);
         return byType.entrySet().stream()
             .sorted(Comparator.comparingInt(entry -> entry.getKey().getDisplayOrder()))
             .map(entry -> {
                 List<LoanApplication> values = entry.getValue();
+                List<LoanApplication> financialValues = financialByType.getOrDefault(entry.getKey(), List.of());
                 long applied = values.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count();
                 long active = values.stream().filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus())).count();
                 long disbursed = values.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count();
                 long paid = values.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
                 long defaulted = values.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
                 long rejected = values.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count();
-                BigDecimal interestPaid = values.stream()
-                    .map(LoanApplication::getId)
-                    .map(id -> paymentTotalsByLoanId.getOrDefault(id, PaymentTotals.ZERO).interestPaid())
+                BigDecimal interestPaid = financialValues.stream()
+                    .map(loan -> interestPaidAmount(loanPaymentSummary(loan), paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal fullyPaidInterest = values.stream()
+                BigDecimal fullyPaidInterest = financialValues.stream()
                     .filter(loan -> loan.getStatus() == LoanStatus.PAID)
-                    .map(LoanApplication::getId)
-                    .map(id -> paymentTotalsByLoanId.getOrDefault(id, PaymentTotals.ZERO).interestPaid())
+                    .map(loan -> interestPaidAmount(loanPaymentSummary(loan), paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-                return new ProductPerformanceRow(entry.getKey().getDisplayLabel(), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
+                return new ProductPerformanceRow(productLabels.getOrDefault(entry.getKey(), entry.getKey().getDisplayLabel()), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
             })
             .toList();
     }
@@ -1110,13 +1136,13 @@ public class LoanReportService {
     }
 
     private List<ProductFinancialBreakdownRow> productFinancialRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+        Map<com.sacco.mvp.domain.LoanType, String> productLabels = configuredProductLabels(loans);
         Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> byType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
-        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes()) {
+        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes(productLabels)) {
             byType.put(type, List.of());
         }
         Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> grouped = loans.stream()
             .filter(loan -> loan.getLoanType() != null)
-            .filter(loan -> loan.getLoanType() != com.sacco.mvp.domain.LoanType.CUSTOMIZED_LOAN)
             .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
         grouped.forEach(byType::put);
         return byType.entrySet().stream()
@@ -1132,19 +1158,79 @@ public class LoanReportService {
                     }
                     LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
                     PaymentTotals totals = paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO);
-                    interestPaid = interestPaid.add(totals.interestPaid() == null ? BigDecimal.ZERO : totals.interestPaid());
+                    interestPaid = interestPaid.add(interestPaidAmount(summary, totals));
                     interestUnpaid = interestUnpaid.add(interestUnpaidAmount(loan, summary, totals));
-                    loanAmountPaid = loanAmountPaid.add(totals.principalPaid() == null ? BigDecimal.ZERO : totals.principalPaid());
+                    loanAmountPaid = loanAmountPaid.add(principalPaidAmount(summary, totals));
                     loanAmountUnpaid = loanAmountUnpaid.add(outstandingPrincipalAmount(loan, summary, totals));
                 }
-                return new ProductFinancialBreakdownRow(entry.getKey().getDisplayLabel(), interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
+                return new ProductFinancialBreakdownRow(productLabels.getOrDefault(entry.getKey(), entry.getKey().getDisplayLabel()), interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
             })
             .toList();
     }
 
-    private List<com.sacco.mvp.domain.LoanType> reportableLoanTypes() {
+    private List<com.sacco.mvp.domain.LoanType> reportableLoanTypes(Map<com.sacco.mvp.domain.LoanType, String> productLabels) {
+        if (productLabels != null && !productLabels.isEmpty()) {
+            return productLabels.keySet().stream()
+                .sorted(Comparator.comparingInt(com.sacco.mvp.domain.LoanType::getDisplayOrder))
+                .toList();
+        }
         return java.util.Arrays.stream(com.sacco.mvp.domain.LoanType.values())
             .filter(type -> type != com.sacco.mvp.domain.LoanType.CUSTOMIZED_LOAN)
+            .toList();
+    }
+
+    @SafeVarargs
+    private final Map<com.sacco.mvp.domain.LoanType, String> configuredProductLabels(List<LoanApplication>... loanSets) {
+        String saccoId = null;
+        for (List<LoanApplication> loans : loanSets) {
+            if (loans == null) {
+                continue;
+            }
+            saccoId = loans.stream()
+                .map(LoanApplication::getSaccoId)
+                .filter(id -> id != null && !id.isBlank())
+                .findFirst()
+                .orElse(null);
+            if (saccoId != null) {
+                break;
+            }
+        }
+        if (saccoId == null) {
+            return Map.of();
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(product -> product.getLoanType() != null)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .collect(Collectors.toMap(
+                LoanProductSetting::getLoanType,
+                LoanProductSetting::getDisplayName,
+                (first, ignored) -> first,
+                LinkedHashMap::new
+            ));
+    }
+
+    private List<LoanApplication> stationFinancialLoans(String saccoId, String stationId, com.sacco.mvp.domain.LoanType loanType) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return List.of();
+        }
+        List<LoanApplication> loans = loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(
+            saccoId,
+            stationId,
+            DISBURSED_STATUSES,
+            loanType
+        );
+        return loans == null ? List.of() : loans;
+    }
+
+    private List<LoanApplication> filterByLoanProductId(List<LoanApplication> loans, UUID loanProductId) {
+        if (loans == null || loans.isEmpty()) {
+            return List.of();
+        }
+        if (loanProductId == null) {
+            return loans;
+        }
+        return loans.stream()
+            .filter(loan -> loanProductId.equals(loan.getLoanProductSettingId()))
             .toList();
     }
 
@@ -1155,21 +1241,17 @@ public class LoanReportService {
             .map(loan -> {
                 LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
                 PaymentTotals totals = paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO);
-                BigDecimal outstanding = summary == null || summary.totalOutstanding() == null
-                    ? loan.getAmount()
-                    : summary.totalOutstanding();
+                BigDecimal outstanding = outstandingBalanceAmount(loan, summary, totals);
                 BigDecimal requiredInterest = requiredInterestAmount(loan, summary);
-                BigDecimal remainingInterest = summary == null || summary.outstandingInterest() == null
-                    ? BigDecimal.ZERO
-                    : summary.outstandingInterest();
+                BigDecimal remainingInterest = interestUnpaidAmount(loan, summary, totals);
                 return new ActiveLoanDetailRow(
                     loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
                     loan.getLoanType() == null ? "-" : loan.getLoanType().getDisplayLabel(),
                     moneyPlain(loan.getAmount()),
                     moneyPlain(outstanding),
                     moneyPlain(requiredInterest),
-                    moneyPlain(totals.principalPaid()),
-                    moneyPlain(totals.interestPaid()),
+                    moneyPlain(principalPaidAmount(summary, totals)),
+                    moneyPlain(interestPaidAmount(summary, totals)),
                     moneyPlain(remainingInterest)
                 );
             })
@@ -1177,33 +1259,35 @@ public class LoanReportService {
     }
 
     private BigDecimal requiredInterestAmount(LoanApplication loan, LoanPaymentSummaryDto summary) {
-        if (summary != null && summary.interestAmount() != null) {
-            return summary.interestAmount();
+        BigDecimal snapshotInterest = financialSnapshotAmount(loan, "interestAmount");
+        if (snapshotInterest != null) {
+            return snapshotInterest;
         }
-        if (loan == null || loan.getFinancialSnapshot() == null || loan.getFinancialSnapshot().isBlank()) {
-            return BigDecimal.ZERO;
-        }
-        try {
-            Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
-            return readBigDecimal(raw.get("interestAmount"));
-        } catch (IOException ex) {
-            return BigDecimal.ZERO;
-        }
+        return summary == null || summary.interestAmount() == null ? BigDecimal.ZERO : summary.interestAmount();
     }
 
-    private BigDecimal outstandingBalanceAmount(LoanApplication loan, LoanPaymentSummaryDto summary) {
+    private BigDecimal outstandingBalanceAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
         if (summary != null && summary.totalOutstanding() != null) {
             return summary.totalOutstanding();
+        }
+        if (totals != null && totals.outstandingBalance() != null) {
+            return totals.outstandingBalance();
         }
         if (loan != null && loan.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO;
         }
-        return loan == null || loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
+        BigDecimal principal = loan == null || loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
+        BigDecimal requiredTotal = principal.add(requiredInterestAmount(loan, summary));
+        BigDecimal paid = totalPaidAmount(summary, totals);
+        return requiredTotal.subtract(paid).max(BigDecimal.ZERO);
     }
 
     private BigDecimal outstandingPrincipalAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
         if (loan != null && loan.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO;
+        }
+        if (totals != null && totals.outstandingPrincipal() != null) {
+            return totals.outstandingPrincipal();
         }
         if (summary != null && summary.outstandingPrincipal() != null) {
             return summary.outstandingPrincipal();
@@ -1218,21 +1302,58 @@ public class LoanReportService {
     }
 
     private BigDecimal interestPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
+        if (totals != null && totals.interestPaid() != null && totals.interestPaid().signum() > 0) {
+            return totals.interestPaid();
+        }
         if (summary != null && summary.totalInterestPaid() != null) {
             return summary.totalInterestPaid();
         }
         return totals == null || totals.interestPaid() == null ? BigDecimal.ZERO : totals.interestPaid();
     }
 
+    private BigDecimal principalPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
+        if (totals != null && totals.principalPaid() != null && totals.principalPaid().signum() > 0) {
+            return totals.principalPaid();
+        }
+        if (summary != null && summary.totalPrincipalPaid() != null) {
+            return summary.totalPrincipalPaid();
+        }
+        return totals == null || totals.principalPaid() == null ? BigDecimal.ZERO : totals.principalPaid();
+    }
+
+    private BigDecimal totalPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
+        if (totals != null && totals.totalPaid() != null && totals.totalPaid().signum() > 0) {
+            return totals.totalPaid();
+        }
+        BigDecimal principalPaid = principalPaidAmount(summary, totals);
+        BigDecimal interestPaid = interestPaidAmount(summary, totals);
+        return principalPaid.add(interestPaid);
+    }
+
     private BigDecimal interestUnpaidAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
         if (loan != null && loan.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO;
         }
-        if (summary != null && summary.outstandingInterest() != null) {
+        if (totals != null && totals.outstandingInterest() != null && totals.outstandingInterest().signum() >= 0) {
+            return totals.outstandingInterest();
+        }
+        if (summary != null && summary.outstandingInterest() != null && summary.outstandingInterest().signum() >= 0) {
             return summary.outstandingInterest();
         }
         BigDecimal required = requiredInterestAmount(loan, summary);
         return required.subtract(interestPaidAmount(summary, totals)).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal financialSnapshotAmount(LoanApplication loan, String key) {
+        if (loan == null || loan.getFinancialSnapshot() == null || loan.getFinancialSnapshot().isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
+            return readBigDecimal(raw.get(key));
+        } catch (IOException ex) {
+            return null;
+        }
     }
 
     private LoanPaymentSummaryDto loanPaymentSummary(LoanApplication loan) {
@@ -1293,11 +1414,9 @@ public class LoanReportService {
         return "Application Submitted";
     }
 
-    private List<String> observations(LoanAnalyticsService.MemberLoanAnalytics analytics,
-                                      LoanAnalyticsService.MemberLoanAnalytics previousAnalytics) {
-        Map<String, LoanAnalyticsService.MetricDelta> deltas = metricDeltas(analytics, previousAnalytics);
+    private List<String> observations(LoanAnalyticsService.MemberLoanAnalytics analytics) {
         List<String> rows = new ArrayList<>();
-        rows.add("Total loan applications changed by " + percentLabel(deltas.get("applied")) + ".");
+        rows.add(analytics.appliedLoans() + " loan application(s) were recorded in the selected period.");
         rows.add(analytics.defaultedLoans() == 0
             ? "No defaults recorded during the reporting period."
             : analytics.defaultedLoans() + " defaulted loan(s) recorded during the reporting period.");
@@ -1330,11 +1449,6 @@ public class LoanReportService {
     private String[] statusRow(AnalyticsExportReport report, String label, long count) {
         long applicantCount = report.kind() == ReportKind.MEMBER ? (count > 0 ? 1 : 0) : count;
         return new String[]{label, String.valueOf(count), String.valueOf(applicantCount)};
-    }
-
-    private String percentLabel(LoanAnalyticsService.MetricDelta delta) {
-        BigDecimal value = delta == null ? BigDecimal.ZERO : delta.percent();
-        return (value.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "") + value.setScale(2, RoundingMode.HALF_UP) + "%";
     }
 
     private String periodLabel(AnalyticsExportReport report) {
@@ -1701,7 +1815,7 @@ public class LoanReportService {
     }
 
     private void writeStationExportSummarySheet(XSSFSheet sheet, StationAnalyticsExportReport report, ExcelStyles styles) {
-        int row = titleRows(sheet, "IAA SACCOS LTD", "STATION LOAN STATUS REPORT", styles);
+        int row = titleRows(sheet, report.saccoName(), "STATION LOAN STATUS REPORT", styles);
         row = writeKeyValueBlock(sheet, row, "REPORT DETAILS", List.of(
             new String[]{"Reporting Period", report.periodLabel()},
             new String[]{"Generated On", formatDate(report.generatedOn())},
@@ -1993,9 +2107,9 @@ public class LoanReportService {
         );
     }
 
-    private byte[] renderPdf(List<String> lines) {
+    private byte[] renderPdf(List<String> lines, String saccoId) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            PDFCursor cursor = new PDFCursor(document);
+            PDFCursor cursor = new PDFCursor(document, saccoLogoBytes(saccoId));
             cursor.openPage();
             for (String line : lines) {
                 if (line == null) {
@@ -2034,7 +2148,8 @@ public class LoanReportService {
                 footerTitle,
                 headers,
                 widths,
-                rowsOrEmpty(rows, headers.length, emptyMessage)
+                rowsOrEmpty(rows, headers.length, emptyMessage),
+                saccoLogoBytes(saccoId)
             );
             renderer.render();
             document.save(output);
@@ -2052,6 +2167,15 @@ public class LoanReportService {
             .map(RegisteredSacco::getSaccoName)
             .filter(name -> !name.isBlank())
             .orElse(saccoId);
+    }
+
+    private byte[] saccoLogoBytes(String saccoId) {
+        try {
+            SaccoLogoStorageService.LogoResource resource = saccoLogoStorageService.load(saccoId);
+            return resource == null ? null : resource.content();
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return null;
+        }
     }
 
     private static String[] singleCellRow(int columns, String message) {
@@ -2539,8 +2663,17 @@ public class LoanReportService {
     private List<StationProductRow> stationProductRows(List<LoanApplication> loans,
                                                        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                        LoanType selectedLoanType) {
-        List<LoanType> productTypes = java.util.Arrays.stream(LoanType.values())
-            .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
+        return stationProductRows(loans, loans, paymentsByLoan, selectedLoanType);
+    }
+
+    private List<StationProductRow> stationProductRows(List<LoanApplication> loans,
+                                                       List<LoanApplication> financialLoans,
+                                                       Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                                       LoanType selectedLoanType) {
+        Map<LoanType, String> productLabels = configuredProductLabels(loans, financialLoans);
+        List<LoanType> productTypes = (productLabels.isEmpty()
+                ? java.util.Arrays.stream(LoanType.values()).filter(type -> type != LoanType.CUSTOMIZED_LOAN)
+                : productLabels.keySet().stream())
             .filter(type -> selectedLoanType == null || type == selectedLoanType)
             .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
             .toList();
@@ -2549,8 +2682,11 @@ public class LoanReportService {
             List<LoanApplication> typedLoans = loans.stream()
                 .filter(loan -> loan.getLoanType() == type)
                 .toList();
+            List<LoanApplication> typedFinancialLoans = financialLoans.stream()
+                .filter(loan -> loan.getLoanType() == type)
+                .toList();
             rows.add(new StationProductRow(
-                type.getDisplayLabel(),
+                productLabels.getOrDefault(type, type.getDisplayLabel()),
                 typedLoans.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count(),
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.MANAGER_ACCEPTED
                     || loan.getStatus() == LoanStatus.LOAN_OFFICER_APPROVED
@@ -2562,14 +2698,22 @@ public class LoanReportService {
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count(),
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count(),
                 typedLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count(),
-                sumInterest(typedLoans, paymentsByLoan, false),
-                sumInterest(typedLoans, paymentsByLoan, true)
+                sumInterest(typedFinancialLoans, paymentsByLoan, false),
+                sumInterest(typedFinancialLoans, paymentsByLoan, true)
             ));
         }
         return rows;
     }
 
     private List<StationYearlySummaryRow> stationYearlyRows(List<LoanApplication> loans,
+                                                            Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
+                                                            LocalDate fromDate,
+                                                            LocalDate toDate) {
+        return stationYearlyRows(loans, loans, paymentsByLoan, fromDate, toDate);
+    }
+
+    private List<StationYearlySummaryRow> stationYearlyRows(List<LoanApplication> loans,
+                                                            List<LoanApplication> financialLoans,
                                                             Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                             LocalDate fromDate,
                                                             LocalDate toDate) {
@@ -2600,8 +2744,8 @@ public class LoanReportService {
                 : BigDecimal.valueOf(defaulted)
                     .multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(yearlyApplicationLoans.size()), 2, RoundingMode.HALF_UP);
-            BigDecimal paidInterest = sumInterestForYear(loans, paymentsByLoan, currentYear, false);
-            BigDecimal fullyPaidInterest = sumInterestForYear(loans, paymentsByLoan, currentYear, true);
+            BigDecimal paidInterest = sumInterestForYear(financialLoans, paymentsByLoan, currentYear, false);
+            BigDecimal fullyPaidInterest = sumInterestForYear(financialLoans, paymentsByLoan, currentYear, true);
             rows.add(new StationYearlySummaryRow(
                 currentYear,
                 yearlyApplicationLoans.size(),
@@ -2631,9 +2775,7 @@ public class LoanReportService {
                                    boolean fullyPaidOnly) {
         return loans.stream()
             .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
-            .flatMap(loan -> paymentsByLoan.getOrDefault(loan.getId(), List.of()).stream())
-            .map(LoanPaymentTransaction::getInterestPaid)
-            .filter(java.util.Objects::nonNull)
+            .map(loan -> stationInterestPaidAmount(loan, paymentsByLoan.getOrDefault(loan.getId(), List.of())))
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
     }
@@ -2644,12 +2786,34 @@ public class LoanReportService {
                                           boolean fullyPaidOnly) {
         return loans.stream()
             .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
-            .flatMap(loan -> paymentsByLoan.getOrDefault(loan.getId(), List.of()).stream())
+            .map(loan -> stationInterestPaidForYear(loan, paymentsByLoan.getOrDefault(loan.getId(), List.of()), year))
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal stationInterestPaidAmount(LoanApplication loan, List<LoanPaymentTransaction> transactions) {
+        BigDecimal transactionInterest = transactions == null ? BigDecimal.ZERO : transactions.stream()
+            .map(LoanPaymentTransaction::getInterestPaid)
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return transactionInterest.signum() > 0 ? transactionInterest : stationSummaryInterestPaidAmount(loan);
+    }
+
+    private BigDecimal stationInterestPaidForYear(LoanApplication loan, List<LoanPaymentTransaction> transactions, int year) {
+        BigDecimal transactionInterest = transactions == null ? BigDecimal.ZERO : transactions.stream()
             .filter(transaction -> transaction.getReceiptDate() != null && transaction.getReceiptDate().getYear() == year)
             .map(LoanPaymentTransaction::getInterestPaid)
             .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add)
-            .setScale(2, RoundingMode.HALF_UP);
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (transactionInterest.signum() > 0) {
+            return transactionInterest;
+        }
+        return loanYear(loan) == year ? stationSummaryInterestPaidAmount(loan) : BigDecimal.ZERO;
+    }
+
+    private BigDecimal stationSummaryInterestPaidAmount(LoanApplication loan) {
+        LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
+        return summary == null || summary.totalInterestPaid() == null ? BigDecimal.ZERO : summary.totalInterestPaid();
     }
 
     private int writeTitle(XSSFSheet sheet, CellStyle titleStyle, String title) {
@@ -2892,9 +3056,23 @@ public class LoanReportService {
     private record PaymentTotals(
         BigDecimal principalPaid,
         BigDecimal interestPaid,
-        BigDecimal totalPaid
+        BigDecimal totalPaid,
+        BigDecimal outstandingBalance,
+        BigDecimal outstandingPrincipal,
+        BigDecimal outstandingInterest
     ) {
-        private static final PaymentTotals ZERO = new PaymentTotals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        private static final PaymentTotals ZERO = new PaymentTotals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null);
+
+        private static PaymentTotals from(LoanPaymentTransaction transaction) {
+            return new PaymentTotals(
+                transaction.getPrincipalPaid() == null ? BigDecimal.ZERO : transaction.getPrincipalPaid(),
+                transaction.getInterestPaid() == null ? BigDecimal.ZERO : transaction.getInterestPaid(),
+                transaction.getTotalPaid() == null ? BigDecimal.ZERO : transaction.getTotalPaid(),
+                transaction.getOutstandingBalance(),
+                transaction.getOutstandingPrincipal(),
+                transaction.getOutstandingInterest()
+            );
+        }
 
         private PaymentTotals plus(PaymentTotals other) {
             if (other == null) {
@@ -2903,7 +3081,10 @@ public class LoanReportService {
             return new PaymentTotals(
                 principalPaid.add(other.principalPaid == null ? BigDecimal.ZERO : other.principalPaid),
                 interestPaid.add(other.interestPaid == null ? BigDecimal.ZERO : other.interestPaid),
-                totalPaid.add(other.totalPaid == null ? BigDecimal.ZERO : other.totalPaid)
+                totalPaid.add(other.totalPaid == null ? BigDecimal.ZERO : other.totalPaid),
+                other.outstandingBalance == null ? outstandingBalance : other.outstandingBalance,
+                other.outstandingPrincipal == null ? outstandingPrincipal : other.outstandingPrincipal,
+                other.outstandingInterest == null ? outstandingInterest : other.outstandingInterest
             );
         }
     }
@@ -3018,6 +3199,7 @@ public class LoanReportService {
     public record AnalyticsExportReport(
         ReportKind kind,
         String saccoName,
+        String saccoId,
         String title,
         String stationId,
         String branchName,
@@ -3029,8 +3211,6 @@ public class LoanReportService {
         String loanProductLabel,
         Member member,
         LoanAnalyticsService.MemberLoanAnalytics analytics,
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics,
-        Map<String, LoanAnalyticsService.MetricDelta> deltaByKey,
         LoanAnalyticsService.StaffPortfolioSummary portfolioSummary,
         List<ProductPerformanceRow> productRows,
         List<ProductFinancialBreakdownRow> productFinancialRows,
@@ -3103,16 +3283,18 @@ public class LoanReportService {
         private final PDDocument document;
         private final AnalyticsExportReport report;
         private final PDRectangle size;
+        private final byte[] watermarkLogo;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.TIMES_BOLD);
         private PDPage page;
         private PDPageContentStream stream;
         private float y;
 
-        private FormalPdf(PDDocument document, AnalyticsExportReport report, PDRectangle size) {
+        private FormalPdf(PDDocument document, AnalyticsExportReport report, PDRectangle size, byte[] watermarkLogo) {
             this.document = document;
             this.report = report;
             this.size = size;
+            this.watermarkLogo = watermarkLogo;
         }
 
         private void renderMemberOnePage() throws IOException {
@@ -3412,7 +3594,7 @@ public class LoanReportService {
                 new String[]{"Loans Approved", String.valueOf(portfolio.approvedLoans())},
                 new String[]{"Loans Disbursed", String.valueOf(portfolio.disbursedLoans())},
                 new String[]{"Loans Rejected", String.valueOf(portfolio.rejectedLoans())},
-                new String[]{"Defaulted After Approval", String.valueOf(portfolio.defaultedAfterApproval())},
+                new String[]{"Defaulted", String.valueOf(portfolio.defaultedAfterApproval())},
                 new String[]{"Default Rate", portfolio.defaultedAfterApprovalRate() + "%"},
                 new String[]{"Portfolio Risk Rating", portfolio.riskLevel()}
             );
@@ -3574,6 +3756,7 @@ public class LoanReportService {
             page = new PDPage(size);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
+            PdfWatermarkRenderer.draw(document, stream, page, watermarkLogo);
             y = page.getMediaBox().getHeight() - MARGIN;
         }
 
@@ -3883,6 +4066,7 @@ public class LoanReportService {
 
     public record StationAnalyticsExportReport(
         String saccoId,
+        String saccoName,
         String stationId,
         LocalDate fromDate,
         LocalDate toDate,
@@ -4143,6 +4327,7 @@ public class LoanReportService {
         private final String[] headers;
         private final float[] widths;
         private final List<String[]> rows;
+        private final byte[] watermarkLogo;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.TIMES_BOLD);
         private PDPage page;
@@ -4159,7 +4344,8 @@ public class LoanReportService {
                                        String footerTitle,
                                        String[] headers,
                                        float[] widths,
-                                       List<String[]> rows) {
+                                       List<String[]> rows,
+                                       byte[] watermarkLogo) {
             this.document = document;
             this.saccoName = sanitizePdfText(saccoName).toUpperCase(Locale.ROOT);
             this.title = sanitizePdfText(title);
@@ -4171,6 +4357,7 @@ public class LoanReportService {
             this.headers = headers;
             this.widths = scaleWidths(widths, PDRectangle.A4.getWidth() - (MARGIN * 2f));
             this.rows = rows;
+            this.watermarkLogo = watermarkLogo;
         }
 
         private void render() throws IOException {
@@ -4188,6 +4375,7 @@ public class LoanReportService {
             page = new PDPage(PDRectangle.A4);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
+            PdfWatermarkRenderer.draw(document, stream, page, watermarkLogo);
             y = page.getMediaBox().getHeight() - TOP_MARGIN;
             drawHeader();
         }
@@ -4349,14 +4537,16 @@ public class LoanReportService {
         private static final float LEADING = 16f;
 
         private final PDDocument document;
+        private final byte[] watermarkLogo;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         private PDPage page;
         private PDPageContentStream stream;
         private float y;
 
-        private PDFCursor(PDDocument document) {
+        private PDFCursor(PDDocument document, byte[] watermarkLogo) {
             this.document = document;
+            this.watermarkLogo = watermarkLogo;
         }
 
         private void openPage() throws IOException {
@@ -4364,6 +4554,7 @@ public class LoanReportService {
             page = new PDPage(PDRectangle.A4);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
+            PdfWatermarkRenderer.draw(document, stream, page, watermarkLogo);
             y = page.getMediaBox().getHeight() - MARGIN;
         }
 
@@ -4443,6 +4634,7 @@ public class LoanReportService {
 
         private final PDDocument document;
         private final StationAnalyticsExportReport report;
+        private final byte[] watermarkLogo;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         private PDPage page;
@@ -4450,9 +4642,10 @@ public class LoanReportService {
         private float y;
         private int pageNumber;
 
-        private StationPdfRenderer(PDDocument document, StationAnalyticsExportReport report) {
+        private StationPdfRenderer(PDDocument document, StationAnalyticsExportReport report, byte[] watermarkLogo) {
             this.document = document;
             this.report = report;
+            this.watermarkLogo = watermarkLogo;
         }
 
         private void render() throws IOException {
@@ -4489,6 +4682,7 @@ public class LoanReportService {
             page = new PDPage(PDRectangle.A4);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
+            PdfWatermarkRenderer.draw(document, stream, page, watermarkLogo);
             pageNumber++;
             y = page.getMediaBox().getHeight() - TOP_MARGIN;
         }
@@ -4502,7 +4696,7 @@ public class LoanReportService {
         }
 
         private void drawHeader() throws IOException {
-            writeCentered("IAA SACCOS LTD", y, bold, TITLE_SIZE);
+            writeCentered(report.saccoName(), y, bold, TITLE_SIZE);
             writeRight("Generated: " + formatDateStatic(report.generatedOn()), page.getMediaBox().getWidth() - MARGIN, y + 2f, regular, BODY_SIZE);
             y -= 18f;
             writeCentered("STATION LOAN STATUS REPORT", y, bold, 13f);
@@ -4567,7 +4761,7 @@ public class LoanReportService {
                 List.of(
                     new String[]{"Loans Handled", String.valueOf(handled)},
                     new String[]{"Paid Loans", String.valueOf(paid)},
-                    new String[]{"Defaulted After Approval", String.valueOf(defaulted)},
+                    new String[]{"Defaulted", String.valueOf(defaulted)},
                     new String[]{"Portfolio Risk Rating", risk}
                 ),
                 BODY_SIZE);
@@ -4833,7 +5027,7 @@ public class LoanReportService {
         private void drawFooter() throws IOException {
             float footerY = BOTTOM_MARGIN;
             ruleAt(footerY + 12f);
-            write("IAA SACCOS LTD | Station Loan Status Report", MARGIN, footerY, regular, 7f);
+            write(report.saccoName() + " | Station Loan Status Report", MARGIN, footerY, regular, 7f);
             writeRight("Page " + pageNumber, page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7f);
         }
 
@@ -4898,6 +5092,7 @@ public class LoanReportService {
 
         private final PDDocument document;
         private final MemberLoanReport report;
+        private final byte[] watermarkLogo;
         private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         private final String generatedDate;
@@ -4905,10 +5100,11 @@ public class LoanReportService {
         private PDPageContentStream stream;
         private float y;
 
-        private MemberPdfRenderer(PDDocument document, MemberLoanReport report, String generatedDate) {
+        private MemberPdfRenderer(PDDocument document, MemberLoanReport report, String generatedDate, byte[] watermarkLogo) {
             this.document = document;
             this.report = report;
             this.generatedDate = generatedDate;
+            this.watermarkLogo = watermarkLogo;
         }
 
         private void render() throws IOException {
@@ -4929,6 +5125,7 @@ public class LoanReportService {
             page = new PDPage(PDRectangle.A4);
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
+            PdfWatermarkRenderer.draw(document, stream, page, watermarkLogo);
             y = page.getMediaBox().getHeight() - TOP_MARGIN;
         }
 

@@ -74,12 +74,30 @@ public class LoanAnalyticsService {
         return summarize(memberLoans(memberId, fromDate, toDate, loanType, loanStatus));
     }
 
+    public MemberLoanAnalytics forMember(UUID memberId,
+                                         LocalDate fromDate,
+                                         LocalDate toDate,
+                                         LoanType loanType,
+                                         UUID loanProductId,
+                                         LoanStatus loanStatus) {
+        return summarize(filterByLoanProductId(memberLoans(memberId, fromDate, toDate, loanType, loanStatus), loanProductId));
+    }
+
     public MemberLoanAnalytics forStaff(AppUserPrincipal principal,
                                         LocalDate fromDate,
                                         LocalDate toDate,
                                         LoanType loanType,
                                         LoanStatus loanStatus) {
         return summarize(staffLoans(principal, fromDate, toDate, loanType, loanStatus));
+    }
+
+    public MemberLoanAnalytics forStaff(AppUserPrincipal principal,
+                                        LocalDate fromDate,
+                                        LocalDate toDate,
+                                        LoanType loanType,
+                                        UUID loanProductId,
+                                        LoanStatus loanStatus) {
+        return summarize(filterByLoanProductId(staffLoans(principal, fromDate, toDate, loanType, loanStatus), loanProductId));
     }
 
     public List<LoanApplication> loansForStaffAnalytics(AppUserPrincipal principal,
@@ -99,10 +117,29 @@ public class LoanAnalyticsService {
         return summarize(stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus));
     }
 
+    public MemberLoanAnalytics forStation(String saccoId,
+                                          String stationId,
+                                          LocalDate fromDate,
+                                          LocalDate toDate,
+                                          LoanType loanType,
+                                          UUID loanProductId,
+                                          LoanStatus loanStatus) {
+        return summarize(filterByLoanProductId(stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus), loanProductId));
+    }
+
     public List<MetricTrendSeries> statusTrendForMember(UUID memberId,
                                                         LocalDate fromDate,
                                                         LocalDate toDate,
                                                         LoanType loanType,
+                                                        LoanStatus loanStatus) {
+        return statusTrendForMember(memberId, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public List<MetricTrendSeries> statusTrendForMember(UUID memberId,
+                                                        LocalDate fromDate,
+                                                        LocalDate toDate,
+                                                        LoanType loanType,
+                                                        UUID loanProductId,
                                                         LoanStatus loanStatus) {
         LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
@@ -114,7 +151,7 @@ public class LoanAnalyticsService {
             cursor = cursor.plusMonths(1);
         }
 
-        List<LoanApplication> loans = memberLoans(memberId, start, end, loanType, loanStatus);
+        List<LoanApplication> loans = filterByLoanProductId(memberLoans(memberId, start, end, loanType, loanStatus), loanProductId);
 
         return List.of(
             trendSeries("Applied", "#2563eb", months, loans, app -> app.getStatus() != LoanStatus.DRAFT),
@@ -130,10 +167,19 @@ public class LoanAnalyticsService {
                                                        LocalDate toDate,
                                                        LoanType loanType,
                                                        LoanStatus loanStatus) {
+        return statusTrendForStaff(principal, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public List<MetricTrendSeries> statusTrendForStaff(AppUserPrincipal principal,
+                                                       LocalDate fromDate,
+                                                       LocalDate toDate,
+                                                       LoanType loanType,
+                                                       UUID loanProductId,
+                                                       LoanStatus loanStatus) {
         LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
-        List<StaffLoanEvent> events = staffLoanEvents(principal, start, end, loanType, loanStatus);
+        List<StaffLoanEvent> events = filterEventsByLoanProductId(staffLoanEvents(principal, start, end, loanType, loanStatus), loanProductId);
 
         return List.of(
             staffTrendSeries("Applied", "#2563eb", months, events, event -> true),
@@ -151,10 +197,20 @@ public class LoanAnalyticsService {
                                                          LocalDate toDate,
                                                          LoanType loanType,
                                                          LoanStatus loanStatus) {
+        return statusTrendForStation(saccoId, stationId, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public List<MetricTrendSeries> statusTrendForStation(String saccoId,
+                                                         String stationId,
+                                                         LocalDate fromDate,
+                                                         LocalDate toDate,
+                                                         LoanType loanType,
+                                                         UUID loanProductId,
+                                                         LoanStatus loanStatus) {
         LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
-        List<LoanApplication> loans = stationLoans(saccoId, stationId, start, end, loanType, loanStatus);
+        List<LoanApplication> loans = filterByLoanProductId(stationLoans(saccoId, stationId, start, end, loanType, loanStatus), loanProductId);
 
         return List.of(
             trendSeries("Applied", "#2563eb", months, loans, app -> app.getStatus() != LoanStatus.DRAFT),
@@ -199,8 +255,17 @@ public class LoanAnalyticsService {
                                                                    LocalDate toDate,
                                                                    LoanType loanType,
                                                                    LoanStatus loanStatus) {
+        return productPerformanceForStaff(principal, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public List<LoanProductPerformance> productPerformanceForStaff(AppUserPrincipal principal,
+                                                                   LocalDate fromDate,
+                                                                   LocalDate toDate,
+                                                                   LoanType loanType,
+                                                                   UUID loanProductId,
+                                                                   LoanStatus loanStatus) {
         return productPerformance(principal == null ? null : principal.getSaccoId(),
-            staffLoans(principal, fromDate, toDate, loanType, loanStatus));
+            filterByLoanProductId(staffLoans(principal, fromDate, toDate, loanType, loanStatus), loanProductId));
     }
 
     public List<LoanProductPerformance> productPerformanceForStation(String saccoId,
@@ -217,7 +282,17 @@ public class LoanAnalyticsService {
                                                                      LocalDate toDate,
                                                                      LoanType loanType,
                                                                      LoanStatus loanStatus) {
-        return productPerformance(saccoId, stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus));
+        return productPerformanceForStation(saccoId, stationId, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public List<LoanProductPerformance> productPerformanceForStation(String saccoId,
+                                                                     String stationId,
+                                                                     LocalDate fromDate,
+                                                                     LocalDate toDate,
+                                                                     LoanType loanType,
+                                                                     UUID loanProductId,
+                                                                     LoanStatus loanStatus) {
+        return productPerformance(saccoId, filterByLoanProductId(stationLoans(saccoId, stationId, fromDate, toDate, loanType, loanStatus), loanProductId));
     }
 
     public List<MetricDelta> metricDeltas(MemberLoanAnalytics current, MemberLoanAnalytics previous) {
@@ -236,7 +311,16 @@ public class LoanAnalyticsService {
                                                 LocalDate toDate,
                                                 LoanType loanType,
                                                 LoanStatus loanStatus) {
-        List<StaffLoanEvent> events = staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus);
+        return staffPortfolio(principal, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public StaffPortfolioSummary staffPortfolio(AppUserPrincipal principal,
+                                                LocalDate fromDate,
+                                                LocalDate toDate,
+                                                LoanType loanType,
+                                                UUID loanProductId,
+                                                LoanStatus loanStatus) {
+        List<StaffLoanEvent> events = filterEventsByLoanProductId(staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus), loanProductId);
         long approved = events.stream().filter(StaffLoanEvent::approved).count();
         long rejected = events.stream().filter(StaffLoanEvent::rejected).count();
         long disbursed = events.stream()
@@ -262,10 +346,19 @@ public class LoanAnalyticsService {
                                                      LocalDate toDate,
                                                      LoanType loanType,
                                                      LoanStatus loanStatus) {
+        return staffReviewAnalytics(principal, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public StaffReviewAnalytics staffReviewAnalytics(AppUserPrincipal principal,
+                                                     LocalDate fromDate,
+                                                     LocalDate toDate,
+                                                     LoanType loanType,
+                                                     UUID loanProductId,
+                                                     LoanStatus loanStatus) {
         LocalDate end = toDate == null ? applicationClock.today() : toDate;
         LocalDate start = fromDate == null ? end.minusMonths(11).withDayOfMonth(1) : fromDate.withDayOfMonth(1);
         List<YearMonth> months = monthsBetween(start, end);
-        List<StaffLoanEvent> events = staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus);
+        List<StaffLoanEvent> events = filterEventsByLoanProductId(staffLoanEvents(principal, fromDate, toDate, loanType, loanStatus), loanProductId);
         List<StaffReviewProductPerformance> productRows = staffReviewProductPerformance(
             principal == null ? null : principal.getSaccoId(),
             events
@@ -294,7 +387,17 @@ public class LoanAnalyticsService {
                                                   LocalDate toDate,
                                                   LoanType loanType,
                                                   LoanStatus loanStatus) {
-        MemberLoanAnalytics analytics = forStation(saccoId, stationId, fromDate, toDate, loanType, loanStatus);
+        return stationPortfolio(saccoId, stationId, fromDate, toDate, loanType, null, loanStatus);
+    }
+
+    public StaffPortfolioSummary stationPortfolio(String saccoId,
+                                                  String stationId,
+                                                  LocalDate fromDate,
+                                                  LocalDate toDate,
+                                                  LoanType loanType,
+                                                  UUID loanProductId,
+                                                  LoanStatus loanStatus) {
+        MemberLoanAnalytics analytics = forStation(saccoId, stationId, fromDate, toDate, loanType, loanProductId, loanStatus);
         BigDecimal defaultedRate = analytics.disbursedLoans() == 0
             ? BigDecimal.ZERO
             : BigDecimal.valueOf(analytics.defaultedLoans())
@@ -370,6 +473,24 @@ public class LoanAnalyticsService {
             return false;
         }
         return matchesStation(app, stationId);
+    }
+
+    private List<LoanApplication> filterByLoanProductId(List<LoanApplication> loans, UUID loanProductId) {
+        if (loanProductId == null || loans == null || loans.isEmpty()) {
+            return loans == null ? List.of() : loans;
+        }
+        return loans.stream()
+            .filter(loan -> loanProductId.equals(loan.getLoanProductSettingId()))
+            .toList();
+    }
+
+    private List<StaffLoanEvent> filterEventsByLoanProductId(List<StaffLoanEvent> events, UUID loanProductId) {
+        if (loanProductId == null || events == null || events.isEmpty()) {
+            return events == null ? List.of() : events;
+        }
+        return events.stream()
+            .filter(event -> event.loan() != null && loanProductId.equals(event.loan().getLoanProductSettingId()))
+            .toList();
     }
 
     private List<LoanApplication> memberLoans(UUID memberId,
@@ -511,14 +632,15 @@ public class LoanAnalyticsService {
         if (productRefs.isEmpty()) {
             productRefs = java.util.Arrays.stream(LoanType.values())
                 .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
-                .map(type -> new ProductRef(type, shortProductLabel(type)))
+                .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
+                .map(type -> new ProductRef(null, type, shortProductLabel(type)))
                 .toList();
         }
-        return productRefs.stream()
-            .filter(product -> product.loanType() != LoanType.CUSTOMIZED_LOAN)
+        List<ProductRef> resolvedProductRefs = productRefs;
+        return resolvedProductRefs.stream()
             .map(product -> {
                 List<LoanApplication> typedLoans = loans.stream()
-                    .filter(app -> app.getLoanType() == product.loanType())
+                    .filter(app -> matchesProduct(app, product, resolvedProductRefs))
                     .toList();
                 return new LoanProductPerformance(
                     product.label(),
@@ -536,14 +658,15 @@ public class LoanAnalyticsService {
         if (productRefs.isEmpty()) {
             productRefs = java.util.Arrays.stream(LoanType.values())
                 .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
-                .map(type -> new ProductRef(type, shortProductLabel(type)))
+                .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
+                .map(type -> new ProductRef(null, type, shortProductLabel(type)))
                 .toList();
         }
-        return productRefs.stream()
-            .filter(product -> product.loanType() != LoanType.CUSTOMIZED_LOAN)
+        List<ProductRef> resolvedProductRefs = productRefs;
+        return resolvedProductRefs.stream()
             .map(product -> {
                 List<StaffLoanEvent> productEvents = events.stream()
-                    .filter(event -> event.loan().getLoanType() == product.loanType())
+                    .filter(event -> matchesProduct(event.loan(), product, resolvedProductRefs))
                     .toList();
                 long reviewed = productEvents.size();
                 long approved = productEvents.stream().filter(StaffLoanEvent::approved).count();
@@ -565,9 +688,26 @@ public class LoanAnalyticsService {
         }
         return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
             .sorted(Comparator.comparingInt(com.sacco.mvp.domain.LoanProductSetting::getResolvedDisplayOrder))
-            .map(product -> new ProductRef(product.getLoanType(), product.getDisplayName()))
+            .map(product -> new ProductRef(product.getId(), product.getLoanType(), product.getDisplayName()))
             .filter(product -> product.loanType() != null)
             .toList();
+    }
+
+    private boolean matchesProduct(LoanApplication loan, ProductRef product, List<ProductRef> productRefs) {
+        if (loan == null || product == null || loan.getLoanType() != product.loanType()) {
+            return false;
+        }
+        if (product.loanProductId() == null) {
+            return true;
+        }
+        if (loan.getLoanProductSettingId() != null) {
+            return product.loanProductId().equals(loan.getLoanProductSettingId());
+        }
+        return productRefs.stream()
+            .filter(candidate -> candidate.loanType() == loan.getLoanType())
+            .findFirst()
+            .map(product::equals)
+            .orElse(false);
     }
 
     private Map<String, Object> productChartSeries(String name,
@@ -946,5 +1086,5 @@ public class LoanAnalyticsService {
         }
     }
 
-    private record ProductRef(LoanType loanType, String label) {}
+    private record ProductRef(UUID loanProductId, LoanType loanType, String label) {}
 }

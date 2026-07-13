@@ -70,7 +70,7 @@ public class SaccoConfigurationService {
                                               BigDecimal guarantorMinimumSavings,
                                               LoanProductStatus productStatus,
                                               boolean active) {
-        if (loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
+        if (loanType != LoanType.CUSTOMIZED_LOAN && loanProductSettingRepository.existsBySaccoIdAndLoanType(saccoId, loanType)) {
             throw new IllegalStateException("That loan product already exists for this SACCO.");
         }
         OffsetDateTime now = OffsetDateTime.now();

@@ -56,11 +56,11 @@ class AppControllerFinancialPreviewTest {
         when(principal.getMemberId()).thenReturn(memberId);
         when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
         when(financialDetailsService.generateSnapshot(
-            saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount, tenorMonths, null
+            saccoId, memberId, product, amount, tenorMonths, null
         )).thenReturn(snapshot);
         when(financialDetailsService.toJson(snapshot)).thenReturn("{}");
         when(loanPresentationService.parseFinancialFields("{}")).thenReturn(Map.of("Loan Amount", "TSh 100,000.00"));
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount)).thenReturn(
+        when(eligibilityService.check(saccoId, memberId, product, amount)).thenReturn(
             new EligibilityService.EligibilityResult(
                 true,
                 new BigDecimal("3"),
@@ -100,11 +100,11 @@ class AppControllerFinancialPreviewTest {
         when(principal.getMemberId()).thenReturn(memberId);
         when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
         when(financialDetailsService.generateSnapshot(
-            saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount, tenorMonths, null
+            saccoId, memberId, product, amount, tenorMonths, null
         )).thenReturn(snapshot);
         when(financialDetailsService.toJson(snapshot)).thenReturn("{}");
         when(loanPresentationService.parseFinancialFields("{}")).thenReturn(Map.of("Interest", "TSh 120,000.00"));
-        when(eligibilityService.check(saccoId, memberId, LoanType.DEVELOPMENT_LOAN, amount)).thenReturn(
+        when(eligibilityService.check(saccoId, memberId, product, amount)).thenReturn(
             new EligibilityService.EligibilityResult(
                 true,
                 new BigDecimal("3"),

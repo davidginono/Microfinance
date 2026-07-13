@@ -289,9 +289,11 @@ public class DisbursementController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
         var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
         model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,
@@ -352,6 +354,7 @@ public class DisbursementController {
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
         model.addAttribute("allowPaymentSync", true);
+        model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";
     }
@@ -439,18 +442,17 @@ public class DisbursementController {
     @PostMapping("/loan-applications/{id}/sync-payments")
     public String syncPayments(@PathVariable UUID id,
                                @AuthenticationPrincipal AppUserPrincipal principal,
-                               @RequestParam(name = "monthsBack", defaultValue = "12") int monthsBack,
                                RedirectAttributes ra) {
         try {
             LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
             if (app.getLoanId() == null || app.getLoanId().isBlank()) {
                 throw new IllegalStateException("This loan has not been disbursed yet.");
             }
-            int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+            int changes = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
             ra.addFlashAttribute("message",
-                inserted == 0
-                    ? "Payment transactions refreshed; nothing new."
-                    : "Payment transactions refreshed; " + inserted + " new record(s) added.");
+                changes == 0
+                    ? "Payment history refreshed; it already matched the payment system."
+                    : "Payment history refreshed; " + changes + " record change(s) were reconciled.");
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -460,9 +462,9 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/recheck-defaulted-payment")
+    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
     public String recheckDefaultedPayment(@PathVariable UUID id,
                                           @AuthenticationPrincipal AppUserPrincipal principal,
-                                          @RequestParam(name = "monthsBack", defaultValue = "24") int monthsBack,
                                           RedirectAttributes ra) {
         try {
             LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
@@ -472,11 +474,13 @@ public class DisbursementController {
             if (app.getLoanId() == null || app.getLoanId().isBlank()) {
                 throw new IllegalStateException("This defaulted loan does not have a loan ID to verify.");
             }
-            int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
+            int changes = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
             ra.addFlashAttribute("message",
-                inserted == 0
-                    ? "Payment status rechecked. The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."
-                    : "Payment status rechecked with " + inserted + " new record(s). The loan is still marked as " + app.getStatus().name().replace('_', ' ') + ".");
+                app.getStatus() == LoanStatus.PAID
+                    ? "Payment status rechecked. Outstanding balance is zero, so this loan is now marked as PAID."
+                    : (changes == 0
+                        ? "Payment status rechecked. The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."
+                        : "Payment status rechecked with " + changes + " reconciled record change(s). The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."));
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Payment status could not be verified: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {

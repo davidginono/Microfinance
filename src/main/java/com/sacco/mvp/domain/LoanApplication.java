@@ -43,6 +43,9 @@ public class LoanApplication {
     @Column(name = "loan_type", nullable = false)
     private LoanType loanType;
 
+    @Column(name = "loan_product_setting_id")
+    private UUID loanProductSettingId;
+
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 

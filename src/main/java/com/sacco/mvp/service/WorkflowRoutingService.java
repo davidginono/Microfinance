@@ -120,8 +120,11 @@ public class WorkflowRoutingService {
             case CHAIRPERSON -> Position.CHAIRPERSON;
             default -> Position.BOARD;
         };
-        return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
-            .map(product -> loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(product.getId(), stage).stream()
+        java.util.Optional<com.sacco.mvp.domain.LoanProductSetting> selectedProduct = app.getLoanProductSettingId() == null
+            ? loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
+            : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId());
+        return selectedProduct
+            .map(productSetting -> loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(productSetting.getId(), stage).stream()
                 .map(com.sacco.mvp.domain.LoanProductBoardReviewer::getBoardMemberId)
                 .filter(boardMemberId -> roleDirectoryService.hasActiveRoleInSacco(boardMemberId, app.getSaccoId(), requiredRole))
                 .toList())

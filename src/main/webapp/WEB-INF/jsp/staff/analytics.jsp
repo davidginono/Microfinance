@@ -203,16 +203,6 @@
         font-weight: 800;
         line-height: 1;
     }
-    .staff-comparison-bar {
-        display: flex;
-        align-items: center;
-        gap: 0.65rem;
-        border: 1px solid #dbeafe;
-        background: #eff6ff;
-        color: #1e3a8a;
-        font-size: 0.8rem;
-        line-height: 1.35;
-    }
     .staff-summary-grid {
         display: grid;
         grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -533,18 +523,20 @@
     }
 </style>
 
-<c:set var="currentQuery" value="fromDate=${fromDate}&toDate=${toDate}&loanType=${loanType}&viewAs=${viewAs}" />
+<c:set var="currentQuery" value="fromDate=${fromDate}&toDate=${toDate}&loanProductId=${loanProductId}&loanType=${loanType}&viewAs=${viewAs}" />
 
 <div class="erp-page-header">
     <c:url var="staffPdfExportUrl" value="/documents/reports/staff-loan-analytics.pdf">
         <c:param name="fromDate" value="${fromDate}" />
         <c:param name="toDate" value="${toDate}" />
+        <c:param name="loanProductId" value="${loanProductId}" />
         <c:param name="loanType" value="${loanType}" />
         <c:param name="viewAs" value="${viewAs}" />
     </c:url>
     <c:url var="staffExcelExportUrl" value="/documents/reports/staff-loan-analytics.xlsx">
         <c:param name="fromDate" value="${fromDate}" />
         <c:param name="toDate" value="${toDate}" />
+        <c:param name="loanProductId" value="${loanProductId}" />
         <c:param name="loanType" value="${loanType}" />
         <c:param name="viewAs" value="${viewAs}" />
     </c:url>
@@ -580,18 +572,20 @@
     <form action="/staff/analytics" method="get" class="erp-panel-body staff-analytics-filter">
         <label class="staff-analytics-control is-date block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.startDate" text="Start Date" />
-            <input name="fromDate" type="date" value="${fromDate}" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            <input name="fromDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" value="${fromDate}" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" />
         </label>
         <label class="staff-analytics-control is-date block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.endDate" text="End Date" />
-            <input name="toDate" type="date" value="${toDate}" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            <input name="toDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" value="${toDate}" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" />
         </label>
         <label class="staff-analytics-control block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.loanProduct" text="Loan Product" />
-            <select name="loanType" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800">
+            <select name="loanProductId" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800">
                 <option value=""><spring:message code="reports.allProducts" text="All Products" /></option>
-                <c:forEach items="${loanTypes}" var="type">
-                    <option value="${type}" ${loanType eq type ? 'selected' : ''}>${type.displayLabel}</option>
+                <c:forEach items="${loanProducts}" var="product">
+                    <option value="${product.id}" ${loanProductId eq product.id ? 'selected' : ''}>
+                        <c:out value="${product.displayName}" />
+                    </option>
                 </c:forEach>
             </select>
         </label>
@@ -615,11 +609,6 @@
     </form>
 </section>
 
-<div class="staff-comparison-bar rounded-md px-4 py-3">
-    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">i</span>
-    <span>${metricComparisonLabel}</span>
-</div>
-
 <c:if test="${not staffReviewView}">
 <section class="staff-metric-grid ${stationWideStaffView ? 'is-station' : ''}">
     <c:forEach items="${metricCards}" var="card">
@@ -638,16 +627,6 @@
                 <div class="min-w-0">
                     <p class="staff-metric-title">${card.label}</p>
                     <p class="staff-metric-value"><fmt:formatNumber value="${card.value}" /></p>
-                    <p class="staff-metric-trend ${card.positive ? '' : 'is-negative'}">
-                        <strong>
-                            <c:choose>
-                                <c:when test="${card.positive}">&uarr;</c:when>
-                                <c:otherwise>&darr;</c:otherwise>
-                            </c:choose>
-                            ${card.percentLabel}
-                        </strong>
-                        <span>vs ${metricPeriodLabel}</span>
-                    </p>
                 </div>
             </div>
             <div class="staff-spark-row">
@@ -736,7 +715,7 @@
                     </div>
                     <div class="staff-summary-item">
                         <span class="staff-summary-icon tone-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.3 4.2 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
-                        <div><p class="erp-widget-title"><spring:message code="staff.analytics.defaultedAfterApproval" text="Defaulted After Approval" /></p><p class="staff-metric-value text-[1.35rem]"><fmt:formatNumber value="${staffPortfolio.defaultedAfterApproval}" /></p></div>
+                        <div><p class="erp-widget-title"><spring:message code="staff.analytics.defaultedAfterApproval" text="Defaulted" /></p><p class="staff-metric-value text-[1.35rem]"><fmt:formatNumber value="${staffPortfolio.defaultedAfterApproval}" /></p></div>
                     </div>
                 </div>
                 <c:if test="${stationWideStaffView}">
@@ -862,6 +841,7 @@
     </span>
 </div>
 
+<%@ include file="../fragments/analytics-chart-utils.jspf" %>
 <script>
 window.addEventListener('load', function () {
     const productSeries = ${productPerformanceJson};
@@ -926,12 +906,6 @@ function renderLegend(svg, series, startX, y) {
         addText(svg, item.name, x + 17, y, { fill: '#334155', 'font-size': 12, 'font-weight': 700 });
         x += Math.max(105, String(item.name).length * 8 + 36);
     });
-}
-
-function niceMax(value) {
-    const safe = Math.max(1, value || 0);
-    const magnitude = Math.pow(10, Math.floor(Math.log10(safe)));
-    return Math.ceil(safe / magnitude) * magnitude;
 }
 
 function renderMetricSparklines(series) {
@@ -1037,18 +1011,19 @@ function renderGroupedBarChart(targetId, series) {
     const tooltip = createChartTooltip(target);
     const svg = chartSvg(width, height);
     const points = (series[0] && series[0].dataPoints) || [];
-    const maxY = niceMax(Math.max.apply(null, series.flatMap(function (item) {
+    const axis = integerChartAxis(Math.max.apply(null, series.flatMap(function (item) {
         return item.dataPoints.map(function (point) { return point.y || 0; });
-    }).concat([0])));
+    }).concat([0])), 4);
+    const maxY = axis.max;
     const plotW = width - margin.left - margin.right;
     const plotH = height - margin.top - margin.bottom;
     const hoverLayer = svgEl('g', {});
     renderLegend(svg, series, Math.max(margin.left, (width - series.length * 135) / 2), 18);
-    for (let i = 0; i <= 4; i++) {
-        const y = margin.top + plotH - (plotH * i / 4);
+    axis.ticks.forEach(function (tick) {
+        const y = margin.top + plotH - (plotH * tick / maxY);
         svg.appendChild(svgEl('line', { x1: margin.left, y1: y, x2: width - margin.right, y2: y, stroke: '#e2e8f0', 'stroke-width': 1 }));
-        addText(svg, Math.round(maxY * i / 4), 8, y + 4, { fill: '#334155', 'font-size': 11, 'font-weight': 600 });
-    }
+        addText(svg, tick, 8, y + 4, { fill: '#334155', 'font-size': 11, 'font-weight': 600 });
+    });
     const groupW = plotW / Math.max(points.length, 1);
     const barW = Math.max(5, Math.min(18, groupW / (series.length + 1.6)));
     points.forEach(function (point, pointIndex) {
@@ -1156,19 +1131,20 @@ function renderLineChart(targetId, series, interval, rangeCount) {
     const tooltip = createChartTooltip(target);
     const svg = chartSvg(width, height);
     const firstPoints = (series[0] && series[0].dataPoints) || [];
-    const maxY = niceMax(Math.max.apply(null, series.flatMap(function (item) {
+    const axis = integerChartAxis(Math.max.apply(null, series.flatMap(function (item) {
         return item.dataPoints.map(function (point) { return point.y || 0; });
-    }).concat([0])));
+    }).concat([0])), 4);
+    const maxY = axis.max;
     const plotW = width - margin.left - margin.right;
     const plotH = height - margin.top - margin.bottom;
     const hoverLayer = svgEl('g', {});
     const guide = svgEl('line', { x1: margin.left, y1: margin.top, x2: margin.left, y2: margin.top + plotH, stroke: '#94a3b8', 'stroke-width': 1, 'stroke-dasharray': '4 4', opacity: 0 });
     renderLegend(svg, series, Math.max(margin.left, (width - series.length * 115) / 2), 18);
-    for (let i = 0; i <= 4; i++) {
-        const y = margin.top + plotH - (plotH * i / 4);
+    axis.ticks.forEach(function (tick) {
+        const y = margin.top + plotH - (plotH * tick / maxY);
         svg.appendChild(svgEl('line', { x1: margin.left, y1: y, x2: width - margin.right, y2: y, stroke: '#e2e8f0', 'stroke-width': 1 }));
-        addText(svg, Math.round(maxY * i / 4), 8, y + 4, { fill: '#334155', 'font-size': 11, 'font-weight': 600 });
-    }
+        addText(svg, tick, 8, y + 4, { fill: '#334155', 'font-size': 11, 'font-weight': 600 });
+    });
     const step = firstPoints.length > 1 ? plotW / (firstPoints.length - 1) : plotW;
     const labelEvery = Math.max(1, Math.ceil(firstPoints.length / 8));
     firstPoints.forEach(function (point, index) {

@@ -12,6 +12,7 @@ import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
+import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
@@ -36,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +50,7 @@ class LoanReportServiceTest {
 
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private LoanPaymentTransactionRepository loanPaymentTransactionRepository;
+    @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
@@ -55,6 +58,7 @@ class LoanReportServiceTest {
     @Mock private LoanAnalyticsService loanAnalyticsService;
     @Mock private RegisteredSaccoRepository registeredSaccoRepository;
     @Mock private SaccoStationRepository saccoStationRepository;
+    @Mock private SaccoLogoStorageService saccoLogoStorageService;
 
     private LoanReportService loanReportService;
 
@@ -63,6 +67,7 @@ class LoanReportServiceTest {
         loanReportService = new LoanReportService(
             loanApplicationRepository,
             loanPaymentTransactionRepository,
+            loanProductSettingRepository,
             memberRepository,
             guarantorRequestRepository,
             boardReviewRepository,
@@ -71,7 +76,8 @@ class LoanReportServiceTest {
             loanAnalyticsService,
             registeredSaccoRepository,
             saccoStationRepository,
-            new ApplicationClock("Africa/Nairobi")
+            new ApplicationClock("Africa/Nairobi"),
+            saccoLogoStorageService
         );
     }
 
@@ -155,6 +161,7 @@ class LoanReportServiceTest {
     void stationAnalyticsPdfShowsClearZeroActivityYearlyGraph() throws Exception {
         LoanReportService.StationAnalyticsExportReport report = new LoanReportService.StationAnalyticsExportReport(
             "IAA",
+            "TAHA SACCOS",
             "AR704",
             LocalDate.of(2025, 6, 19),
             LocalDate.of(2026, 6, 19),
@@ -217,6 +224,176 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void stationStaffAnalyticsFinancialRowsPreferPersistedInstallmentPaymentsForOlderLoans() {
+        UUID loanId = UUID.randomUUID();
+        Member manager = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("IAA")
+            .stationId("AR704")
+            .memberNo("MGR-1")
+            .fullName("Alex Jumapili")
+            .position(com.sacco.mvp.domain.Position.MANAGER)
+            .staffRoles(Set.of(com.sacco.mvp.domain.Position.MANAGER))
+            .memberAccount(false)
+            .passwordHash("secret")
+            .build();
+        var principal = new com.sacco.mvp.security.AppUserPrincipal(manager, Set.of());
+        LoanApplication olderActiveLoan = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("IAA")
+            .stationId("AR704")
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.LOAN_ADVANCE)
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2025-01-10T08:00:00Z"))
+            .loanPaymentSummaryJson("""
+                {
+                  "principalAmount": 700000.00,
+                  "interestAmount": 70000.00,
+                  "outstandingPrincipal": 200000.00,
+                  "outstandingInterest": 10000.00,
+                  "totalOutstanding": 210000.00
+                }
+                """)
+            .build();
+        LoanPaymentTransaction inRangePayment = LoanPaymentTransaction.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .saccoId("IAA")
+            .externalLoanId("LN-1")
+            .principalPaid(new BigDecimal("500000.00"))
+            .interestPaid(new BigDecimal("60000.00"))
+            .totalPaid(new BigDecimal("560000.00"))
+            .receiptDate(LocalDate.of(2026, 7, 8))
+            .outstandingBalance(new BigDecimal("210000.00"))
+            .fetchedAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .build();
+        LoanAnalyticsService.MemberLoanAnalytics analytics =
+            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO);
+
+        when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(analytics);
+        when(loanAnalyticsService.statusTrendForStation(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
+        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
+            .thenReturn(List.of(olderActiveLoan));
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of(inRangePayment));
+        when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
+        when(saccoStationRepository.findBySaccoIdAndStationId("IAA", "AR704")).thenReturn(Optional.empty());
+
+        LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
+            principal,
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            LoanType.LOAN_ADVANCE,
+            "staff"
+        );
+
+        LoanReportService.ProductPerformanceRow productRow = report.productRows().stream()
+            .filter(row -> row.label().equals("Loan Advance (Mkopo wa Chapchap)"))
+            .findFirst()
+            .orElseThrow();
+        LoanReportService.ProductFinancialBreakdownRow financialRow = report.productFinancialRows().stream()
+            .filter(row -> row.loanProduct().equals("Loan Advance (Mkopo wa Chapchap)"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(productRow.applied()).isZero();
+        assertThat(productRow.interestPaid()).isEqualByComparingTo("60000.00");
+        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("60000.00");
+        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("10000.00");
+        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("500000.00");
+        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("200000.00");
+    }
+
+    @Test
+    void stationFinancialAnalyticsFallsBackToPaymentSummaryWhenTransactionsAreMissing() {
+        UUID loanId = UUID.randomUUID();
+        Member manager = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("IAA")
+            .stationId("AR704")
+            .memberNo("MGR-1")
+            .fullName("Alex Jumapili")
+            .position(com.sacco.mvp.domain.Position.MANAGER)
+            .staffRoles(Set.of(com.sacco.mvp.domain.Position.MANAGER))
+            .memberAccount(false)
+            .passwordHash("secret")
+            .build();
+        var principal = new com.sacco.mvp.security.AppUserPrincipal(manager, Set.of());
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("IAA")
+            .stationId("AR704")
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .financialSnapshot("""
+                {"interestAmount":70000.00}
+                """)
+            .loanPaymentSummaryJson("""
+                {
+                  "principalAmount": 700000.00,
+                  "interestAmount": 24500.00,
+                  "totalPrincipalPaid": 500000.00,
+                  "totalInterestPaid": 60000.00,
+                  "outstandingPrincipal": 200000.00,
+                  "outstandingInterest": -35500.00,
+                  "totalOutstanding": 164500.00
+                }
+                """)
+            .build();
+        LoanAnalyticsService.MemberLoanAnalytics analytics =
+            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO);
+
+        when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(analytics);
+        when(loanAnalyticsService.statusTrendForStation(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
+        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of());
+        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
+            .thenReturn(List.of(activeLoan));
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of());
+        when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
+        when(saccoStationRepository.findBySaccoIdAndStationId("IAA", "AR704")).thenReturn(Optional.empty());
+
+        LoanReportService.AnalyticsExportReport report = loanReportService.staffAnalyticsExportReport(
+            principal,
+            LocalDate.of(2025, 7, 13),
+            LocalDate.of(2026, 7, 13),
+            LoanType.EDUCATION_LOAN,
+            "staff"
+        );
+
+        LoanReportService.ProductFinancialBreakdownRow financialRow = report.productFinancialRows().stream()
+            .filter(row -> row.loanProduct().equals("Education Loan (Mkopo wa Elimu)"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(report.productRows().stream()
+            .filter(row -> row.label().equals("Education Loan (Mkopo wa Elimu)"))
+            .findFirst()
+            .orElseThrow()
+            .interestPaid()).isEqualByComparingTo("60000.00");
+        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("60000.00");
+        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("10000.00");
+        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("500000.00");
+        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("200000.00");
+    }
+
+    @Test
     void memberActiveLoanDetailsUseFilteredTransactionInterestAndOutstandingInterest() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
@@ -265,6 +442,51 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void memberActiveLoanDetailsUseSnapshotAndSummaryWhenTransactionsAreMissing() {
+        UUID memberId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        LoanApplication loan = LoanApplication.builder()
+            .id(loanId)
+            .applicantMemberId(memberId)
+            .loanType(LoanType.EDUCATION_LOAN)
+            .loanId("10706")
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .financialSnapshot("""
+                {"interestAmount":70000.00}
+                """)
+            .loanPaymentSummaryJson("""
+                {
+                  "principalAmount": 700000.00,
+                  "interestAmount": 24500.00,
+                  "totalPrincipalPaid": 500000.00,
+                  "totalInterestPaid": 60000.00,
+                  "outstandingPrincipal": 200000.00,
+                  "outstandingInterest": -35500.00,
+                  "totalOutstanding": 164500.00
+                }
+                """)
+            .build();
+
+        when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
+            .thenReturn(List.of(loan));
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of());
+
+        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
+            memberId, LocalDate.of(2025, 7, 13), LocalDate.of(2026, 7, 13), null);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.getFirst().loanAmount()).isEqualTo("700,000");
+        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("164,500");
+        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("70,000");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("500,000");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("60,000");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("10,000");
+    }
+
+    @Test
     void memberAnalyticsPdfUsesTwoPageFormalTemplate() throws Exception {
         byte[] pdf = loanReportService.buildMemberAnalyticsPdf(exportReport(LoanReportService.ReportKind.MEMBER));
 
@@ -304,6 +526,8 @@ class LoanReportServiceTest {
             .build();
 
         when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(paidLoan, activeLoan));
+        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
             .thenReturn(List.of(paidLoan, activeLoan));
         when(memberRepository.countActiveMemberAccountsForScope("IAA", "AR704")).thenReturn(10L);
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
@@ -352,9 +576,64 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void stationAnalyticsReportUsesSummaryInterestWhenTransactionsAreMissing() {
+        UUID activeLoanId = UUID.randomUUID();
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(activeLoanId)
+            .saccoId("TAHA")
+            .stationId("AR704")
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .updatedAt(OffsetDateTime.parse("2026-07-13T10:00:00Z"))
+            .loanPaymentSummaryJson("""
+                {
+                  "totalInterestPaid": 60000.00
+                }
+                """)
+            .build();
+
+        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(activeLoan));
+        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
+            .thenReturn(List.of(activeLoan));
+        when(memberRepository.countActiveMemberAccountsForScope("TAHA", "AR704")).thenReturn(3L);
+        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
+            .thenReturn(List.of());
+        when(registeredSaccoRepository.findById("TAHA"))
+            .thenReturn(Optional.of(com.sacco.mvp.domain.RegisteredSacco.builder()
+                .saccoId("TAHA")
+                .saccoName("TAHA SACCOS")
+                .active(true)
+                .createdAt(OffsetDateTime.now())
+                .updatedAt(OffsetDateTime.now())
+                .build()));
+
+        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+            "TAHA",
+            "AR704",
+            LocalDate.of(2025, 7, 13),
+            LocalDate.of(2026, 7, 13),
+            LoanType.EDUCATION_LOAN,
+            "Daniel Sikukuu",
+            "Manager"
+        );
+
+        assertThat(report.saccoName()).isEqualTo("TAHA SACCOS");
+        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("60000.00");
+        assertThat(report.yearlyRows()).anySatisfy(row -> {
+            assertThat(row.year()).isEqualTo(2026);
+            assertThat(row.totalPaidInterestAccumulated()).isEqualByComparingTo("60000.00");
+        });
+    }
+
+    @Test
     void stationAnalyticsExcelContainsApplicantAndYearlyInterestHeaders() throws Exception {
         LoanReportService.StationAnalyticsExportReport report = new LoanReportService.StationAnalyticsExportReport(
             "IAA",
+            "TAHA SACCOS",
             "AR704",
             LocalDate.of(2026, 1, 1),
             LocalDate.of(2026, 12, 31),
@@ -384,10 +663,6 @@ class LoanReportServiceTest {
     private LoanReportService.AnalyticsExportReport exportReport(LoanReportService.ReportKind kind) {
         LoanAnalyticsService.MemberLoanAnalytics analytics = new LoanAnalyticsService.MemberLoanAnalytics(
             0, 4, 0, 0, 5, 4, new BigDecimal("772000.00"));
-        Map<String, LoanAnalyticsService.MetricDelta> deltas = new LinkedHashMap<>();
-        for (String key : List.of("applied", "active", "disbursed", "paid", "defaulted", "rejected")) {
-            deltas.put(key, new LoanAnalyticsService.MetricDelta(key, key.equals("applied") ? new BigDecimal("100.00") : BigDecimal.ZERO, false));
-        }
         Member member = Member.builder()
             .id(UUID.randomUUID())
             .fullName("David Wankyo")
@@ -397,6 +672,7 @@ class LoanReportServiceTest {
         return new LoanReportService.AnalyticsExportReport(
             kind,
             "IAA SACCOS LTD",
+            "SACCO-1",
             kind == LoanReportService.ReportKind.MEMBER
                 ? "MEMBER LOAN REPORT"
                 : kind == LoanReportService.ReportKind.STAFF ? "STAFF LOAN REVIEW REPORT" : "STATION LOAN STATUS REPORT",
@@ -410,8 +686,6 @@ class LoanReportServiceTest {
             "All Products",
             kind == LoanReportService.ReportKind.MEMBER ? member : null,
             analytics,
-            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
-            deltas,
             new LoanAnalyticsService.StaffPortfolioSummary(5, 4, 0, 4, 0, BigDecimal.ZERO, "Low"),
             List.of(new LoanReportService.ProductPerformanceRow("Loan Advance", 5, 5, 4, 0, 0, 0, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),
             List.of(new LoanReportService.ProductFinancialBreakdownRow("Loan Advance", new BigDecimal("15000.00"), new BigDecimal("13000.00"), new BigDecimal("28000.00"), new BigDecimal("772000.00"))),

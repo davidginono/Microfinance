@@ -13,6 +13,10 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
 
     Optional<LoanProductSetting> findBySaccoIdAndLoanType(String saccoId, LoanType loanType);
 
+    Optional<LoanProductSetting> findByIdAndSaccoId(UUID id, String saccoId);
+
+    Optional<LoanProductSetting> findByIdAndSaccoIdAndActiveTrue(UUID id, String saccoId);
+
     List<LoanProductSetting> findBySaccoIdAndActiveTrue(String saccoId);
 
     List<LoanProductSetting> findBySaccoIdOrderByLoanTypeAsc(String saccoId);

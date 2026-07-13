@@ -21,23 +21,20 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SaccoLogoStorageService {
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("png", "jpg", "jpeg");
-    private static final long MAX_FILE_SIZE_BYTES = 1_048_576L;
-    private static final int MIN_WIDTH = 64;
-    private static final int MIN_HEIGHT = 64;
-    private static final int MAX_WIDTH = 1024;
-    private static final int MAX_HEIGHT = 1024;
 
     private final StoredUploadStorageService storedUploadStorageService;
+    private final PlatformBrandingSettingsService platformBrandingSettingsService;
 
     public void store(String saccoId, MultipartFile logoFile) {
         if (logoFile == null || logoFile.isEmpty()) {
             return;
         }
 
+        LogoUploadPolicy policy = platformBrandingSettingsService.logoUploadPolicy();
         resolveAllowedExtension(logoFile);
-        validateSize(logoFile);
+        validateSize(logoFile, policy);
         byte[] bytes = readBytes(logoFile);
-        validateImageDimensions(bytes);
+        validateImageDimensions(bytes, policy);
         storedUploadStorageService.replaceCategory(
             StoredUploadStorageService.OWNER_SACCO,
             requireSaccoId(saccoId),
@@ -90,9 +87,9 @@ public class SaccoLogoStorageService {
         return "jpg".equals(normalized) ? "jpeg" : normalized;
     }
 
-    private void validateSize(MultipartFile logoFile) {
-        if (logoFile.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw new IllegalStateException("SACCO logo image must be 1 MB or smaller.");
+    private void validateSize(MultipartFile logoFile, LogoUploadPolicy policy) {
+        if (logoFile.getSize() > policy.maxFileSizeBytes()) {
+            throw new IllegalStateException("SACCO logo image must be " + policy.maxFileSizeLabel() + " or smaller.");
         }
     }
 
@@ -104,7 +101,7 @@ public class SaccoLogoStorageService {
         }
     }
 
-    private void validateImageDimensions(byte[] bytes) {
+    private void validateImageDimensions(byte[] bytes, LogoUploadPolicy policy) {
         try {
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
             if (image == null) {
@@ -112,8 +109,11 @@ public class SaccoLogoStorageService {
             }
             int width = image.getWidth();
             int height = image.getHeight();
-            if (width < MIN_WIDTH || height < MIN_HEIGHT || width > MAX_WIDTH || height > MAX_HEIGHT) {
-                throw new IllegalStateException("SACCO logo image must be between 64x64 and 1024x1024 pixels.");
+            if (width < policy.minWidthPx()
+                || height < policy.minHeightPx()
+                || width > policy.maxWidthPx()
+                || height > policy.maxHeightPx()) {
+                throw new IllegalStateException("SACCO logo image must be between " + policy.dimensionsLabel() + ".");
             }
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to inspect the SACCO logo image.", ex);

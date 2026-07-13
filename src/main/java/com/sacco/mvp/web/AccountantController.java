@@ -289,9 +289,11 @@ public class AccountantController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
         var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
         model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,
@@ -350,6 +352,7 @@ public class AccountantController {
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("allowPaymentSync", false);
+        model.addAttribute("allowDefaultedPaymentRecheck", false);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";
     }

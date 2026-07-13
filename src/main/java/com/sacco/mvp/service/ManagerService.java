@@ -400,31 +400,18 @@ public class ManagerService {
     }
 
     /**
-     * Manager-triggered on-demand refresh of payment transactions for the last
-     * {@code monthsBack} calendar months. Returns the number of newly inserted
-     * rows so the caller can surface it as a flash message.
+     * Manager-triggered full payment-history reconciliation. Returns the number
+     * of inserted or removed rows so the caller can surface it as a flash message.
      */
-    public int syncLoanPayments(UUID applicationId, UUID managerId, int monthsBack) {
+    public int syncLoanPayments(UUID applicationId, UUID managerId) {
         LoanApplication app = getManagedApplication(applicationId, managerId);
         if (app.getLoanId() == null || app.getLoanId().isBlank()) {
             throw new IllegalStateException("This loan has not been disbursed yet.");
         }
-        return loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
-    }
-
-    public DefaultedLoanRecheckResult recheckDefaultedLoanPaymentStatus(UUID applicationId, UUID managerId, int monthsBack) {
-        LoanApplication app = getManagedApplication(applicationId, managerId);
-        if (app.getStatus() != LoanStatus.DEFAULTED) {
-            throw new IllegalStateException("Only defaulted loans can be rechecked with this action.");
+        if (app.getStatus() == LoanStatus.DEFAULTED) {
+            throw new IllegalStateException("Defaulted loan recovery is available in the Disbursement/Teller workspace.");
         }
-        if (app.getLoanId() == null || app.getLoanId().isBlank()) {
-            throw new IllegalStateException("This defaulted loan does not have a loan ID to verify.");
-        }
-        int inserted = loanPaymentTransactionSyncService.syncRecentAndRefreshSummary(app, monthsBack);
-        return new DefaultedLoanRecheckResult(inserted, app.getStatus() == LoanStatus.PAID, app.getStatus());
-    }
-
-    public record DefaultedLoanRecheckResult(int insertedTransactions, boolean paid, LoanStatus status) {
+        return loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
     }
 
     public boolean matchesApplicantStation(LoanApplication loan, String stationId) {
@@ -439,7 +426,10 @@ public class ManagerService {
         if (app == null || app.getLoanType() == null) {
             return true;
         }
-        return loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType())
+        java.util.Optional<LoanProductSetting> product = app.getLoanProductSettingId() == null
+            ? loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType())
+            : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId());
+        return product
             .map(LoanProductSetting::isDisbursementProofRequired)
             .orElse(true);
     }

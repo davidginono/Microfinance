@@ -36,8 +36,9 @@ public class RepaymentScheduleService {
         int installments = frequency == RepaymentFrequency.WEEKLY
             ? Math.max(app.getTenorMonths() * 4, 1)
             : Math.max(app.getTenorMonths(), 1);
-        LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType())
-            .orElse(null);
+        LoanProductSetting product = app.getLoanProductSettingId() == null
+            ? loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(app.getSaccoId(), app.getLoanType()).orElse(null)
+            : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId()).orElse(null);
         BigDecimal configuredRate = resolveAnnualInterestRate(app, product);
         InterestMethod interestMethod = resolveInterestMethod(app, product);
         BigDecimal totalFlatInterest = resolveFlatInterestAmount(app, configuredRate);

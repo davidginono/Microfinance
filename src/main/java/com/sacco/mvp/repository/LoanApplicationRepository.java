@@ -87,6 +87,20 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                      @Param("loanType") LoanType loanType,
                                                      @Param("status") LoanStatus status);
 
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and l.status in :statuses
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+        order by l.createdAt desc
+        """)
+    List<LoanApplication> findScopeLoansForStationFinancialAnalytics(@Param("saccoId") String saccoId,
+                                                                     @Param("stationId") String stationId,
+                                                                     @Param("statuses") Collection<LoanStatus> statuses,
+                                                                     @Param("loanType") LoanType loanType);
+
     List<LoanApplication> findBySaccoIdOrderByCreatedAtDesc(String saccoId);
     List<LoanApplication> findBySaccoIdIn(Collection<String> saccoIds);
     List<LoanApplication> findBySaccoIdAndStatusOrderByCreatedAtAsc(String saccoId, LoanStatus status);

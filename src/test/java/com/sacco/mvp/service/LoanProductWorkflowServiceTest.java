@@ -15,9 +15,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LoanProductWorkflowServiceTest {
@@ -154,6 +158,35 @@ class LoanProductWorkflowServiceTest {
         assertThat(definition.managerPriority()).isEqualTo(2);
         assertThat(definition.loanOfficerPriority()).isEqualTo(1);
         assertThat(definition.startStage()).isEqualTo(ApprovalWorkflowStage.LOAN_OFFICER);
+    }
+
+    @Test
+    void resolvesApplicationWorkflowByStoredProductIdWhenLoanTypesAreShared() {
+        LoanProductWorkflowService service = new LoanProductWorkflowService(
+            new ObjectMapper(),
+            loanProductSettingRepository,
+            saccoSettingsRepository
+        );
+        LoanProductSetting selectedProduct = product(false, true, false, false, ApprovalWorkflowStage.LOAN_OFFICER);
+        selectedProduct.setLoanType(LoanType.EDUCATION_LOAN);
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-01")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .loanProductSettingId(selectedProduct.getId())
+            .status(LoanStatus.DRAFT)
+            .build();
+        when(loanProductSettingRepository.findByIdAndSaccoId(selectedProduct.getId(), "SACCO-01"))
+            .thenReturn(Optional.of(selectedProduct));
+
+        LoanProductWorkflowService.WorkflowDefinition definition = service.resolveForApplication(app);
+
+        assertThat(definition.stages()).containsExactly(
+            ApprovalWorkflowStage.LOAN_OFFICER,
+            ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+        );
+        verify(loanProductSettingRepository, never())
+            .findBySaccoIdAndLoanType("SACCO-01", LoanType.EDUCATION_LOAN);
     }
 
     private LoanProductSetting product(boolean manager,

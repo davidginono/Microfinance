@@ -23,6 +23,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,9 +34,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Reusable loan-payment sync logic. Called by both the monthly scheduler
- * (with a single target month) and by the manager-triggered manual refresh
- * (with a window spanning several past months).
+ * Reconciles the complete immutable payment history returned by memberportal.
+ * The summary endpoint supplies the latest balances, which are rolled backward
+ * across the stored payment records.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,37 +51,8 @@ public class LoanPaymentTransactionSyncService {
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Fetches every transaction the memberportal has for the loan and
-     * upserts those whose {@code receiptDate} falls within {@code target}.
-     *
-     * @return number of rows inserted (existing duplicates are skipped).
-     */
     @Transactional
-    public int syncMonth(LoanApplication loan, YearMonth target) {
-        return syncInternal(loan, transaction -> target.equals(YearMonth.from(transaction.receiptDate())), false);
-    }
-
-    /**
-     * Upserts every transaction whose {@code receiptDate} is within the last
-     * {@code monthsBack} calendar months (inclusive of the current month).
-     * Used by the on-demand manager action to backfill history.
-     */
-    @Transactional
-    public int syncRecent(LoanApplication loan, int monthsBack) {
-        YearMonth cutoff = YearMonth.now().minusMonths(Math.max(monthsBack - 1, 0));
-        return syncInternal(loan, transaction -> !YearMonth.from(transaction.receiptDate()).isBefore(cutoff), false);
-    }
-
-    @Transactional
-    public int syncRecentAndRefreshSummary(LoanApplication loan, int monthsBack) {
-        YearMonth cutoff = YearMonth.now().minusMonths(Math.max(monthsBack - 1, 0));
-        return syncInternal(loan, transaction -> !YearMonth.from(transaction.receiptDate()).isBefore(cutoff), true);
-    }
-
-    private int syncInternal(LoanApplication loan,
-                             java.util.function.Predicate<LoanPaymentTransactionDto> filter,
-                             boolean refreshSummaryEvenWithoutTransactions) {
+    public int syncAllAndRefreshSummary(LoanApplication loan) {
         if (loan.getLoanId() == null || loan.getLoanId().isBlank()) {
             log.debug("Skipping payment sync for application {} without a loan ID", loan.getId());
             return 0;
@@ -100,51 +75,70 @@ public class LoanPaymentTransactionSyncService {
         List<LoanPaymentTransactionDto> transactions = client.fetchTransactions(
             applicant.getMemberNo(), loanStationId, loan.getLoanId());
 
-        int inserted = 0;
         OffsetDateTime fetchedAt = OffsetDateTime.now();
-        boolean matchedTransactions = false;
+        List<LoanPaymentTransaction> storedTransactions = new ArrayList<>(transactionRepository
+            .findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(loan.getId()));
+        Map<PaymentIdentity, LoanPaymentTransaction> storedByIdentity = new HashMap<>();
+        for (LoanPaymentTransaction stored : storedTransactions) {
+            storedByIdentity.put(paymentIdentity(stored), stored);
+        }
+
+        Map<PaymentSignature, Integer> occurrences = new LinkedHashMap<>();
+        List<LoanPaymentTransaction> reconciledTransactions = new ArrayList<>();
+        int inserted = 0;
+        int providerOrder = 0;
         boolean matchedFinalInstallmentMonth = false;
         for (LoanPaymentTransactionDto dto : transactions) {
-            if (dto == null || dto.receiptDate() == null || dto.totalPaid() == null) {
+            if (!isValidPayment(dto)) {
                 continue;
             }
-            if (dto.totalPaid().signum() <= 0) {
-                continue;
+            PaymentSignature signature = paymentSignature(dto);
+            int duplicateOccurrence = occurrences.getOrDefault(signature, 0);
+            occurrences.put(signature, duplicateOccurrence + 1);
+            PaymentIdentity identity = new PaymentIdentity(signature, duplicateOccurrence);
+            LoanPaymentTransaction transaction = storedByIdentity.remove(identity);
+            if (transaction == null) {
+                transaction = LoanPaymentTransaction.builder()
+                    .id(UUID.randomUUID())
+                    .loanApplicationId(loan.getId())
+                    .saccoId(loan.getSaccoId())
+                    .externalLoanId(loan.getLoanId())
+                    .receiptDate(dto.receiptDate())
+                    .principalPaid(dto.principalPaid())
+                    .interestPaid(dto.interestPaid())
+                    .totalPaid(dto.totalPaid())
+                    .duplicateOccurrence(duplicateOccurrence)
+                    .build();
+                storedTransactions.add(transaction);
+                inserted++;
             }
-            if (!filter.test(dto)) {
-                continue;
-            }
-            matchedTransactions = true;
+            transaction.setSaccoId(loan.getSaccoId());
+            transaction.setExternalLoanId(loan.getLoanId());
+            transaction.setProviderOrder(providerOrder++);
+            transaction.setFetchedAt(fetchedAt);
+            reconciledTransactions.add(transaction);
             if (isFinalInstallmentMonth(loan, dto.receiptDate())) {
                 matchedFinalInstallmentMonth = true;
             }
-            boolean exists = transactionRepository
-                .existsByLoanApplicationIdAndReceiptDateAndPrincipalPaidAndInterestPaidAndTotalPaid(
-                    loan.getId(),
-                    dto.receiptDate(),
-                    dto.principalPaid(),
-                    dto.interestPaid(),
-                    dto.totalPaid());
-            if (exists) {
-                continue;
+        }
+        if (!reconciledTransactions.isEmpty()) {
+            transactionRepository.saveAll(reconciledTransactions);
+        }
+        List<LoanPaymentTransaction> removedTransactions = new ArrayList<>(storedByIdentity.values());
+        if (!removedTransactions.isEmpty()) {
+            transactionRepository.deleteAllInBatch(removedTransactions);
+            storedTransactions.removeAll(removedTransactions);
+        }
+
+        Optional<LoanPaymentSummaryDto> paymentSummary = fetchLoanPaymentSummary(loan, applicant);
+        if (paymentSummary.isPresent()) {
+            applyOutstandingBalances(storedTransactions, paymentSummary.get(), fetchedAt);
+            if (!storedTransactions.isEmpty()) {
+                transactionRepository.saveAll(storedTransactions);
             }
-            transactionRepository.save(LoanPaymentTransaction.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(loan.getId())
-                .saccoId(loan.getSaccoId())
-                .externalLoanId(loan.getLoanId())
-                .receiptDate(dto.receiptDate())
-                .principalPaid(dto.principalPaid())
-                .interestPaid(dto.interestPaid())
-                .totalPaid(dto.totalPaid())
-                .fetchedAt(fetchedAt)
-                .build());
-            inserted++;
+            applySummary(loan, paymentSummary.get(), fetchedAt, matchedFinalInstallmentMonth);
         }
-        if (matchedTransactions || refreshSummaryEvenWithoutTransactions) {
-            refreshLoanPaymentSummary(loan, applicant, fetchedAt, matchedFinalInstallmentMonth);
-        }
-        return inserted;
+        return inserted + removedTransactions.size();
     }
 
     private boolean isFinalInstallmentMonth(LoanApplication loan, LocalDate receiptDate) {
@@ -153,22 +147,81 @@ public class LoanPaymentTransactionSyncService {
             && YearMonth.from(loan.getFinalDueDate()).equals(YearMonth.from(receiptDate));
     }
 
-    private void refreshLoanPaymentSummary(LoanApplication loan,
-                                           Member applicant,
-                                           OffsetDateTime fetchedAt,
-                                           boolean finalInstallmentMonthMatched) {
+    private Optional<LoanPaymentSummaryDto> fetchLoanPaymentSummary(LoanApplication loan, Member applicant) {
         try {
-            Optional<LoanPaymentSummaryDto> summaryOpt = loanPaymentSummaryClient.fetchSummary(
+            return loanPaymentSummaryClient.fetchSummary(
                 applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
-            if (summaryOpt.isEmpty()) {
-                return;
-            }
-            applySummary(loan, summaryOpt.get(), fetchedAt, finalInstallmentMonthMatched);
         } catch (LoanPaymentLookupException ex) {
             log.warn("Loan payment summary sync failed for applicationNumber={} loanId={}: {}",
                 loan.getApplicationNumber(), loan.getLoanId(), ex.getMessage());
+            return Optional.empty();
         }
     }
+
+    private void applyOutstandingBalances(List<LoanPaymentTransaction> transactions,
+                                          LoanPaymentSummaryDto summary,
+                                          OffsetDateTime fetchedAt) {
+        List<LoanPaymentTransaction> newestFirst = transactions.stream()
+            .filter(transaction -> transaction.getReceiptDate() != null)
+            .sorted(Comparator.comparing(LoanPaymentTransaction::getReceiptDate).reversed()
+                .thenComparingInt(LoanPaymentTransaction::getProviderOrder)
+                .thenComparingInt(LoanPaymentTransaction::getDuplicateOccurrence)
+                .thenComparing(LoanPaymentTransaction::getId))
+            .toList();
+        BigDecimal outstandingTotal = summary.totalOutstanding();
+        BigDecimal outstandingPrincipal = summary.outstandingPrincipal();
+        BigDecimal outstandingInterest = summary.outstandingInterest();
+        for (LoanPaymentTransaction transaction : newestFirst) {
+            transaction.setOutstandingBalance(outstandingTotal);
+            transaction.setOutstandingPrincipal(outstandingPrincipal);
+            transaction.setOutstandingInterest(outstandingInterest);
+            transaction.setFetchedAt(fetchedAt);
+            outstandingTotal = addNullable(outstandingTotal, transaction.getTotalPaid());
+            outstandingPrincipal = addNullable(outstandingPrincipal, transaction.getPrincipalPaid());
+            outstandingInterest = addNullable(outstandingInterest, transaction.getInterestPaid());
+        }
+    }
+
+    private BigDecimal addNullable(BigDecimal balance, BigDecimal paid) {
+        return balance == null || paid == null ? null : balance.add(paid);
+    }
+
+    private boolean isValidPayment(LoanPaymentTransactionDto dto) {
+        return dto != null
+            && dto.receiptDate() != null
+            && dto.principalPaid() != null
+            && dto.interestPaid() != null
+            && dto.totalPaid() != null
+            && dto.principalPaid().signum() >= 0
+            && dto.interestPaid().signum() >= 0
+            && dto.totalPaid().signum() > 0;
+    }
+
+    private PaymentIdentity paymentIdentity(LoanPaymentTransaction transaction) {
+        return new PaymentIdentity(new PaymentSignature(
+            transaction.getReceiptDate(),
+            canonicalMoney(transaction.getPrincipalPaid()),
+            canonicalMoney(transaction.getInterestPaid()),
+            canonicalMoney(transaction.getTotalPaid())
+        ), transaction.getDuplicateOccurrence());
+    }
+
+    private PaymentSignature paymentSignature(LoanPaymentTransactionDto dto) {
+        return new PaymentSignature(
+            dto.receiptDate(),
+            canonicalMoney(dto.principalPaid()),
+            canonicalMoney(dto.interestPaid()),
+            canonicalMoney(dto.totalPaid())
+        );
+    }
+
+    private String canonicalMoney(BigDecimal value) {
+        return value == null ? "" : value.stripTrailingZeros().toPlainString();
+    }
+
+    private record PaymentSignature(LocalDate receiptDate, String principalPaid, String interestPaid, String totalPaid) {}
+
+    private record PaymentIdentity(PaymentSignature signature, int duplicateOccurrence) {}
 
     private void applySummary(LoanApplication loan,
                               LoanPaymentSummaryDto summary,

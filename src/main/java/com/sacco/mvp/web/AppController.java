@@ -39,6 +39,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
@@ -163,7 +164,7 @@ public class AppController {
         model.addAttribute("currentWorkflowProductName",
             currentWorkflowApplication == null
                 ? "-"
-                : loanProductName(currentWorkflowApplication.getLoanType(), loanProductNames));
+                : loanProductName(currentWorkflowApplication, loanProductNames));
         model.addAttribute("currentWorkflowApplicantReason",
             currentWorkflowApplication == null
                 ? ""
@@ -241,6 +242,7 @@ public class AppController {
         LoanApplication currentWorkflowApplication = applications.latestCurrentApplication();
         model.addAttribute("apps", apps);
         model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
+        model.addAttribute("loanProductNamesById", loanProductNamesById(principal.getSaccoId()));
         model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
         model.addAttribute("currentWorkflowSteps", currentWorkflowApplication == null
             ? List.of()
@@ -304,6 +306,7 @@ public class AppController {
         List<GuarantorRequest> guarantorArchives = guarantorArchivePage.getContent();
         model.addAttribute("archives", archives);
         model.addAttribute("loanProductNames", loanProductDisplayService.namesForSacco(principal.getSaccoId()));
+        model.addAttribute("loanProductNamesById", loanProductNamesById(principal.getSaccoId()));
         model.addAttribute("guarantorArchives", guarantorArchives);
         model.addAttribute("archiveSection", archiveSection);
         model.addAttribute("archivePage", "guarantors".equals(archiveSection) ? guarantorArchivePage : loanArchivePage);
@@ -320,6 +323,7 @@ public class AppController {
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) LocalDate fromDate,
                           @RequestParam(required = false) LocalDate toDate,
+                          @RequestParam(required = false) UUID loanProductId,
                           @RequestParam(required = false) LoanType loanType,
                           Model model) {
         LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
@@ -329,28 +333,27 @@ public class AppController {
             resolvedFrom = resolvedTo;
             resolvedTo = swap;
         }
-        ReportsDateRange previousRange = previousRange(resolvedFrom, resolvedTo);
+        LoanProductSetting selectedProduct = selectedAnalyticsProduct(principal.getSaccoId(), loanProductId, loanType);
+        LoanType resolvedLoanType = selectedProduct == null ? loanType : selectedProduct.getLoanType();
+        UUID resolvedLoanProductId = selectedProduct == null ? null : selectedProduct.getId();
         LoanAnalyticsService.MemberLoanAnalytics analytics =
-            loanAnalyticsService.forMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null);
-        LoanAnalyticsService.MemberLoanAnalytics previousAnalytics =
-            loanAnalyticsService.forMember(principal.getMemberId(), previousRange.fromDate(), previousRange.toDate(), loanType, null);
+            loanAnalyticsService.forMember(principal.getMemberId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
-            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), resolvedFrom, resolvedTo, loanType, null);
-        Map<String, LoanAnalyticsService.MetricDelta> metricDeltas = loanAnalyticsService.metricDeltas(analytics, previousAnalytics)
-            .stream()
-            .collect(Collectors.toMap(LoanAnalyticsService.MetricDelta::key, java.util.function.Function.identity()));
+            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
         LoanQualificationPolicyService.EligibilitySummary eligibilitySummary =
             loanQualificationPolicyService.eligibilitySummary(principal.getSaccoId(), principal.getMemberId());
         model.addAttribute("analytics", analytics);
-        model.addAttribute("metricCards", memberMetricCards(analytics, metricDeltas));
-        model.addAttribute("metricPeriodLabel", previousPeriodLabel(resolvedFrom, resolvedTo));
-        model.addAttribute("fromDate", resolvedFrom);
-        model.addAttribute("toDate", resolvedTo);
-        model.addAttribute("loanType", loanType);
-        model.addAttribute("loanTypes", LoanType.values());
+        model.addAttribute("metricCards", memberMetricCards(analytics));
+        model.addAttribute("fromDate", StrictAnalyticsLocalDateEditor.format(resolvedFrom));
+        model.addAttribute("toDate", StrictAnalyticsLocalDateEditor.format(resolvedTo));
+        model.addAttribute("loanProductId", resolvedLoanProductId);
+        model.addAttribute("loanType", resolvedLoanType);
+        model.addAttribute("loanProducts", loanWorkflowService.listProducts(principal.getSaccoId()).stream()
+            .filter(product -> product.getLoanType() != null)
+            .toList());
         model.addAttribute("trendSeriesJson", toJson(trendSeries));
         model.addAttribute("activeLoanDetails", loanReportService.memberActiveLoanDetails(
-            principal.getMemberId(), resolvedFrom, resolvedTo, loanType));
+            principal.getMemberId(), resolvedFrom, resolvedTo, resolvedLoanType));
         model.addAttribute("eligibilitySummary", eligibilitySummary);
         model.addAttribute("canApply", eligibilitySummary.canApply());
         model.addAttribute("canGuarantee", eligibilitySummary.canGuarantee());
@@ -358,61 +361,43 @@ public class AppController {
         return "app/reports";
     }
 
-    private ReportsDateRange previousRange(LocalDate fromDate, LocalDate toDate) {
-        long days = Math.max(java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate), 0);
-        LocalDate previousTo = fromDate.minusDays(1);
-        LocalDate previousFrom = previousTo.minusDays(days);
-        return new ReportsDateRange(previousFrom, previousTo);
-    }
-
-    private String previousPeriodLabel(LocalDate fromDate, LocalDate toDate) {
-        long days = Math.max(java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate) + 1, 1);
-        if (days >= 60) {
-            long months = Math.max(1, Math.round(days / 30.4375d));
-            return months == 1 ? "previous month" : "previous " + months + " months";
+    private LoanProductSetting selectedAnalyticsProduct(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
+        if (loanProductId != null) {
+            return loanProductSettingRepository.findByIdAndSaccoId(loanProductId, saccoId).orElse(null);
         }
-        return days == 1 ? "previous day" : "previous " + days + " days";
+        if (fallbackLoanType == null) {
+            return null;
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(product -> product.getLoanType() == fallbackLoanType)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .findFirst()
+            .orElse(null);
     }
 
-    private List<MemberMetricCard> memberMetricCards(LoanAnalyticsService.MemberLoanAnalytics analytics,
-                                                     Map<String, LoanAnalyticsService.MetricDelta> deltas) {
+    private List<MemberMetricCard> memberMetricCards(LoanAnalyticsService.MemberLoanAnalytics analytics) {
         return List.of(
-            memberMetricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied", deltas),
-            memberMetricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Applied", deltas),
-            memberMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed", deltas),
-            memberMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid", deltas),
-            memberMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted", deltas),
-            memberMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected", deltas)
+            new MemberMetricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied"),
+            new MemberMetricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Applied"),
+            new MemberMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed"),
+            new MemberMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid"),
+            new MemberMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted"),
+            new MemberMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected")
         );
     }
 
-    private MemberMetricCard memberMetricCard(String key,
-                                              String label,
-                                              long value,
-                                              String tone,
-                                              String sparkName,
-                                              Map<String, LoanAnalyticsService.MetricDelta> deltas) {
-        BigDecimal percent = deltas.getOrDefault(key, new LoanAnalyticsService.MetricDelta(key, BigDecimal.ZERO, false)).percent();
-        boolean positive = percent.compareTo(BigDecimal.ZERO) >= 0;
-        return new MemberMetricCard(key, label, value, tone, sparkName, formatAnalyticsPercent(percent), positive);
-    }
-
-    private String formatAnalyticsPercent(BigDecimal value) {
-        String sign = value.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
-        return sign + value.setScale(2, RoundingMode.HALF_UP) + "%";
-    }
-
-    public record MemberMetricCard(String key, String label, long value, String tone, String sparkName, String percentLabel, boolean positive) {
+    public record MemberMetricCard(String key, String label, long value, String tone, String sparkName) {
         public String getKey() { return key; }
         public String getLabel() { return label; }
         public long getValue() { return value; }
         public String getTone() { return tone; }
         public String getSparkName() { return sparkName; }
-        public String getPercentLabel() { return percentLabel; }
-        public boolean isPositive() { return positive; }
     }
 
-    private record ReportsDateRange(LocalDate fromDate, LocalDate toDate) {}
+    @InitBinder
+    void bindAnalyticsDates(WebDataBinder binder) {
+        binder.registerCustomEditor(LocalDate.class, new StrictAnalyticsLocalDateEditor());
+    }
 
     private String toJson(Object value) {
         try {
@@ -447,7 +432,7 @@ public class AppController {
 
                 row.put("fullId", app.getId());
                 row.put("loanId", app.getLoanId() == null || app.getLoanId().isBlank() ? "-" : app.getLoanId());
-                row.put("loanProductName", loanProductName(app.getLoanType(), loanProductNames));
+                row.put("loanProductName", loanProductName(app, loanProductNames));
                 row.put("applicantReason", applicantReason(app));
                 row.put("amountLabel", loanPresentationService.formatMoneyDisplay(app.getAmount()));
                 row.put("disbursementDate", app.getDisbursementDate() == null ? "-" : app.getDisbursementDate());
@@ -487,7 +472,29 @@ public class AppController {
             ));
     }
 
-    private String loanProductName(LoanType loanType, Map<LoanType, String> loanProductNames) {
+    private Map<UUID, String> loanProductNamesById(String saccoId) {
+        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+            .collect(Collectors.toMap(
+                LoanProductSetting::getId,
+                LoanProductSetting::getDisplayName,
+                (first, ignored) -> first,
+                LinkedHashMap::new
+            ));
+    }
+
+    private String loanProductName(LoanApplication app, Map<LoanType, String> loanProductNames) {
+        if (app == null) {
+            return "-";
+        }
+        if (app.getLoanProductSettingId() != null) {
+            String productName = loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId())
+                .map(LoanProductSetting::getDisplayName)
+                .orElse(null);
+            if (productName != null && !productName.isBlank()) {
+                return productName;
+            }
+        }
+        LoanType loanType = app.getLoanType();
         if (loanType == null) {
             return "-";
         }
@@ -921,7 +928,8 @@ public class AppController {
     @GetMapping("/loan-applications/new")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
     public String newApp(@AuthenticationPrincipal AppUserPrincipal principal,
-                         @RequestParam LoanType loanType,
+                         @RequestParam(required = false) UUID loanProductId,
+                         @RequestParam(required = false) LoanType loanType,
                          @RequestParam(required = false) UUID topUpLoanId,
                          RedirectAttributes ra,
                          Model model) {
@@ -936,7 +944,7 @@ public class AppController {
             );
             return "redirect:/app/loan-applications/" + app.getId();
         }
-        LoanProductSetting product = formSchemaService.getSchema(principal.getSaccoId(), loanType);
+        LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         try {
             loanWorkflowService.assertCanApplyForProduct(principal.getSaccoId(), principal.getMemberId(), product);
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -953,7 +961,7 @@ public class AppController {
             }
             formValues.put("topUpLoanId", topUpLoanId.toString());
         }
-        return prepareLoanNewModel(principal, loanType, formValues, Collections.emptyList(), null, model);
+        return prepareLoanNewModel(principal, product, formValues, Collections.emptyList(), null, model);
     }
 
     @GetMapping("/loan-applications/{id}/edit")
@@ -980,7 +988,7 @@ public class AppController {
 
         return prepareLoanNewModel(
             principal,
-            app.getLoanType(),
+            resolveApplicationProduct(principal.getSaccoId(), app.getLoanProductSettingId(), app.getLoanType()),
             formValues,
             parseUuidList(app.getSelectedGuarantors()),
             app.getRequiredGuarantors(),
@@ -991,7 +999,8 @@ public class AppController {
     @PostMapping("/loan-applications")
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
     public String createDraft(@AuthenticationPrincipal AppUserPrincipal principal,
-                              @RequestParam LoanType loanType,
+                              @RequestParam(required = false) UUID loanProductId,
+                              @RequestParam(required = false) LoanType loanType,
                               @RequestParam BigDecimal amount,
                               @RequestParam Integer tenorMonths,
                               @RequestParam(required = false) UUID applicationId,
@@ -1007,6 +1016,7 @@ public class AppController {
                               Model model) {
         Map<String, String> submittedValues = new LinkedHashMap<>(params);
         Map<String, String> formPayload = new LinkedHashMap<>(params);
+        formPayload.remove("loanProductId");
         formPayload.remove("loanType");
         formPayload.remove("amount");
         formPayload.remove("tenorMonths");
@@ -1018,13 +1028,15 @@ public class AppController {
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
         Map<UUID, List<MultipartFile>> requiredAttachmentFiles = requiredAttachmentFiles(request);
+        LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
+        LoanType resolvedLoanType = product.getLoanType();
 
         try {
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
                 if (applicationId == null) {
                     throw new IllegalStateException("Save the application as a draft before submitting it.");
                 }
-                boolean submitsDirectlyToStaff = requiresApplicantOtpBeforeImmediateSubmission(principal.getSaccoId(), loanType);
+                boolean submitsDirectlyToStaff = requiresApplicantOtpBeforeImmediateSubmission(principal.getSaccoId(), product);
                 if (submitsDirectlyToStaff) {
                     requireTermsAccepted(params.get("termsAccepted"));
                 }
@@ -1035,7 +1047,8 @@ public class AppController {
                 LoanApplication submitted = loanWorkflowService.saveAndSubmit(
                     principal.getSaccoId(),
                     principal.getMemberId(),
-                    loanType,
+                    product.getId(),
+                    resolvedLoanType,
                     amount,
                     tenorMonths,
                     formPayload,
@@ -1070,14 +1083,14 @@ public class AppController {
                 return "redirect:/app/loan-applications/" + submitted.getId();
             }
 
-            LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), loanType,
+            LoanApplication app = loanWorkflowService.saveDraft(principal.getSaccoId(), principal.getMemberId(), product.getId(), resolvedLoanType,
                 amount, tenorMonths, formPayload, applicationId, guarantorIds,
                 financialSnapshotJson, topUpLoanId, attachments, requiredAttachmentFiles);
 
             ra.addFlashAttribute("message", "Draft saved successfully. You can continue editing.");
             return "redirect:/app/loan-applications/" + app.getId() + "/edit";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            String errorMessage = humanizeLoanFormError(ex.getMessage(), principal, loanType);
+            String errorMessage = humanizeLoanFormError(ex.getMessage(), principal, product);
             model.addAttribute("error", errorMessage);
             if (ex instanceof LoanWorkflowService.GuarantorValidationException guarantorEx
                 && guarantorEx.getGuarantorId() != null) {
@@ -1087,7 +1100,7 @@ public class AppController {
             Integer requiredGuarantorsOverride = resolveDraftRequiredGuarantors(principal.getMemberId(), applicationId);
             return prepareLoanNewModel(
                 principal,
-                loanType,
+                product,
                 submittedValues,
                 guarantorIds,
                 requiredGuarantorsOverride,
@@ -1159,14 +1172,15 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("decisionFeedback", isRejectedStatus(app.getStatus()) ? loanPresentationService.rejectionFeedback(id) : List.of());
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
         var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
         model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
-        model.addAttribute("repaymentSummary",
-            loanPresentationService.parseRepaymentSummary(app.getRepaymentScheduleJson(), app.getPaidAt()));
+        model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
             app.getRepaymentScheduleJson(),
             repaymentTransactions,
@@ -1398,14 +1412,13 @@ public class AppController {
     @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
     public String syncLoanPayments(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
-                                   @RequestParam(name = "monthsBack", defaultValue = "12") int monthsBack,
                                    RedirectAttributes ra) {
         try {
-            int inserted = loanWorkflowService.syncLoanPayments(id, principal.getMemberId(), monthsBack);
+            int changes = loanWorkflowService.syncLoanPayments(id, principal.getMemberId());
             ra.addFlashAttribute("message",
-                inserted == 0
-                    ? "Repayment data refreshed; nothing new was found."
-                    : "Repayment data refreshed; " + inserted + " new payment record(s) were added.");
+                changes == 0
+                    ? "Repayment history refreshed; it already matched the payment system."
+                    : "Repayment history refreshed; " + changes + " record change(s) were reconciled.");
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Repayment data could not be fetched: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -1434,6 +1447,7 @@ public class AppController {
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
                                                       @RequestParam(defaultValue = "") String q,
                                                       @RequestParam(required = false) String searchBy,
+                                                      @RequestParam(required = false) UUID loanProductId,
                                                       @RequestParam(required = false) LoanType loanType) {
         String mode = resolveGuarantorSearchMode(searchBy, q);
         String query = q == null ? "" : q.trim();
@@ -1453,13 +1467,14 @@ public class AppController {
         if (query.isBlank()) {
             return Collections.emptyList();
         }
+        LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         return loanWorkflowService.searchGuarantorCandidates(
                 principal.getSaccoId(),
                 principal.getStationId(),
                 principal.getMemberId(),
                 query,
                 mode,
-                loanType,
+                product,
                 0,
                 6)
             .stream()
@@ -1491,18 +1506,19 @@ public class AppController {
     @PostMapping("/loan-applications/financial-preview")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> financialPreview(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                                @RequestParam LoanType loanType,
+                                                                @RequestParam(required = false) UUID loanProductId,
+                                                                @RequestParam(required = false) LoanType loanType,
                                                                 @RequestParam BigDecimal amount,
                                                                 @RequestParam Integer tenorMonths,
                                                                 @RequestParam(required = false) UUID applicationId,
                                                                 @RequestParam(required = false) UUID topUpLoanId) {
         try {
             loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
-            formSchemaService.getSchema(principal.getSaccoId(), loanType);
+            LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
             Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
-                principal.getSaccoId(), principal.getMemberId(), loanType, amount, tenorMonths, topUpLoanId);
+                principal.getSaccoId(), principal.getMemberId(), product, amount, tenorMonths, topUpLoanId);
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-                principal.getSaccoId(), principal.getMemberId(), loanType, amount);
+                principal.getSaccoId(), principal.getMemberId(), product, amount);
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
@@ -1532,19 +1548,30 @@ public class AppController {
         }
     }
 
+    ResponseEntity<Map<String, Object>> financialPreview(AppUserPrincipal principal,
+                                                         LoanType loanType,
+                                                         BigDecimal amount,
+                                                         Integer tenorMonths,
+                                                         UUID applicationId,
+                                                         UUID topUpLoanId) {
+        return financialPreview(principal, null, loanType, amount, tenorMonths, applicationId, topUpLoanId);
+    }
+
     @GetMapping("/loan-applications/external-eligibility-summary")
     @ResponseBody
     public Map<String, Object> externalEligibilitySummary(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                          @RequestParam LoanType loanType) {
+                                                          @RequestParam(required = false) UUID loanProductId,
+                                                          @RequestParam(required = false) LoanType loanType) {
         Member member = memberRepository.findById(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Logged-in member was not found."));
         if (member.getStationId() == null || member.getStationId().isBlank()) {
             throw new IllegalStateException("Station ID is not configured for this member.");
         }
+        LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         EligibilityService.EligibilityResult eligibility = eligibilityService.check(
             principal.getSaccoId(),
             principal.getMemberId(),
-            loanType,
+            product,
             BigDecimal.ZERO
         );
 
@@ -2195,18 +2222,18 @@ public class AppController {
     }
 
     private String prepareLoanNewModel(AppUserPrincipal principal,
-                                       LoanType loanType,
+                                       LoanProductSetting schema,
                                        Map<String, String> formValues,
                                        List<UUID> guarantorIds,
                                        Integer requiredGuarantorsOverride,
                                        Model model) {
-        LoanProductSetting schema = formSchemaService.getSchema(principal.getSaccoId(), loanType);
+        LoanType loanType = schema.getLoanType();
         FormModel form = formSchemaService.toFormModel(loanType, schema.getFormSchema());
         int requiredGuarantors = requiredGuarantorsOverride == null
             ? schema.getGuarantorsRequired()
             : Math.max(requiredGuarantorsOverride, 0);
         EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-            principal.getSaccoId(), principal.getMemberId(), loanType, BigDecimal.ZERO);
+            principal.getSaccoId(), principal.getMemberId(), schema, BigDecimal.ZERO);
 
         model.addAttribute("formModel", form);
         model.addAttribute("product", schema);
@@ -2214,6 +2241,7 @@ public class AppController {
         model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(formValues));
         model.addAttribute("existingRequiredAttachmentNames", existingRequiredAttachmentNames(formValues));
         model.addAttribute("loanType", loanType);
+        model.addAttribute("loanProductId", schema.getId());
         model.addAttribute("loanProductName", schema.getDisplayName());
         model.addAttribute("loanProductCode", schema.getDisplayCode());
         model.addAttribute("loanProductDescription", schema.getDisplayDescription());
@@ -2483,12 +2511,33 @@ public class AppController {
         }
     }
 
-    private String humanizeLoanFormError(String message, AppUserPrincipal principal, LoanType loanType) {
+    private LoanProductSetting resolveApplicationProduct(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
+        return loanProductId == null
+            ? formSchemaService.getSchema(saccoId, fallbackLoanType)
+            : formSchemaService.getSchema(saccoId, loanProductId, fallbackLoanType);
+    }
+
+    private LoanProductSetting resolveExistingApplicationProduct(LoanApplication application) {
+        if (application == null || application.getSaccoId() == null) {
+            return null;
+        }
+        if (application.getLoanProductSettingId() != null) {
+            return loanProductSettingRepository.findByIdAndSaccoId(
+                application.getLoanProductSettingId(), application.getSaccoId()).orElse(null);
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(application.getSaccoId()).stream()
+            .filter(product -> product.getLoanType() == application.getLoanType())
+            .sorted(Comparator.comparing(LoanProductSetting::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String humanizeLoanFormError(String message, AppUserPrincipal principal, LoanProductSetting product) {
         if (message != null
             && (message.contains("Amount exceeds eligibility cap")
                 || message.contains("Loan amount exceeds the applicant savings limit"))) {
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-                principal.getSaccoId(), principal.getMemberId(), loanType, BigDecimal.ZERO);
+                principal.getSaccoId(), principal.getMemberId(), product, BigDecimal.ZERO);
             return "Amount exceeds your eligibility. Maximum allowed now is " + formatTzs(eligibility.maxAllowed())
                 + " (" + eligibility.ratio().multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString()
                 + "% of savings " + formatTzs(eligibility.savings()) + ").";
@@ -2642,11 +2691,10 @@ public class AppController {
     private record DirectGuarantorOtpIssueSummary(int sent, List<String> warnings) {
     }
 
-    private boolean requiresApplicantOtpBeforeImmediateSubmission(String saccoId, LoanType loanType) {
-        return loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, loanType)
-            .map(LoanProductSetting::getGuarantorsRequired)
-            .map(required -> required == null || required <= 0)
-            .orElse(false);
+    private boolean requiresApplicantOtpBeforeImmediateSubmission(String saccoId, LoanProductSetting product) {
+        return product != null
+            && saccoId.equals(product.getSaccoId())
+            && (product.getGuarantorsRequired() == null || product.getGuarantorsRequired() <= 0);
     }
 
     private void assertApplicantSignatureOtpAllowed(LoanApplication application) {
@@ -2801,7 +2849,7 @@ public class AppController {
                     application.getSaccoId(),
                     request.getGuarantorMemberId(),
                     request.getRequestedAmount(),
-                    loanProductSettingRepository.findBySaccoIdAndLoanType(application.getSaccoId(), application.getLoanType()).orElse(null)
+                    resolveExistingApplicationProduct(application)
                 );
             guaranteePolicyEligible.put(request.getId(), policyReason.isEmpty());
             policyReason.ifPresent(reason -> guaranteePolicyReasons.put(request.getId(), reason));

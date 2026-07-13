@@ -58,6 +58,7 @@
 
 <form id="loanApplicationForm" method="post" action="/app/loan-applications" enctype="multipart/form-data" class="erp-form-wrap space-y-5">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+    <input type="hidden" name="loanProductId" value="${loanProductId}" />
     <input type="hidden" name="loanType" value="${loanType}" />
     <input type="hidden" id="loanFormAction" name="action" value="SAVE_DRAFT" />
     <input type="hidden" id="financialSnapshotJson" name="financialSnapshotJson" value="${fn:escapeXml(formValues['financialSnapshotJson'])}" />
@@ -1058,7 +1059,7 @@
             eligibilityExternalStatus.classList.remove("text-emerald-600", "text-rose-600");
             eligibilityExternalStatus.classList.add("text-slate-500");
             try {
-                const response = await fetch("/app/loan-applications/external-eligibility-summary?loanType=${loanType}", {
+                const response = await fetch("/app/loan-applications/external-eligibility-summary?loanProductId=${loanProductId}", {
                     headers: {
                         "Accept": "application/json",
                         "X-Requested-With": "XMLHttpRequest"
@@ -1162,6 +1163,7 @@
                     },
                     body: new URLSearchParams({
                         "${_csrf.parameterName}": csrfInput.value,
+                        "loanProductId": "${loanProductId}",
                         "loanType": "${loanType}",
                         "amount": amountInput.value,
                         "tenorMonths": tenorInput.value,
@@ -1469,7 +1471,7 @@
                         return;
                     }
                 }
-                const query = new URLSearchParams({ q: term, searchBy: mode, loanType: "${loanType}" });
+                const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
                 const response = await fetch("/app/guarantors/search?" + query.toString(), {
                     headers: {
                         "X-Requested-With": "XMLHttpRequest"

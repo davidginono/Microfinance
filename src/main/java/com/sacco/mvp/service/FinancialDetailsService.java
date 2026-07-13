@@ -35,10 +35,18 @@ public class FinancialDetailsService {
 
     public Map<String, Object> generateSnapshot(String saccoId, UUID memberId, LoanType loanType, BigDecimal amount,
                                                 Integer tenorMonths, UUID topUpSourceLoanId) {
-        BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        int safeTenor = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
         LoanProductSetting product = loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, loanType)
             .orElseThrow(() -> new IllegalArgumentException("Loan product settings not found"));
+        return generateSnapshot(saccoId, memberId, product, amount, tenorMonths, topUpSourceLoanId);
+    }
+
+    public Map<String, Object> generateSnapshot(String saccoId, UUID memberId, LoanProductSetting product, BigDecimal amount,
+                                                Integer tenorMonths, UUID topUpSourceLoanId) {
+        if (product == null) {
+            throw new IllegalArgumentException("Loan product settings not found");
+        }
+        BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
+        int safeTenor = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
         validateRequestedAmount(product, safeAmount);
         validateRepaymentPeriod(product, safeTenor);
 

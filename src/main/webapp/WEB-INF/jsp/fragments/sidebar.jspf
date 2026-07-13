@@ -6,6 +6,12 @@
 <aside id="appSidebar" class="shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0" style="top: var(--shell-nav-height); border-color: #d7dde3;">
     <div class="shell-sidebar-panel flex h-full flex-col overflow-hidden border-r border-slate-200/60 bg-transparent">
         <div class="shell-sidebar-toggle-row hidden lg:flex">
+            <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
+                <span class="shell-sidebar-toggle-label"><spring:message code="menu.main" text="Main Menu" /></span>
+            </sec:authorize>
+            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                <span class="shell-sidebar-toggle-label"><spring:message code="admin.tools" text="Admin Tools" /></span>
+            </sec:authorize>
             <button id="desktopSidebarToggle" type="button" class="desktop-sidebar-toggle" aria-label="Collapse sidebar" aria-pressed="false" title="Collapse sidebar">
                 <svg class="desktop-sidebar-toggle__collapse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zM7.5 4.5v11h7.75a.25.25 0 00.25-.25V4.75a.25.25 0 00-.25-.25H7.5zm-1.5 0H4.75a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25H6v-11z" clip-rule="evenodd"/>
@@ -19,9 +25,6 @@
         </div>
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
             <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
-                <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.main" text="Main Menu" /></p>
-                </div>
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                     <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 1.707a1 1 0 00-1.414 0l-8 8A1 1 0 002 11.414V17a2 2 0 002 2h4a1 1 0 001-1v-4h2v4a1 1 0 001 1h4a2 2 0 002-2v-5.586a1 1 0 00-.293-.707l-8-8z"/></svg>
@@ -143,12 +146,10 @@
             </sec:authorize>
 
             <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
-                <div class="shell-sidebar-section-header border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="admin.tools" text="Admin Tools" /></p>
-                </div>
                 <c:choose>
                     <c:when test="${pageContext.request.isUserInRole('ROLE_ADMIN')}">
                         <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
+                        <c:set var="platformSettingsActive" value="${requestUri eq '/admin/platform-settings'}" />
                         <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
                         <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
@@ -186,6 +187,10 @@
                         <a href="/admin/sms-usage" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H9.5L5 18v-4a2 2 0 01-2-2V4zm3 2v1.5h8V6H6zm0 3v1.5h6V9H6z"/></svg></span>
                             SMS Usage
+                        </a>
+                        <a href="/admin/platform-settings" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${platformSettingsActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border ${platformSettingsActive ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046a1 1 0 00-2.6 0l-.16.59a1 1 0 01-.95.74l-.61.024a1 1 0 00-.82.51l-.3.52a1 1 0 01-1.13.46l-.58-.16a1 1 0 00-1.3 1.3l.16.58a1 1 0 01-.46 1.13l-.52.3a1 1 0 00-.51.82l-.024.61a1 1 0 01-.74.95l-.59.16a1 1 0 000 2.6l.59.16a1 1 0 01.74.95l.024.61a1 1 0 00.51.82l.52.3a1 1 0 01.46 1.13l-.16.58a1 1 0 001.3 1.3l.58-.16a1 1 0 011.13.46l.3.52a1 1 0 00.82.51l.61.024a1 1 0 01.95.74l.16.59a1 1 0 002.6 0l.16-.59a1 1 0 01.95-.74l.61-.024a1 1 0 00.82-.51l.3-.52a1 1 0 011.13-.46l.58.16a1 1 0 001.3-1.3l-.16-.58a1 1 0 01.46-1.13l.52-.3a1 1 0 00.51-.82l.024-.61a1 1 0 01.74-.95l.59-.16a1 1 0 000-2.6l-.59-.16a1 1 0 01-.74-.95l-.024-.61a1 1 0 00-.51-.82l-.52-.3a1 1 0 01-.46-1.13l.16-.58a1 1 0 00-1.3-1.3l-.58.16a1 1 0 01-1.13-.46l-.3-.52a1 1 0 00-.82-.51l-.61-.024a1 1 0 01-.95-.74l-.16-.59zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg></span>
+                            Platform Settings
                         </a>
                         <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
@@ -311,7 +316,7 @@
                 <c:set var="staffReportsActive" value="${requestUri eq '/staff/analytics'}" />
                 <div class="shell-sidebar-group space-y-1">
                     <a href="${staffDashboardHref}"
-                       class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffDashboardActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                       class="shell-review-panel-link group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffDashboardActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-white hover:text-slate-900'}">
                         <span class="inline-flex h-7 w-7 items-center justify-center border ${staffDashboardActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 011-1h2a1 1 0 011 1v14H4a1 1 0 01-1-1V3zm5 6a1 1 0 011-1h2a1 1 0 011 1v8H8V9zm5-4a1 1 0 011-1h2a1 1 0 011 1v12h-4V5z"/></svg></span>
                         <span class="min-w-0 flex-1">
                             <c:choose>
@@ -325,9 +330,9 @@
                 <c:if test="${showStaffAnalyticsPanel}">
                     <div class="shell-sidebar-group space-y-1">
                         <a href="/staff/analytics"
-                           class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffReportsActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
+                           class="shell-review-panel-link group flex w-full items-center gap-3 border px-3 pb-4 pt-3 text-left text-sm font-semibold transition ${staffReportsActive ? 'border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-white hover:text-slate-900'}">
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${staffReportsActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 6L14 3.293A1 1 0 0013.293 3H4zm2 9h2v3H6v-3zm3-4h2v7H9V8zm3 2h2v5h-2v-5z"/></svg></span>
-                            <span class="min-w-0 flex-1">
+                            <span class="min-w-0 flex-1 leading-5">
                                 <c:choose>
                                     <c:when test="${showChairpersonPanel and staffDashboardHref eq '/chairperson/dashboard'}"><spring:message code="menu.chairpersonReportsAnalytics" text="Chairperson Reports and Analytics" /></c:when>
                                     <c:when test="${showCreditCommitteePanel and staffDashboardHref eq '/credit-committee/dashboard'}"><spring:message code="menu.creditCommitteeReportsAnalytics" text="Credit Committee Reports and Analytics" /></c:when>

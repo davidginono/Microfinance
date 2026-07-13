@@ -21,6 +21,7 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
+import com.sacco.mvp.service.PlatformBrandingSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.SmsUsageManagementService;
@@ -68,6 +69,7 @@ public class AdminController {
     private final SmsUsageManagementService smsUsageManagementService;
     private final StationOtpSettingsService stationOtpSettingsService;
     private final SaccoDataDeletionService saccoDataDeletionService;
+    private final PlatformBrandingSettingsService platformBrandingSettingsService;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
@@ -192,6 +194,39 @@ public class AdminController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/admin/sms-usage";
+    }
+
+    @GetMapping("/platform-settings")
+    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    public String platformSettings(Model model) {
+        model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
+        model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
+        return "admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/logo-policy")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateLogoPolicy(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @RequestParam int minWidthPx,
+                                   @RequestParam int minHeightPx,
+                                   @RequestParam int maxWidthPx,
+                                   @RequestParam int maxHeightPx,
+                                   @RequestParam int maxFileSizeKb,
+                                   RedirectAttributes ra) {
+        try {
+            platformBrandingSettingsService.updateLogoPolicy(
+                minWidthPx,
+                minHeightPx,
+                maxWidthPx,
+                maxHeightPx,
+                maxFileSizeKb,
+                principal.getMemberId()
+            );
+            ra.addFlashAttribute("message", "Logo upload rules updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
     }
 
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -658,7 +693,7 @@ public class AdminController {
             products.stream().map(LoanProductSetting::getId).toList()));
         model.addAttribute("productVersionsByProductId", adminService.loanProductVersions(saccoId));
         model.addAttribute("loanProductsVersions", adminService.loanProductsVersionHistory(saccoId));
-        model.addAttribute("customizedProductExists", adminService.customizedLoanProductExists(saccoId));
+        model.addAttribute("customizedProductExists", false);
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
         model.addAttribute("settings", settings);
@@ -851,9 +886,9 @@ public class AdminController {
         return "redirect:/admin/settings-controls?section=loan";
     }
 
-    @PostMapping({"/loan-products/customized-product", "/settings-controls/customized-product"})
+    @PostMapping({"/loan-products", "/settings-controls/loan-products"})
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
-    public String createCustomizedLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
+    public String createLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @RequestParam(required = false) String productCode,
                                               @RequestParam(required = false) String productName,
                                               @RequestParam(required = false) String productDescription,
@@ -909,7 +944,7 @@ public class AdminController {
                 managerPriority,
                 loanOfficerPriority
             );
-            LoanProductSetting product = adminService.createCustomizedLoanProduct(
+            LoanProductSetting product = adminService.createLoanProduct(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
                 productCode,
@@ -956,7 +991,7 @@ public class AdminController {
                 productStatus
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
-            ra.addFlashAttribute("message", "Customized loan product added.");
+            ra.addFlashAttribute("message", "Loan product added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
         }
@@ -1454,6 +1489,7 @@ public class AdminController {
             .toList();
         model.addAttribute("superAdmin", false);
         model.addAttribute("registeredSaccos", registeredSaccos);
+        model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         return "admin/sacco-registry";
     }
 
@@ -1462,6 +1498,7 @@ public class AdminController {
     public String saccoRegistry(Model model) {
         model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
         model.addAttribute("superAdmin", true);
+        model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         return "admin/sacco-registry";
     }
 
@@ -1708,6 +1745,25 @@ public class AdminController {
         return principal != null && principal.hasRole(Position.ADMIN)
             ? "redirect:/admin/saccos/registry"
             : "redirect:/admin/saccos";
+    }
+
+    @PostMapping("/saccos/{saccoId}/logo")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateWorkspaceSaccoLogo(@PathVariable String saccoId,
+                                           @AuthenticationPrincipal AppUserPrincipal principal,
+                                           @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
+                                           RedirectAttributes ra) {
+        try {
+            String currentSaccoId = adminScopeService.currentSaccoId(principal);
+            if (currentSaccoId == null || !currentSaccoId.equalsIgnoreCase(saccoId == null ? "" : saccoId.trim())) {
+                throw new IllegalStateException("You can only update the logo for your SACCO workspace.");
+            }
+            saccoRegistryService.updateLogoOnly(currentSaccoId, logoFile, principal.getMemberId());
+            ra.addFlashAttribute("message", "SACCO logo updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos";
     }
 
     @PostMapping("/saccos/{saccoId}/delete")

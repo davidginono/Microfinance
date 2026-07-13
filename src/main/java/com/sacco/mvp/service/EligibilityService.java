@@ -34,6 +34,17 @@ public class EligibilityService {
         BigDecimal savings = resolveSavings(memberId);
 
         LoanProductSetting product = resolveProduct(saccoId, loanType);
+        return check(saccoId, memberId, product, amount, savings);
+    }
+
+    public EligibilityResult check(String saccoId, UUID memberId, LoanProductSetting product, BigDecimal amount) {
+        return check(saccoId, memberId, product, amount, resolveSavings(memberId));
+    }
+
+    private EligibilityResult check(String saccoId, UUID memberId, LoanProductSetting product, BigDecimal amount, BigDecimal savings) {
+        if (product == null) {
+            throw new IllegalArgumentException("Loan product not found");
+        }
         BigDecimal ratio = resolveRatio(saccoId, product);
         BigDecimal savingsBasedMaxAllowed = savings.multiply(ratio).setScale(2, RoundingMode.DOWN);
         BigDecimal maxAllowed = capToProductMaximum(savingsBasedMaxAllowed, product);

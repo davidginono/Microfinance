@@ -269,9 +269,11 @@ public class ManagerController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
         var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
         model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,
@@ -332,6 +334,7 @@ public class ManagerController {
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
         model.addAttribute("allowPaymentSync", true);
+        model.addAttribute("allowDefaultedPaymentRecheck", false);
         addReviewDisplayAttributes(model, app, managerReason);
         return "manager/detail";
     }
@@ -532,40 +535,19 @@ public class ManagerController {
     @PostMapping("/loan-applications/{id}/sync-payments")
     public String syncPayments(@PathVariable UUID id,
                                @AuthenticationPrincipal AppUserPrincipal principal,
-                               @RequestParam(name = "monthsBack", defaultValue = "12") int monthsBack,
                                RedirectAttributes ra) {
         try {
-            int inserted = managerService.syncLoanPayments(id, principal.getMemberId(), monthsBack);
+            var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+            if (app.getStatus() == LoanStatus.DEFAULTED) {
+                throw new IllegalStateException("Defaulted loan recovery is available in the Disbursement/Teller workspace.");
+            }
+            int changes = managerService.syncLoanPayments(id, principal.getMemberId());
             ra.addFlashAttribute("message",
-                inserted == 0
-                    ? "Payment transactions refreshed; nothing new."
-                    : "Payment transactions refreshed; " + inserted + " new record(s) added.");
+                changes == 0
+                    ? "Payment history refreshed; it already matched the payment system."
+                    : "Payment history refreshed; " + changes + " record change(s) were reconciled.");
         } catch (LoanPaymentLookupException ex) {
             ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/manager/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/recheck-defaulted-payment")
-    public String recheckDefaultedPayment(@PathVariable UUID id,
-                                          @AuthenticationPrincipal AppUserPrincipal principal,
-                                          @RequestParam(name = "monthsBack", defaultValue = "24") int monthsBack,
-                                          RedirectAttributes ra) {
-        try {
-            ManagerService.DefaultedLoanRecheckResult result =
-                managerService.recheckDefaultedLoanPaymentStatus(id, principal.getMemberId(), monthsBack);
-            if (result.paid()) {
-                ra.addFlashAttribute("message", "Foresight confirms this defaulted loan is fully paid. Status changed to PAID and guarantor capacity has been released.");
-            } else {
-                ra.addFlashAttribute("message",
-                    result.insertedTransactions() == 0
-                        ? "Payment status rechecked. The loan is still marked as " + result.status().name().replace('_', ' ') + "."
-                        : "Payment status rechecked with " + result.insertedTransactions() + " new record(s). The loan is still marked as " + result.status().name().replace('_', ' ') + ".");
-            }
-        } catch (LoanPaymentLookupException ex) {
-            ra.addFlashAttribute("error", "Payment status could not be verified: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

@@ -224,6 +224,16 @@ public class LoanWorkflowService {
                                      List<UUID> guarantorIds,
                                      String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                      Map<UUID, List<MultipartFile>> requiredAttachments) {
+        return saveDraft(saccoId, applicantId, null, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+            financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
+    }
+
+    @Transactional
+    public LoanApplication saveDraft(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
+                                     Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
+                                     List<UUID> guarantorIds,
+                                     String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
+                                     Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
         LoanApplication existingDraft = existingId == null
             ? null
@@ -241,7 +251,10 @@ public class LoanWorkflowService {
         String applicantStationId = existingDraft != null
             ? coalesceStationId(existingDraft.getStationId(), resolveMemberStationId(applicantId))
             : requireMemberStationId(applicantId);
-        LoanProductSetting product = formSchemaService.getSchema(saccoId, loanType);
+        LoanProductSetting product = loanProductId == null
+            ? formSchemaService.getSchema(saccoId, loanType)
+            : formSchemaService.getSchema(saccoId, loanProductId, loanType);
+        LoanType resolvedLoanType = product.getLoanType();
         assertCanApplyForProduct(saccoId, applicantId, product, existingDraft == null ? null : existingDraft.getId());
         validateRequestedAmount(product, amount);
         validateRepaymentPeriod(product, tenorMonths);
@@ -269,7 +282,9 @@ public class LoanWorkflowService {
             product
         );
 
-        EligibilityService.EligibilityResult eligibility = checkApplicantSavingsEligibility(saccoId, applicantId, loanType, amount);
+        EligibilityService.EligibilityResult eligibility = loanProductId == null
+            ? checkApplicantSavingsEligibility(saccoId, applicantId, resolvedLoanType, amount)
+            : checkApplicantSavingsEligibility(saccoId, applicantId, product, amount);
         String snapshot = eligibilityService.policySnapshotJson(
             eligibility,
             product.getGuarantorsRequired(),
@@ -290,7 +305,8 @@ public class LoanWorkflowService {
         application.setStationId(applicantStationId);
         application.setApplicantMemberId(applicantId);
         application.setTopUpSourceLoanId(topUpSourceLoan == null ? null : topUpSourceLoan.getId());
-        application.setLoanType(loanType);
+        application.setLoanType(resolvedLoanType);
+        application.setLoanProductSettingId(product.getId());
         application.setAmount(amount);
         application.setTenorMonths(tenorMonths);
         application.setStatus(LoanStatus.DRAFT);
@@ -438,6 +454,19 @@ public class LoanWorkflowService {
     }
 
     @Transactional
+    public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
+                                         Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
+                                         List<UUID> guarantorIds,
+                                         String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
+                                         Map<UUID, List<MultipartFile>> requiredAttachments) {
+        LoanApplication saved = saveDraft(
+            saccoId, applicantId, loanProductId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+            financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
+        LoanApplication submitted = submit(saved.getId(), applicantId);
+        return getMine(submitted.getId(), applicantId);
+    }
+
+    @Transactional
     public LoanApplication submit(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED) {
@@ -454,8 +483,7 @@ public class LoanWorkflowService {
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
 
-        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(
-            app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount());
+        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(app, product);
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
             result,
             app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
@@ -505,9 +533,7 @@ public class LoanWorkflowService {
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
-        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(
-            app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount()
-        );
+        EligibilityService.EligibilityResult result = checkApplicantSavingsEligibility(app, product);
         app.setPolicySnapshot(eligibilityService.policySnapshotJson(
             result,
             app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0),
@@ -569,12 +595,12 @@ public class LoanWorkflowService {
     }
 
     @Transactional
-    public int syncLoanPayments(UUID appId, UUID memberId, int monthsBack) {
+    public int syncLoanPayments(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getLoanId() == null || app.getLoanId().isBlank()) {
             throw new IllegalStateException("This loan has not been disbursed yet.");
         }
-        return loanPaymentTransactionSyncService.syncRecent(app, monthsBack);
+        return loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
     }
 
     public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, int page, int size) {
@@ -643,6 +669,17 @@ public class LoanWorkflowService {
                                                               int page,
                                                               int size) {
         LoanProductSetting product = loanType == null ? null : formSchemaService.getSchema(saccoId, loanType);
+        return searchGuarantorCandidates(saccoId, stationId, applicantId, q, searchBy, product, page, size);
+    }
+
+    public List<GuarantorCandidate> searchGuarantorCandidates(String saccoId,
+                                                              String stationId,
+                                                              UUID applicantId,
+                                                              String q,
+                                                              String searchBy,
+                                                              LoanProductSetting product,
+                                                              int page,
+                                                              int size) {
         return searchGuarantors(saccoId, stationId, applicantId, q, searchBy, page, size).getContent().stream()
             .map(member -> {
                 String reason = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReason(saccoId, member.getId(), null, product))
@@ -833,8 +870,10 @@ public class LoanWorkflowService {
 
         long approvals = guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanApplicationId,
             GuarantorRequestStatus.APPROVED);
-        EligibilityService.EligibilityResult eligibility = eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(),
-            app.getLoanType(), app.getAmount());
+        LoanProductSetting product = resolveWorkflowProduct(app);
+        EligibilityService.EligibilityResult eligibility = app.getLoanProductSettingId() == null
+            ? eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount())
+            : eligibilityService.check(app.getSaccoId(), app.getApplicantMemberId(), product, app.getAmount());
 
         long approvalsNeeded = app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0);
         boolean allGuarantorsApproved = approvals >= approvalsNeeded && eligibility.eligible();
@@ -1153,6 +1192,26 @@ public class LoanWorkflowService {
                                                                                   LoanType loanType,
                                                                                   BigDecimal amount) {
         EligibilityService.EligibilityResult result = eligibilityService.check(saccoId, applicantId, loanType, amount);
+        return requireSavingsEligibility(result, amount);
+    }
+
+    private EligibilityService.EligibilityResult checkApplicantSavingsEligibility(String saccoId,
+                                                                                  UUID applicantId,
+                                                                                  LoanProductSetting product,
+                                                                                  BigDecimal amount) {
+        EligibilityService.EligibilityResult result = eligibilityService.check(saccoId, applicantId, product, amount);
+        return requireSavingsEligibility(result, amount);
+    }
+
+    private EligibilityService.EligibilityResult checkApplicantSavingsEligibility(LoanApplication app,
+                                                                                  LoanProductSetting product) {
+        return app.getLoanProductSettingId() == null
+            ? checkApplicantSavingsEligibility(app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount())
+            : checkApplicantSavingsEligibility(app.getSaccoId(), app.getApplicantMemberId(), product, app.getAmount());
+    }
+
+    private EligibilityService.EligibilityResult requireSavingsEligibility(EligibilityService.EligibilityResult result,
+                                                                          BigDecimal amount) {
         if (!result.eligible()) {
             throw new IllegalStateException(
                 "Loan amount exceeds the applicant savings limit for this product. Requested "
@@ -1204,7 +1263,14 @@ public class LoanWorkflowService {
     }
 
     private LoanProductSetting resolveWorkflowProduct(LoanApplication app) {
-        if (app == null || app.getSaccoId() == null || app.getLoanType() == null) {
+        if (app == null || app.getSaccoId() == null) {
+            return null;
+        }
+        if (app.getLoanProductSettingId() != null) {
+            return loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId())
+                .orElse(null);
+        }
+        if (app.getLoanType() == null) {
             return null;
         }
         return loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
@@ -1215,14 +1281,14 @@ public class LoanWorkflowService {
         if (app == null) {
             return;
         }
-        Map<String, Object> latestSnapshot = new LinkedHashMap<>(financialDetailsService.generateSnapshot(
-            app.getSaccoId(),
-            app.getApplicantMemberId(),
-            app.getLoanType(),
-            app.getAmount(),
-            app.getTenorMonths(),
-            app.getTopUpSourceLoanId()
-        ));
+        Map<String, Object> generatedSnapshot = app.getLoanProductSettingId() == null
+            ? financialDetailsService.generateSnapshot(
+                app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount(),
+                app.getTenorMonths(), app.getTopUpSourceLoanId())
+            : financialDetailsService.generateSnapshot(
+                app.getSaccoId(), app.getApplicantMemberId(), resolveWorkflowProduct(app), app.getAmount(),
+                app.getTenorMonths(), app.getTopUpSourceLoanId());
+        Map<String, Object> latestSnapshot = new LinkedHashMap<>(generatedSnapshot);
         latestSnapshot.putAll(extractLiveFinancialValues(app.getFinancialSnapshot()));
         app.setFinancialSnapshot(writeJson(latestSnapshot, "Failed to refresh financial snapshot."));
     }

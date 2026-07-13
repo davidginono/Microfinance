@@ -40,6 +40,21 @@ public class LoanPaymentTransaction {
     @Column(name = "total_paid", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalPaid;
 
+    @Column(name = "outstanding_balance", precision = 18, scale = 2)
+    private BigDecimal outstandingBalance;
+
+    @Column(name = "outstanding_principal", precision = 18, scale = 2)
+    private BigDecimal outstandingPrincipal;
+
+    @Column(name = "outstanding_interest", precision = 18, scale = 2)
+    private BigDecimal outstandingInterest;
+
+    @Column(name = "provider_order", nullable = false)
+    private int providerOrder;
+
+    @Column(name = "duplicate_occurrence", nullable = false)
+    private int duplicateOccurrence;
+
     @Column(name = "fetched_at", nullable = false)
     private OffsetDateTime fetchedAt;
 }

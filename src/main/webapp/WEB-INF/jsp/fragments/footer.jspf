@@ -29,6 +29,8 @@
         const desktopCollapseKey = "shell:desktopSidebarCollapsed";
         const desktopSidebarMedia = window.matchMedia("(min-width: 1024px)");
         let collapsedSidebarTooltip = null;
+        let collapsedSidebarFlyout = null;
+        let collapsedSidebarFlyoutOwner = null;
 
         function storedDesktopSidebarCollapsed() {
             try {
@@ -51,6 +53,7 @@
             document.documentElement.classList.toggle("shell-sidebar-collapsed", shouldCollapse);
             if (!shouldCollapse) {
                 hideCollapsedSidebarTooltip();
+                hideCollapsedSidebarFlyout();
             }
             if (desktopToggle) {
                 desktopToggle.setAttribute("aria-pressed", shouldCollapse ? "true" : "false");
@@ -94,6 +97,7 @@
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
                 closeSidebar();
+                hideCollapsedSidebarFlyout();
             }
         });
 
@@ -179,7 +183,7 @@
 
         function sidebarTooltipTarget(event) {
             const eventTarget = event.target instanceof Element ? event.target : null;
-            if (!eventTarget || !document.documentElement.classList.contains("shell-sidebar-collapsed")) {
+            if (!eventTarget || !isDesktopSidebarCollapsed() || isCollapsedSidebarFlyoutVisible()) {
                 return null;
             }
             return eventTarget.closest(".shell-sidebar-scroll a[href], .shell-sidebar-scroll button");
@@ -202,6 +206,96 @@
             if (collapsedSidebarTooltip) {
                 collapsedSidebarTooltip.classList.remove("is-visible");
             }
+        }
+
+        function isDesktopSidebarCollapsed() {
+            return document.documentElement.classList.contains("shell-sidebar-collapsed") && desktopSidebarMedia.matches;
+        }
+
+        function ensureCollapsedSidebarFlyout() {
+            if (!collapsedSidebarFlyout) {
+                collapsedSidebarFlyout = document.createElement("div");
+                collapsedSidebarFlyout.className = "shell-sidebar-flyout";
+                collapsedSidebarFlyout.setAttribute("role", "menu");
+                document.body.appendChild(collapsedSidebarFlyout);
+            }
+            return collapsedSidebarFlyout;
+        }
+
+        function hideCollapsedSidebarFlyout() {
+            collapsedSidebarFlyoutOwner = null;
+            if (collapsedSidebarFlyout) {
+                collapsedSidebarFlyout.classList.remove("is-visible");
+            }
+        }
+
+        function isCollapsedSidebarFlyoutVisible() {
+            return !!collapsedSidebarFlyout && collapsedSidebarFlyout.classList.contains("is-visible");
+        }
+
+        function positionCollapsedSidebarFlyout(owner) {
+            if (!collapsedSidebarFlyout || !owner) {
+                return;
+            }
+            const rect = owner.getBoundingClientRect();
+            const flyoutWidth = collapsedSidebarFlyout.offsetWidth || 224;
+            const flyoutHeight = collapsedSidebarFlyout.offsetHeight || 120;
+            const left = Math.min(rect.right + 10, Math.max(10, window.innerWidth - flyoutWidth - 10));
+            const top = Math.min(Math.max(rect.top, 10), Math.max(10, window.innerHeight - flyoutHeight - 10));
+            collapsedSidebarFlyout.style.left = Math.round(left) + "px";
+            collapsedSidebarFlyout.style.top = Math.round(top) + "px";
+        }
+
+        function sourceLinkIsActive(source) {
+            return Array.from(source.classList).some(function (className) {
+                return className === "text-cyan-800"
+                    || className === "text-blue-800"
+                    || className === "text-green-800"
+                    || className === "text-amber-800"
+                    || className === "text-teal-800"
+                    || className === "text-emerald-800"
+                    || className === "text-sacco-blue"
+                    || className === "text-sacco-green"
+                    || className === "text-sacco-brown";
+            });
+        }
+
+        function showCollapsedSidebarFlyout(toggle, panel) {
+            if (!toggle || !panel) {
+                return;
+            }
+            const links = Array.from(panel.querySelectorAll("a[href]"));
+            if (links.length === 0) {
+                return;
+            }
+
+            hideCollapsedSidebarTooltip();
+            const flyout = ensureCollapsedSidebarFlyout();
+            flyout.textContent = "";
+
+            const title = document.createElement("div");
+            title.className = "shell-sidebar-flyout-title";
+            title.textContent = toggle.dataset.sidebarLabel || (toggle.textContent || "").replace(/\s+/g, " ").trim();
+            flyout.appendChild(title);
+
+            const list = document.createElement("div");
+            list.className = "shell-sidebar-flyout-list";
+            links.forEach(function (source) {
+                const link = document.createElement("a");
+                link.className = "shell-sidebar-flyout-link";
+                if (sourceLinkIsActive(source)) {
+                    link.classList.add("is-active");
+                }
+                link.href = source.getAttribute("href") || source.href;
+                link.textContent = (source.textContent || "").replace(/\s+/g, " ").trim();
+                link.setAttribute("role", "menuitem");
+                list.appendChild(link);
+            });
+            flyout.appendChild(list);
+
+            collapsedSidebarFlyoutOwner = toggle;
+            flyout.classList.add("is-visible");
+            positionCollapsedSidebarFlyout(toggle);
         }
 
         function normalizeSidebarUrl(url) {
@@ -311,6 +405,10 @@
             const storedState = activeState || (stored === null ? false : stored === "true");
             applyExpanded(storedState);
             toggle.addEventListener("click", function () {
+                if (isDesktopSidebarCollapsed()) {
+                    showCollapsedSidebarFlyout(toggle, panel);
+                    return;
+                }
                 const isExpanded = toggle.getAttribute("aria-expanded") === "true";
                 const nextExpanded = !isExpanded;
                 applyExpanded(nextExpanded);
@@ -347,8 +445,33 @@
                 showCollapsedSidebarTooltip(sidebarTooltipTarget(event));
             });
             sidebarScroll.addEventListener("focusout", hideCollapsedSidebarTooltip);
-            sidebarScroll.addEventListener("scroll", hideCollapsedSidebarTooltip, { passive: true });
+            sidebarScroll.addEventListener("scroll", function () {
+                hideCollapsedSidebarTooltip();
+                hideCollapsedSidebarFlyout();
+            }, { passive: true });
         }
+
+        document.addEventListener("click", function (event) {
+            const target = event.target instanceof Element ? event.target : null;
+            if (!target || !collapsedSidebarFlyout || !collapsedSidebarFlyout.classList.contains("is-visible")) {
+                return;
+            }
+            if (collapsedSidebarFlyout.contains(target) || (collapsedSidebarFlyoutOwner && collapsedSidebarFlyoutOwner.contains(target))) {
+                return;
+            }
+            hideCollapsedSidebarFlyout();
+        });
+
+        window.addEventListener("resize", function () {
+            if (!collapsedSidebarFlyout || !collapsedSidebarFlyout.classList.contains("is-visible")) {
+                return;
+            }
+            if (isDesktopSidebarCollapsed() && collapsedSidebarFlyoutOwner) {
+                positionCollapsedSidebarFlyout(collapsedSidebarFlyoutOwner);
+            } else {
+                hideCollapsedSidebarFlyout();
+            }
+        });
 
         if (adminScopeToggle && adminScopePanel) {
             adminScopeToggle.addEventListener("click", function () {
@@ -378,20 +501,32 @@
     })();
 </script>
 <div id="sessionInactivityPrompt"
-     class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/45 px-4"
+     class="fixed inset-x-3 bottom-3 z-[9999] hidden justify-end pointer-events-none sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-96"
+     role="alertdialog"
+     aria-labelledby="sessionInactivityTitle"
+     aria-describedby="sessionInactivityMessage"
      data-keepalive-url="<c:url value='/session/keepalive' />"
      data-csrf-header="${_csrf.headerName}"
      data-csrf-token="${_csrf.token}">
-    <div class="w-full max-w-md rounded-md border border-slate-200 bg-white p-5 shadow-xl">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Session Check</p>
-        <h2 class="mt-2 text-lg font-bold text-sacco-ink">Are you still there?</h2>
-        <p class="mt-2 text-sm text-slate-600">Your session will be closed if there is no response.</p>
-        <div class="mt-5 flex flex-wrap justify-end gap-2">
-            <form id="sessionInactivityLogoutForm" action="/logout" method="post">
+    <div class="pointer-events-auto w-full rounded-md border border-slate-200 bg-white p-4 shadow-xl ring-1 ring-slate-900/5">
+        <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-sky-100 bg-sky-50 text-sky-700">
+                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm.75 4.25a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.25zm0 6.75a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0V13z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Session Check</p>
+                <h2 id="sessionInactivityTitle" class="mt-1 text-base font-bold text-sacco-ink">Are you still there?</h2>
+                <p id="sessionInactivityMessage" class="mt-1 text-sm leading-5 text-slate-600">Your session will close soon if there is no response.</p>
+            </div>
+        </div>
+        <div class="mt-4 flex flex-row flex-wrap items-center justify-end gap-2">
+            <form id="sessionInactivityLogoutForm" action="/logout" method="post" class="shrink-0">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn btn-neutral">Logout</button>
             </form>
-            <button id="sessionInactivityStayButton" type="button" class="app-btn btn-primary">Stay Logged In</button>
+            <button id="sessionInactivityStayButton" type="button" class="app-btn btn-primary shrink-0">Stay Logged In</button>
         </div>
     </div>
 </div>
@@ -410,17 +545,15 @@
         }
         let promptTimer = null;
         let logoutTimer = null;
-        let promptToast = null;
         let keepalivePending = false;
         const activityEvents = ["click", "keydown", "mousemove", "touchstart", "scroll"];
+        if (prompt.parentElement !== document.body) {
+            document.body.appendChild(prompt);
+        }
 
         function hidePrompt() {
             prompt.classList.add("hidden");
             prompt.classList.remove("flex");
-            if (promptToast && typeof promptToast.dismiss === "function") {
-                promptToast.dismiss();
-                promptToast = null;
-            }
             if (logoutTimer) {
                 window.clearTimeout(logoutTimer);
                 logoutTimer = null;
@@ -430,11 +563,7 @@
         function showPrompt() {
             prompt.classList.remove("hidden");
             prompt.classList.add("flex");
-            if (typeof window.showToast === "function") {
-                promptToast = window.showToast("info", "Are you still there? Choose Stay Logged In to keep working.", {
-                    duration: Math.max(graceMs, 15000)
-                });
-            }
+            window.setTimeout(() => stayButton.focus({ preventScroll: true }), 0);
         }
 
         function keepaliveHeaders() {

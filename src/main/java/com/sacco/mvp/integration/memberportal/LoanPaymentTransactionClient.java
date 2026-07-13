@@ -54,6 +54,7 @@ public class LoanPaymentTransactionClient {
             log.info("Memberportal loan-payment-transactions request: {}", requestUri);
             List<LoanPaymentTransactionDto> body = client().get()
                 .uri(requestUri)
+                .header("Content-Type", "application/json")
                 .retrieve()
                 .body(RESPONSE_TYPE);
             List<LoanPaymentTransactionDto> transactions = body == null ? Collections.emptyList() : body;

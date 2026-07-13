@@ -270,9 +270,11 @@ public class LoanOfficerController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAsc(app.getId());
+        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
         var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
+        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
         model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
+        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
             app,

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,12 +34,20 @@ public class LoanProductDisplayService {
         if (app == null) {
             return "-";
         }
+        String productName = displayNameByProductId(app);
+        if (productName != null) {
+            return productName;
+        }
         return displayName(app.getLoanType(), namesForSacco(app.getSaccoId()));
     }
 
     public String displayName(LoanApplication app, Map<LoanType, String> productNames) {
         if (app == null) {
             return "-";
+        }
+        String productName = displayNameByProductId(app);
+        if (productName != null) {
+            return productName;
         }
         return displayName(app.getLoanType(), productNames);
     }
@@ -52,5 +61,16 @@ public class LoanProductDisplayService {
             return configuredName;
         }
         return loanType.getDisplayLabel();
+    }
+
+    private String displayNameByProductId(LoanApplication app) {
+        UUID productId = app.getLoanProductSettingId();
+        if (productId == null || app.getSaccoId() == null || app.getSaccoId().isBlank()) {
+            return null;
+        }
+        return loanProductSettingRepository.findByIdAndSaccoId(productId, app.getSaccoId())
+            .map(LoanProductSetting::getDisplayName)
+            .filter(name -> !name.isBlank())
+            .orElse(null);
     }
 }

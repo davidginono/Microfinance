@@ -123,6 +123,7 @@ class AdminServiceTest {
             saccoSettingsRepository,
             null,
             org.mockito.Mockito.mock(SmsUnitTransactionService.class),
+            auditService,
             org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
         MinorAdminInvitationService minorAdminInvitationService = new MinorAdminInvitationService(
@@ -1328,7 +1329,6 @@ class AdminServiceTest {
         when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
         when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
-        when(loanProductSettingRepository.existsBySaccoIdAndLoanType("SACCO-01", LoanType.CUSTOMIZED_LOAN)).thenReturn(false);
         AtomicReference<LoanProductSetting> savedProduct = new AtomicReference<>();
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> {
             LoanProductSetting product = invocation.getArgument(0);

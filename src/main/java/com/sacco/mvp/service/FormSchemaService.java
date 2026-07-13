@@ -24,8 +24,22 @@ public class FormSchemaService {
     private final ObjectMapper objectMapper;
 
     public LoanProductSetting getSchema(String saccoId, LoanType loanType) {
-        return loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue(saccoId, loanType)
+        if (loanType == null) {
+            throw new IllegalArgumentException("Loan product schema not found");
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(product -> product.getLoanType() == loanType)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Loan product schema not found"));
+    }
+
+    public LoanProductSetting getSchema(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
+        if (loanProductId != null) {
+            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan product schema not found"));
+        }
+        return getSchema(saccoId, fallbackLoanType);
     }
 
     public FormModel toFormModel(LoanType loanType, String schemaJson) {

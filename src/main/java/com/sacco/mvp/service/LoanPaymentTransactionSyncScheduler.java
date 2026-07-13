@@ -14,14 +14,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.YearMonth;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Monthly job that pulls the previous month's payment transactions for every
- * disbursed loan. Failures are isolated per loan so a single bad call does not
- * stop the batch.
+ * Reconciles complete payment histories for disbursed loans. Failures are
+ * isolated per loan so a single bad call does not stop the batch.
  */
 @Component
 @ConditionalOnProperty(name = "app.loan-payments.sync-enabled", matchIfMissing = true)
@@ -44,11 +42,10 @@ public class LoanPaymentTransactionSyncScheduler {
 
     @Scheduled(cron = "${app.loan-payments.sync-cron:0 17 3 1 * *}", zone = "${app.loan-payments.sync-zone:Africa/Nairobi}")
     public void syncPreviousMonth() {
-        YearMonth target = YearMonth.now().minusMonths(1);
-        SyncTotals totals = syncPaged("monthly loan payment transaction sync for " + target,
-            loan -> syncService.syncMonth(loan, target));
-        log.info("Loan payment transaction sync for {} completed: loans={}, inserted={}, failures={}",
-            target, totals.loans(), totals.inserted(), totals.failures());
+        SyncTotals totals = syncPaged("monthly full loan payment history reconciliation",
+            syncService::syncAllAndRefreshSummary);
+        log.info("Monthly loan payment history reconciliation completed: loans={}, changes={}, failures={}",
+            totals.loans(), totals.changes(), totals.failures());
     }
 
     @Scheduled(cron = "${app.loan-payments.recent-sync-cron:0 0 6-21/3 * * *}", zone = "${app.loan-payments.sync-zone:Africa/Nairobi}")
@@ -58,10 +55,10 @@ public class LoanPaymentTransactionSyncScheduler {
             return;
         }
         try {
-            SyncTotals totals = syncPaged("recent loan payment transaction sync for current and previous month",
-                loan -> syncService.syncRecent(loan, 2));
-            log.info("Recent loan payment transaction sync completed: loans={}, inserted={}, failures={}",
-                totals.loans(), totals.inserted(), totals.failures());
+            SyncTotals totals = syncPaged("scheduled full loan payment history reconciliation",
+                syncService::syncAllAndRefreshSummary);
+            log.info("Scheduled loan payment history reconciliation completed: loans={}, changes={}, failures={}",
+                totals.loans(), totals.changes(), totals.failures());
         } finally {
             recentSyncRunning.set(false);
         }
@@ -71,7 +68,7 @@ public class LoanPaymentTransactionSyncScheduler {
         int pageSize = Math.max(25, syncPageSize);
         int pageNumber = 0;
         int totalLoans = 0;
-        int totalInserted = 0;
+        int totalChanges = 0;
         int failures = 0;
         Page<LoanApplication> page;
         log.info("Starting {} with pageSize={}", label, pageSize);
@@ -83,11 +80,11 @@ public class LoanPaymentTransactionSyncScheduler {
             for (LoanApplication loan : page.getContent()) {
                 totalLoans++;
                 try {
-                    int inserted = action.sync(loan);
-                    totalInserted += inserted;
-                    if (inserted > 0) {
-                        log.info("Loan payment sync for applicationNumber={} loanId={}: inserted {} transaction(s)",
-                            loan.getApplicationNumber(), loan.getLoanId(), inserted);
+                    int changes = action.sync(loan);
+                    totalChanges += changes;
+                    if (changes > 0) {
+                        log.info("Loan payment sync for applicationNumber={} loanId={}: reconciled {} transaction change(s)",
+                            loan.getApplicationNumber(), loan.getLoanId(), changes);
                     }
                 } catch (LoanPaymentLookupException ex) {
                     failures++;
@@ -101,7 +98,7 @@ public class LoanPaymentTransactionSyncScheduler {
             }
             pageNumber++;
         } while (page.hasNext());
-        return new SyncTotals(totalLoans, totalInserted, failures);
+        return new SyncTotals(totalLoans, totalChanges, failures);
     }
 
     @FunctionalInterface
@@ -109,6 +106,6 @@ public class LoanPaymentTransactionSyncScheduler {
         int sync(LoanApplication loan);
     }
 
-    private record SyncTotals(int loans, int inserted, int failures) {
+    private record SyncTotals(int loans, int changes, int failures) {
     }
 }

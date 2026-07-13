@@ -11,7 +11,7 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260709-sidebar-collapse-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260710-sidebar-flyout-v1' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="min-h-screen font-sans text-sacco-ink antialiased" style="background: var(--page-bg); overflow-x: clip;">

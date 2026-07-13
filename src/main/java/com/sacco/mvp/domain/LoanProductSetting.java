@@ -11,7 +11,6 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "loan_product_settings", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"sacco_id", "loan_type"}),
     @UniqueConstraint(columnNames = {"sacco_id", "product_code"})
 })
 @Getter

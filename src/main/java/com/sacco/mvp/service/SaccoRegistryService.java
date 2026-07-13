@@ -32,6 +32,7 @@ public class SaccoRegistryService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final SmsUnitTransactionService smsUnitTransactionService;
+    private final AuditService auditService;
     private final JdbcTemplate jdbcTemplate;
     private volatile List<RegisteredSaccoView> registeredSaccoCache;
 
@@ -191,6 +192,34 @@ public class SaccoRegistryService {
             .orElseThrow(() -> new IllegalStateException("SACCO not found."));
         upsertSacco(normalizedSaccoId, sacco.getSaccoName(), stationIds, OffsetDateTime.now(), true);
         invalidateRegisteredSaccoCache();
+    }
+
+    @Transactional
+    public void updateLogoOnly(String saccoId, MultipartFile logoFile, UUID actorMemberId) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        if (normalizedSaccoId == null) {
+            throw new IllegalStateException("SACCO ID is required.");
+        }
+        if (logoFile == null || logoFile.isEmpty()) {
+            throw new IllegalStateException("Choose a logo image before saving.");
+        }
+        RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
+            .filter(RegisteredSacco::isActive)
+            .orElseThrow(() -> new IllegalStateException("SACCO not found."));
+        Map<String, Object> before = Map.of(
+            "saccoId", sacco.getSaccoId(),
+            "hasLogo", saccoLogoStorageService.hasLogo(normalizedSaccoId),
+            "updatedAt", sacco.getUpdatedAt()
+        );
+        saccoLogoStorageService.store(normalizedSaccoId, logoFile);
+        sacco.setUpdatedAt(OffsetDateTime.now());
+        registeredSaccoRepository.save(sacco);
+        invalidateRegisteredSaccoCache();
+        auditService.log("REGISTERED_SACCO", null, "ADMIN_UPDATE_SACCO_LOGO", actorMemberId, before, Map.of(
+            "saccoId", sacco.getSaccoId(),
+            "hasLogo", true,
+            "updatedAt", sacco.getUpdatedAt()
+        ));
     }
 
     @Transactional

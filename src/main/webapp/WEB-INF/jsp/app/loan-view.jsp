@@ -330,7 +330,7 @@
     </c:otherwise>
 </c:choose>
 
-<c:if test="${not empty calculatedRepaymentRows}">
+<c:if test="${not empty calculatedRepaymentRows and empty generatedRepaymentRows}">
     <div class="erp-table-wrap erp-table-scroll">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></div>
@@ -402,6 +402,24 @@
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.installmentAmount" text="Installment Amount" /></div>
                     <div class="loan-repayment-card-value">
                         <c:out value="${repaymentSummary['Installment Amount']}" default="Pending update" />
+                    </div>
+                </div>
+                <div class="loan-repayment-card">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalInterest" text="Total Interest" /></div>
+                    <div class="loan-repayment-card-value">
+                        <c:out value="${repaymentSummary['Total Interest']}" default="Pending update" />
+                    </div>
+                </div>
+                <div class="loan-repayment-card">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalPrincipal" text="Total Principal" /></div>
+                    <div class="loan-repayment-card-value">
+                        <c:out value="${repaymentSummary['Total Principal']}" default="Pending update" />
+                    </div>
+                </div>
+                <div class="loan-repayment-card">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalAmount" text="Total Amount" /></div>
+                    <div class="loan-repayment-card-value">
+                        <c:out value="${repaymentSummary['Total Amount']}" default="Pending update" />
                     </div>
                 </div>
                 <div class="loan-repayment-card">
@@ -498,46 +516,57 @@
             <c:when test="${not empty generatedRepaymentRows}">
                 <div class="mt-5 erp-table-wrap overflow-x-auto">
                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                        <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.generatedSchedule" text="Generated Repayment Schedule" /></div>
+                        <div class="text-sm font-semibold text-slate-900">
+                            <c:choose>
+                                <c:when test="${generatedRepaymentRowsArePaymentRecords}"><spring:message code="loan.repayment.paymentRecords" text="Record of Payments" /></c:when>
+                                <c:otherwise><spring:message code="loan.repayment.paymentRecords" text="Record of Payments" /></c:otherwise>
+                            </c:choose>
+                        </div>
                     </div>
                     <table class="erp-table">
                         <thead>
                             <tr>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
+                                <c:if test="${not generatedRepaymentRowsArePaymentRecords}">
+                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
+                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
+                                </c:if>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingPrincipal" text="Outstanding Principal" /></th>
+                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingInterest" text="Outstanding Interest" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
                                 <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentStatus" text="Payment Status" /></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <c:forEach items="${generatedRepaymentRows}" var="row">
                                 <tr>
                                     <td class="px-3 py-2 font-medium text-slate-700">${row.installment}</td>
-                                    <td class="px-3 py-2">${row.dueDate}</td>
-                                    <td class="px-3 py-2">
-                                        <div class="font-medium text-slate-900">${row.amount}</div>
-                                        <c:if test="${(not empty row.loanAmount and row.loanAmount ne '-') or (not empty row.interest and row.interest ne '-')}">
-                                            <div class="mt-1 space-y-0.5 text-xs font-medium leading-5 text-slate-500">
-                                                <c:if test="${not empty row.loanAmount and row.loanAmount ne '-'}">
-                                                    <div><spring:message code="loan.amount.label" text="Loan Amount" />: <span class="text-slate-700">${row.loanAmount}</span></div>
-                                                </c:if>
-                                                <c:if test="${not empty row.interest and row.interest ne '-'}">
-                                                    <div><spring:message code="repayment.interest" text="Interest" />: <span class="text-slate-700">${row.interest}</span></div>
-                                                </c:if>
-                                            </div>
-                                        </c:if>
-                                    </td>
+                                    <c:if test="${not generatedRepaymentRowsArePaymentRecords}">
+                                        <td class="px-3 py-2">${row.dueDate}</td>
+                                        <td class="px-3 py-2">
+                                            <div class="font-medium text-slate-900">${row.amount}</div>
+                                            <c:if test="${(not empty row.loanAmount and row.loanAmount ne '-') or (not empty row.interest and row.interest ne '-')}">
+                                                <div class="mt-1 space-y-0.5 text-xs font-medium leading-5 text-slate-500">
+                                                    <c:if test="${not empty row.loanAmount and row.loanAmount ne '-'}">
+                                                        <div><spring:message code="loan.amount.label" text="Loan Amount" />: <span class="text-slate-700">${row.loanAmount}</span></div>
+                                                    </c:if>
+                                                    <c:if test="${not empty row.interest and row.interest ne '-'}">
+                                                        <div><spring:message code="repayment.interest" text="Interest" />: <span class="text-slate-700">${row.interest}</span></div>
+                                                    </c:if>
+                                                </div>
+                                            </c:if>
+                                        </td>
+                                    </c:if>
                                     <td class="px-3 py-2">${row.outstandingBalance}</td>
+                                    <td class="px-3 py-2">${row.outstandingPrincipal}</td>
+                                    <td class="px-3 py-2">${row.outstandingInterest}</td>
                                     <td class="px-3 py-2">${row.principalPaid}</td>
                                     <td class="px-3 py-2">${row.interestPaid}</td>
                                     <td class="px-3 py-2 font-medium text-slate-900">${row.totalPaid}</td>
                                     <td class="px-3 py-2">${row.paymentDate}</td>
-                                    <td class="px-3 py-2">${row.paymentStatus}</td>
                                 </tr>
                             </c:forEach>
                         </tbody>
@@ -546,10 +575,46 @@
             </c:when>
             <c:otherwise>
                 <div class="mt-5 loan-repayment-empty">
-                    <spring:message code="loan.repayment.empty" text="Repayment schedule details are not available yet for this disbursed loan. Core repayment dates will appear here once the schedule is fully posted." />
+                    <spring:message code="loan.repayment.empty" text="No payments have been recorded for this loan yet." />
                 </div>
             </c:otherwise>
         </c:choose>
+        <c:if test="${not empty generatedRepaymentRows and not empty calculatedRepaymentRows}">
+            <details class="mt-5 rounded-md border border-slate-200 bg-white" open>
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
+                    <span><spring:message code="loan.repayment.expectedScheduleToggle" text="See Expected Schedule From Loan Calculator" /></span>
+                    <span class="text-slate-400">v</span>
+                </summary>
+                <div class="erp-table-wrap overflow-x-auto rounded-none border-0">
+                    <table class="erp-table">
+                        <thead>
+                            <tr>
+                                <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                                <th><spring:message code="repayment.month" text="Month" /></th>
+                                <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                                <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                                <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                                <th><spring:message code="repayment.interest" text="Interest" /></th>
+                                <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <c:forEach items="${calculatedRepaymentRows}" var="row">
+                                <tr>
+                                    <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                                    <td class="px-3 py-2">${row.month}</td>
+                                    <td class="px-3 py-2">${row.beginningBalance}</td>
+                                    <td class="px-3 py-2 font-medium text-slate-900">${row.payment}</td>
+                                    <td class="px-3 py-2">${row.loanAmount}</td>
+                                    <td class="px-3 py-2">${row.interest}</td>
+                                    <td class="px-3 py-2">${row.endingBalance}</td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </c:if>
     </div>
 </c:if>
 
@@ -829,7 +894,18 @@
                 </form>
             </c:if>
             <c:if test="${showTopUpAction}">
-                <a href="/app/loan-applications/new?loanType=${app.loanType}&topUpLoanId=${app.id}" class="app-btn btn-neutral">
+                <c:url value="/app/loan-applications/new" var="topUpLoanUrl">
+                    <c:choose>
+                        <c:when test="${not empty app.loanProductSettingId}">
+                            <c:param name="loanProductId" value="${app.loanProductSettingId}" />
+                        </c:when>
+                        <c:otherwise>
+                            <c:param name="loanType" value="${app.loanType}" />
+                        </c:otherwise>
+                    </c:choose>
+                    <c:param name="topUpLoanId" value="${app.id}" />
+                </c:url>
+                <a href="${topUpLoanUrl}" class="app-btn btn-neutral">
                     <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
                 </a>
             </c:if>

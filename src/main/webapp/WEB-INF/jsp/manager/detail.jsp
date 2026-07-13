@@ -19,10 +19,12 @@
         border-radius: 0.35rem;
         background: #ffffff;
         padding: 0.95rem 1rem;
-        color: #172033;
-        font-size: 1rem;
-        font-weight: 800;
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
         text-align: left;
+        text-transform: uppercase;
     }
     .disbursement-collapsible-trigger:hover,
     .disbursement-collapsible-trigger:focus-visible {

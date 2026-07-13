@@ -49,6 +49,7 @@ class SaccoRegistryServiceTest {
             saccoSettingsRepository,
             saccoLogoStorageService,
             Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(AuditService.class),
             Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
@@ -115,6 +116,7 @@ class SaccoRegistryServiceTest {
             saccoSettingsRepository,
             saccoLogoStorageService,
             Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(AuditService.class),
             Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
@@ -164,6 +166,57 @@ class SaccoRegistryServiceTest {
     }
 
     @Test
+    void updateLogoOnlyStoresLogoRefreshesSaccoAndAudits() throws IOException {
+        RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
+        SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
+        SaccoSettingsRepository saccoSettingsRepository = Mockito.mock(SaccoSettingsRepository.class);
+        SaccoLogoStorageService saccoLogoStorageService = Mockito.mock(SaccoLogoStorageService.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+
+        SaccoRegistryService service = new SaccoRegistryService(
+            registeredSaccoRepository,
+            saccoStationRepository,
+            saccoSettingsRepository,
+            saccoLogoStorageService,
+            Mockito.mock(SmsUnitTransactionService.class),
+            auditService,
+            Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        );
+
+        OffsetDateTime now = OffsetDateTime.now().minusDays(1);
+        RegisteredSacco existingSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-1")
+            .saccoName("Example Sacco")
+            .active(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        MockMultipartFile logoFile = new MockMultipartFile(
+            "logoFile",
+            "logo.png",
+            "image/png",
+            pngBytes(120, 120)
+        );
+        UUID actorId = UUID.randomUUID();
+        when(registeredSaccoRepository.findById("SACCO-1")).thenReturn(Optional.of(existingSacco));
+
+        service.updateLogoOnly("SACCO-1", logoFile, actorId);
+
+        verify(saccoLogoStorageService).store("SACCO-1", logoFile);
+        verify(registeredSaccoRepository).save(argThat(sacco -> sacco != null
+            && "SACCO-1".equals(sacco.getSaccoId())
+            && sacco.getUpdatedAt().isAfter(now)));
+        verify(auditService).log(
+            org.mockito.ArgumentMatchers.eq("REGISTERED_SACCO"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq("ADMIN_UPDATE_SACCO_LOGO"),
+            org.mockito.ArgumentMatchers.eq(actorId),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
     void updateSaccoStoresStationAddressLocation() {
         RegisteredSaccoRepository registeredSaccoRepository = Mockito.mock(RegisteredSaccoRepository.class);
         SaccoStationRepository saccoStationRepository = Mockito.mock(SaccoStationRepository.class);
@@ -176,6 +229,7 @@ class SaccoRegistryServiceTest {
             saccoSettingsRepository,
             saccoLogoStorageService,
             Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(AuditService.class),
             Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 
@@ -240,6 +294,7 @@ class SaccoRegistryServiceTest {
             saccoSettingsRepository,
             saccoLogoStorageService,
             Mockito.mock(SmsUnitTransactionService.class),
+            Mockito.mock(AuditService.class),
             Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
 

@@ -13,7 +13,7 @@ public enum LoanType {
             case EDUCATION_LOAN -> "Education Loan (Mkopo wa Elimu)";
             case EMERGENCY_LOAN -> "Emergency Loan (Mkopo wa Dharura)";
             case DEVELOPMENT_LOAN -> "Development Loan (Mkopo wa Biashara)";
-            case CUSTOMIZED_LOAN -> "Customized Loan Product";
+            case CUSTOMIZED_LOAN -> "Loan Product";
         };
     }
 

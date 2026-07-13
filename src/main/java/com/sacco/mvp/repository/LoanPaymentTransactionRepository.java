@@ -11,17 +11,11 @@ import java.util.UUID;
 
 public interface LoanPaymentTransactionRepository extends JpaRepository<LoanPaymentTransaction, UUID> {
 
-    List<LoanPaymentTransaction> findByLoanApplicationIdOrderByReceiptDateAsc(UUID loanApplicationId);
+    List<LoanPaymentTransaction> findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(UUID loanApplicationId);
 
     List<LoanPaymentTransaction> findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(
         Collection<UUID> loanApplicationIds,
         LocalDate fromDate,
         LocalDate toDate);
 
-    boolean existsByLoanApplicationIdAndReceiptDateAndPrincipalPaidAndInterestPaidAndTotalPaid(
-        UUID loanApplicationId,
-        LocalDate receiptDate,
-        BigDecimal principalPaid,
-        BigDecimal interestPaid,
-        BigDecimal totalPaid);
 }

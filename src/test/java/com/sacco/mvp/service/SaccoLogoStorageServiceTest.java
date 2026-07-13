@@ -22,7 +22,7 @@ class SaccoLogoStorageServiceTest {
     @Test
     void storesValidPngLogoInDatabaseStorage() throws IOException {
         StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
-        SaccoLogoStorageService service = new SaccoLogoStorageService(storage);
+        SaccoLogoStorageService service = service(storage);
         byte[] content = pngBytes(128, 128);
 
         service.store("SACCO-ARUSHA-001", new MockMultipartFile(
@@ -45,14 +45,14 @@ class SaccoLogoStorageServiceTest {
             .content(new byte[]{1, 2, 3})
             .contentType("image/png")
             .build());
-        SaccoLogoStorageService service = new SaccoLogoStorageService(storage);
+        SaccoLogoStorageService service = service(storage);
 
         assertEquals("image/png", service.load("SACCO-ARUSHA-001").contentType().toString());
     }
 
     @Test
     void rejectsLogoOutsideAllowedResolutionRange() throws IOException {
-        SaccoLogoStorageService service = new SaccoLogoStorageService(mock(StoredUploadStorageService.class));
+        SaccoLogoStorageService service = service(mock(StoredUploadStorageService.class));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.store(
             "SACCO-ARUSHA-001",
@@ -60,6 +60,27 @@ class SaccoLogoStorageServiceTest {
         ));
 
         assertEquals("SACCO logo image must be between 64x64 and 1024x1024 pixels.", ex.getMessage());
+    }
+
+    @Test
+    void rejectsLogoUsingConfiguredResolutionRange() throws IOException {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        PlatformBrandingSettingsService settings = mock(PlatformBrandingSettingsService.class);
+        when(settings.logoUploadPolicy()).thenReturn(new LogoUploadPolicy(128, 128, 256, 256, 1024));
+        SaccoLogoStorageService service = new SaccoLogoStorageService(storage, settings);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.store(
+            "SACCO-ARUSHA-001",
+            new MockMultipartFile("logoFile", "logo.png", "image/png", pngBytes(96, 96))
+        ));
+
+        assertEquals("SACCO logo image must be between 128x128 and 256x256 pixels.", ex.getMessage());
+    }
+
+    private SaccoLogoStorageService service(StoredUploadStorageService storage) {
+        PlatformBrandingSettingsService settings = mock(PlatformBrandingSettingsService.class);
+        when(settings.logoUploadPolicy()).thenReturn(new LogoUploadPolicy(64, 64, 1024, 1024, 1024));
+        return new SaccoLogoStorageService(storage, settings);
     }
 
     private byte[] pngBytes(int width, int height) throws IOException {
