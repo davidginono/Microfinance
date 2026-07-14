@@ -788,9 +788,18 @@
                 </span>
             </div>
         </summary>
-        <div class="mt-4 space-y-3">
-            <c:forEach items="${directOtpGuarantorRequests}" var="req">
-                <div class="rounded-md border border-slate-200 bg-white p-4"
+        <div class="mt-4">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <span class="font-semibold text-slate-800">
+                    <spring:message code="loan.guarantorOtp.currentStep" text="Current guarantor" />
+                </span>
+                <span>
+                    1 of ${fn:length(directOtpGuarantorRequests)}
+                </span>
+            </div>
+            <div class="space-y-3">
+            <c:forEach items="${directOtpGuarantorRequests}" var="req" varStatus="otpStatus">
+                <div class="${otpStatus.first ? '' : 'hidden'} rounded-md border border-slate-200 bg-white p-4"
                      data-guarantor-direct-otp-card
                      data-verify-url="/app/loan-applications/${app.id}/guarantors/${req.id}/verify-confirmation-otp"
                      data-resend-url="/app/loan-applications/${app.id}/guarantors/${req.id}/request-confirmation-otp-json">
@@ -852,6 +861,7 @@
                     </form>
                 </div>
             </c:forEach>
+            </div>
         </div>
     </details>
 </c:if>

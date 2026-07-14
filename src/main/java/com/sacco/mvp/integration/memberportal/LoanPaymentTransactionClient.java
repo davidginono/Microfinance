@@ -3,6 +3,8 @@ package com.sacco.mvp.integration.memberportal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -52,11 +54,16 @@ public class LoanPaymentTransactionClient {
                 .build()
                 .toUri();
             log.info("Memberportal loan-payment-transactions request: {}", requestUri);
-            List<LoanPaymentTransactionDto> body = client().get()
+            ResponseEntity<List<LoanPaymentTransactionDto>> response = client().get()
                 .uri(requestUri)
                 .header("Content-Type", "application/json")
                 .retrieve()
-                .body(RESPONSE_TYPE);
+                .toEntity(RESPONSE_TYPE);
+            if (!HttpStatus.OK.equals(response.getStatusCode())) {
+                throw new LoanPaymentLookupException(
+                    "Loan payment transactions lookup failed with status " + response.getStatusCode() + ".", null);
+            }
+            List<LoanPaymentTransactionDto> body = response.getBody();
             List<LoanPaymentTransactionDto> transactions = body == null ? Collections.emptyList() : body;
             log.info("Memberportal loan-payment-transactions lookup completed: loanId={}, transactions={}",
                 loanId, transactions.size());

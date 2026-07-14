@@ -148,14 +148,8 @@ public class LoanPaymentTransactionSyncService {
     }
 
     private Optional<LoanPaymentSummaryDto> fetchLoanPaymentSummary(LoanApplication loan, Member applicant) {
-        try {
-            return loanPaymentSummaryClient.fetchSummary(
-                applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
-        } catch (LoanPaymentLookupException ex) {
-            log.warn("Loan payment summary sync failed for applicationNumber={} loanId={}: {}",
-                loan.getApplicationNumber(), loan.getLoanId(), ex.getMessage());
-            return Optional.empty();
-        }
+        return loanPaymentSummaryClient.fetchSummary(
+            applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
     }
 
     private void applyOutstandingBalances(List<LoanPaymentTransaction> transactions,
