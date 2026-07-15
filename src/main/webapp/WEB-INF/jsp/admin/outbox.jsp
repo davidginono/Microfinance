@@ -132,8 +132,8 @@
             </c:if>
         </label>
         <label class="admin-filter-field admin-filter-field--loan block min-w-0 text-sm font-semibold text-slate-700">
-            Loan ID
-            <input type="text" name="loanId" value="${selectedLoanId}" placeholder="Search loan UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
+            Loan Application ID
+            <input type="text" name="loanApplicationId" value="${selectedLoanApplicationId}" placeholder="Search application UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
         </label>
         <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700">
             <span class="admin-filter-field--rows-label">Rows Per Page</span>
@@ -167,7 +167,7 @@
                             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                             <input type="hidden" name="dateFrom" value="${selectedDateFrom}" />
                             <input type="hidden" name="dateTo" value="${selectedDateTo}" />
-                            <input type="hidden" name="loanId" value="${selectedLoanId}" />
+                            <input type="hidden" name="loanApplicationId" value="${selectedLoanApplicationId}" />
                             <input type="hidden" name="saccoId" value="${selectedSaccoId}" />
                             <input type="hidden" name="stationId" value="${selectedStationId}" />
                             <input type="hidden" name="size" value="${selectedPageSize}" />

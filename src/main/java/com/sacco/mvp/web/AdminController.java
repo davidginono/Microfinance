@@ -1391,6 +1391,7 @@ public class AdminController {
     @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
     public String outbox(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
+                         @RequestParam(required = false) String loanApplicationId,
                          @RequestParam(required = false) String loanId,
                          @RequestParam(required = false) String saccoId,
                          @RequestParam(required = false) String stationId,
@@ -1401,9 +1402,10 @@ public class AdminController {
         boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
         String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
         String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
+        String selectedLoanApplicationId = firstNonBlank(loanApplicationId, loanId);
         Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
         if (!dateErrors.isEmpty()) {
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, selectedLoanApplicationId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             applyDateErrors(model, dateErrors);
             return "admin/outbox";
         }
@@ -1414,13 +1416,13 @@ public class AdminController {
                 null,
                 dateFrom,
                 dateTo,
-                loanId,
+                selectedLoanApplicationId,
                 scopedSaccoId.isBlank() ? null : scopedSaccoId,
                 scopedStationId.isBlank() ? null : scopedStationId
             );
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, eventsPage);
+            populateOutboxFilterModel(model, dateFrom, dateTo, selectedLoanApplicationId, scopedSaccoId, scopedStationId, superAdmin, eventsPage);
         } catch (IllegalArgumentException | DataAccessException ex) {
-            populateOutboxFilterModel(model, dateFrom, dateTo, loanId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
+            populateOutboxFilterModel(model, dateFrom, dateTo, selectedLoanApplicationId, scopedSaccoId, scopedStationId, superAdmin, Page.empty(PageRequest.of(0, normalizePageSize(size))));
             model.addAttribute("error", resolveFilterErrorMessage(ex, "We couldn't apply that outbox filter. Adjust the values and try again."));
         }
         return "admin/outbox";
@@ -1431,7 +1433,10 @@ public class AdminController {
     public String retryOutbox(@PathVariable UUID id,
                               @RequestParam(required = false) String dateFrom,
                               @RequestParam(required = false) String dateTo,
+                              @RequestParam(required = false) String loanApplicationId,
                               @RequestParam(required = false) String loanId,
+                              @RequestParam(required = false) String saccoId,
+                              @RequestParam(required = false) String stationId,
                               @RequestParam(defaultValue = "0") int page,
                               @RequestParam(defaultValue = "50") int size,
                               @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1439,7 +1444,7 @@ public class AdminController {
         adminService.retryOutbox(principal.getMemberId(), id);
         ra.addFlashAttribute("message", "Outbox event moved back to NEW for retry.");
         return "redirect:/admin/outbox?page=" + normalizePage(page)
-            + buildOutboxPaginationQuery(dateFrom, dateTo, loanId, normalizePageSize(size));
+            + buildOutboxPaginationQuery(dateFrom, dateTo, firstNonBlank(loanApplicationId, loanId), saccoId, stationId, normalizePageSize(size));
     }
 
     @GetMapping("/events")
@@ -1510,6 +1515,9 @@ public class AdminController {
     public String saccoDetail(@PathVariable String saccoId,
                               @RequestParam(required = false) String section,
                               @RequestParam(required = false) String stationId,
+                              @RequestParam(required = false) String memberQuery,
+                              @RequestParam(defaultValue = "0") int memberPage,
+                              @RequestParam(defaultValue = "25") int memberSize,
                               @RequestParam(defaultValue = "0") int smsPage,
                               @RequestParam(defaultValue = "0") int smsHistoryPage,
                               @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1539,6 +1547,24 @@ public class AdminController {
                     PageRequest.of(safeSmsPage, 25)
                 ));
             }
+        }
+        if ("members".equals(selectedSection)) {
+            Page<AdminService.UserAccessView> membersPage = adminService.saccoDetailMembersPage(
+                saccoDetail.getSaccoId(),
+                saccoDetail.getSelectedStationId(),
+                memberQuery,
+                memberPage,
+                memberSize
+            );
+            model.addAttribute("saccoMembers", membersPage.getContent());
+            model.addAttribute("saccoMembersPage", membersPage);
+            model.addAttribute("selectedMemberQuery", normalizeTextParam(memberQuery));
+            model.addAttribute("selectedMemberPageSize", membersPage.getSize());
+            model.addAttribute("saccoMembersPaginationQuery", buildSaccoMembersPaginationQuery(
+                saccoDetail.getSelectedStationId(),
+                memberQuery,
+                membersPage.getSize()
+            ));
         }
         return "admin/sacco-detail";
     }
@@ -1913,6 +1939,11 @@ public class AdminController {
         return raw == null ? "" : raw.trim();
     }
 
+    private String firstNonBlank(String primary, String fallback) {
+        String normalizedPrimary = normalizeTextParam(primary);
+        return normalizedPrimary.isBlank() ? normalizeTextParam(fallback) : normalizedPrimary;
+    }
+
     private int normalizePageSize(int size) {
         if (size <= 0) {
             return 50;
@@ -1927,15 +1958,15 @@ public class AdminController {
     private void populateOutboxFilterModel(Model model,
                                            String dateFrom,
                                            String dateTo,
-                                           String loanId,
+                                           String loanApplicationId,
                                            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
-        populateOutboxFilterModel(model, dateFrom, dateTo, loanId, "", "", false, eventsPage);
+        populateOutboxFilterModel(model, dateFrom, dateTo, loanApplicationId, "", "", false, eventsPage);
     }
 
     private void populateOutboxFilterModel(Model model,
                                            String dateFrom,
                                            String dateTo,
-                                           String loanId,
+                                           String loanApplicationId,
                                            String saccoId,
                                            String stationId,
                                            boolean superAdmin,
@@ -1944,9 +1975,9 @@ public class AdminController {
         model.addAttribute("eventsPage", eventsPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
-        model.addAttribute("selectedLoanId", normalizeTextParam(loanId));
+        model.addAttribute("selectedLoanApplicationId", normalizeTextParam(loanApplicationId));
         addAdminScopeFilters(model, saccoId, stationId, superAdmin);
-        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(dateFrom, dateTo, loanId, saccoId, stationId, eventsPage.getSize()));
+        model.addAttribute("outboxPaginationQuery", buildOutboxPaginationQuery(dateFrom, dateTo, loanApplicationId, saccoId, stationId, eventsPage.getSize()));
         model.addAttribute("selectedPageSize", eventsPage.getSize());
     }
 
@@ -2033,11 +2064,11 @@ public class AdminController {
         model.addAttribute("dateToError", dateErrors.get("dateToError"));
     }
 
-    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanId, int size) {
-        return buildOutboxPaginationQuery(dateFrom, dateTo, loanId, null, null, size);
+    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanApplicationId, int size) {
+        return buildOutboxPaginationQuery(dateFrom, dateTo, loanApplicationId, null, null, size);
     }
 
-    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanId, String saccoId, String stationId, int size) {
+    private String buildOutboxPaginationQuery(String dateFrom, String dateTo, String loanApplicationId, String saccoId, String stationId, int size) {
         StringBuilder query = new StringBuilder("&size=").append(size);
         if (dateFrom != null && !dateFrom.isBlank()) {
             query.append("&dateFrom=").append(UriUtils.encode(dateFrom.trim(), StandardCharsets.UTF_8));
@@ -2045,8 +2076,8 @@ public class AdminController {
         if (dateTo != null && !dateTo.isBlank()) {
             query.append("&dateTo=").append(UriUtils.encode(dateTo.trim(), StandardCharsets.UTF_8));
         }
-        if (loanId != null && !loanId.isBlank()) {
-            query.append("&loanId=").append(UriUtils.encode(loanId.trim(), StandardCharsets.UTF_8));
+        if (loanApplicationId != null && !loanApplicationId.isBlank()) {
+            query.append("&loanApplicationId=").append(UriUtils.encode(loanApplicationId.trim(), StandardCharsets.UTF_8));
         }
         if (saccoId != null && !saccoId.isBlank()) {
             query.append("&saccoId=").append(UriUtils.encode(saccoId.trim(), StandardCharsets.UTF_8));
@@ -2087,6 +2118,17 @@ public class AdminController {
         query.append("&searchBy=").append(UriUtils.encode(normalizedSearchBy, StandardCharsets.UTF_8));
         if (queryText != null && !queryText.isBlank()) {
             query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
+        }
+        return query.toString();
+    }
+
+    private String buildSaccoMembersPaginationQuery(String stationId, String memberQuery, int size) {
+        StringBuilder query = new StringBuilder("&section=members&memberSize=").append(size);
+        if (stationId != null && !stationId.isBlank()) {
+            query.append("&stationId=").append(UriUtils.encode(stationId.trim(), StandardCharsets.UTF_8));
+        }
+        if (memberQuery != null && !memberQuery.isBlank()) {
+            query.append("&memberQuery=").append(UriUtils.encode(memberQuery.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
     }

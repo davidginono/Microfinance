@@ -281,6 +281,39 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                           @Param("query") String query,
                                           Pageable pageable);
 
+    @Query(
+        value = """
+            select m.*
+            from members m
+            where m.sacco_id = :saccoId
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and (
+                :query = ''
+                or cast(m.id as text) ilike concat(cast(:query as text), '%')
+                or lower(coalesce(m.member_no, '')) like concat(cast(:query as text), '%')
+                or lower(coalesce(m.full_name, '')) like concat('%', cast(:query as text), '%')
+              )
+            order by m.full_name asc, m.member_no asc
+            """,
+        countQuery = """
+            select count(*)
+            from members m
+            where m.sacco_id = :saccoId
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and (
+                :query = ''
+                or cast(m.id as text) ilike concat(cast(:query as text), '%')
+                or lower(coalesce(m.member_no, '')) like concat(cast(:query as text), '%')
+                or lower(coalesce(m.full_name, '')) like concat('%', cast(:query as text), '%')
+              )
+            """,
+        nativeQuery = true
+    )
+    Page<Member> findSaccoDetailMemberPage(@Param("saccoId") String saccoId,
+                                           @Param("stationId") String stationId,
+                                           @Param("query") String query,
+                                           Pageable pageable);
+
     @Query("""
         select m.status as status, count(m) as total
         from Member m

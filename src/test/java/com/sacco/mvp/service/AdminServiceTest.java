@@ -65,6 +65,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -232,6 +233,7 @@ class AdminServiceTest {
             .memberNo("10002")
             .fullName("Loan Officer")
             .email("officer@example.com")
+            .phone("255712345678")
             .position(Position.LOAN_OFFICER)
             .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
             .memberAccount(false)
@@ -250,6 +252,7 @@ class AdminServiceTest {
         assertThat(row.getUserIdLabel()).isEqualTo("12345678");
         assertThat(row.getMemberNumber()).isEqualTo("-");
         assertThat(row.getStaffMemberNumber()).isEqualTo("10002");
+        assertThat(row.getPhone()).isEqualTo("255712345678");
         assertThat(row.getDisplayStatus()).isEqualTo("Invite email sent - waiting");
         verify(memberRepository, never()).findUserAccessPageByName(any(), any(), any(), any());
     }
@@ -264,6 +267,7 @@ class AdminServiceTest {
             .memberNo("MEM001")
             .fullName("Member User")
             .email("member@example.com")
+            .phone("255798765432")
             .position(Position.MEMBER)
             .memberAccount(true)
             .status(MemberStatus.ACTIVE)
@@ -281,8 +285,53 @@ class AdminServiceTest {
         assertThat(row.getUserIdLabel()).isEqualTo("87654321");
         assertThat(row.getMemberNumber()).isEqualTo("MEM001");
         assertThat(row.getStaffMemberNumber()).isEqualTo("-");
+        assertThat(row.getPhone()).isEqualTo("255798765432");
         assertThat(row.getDisplayStatus()).isEqualTo("ACTIVE");
         verify(memberRepository, never()).findUserAccessPageByUserId(any(), any(), any(), any());
+    }
+
+    @Test
+    void saccoDetailMembersPageUsesCombinedSearchAndAccountLabels() {
+        UUID accountId = UUID.fromString("abcdef12-1234-1234-1234-123456789abc");
+        Member staffMember = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .memberNo("MBR100")
+            .fullName("Dual Access User")
+            .email("dual@example.com")
+            .phone("255700000001")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(true)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findSaccoDetailMemberPage(eq("SACCO-1"), eq("ST-1"), eq("dual"), any()))
+            .thenReturn(new PageImpl<>(List.of(staffMember)));
+
+        AdminService.UserAccessView row = adminService
+            .saccoDetailMembersPage("SACCO-1", "ST-1", " Dual ", 0, 25)
+            .getContent()
+            .get(0);
+
+        assertThat(row.getAccountId()).isEqualTo(accountId);
+        assertThat(row.getLoginId()).isEqualTo("MBR100");
+        assertThat(row.getMembershipLabel()).isEqualTo("Staff And Member");
+        assertThat(row.getRoleSummary()).isEqualTo("Manager");
+        assertThat(row.getPhone()).isEqualTo("255700000001");
+    }
+
+    @Test
+    void outboxEventsSearchesByLoanApplicationId() {
+        when(outboxEventRepository.searchMonitorView(isNull(), isNull(), isNull(), eq("abc123"), any()))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        adminService.outboxEvents(0, 25, null, null, null, " abc123 ");
+
+        verify(outboxEventRepository).searchMonitorView(isNull(), isNull(), isNull(), eq("abc123"), any());
+        verify(outboxEventRepository, never()).searchMonitorViewScoped(any(), any(), any(), any(), any(), any(), any());
     }
 
     private void stubActiveRoleDirectory(String saccoId, List<Member> activeMembers) {

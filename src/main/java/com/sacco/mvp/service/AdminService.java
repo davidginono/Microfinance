@@ -183,6 +183,15 @@ public class AdminService {
             .map(this::toUserAccessView);
     }
 
+    public Page<UserAccessView> saccoDetailMembersPage(String saccoId, String stationId, String query, int page, int size) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? DEFAULT_USER_PAGE_SIZE : Math.min(size, MAX_USER_PAGE_SIZE);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize);
+        return memberRepository.findSaccoDetailMemberPage(saccoId, normalizeOptional(stationId), normalizedQuery, pageRequest)
+            .map(this::toUserAccessView);
+    }
+
     @Transactional
     public Member createUser(String saccoId,
                              String stationId,
@@ -1930,8 +1939,8 @@ public class AdminService {
             Map.of("subject", subject, "message", message, "saccoId", saccoId, "stationId", normalizedStationId == null ? "" : normalizedStationId));
     }
 
-    public Page<OutboxEvent> outboxEvents(int page, int size, OutboxStatus status, String dateFrom, String dateTo, String loanId) {
-        return outboxEvents(page, size, status, dateFrom, dateTo, loanId, null, null);
+    public Page<OutboxEvent> outboxEvents(int page, int size, OutboxStatus status, String dateFrom, String dateTo, String loanApplicationId) {
+        return outboxEvents(page, size, status, dateFrom, dateTo, loanApplicationId, null, null);
     }
 
     public Page<OutboxEvent> outboxEvents(int page,
@@ -1939,11 +1948,11 @@ public class AdminService {
                                           OutboxStatus status,
                                           String dateFrom,
                                           String dateTo,
-                                          String loanId,
+                                          String loanApplicationId,
                                           String saccoId,
                                           String stationId) {
         PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizePageSize(size));
-        String normalizedLoanId = normalizeOptional(loanId);
+        String normalizedLoanApplicationId = normalizeOptional(loanApplicationId);
         String normalizedSaccoId = normalizeOptional(saccoId);
         String normalizedStationId = normalizeOptional(stationId);
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
@@ -1952,7 +1961,7 @@ public class AdminService {
                 status == null ? null : status.name(),
                 dateRange.start(),
                 dateRange.endExclusive(),
-                normalizedLoanId,
+                normalizedLoanApplicationId,
                 normalizedSaccoId,
                 normalizedStationId,
                 pageRequest
@@ -1962,7 +1971,7 @@ public class AdminService {
             status == null ? null : status.name(),
             dateRange.start(),
             dateRange.endExclusive(),
-            normalizedLoanId,
+            normalizedLoanApplicationId,
             pageRequest
         );
     }
@@ -2298,6 +2307,7 @@ public class AdminService {
             .staffMemberNumber(memberAccess ? "-" : displayOrDash(member.getMemberNo()))
             .fullName(member.getFullName())
             .email(member.getEmail())
+            .phone(displayOrDash(member.getPhone()))
             .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), memberAccess))
             .staffRoles(member.getStaffRolesResolved())
             .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), memberAccess))
@@ -3137,6 +3147,7 @@ public class AdminService {
         private String staffMemberNumber;
         private String fullName;
         private String email;
+        private String phone;
         private String roleSummary;
         @lombok.Builder.Default
         private Set<Position> staffRoles = new LinkedHashSet<>();

@@ -62,7 +62,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
             where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
               and oe.created_at >= coalesce(:dateFrom, oe.created_at)
               and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanApplicationId as text), '%'), '%')
             order by oe.created_at desc
             """,
         countQuery = """
@@ -71,14 +71,14 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
             where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
               and oe.created_at >= coalesce(:dateFrom, oe.created_at)
               and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanApplicationId as text), '%'), '%')
             """,
         nativeQuery = true
     )
     Page<OutboxEvent> searchMonitorView(@Param("status") String status,
                                         @Param("dateFrom") OffsetDateTime dateFrom,
                                         @Param("dateTo") OffsetDateTime dateTo,
-                                        @Param("loanId") String loanId,
+                                        @Param("loanApplicationId") String loanApplicationId,
                                         Pageable pageable);
 
     @Query(
@@ -91,7 +91,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
             where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
               and oe.created_at >= coalesce(:dateFrom, oe.created_at)
               and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanApplicationId as text), '%'), '%')
               and (
                 cast(:saccoId as text) is null
                 or la.sacco_id = cast(:saccoId as text)
@@ -125,7 +125,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
             where cast(oe.status as text) = coalesce(cast(:status as text), cast(oe.status as text))
               and oe.created_at >= coalesce(:dateFrom, oe.created_at)
               and oe.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanId as text), '%'), '%')
+              and cast(oe.aggregate_id as text) ilike coalesce(concat('%', cast(:loanApplicationId as text), '%'), '%')
               and (
                 cast(:saccoId as text) is null
                 or la.sacco_id = cast(:saccoId as text)
@@ -154,7 +154,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
     Page<OutboxEvent> searchMonitorViewScoped(@Param("status") String status,
                                               @Param("dateFrom") OffsetDateTime dateFrom,
                                               @Param("dateTo") OffsetDateTime dateTo,
-                                              @Param("loanId") String loanId,
+                                              @Param("loanApplicationId") String loanApplicationId,
                                               @Param("saccoId") String saccoId,
                                               @Param("stationId") String stationId,
                                               Pageable pageable);

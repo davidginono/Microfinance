@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
@@ -213,7 +214,7 @@
             <div class="erp-panel-header">
                 <p class="erp-panel-title">Member Summary</p>
             </div>
-            <div class="erp-panel-body">
+            <div class="erp-panel-body space-y-4">
                 <div class="grid gap-3 sm:grid-cols-3">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total Members</p>
@@ -227,6 +228,125 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive Members</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.inactiveMembers}</p>
                     </div>
+                </div>
+                <div class="rounded border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                            <p class="erp-widget-title">Member List</p>
+                            <p class="mt-1 text-sm text-slate-500">Search by User ID, member number, or name.</p>
+                        </div>
+                        <div class="inline-flex flex-wrap items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
+                            <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
+                            <c:set var="memberTotal" value="${saccoMembersPage.totalElements}" />
+                            <c:set var="memberSliceStart" value="${memberTotal == 0 ? 0 : (saccoMembersPage.number * saccoMembersPage.size) + 1}" />
+                            <c:set var="memberSliceEndRaw" value="${(saccoMembersPage.number * saccoMembersPage.size) + fn:length(saccoMembers)}" />
+                            <c:set var="memberSliceEnd" value="${memberTotal == 0 ? 0 : memberSliceEndRaw}" />
+                            <span>Showing <span class="font-semibold text-slate-800">${memberSliceStart}-${memberSliceEnd}</span> of <span class="font-semibold text-slate-800">${memberTotal}</span> accounts</span>
+                        </div>
+                    </div>
+                    <form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3">
+                        <input type="hidden" name="section" value="members" />
+                        <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
+                        <label class="block min-w-[16rem] flex-[1_1_22rem]">
+                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Search Member</span>
+                            <input type="text"
+                                   name="memberQuery"
+                                   value="${selectedMemberQuery}"
+                                   class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                                   style="height:3rem;min-height:3rem;max-height:3rem;"
+                                   placeholder="User ID, member number, or name" />
+                        </label>
+                        <label class="block min-w-[10rem] flex-[0_1_12rem]">
+                            <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Rows Per Page</span>
+                            <select name="memberSize" class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
+                                <option value="25" ${selectedMemberPageSize == 25 ? 'selected' : ''}>25 rows</option>
+                                <option value="50" ${selectedMemberPageSize == 50 ? 'selected' : ''}>50 rows</option>
+                                <option value="100" ${selectedMemberPageSize == 100 ? 'selected' : ''}>100 rows</option>
+                            </select>
+                        </label>
+                        <div class="flex shrink-0 flex-wrap items-end gap-2">
+                            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Search</button>
+                            <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="app-btn btn-neutral" style="height:3rem;min-height:3rem;">Reset</a>
+                        </div>
+                    </form>
+                </div>
+                <div class="erp-table-wrap erp-table-scroll">
+                    <table class="erp-table min-w-[1120px]">
+                        <thead>
+                        <tr>
+                            <th class="whitespace-nowrap">UUID User ID</th>
+                            <th class="whitespace-nowrap">Member Number</th>
+                            <th class="whitespace-nowrap">Name</th>
+                            <th class="whitespace-nowrap">Account Type</th>
+                            <th class="whitespace-nowrap">Staff Roles</th>
+                            <th class="whitespace-nowrap">Current Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <c:choose>
+                            <c:when test="${empty saccoMembers}">
+                                <tr>
+                                    <td colspan="6" class="text-slate-500">
+                                        <c:choose>
+                                            <c:when test="${not empty selectedMemberQuery}">
+                                                No members matched <span class="font-semibold text-slate-700">${selectedMemberQuery}</span>.
+                                            </c:when>
+                                            <c:otherwise>
+                                                No members are available for this view.
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
+                                </tr>
+                            </c:when>
+                            <c:otherwise>
+                                <c:forEach items="${saccoMembers}" var="member">
+                                    <tr>
+                                        <td class="align-top font-medium text-slate-700 break-all">${member.accountId}</td>
+                                        <td class="align-top whitespace-nowrap">${member.loginId}</td>
+                                        <td class="align-top font-semibold text-slate-900">${member.fullName}</td>
+                                        <td class="align-top whitespace-nowrap">
+                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${member.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
+                                                ${member.membershipLabel}
+                                            </span>
+                                        </td>
+                                        <td class="align-top whitespace-nowrap">${empty member.roleSummary ? '-' : member.roleSummary}</td>
+                                        <td class="align-top whitespace-nowrap">
+                                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${member.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : member.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
+                                                ${member.displayStatus}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </c:otherwise>
+                        </c:choose>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm text-slate-600">The table is server-paged to keep large member lists manageable.</p>
+                    <c:if test="${saccoMembersPage.totalPages gt 1}">
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <c:choose>
+                                <c:when test="${saccoMembersPage.first}">
+                                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Previous</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number - 1}${saccoMembersPaginationQuery}" class="app-btn btn-neutral">Previous</a>
+                                </c:otherwise>
+                            </c:choose>
+                            <span class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+                                Page ${saccoMembersPage.number + 1} of ${saccoMembersPage.totalPages}
+                            </span>
+                            <c:choose>
+                                <c:when test="${saccoMembersPage.last}">
+                                    <span class="app-btn btn-neutral pointer-events-none opacity-50">Next</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" class="app-btn btn-primary">Next</a>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
+                    </c:if>
                 </div>
             </div>
         </section>

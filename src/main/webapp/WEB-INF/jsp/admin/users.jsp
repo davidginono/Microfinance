@@ -68,10 +68,10 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6" data-auto-submit-filter>
+    <form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6">
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search By</span>
-            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;" data-auto-submit-on-change>
+            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
                 <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}>User ID</option>
                 <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}>Name</option>
             </select>
@@ -84,8 +84,7 @@
                    value="${selectedUserQuery}"
                    class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
                    style="height:3rem;min-height:3rem;max-height:3rem;"
-                   placeholder="Enter selected User ID or name"
-                   data-auto-submit-on-input />
+                   placeholder="Enter selected User ID or name" />
         </label>
 
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
@@ -98,14 +97,14 @@
         </label>
 
         <div class="flex shrink-0 flex-wrap items-end gap-3">
-            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Apply Filters</button>
+            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Search</button>
             <a href="/admin/users" class="app-btn btn-neutral" style="height:3rem;min-height:3rem;">Reset</a>
         </div>
     </form>
 </div>
 
 <div class="erp-table-wrap erp-table-scroll">
-    <table class="erp-table min-w-[1320px]">
+    <table class="erp-table min-w-[1420px]">
         <thead>
         <tr>
             <th class="px-3 py-2 text-left whitespace-nowrap">User</th>
@@ -113,6 +112,7 @@
             <th class="px-3 py-2 text-left whitespace-nowrap">Member Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Staff Member Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Email</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">Phone Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Roles</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Membership</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Status</th>
@@ -123,7 +123,7 @@
         <c:choose>
             <c:when test="${empty users}">
                 <tr>
-                    <td colspan="9" class="px-4 py-5 text-sm text-slate-500">
+                    <td colspan="10" class="px-4 py-5 text-sm text-slate-500">
                         <c:choose>
                             <c:when test="${not empty selectedUserQuery}">
                                 No users matched the selected search for <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
@@ -145,6 +145,7 @@
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.memberNumber}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.staffMemberNumber}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.phone}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
@@ -529,5 +530,4 @@
     })();
 </script>
 
-<%@ include file="../fragments/auto-submit-filter.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>
