@@ -21,7 +21,7 @@ public class NotificationEmailService {
     private final MemberRepository memberRepository;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
-    @Value("${spring.mail.username:no-reply@sacco.local}")
+    @Value("${app.mail.from-address:${spring.mail.username:no-reply@sacco.local}}")
     private String fromAddress;
 
     @Value("${app.mail.override-recipient:}")

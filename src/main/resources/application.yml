@@ -101,6 +101,7 @@ app:
     inactivity-prompt-ms: ${APP_SESSION_INACTIVITY_PROMPT_MS:600000}
     inactivity-grace-ms: ${APP_SESSION_INACTIVITY_GRACE_MS:60000}
   mail:
+    from-address: ${APP_MAIL_FROM_ADDRESS:${SPRING_MAIL_USERNAME:no-reply@sacco.local}}
     override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
@@ -126,10 +127,10 @@ app:
     connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}
     read-timeout: ${APP_SMS_READ_TIMEOUT:8s}
     benter:
-      base-url: ${APP_SMS_BENTER_BASE_URL:https://api.onfonmedia.co.ke}
-      send-path: ${APP_SMS_BENTER_SEND_PATH:/v1/sms/SendBulkSMS}
+      base-url: ${APP_SMS_BENTER_BASE_URL:https://api.bentergroup.com}
+      send-path: ${APP_SMS_BENTER_SEND_PATH:/version2/messaging/legacy}
       client-id: ${APP_SMS_BENTER_CLIENT_ID:foresight}
-      api-key: ${APP_SMS_BENTER_API_KEY:Lm4HhIKNO8wl7TVzRAnoicjr02g6Euv9aS5FZMCWUqx3BQk1}
+      api-key: ${APP_SMS_BENTER_API_KEY:oR28OxFnV49KBsTXiSUEMdfD1atI6WQu7zCYvHgkA53Zwj0P}
       sender-id: ${APP_SMS_BENTER_SENDER_ID:FORESIGHT}
   retention:
     cleanup-enabled: ${APP_RETENTION_CLEANUP_ENABLED:true}
