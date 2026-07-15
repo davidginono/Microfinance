@@ -76,6 +76,7 @@ public class LoanWorkflowService {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
         if (!products.isEmpty()) {
             return products.stream()
+                .filter(LoanProductSetting::isAvailableForApplications)
                 .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
                 .toList();
         }

@@ -29,6 +29,7 @@ public class FormSchemaService {
         }
         return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
             .filter(product -> product.getLoanType() == loanType)
+            .filter(LoanProductSetting::isAvailableForApplications)
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Loan product schema not found"));
@@ -37,6 +38,7 @@ public class FormSchemaService {
     public LoanProductSetting getSchema(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
         if (loanProductId != null) {
             return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+                .filter(LoanProductSetting::isAvailableForApplications)
                 .orElseThrow(() -> new IllegalArgumentException("Loan product schema not found"));
         }
         return getSchema(saccoId, fallbackLoanType);

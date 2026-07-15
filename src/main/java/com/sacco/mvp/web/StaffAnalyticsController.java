@@ -155,13 +155,16 @@ public class StaffAnalyticsController {
         }
         return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
             .filter(product -> product.getLoanType() != null)
+            .filter(LoanProductSetting::isAvailableForApplications)
             .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
     }
 
     private LoanProductSetting selectedAnalyticsProduct(String saccoId, java.util.UUID loanProductId, LoanType fallbackLoanType) {
         if (loanProductId != null) {
-            return loanProductSettingRepository.findByIdAndSaccoId(loanProductId, saccoId).orElse(null);
+            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+                .filter(LoanProductSetting::isAvailableForApplications)
+                .orElse(null);
         }
         if (fallbackLoanType == null) {
             return null;
@@ -184,7 +187,7 @@ public class StaffAnalyticsController {
             .map(LoanProductSetting::getDisplayName)
             .filter(label -> label != null && !label.isBlank())
             .findFirst()
-            .orElseGet(loanType::getDisplayLabel);
+            .orElse("All Products");
     }
 
     private List<AnalyticsMetricCard> metricCards(LoanAnalyticsService.MemberLoanAnalytics analytics) {

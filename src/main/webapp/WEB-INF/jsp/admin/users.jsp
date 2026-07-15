@@ -46,8 +46,8 @@
 </div>
 
 <div class="erp-toolbar">
-    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Add User is for staff accounts only." /></div>
-    <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add User" /></button>
+    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Add Staff Member is for staff accounts only." /></div>
+    <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
 </div>
 
 <div class="erp-panel overflow-hidden">
@@ -191,8 +191,8 @@
         <div class="app-modal-scroll">
         <div class="app-modal-header">
             <div>
-                <p class="erp-widget-title">Add User</p>
-                <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Staff User</h2>
+                <p class="erp-widget-title">Add Staff Member</p>
+                <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Staff Member</h2>
             </div>
             <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="Close modal">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -206,7 +206,7 @@
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 User ID
-                <input name="memberNo" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. MGR004 or STAFF001" />
+                <input type="text" readonly aria-readonly="true" value="${nextGeneratedUserId}" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" />
             </label>
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -243,7 +243,7 @@
 
             <div class="app-modal-actions md:col-span-2">
                 <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
-                <button type="submit" class="app-btn btn-primary">Create User</button>
+                <button type="submit" class="app-btn btn-primary">Create Staff Member</button>
             </div>
         </form>
         </div>

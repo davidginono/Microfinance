@@ -78,7 +78,6 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -488,7 +487,8 @@ public class LoanReportService {
             statusRows,
             participation,
             productRows,
-            yearlyRows
+            yearlyRows,
+            loanProductLabel(saccoId, loanProductId, loanType)
         );
     }
 
@@ -650,7 +650,7 @@ public class LoanReportService {
             applicationClock.today(),
             principal.getFullName(),
             exporterRoleLabel(principal),
-            loanProductLabel(loanType),
+            loanProductLabel(principal.getSaccoId(), loanProductId, loanType),
             member,
             analytics,
             memberPortfolio(analytics),
@@ -730,7 +730,7 @@ public class LoanReportService {
             applicationClock.today(),
             principal.getFullName(),
             exporterRoleLabel(principal),
-            loanProductLabel(loanType),
+            loanProductLabel(principal.getSaccoId(), loanProductId, loanType),
             null,
             analytics,
             portfolio,
@@ -1027,7 +1027,7 @@ public class LoanReportService {
         String branchName = station == null || station.getAddressLocation() == null || station.getAddressLocation().isBlank()
             ? stationId
             : station.getAddressLocation();
-        return new ExportContext(saccoName, stationId, branchName, range.fromDate(), range.toDate(), loanProductLabel(loanType));
+        return new ExportContext(saccoName, stationId, branchName, range.fromDate(), range.toDate(), "All Products");
     }
 
     private String exporterRoleLabel(AppUserPrincipal principal) {
@@ -1037,8 +1037,28 @@ public class LoanReportService {
         return principal.getPosition().getDisplayName();
     }
 
-    private String loanProductLabel(com.sacco.mvp.domain.LoanType loanType) {
-        return loanType == null ? "All Products" : loanType.getDisplayLabel();
+    private String loanProductLabel(String saccoId, UUID loanProductId, com.sacco.mvp.domain.LoanType loanType) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return "All Products";
+        }
+        if (loanProductId != null) {
+            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+                .filter(LoanProductSetting::isAvailableForApplications)
+                .map(LoanProductSetting::getDisplayName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("All Products");
+        }
+        if (loanType == null) {
+            return "All Products";
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .filter(product -> product.getLoanType() == loanType)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .map(LoanProductSetting::getDisplayName)
+            .filter(name -> name != null && !name.isBlank())
+            .findFirst()
+            .orElse("All Products");
     }
 
     private LoanAnalyticsService.StaffPortfolioSummary memberPortfolio(LoanAnalyticsService.MemberLoanAnalytics analytics) {
@@ -1087,26 +1107,16 @@ public class LoanReportService {
     private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> countLoans,
                                                              List<LoanApplication> financialLoans,
                                                              Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
-        Map<com.sacco.mvp.domain.LoanType, String> productLabels = configuredProductLabels(countLoans, financialLoans);
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> byType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> financialByType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
-        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes(productLabels)) {
-            byType.put(type, List.of());
-            financialByType.put(type, List.of());
+        List<ProductRef> productRefs = configuredProductRefs(countLoans, financialLoans);
+        if (productRefs.isEmpty()) {
+            return List.of();
         }
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> grouped = countLoans.stream()
-            .filter(loan -> loan.getLoanType() != null)
-            .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
-        grouped.forEach(byType::put);
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> financialGrouped = financialLoans.stream()
-            .filter(loan -> loan.getLoanType() != null)
-            .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
-        financialGrouped.forEach(financialByType::put);
-        return byType.entrySet().stream()
-            .sorted(Comparator.comparingInt(entry -> entry.getKey().getDisplayOrder()))
-            .map(entry -> {
-                List<LoanApplication> values = entry.getValue();
-                List<LoanApplication> financialValues = financialByType.getOrDefault(entry.getKey(), List.of());
+        Map<UUID, List<LoanApplication>> byProductId = groupByLoanProductId(countLoans);
+        Map<UUID, List<LoanApplication>> financialByProductId = groupByLoanProductId(financialLoans);
+        return productRefs.stream()
+            .map(product -> {
+                List<LoanApplication> values = byProductId.getOrDefault(product.loanProductId(), List.of());
+                List<LoanApplication> financialValues = financialByProductId.getOrDefault(product.loanProductId(), List.of());
                 long applied = values.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count();
                 long active = values.stream().filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus())).count();
                 long disbursed = values.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count();
@@ -1120,7 +1130,7 @@ public class LoanReportService {
                     .filter(loan -> loan.getStatus() == LoanStatus.PAID)
                     .map(loan -> interestPaidAmount(loanPaymentSummary(loan), paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-                return new ProductPerformanceRow(productLabels.getOrDefault(entry.getKey(), entry.getKey().getDisplayLabel()), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
+                return new ProductPerformanceRow(product.label(), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
             })
             .toList();
     }
@@ -1136,23 +1146,18 @@ public class LoanReportService {
     }
 
     private List<ProductFinancialBreakdownRow> productFinancialRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
-        Map<com.sacco.mvp.domain.LoanType, String> productLabels = configuredProductLabels(loans);
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> byType = new EnumMap<>(com.sacco.mvp.domain.LoanType.class);
-        for (com.sacco.mvp.domain.LoanType type : reportableLoanTypes(productLabels)) {
-            byType.put(type, List.of());
+        List<ProductRef> productRefs = configuredProductRefs(loans);
+        if (productRefs.isEmpty()) {
+            return List.of();
         }
-        Map<com.sacco.mvp.domain.LoanType, List<LoanApplication>> grouped = loans.stream()
-            .filter(loan -> loan.getLoanType() != null)
-            .collect(Collectors.groupingBy(LoanApplication::getLoanType, () -> new EnumMap<>(com.sacco.mvp.domain.LoanType.class), Collectors.toList()));
-        grouped.forEach(byType::put);
-        return byType.entrySet().stream()
-            .sorted(Comparator.comparingInt(entry -> entry.getKey().getDisplayOrder()))
-            .map(entry -> {
+        Map<UUID, List<LoanApplication>> byProductId = groupByLoanProductId(loans);
+        return productRefs.stream()
+            .map(product -> {
                 BigDecimal interestPaid = BigDecimal.ZERO;
                 BigDecimal interestUnpaid = BigDecimal.ZERO;
                 BigDecimal loanAmountPaid = BigDecimal.ZERO;
                 BigDecimal loanAmountUnpaid = BigDecimal.ZERO;
-                for (LoanApplication loan : entry.getValue()) {
+                for (LoanApplication loan : byProductId.getOrDefault(product.loanProductId(), List.of())) {
                     if (!DISBURSED_STATUSES.contains(loan.getStatus())) {
                         continue;
                     }
@@ -1163,24 +1168,13 @@ public class LoanReportService {
                     loanAmountPaid = loanAmountPaid.add(principalPaidAmount(summary, totals));
                     loanAmountUnpaid = loanAmountUnpaid.add(outstandingPrincipalAmount(loan, summary, totals));
                 }
-                return new ProductFinancialBreakdownRow(productLabels.getOrDefault(entry.getKey(), entry.getKey().getDisplayLabel()), interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
+                return new ProductFinancialBreakdownRow(product.label(), interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
             })
             .toList();
     }
 
-    private List<com.sacco.mvp.domain.LoanType> reportableLoanTypes(Map<com.sacco.mvp.domain.LoanType, String> productLabels) {
-        if (productLabels != null && !productLabels.isEmpty()) {
-            return productLabels.keySet().stream()
-                .sorted(Comparator.comparingInt(com.sacco.mvp.domain.LoanType::getDisplayOrder))
-                .toList();
-        }
-        return java.util.Arrays.stream(com.sacco.mvp.domain.LoanType.values())
-            .filter(type -> type != com.sacco.mvp.domain.LoanType.CUSTOMIZED_LOAN)
-            .toList();
-    }
-
     @SafeVarargs
-    private final Map<com.sacco.mvp.domain.LoanType, String> configuredProductLabels(List<LoanApplication>... loanSets) {
+    private final List<ProductRef> configuredProductRefs(List<LoanApplication>... loanSets) {
         String saccoId = null;
         for (List<LoanApplication> loans : loanSets) {
             if (loans == null) {
@@ -1196,16 +1190,30 @@ public class LoanReportService {
             }
         }
         if (saccoId == null) {
+            return List.of();
+        }
+        List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+        return products.stream()
+            .filter(product -> product.getLoanType() != null)
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .map(product -> new ProductRef(product.getId(), product.getLoanType(), product.getDisplayName()))
+            .toList();
+    }
+
+    private Map<UUID, List<LoanApplication>> groupByLoanProductId(List<LoanApplication> loans) {
+        if (loans == null || loans.isEmpty()) {
             return Map.of();
         }
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
-            .filter(product -> product.getLoanType() != null)
-            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
-            .collect(Collectors.toMap(
-                LoanProductSetting::getLoanType,
-                LoanProductSetting::getDisplayName,
-                (first, ignored) -> first,
-                LinkedHashMap::new
+        return loans.stream()
+            .filter(loan -> loan.getLoanProductSettingId() != null)
+            .collect(Collectors.groupingBy(
+                LoanApplication::getLoanProductSettingId,
+                LinkedHashMap::new,
+                Collectors.toList()
             ));
     }
 
@@ -1246,7 +1254,7 @@ public class LoanReportService {
                 BigDecimal remainingInterest = interestUnpaidAmount(loan, summary, totals);
                 return new ActiveLoanDetailRow(
                     loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
-                    loan.getLoanType() == null ? "-" : loan.getLoanType().getDisplayLabel(),
+                    loanProductName(loan),
                     moneyPlain(loan.getAmount()),
                     moneyPlain(outstanding),
                     moneyPlain(requiredInterest),
@@ -1394,7 +1402,7 @@ public class LoanReportService {
             .map(loan -> new ActivityRow(
                 loan.getCreatedAt() == null ? "-" : HUMAN_DATE_FORMATTER.format(loan.getCreatedAt().toLocalDate()),
                 activityLabel(loan),
-                loan.getLoanType() == null ? "-" : loan.getLoanType().getDisplayLabel(),
+                loanProductName(loan),
                 moneyPlain(loan.getAmount()),
                 humanizeLoanStatusForReport(loan.getStatus())
             ))
@@ -2216,10 +2224,18 @@ public class LoanReportService {
     }
 
     private String loanTypeLabel(LoanApplication loan) {
-        if (loan == null || loan.getLoanType() == null) {
+        return loanProductName(loan);
+    }
+
+    private String loanProductName(LoanApplication loan) {
+        if (loan == null || loan.getLoanProductSettingId() == null || loan.getSaccoId() == null || loan.getSaccoId().isBlank()) {
             return "-";
         }
-        return loan.getLoanType().getDisplayLabel();
+        return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loan.getLoanProductSettingId(), loan.getSaccoId())
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .map(LoanProductSetting::getDisplayName)
+            .filter(name -> name != null && !name.isBlank())
+            .orElse("-");
     }
 
     private String blankToFallback(String value, String fallback) {
@@ -2481,7 +2497,7 @@ public class LoanReportService {
             loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber().toString(),
             loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
             formatMemberDetails(member),
-            loan.getLoanType().getDisplayLabel(),
+            loanTypeLabel(loan),
             formatMoney(loan.getAmount()),
             loan.getTenorMonths() == null ? "-" : loan.getTenorMonths() + " month(s)",
             applicationFeeLabel,
@@ -2670,23 +2686,20 @@ public class LoanReportService {
                                                        List<LoanApplication> financialLoans,
                                                        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                        LoanType selectedLoanType) {
-        Map<LoanType, String> productLabels = configuredProductLabels(loans, financialLoans);
-        List<LoanType> productTypes = (productLabels.isEmpty()
-                ? java.util.Arrays.stream(LoanType.values()).filter(type -> type != LoanType.CUSTOMIZED_LOAN)
-                : productLabels.keySet().stream())
-            .filter(type -> selectedLoanType == null || type == selectedLoanType)
-            .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
+        List<ProductRef> productRefs = configuredProductRefs(loans, financialLoans).stream()
+            .filter(product -> selectedLoanType == null || product.loanType() == selectedLoanType)
             .toList();
+        if (productRefs.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, List<LoanApplication>> loansByProductId = groupByLoanProductId(loans);
+        Map<UUID, List<LoanApplication>> financialLoansByProductId = groupByLoanProductId(financialLoans);
         List<StationProductRow> rows = new ArrayList<>();
-        for (LoanType type : productTypes) {
-            List<LoanApplication> typedLoans = loans.stream()
-                .filter(loan -> loan.getLoanType() == type)
-                .toList();
-            List<LoanApplication> typedFinancialLoans = financialLoans.stream()
-                .filter(loan -> loan.getLoanType() == type)
-                .toList();
+        for (ProductRef product : productRefs) {
+            List<LoanApplication> typedLoans = loansByProductId.getOrDefault(product.loanProductId(), List.of());
+            List<LoanApplication> typedFinancialLoans = financialLoansByProductId.getOrDefault(product.loanProductId(), List.of());
             rows.add(new StationProductRow(
-                productLabels.getOrDefault(type, type.getDisplayLabel()),
+                product.label(),
                 typedLoans.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count(),
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.MANAGER_ACCEPTED
                     || loan.getStatus() == LoanStatus.LOAN_OFFICER_APPROVED
@@ -3052,6 +3065,8 @@ public class LoanReportService {
         LocalDate toDate,
         String loanProductLabel
     ) {}
+
+    private record ProductRef(UUID loanProductId, LoanType loanType, String label) {}
 
     private record PaymentTotals(
         BigDecimal principalPaid,
@@ -4077,14 +4092,11 @@ public class LoanReportService {
         List<StationStatusRow> statusRows,
         StationParticipationSummary participation,
         List<StationProductRow> productRows,
-        List<StationYearlySummaryRow> yearlyRows
+        List<StationYearlySummaryRow> yearlyRows,
+        String loanProductLabel
     ) {
         public String periodLabel() {
             return DATE_FORMATTER.format(fromDate) + " - " + DATE_FORMATTER.format(toDate);
-        }
-
-        public String loanProductLabel() {
-            return loanType == null ? "All Products" : loanType.getDisplayLabel();
         }
     }
 

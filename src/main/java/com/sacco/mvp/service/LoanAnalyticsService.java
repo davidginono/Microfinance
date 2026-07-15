@@ -630,11 +630,7 @@ public class LoanAnalyticsService {
     private List<LoanProductPerformance> productPerformance(String saccoId, List<LoanApplication> loans) {
         List<ProductRef> productRefs = configuredProductRefs(saccoId);
         if (productRefs.isEmpty()) {
-            productRefs = java.util.Arrays.stream(LoanType.values())
-                .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
-                .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
-                .map(type -> new ProductRef(null, type, shortProductLabel(type)))
-                .toList();
+            return List.of();
         }
         List<ProductRef> resolvedProductRefs = productRefs;
         return resolvedProductRefs.stream()
@@ -656,11 +652,7 @@ public class LoanAnalyticsService {
     private List<StaffReviewProductPerformance> staffReviewProductPerformance(String saccoId, List<StaffLoanEvent> events) {
         List<ProductRef> productRefs = configuredProductRefs(saccoId);
         if (productRefs.isEmpty()) {
-            productRefs = java.util.Arrays.stream(LoanType.values())
-                .sorted(Comparator.comparingInt(LoanType::getDisplayOrder))
-                .filter(type -> type != LoanType.CUSTOMIZED_LOAN)
-                .map(type -> new ProductRef(null, type, shortProductLabel(type)))
-                .toList();
+            return List.of();
         }
         List<ProductRef> resolvedProductRefs = productRefs;
         return resolvedProductRefs.stream()
@@ -686,7 +678,12 @@ public class LoanAnalyticsService {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+        List<com.sacco.mvp.domain.LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+        return products.stream()
+            .filter(com.sacco.mvp.domain.LoanProductSetting::isAvailableForApplications)
             .sorted(Comparator.comparingInt(com.sacco.mvp.domain.LoanProductSetting::getResolvedDisplayOrder))
             .map(product -> new ProductRef(product.getId(), product.getLoanType(), product.getDisplayName()))
             .filter(product -> product.loanType() != null)
@@ -697,17 +694,8 @@ public class LoanAnalyticsService {
         if (loan == null || product == null || loan.getLoanType() != product.loanType()) {
             return false;
         }
-        if (product.loanProductId() == null) {
-            return true;
-        }
-        if (loan.getLoanProductSettingId() != null) {
-            return product.loanProductId().equals(loan.getLoanProductSettingId());
-        }
-        return productRefs.stream()
-            .filter(candidate -> candidate.loanType() == loan.getLoanType())
-            .findFirst()
-            .map(product::equals)
-            .orElse(false);
+        return loan.getLoanProductSettingId() != null
+            && product.loanProductId().equals(loan.getLoanProductSettingId());
     }
 
     private Map<String, Object> productChartSeries(String name,
@@ -760,16 +748,6 @@ public class LoanAnalyticsService {
         return BigDecimal.valueOf(current - previous)
             .multiply(BigDecimal.valueOf(100))
             .divide(BigDecimal.valueOf(previous), 2, RoundingMode.HALF_UP);
-    }
-
-    private String shortProductLabel(LoanType type) {
-        return switch (type) {
-            case LOAN_ADVANCE -> "Salary Advance";
-            case EDUCATION_LOAN -> "Education Loan";
-            case EMERGENCY_LOAN -> "Emergency Loan";
-            case DEVELOPMENT_LOAN -> "Development Loan";
-            case CUSTOMIZED_LOAN -> "Other Loans";
-        };
     }
 
     private MemberLoanAnalytics summarize(List<LoanApplication> loans) {

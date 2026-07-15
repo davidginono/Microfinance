@@ -21,7 +21,9 @@ public class LoanProductDisplayService {
         if (saccoId == null || saccoId.isBlank()) {
             return Map.of();
         }
-        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .collect(Collectors.toMap(
                 LoanProductSetting::getLoanType,
                 LoanProductSetting::getDisplayName,
@@ -68,7 +70,8 @@ public class LoanProductDisplayService {
         if (productId == null || app.getSaccoId() == null || app.getSaccoId().isBlank()) {
             return null;
         }
-        return loanProductSettingRepository.findByIdAndSaccoId(productId, app.getSaccoId())
+        return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, app.getSaccoId())
+            .filter(LoanProductSetting::isAvailableForApplications)
             .map(LoanProductSetting::getDisplayName)
             .filter(name -> !name.isBlank())
             .orElse(null);

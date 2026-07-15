@@ -358,7 +358,6 @@ class AdminServiceTest {
             "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
-            "MINOR001",
             "SACCOS Admin",
             "minor@example.com",
             null,
@@ -373,7 +372,7 @@ class AdminServiceTest {
 
     @Test
     void createUserRejectsEmailAlreadyUsedByAnyAccount() {
-        when(memberRepository.findByMemberNo("MGR001")).thenReturn(Optional.empty());
+        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of());
         when(memberRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> adminService.createUser(
@@ -381,7 +380,6 @@ class AdminServiceTest {
             "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
-            "MGR001",
             "Mary Manager",
             " Existing@Example.com ",
             null,
@@ -671,7 +669,6 @@ class AdminServiceTest {
             accountId,
             "SACCO-01",
             "ST-2",
-            "MINOR001",
             "SACCOS Admin",
             "minor@example.com",
             null
@@ -719,7 +716,6 @@ class AdminServiceTest {
         when(registeredSaccoRepository.findById("SACCO-01")).thenReturn(Optional.of(registeredSacco));
         when(saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-01", "ST-2")).thenReturn(Optional.of(station));
         when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot("SACCO-01", "ST-2", Position.MINOR_ADMIN, accountId)).thenReturn(false);
-        when(memberRepository.existsByMemberNoIgnoreCaseAndIdNot("MINOR002", accountId)).thenReturn(false);
         when(memberRepository.existsByEmailIgnoreCaseAndIdNot("minor2@example.com", accountId)).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -728,14 +724,13 @@ class AdminServiceTest {
             accountId,
             "SACCO-01",
             "ST-2",
-            "MINOR002",
             "SACCOS Admin Two",
             "minor2@example.com",
             "255712345679"
         );
 
         assertThat(member.getStationId()).isEqualTo("ST-2");
-        assertThat(member.getMemberNo()).isEqualTo("MINOR002");
+        assertThat(member.getMemberNo()).isEqualTo("MINOR001");
         assertThat(member.getEmail()).isEqualTo("minor2@example.com");
         verify(memberRepository).save(member);
     }
@@ -952,7 +947,7 @@ class AdminServiceTest {
     @Test
     void createUserForNonMinorAdminStaffAlsoIssuesInvitation() {
         UUID adminId = UUID.randomUUID();
-        when(memberRepository.findByMemberNo("MGR001")).thenReturn(Optional.empty());
+        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of("10000", "10001"));
         when(memberRepository.existsByEmailIgnoreCase("manager@example.com")).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -961,7 +956,6 @@ class AdminServiceTest {
             null,
             adminId,
             Set.of(Position.ADMIN),
-            "MGR001",
             "Mary Manager",
             "manager@example.com",
             null,
@@ -971,6 +965,7 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(lastInvitedBy.get()).isEqualTo(adminId);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("10002");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
     }
@@ -996,7 +991,7 @@ class AdminServiceTest {
         when(registeredSaccoRepository.findById("SACCO-01")).thenReturn(Optional.of(registeredSacco));
         when(saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-01", "ST-1")).thenReturn(Optional.of(station));
         when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN)).thenReturn(false);
-        when(memberRepository.findByMemberNo("MINOR001")).thenReturn(Optional.empty());
+        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of("10000"));
         when(memberRepository.existsByEmailIgnoreCase("minor@example.com")).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1004,7 +999,6 @@ class AdminServiceTest {
             adminId,
             "SACCO-01",
             "ST-1",
-            "MINOR001",
             "SACCOS Admin",
             "minor@example.com",
             "255712345678"
@@ -1013,6 +1007,7 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(lastInvitedBy.get()).isEqualTo(adminId);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("10001");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStationId()).isEqualTo("ST-1");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");

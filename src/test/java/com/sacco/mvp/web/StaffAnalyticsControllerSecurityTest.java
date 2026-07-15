@@ -105,7 +105,8 @@ class StaffAnalyticsControllerSecurityTest {
                 List.of(),
                 new LoanReportService.StationParticipationSummary(0, 0, BigDecimal.ZERO, BigDecimal.ZERO, 0),
                 List.of(),
-                List.of()
+                List.of(),
+                "All Products"
             ));
 
         mockMvc.perform(get("/staff/analytics")

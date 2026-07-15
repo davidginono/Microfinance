@@ -39,6 +39,8 @@ public class AdminService {
     private static final int MAX_LOG_PAGE_SIZE = 100;
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
+    private static final int FIRST_GENERATED_USER_ID = 10000;
+    private static final int LAST_GENERATED_USER_ID = 99999;
     private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
     private static final int MAX_PRODUCT_VERSION_HISTORY = 3;
     private static final int MAX_LOAN_PRODUCTS_VERSION_HISTORY = 3;
@@ -154,7 +156,6 @@ public class AdminService {
                              String stationId,
                              UUID adminId,
                              Set<Position> actorRoles,
-                             String memberNo,
                              String fullName,
                              String email,
                              String phone,
@@ -164,7 +165,6 @@ public class AdminService {
             saccoId,
             normalizeOptional(stationId),
             adminId,
-            memberNo,
             fullName,
             email,
             phone,
@@ -243,7 +243,6 @@ public class AdminService {
     public Member registerMinorAdmin(UUID adminId,
                                      String saccoId,
                                      String stationId,
-                                     String memberNo,
                                      String fullName,
                                      String email,
                                      String phone) {
@@ -253,7 +252,6 @@ public class AdminService {
             resolvedSaccoId,
             resolvedStationId,
             adminId,
-            memberNo,
             fullName,
             email,
             phone,
@@ -267,7 +265,6 @@ public class AdminService {
                                  UUID accountId,
                                  String saccoId,
                                  String stationId,
-                                 String memberNo,
                                  String fullName,
                                  String email,
                                  String phone) {
@@ -280,7 +277,6 @@ public class AdminService {
         String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
         String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
         ensureMinorAdminSlotAvailable(resolvedSaccoId, resolvedStationId, accountId);
-        String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
         String normalizedFullName = nameSignatureService.requireFullName(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
@@ -288,9 +284,6 @@ public class AdminService {
             throw new IllegalStateException("Enter the SACCOS Admin phone number.");
         }
 
-        if (memberRepository.existsByMemberNoIgnoreCaseAndIdNot(normalizedMemberNo, accountId)) {
-            throw new IllegalStateException("That user ID is already in use.");
-        }
         if (memberRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, accountId)) {
             throw new IllegalStateException("That email address is already in use.");
         }
@@ -302,7 +295,6 @@ public class AdminService {
         boolean saccoChanged = !resolvedSaccoId.equals(member.getSaccoId());
         member.setSaccoId(resolvedSaccoId);
         member.setStationId(resolvedStationId);
-        member.setMemberNo(normalizedMemberNo);
         member.setFullName(normalizedFullName);
         if (member.getStatus() == MemberStatus.ACTIVE || member.getSignatureRegisteredAt() != null) {
             member.setSignatureText(nameSignatureService.signatureFromFullName(normalizedFullName));
@@ -2313,7 +2305,6 @@ public class AdminService {
     private Member createStaffAccount(String saccoId,
                                       String stationId,
                                       UUID adminId,
-                                      String memberNo,
                                       String fullName,
                                       String email,
                                       String phone,
@@ -2327,7 +2318,7 @@ public class AdminService {
         if (staffRoles.contains(Position.CHAIRPERSON)) {
             ensureChairpersonSlotAvailable(saccoId, null);
         }
-        String normalizedMemberNo = requireValue(memberNo, "Enter a user ID.").toUpperCase();
+        String normalizedMemberNo = generateUniqueUserId();
         String normalizedFullName = nameSignatureService.requireFullName(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
@@ -2335,9 +2326,6 @@ public class AdminService {
             throw new IllegalStateException("Enter the SACCOS Admin phone number.");
         }
 
-        if (memberRepository.findByMemberNo(normalizedMemberNo).isPresent()) {
-            throw new IllegalStateException("That user ID is already in use.");
-        }
         if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalStateException("That email address is already in use.");
         }
@@ -2375,6 +2363,26 @@ public class AdminService {
             minorAdminInvitationService.issueInvitation(saved, adminId);
         }
         return saved;
+    }
+
+    public String nextGeneratedUserIdPreview() {
+        return generateUniqueUserId();
+    }
+
+    private String generateUniqueUserId() {
+        List<String> existingIds = memberRepository.findFiveDigitMemberNumbers();
+        Set<String> usedIds = existingIds == null
+            ? Set.of()
+            : existingIds.stream()
+                .filter(id -> id != null && id.matches("[0-9]{5}"))
+                .collect(Collectors.toSet());
+        for (int candidate = FIRST_GENERATED_USER_ID; candidate <= LAST_GENERATED_USER_ID; candidate++) {
+            String value = String.valueOf(candidate);
+            if (!usedIds.contains(value)) {
+                return value;
+            }
+        }
+        throw new IllegalStateException("All five-digit user IDs are already in use.");
     }
 
     private String requireValue(String value, String message) {

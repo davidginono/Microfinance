@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
+import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
@@ -175,7 +176,8 @@ class LoanReportServiceTest {
             List.of(
                 new LoanReportService.StationYearlySummaryRow(2025, 0, 0, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, BigDecimal.ZERO),
                 new LoanReportService.StationYearlySummaryRow(2026, 0, 0, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, BigDecimal.ZERO)
-            )
+            ),
+            "All Products"
         );
 
         byte[] pdf = loanReportService.buildStationAnalyticsPdf(report);
@@ -226,6 +228,7 @@ class LoanReportServiceTest {
     @Test
     void stationStaffAnalyticsFinancialRowsPreferPersistedInstallmentPaymentsForOlderLoans() {
         UUID loanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         Member manager = Member.builder()
             .id(UUID.randomUUID())
             .saccoId("IAA")
@@ -244,6 +247,7 @@ class LoanReportServiceTest {
             .stationId("AR704")
             .applicantMemberId(UUID.randomUUID())
             .loanType(LoanType.LOAN_ADVANCE)
+            .loanProductSettingId(productId)
             .amount(new BigDecimal("700000.00"))
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2025-01-10T08:00:00Z"))
@@ -284,6 +288,8 @@ class LoanReportServiceTest {
             .thenReturn(List.of(olderActiveLoan));
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
             .thenReturn(List.of(inRangePayment));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
         when(saccoStationRepository.findBySaccoIdAndStationId("IAA", "AR704")).thenReturn(Optional.empty());
 
@@ -315,6 +321,7 @@ class LoanReportServiceTest {
     @Test
     void stationFinancialAnalyticsFallsBackToPaymentSummaryWhenTransactionsAreMissing() {
         UUID loanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         Member manager = Member.builder()
             .id(UUID.randomUUID())
             .saccoId("IAA")
@@ -333,6 +340,7 @@ class LoanReportServiceTest {
             .stationId("AR704")
             .applicantMemberId(UUID.randomUUID())
             .loanType(LoanType.EDUCATION_LOAN)
+            .loanProductSettingId(productId)
             .amount(new BigDecimal("700000.00"))
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
@@ -366,6 +374,8 @@ class LoanReportServiceTest {
             .thenReturn(List.of(activeLoan));
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
             .thenReturn(List.of());
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
         when(saccoStationRepository.findBySaccoIdAndStationId("IAA", "AR704")).thenReturn(Optional.empty());
 
@@ -397,10 +407,13 @@ class LoanReportServiceTest {
     void memberActiveLoanDetailsUseFilteredTransactionInterestAndOutstandingInterest() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         LoanApplication loan = LoanApplication.builder()
             .id(loanId)
+            .saccoId("IAA")
             .applicantMemberId(memberId)
             .loanType(LoanType.LOAN_ADVANCE)
+            .loanProductSettingId(productId)
             .loanId("LN-1001")
             .amount(new BigDecimal("800000.00"))
             .status(LoanStatus.DISBURSED)
@@ -428,6 +441,8 @@ class LoanReportServiceTest {
             .thenReturn(List.of(loan));
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
             .thenReturn(List.of(transaction));
+        when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
+            .thenReturn(Optional.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
         List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
             memberId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null);
@@ -445,10 +460,13 @@ class LoanReportServiceTest {
     void memberActiveLoanDetailsUseSnapshotAndSummaryWhenTransactionsAreMissing() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         LoanApplication loan = LoanApplication.builder()
             .id(loanId)
+            .saccoId("IAA")
             .applicantMemberId(memberId)
             .loanType(LoanType.EDUCATION_LOAN)
+            .loanProductSettingId(productId)
             .loanId("10706")
             .amount(new BigDecimal("700000.00"))
             .status(LoanStatus.DISBURSED)
@@ -473,6 +491,8 @@ class LoanReportServiceTest {
             .thenReturn(List.of(loan));
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
             .thenReturn(List.of());
+        when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
+            .thenReturn(Optional.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
 
         List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
             memberId, LocalDate.of(2025, 7, 13), LocalDate.of(2026, 7, 13), null);
@@ -501,12 +521,14 @@ class LoanReportServiceTest {
         UUID applicantTwo = UUID.randomUUID();
         UUID paidLoanId = UUID.randomUUID();
         UUID activeLoanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         LoanApplication paidLoan = LoanApplication.builder()
             .id(paidLoanId)
             .saccoId("IAA")
             .stationId("AR704")
             .applicantMemberId(applicantOne)
             .loanType(LoanType.LOAN_ADVANCE)
+            .loanProductSettingId(productId)
             .amount(new BigDecimal("500000.00"))
             .status(LoanStatus.PAID)
             .createdAt(OffsetDateTime.parse("2026-02-10T08:00:00Z"))
@@ -519,6 +541,7 @@ class LoanReportServiceTest {
             .stationId("AR704")
             .applicantMemberId(applicantTwo)
             .loanType(LoanType.LOAN_ADVANCE)
+            .loanProductSettingId(productId)
             .amount(new BigDecimal("300000.00"))
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
@@ -549,6 +572,8 @@ class LoanReportServiceTest {
                     .totalPaid(new BigDecimal("3000.00"))
                     .build()
             ));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
         LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
             "IAA",
@@ -578,12 +603,14 @@ class LoanReportServiceTest {
     @Test
     void stationAnalyticsReportUsesSummaryInterestWhenTransactionsAreMissing() {
         UUID activeLoanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
         LoanApplication activeLoan = LoanApplication.builder()
             .id(activeLoanId)
             .saccoId("TAHA")
             .stationId("AR704")
             .applicantMemberId(UUID.randomUUID())
             .loanType(LoanType.EDUCATION_LOAN)
+            .loanProductSettingId(productId)
             .amount(new BigDecimal("700000.00"))
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
@@ -602,6 +629,8 @@ class LoanReportServiceTest {
         when(memberRepository.countActiveMemberAccountsForScope("TAHA", "AR704")).thenReturn(3L);
         when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
             .thenReturn(List.of());
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("TAHA"))
+            .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
         when(registeredSaccoRepository.findById("TAHA"))
             .thenReturn(Optional.of(com.sacco.mvp.domain.RegisteredSacco.builder()
                 .saccoId("TAHA")
@@ -644,7 +673,8 @@ class LoanReportServiceTest {
             List.of(new LoanReportService.StationStatusRow("Applied Loans", 2, 2)),
             new LoanReportService.StationParticipationSummary(10, 2, new BigDecimal("20.00"), new BigDecimal("1.00"), 0),
             List.of(new LoanReportService.StationProductRow("Loan Advance (Mkopo wa Chapchap)", 2, 2, 1, 2, 1, 0, 0, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),
-            List.of(new LoanReportService.StationYearlySummaryRow(2026, 2, 2, 0, BigDecimal.ZERO, 1, new BigDecimal("15000.00"), new BigDecimal("12000.00")))
+            List.of(new LoanReportService.StationYearlySummaryRow(2026, 2, 2, 0, BigDecimal.ZERO, 1, new BigDecimal("15000.00"), new BigDecimal("12000.00"))),
+            "All Products"
         );
 
         byte[] workbookBytes = loanReportService.buildStationAnalyticsExcel(report);
@@ -716,6 +746,19 @@ class LoanReportServiceTest {
             List.of("Total loan applications increased by 100%.", "No defaults recorded during the reporting period."),
             "This report summarizes the loan performance and status within the selected period."
         );
+    }
+
+    private LoanProductSetting product(UUID id, LoanType loanType, String name) {
+        return LoanProductSetting.builder()
+            .id(id)
+            .saccoId("IAA")
+            .loanType(loanType)
+            .productName(name)
+            .displayOrder(1)
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
     }
 
     private boolean sheetContains(XSSFWorkbook workbook, String sheetName, String expected) {

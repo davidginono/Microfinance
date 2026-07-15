@@ -363,13 +363,16 @@ public class AppController {
 
     private LoanProductSetting selectedAnalyticsProduct(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
         if (loanProductId != null) {
-            return loanProductSettingRepository.findByIdAndSaccoId(loanProductId, saccoId).orElse(null);
+            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+                .filter(LoanProductSetting::isAvailableForApplications)
+                .orElse(null);
         }
         if (fallbackLoanType == null) {
             return null;
         }
         return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
             .filter(product -> product.getLoanType() == fallbackLoanType)
+            .filter(LoanProductSetting::isAvailableForApplications)
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .findFirst()
             .orElse(null);
@@ -463,7 +466,9 @@ public class AppController {
     }
 
     private Map<LoanType, String> loanProductNames(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .collect(Collectors.toMap(
                 LoanProductSetting::getLoanType,
                 LoanProductSetting::getDisplayName,
@@ -473,7 +478,9 @@ public class AppController {
     }
 
     private Map<UUID, String> loanProductNamesById(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .collect(Collectors.toMap(
                 LoanProductSetting::getId,
                 LoanProductSetting::getDisplayName,
@@ -487,7 +494,8 @@ public class AppController {
             return "-";
         }
         if (app.getLoanProductSettingId() != null) {
-            String productName = loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId())
+            String productName = loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(app.getLoanProductSettingId(), app.getSaccoId())
+                .filter(LoanProductSetting::isAvailableForApplications)
                 .map(LoanProductSetting::getDisplayName)
                 .orElse(null);
             if (productName != null && !productName.isBlank()) {

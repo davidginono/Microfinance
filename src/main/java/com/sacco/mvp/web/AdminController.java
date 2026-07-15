@@ -618,6 +618,7 @@ public class AdminController {
         model.addAttribute("selectedUserQuery", query == null ? "" : query.trim());
         model.addAttribute("selectedPageSize", usersPage.getSize());
         model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, usersPage.getSize()));
+        model.addAttribute("nextGeneratedUserId", adminService.nextGeneratedUserIdPreview());
         model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
             ? Position.staffAssignableRoles()
             : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
@@ -629,25 +630,23 @@ public class AdminController {
     @PostMapping("/users")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String createUser(@AuthenticationPrincipal AppUserPrincipal principal,
-                             @RequestParam String memberNo,
                              @RequestParam String fullName,
                              @RequestParam String email,
                              @RequestParam(required = false) String phone,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
         try {
-            adminService.createUser(
+            var createdUser = adminService.createUser(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 principal.getMemberId(),
                 principal.getGrantedPositions(),
-                memberNo,
                 fullName,
                 email,
                 phone,
                 positions
             );
-            ra.addFlashAttribute("message", "User created.");
+            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUser.getMemberNo() + ".");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1571,6 +1570,7 @@ public class AdminController {
         model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
         model.addAttribute("minorAdmins", adminService.minorAdmins());
         model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
+        model.addAttribute("nextGeneratedUserId", adminService.nextGeneratedUserIdPreview());
         model.addAttribute("superAdmin", true);
         return "admin/minor-admins";
     }
@@ -1598,16 +1598,15 @@ public class AdminController {
                                      @ModelAttribute MinorAdminRegistrationForm registrationForm,
                                      RedirectAttributes ra) {
         try {
-            adminService.registerMinorAdmin(
+            var createdAdmin = adminService.registerMinorAdmin(
                 principal.getMemberId(),
                 registrationForm.getSaccoId(),
                 registrationForm.getStationId(),
-                registrationForm.getMemberNo(),
                 registrationForm.getFullName(),
                 registrationForm.getEmail(),
                 registrationForm.getPhone()
             );
-            ra.addFlashAttribute("message", "SACCOS Admin invited. A password setup link has been emailed to them.");
+            ra.addFlashAttribute("message", "SACCOS Admin invited with User ID " + createdAdmin.getMemberNo() + ". A password setup link has been emailed to them.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1620,7 +1619,6 @@ public class AdminController {
                                    @PathVariable UUID accountId,
                                    @RequestParam String saccoId,
                                    @RequestParam String stationId,
-                                   @RequestParam String memberNo,
                                    @RequestParam String fullName,
                                    @RequestParam String email,
                                    @RequestParam(required = false) String phone,
@@ -1631,7 +1629,6 @@ public class AdminController {
                 accountId,
                 saccoId,
                 stationId,
-                memberNo,
                 fullName,
                 email,
                 phone

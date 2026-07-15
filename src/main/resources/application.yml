@@ -1,6 +1,4 @@
 spring:
-  config:
-    import: optional:file:./application-local.yml
   sql:
     init:
       mode: never
@@ -42,18 +40,18 @@ spring:
       cache:
         period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
   mail:
-    host: ${SPRING_MAIL_HOST:localhost}
-    port: ${SPRING_MAIL_PORT:1025}
-    username: ${SPRING_MAIL_USERNAME:no-reply@sacco.local}
-    password: ${SPRING_MAIL_PASSWORD:}
+    host: smtp.stackmail.com
+    port: 465
+    username: no-reply@foresight.co.tz
+    password: qwerty1!
     properties:
       mail:
         smtp:
-          auth: ${SPRING_MAIL_SMTP_AUTH:false}
+          auth: true
           ssl:
-            enable: ${SPRING_MAIL_SMTP_SSL_ENABLE:false}
+            enable: true
           starttls:
-            enable: ${SPRING_MAIL_SMTP_STARTTLS:false}
+            enable: false
   security:
     oauth2:
       client:
@@ -103,7 +101,7 @@ app:
     inactivity-prompt-ms: ${APP_SESSION_INACTIVITY_PROMPT_MS:600000}
     inactivity-grace-ms: ${APP_SESSION_INACTIVITY_GRACE_MS:60000}
   mail:
-    from-address: ${APP_MAIL_FROM_ADDRESS:${SPRING_MAIL_USERNAME:no-reply@sacco.local}}
+    from-address: no-reply@foresight.co.tz
     override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}

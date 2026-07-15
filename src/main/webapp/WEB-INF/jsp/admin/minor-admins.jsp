@@ -60,7 +60,7 @@
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="admin.users.userId" text="User ID" />
-                    <input name="memberNo" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. MADMIN001" />
+                    <input type="text" readonly aria-readonly="true" value="${nextGeneratedUserId}" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -254,7 +254,7 @@
 
                     <label class="block text-sm font-semibold text-slate-700">
                         <spring:message code="admin.users.userId" text="User ID" />
-                        <input name="memberNo" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" value="${minorAdmin.loginId}" />
+                        <input type="text" readonly aria-readonly="true" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600" value="${minorAdmin.loginId}" />
                     </label>
 
                     <label class="block text-sm font-semibold text-slate-700">

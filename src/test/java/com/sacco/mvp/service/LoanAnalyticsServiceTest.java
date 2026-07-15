@@ -74,20 +74,7 @@ class LoanAnalyticsServiceTest {
         LoanAnalyticsService.StaffPortfolioSummary portfolio =
             service.staffPortfolio(principal, now.minusDays(7).toLocalDate(), now.toLocalDate(), null, null);
 
-        assertThat(performance)
-            .filteredOn(item -> item.label().equals("Education Loan"))
-            .singleElement()
-            .satisfies(item -> {
-                assertThat(item.totalLoans()).isEqualTo(1);
-                assertThat(item.paidLoans()).isEqualTo(1);
-            });
-        assertThat(performance)
-            .filteredOn(item -> item.label().equals("Emergency Loan"))
-            .singleElement()
-            .satisfies(item -> {
-                assertThat(item.totalLoans()).isEqualTo(1);
-                assertThat(item.defaultedLoans()).isEqualTo(1);
-            });
+        assertThat(performance).isEmpty();
         assertThat(portfolio.handledLoans()).isEqualTo(3);
         assertThat(portfolio.approvedLoans()).isEqualTo(2);
         assertThat(portfolio.rejectedLoans()).isEqualTo(1);

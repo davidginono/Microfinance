@@ -8,7 +8,6 @@ import lombok.Setter;
 public class MinorAdminRegistrationForm {
     private String saccoId;
     private String stationId;
-    private String memberNo;
     private String fullName;
     private String email;
     private String phone;
