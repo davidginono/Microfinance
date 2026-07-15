@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
+import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -77,6 +78,7 @@ public class AdminService {
     private final MinorAdminInvitationService minorAdminInvitationService;
     private final ObjectMapper objectMapper;
     private final NameSignatureService nameSignatureService;
+    private final ForesightDirectoryService foresightDirectoryService;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
         return dashboard(saccoId, null, adminId);
@@ -2335,21 +2337,22 @@ public class AdminService {
         if (staffRoles.contains(Position.CHAIRPERSON)) {
             ensureChairpersonSlotAvailable(saccoId, null);
         }
-        String normalizedMemberNo = generateUniqueUserId();
         String normalizedFullName = nameSignatureService.requireFullName(fullName, "Enter the user's full name.");
         String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
         String normalizedPhone = normalizeAdminPhone(phone);
-        if (staffRoles.contains(Position.MINOR_ADMIN) && normalizedPhone == null) {
-            throw new IllegalStateException("Enter the SACCOS Admin phone number.");
+        if (normalizedPhone == null) {
+            throw new IllegalStateException("Enter the staff member phone number.");
         }
+        ensureStaffIsNotExternalMember(normalizedEmail, normalizedPhone);
 
         if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalStateException("That email address is already in use.");
         }
-        if (normalizedPhone != null && memberRepository.existsByPhone(normalizedPhone)) {
+        if (memberRepository.existsByPhone(normalizedPhone)) {
             throw new IllegalStateException("That phone number is already in use.");
         }
 
+        String normalizedMemberNo = generateUniqueUserId();
         OffsetDateTime now = OffsetDateTime.now();
         // All staff accounts are provisioned passwordless: they receive an activation
         // email (see MinorAdminInvitationService.issueInvitation) and sign in using
@@ -2380,6 +2383,28 @@ public class AdminService {
             minorAdminInvitationService.issueInvitation(saved, adminId);
         }
         return saved;
+    }
+
+    private void ensureStaffIsNotExternalMember(String normalizedEmail, String normalizedPhone) {
+        ForesightDirectoryService.MemberProfileLookupResult phoneLookup =
+            foresightDirectoryService.lookupMemberProfileByPhone("+" + normalizedPhone);
+        ForesightDirectoryService.MemberProfileLookupResult emailLookup =
+            foresightDirectoryService.lookupMemberProfileByEmailV2(normalizedEmail);
+
+        if (isExternalMemberFound(phoneLookup) || isExternalMemberFound(emailLookup)) {
+            throw new IllegalStateException("This person is already registered as a SACCO member and cannot be added as staff.");
+        }
+        if (!isExternalMemberNotFound(phoneLookup) || !isExternalMemberNotFound(emailLookup)) {
+            throw new IllegalStateException("We could not verify this person against Foresight. Try again later.");
+        }
+    }
+
+    private boolean isExternalMemberFound(ForesightDirectoryService.MemberProfileLookupResult lookup) {
+        return lookup != null && lookup.isFound();
+    }
+
+    private boolean isExternalMemberNotFound(ForesightDirectoryService.MemberProfileLookupResult lookup) {
+        return lookup != null && lookup.isNotFound();
     }
 
     public String nextGeneratedUserIdPreview() {

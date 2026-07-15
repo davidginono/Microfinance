@@ -21,6 +21,8 @@ import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.StationSmsAccount;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.UserSettings;
+import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.ForesightMemberProfile;
 import com.sacco.mvp.repository.AdminIncidentRepository;
 import com.sacco.mvp.repository.AuditLogRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
@@ -92,6 +94,7 @@ class AdminServiceTest {
     @Mock private AdminIncidentRepository adminIncidentRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
+    @Mock private ForesightDirectoryService foresightDirectoryService;
 
     private AdminService adminService;
     private AtomicInteger issuedInvitationCount;
@@ -154,6 +157,10 @@ class AdminServiceTest {
                 lastRevokedBy.set(revokedBy);
             }
         };
+        lenient().when(foresightDirectoryService.lookupMemberProfileByPhone(any()))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
+        lenient().when(foresightDirectoryService.lookupMemberProfileByEmailV2(any()))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
 
         adminService = new AdminService(
             memberRepository,
@@ -183,7 +190,8 @@ class AdminServiceTest {
             saccoRegistryService,
             minorAdminInvitationService,
             objectMapper,
-            nameSignatureService
+            nameSignatureService,
+            foresightDirectoryService
         );
     }
 
@@ -405,7 +413,6 @@ class AdminServiceTest {
 
     @Test
     void createUserRejectsEmailAlreadyUsedByAnyAccount() {
-        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of());
         when(memberRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> adminService.createUser(
@@ -415,7 +422,7 @@ class AdminServiceTest {
             Set.of(Position.ADMIN),
             "Mary Manager",
             " Existing@Example.com ",
-            null,
+            "255700000005",
             List.of(Position.MANAGER)
         ))
             .isInstanceOf(IllegalStateException.class)
@@ -991,7 +998,7 @@ class AdminServiceTest {
             Set.of(Position.ADMIN),
             "Mary Manager",
             "manager@example.com",
-            null,
+            "255700000001",
             List.of(Position.MANAGER)
         );
 
@@ -1001,6 +1008,101 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("10002");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
+        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000001");
+        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("manager@example.com");
+    }
+
+    @Test
+    void createUserRejectsWhenForesightPhoneProfileExists() {
+        when(foresightDirectoryService.lookupMemberProfileByPhone("+255700000002"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
+                new ForesightMemberProfile("Smith", "Anna", "MBR-001", "ST-1", "Demo SACCO")
+            ));
+
+        assertThatThrownBy(() -> adminService.createUser(
+            "SACCO-01",
+            null,
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            "Anna Smith",
+            "anna.staff@example.com",
+            "255700000002",
+            List.of(Position.MANAGER)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("This person is already registered as a SACCO member and cannot be added as staff.");
+
+        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000002");
+        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("anna.staff@example.com");
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void createUserRejectsWhenForesightEmailProfileExists() {
+        when(foresightDirectoryService.lookupMemberProfileByEmailV2("member@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
+                new ForesightMemberProfile("Member", "Existing", "MBR-002", "ST-1", "Demo SACCO")
+            ));
+
+        assertThatThrownBy(() -> adminService.createUser(
+            "SACCO-01",
+            null,
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            "Existing Member",
+            "member@example.com",
+            "255700000003",
+            List.of(Position.MANAGER)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("This person is already registered as a SACCO member and cannot be added as staff.");
+
+        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000003");
+        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("member@example.com");
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void createUserRejectsWhenAnyForesightLookupIsUnavailable() {
+        when(foresightDirectoryService.lookupMemberProfileByEmailV2("offline@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.unavailable());
+
+        assertThatThrownBy(() -> adminService.createUser(
+            "SACCO-01",
+            null,
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            "Offline Lookup",
+            "offline@example.com",
+            "255700000004",
+            List.of(Position.MANAGER)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("We could not verify this person against Foresight. Try again later.");
+
+        verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000004");
+        verify(foresightDirectoryService).lookupMemberProfileByEmailV2("offline@example.com");
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void createUserRejectsMissingPhoneBeforeSaving() {
+        assertThatThrownBy(() -> adminService.createUser(
+            "SACCO-01",
+            null,
+            UUID.randomUUID(),
+            Set.of(Position.ADMIN),
+            "No Phone",
+            "no-phone@example.com",
+            null,
+            List.of(Position.MANAGER)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Enter the staff member phone number.");
+
+        verify(foresightDirectoryService, never()).lookupMemberProfileByPhone(any());
+        verify(foresightDirectoryService, never()).lookupMemberProfileByEmailV2(any());
+        verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
