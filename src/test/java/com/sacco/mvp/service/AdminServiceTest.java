@@ -222,6 +222,69 @@ class AdminServiceTest {
         verify(stationSmsAccountRepository, never()).save(any());
     }
 
+    @Test
+    void usersPageSearchesByUserIdPrefixAndSeparatesStaffNumber() {
+        UUID accountId = UUID.fromString("12345678-1234-1234-1234-123456789abc");
+        Member staff = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .memberNo("10002")
+            .fullName("Loan Officer")
+            .email("officer@example.com")
+            .position(Position.LOAN_OFFICER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findUserAccessPageByUserId(eq("SACCO-1"), eq("ST-1"), eq("1234"), any()))
+            .thenReturn(new PageImpl<>(List.of(staff)));
+
+        AdminService.UserAccessView row = adminService
+            .usersPage("SACCO-1", "ST-1", "userId", "1234", 0, 25)
+            .getContent()
+            .get(0);
+
+        assertThat(row.getUserIdLabel()).isEqualTo("12345678");
+        assertThat(row.getMemberNumber()).isEqualTo("-");
+        assertThat(row.getStaffMemberNumber()).isEqualTo("10002");
+        assertThat(row.getDisplayStatus()).isEqualTo("Invite email sent - waiting");
+        verify(memberRepository, never()).findUserAccessPageByName(any(), any(), any(), any());
+    }
+
+    @Test
+    void usersPageSearchesByNameAndSeparatesMemberNumber() {
+        UUID accountId = UUID.fromString("87654321-1234-1234-1234-123456789abc");
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .memberNo("MEM001")
+            .fullName("Member User")
+            .email("member@example.com")
+            .position(Position.MEMBER)
+            .memberAccount(true)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findUserAccessPageByName(eq("SACCO-1"), eq("ST-1"), eq("member"), any()))
+            .thenReturn(new PageImpl<>(List.of(member)));
+
+        AdminService.UserAccessView row = adminService
+            .usersPage("SACCO-1", "ST-1", "name", " Member ", 0, 25)
+            .getContent()
+            .get(0);
+
+        assertThat(row.getUserIdLabel()).isEqualTo("87654321");
+        assertThat(row.getMemberNumber()).isEqualTo("MEM001");
+        assertThat(row.getStaffMemberNumber()).isEqualTo("-");
+        assertThat(row.getDisplayStatus()).isEqualTo("ACTIVE");
+        verify(memberRepository, never()).findUserAccessPageByUserId(any(), any(), any(), any());
+    }
+
     private void stubActiveRoleDirectory(String saccoId, List<Member> activeMembers) {
         lenient().when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE))
             .thenReturn(activeMembers);
@@ -816,6 +879,153 @@ class AdminServiceTest {
         assertThat(member.getSaccoId()).isEqualTo("SACCO-ARUSHA-001");
         assertThat(member.getStationId()).isEqualTo("AR704");
         verify(memberRepository, never()).save(member);
+    }
+
+    @Test
+    void updateUserRejectsManualActivationForInvitedStaff() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("10002")
+            .fullName("Invited Staff")
+            .email("invited@example.com")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.MANAGER),
+            MemberStatus.ACTIVE
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Invited staff accounts become active only after the invite form is completed.");
+
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void updateUserRejectsManualDeactivationForInvitedStaff() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("10002")
+            .fullName("Invited Staff")
+            .email("invited@example.com")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.MANAGER),
+            MemberStatus.INACTIVE
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Invited staff accounts become active only after the invite form is completed.");
+
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void updateUserRejectsMovingActiveStaffBackToInvited() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("10002")
+            .fullName("Active Staff")
+            .email("active@example.com")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.MANAGER),
+            MemberStatus.INVITED
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Staff accounts cannot be manually moved back to invited status.");
+
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void updateUserAllowsRoleAndClaimEditsForInvitedStaffWhenStatusRemainsInvited() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("10002")
+            .fullName("Invited Staff")
+            .email("invited@example.com")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        UserSettings settings = UserSettings.builder()
+            .memberId(accountId)
+            .language("en")
+            .notificationPrefs("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userSettingsRepository.existsById(accountId)).thenReturn(true);
+        when(userSettingsRepository.findById(accountId)).thenReturn(Optional.of(settings));
+
+        adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.LOAN_OFFICER),
+            MemberStatus.INVITED,
+            List.of(UserClaim.REVIEW_LOAN_OFFICER_QUEUE)
+        );
+
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.INVITED);
+        assertThat(member.getStaffRolesResolved()).contains(Position.LOAN_OFFICER);
+        verify(memberRepository).save(member);
     }
 
     @Test

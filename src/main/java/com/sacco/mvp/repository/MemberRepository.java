@@ -236,6 +236,35 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     boolean existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(String saccoId, String stationId, Position position, UUID id);
 
+    @Query(
+        value = """
+            select m.*
+            from members m
+            where m.sacco_id = :saccoId
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and (
+                :query = ''
+                or cast(m.id as text) ilike concat(cast(:query as text), '%')
+              )
+            order by m.full_name asc
+            """,
+        countQuery = """
+            select count(*)
+            from members m
+            where m.sacco_id = :saccoId
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and (
+                :query = ''
+                or cast(m.id as text) ilike concat(cast(:query as text), '%')
+              )
+            """,
+        nativeQuery = true
+    )
+    Page<Member> findUserAccessPageByUserId(@Param("saccoId") String saccoId,
+                                            @Param("stationId") String stationId,
+                                            @Param("query") String query,
+                                            Pageable pageable);
+
     @Query("""
         select m
         from Member m
@@ -243,14 +272,14 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
           and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
           and (
             :query = ''
-            or lower(coalesce(m.email, '')) like concat('%', :query, '%')
-            or lower(coalesce(m.memberNo, '')) like concat('%', :query, '%')
+            or lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
           )
+        order by m.fullName asc
         """)
-    Page<Member> findUserAccessPage(@Param("saccoId") String saccoId,
-                                    @Param("stationId") String stationId,
-                                    @Param("query") String query,
-                                    Pageable pageable);
+    Page<Member> findUserAccessPageByName(@Param("saccoId") String saccoId,
+                                          @Param("stationId") String stationId,
+                                          @Param("query") String query,
+                                          Pageable pageable);
 
     @Query("""
         select m.status as status, count(m) as total

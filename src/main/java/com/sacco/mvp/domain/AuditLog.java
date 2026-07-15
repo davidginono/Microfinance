@@ -172,7 +172,7 @@ public class AuditLog {
 
     @Transient
     public String getActorReferenceLabel() {
-        return actorMemberId == null ? "System" : "#" + actorMemberId.toString().substring(0, 8);
+        return actorMemberId == null ? "System" : actorMemberId.toString().substring(0, 8);
     }
 
     @Transient

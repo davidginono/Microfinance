@@ -73,7 +73,7 @@
     <p class="erp-page-subtitle"><spring:message code="admin.events.subtitle" text="Review recorded system activity." /></p>
 </div>
 <section class="erp-form-wrap mb-4">
-    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar">
+    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar" data-auto-submit-filter>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 SACCO
@@ -117,7 +117,7 @@
         </label>
         <label class="admin-filter-field admin-filter-field--actor block min-w-0 text-sm font-semibold text-slate-700">
             Actor / User ID
-            <input type="text" name="actorId" value="${selectedActorId}" placeholder="Search actor UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
+            <input type="text" name="actorId" value="${selectedActorId}" placeholder="Search actor UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" data-auto-submit-on-input />
         </label>
         <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700">
             <span class="admin-filter-field--rows-label">Rows Per Page</span>
@@ -238,4 +238,5 @@
     </script>
 </c:if>
 
+<%@ include file="../fragments/auto-submit-filter.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

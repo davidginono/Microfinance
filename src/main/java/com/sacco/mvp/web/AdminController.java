@@ -603,12 +603,15 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String users(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam(required = false) String query,
+                        @RequestParam(required = false, defaultValue = "userId") String searchBy,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "25") int size,
                         Model model) {
+        String selectedSearchBy = normalizeUsersSearchBy(searchBy);
         Page<AdminService.UserAccessView> usersPage = adminService.usersPage(
             adminScopeService.currentSaccoId(principal),
             adminScopeService.currentStationId(principal),
+            selectedSearchBy,
             query,
             page,
             size
@@ -616,8 +619,9 @@ public class AdminController {
         model.addAttribute("users", usersPage.getContent());
         model.addAttribute("usersPage", usersPage);
         model.addAttribute("selectedUserQuery", query == null ? "" : query.trim());
+        model.addAttribute("selectedUserSearchBy", selectedSearchBy);
         model.addAttribute("selectedPageSize", usersPage.getSize());
-        model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, usersPage.getSize()));
+        model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize()));
         model.addAttribute("nextGeneratedUserId", adminService.nextGeneratedUserIdPreview());
         model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
             ? Position.staffAssignableRoles()
@@ -646,7 +650,7 @@ public class AdminController {
                 phone,
                 positions
             );
-            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUser.getMemberNo() + ".");
+            ra.addFlashAttribute("message", "Staff member created with Staff Member Number " + createdUser.getMemberNo() + ". Invite email sent and waiting for activation.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -2077,12 +2081,18 @@ public class AdminController {
         return query.toString();
     }
 
-    private String buildUsersPaginationQuery(String queryText, int size) {
+    private String buildUsersPaginationQuery(String queryText, String searchBy, int size) {
         StringBuilder query = new StringBuilder("&size=").append(size);
+        String normalizedSearchBy = normalizeUsersSearchBy(searchBy);
+        query.append("&searchBy=").append(UriUtils.encode(normalizedSearchBy, StandardCharsets.UTF_8));
         if (queryText != null && !queryText.isBlank()) {
             query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
+    }
+
+    private String normalizeUsersSearchBy(String searchBy) {
+        return "name".equalsIgnoreCase(searchBy == null ? "" : searchBy.trim()) ? "name" : "userId";
     }
 
     private BigDecimal percentToRatio(BigDecimal percent) {

@@ -55,7 +55,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
                 <p class="erp-widget-title"><spring:message code="common.filterViewOptions" text="Filter And View Options" /></p>
-                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search users by member number or email and page the results." /></p>
+                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search users by User ID or name and page the results." /></p>
             </div>
             <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                 <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
@@ -68,37 +68,50 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="admin-filter-form grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_14rem_auto] lg:items-end">
-        <label class="block">
+    <form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6" data-auto-submit-filter>
+        <label class="block min-w-[10rem] flex-[0_1_12rem]">
+            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search By</span>
+            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;" data-auto-submit-on-change>
+                <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}>User ID</option>
+                <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}>Name</option>
+            </select>
+        </label>
+
+        <label class="block min-w-[16rem] flex-[1_1_20rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search User</span>
             <input type="text"
                    name="query"
                    value="${selectedUserQuery}"
-                   class="mt-2 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
-                   placeholder="Search by member number or email" />
+                   class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
+                   style="height:3rem;min-height:3rem;max-height:3rem;"
+                   placeholder="Enter selected User ID or name"
+                   data-auto-submit-on-input />
         </label>
 
-        <label class="block">
+        <label class="block min-w-[10rem] flex-[0_1_12rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Rows Per Page</span>
-            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800">
+            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
                 <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
                 <option value="50" ${selectedPageSize == 50 ? 'selected' : ''}>50 rows</option>
                 <option value="100" ${selectedPageSize == 100 ? 'selected' : ''}>100 rows</option>
             </select>
         </label>
 
-        <div class="flex flex-wrap gap-3">
-            <button type="submit" class="app-btn btn-primary">Apply Filters</button>
-            <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
+        <div class="flex shrink-0 flex-wrap items-end gap-3">
+            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Apply Filters</button>
+            <a href="/admin/users" class="app-btn btn-neutral" style="height:3rem;min-height:3rem;">Reset</a>
         </div>
     </form>
 </div>
 
 <div class="erp-table-wrap erp-table-scroll">
-    <table class="erp-table min-w-[980px]">
+    <table class="erp-table min-w-[1320px]">
         <thead>
         <tr>
             <th class="px-3 py-2 text-left whitespace-nowrap">User</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">User ID</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">Member Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">Staff Member Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Email</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Roles</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Membership</th>
@@ -110,10 +123,10 @@
         <c:choose>
             <c:when test="${empty users}">
                 <tr>
-                    <td colspan="6" class="px-4 py-5 text-sm text-slate-500">
+                    <td colspan="9" class="px-4 py-5 text-sm text-slate-500">
                         <c:choose>
                             <c:when test="${not empty selectedUserQuery}">
-                                No users matched member number or email <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
+                                No users matched the selected search for <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
                             </c:when>
                             <c:otherwise>
                                 No users are available in the current slice.
@@ -127,8 +140,10 @@
                     <tr>
                         <td class="px-3 py-2 align-top">
                             <div class="font-semibold text-slate-900">${user.fullName}</div>
-                            <div class="text-xs text-slate-500">${user.loginId}</div>
                         </td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700">${user.userIdLabel}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.memberNumber}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.staffMemberNumber}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
@@ -136,7 +151,11 @@
                                 ${user.membershipLabel}
                             </span>
                         </td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.status}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap">
+                            <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : user.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
+                                ${user.displayStatus}
+                            </span>
+                        </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <button type="button"
                                     class="app-btn btn-primary"
@@ -259,7 +278,15 @@
                 <div>
                     <p class="erp-widget-title">Edit User</p>
                     <h2 class="mt-1 text-xl font-bold text-sacco-ink">${user.fullName}</h2>
-                    <p class="mt-1 text-sm text-slate-500">${user.loginId}</p>
+                    <p class="mt-1 text-sm text-slate-500">User ID ${user.userIdLabel}</p>
+                    <c:choose>
+                        <c:when test="${user.memberAccess}">
+                            <p class="mt-1 text-xs text-slate-500">Member Number ${user.memberNumber}</p>
+                        </c:when>
+                        <c:otherwise>
+                            <p class="mt-1 text-xs text-slate-500">Staff Member Number ${user.staffMemberNumber}</p>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
                 <button type="button" class="app-modal-close" data-user-modal-close="user-${user.accountId}" aria-label="Close modal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -310,14 +337,28 @@
                     </div>
                 </div>
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Status
-                    <select name="status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                        <c:forEach items="${statuses}" var="status">
-                            <option value="${status}" ${user.status eq status ? 'selected' : ''}>${status}</option>
-                        </c:forEach>
-                    </select>
-                </label>
+                <c:choose>
+                    <c:when test="${user.status eq 'INVITED'}">
+                        <input type="hidden" name="status" value="INVITED" />
+                        <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Status</p>
+                            <p class="mt-1 text-sm font-semibold text-amber-800">${user.displayStatus}</p>
+                            <p class="mt-1 text-xs leading-5 text-amber-700">This account becomes active only after the invite form is completed.</p>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Status
+                            <select name="status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
+                                <c:forEach items="${statuses}" var="status">
+                                    <c:if test="${status ne 'INVITED'}">
+                                        <option value="${status}" ${user.status eq status ? 'selected' : ''}>${status}</option>
+                                    </c:if>
+                                </c:forEach>
+                            </select>
+                        </label>
+                    </c:otherwise>
+                </c:choose>
 
                 <div class="app-modal-actions">
                     <button type="button"
@@ -488,4 +529,5 @@
     })();
 </script>
 
+<%@ include file="../fragments/auto-submit-filter.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

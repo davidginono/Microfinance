@@ -40,6 +40,8 @@ public class AdminService {
     private static final int MAX_LOG_PAGE_SIZE = 100;
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
+    private static final String USER_SEARCH_BY_USER_ID = "userId";
+    private static final String USER_SEARCH_BY_NAME = "name";
     private static final int FIRST_GENERATED_USER_ID = 10000;
     private static final int LAST_GENERATED_USER_ID = 99999;
     private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
@@ -159,14 +161,25 @@ public class AdminService {
     }
 
     public Page<UserAccessView> usersPage(String saccoId, String query, int page, int size) {
-        return usersPage(saccoId, null, query, page, size);
+        return usersPage(saccoId, null, USER_SEARCH_BY_USER_ID, query, page, size);
     }
 
     public Page<UserAccessView> usersPage(String saccoId, String stationId, String query, int page, int size) {
-        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        return usersPage(saccoId, stationId, USER_SEARCH_BY_USER_ID, query, page, size);
+    }
+
+    public Page<UserAccessView> usersPage(String saccoId, String stationId, String searchBy, String query, int page, int size) {
+        String normalizedSearchBy = normalizeUserSearchBy(searchBy);
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? DEFAULT_USER_PAGE_SIZE : Math.min(size, MAX_USER_PAGE_SIZE);
-        return memberRepository.findUserAccessPage(saccoId, normalizeOptional(stationId), normalizedQuery, PageRequest.of(safePage, safeSize))
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize);
+        String normalizedStationId = normalizeOptional(stationId);
+        if (USER_SEARCH_BY_NAME.equals(normalizedSearchBy)) {
+            return memberRepository.findUserAccessPageByName(saccoId, normalizedStationId, normalizedQuery, pageRequest)
+                .map(this::toUserAccessView);
+        }
+        return memberRepository.findUserAccessPageByUserId(saccoId, normalizedStationId, normalizedQuery, pageRequest)
             .map(this::toUserAccessView);
     }
 
@@ -419,6 +432,7 @@ public class AdminService {
         if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
             throw new IllegalStateException("Only super admins can update Super Admin accounts.");
         }
+        enforceUserStatusTransition(member.getStatus(), status);
         LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
             String slotStationId = normalizedStationId != null ? normalizedStationId : member.getStationId();
@@ -2275,18 +2289,60 @@ public class AdminService {
     }
 
     private UserAccessView toUserAccessView(Member member) {
+        boolean memberAccess = member.isMemberAccess();
         return UserAccessView.builder()
             .accountId(member.getId())
+            .userIdLabel(formatUserId(member.getId()))
             .loginId(member.getMemberNo())
+            .memberNumber(memberAccess ? displayOrDash(member.getMemberNo()) : "-")
+            .staffMemberNumber(memberAccess ? "-" : displayOrDash(member.getMemberNo()))
             .fullName(member.getFullName())
             .email(member.getEmail())
-            .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), member.isMemberAccess()))
+            .roleSummary(formatRoleSummary(member.getStaffRolesResolved(), memberAccess))
             .staffRoles(member.getStaffRolesResolved())
-            .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess()))
+            .claims(userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), memberAccess))
             .status(member.getStatus())
+            .displayStatus(displayUserStatus(member.getStatus()))
             .membershipLabel(resolveMembershipLabel(member))
-            .memberAccess(member.isMemberAccess())
+            .memberAccess(memberAccess)
             .build();
+    }
+
+    private String normalizeUserSearchBy(String searchBy) {
+        if (searchBy != null && USER_SEARCH_BY_NAME.equalsIgnoreCase(searchBy.trim())) {
+            return USER_SEARCH_BY_NAME;
+        }
+        return USER_SEARCH_BY_USER_ID;
+    }
+
+    private void enforceUserStatusTransition(MemberStatus currentStatus, MemberStatus requestedStatus) {
+        MemberStatus current = currentStatus == null ? MemberStatus.INACTIVE : currentStatus;
+        MemberStatus requested = requestedStatus == null ? current : requestedStatus;
+        if (current == MemberStatus.INVITED && requested != MemberStatus.INVITED) {
+            throw new IllegalStateException("Invited staff accounts become active only after the invite form is completed.");
+        }
+        if (current != MemberStatus.INVITED && requested == MemberStatus.INVITED) {
+            throw new IllegalStateException("Staff accounts cannot be manually moved back to invited status.");
+        }
+    }
+
+    private String formatUserId(UUID accountId) {
+        if (accountId == null) {
+            return "-";
+        }
+        String value = accountId.toString();
+        return value.substring(0, Math.min(8, value.length()));
+    }
+
+    private String displayUserStatus(MemberStatus status) {
+        if (status == MemberStatus.INVITED) {
+            return "Invite email sent - waiting";
+        }
+        return status == null ? "-" : status.name();
+    }
+
+    private String displayOrDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private String lower(String value) {
@@ -3075,7 +3131,10 @@ public class AdminService {
     @lombok.Builder
     public static class UserAccessView {
         private UUID accountId;
+        private String userIdLabel;
         private String loginId;
+        private String memberNumber;
+        private String staffMemberNumber;
         private String fullName;
         private String email;
         private String roleSummary;
@@ -3084,6 +3143,7 @@ public class AdminService {
         @lombok.Builder.Default
         private Set<UserClaim> claims = new LinkedHashSet<>();
         private MemberStatus status;
+        private String displayStatus;
         private String membershipLabel;
         private boolean memberAccess;
     }
