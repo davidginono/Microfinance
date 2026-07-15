@@ -116,12 +116,19 @@ CREATE TABLE public.app_usage_page_metrics (
 CREATE TABLE public.audit_log (
     id uuid NOT NULL,
     action character varying(255),
+    action_description character varying(255),
     actor_member_id uuid,
     after_state jsonb,
     before_state jsonb,
     created_at timestamp(6) with time zone NOT NULL,
     entity_id uuid,
-    entity_type character varying(255)
+    entity_type character varying(255),
+    event_status character varying(20),
+    reference_type character varying(80),
+    reference_value character varying(255),
+    request_metadata jsonb,
+    sacco_id character varying(255),
+    station_id character varying(255)
 );
 
 
@@ -1194,6 +1201,20 @@ CREATE INDEX idx_app_usage_page_metrics_scope_bucket ON public.app_usage_page_me
 --
 
 CREATE INDEX idx_audit_log_created_at ON public.audit_log USING btree (created_at);
+
+
+--
+-- Name: idx_audit_log_scope_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_scope_created_at ON public.audit_log USING btree (sacco_id, station_id, created_at DESC);
+
+
+--
+-- Name: idx_audit_log_status_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_status_created_at ON public.audit_log USING btree (event_status, created_at DESC);
 
 
 --

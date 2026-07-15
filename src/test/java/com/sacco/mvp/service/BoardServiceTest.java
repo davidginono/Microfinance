@@ -30,6 +30,7 @@ class BoardServiceTest {
     @Mock private WorkflowRoutingService workflowRoutingService;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
+    @Mock private AuditService auditService;
 
     @InjectMocks
     private BoardService boardService;

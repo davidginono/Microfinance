@@ -19,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -31,6 +32,7 @@ public class SmsUnitTransactionService {
     private final SmsUsageLedgerRepository ledgerRepository;
     private final PlatformSmsSettingsRepository settingsRepository;
     private final SaccoStationRepository stationRepository;
+    private final AuditService auditService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReservationResult reserve(String saccoId, String stationId, UUID notificationId, String eventType) {
@@ -213,6 +215,7 @@ public class SmsUnitTransactionService {
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build());
+        auditSms(account, actorMemberId, "SMS_UNITS_ALLOCATED", "SMS units allocated", Map.of("units", units));
         return account;
     }
 
@@ -227,6 +230,19 @@ public class SmsUnitTransactionService {
         settings.setUpdatedByMemberId(actorMemberId);
         settings.setUpdatedAt(now);
         settingsRepository.save(settings);
+        auditService.logEvent(
+            "SMS_SETTINGS",
+            null,
+            "SMS_THRESHOLDS_UPDATED",
+            actorMemberId,
+            com.sacco.mvp.domain.AuditEventStatus.SUCCESS,
+            "SMS thresholds updated",
+            "SMS_SETTINGS",
+            "SMS thresholds",
+            null,
+            null,
+            Map.of("result", "SUCCESS", "lowPercent", lowPercent, "criticalPercent", criticalPercent)
+        );
 
         List<StatusAlert> alerts = new ArrayList<>();
         for (StationSmsAccount account : accountRepository.findAllByOrderBySaccoIdAscStationIdAsc()) {
@@ -349,6 +365,35 @@ public class SmsUnitTransactionService {
             return SmsUnitStatus.LOW;
         }
         return SmsUnitStatus.HEALTHY;
+    }
+
+    private void auditSms(StationSmsAccount account,
+                          UUID actorMemberId,
+                          String action,
+                          String description,
+                          Map<String, Object> extraDetails) {
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", account.getSaccoId());
+        details.put("stationId", account.getStationId());
+        details.put("availableUnits", account.getAvailableUnits());
+        details.put("smsStatus", account.getStatus() == null ? null : account.getStatus().name());
+        if (extraDetails != null) {
+            details.putAll(extraDetails);
+        }
+        auditService.logEvent(
+            "SMS_UNITS",
+            account.getId(),
+            action,
+            actorMemberId,
+            com.sacco.mvp.domain.AuditEventStatus.SUCCESS,
+            description,
+            "STATION",
+            "Station " + account.getStationId(),
+            account.getSaccoId(),
+            account.getStationId(),
+            details
+        );
     }
 
     private void validateThresholds(int lowPercent, int criticalPercent) {

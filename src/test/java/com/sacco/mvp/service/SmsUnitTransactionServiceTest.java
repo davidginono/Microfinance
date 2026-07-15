@@ -170,6 +170,7 @@ class SmsUnitTransactionServiceTest {
         final SmsUsageLedgerRepository ledgerRepository = mock(SmsUsageLedgerRepository.class);
         final PlatformSmsSettingsRepository settingsRepository = mock(PlatformSmsSettingsRepository.class);
         final SaccoStationRepository stationRepository = mock(SaccoStationRepository.class);
+        final AuditService auditService = mock(AuditService.class);
         final StationSmsAccount account;
         final SmsUnitTransactionService service;
 
@@ -184,7 +185,7 @@ class SmsUnitTransactionServiceTest {
                 .createdAt(OffsetDateTime.now())
                 .updatedAt(OffsetDateTime.now())
                 .build();
-            service = new SmsUnitTransactionService(accountRepository, ledgerRepository, settingsRepository, stationRepository);
+            service = new SmsUnitTransactionService(accountRepository, ledgerRepository, settingsRepository, stationRepository, auditService);
             when(stationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-1", "STN001"))
                 .thenReturn(Optional.of(SaccoStation.builder().saccoId("SACCO-1").stationId("STN001").active(true).build()));
             when(accountRepository.findForUpdate("SACCO-1", "STN001")).thenReturn(Optional.of(account));

@@ -1,5 +1,7 @@
 package com.sacco.mvp.config;
 
+import com.sacco.mvp.domain.AuditEventStatus;
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -12,6 +14,7 @@ import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
+import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
@@ -44,6 +47,8 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.UUID;
+
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -69,7 +74,8 @@ public class SecurityConfig {
                                                    StaffMfaService staffMfaService,
                                                    StationOtpSettingsService stationOtpSettingsService,
                                                    UserClaimService userClaimService,
-                                                   AppUsageAnalyticsService appUsageAnalyticsService) throws Exception {
+                                                   AppUsageAnalyticsService appUsageAnalyticsService,
+                                                   AuditService auditService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
@@ -97,8 +103,11 @@ public class SecurityConfig {
                     String loginType = request.getParameter("loginType");
                     String message = "Invalid member number or password.";
                     String redirectTarget = "/login?error";
+                    Member auditMember = null;
                     if (username != null && !username.isBlank()) {
-                        message = memberRepository.findByMemberNo(username.trim())
+                        java.util.Optional<Member> matchedMember = memberRepository.findByMemberNo(username.trim());
+                        auditMember = matchedMember.orElse(null);
+                        message = matchedMember
                             .map(member -> {
                                 if (member.getStatus() != MemberStatus.ACTIVE) {
                                     return "This account is not active.";
@@ -133,6 +142,7 @@ public class SecurityConfig {
                     if ("staff-password".equals(loginType)) {
                         redirectTarget = "/login?error&tab=staff";
                     }
+                    auditLogin(auditService, auditMember, null, AuditEventStatus.FAIL, "Password login", message);
                     request.getSession(true).setAttribute("loginErrorMessage", message);
                     response.sendRedirect(redirectTarget);
                 })
@@ -158,6 +168,7 @@ public class SecurityConfig {
                             try {
                                 staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
+                                auditLogin(auditService, null, principal, AuditEventStatus.FAIL, "Password login", ex.getMessage());
                                 clearAuthenticationContext(request);
                                 request.getSession(true).setAttribute("loginErrorMessage", ex.getMessage());
                                 response.sendRedirect("/login?error" + (staffPasswordLogin ? "&tab=staff" : ""));
@@ -173,22 +184,27 @@ public class SecurityConfig {
                     }
 
                     if (savedTarget != null) {
+                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(savedTarget);
                         return;
                     }
                     if (!staffPasswordLogin && principal != null && principal.isMemberAccess()) {
+                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(WorkspaceLanding.memberDashboard());
                         return;
                     }
                     if (isSuperAdmin) {
                         adminScopeService.clearScope();
+                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
                     }
                     if (principal != null && (staffPasswordLogin || !principal.getStaffRoles().isEmpty())) {
+                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
                     }
+                    auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                     response.sendRedirect(WorkspaceLanding.memberDashboard());
                 })
                 .permitAll())
@@ -205,6 +221,7 @@ public class SecurityConfig {
                     OAuth2User oauthUser = authentication.getPrincipal() instanceof OAuth2User user ? user : null;
                     String email = oauthUser == null ? "" : String.valueOf(oauthUser.getAttribute("email")).trim().toLowerCase();
                     if (email.isBlank() || "null".equals(email)) {
+                        auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "Google did not return a verified email address.");
                         request.getSession(true).setAttribute("loginErrorMessage", "Google did not return a verified email address.");
                         response.sendRedirect("/login?error");
                         return;
@@ -215,6 +232,7 @@ public class SecurityConfig {
                         .filter(member -> member.isMemberAccess() || !member.getStaffRolesResolved().isEmpty())
                         .orElse(null);
                     if (ssoMember == null) {
+                        auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "No active SACCO account is linked to that Google email.");
                         request.getSession(true).setAttribute("loginErrorMessage", "No active SACCO account is linked to that Google email.");
                         response.sendRedirect("/login?error");
                         return;
@@ -229,6 +247,7 @@ public class SecurityConfig {
                             .map(this::suspendedMessage)
                             .orElse(null);
                         if (blockedMessage != null) {
+                            auditLogin(auditService, ssoMember, null, AuditEventStatus.FAIL, "Google SSO", blockedMessage);
                             request.getSession(true).setAttribute("loginErrorMessage", blockedMessage);
                             response.sendRedirect("/login?error");
                             return;
@@ -252,12 +271,15 @@ public class SecurityConfig {
                     }
                     String savedTarget = savedRequestTarget(request);
                     if (savedTarget != null) {
+                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
                         response.sendRedirect(savedTarget);
                         return;
                     }
+                    auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
                     response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
                 })
                 .failureHandler((request, response, exception) -> {
+                    auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "Google sign-in could not be completed.");
                     request.getSession(true).setAttribute("loginErrorMessage", "Google sign-in could not be completed.");
                     response.sendRedirect("/login?error");
                 }));
@@ -332,6 +354,48 @@ public class SecurityConfig {
             return "This station workspace has been suspended. Contact the platform administrator.";
         }
         return "This station workspace has been suspended: " + reason.trim();
+    }
+
+    private void auditLogin(AuditService auditService,
+                            Member member,
+                            AppUserPrincipal principal,
+                            AuditEventStatus status,
+                            String method,
+                            String message) {
+        if (auditService == null) {
+            return;
+        }
+        UUID actorId = principal == null ? (member == null ? null : member.getId()) : principal.getMemberId();
+        String saccoId = principal == null ? (member == null ? null : member.getSaccoId()) : principal.getSaccoId();
+        String stationId = principal == null ? (member == null ? null : member.getStationId()) : principal.getStationId();
+        boolean staff = principal != null
+            ? principal.getStaffRoles() != null && !principal.getStaffRoles().isEmpty()
+            : member != null && !member.getStaffRolesResolved().isEmpty();
+        String memberNo = principal == null ? (member == null ? null : member.getMemberNo()) : principal.getUsername();
+        java.util.Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("result", status == AuditEventStatus.FAIL ? "ERROR" : "SUCCESS");
+        details.put("method", method);
+        details.put("saccoId", saccoId);
+        details.put("stationId", stationId);
+        details.put("memberNo", memberNo);
+        if (message != null && !message.isBlank()) {
+            details.put("message", message);
+        }
+        auditService.logEvent(
+            staff ? "STAFF_USER" : "MEMBER",
+            actorId,
+            "LOGIN",
+            actorId,
+            status,
+            "Login",
+            staff ? "STAFF" : "MEMBER",
+            memberNo == null || memberNo.isBlank()
+                ? "-"
+                : (staff ? "Staff " : "Member ") + memberNo,
+            saccoId,
+            stationId,
+            details
+        );
     }
 
     private boolean requiresPasswordLoginMfa(AppUserPrincipal principal,

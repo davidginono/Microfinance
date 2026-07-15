@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanStatus;
@@ -50,6 +51,7 @@ public class LoanPaymentTransactionSyncService {
     private final LoanApplicationRepository loanApplicationRepository;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
     @Transactional
     public int syncAllAndRefreshSummary(LoanApplication loan) {
@@ -148,8 +150,13 @@ public class LoanPaymentTransactionSyncService {
     }
 
     private Optional<LoanPaymentSummaryDto> fetchLoanPaymentSummary(LoanApplication loan, Member applicant) {
-        return loanPaymentSummaryClient.fetchSummary(
-            applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
+        try {
+            return loanPaymentSummaryClient.fetchSummary(
+                applicant.getMemberNo(), normalizeStationId(loan.getStationId()), loan.getLoanId());
+        } catch (LoanPaymentLookupException ex) {
+            log.warn("Skipping payment summary refresh for application {}: {}", loan.getId(), ex.getMessage());
+            return Optional.empty();
+        }
     }
 
     private void applyOutstandingBalances(List<LoanPaymentTransaction> transactions,
@@ -239,6 +246,7 @@ public class LoanPaymentTransactionSyncService {
                     "paidAt", fetchedAt.toString(),
                     "lastPaymentDate", Objects.toString(summary.lastPaymentDate(), "")
             ));
+            auditLoanStatus(loan, "LOAN_MARKED_PAID", "Loan marked paid");
             return;
         }
 
@@ -254,6 +262,7 @@ public class LoanPaymentTransactionSyncService {
                     "finalDueDate", Objects.toString(loan.getFinalDueDate(), ""),
                     "totalOutstanding", Objects.toString(summary.totalOutstanding(), "")
                 ));
+            auditLoanStatus(loan, "LOAN_MARKED_DEFAULTED", "Loan marked defaulted");
             return;
         }
 
@@ -291,6 +300,31 @@ public class LoanPaymentTransactionSyncService {
 
     private boolean hasOutstanding(BigDecimal totalOutstanding) {
         return totalOutstanding != null && totalOutstanding.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private void auditLoanStatus(LoanApplication loan, String action, String description) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", loan.getSaccoId());
+        details.put("stationId", loan.getStationId());
+        details.put("applicationNumber", loan.getApplicationNumber());
+        details.put("loanId", loan.getLoanId());
+        details.put("workflowStatus", loan.getStatus() == null ? null : loan.getStatus().name());
+        auditService.logEvent(
+            "LOAN_APPLICATION",
+            loan.getId(),
+            action,
+            null,
+            AuditEventStatus.SUCCESS,
+            description,
+            "LOAN_APPLICATION",
+            loan.getLoanId() == null || loan.getLoanId().isBlank()
+                ? "Loan Application #" + loan.getApplicationNumber()
+                : "Loan ID " + loan.getLoanId(),
+            loan.getSaccoId(),
+            loan.getStationId(),
+            details
+        );
     }
 
     private String writeSummaryJson(LoanPaymentSummaryDto summary) {

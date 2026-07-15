@@ -10,6 +10,7 @@ import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.SaccoRegistryService;
@@ -44,6 +45,7 @@ class AuthControllerSaccoAccessTest {
     @Mock private SaccoRegistryService saccoRegistryService;
     @Mock private AdminScopeService adminScopeService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuditService auditService;
 
     @Test
     void memberOtpRequestIsBlockedWhenSaccoIsSuspended() {
@@ -111,7 +113,8 @@ class AuthControllerSaccoAccessTest {
             saccoRegistryService,
             adminScopeService,
             new ObjectMapper(),
-            passwordEncoder
+            passwordEncoder,
+            auditService
         );
     }
 

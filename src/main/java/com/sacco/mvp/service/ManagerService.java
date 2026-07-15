@@ -42,6 +42,7 @@ public class ManagerService {
     private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final LoanAttachmentService loanAttachmentService;
     private final WorkflowRoutingService workflowRoutingService;
+    private final AuditService auditService;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -268,11 +269,13 @@ public class ManagerService {
             outboxService.enqueue("LOAN", loanId, "MANAGER_REJECTED", app.getApplicantMemberId(),
                 app.getSaccoId(), app.getStationId(),
                 Map.of("reasons", normalizedReasons));
+            auditLoanReview(app, managerId, ApprovalWorkflowStage.MANAGER, decision);
             return;
         }
 
         workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.MANAGER, managerId);
         loanApplicationRepository.save(app);
+        auditLoanReview(app, managerId, ApprovalWorkflowStage.MANAGER, decision);
     }
 
     @Transactional
@@ -301,10 +304,12 @@ public class ManagerService {
             outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
                 app.getSaccoId(), app.getStationId(),
                 Map.of("reasons", normalizedReasons));
+            auditLoanReview(app, accountantId, ApprovalWorkflowStage.ACCOUNTANT, decision);
             return;
         }
         workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.ACCOUNTANT, accountantId);
         loanApplicationRepository.save(app);
+        auditLoanReview(app, accountantId, ApprovalWorkflowStage.ACCOUNTANT, decision);
     }
 
     private String normalizeDecisionReasons(String reasons) {
@@ -397,6 +402,8 @@ public class ManagerService {
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
             app.getSaccoId(), app.getStationId(),
             details);
+        auditLoan(app, disbursementOfficerId, "LOAN_DISBURSED", "Loan disbursed",
+            Map.of("loanId", app.getLoanId(), "disbursementDate", String.valueOf(app.getDisbursementDate())));
     }
 
     /**
@@ -411,7 +418,9 @@ public class ManagerService {
         if (app.getStatus() == LoanStatus.DEFAULTED) {
             throw new IllegalStateException("Defaulted loan recovery is available in the Disbursement/Teller workspace.");
         }
-        return loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
+        int syncedRows = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
+        auditLoan(app, managerId, "LOAN_PAYMENT_SYNC", "Loan payment sync", Map.of("syncedRows", syncedRows));
+        return syncedRows;
     }
 
     public boolean matchesApplicantStation(LoanApplication loan, String stationId) {
@@ -420,6 +429,52 @@ public class ManagerService {
         }
         String loanStationId = blankToNull(loan.getStationId());
         return loanStationId != null && loanStationId.equalsIgnoreCase(stationId);
+    }
+
+    private void auditLoanReview(LoanApplication app,
+                                 UUID actorId,
+                                 ApprovalWorkflowStage stage,
+                                 ManagerDecision decision) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("reviewStage", stage == null ? null : stage.name());
+        details.put("decision", decision == null ? null : decision.name());
+        auditLoan(app, actorId, "STAFF_REVIEWED_LOAN_APPLICATION", "Staff reviewed loan application", details);
+    }
+
+    private void auditLoan(LoanApplication app,
+                           UUID actorId,
+                           String action,
+                           String description,
+                           Map<String, Object> extraDetails) {
+        if (app == null) {
+            return;
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", app.getSaccoId());
+        details.put("stationId", app.getStationId());
+        details.put("applicationNumber", app.getApplicationNumber());
+        details.put("loanId", app.getLoanId());
+        details.put("workflowStatus", app.getStatus() == null ? null : app.getStatus().name());
+        if (extraDetails != null) {
+            details.putAll(extraDetails);
+        }
+        String referenceValue = app.getLoanId() != null && !app.getLoanId().isBlank() && "LOAN_DISBURSED".equals(action)
+            ? "Loan ID " + app.getLoanId()
+            : "Loan Application #" + app.getApplicationNumber();
+        auditService.logEvent(
+            "LOAN_APPLICATION",
+            app.getId(),
+            action,
+            actorId,
+            AuditEventStatus.SUCCESS,
+            description,
+            "LOAN_APPLICATION",
+            referenceValue,
+            app.getSaccoId(),
+            app.getStationId(),
+            details
+        );
     }
 
     public boolean isDisbursementProofRequired(LoanApplication app) {

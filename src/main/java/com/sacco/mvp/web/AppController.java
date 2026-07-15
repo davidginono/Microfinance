@@ -2654,11 +2654,34 @@ public class AppController {
             EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION,
             guarantor.getId(),
             "Your SACCO guarantor confirmation code",
-            "Share this OTP with the applicant only if you approve being listed as guarantor for this loan application.",
+            directGuarantorOtpIntro(application),
             application.getSaccoId(),
             application.getStationId(),
             guarantor.getPhone()
         );
+    }
+
+    private String directGuarantorOtpIntro(LoanApplication application) {
+        List<String> summary = new ArrayList<>();
+        if (application.getApplicationNumber() != null) {
+            summary.add("Application #" + application.getApplicationNumber());
+        }
+        if (application.getAmount() != null) {
+            summary.add("Amount: " + formatTzs(application.getAmount()));
+        }
+        if (application.getTenorMonths() != null) {
+            summary.add("Tenure: " + application.getTenorMonths() + " month(s)");
+        }
+        if (application.getLoanType() != null) {
+            summary.add("Product: " + application.getLoanType().getDisplayLabel());
+        }
+        String requestSummary = summary.isEmpty()
+            ? "Loan request details were not available."
+            : String.join("; ", summary) + ".";
+        return "Share this OTP with the applicant only if you approve being listed as guarantor for this loan application."
+            + System.lineSeparator()
+            + "Request summary: "
+            + requestSummary;
     }
 
     private void addDirectGuarantorOtpFlash(RedirectAttributes ra, DirectGuarantorOtpIssueSummary summary) {

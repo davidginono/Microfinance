@@ -17,6 +17,8 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStation;
+import com.sacco.mvp.domain.SmsUnitStatus;
+import com.sacco.mvp.domain.StationSmsAccount;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.UserSettings;
 import com.sacco.mvp.repository.AdminIncidentRepository;
@@ -36,10 +38,12 @@ import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.SavingsAccountRepository;
+import com.sacco.mvp.repository.StationSmsAccountRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageImpl;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -84,6 +88,7 @@ class AdminServiceTest {
     @Mock private NotificationRepository notificationRepository;
     @Mock private OutboxEventRepository outboxEventRepository;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private StationSmsAccountRepository stationSmsAccountRepository;
     @Mock private AdminIncidentRepository adminIncidentRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
@@ -165,6 +170,7 @@ class AdminServiceTest {
             notificationRepository,
             outboxEventRepository,
             auditLogRepository,
+            stationSmsAccountRepository,
             adminIncidentRepository,
             guarantorRequestRepository,
             managerReviewRepository,
@@ -179,6 +185,33 @@ class AdminServiceTest {
             objectMapper,
             nameSignatureService
         );
+    }
+
+    @Test
+    void dashboardReadsSelectedStationSmsBalanceWithoutCreatingAccount() {
+        StationSmsAccount account = StationSmsAccount.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .availableUnits(17)
+            .status(SmsUnitStatus.LOW)
+            .build();
+        when(outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(com.sacco.mvp.domain.OutboxStatus.FAILED))
+            .thenReturn(List.of());
+        when(auditLogRepository.searchEventLogViewScoped(any(), any(), any(), eq("SACCO-1"), eq("ST-1"), any()))
+            .thenReturn(new PageImpl<>(List.of()));
+        when(adminIncidentRepository.findTop50BySaccoIdAndCreatedAtAfterOrderByCreatedAtDesc(eq("SACCO-1"), any()))
+            .thenReturn(List.of());
+        when(memberRepository.countByStatusForScope("SACCO-1", "ST-1")).thenReturn(List.of());
+        when(loanApplicationRepository.countByStatusForScope("SACCO-1", "ST-1")).thenReturn(List.of());
+        when(stationSmsAccountRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.of(account));
+
+        AdminService.AdminDashboard dashboard = adminService.dashboard("SACCO-1", "ST-1", UUID.randomUUID());
+
+        assertThat(dashboard.getSmsBalance().getAvailableUnits()).isEqualTo(17);
+        assertThat(dashboard.getSmsBalance().getStationId()).isEqualTo("ST-1");
+        assertThat(dashboard.getSmsBalance().getStatusLabel()).isEqualTo("Low");
+        verify(stationSmsAccountRepository, never()).save(any());
     }
 
     private void stubActiveRoleDirectory(String saccoId, List<Member> activeMembers) {

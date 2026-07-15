@@ -3,6 +3,8 @@ package com.sacco.mvp.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -46,6 +48,25 @@ public class AuditLog {
     @Column(name = "actor_member_id")
     private UUID actorMemberId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_status")
+    private AuditEventStatus eventStatus;
+
+    @Column(name = "sacco_id")
+    private String saccoId;
+
+    @Column(name = "station_id")
+    private String stationId;
+
+    @Column(name = "action_description")
+    private String actionDescription;
+
+    @Column(name = "reference_type")
+    private String referenceType;
+
+    @Column(name = "reference_value")
+    private String referenceValue;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "before_state", columnDefinition = "jsonb")
     private String beforeState;
@@ -54,11 +75,18 @@ public class AuditLog {
     @Column(name = "after_state", columnDefinition = "jsonb")
     private String afterState;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "request_metadata", columnDefinition = "jsonb")
+    private String requestMetadata;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     @Transient
     public String getDisplayAction() {
+        if (actionDescription != null && !actionDescription.isBlank()) {
+            return actionDescription;
+        }
         if (action == null || action.isBlank()) {
             return "System activity";
         }
@@ -121,23 +149,47 @@ public class AuditLog {
             case "NONMEMBERUSER", "STAFFUSER" -> "Staff account";
             case "MEMBER" -> "Member account";
             case "LOANPRODUCT" -> "Loan product";
+            case "LOANAPPLICATION" -> "Loan application";
             case "SACCOSETTINGS" -> "SACCO settings";
             case "ADMININCIDENT" -> "Admin incident";
             case "NOTIFICATION" -> "Notification";
             case "SUPPORT" -> "Support";
             case "OUTBOX" -> "Outbox event";
+            case "REPORT" -> "Report";
+            case "SMSUNITS" -> "SMS units";
+            case "SMSSETTINGS" -> "SMS settings";
             default -> humanize(entityType);
         };
     }
 
     @Transient
     public String getShortEntityReference() {
+        if (referenceValue != null && !referenceValue.isBlank()) {
+            return referenceValue;
+        }
         return entityId == null ? "-" : "#" + entityId.toString().substring(0, 8);
     }
 
     @Transient
     public String getActorReferenceLabel() {
         return actorMemberId == null ? "System" : "#" + actorMemberId.toString().substring(0, 8);
+    }
+
+    @Transient
+    public String getDisplayStatus() {
+        return eventStatus == AuditEventStatus.FAIL ? "Fail" : "Success";
+    }
+
+    @Transient
+    public String getStatusBadgeClass() {
+        return eventStatus == AuditEventStatus.FAIL
+            ? "bg-rose-50 text-rose-700 border-rose-200"
+            : "bg-emerald-50 text-emerald-700 border-emerald-200";
+    }
+
+    @Transient
+    public String getSaccoReferenceLabel() {
+        return saccoId == null || saccoId.isBlank() ? "-" : saccoId;
     }
 
     @Transient

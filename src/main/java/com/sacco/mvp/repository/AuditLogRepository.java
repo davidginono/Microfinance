@@ -24,7 +24,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
             from audit_log al
             where al.created_at >= coalesce(:dateFrom, al.created_at)
               and al.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(al.actor_member_id as text) ilike coalesce(concat('%', cast(:actorId as text), '%'), '%')
+              and (cast(:actorId as text) is null or cast(al.actor_member_id as text) ilike concat('%', cast(:actorId as text), '%'))
             order by al.created_at desc
             """,
         countQuery = """
@@ -32,7 +32,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
             from audit_log al
             where al.created_at >= coalesce(:dateFrom, al.created_at)
               and al.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(al.actor_member_id as text) ilike coalesce(concat('%', cast(:actorId as text), '%'), '%')
+              and (cast(:actorId as text) is null or cast(al.actor_member_id as text) ilike concat('%', cast(:actorId as text), '%'))
             """,
         nativeQuery = true
     )
@@ -51,9 +51,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
             left join members loan_applicant on loan_applicant.id = entity_loan.applicant_member_id
             where al.created_at >= coalesce(:dateFrom, al.created_at)
               and al.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(al.actor_member_id as text) ilike coalesce(concat('%', cast(:actorId as text), '%'), '%')
+              and (cast(:actorId as text) is null or cast(al.actor_member_id as text) ilike concat('%', cast(:actorId as text), '%'))
               and (
                 cast(:saccoId as text) is null
+                or al.sacco_id = cast(:saccoId as text)
                 or actor_member.sacco_id = cast(:saccoId as text)
                 or entity_member.sacco_id = cast(:saccoId as text)
                 or entity_loan.sacco_id = cast(:saccoId as text)
@@ -66,7 +67,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
                 or (
                   cast(:saccoId as text) is not null
                   and (
-                    (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
+                    al.station_id = cast(:stationId as text)
+                    or (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
                     or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
                     or (entity_loan.sacco_id = cast(:saccoId as text) and entity_loan.station_id = cast(:stationId as text))
                     or (loan_applicant.sacco_id = cast(:saccoId as text) and loan_applicant.station_id = cast(:stationId as text))
@@ -94,9 +96,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
             left join members loan_applicant on loan_applicant.id = entity_loan.applicant_member_id
             where al.created_at >= coalesce(:dateFrom, al.created_at)
               and al.created_at < coalesce(:dateTo, cast('9999-12-31 23:59:59+00' as timestamptz))
-              and cast(al.actor_member_id as text) ilike coalesce(concat('%', cast(:actorId as text), '%'), '%')
+              and (cast(:actorId as text) is null or cast(al.actor_member_id as text) ilike concat('%', cast(:actorId as text), '%'))
               and (
                 cast(:saccoId as text) is null
+                or al.sacco_id = cast(:saccoId as text)
                 or actor_member.sacco_id = cast(:saccoId as text)
                 or entity_member.sacco_id = cast(:saccoId as text)
                 or entity_loan.sacco_id = cast(:saccoId as text)
@@ -109,7 +112,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSp
                 or (
                   cast(:saccoId as text) is not null
                   and (
-                    (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
+                    al.station_id = cast(:stationId as text)
+                    or (actor_member.sacco_id = cast(:saccoId as text) and actor_member.station_id = cast(:stationId as text))
                     or (entity_member.sacco_id = cast(:saccoId as text) and entity_member.station_id = cast(:stationId as text))
                     or (entity_loan.sacco_id = cast(:saccoId as text) and entity_loan.station_id = cast(:stationId as text))
                     or (loan_applicant.sacco_id = cast(:saccoId as text) and loan_applicant.station_id = cast(:stationId as text))

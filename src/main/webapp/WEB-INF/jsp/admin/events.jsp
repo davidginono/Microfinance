@@ -138,6 +138,10 @@
         <thead>
         <tr>
             <th>Action</th>
+            <c:if test="${superAdminScopeFilters}">
+                <th>SACCO</th>
+            </c:if>
+            <th>Status</th>
             <th>Entity</th>
             <th>Reference</th>
             <th>Actor</th>
@@ -148,6 +152,12 @@
         <c:forEach items="${entries}" var="entry">
             <tr>
                 <td class="px-3 py-2 font-semibold text-slate-900">${entry.displayAction}</td>
+                <c:if test="${superAdminScopeFilters}">
+                    <td class="px-3 py-2">${entry.saccoReferenceLabel}</td>
+                </c:if>
+                <td class="px-3 py-2">
+                    <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}">${entry.displayStatus}</span>
+                </td>
                 <td class="px-3 py-2">${entry.displayEntityType}</td>
                 <td class="px-3 py-2">${entry.shortEntityReference}</td>
                 <td class="px-3 py-2">${entry.actorReferenceLabel}</td>
@@ -155,7 +165,7 @@
             </tr>
         </c:forEach>
         <c:if test="${empty entries}">
-            <tr><td colspan="5" class="px-3 py-3 text-slate-500">No events recorded yet.</td></tr>
+            <tr><td colspan="${superAdminScopeFilters ? 7 : 6}" class="px-3 py-3 text-slate-500">No events recorded yet.</td></tr>
         </c:if>
         </tbody>
     </table>

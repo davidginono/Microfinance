@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +27,7 @@ public class BoardService {
     private final WorkflowRoutingService workflowRoutingService;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
+    private final AuditService auditService;
 
     public List<LoanApplication> assignedPending(UUID boardMemberId) {
         return assignedPending(boardMemberId, ApprovalWorkflowStage.BOARD);
@@ -128,6 +130,7 @@ public class BoardService {
         review.setDecidedAt(OffsetDateTime.now());
         boardReviewRepository.save(review);
         evaluateOutcome(app, stage, boardMemberId);
+        auditBoardReview(app, boardMemberId, stage, decision);
     }
 
     private void evaluateOutcome(LoanApplication app,
@@ -177,6 +180,34 @@ public class BoardService {
                 app.getSaccoId(), app.getStationId(),
                 Map.of("loanId", loanId.toString()));
         }
+    }
+
+    private void auditBoardReview(LoanApplication app,
+                                  UUID actorId,
+                                  ApprovalWorkflowStage stage,
+                                  BoardDecision decision) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", app.getSaccoId());
+        details.put("stationId", app.getStationId());
+        details.put("applicationNumber", app.getApplicationNumber());
+        details.put("loanId", app.getLoanId());
+        details.put("reviewStage", stage == null ? null : stage.name());
+        details.put("decision", decision == null ? null : decision.name());
+        details.put("workflowStatus", app.getStatus() == null ? null : app.getStatus().name());
+        auditService.logEvent(
+            "LOAN_APPLICATION",
+            app.getId(),
+            "BOARD_REVIEWED_LOAN_APPLICATION",
+            actorId,
+            AuditEventStatus.SUCCESS,
+            "Board reviewed loan application",
+            "LOAN_APPLICATION",
+            "Loan Application #" + app.getApplicationNumber(),
+            app.getSaccoId(),
+            app.getStationId(),
+            details
+        );
     }
 
     private String normalizeComment(String comment) {

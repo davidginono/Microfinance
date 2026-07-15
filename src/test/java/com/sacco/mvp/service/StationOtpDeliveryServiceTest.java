@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +62,11 @@ class StationOtpDeliveryServiceTest {
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.SMS);
         verify(emailService, never()).sendDirectEmail(any(), any(), any());
+        verify(smsGateway).send(eq("255700000001"), argThat(message ->
+            message.contains("Intro")
+                && message.contains("OTP: 123456")
+                && message.contains("10 minutes")
+        ));
     }
 
     @Test

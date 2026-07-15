@@ -1,7 +1,9 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.WorkspaceLanding;
+import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.StaffMfaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StaffMfaController {
     private final StaffMfaService staffMfaService;
+    private final AuditService auditService;
 
     @GetMapping("/login/mfa")
     public String challenge(HttpServletRequest request, Model model) {
@@ -98,6 +101,7 @@ public class StaffMfaController {
             HttpSession sessionBefore = request.getSession(false);
             String landing = staffMfaService.pendingLanding(sessionBefore);
             AppUserPrincipal principal = staffMfaService.completeChallenge(otpCode.trim(), request);
+            auditLogin(principal);
             String redirectUrl = landing != null && !landing.isBlank()
                 ? landing
                 : WorkspaceLanding.authenticatedDefault(principal);
@@ -155,5 +159,30 @@ public class StaffMfaController {
         String domain = email.substring(at);
         String visible = local.substring(0, Math.min(2, local.length()));
         return visible + "***" + domain;
+    }
+
+    private void auditLogin(AppUserPrincipal principal) {
+        if (principal == null) {
+            return;
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("method", "Password login with MFA");
+        details.put("saccoId", principal.getSaccoId());
+        details.put("stationId", principal.getStationId());
+        details.put("memberNo", principal.getUsername());
+        auditService.logEvent(
+            "STAFF_USER",
+            principal.getMemberId(),
+            "LOGIN",
+            principal.getMemberId(),
+            AuditEventStatus.SUCCESS,
+            "Login",
+            "STAFF",
+            "Staff " + principal.getUsername(),
+            principal.getSaccoId(),
+            principal.getStationId(),
+            details
+        );
     }
 }

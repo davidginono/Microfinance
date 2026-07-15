@@ -29,15 +29,34 @@ public class EventLogAspect {
         String action = "WEB_" + toUpperSnakeCase(signature.getMethod().getName());
         try {
             Object result = joinPoint.proceed();
-            auditService.log(entityType, null, action, actorId, null, Map.of("result", "SUCCESS"));
+            if (!auditService.hasCurrentRequestAuditMarker()) {
+                auditService.log(entityType, null, action, actorId, null, eventState("SUCCESS", null));
+            }
             return result;
         } catch (Throwable ex) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("result", "ERROR");
             error.put("message", ex.getMessage());
+            currentPrincipal().ifPresent(principal -> {
+                error.put("saccoId", principal.getSaccoId());
+                error.put("stationId", principal.getStationId());
+            });
             auditService.log(entityType, null, action, actorId, null, error);
             throw ex;
         }
+    }
+
+    private Map<String, Object> eventState(String result, String message) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("result", result);
+        if (message != null && !message.isBlank()) {
+            state.put("message", message);
+        }
+        currentPrincipal().ifPresent(principal -> {
+            state.put("saccoId", principal.getSaccoId());
+            state.put("stationId", principal.getStationId());
+        });
+        return state;
     }
 
     private String toUpperSnakeCase(String value) {
@@ -53,10 +72,14 @@ public class EventLogAspect {
     }
 
     private UUID currentActorId() {
+        return currentPrincipal().map(AppUserPrincipal::getMemberId).orElse(null);
+    }
+
+    private java.util.Optional<AppUserPrincipal> currentPrincipal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof AppUserPrincipal principal)) {
-            return null;
+            return java.util.Optional.empty();
         }
-        return principal.getMemberId();
+        return java.util.Optional.of(principal);
     }
 }

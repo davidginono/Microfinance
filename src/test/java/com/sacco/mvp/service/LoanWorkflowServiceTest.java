@@ -69,6 +69,7 @@ class LoanWorkflowServiceTest {
     @Mock private LoanQualificationPolicyService loanQualificationPolicyService;
     @Mock private PaymentDetailsService paymentDetailsService;
     @Mock private ReversalRequestRepository reversalRequestRepository;
+    @Mock private AuditService auditService;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;

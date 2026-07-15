@@ -63,6 +63,7 @@ public class AdminService {
     private final NotificationRepository notificationRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final AuditLogRepository auditLogRepository;
+    private final StationSmsAccountRepository stationSmsAccountRepository;
     private final AdminIncidentRepository adminIncidentRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final ManagerReviewRepository managerReviewRepository;
@@ -85,7 +86,14 @@ public class AdminService {
         OffsetDateTime recentWindowStart = OffsetDateTime.now().minusDays(DASHBOARD_RECENT_WINDOW_DAYS);
         String normalizedStationId = normalizeOptional(stationId);
         List<OutboxEvent> failedEvents = outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus.FAILED);
-        List<AuditLog> auditEntries = auditLogRepository.findTop100ByOrderByCreatedAtDesc();
+        List<AuditLog> auditEntries = auditLogRepository.searchEventLogViewScoped(
+            recentWindowStart,
+            null,
+            null,
+            saccoId,
+            normalizedStationId,
+            PageRequest.of(0, 10)
+        ).getContent();
         List<AdminIncident> incidents = filterIncidentsByStation(
             adminIncidentRepository.findTop50BySaccoIdAndCreatedAtAfterOrderByCreatedAtDesc(saccoId, recentWindowStart),
             normalizedStationId
@@ -109,7 +117,6 @@ public class AdminService {
             outboxCounts,
             failedEvents.stream().limit(10).toList(),
             auditEntries.stream()
-                .filter(entry -> entry.getCreatedAt() != null && !entry.getCreatedAt().isBefore(recentWindowStart))
                 .limit(10)
                 .map(entry -> new AdminEventItem(
                     entry.getDisplayAction(),
@@ -121,10 +128,20 @@ public class AdminService {
                 .filter(incident -> incident.getCreatedAt() != null && !incident.getCreatedAt().isBefore(recentWindowStart))
                 .limit(10)
                 .toList(),
+            stationSmsBalance(saccoId, normalizedStationId),
             attachmentStorageReady,
             Math.toIntExact(memberRepository.countForScope(saccoId, normalizedStationId)),
             Math.toIntExact(loanApplicationRepository.countForScope(saccoId, normalizedStationId))
         );
+    }
+
+    private SmsBalanceSummary stationSmsBalance(String saccoId, String stationId) {
+        if (stationId == null || stationId.isBlank()) {
+            return new SmsBalanceSummary("-", 0L, SmsUnitStatus.DEPLETED);
+        }
+        return stationSmsAccountRepository.findBySaccoIdAndStationId(saccoId, stationId)
+            .map(account -> new SmsBalanceSummary(account.getStationId(), account.getAvailableUnits(), account.getStatus()))
+            .orElseGet(() -> new SmsBalanceSummary(stationId, 0L, SmsUnitStatus.DEPLETED));
     }
 
     public List<UserAccessView> users(String saccoId) {
@@ -3569,6 +3586,7 @@ public class AdminService {
         List<OutboxEvent> failedOutboxEvents,
         List<AdminEventItem> recentAuditEntries,
         List<AdminIncident> recentIncidents,
+        SmsBalanceSummary smsBalance,
         boolean attachmentStorageReady,
         int totalMembers,
         int totalApplications
@@ -3595,6 +3613,10 @@ public class AdminService {
 
         public List<AdminIncident> getRecentIncidents() {
             return recentIncidents;
+        }
+
+        public SmsBalanceSummary getSmsBalance() {
+            return smsBalance;
         }
 
         public boolean getAttachmentStorageReady() {
@@ -3636,6 +3658,42 @@ public class AdminService {
 
         public long getOutboxFailedCount() {
             return outboxCounts.getOrDefault(OutboxStatus.FAILED, 0L);
+        }
+    }
+
+    public record SmsBalanceSummary(
+        String stationId,
+        long availableUnits,
+        SmsUnitStatus status
+    ) {
+        public String getStationId() {
+            return stationId;
+        }
+
+        public long getAvailableUnits() {
+            return availableUnits;
+        }
+
+        public SmsUnitStatus getStatus() {
+            return status;
+        }
+
+        public String getStatusLabel() {
+            if (status == null) {
+                return "Depleted";
+            }
+            String lower = status.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+            StringBuilder label = new StringBuilder();
+            for (String part : lower.split(" ")) {
+                if (part.isBlank()) {
+                    continue;
+                }
+                if (label.length() > 0) {
+                    label.append(' ');
+                }
+                label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+            }
+            return label.length() == 0 ? status.name() : label.toString();
         }
     }
 

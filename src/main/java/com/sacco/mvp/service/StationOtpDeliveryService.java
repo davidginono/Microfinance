@@ -36,7 +36,7 @@ public class StationOtpDeliveryService {
             return new DeliveryReceipt(OtpDeliveryChannel.EMAIL, "We sent an OTP code to your registered email.");
         }
 
-        SmsAttempt smsAttempt = sendSms(saccoId, stationId, phone, purpose, code, ttlMinutes);
+        SmsAttempt smsAttempt = sendSms(saccoId, stationId, phone, purpose, introMessage, code, ttlMinutes);
         if (smsAttempt.delivered()) {
             return new DeliveryReceipt(OtpDeliveryChannel.SMS, "We sent an OTP code to your registered phone.");
         }
@@ -63,6 +63,7 @@ public class StationOtpDeliveryService {
                                String stationId,
                                String phone,
                                EmailOtpPurpose purpose,
+                               String introMessage,
                                String code,
                                int ttlMinutes) {
         String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(phone);
@@ -87,7 +88,7 @@ public class StationOtpDeliveryService {
         try {
             result = smsGateway.send(
                 normalizedPhone,
-                "Your SACCO OTP code is " + code + ". It expires in " + ttlMinutes + " minutes."
+                smsOtpMessage(introMessage, code, ttlMinutes)
             );
         } catch (RuntimeException ex) {
             result = SmsSendResult.acceptanceUnknown("SMS gateway call ended unexpectedly");
@@ -102,6 +103,14 @@ public class StationOtpDeliveryService {
             return SmsAttempt.sent();
         }
         return SmsAttempt.failed("The SMS OTP provider rejected the request. Try again or contact your SACCOS Admin.");
+    }
+
+    private String smsOtpMessage(String introMessage, String code, int ttlMinutes) {
+        String intro = introMessage == null ? "" : introMessage.trim().replaceAll("\\s+", " ");
+        if (intro.isBlank()) {
+            return "Your SACCO OTP code is " + code + ". It expires in " + ttlMinutes + " minutes.";
+        }
+        return "OTP: " + code + ". Expires in " + ttlMinutes + " minutes. " + intro;
     }
 
     private void sendEmail(String email, String subject, String message) {

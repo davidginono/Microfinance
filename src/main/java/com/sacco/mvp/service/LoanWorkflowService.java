@@ -71,6 +71,7 @@ public class LoanWorkflowService {
     private final LoanQualificationPolicyService loanQualificationPolicyService;
     private final PaymentDetailsService paymentDetailsService;
     private final ReversalRequestRepository reversalRequestRepository;
+    private final AuditService auditService;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -338,7 +339,9 @@ public class LoanWorkflowService {
                 .toList(),
             saved.getAttachmentsJson()
         ));
-        return loanApplicationRepository.save(saved);
+        LoanApplication finalSaved = loanApplicationRepository.save(saved);
+        auditLoan(finalSaved, applicantId, "LOAN_APPLICATION_DRAFT", "Loan application draft");
+        return finalSaved;
     }
 
     private void expireGuarantorApprovalsForApplicantEdit(UUID appId) {
@@ -507,14 +510,18 @@ public class LoanWorkflowService {
         }
         app.setUpdatedAt(OffsetDateTime.now());
         LoanApplication submitted = loanApplicationRepository.save(app);
+        auditLoan(submitted, memberId, "LOAN_APPLICATION_SUBMITTED", "Loan application submitted");
         if (submitted.getRequiredGuarantors() > 0) {
             refreshGuarantorRequestsForSubmission(
                 submitted,
                 memberId,
                 parseSelectedGuarantors(submitted.getSelectedGuarantors())
             );
-            return getMine(submitted.getId(), memberId);
+            LoanApplication reloaded = getMine(submitted.getId(), memberId);
+            auditLoan(reloaded, memberId, "LOAN_SENT_TO_GUARANTORS", "Application sent to guarantors");
+            return reloaded;
         }
+        auditLoan(submitted, memberId, "LOAN_SENT_TO_STAFF", "Application sent to staff");
         return submitted;
     }
 
@@ -545,7 +552,9 @@ public class LoanWorkflowService {
 
         capturePaymentDetailsIfMissing(app);
         moveIntoConfiguredReviewStage(app, memberId);
-        return loanApplicationRepository.save(app);
+        LoanApplication saved = loanApplicationRepository.save(app);
+        auditLoan(saved, memberId, "LOAN_SENT_TO_STAFF", "Application sent to staff");
+        return saved;
     }
 
     private void capturePaymentDetailsIfMissing(LoanApplication app) {
@@ -601,7 +610,9 @@ public class LoanWorkflowService {
         if (app.getLoanId() == null || app.getLoanId().isBlank()) {
             throw new IllegalStateException("This loan has not been disbursed yet.");
         }
-        return loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
+        int syncedRows = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
+        auditLoan(app, memberId, "LOAN_PAYMENT_SYNC", "Loan payment sync", Map.of("syncedRows", syncedRows));
+        return syncedRows;
     }
 
     public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, int page, int size) {
@@ -764,6 +775,8 @@ public class LoanWorkflowService {
         request.setDecidedAt(OffsetDateTime.now());
         guarantorRequestRepository.save(request);
         evaluateReadiness(request.getLoanApplicationId());
+        loanApplicationRepository.findById(request.getLoanApplicationId())
+            .ifPresent(app -> auditLoan(app, guarantorId, "GUARANTOR_REQUEST_APPROVED", "Guarantor request approved"));
     }
 
     @Transactional
@@ -784,6 +797,8 @@ public class LoanWorkflowService {
         request.setDecidedAt(OffsetDateTime.now());
         guarantorRequestRepository.save(request);
         evaluateReadiness(request.getLoanApplicationId());
+        loanApplicationRepository.findById(request.getLoanApplicationId())
+            .ifPresent(app -> auditLoan(app, guarantorId, "GUARANTOR_REQUEST_REJECTED", "Guarantor request rejected"));
     }
 
     @Transactional
@@ -836,6 +851,7 @@ public class LoanWorkflowService {
         app.setApplicantSignatureVerifiedAt(null);
         app.setUpdatedAt(OffsetDateTime.now());
         loanApplicationRepository.save(app);
+        auditLoan(app, applicantId, "LOAN_SUBMISSION_CANCELLED", "Loan submission moved back to draft");
     }
 
     @Transactional
@@ -847,6 +863,7 @@ public class LoanWorkflowService {
         }
 
         deleteApplicationRecords(app);
+        auditLoan(app, applicantId, "LOAN_APPLICATION_DELETED", "Loan application removed");
     }
 
     @Transactional
@@ -1413,6 +1430,46 @@ public class LoanWorkflowService {
         return String.join(", ", loanIds.subList(0, loanIds.size() - 1))
             + " and "
             + loanIds.get(loanIds.size() - 1);
+    }
+
+    private void auditLoan(LoanApplication app, UUID actorId, String action, String description) {
+        auditLoan(app, actorId, action, description, Map.of());
+    }
+
+    private void auditLoan(LoanApplication app,
+                           UUID actorId,
+                           String action,
+                           String description,
+                           Map<String, Object> extraDetails) {
+        if (app == null) {
+            return;
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", app.getSaccoId());
+        details.put("stationId", app.getStationId());
+        details.put("applicationNumber", app.getApplicationNumber());
+        details.put("loanId", app.getLoanId());
+        details.put("workflowStatus", app.getStatus() == null ? null : app.getStatus().name());
+        if (extraDetails != null) {
+            details.putAll(extraDetails);
+        }
+        String referenceValue = app.getLoanId() != null && !app.getLoanId().isBlank() && "LOAN_DISBURSED".equals(action)
+            ? "Loan ID " + app.getLoanId()
+            : "Loan Application #" + app.getApplicationNumber();
+        auditService.logEvent(
+            "LOAN_APPLICATION",
+            app.getId(),
+            action,
+            actorId,
+            AuditEventStatus.SUCCESS,
+            description,
+            "LOAN_APPLICATION",
+            referenceValue,
+            app.getSaccoId(),
+            app.getStationId(),
+            details
+        );
     }
 
     public record MemberDashboardData(

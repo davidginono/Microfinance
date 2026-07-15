@@ -1,5 +1,6 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
@@ -19,6 +20,7 @@ import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanAttachmentService;
+import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.MemberProfileImageService;
@@ -60,10 +62,12 @@ public class LoanDocumentController {
     private final LoanReportService loanReportService;
     private final MemberProfileImageService memberProfileImageService;
     private final SaccoLogoStorageService saccoLogoStorageService;
+    private final AuditService auditService;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
     public ResponseEntity<byte[]> downloadPrintable(@PathVariable UUID loanId,
+                                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                                     @RequestParam(name = "signatureMode", defaultValue = "signed") String signatureMode) {
         boolean includeRecordedSignatures = !"unsigned".equalsIgnoreCase(signatureMode);
         LoanApplication app = loanApplicationRepository.findById(loanId)
@@ -126,6 +130,7 @@ public class LoanDocumentController {
         );
 
         String modeLabel = includeRecordedSignatures ? "signed" : "physical-signature";
+        auditLoanDocument(app, principal, "LOAN_APPLICATION_DOCUMENT_EXPORTED", "Loan application document exported");
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=loan-application-" + loanId.toString().substring(0, 8) + "-" + modeLabel + ".pdf")
@@ -166,6 +171,7 @@ public class LoanDocumentController {
     @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
     public ResponseEntity<byte[]> downloadAttachment(@PathVariable UUID loanId,
                                                      @PathVariable String attachmentId,
+                                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                                      @RequestParam(name = "inline", defaultValue = "false") boolean inline) throws IOException {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
@@ -176,6 +182,7 @@ public class LoanDocumentController {
         } catch (Exception ignored) {
         }
 
+        auditLoanDocument(app, principal, "ATTACHMENT_DOWNLOADED", "Attachment downloaded");
         return ResponseEntity.ok()
             .contentType(mediaType)
             .header(HttpHeaders.CONTENT_DISPOSITION, (inline ? "inline" : "attachment") + "; filename=\"" + resource.getOriginalName() + "\"")
@@ -213,6 +220,7 @@ public class LoanDocumentController {
                                                            @RequestParam(required = false) LoanType loanType) {
         LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
         byte[] pdf = loanReportService.buildMemberAnalyticsPdf(report);
+        auditReportExport(principal, "member-loan-report", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -229,6 +237,7 @@ public class LoanDocumentController {
                                                                 @RequestParam(required = false) LoanType loanType) {
         LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
         byte[] workbook = loanReportService.buildMemberAnalyticsExcel(report);
+        auditReportExport(principal, "member-loan-report", "XLSX", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -272,6 +281,7 @@ public class LoanDocumentController {
             filenameTo = report.toDate();
             reportSlug = "staff-loan-review";
         }
+        auditReportExport(principal, reportSlug, "PDF", filenameFrom, filenameTo);
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -315,6 +325,7 @@ public class LoanDocumentController {
             filenameTo = report.toDate();
             reportSlug = "staff-loan-review";
         }
+        auditReportExport(principal, reportSlug, "XLSX", filenameFrom, filenameTo);
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -331,6 +342,7 @@ public class LoanDocumentController {
         LoanReportService.ManagerWorkflowReport report = loanReportService.managerWorkflowReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildManagerWorkflowPdf(report);
+        auditReportExport(principal, "manager-reviewed-loans", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -351,6 +363,7 @@ public class LoanDocumentController {
                 : ApprovalWorkflowStage.BOARD,
             fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildBoardWorkflowPdf(report);
+        auditReportExport(principal, "board-reviewed-loans", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -368,6 +381,7 @@ public class LoanDocumentController {
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
             ApprovalWorkflowStage.LOAN_OFFICER, fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildLoanOfficerWorkflowPdf(report);
+        auditReportExport(principal, "loan-officer-reviewed-loans", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -384,6 +398,7 @@ public class LoanDocumentController {
         LoanReportService.AccountantLoanReport report = loanReportService.accountantReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildAccountantPdf(report);
+        auditReportExport(principal, "accountant-reviewed-loans", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -399,11 +414,67 @@ public class LoanDocumentController {
         LoanReportService.DisbursementLoanReport report = loanReportService.disbursementReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate);
         byte[] pdf = loanReportService.buildDisbursementPdf(report);
+        auditReportExport(principal, "disbursement-loans", "PDF", report.fromDate(), report.toDate());
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; filename=disbursement-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
             .body(pdf);
+    }
+
+    private void auditReportExport(AppUserPrincipal principal,
+                                   String reportName,
+                                   String format,
+                                   LocalDate fromDate,
+                                   LocalDate toDate) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", principal == null ? null : principal.getSaccoId());
+        details.put("stationId", principal == null ? null : principal.getStationId());
+        details.put("reportName", reportName);
+        details.put("format", format);
+        details.put("fromDate", fromDate == null ? null : fromDate.toString());
+        details.put("toDate", toDate == null ? null : toDate.toString());
+        auditService.logEvent(
+            "REPORT",
+            null,
+            "REPORT_EXPORTED",
+            principal == null ? null : principal.getMemberId(),
+            AuditEventStatus.SUCCESS,
+            "Report exported",
+            "REPORT",
+            "Report " + reportName,
+            principal == null ? null : principal.getSaccoId(),
+            principal == null ? null : principal.getStationId(),
+            details
+        );
+    }
+
+    private void auditLoanDocument(LoanApplication app,
+                                   AppUserPrincipal principal,
+                                   String action,
+                                   String description) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", app.getSaccoId());
+        details.put("stationId", app.getStationId());
+        details.put("applicationNumber", app.getApplicationNumber());
+        details.put("loanId", app.getLoanId());
+        auditService.logEvent(
+            "LOAN_APPLICATION",
+            app.getId(),
+            action,
+            principal == null ? null : principal.getMemberId(),
+            AuditEventStatus.SUCCESS,
+            description,
+            "LOAN_APPLICATION",
+            app.getLoanId() == null || app.getLoanId().isBlank()
+                ? "Loan Application #" + app.getApplicationNumber()
+                : "Loan ID " + app.getLoanId(),
+            app.getSaccoId(),
+            app.getStationId(),
+            details
+        );
     }
 
     private String roleLabel(com.sacco.mvp.domain.Position position) {

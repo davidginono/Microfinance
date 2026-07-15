@@ -1,6 +1,7 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.EmailOtpPurpose;
+import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
@@ -11,6 +12,7 @@ import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.UserClaimService;
@@ -52,6 +54,7 @@ public class AuthController {
     private final AdminScopeService adminScopeService;
     private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     @org.springframework.beans.factory.annotation.Value("${app.auth.google-sso.enabled:false}")
     private boolean googleSsoEnabled;
@@ -135,6 +138,8 @@ public class AuthController {
             response.put("saccoId", verified.saccoId());
             response.put("stationId", verified.stationId());
             response.put("message", deliveryMessage(delivery, "We sent an OTP code using the station delivery policy."));
+            auditIdentityEvent(null, "OTP_REQUEST", "OTP request", "MEMBER", "Member " + verified.memberNo(),
+                verified.saccoId(), verified.stationId(), Map.of("purpose", EmailOtpPurpose.REGISTRATION.name(), "memberNo", verified.memberNo()));
             return ResponseEntity.ok(response);
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -167,7 +172,9 @@ public class AuthController {
                 return "register-member";
             }
             emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, form.getOtpCode());
-            memberRegistrationService.register(form);
+            Member registered = memberRegistrationService.register(form);
+            auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
+                registered.getSaccoId(), registered.getStationId(), Map.of("memberNo", registered.getMemberNo()));
             ra.addFlashAttribute("message", "Registration completed successfully. Request a sign-in code with your email to access the member workspace.");
             return "redirect:/login";
         } catch (IllegalStateException ex) {
@@ -198,6 +205,10 @@ public class AuthController {
                 "Your Loan Application Portal password reset code",
                 "Use this OTP code to reset your Loan Application Portal password."
             );
+            auditIdentityEvent(member.getId(), "PASSWORD_RESET_REQUEST", "Password reset request",
+                member.getStaffRolesResolved().isEmpty() ? "MEMBER" : "STAFF",
+                (member.getStaffRolesResolved().isEmpty() ? "Member " : "Staff ") + member.getMemberNo(),
+                member.getSaccoId(), member.getStationId(), Map.of("memberNo", member.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", deliveryMessage(delivery, "We sent a password reset code using the station delivery policy.")
@@ -297,6 +308,8 @@ public class AuthController {
                 "Your Loan Application Portal sign-in code",
                 "Use this OTP code to sign in to Loan Application Portal."
             );
+            auditIdentityEvent(member.getId(), "OTP_REQUEST", "OTP request", "MEMBER", "Member " + member.getMemberNo(),
+                member.getSaccoId(), member.getStationId(), Map.of("purpose", EmailOtpPurpose.LOGIN.name(), "memberNo", member.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
@@ -326,6 +339,8 @@ public class AuthController {
             ensureSaccoAccessAllowed(member);
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.LOGIN, otpCode);
             signInMember(member, request);
+            auditIdentityEvent(member.getId(), "LOGIN", "Login", "MEMBER", "Member " + member.getMemberNo(),
+                member.getSaccoId(), member.getStationId(), Map.of("method", "OTP", "memberNo", member.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "redirectUrl", WorkspaceLanding.memberDashboard()
@@ -377,6 +392,8 @@ public class AuthController {
                 "Your Loan Application Portal staff sign-in code",
                 "Use this OTP code to sign in to the Loan Application Portal staff workspace."
             );
+            auditIdentityEvent(user.getId(), "OTP_REQUEST", "OTP request", "STAFF", "Staff " + user.getMemberNo(),
+                user.getSaccoId(), user.getStationId(), Map.of("purpose", EmailOtpPurpose.STAFF_LOGIN.name(), "memberNo", user.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
@@ -412,6 +429,8 @@ public class AuthController {
                 user,
                 userClaimService.effectiveClaims(user.getId(), user.getStaffRolesResolved(), user.isMemberAccess())
             ), request);
+            auditIdentityEvent(user.getId(), "LOGIN", "Login", "STAFF", "Staff " + user.getMemberNo(),
+                user.getSaccoId(), user.getStationId(), Map.of("method", "OTP", "memberNo", user.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "redirectUrl", WorkspaceLanding.staffDashboard(user)
@@ -447,6 +466,36 @@ public class AuthController {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    }
+
+    private void auditIdentityEvent(java.util.UUID entityId,
+                                    String action,
+                                    String description,
+                                    String referenceType,
+                                    String referenceValue,
+                                    String saccoId,
+                                    String stationId,
+                                    Map<String, Object> extraDetails) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("result", "SUCCESS");
+        details.put("saccoId", saccoId);
+        details.put("stationId", stationId);
+        if (extraDetails != null) {
+            details.putAll(extraDetails);
+        }
+        auditService.logEvent(
+            referenceType == null || referenceType.isBlank() ? "MEMBER" : referenceType,
+            entityId,
+            action,
+            entityId,
+            AuditEventStatus.SUCCESS,
+            description,
+            referenceType,
+            referenceValue,
+            saccoId,
+            stationId,
+            details
+        );
     }
 
     private void ensureSaccoAccessAllowed(Member member) {

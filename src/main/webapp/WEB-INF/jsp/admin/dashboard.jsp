@@ -7,7 +7,7 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" text="Admin Tools / Dashboard" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.dashboard.title" text="Admin Dashboard" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.dashboard.subtitle" text="Track incidents, outbox delivery, and storage." /></p>
+    <p class="erp-page-subtitle"><spring:message code="admin.dashboard.subtitle" text="Track incidents, SMS units, and storage." /></p>
 </div>
 
 <section class="erp-stat-grid">
@@ -35,13 +35,13 @@
     <div class="erp-stat-card erp-stat-amber">
         <div class="erp-stat-main">
             <div>
-                <p class="erp-stat-label"><spring:message code="admin.dashboard.outboxFailures" text="Outbox Failures" /></p>
-                <p class="erp-stat-value">${dashboard.outboxFailedCount}</p>
-                <p class="erp-stat-meta"><spring:message code="admin.dashboard.new" text="New" />: ${dashboard.outboxNewCount} | <spring:message code="admin.dashboard.published" text="Published" />: ${dashboard.outboxPublishedCount}</p>
+                <p class="erp-stat-label"><spring:message code="admin.dashboard.smsUnits" text="SMS Units" /></p>
+                <p class="erp-stat-value">${dashboard.smsBalance.availableUnits}</p>
+                <p class="erp-stat-meta"><spring:message code="admin.dashboard.station" text="Station" />: ${dashboard.smsBalance.stationId}</p>
             </div>
-            <span class="erp-stat-icon">O</span>
+            <span class="erp-stat-icon">U</span>
         </div>
-        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.needsAttention" text="Needs attention" /></span><span>${dashboard.outboxFailedCount}</span></div>
+        <div class="erp-stat-footer"><span><spring:message code="admin.dashboard.smsBalance" text="SMS balance" /></span><span>${dashboard.smsBalance.statusLabel}</span></div>
     </div>
     <div class="erp-stat-card erp-stat-red">
         <div class="erp-stat-main">

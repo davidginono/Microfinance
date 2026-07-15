@@ -47,6 +47,7 @@ class LoanPaymentTransactionSyncServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private OutboxService outboxService;
+    @Mock private AuditService auditService;
 
     private LoanPaymentTransactionSyncService syncService;
 
@@ -59,7 +60,8 @@ class LoanPaymentTransactionSyncServiceTest {
             memberRepository,
             loanApplicationRepository,
             outboxService,
-            JsonMapper.builder().findAndAddModules().build()
+            JsonMapper.builder().findAndAddModules().build(),
+            auditService
         );
     }
 

@@ -52,6 +52,7 @@ class ManagerServiceTest {
     @Mock private LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private WorkflowRoutingService workflowRoutingService;
+    @Mock private AuditService auditService;
 
     @InjectMocks
     private ManagerService managerService;
