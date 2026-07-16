@@ -14,11 +14,11 @@ public class SessionInactivityModelAdvice {
 
     @ModelAttribute("sessionInactivityPromptMs")
     public long sessionInactivityPromptMs() {
-        return Math.max(60000L, inactivityPromptMs);
+        return inactivityPromptMs;
     }
 
     @ModelAttribute("sessionInactivityGraceMs")
     public long sessionInactivityGraceMs() {
-        return Math.max(15000L, inactivityGraceMs);
+        return inactivityGraceMs;
     }
 }

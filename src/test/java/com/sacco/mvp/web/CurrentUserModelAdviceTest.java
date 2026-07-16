@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
@@ -31,11 +32,12 @@ class CurrentUserModelAdviceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Accept", "application/json");
         AdminScopeService scopes = mock(AdminScopeService.class);
+        MemberRepository members = mock(MemberRepository.class);
         RegisteredSaccoRepository registeredSaccos = mock(RegisteredSaccoRepository.class);
         SaccoSettingsRepository settings = mock(SaccoSettingsRepository.class);
         SaccoStationRepository stations = mock(SaccoStationRepository.class);
         SaccoLogoStorageService logos = mock(SaccoLogoStorageService.class);
-        CurrentUserModelAdvice advice = advice(request, scopes, registeredSaccos, settings, stations, logos);
+        CurrentUserModelAdvice advice = advice(request, scopes, members, registeredSaccos, settings, stations, logos);
         AppUserPrincipal principal = memberPrincipal();
 
         assertThat(advice.adminScope(principal)).isNull();
@@ -48,6 +50,7 @@ class CurrentUserModelAdviceTest {
 
     private CurrentUserModelAdvice advice(MockHttpServletRequest request,
                                           AdminScopeService scopes,
+                                          MemberRepository members,
                                           RegisteredSaccoRepository registeredSaccos,
                                           SaccoSettingsRepository settings,
                                           SaccoStationRepository stations,
@@ -55,6 +58,7 @@ class CurrentUserModelAdviceTest {
         ObjectFactory<HttpServletRequest> requestFactory = () -> request;
         return new CurrentUserModelAdvice(
             scopes,
+            members,
             registeredSaccos,
             settings,
             stations,

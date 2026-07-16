@@ -1264,7 +1264,8 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(lastInvitedBy.get()).isEqualTo(adminId);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("10002");
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStaffNo()).isEqualTo("10002");
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("STAFF-10002");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
         verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000001");
@@ -1401,7 +1402,8 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(lastInvitedBy.get()).isEqualTo(adminId);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("10001");
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStaffNo()).isEqualTo("10001");
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("STAFF-10001");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStationId()).isEqualTo("ST-1");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");

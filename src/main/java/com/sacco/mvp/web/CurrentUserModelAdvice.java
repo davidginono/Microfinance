@@ -1,8 +1,10 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
@@ -25,6 +27,7 @@ public class CurrentUserModelAdvice {
     private static final String REQUEST_ACTIVE_SACCO_BRAND = CurrentUserModelAdvice.class.getName() + ".activeSaccoBrand";
 
     private final AdminScopeService adminScopeService;
+    private final MemberRepository memberRepository;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoStationRepository saccoStationRepository;
@@ -38,12 +41,30 @@ public class CurrentUserModelAdvice {
             return null;
         }
         return CurrentUserView.builder()
-            .memberNo(principal.getUsername())
+            .memberNo(principal.getMemberNo())
+            .staffNo(principal.getStaffNo())
             .fullName(principal.getFullName())
             .email(principal.getEmail())
             .position(principal.getPosition())
             .memberAccess(principal.isMemberAccess())
+            .staffSession(principal.isStaffSession())
             .build();
+    }
+
+    @ModelAttribute("pendingStaffAccess")
+    public PendingStaffAccessView pendingStaffAccess(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null || isJsonRequest()) {
+            return null;
+        }
+        return memberRepository.findById(principal.getMemberId())
+            .filter(Member::isStaffAccessPendingAcknowledgement)
+            .map(member -> new PendingStaffAccessView(
+                member.getStaffNo(),
+                member.getStaffRolesResolved().stream()
+                    .map(Position::getDisplayName)
+                    .collect(java.util.stream.Collectors.joining(", "))
+            ))
+            .orElse(null);
     }
 
     @ModelAttribute("adminScope")
@@ -227,6 +248,13 @@ public class CurrentUserModelAdvice {
     public static class HeaderStationView {
         private String stationId;
         private String stationAddressLocation;
+    }
+
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class PendingStaffAccessView {
+        private String staffNo;
+        private String roles;
     }
 
     private record ActiveSaccoBrand(String id, String name, String logoText, String logoUrl) {}

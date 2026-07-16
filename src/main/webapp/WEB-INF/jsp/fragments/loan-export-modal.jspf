@@ -77,11 +77,6 @@
         [signedLink, unsignedLink].forEach((link) => link.addEventListener("click", closeModal));
 
         modal.querySelectorAll("[data-loan-export-close]").forEach((button) => button.addEventListener("click", closeModal));
-        modal.addEventListener("click", (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && modal.classList.contains("is-open")) {
                 closeModal();

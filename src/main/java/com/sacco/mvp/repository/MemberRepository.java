@@ -29,9 +29,14 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     Optional<Member> findByMemberNo(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
+    Optional<Member> findByStaffNo(String staffNo);
+    boolean existsByStaffNoIgnoreCase(String staffNo);
 
     @Query(value = "select member_no from members where member_no ~ '^[0-9]{5}$'", nativeQuery = true)
     List<String> findFiveDigitMemberNumbers();
+
+    @Query(value = "select staff_no from members where staff_no ~ '^[0-9]{5}$'", nativeQuery = true)
+    List<String> findFiveDigitStaffNumbers();
 
     Optional<Member> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
@@ -121,6 +126,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         left join m.staffRoles staffRole
         where m.saccoId = :saccoId
           and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and m.staffAccessStatus = com.sacco.mvp.domain.StaffAccessStatus.ACTIVE
           and (m.position = :position or staffRole = :position)
         order by m.fullName asc
         """)
@@ -134,6 +140,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         where m.saccoId = :saccoId
           and lower(m.stationId) = lower(:stationId)
           and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and m.staffAccessStatus = com.sacco.mvp.domain.StaffAccessStatus.ACTIVE
           and (m.position = :position or staffRole = :position)
         order by m.fullName asc
         """)
@@ -147,6 +154,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         left join m.staffRoles staffRole
         where m.saccoId = :saccoId
           and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and m.staffAccessStatus = com.sacco.mvp.domain.StaffAccessStatus.ACTIVE
           and (m.position in :positions or staffRole in :positions)
         order by m.fullName asc
         """)
@@ -160,6 +168,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         where m.saccoId = :saccoId
           and lower(m.stationId) = lower(:stationId)
           and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and m.staffAccessStatus = com.sacco.mvp.domain.StaffAccessStatus.ACTIVE
           and (m.position in :positions or staffRole in :positions)
         order by m.fullName asc
         """)
@@ -174,6 +183,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
             join user_settings us on us.member_id = m.id
             where m.sacco_id = :saccoId
               and m.status = 'ACTIVE'
+              and m.staff_access_status = 'ACTIVE'
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and exists (
                 select 1
@@ -193,6 +203,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         from Member m
         left join m.staffRoles staffRole
         where m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
+          and m.staffAccessStatus = com.sacco.mvp.domain.StaffAccessStatus.ACTIVE
           and (m.position = :position or staffRole = :position)
         order by m.fullName asc
         """)
@@ -291,9 +302,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                 :query = ''
                 or cast(m.id as text) ilike concat(cast(:query as text), '%')
                 or lower(coalesce(m.member_no, '')) like concat(cast(:query as text), '%')
+                or lower(coalesce(m.staff_no, '')) like concat(cast(:query as text), '%')
                 or lower(coalesce(m.full_name, '')) like concat('%', cast(:query as text), '%')
               )
-            order by m.full_name asc, m.member_no asc
+            order by m.full_name asc, coalesce(m.staff_no, m.member_no) asc
             """,
         countQuery = """
             select count(*)
@@ -304,6 +316,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                 :query = ''
                 or cast(m.id as text) ilike concat(cast(:query as text), '%')
                 or lower(coalesce(m.member_no, '')) like concat(cast(:query as text), '%')
+                or lower(coalesce(m.staff_no, '')) like concat(cast(:query as text), '%')
                 or lower(coalesce(m.full_name, '')) like concat('%', cast(:query as text), '%')
               )
             """,

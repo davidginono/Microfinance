@@ -650,7 +650,11 @@ public class AdminController {
                 phone,
                 positions
             );
-            ra.addFlashAttribute("message", "Staff member created with Staff Member Number " + createdUser.getMemberNo() + ". Invite email sent and waiting for activation.");
+            String createdUserId = adminService.userIdLabel(createdUser.getId());
+            ra.addFlashAttribute("createdStaffUserId", createdUserId);
+            ra.addFlashAttribute("createdStaffMemberNumber", createdUser.getStaffNo());
+            ra.addFlashAttribute("openUserModalKey", "create-user");
+            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUserId + " and Staff Member Number " + createdUser.getStaffNo() + ". Invite email sent and waiting for activation.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -666,7 +670,7 @@ public class AdminController {
                              @RequestParam MemberStatus status,
                              RedirectAttributes ra) {
         try {
-            adminService.updateUser(
+            AdminService.UserUpdateResult result = adminService.updateUser(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 principal.getMemberId(),
@@ -676,7 +680,11 @@ public class AdminController {
                 status,
                 claims
             );
-            ra.addFlashAttribute("message", "User updated.");
+            if (result.isStaffAccessPending()) {
+                ra.addFlashAttribute("message", "User updated. Staff Member Number " + result.getStaffNo() + " is pending member acknowledgement.");
+            } else {
+                ra.addFlashAttribute("message", "User updated.");
+            }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

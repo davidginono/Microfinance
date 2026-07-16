@@ -206,9 +206,10 @@ public class AuthController {
                 "Use this OTP code to reset your Loan Application Portal password."
             );
             auditIdentityEvent(member.getId(), "PASSWORD_RESET_REQUEST", "Password reset request",
-                member.getStaffRolesResolved().isEmpty() ? "MEMBER" : "STAFF",
-                (member.getStaffRolesResolved().isEmpty() ? "Member " : "Staff ") + member.getMemberNo(),
-                member.getSaccoId(), member.getStationId(), Map.of("memberNo", member.getMemberNo()));
+                member.isStaffAccessActive() && "staff".equalsIgnoreCase(accountType) ? "STAFF" : "MEMBER",
+                (member.isStaffAccessActive() && "staff".equalsIgnoreCase(accountType) ? "Staff " : "Member ")
+                    + displayLoginNumber(member, accountType),
+                member.getSaccoId(), member.getStationId(), Map.of("loginNo", displayLoginNumber(member, accountType)));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", deliveryMessage(delivery, "We sent a password reset code using the station delivery policy.")
@@ -368,7 +369,7 @@ public class AuthController {
         Member user = memberRepository
             .findByEmailIgnoreCase(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> !existing.getStaffRolesResolved().isEmpty())
+            .filter(Member::isStaffAccessActive)
             .orElse(null);
         if (user == null) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -392,8 +393,8 @@ public class AuthController {
                 "Your Loan Application Portal staff sign-in code",
                 "Use this OTP code to sign in to the Loan Application Portal staff workspace."
             );
-            auditIdentityEvent(user.getId(), "OTP_REQUEST", "OTP request", "STAFF", "Staff " + user.getMemberNo(),
-                user.getSaccoId(), user.getStationId(), Map.of("purpose", EmailOtpPurpose.STAFF_LOGIN.name(), "memberNo", user.getMemberNo()));
+            auditIdentityEvent(user.getId(), "OTP_REQUEST", "OTP request", "STAFF", "Staff " + displayStaffNo(user),
+                user.getSaccoId(), user.getStationId(), Map.of("purpose", EmailOtpPurpose.STAFF_LOGIN.name(), "staffNo", displayStaffNo(user)));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
@@ -421,16 +422,17 @@ public class AuthController {
             Member user = memberRepository
                 .findByEmailIgnoreCase(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-                .filter(existing -> !existing.getStaffRolesResolved().isEmpty())
+                .filter(Member::isStaffAccessActive)
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
             ensureSaccoAccessAllowed(user);
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
             signInPrincipal(new AppUserPrincipal(
                 user,
-                userClaimService.effectiveClaims(user.getId(), user.getStaffRolesResolved(), user.isMemberAccess())
+                userClaimService.effectiveClaims(user.getId(), user.getActiveStaffRolesResolved(), user.isMemberAccess()),
+                true
             ), request);
-            auditIdentityEvent(user.getId(), "LOGIN", "Login", "STAFF", "Staff " + user.getMemberNo(),
-                user.getSaccoId(), user.getStationId(), Map.of("method", "OTP", "memberNo", user.getMemberNo()));
+            auditIdentityEvent(user.getId(), "LOGIN", "Login", "STAFF", "Staff " + displayStaffNo(user),
+                user.getSaccoId(), user.getStationId(), Map.of("method", "OTP", "staffNo", displayStaffNo(user)));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "redirectUrl", WorkspaceLanding.staffDashboard(user)
@@ -447,7 +449,8 @@ public class AuthController {
         ensureSaccoAccessAllowed(member);
         AppUserPrincipal principal = new AppUserPrincipal(
             member,
-            userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess())
+            userClaimService.defaultClaims(java.util.List.of(), true),
+            false
         );
         signInPrincipal(principal, request);
     }
@@ -506,7 +509,7 @@ public class AuthController {
     }
 
     private String suspendedAccessMessage(Member member) {
-        if (member == null || member.getStaffRolesResolved().contains(Position.ADMIN)) {
+        if (member == null || member.getActiveStaffRolesResolved().contains(Position.ADMIN)) {
             return null;
         }
         String saccoId = member.getSaccoId();
@@ -562,19 +565,30 @@ public class AuthController {
 
     private Member findPasswordResetAccount(String normalizedUsername, String accountType) {
         String normalizedType = accountType == null ? "" : accountType.trim().toLowerCase();
+        if ("staff".equals(normalizedType)) {
+            return memberRepository.findByStaffNo(normalizedUsername)
+                .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+                .filter(Member::isStaffAccessActive)
+                .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff member number."));
+        }
         Member member = memberRepository.findByMemberNo(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .orElseThrow(() -> new IllegalStateException("No active account was found for that member number."));
-        if ("staff".equals(normalizedType)) {
-            if (member.getStaffRolesResolved().isEmpty()) {
-                throw new IllegalStateException("No active staff account was found for that member number.");
-            }
-            return member;
-        }
         if (!member.isMemberAccess()) {
             throw new IllegalStateException("No active member account was found for that member number.");
         }
         return member;
+    }
+
+    private String displayLoginNumber(Member member, String accountType) {
+        return "staff".equalsIgnoreCase(accountType) ? displayStaffNo(member) : member.getMemberNo();
+    }
+
+    private String displayStaffNo(Member member) {
+        if (member == null || member.getStaffNo() == null || member.getStaffNo().isBlank()) {
+            return "";
+        }
+        return member.getStaffNo();
     }
 
     private void populateRegistrationOptions(Model model) {

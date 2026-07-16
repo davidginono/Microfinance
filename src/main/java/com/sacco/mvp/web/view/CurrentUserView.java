@@ -14,8 +14,10 @@ import lombok.Setter;
 @Builder
 public class CurrentUserView {
     private String memberNo;
+    private String staffNo;
     private String fullName;
     private String email;
     private Position position;
     private boolean memberAccess;
+    private boolean staffSession;
 }

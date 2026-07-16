@@ -1,5 +1,6 @@
 package com.sacco.mvp.security;
 
+import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoStation;
@@ -13,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class AppUserDetailsService implements UserDetailsService {
@@ -22,25 +25,63 @@ public class AppUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        String normalizedUsername = username == null ? "" : username.trim();
+        Member member = memberRepository.findByMemberNo(normalizedUsername)
+            .or(() -> memberRepository.findByStaffNo(normalizedUsername))
+            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(existing -> existing.isMemberAccess() || existing.isStaffAccessActive())
+            .map(existing -> ensureStationAllowed(existing, existing.isStaffAccessActive()))
+            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+        boolean staffSession = member.isStaffAccessActive();
+        return new AppUserPrincipal(
+            member,
+            staffSession
+                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
+                : userClaimService.defaultClaims(List.of(), true),
+            staffSession
+        );
+    }
+
+    public UserDetails loadMemberByMemberNo(String username) throws UsernameNotFoundException {
         return memberRepository.findByMemberNo(username)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-            .filter(member -> member.isMemberAccess() || !member.getStaffRolesResolved().isEmpty())
-            .map(member -> {
-                if (!member.getStaffRolesResolved().contains(Position.ADMIN)
-                    && member.getSaccoId() != null
-                    && !member.getSaccoId().isBlank()
-                    && member.getStationId() != null
-                    && !member.getStationId().isBlank()) {
-                    saccoStationRepository.findBySaccoIdAndStationId(member.getSaccoId(), member.getStationId())
-                        .filter(SaccoStation::isAccessSuspended)
-                        .ifPresent(station -> {
-                            throw new DisabledException(suspendedMessage(station));
-                        });
-                }
-                return member;
-            })
-            .map(member -> new AppUserPrincipal(member, userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess())))
+            .filter(Member::isMemberAccess)
+            .map(member -> ensureStationAllowed(member, false))
+            .map(member -> new AppUserPrincipal(
+                member,
+                userClaimService.defaultClaims(List.of(), true),
+                false
+            ))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+    }
+
+    public UserDetails loadStaffByStaffNo(String staffNo) throws UsernameNotFoundException {
+        return memberRepository.findByStaffNo(staffNo)
+            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+            .filter(Member::isStaffAccessActive)
+            .map(member -> ensureStationAllowed(member, true))
+            .map(member -> new AppUserPrincipal(
+                member,
+                userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()),
+                true
+            ))
+            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+    }
+
+    private Member ensureStationAllowed(Member member, boolean staffLogin) {
+        boolean adminBypass = staffLogin && member.getActiveStaffRolesResolved().contains(Position.ADMIN);
+        if (!adminBypass
+            && member.getSaccoId() != null
+            && !member.getSaccoId().isBlank()
+            && member.getStationId() != null
+            && !member.getStationId().isBlank()) {
+            saccoStationRepository.findBySaccoIdAndStationId(member.getSaccoId(), member.getStationId())
+                .filter(SaccoStation::isAccessSuspended)
+                .ifPresent(station -> {
+                    throw new DisabledException(suspendedMessage(station));
+                });
+        }
+        return member;
     }
 
     private String suspendedMessage(SaccoStation station) {

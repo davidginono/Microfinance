@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.MinorAdminInvitation;
+import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.MinorAdminInvitationRepository;
 import lombok.RequiredArgsConstructor;
@@ -116,6 +117,11 @@ public class MinorAdminInvitationService {
 
         OffsetDateTime now = OffsetDateTime.now();
         member.setStatus(MemberStatus.ACTIVE);
+        member.setStaffAccessStatus(StaffAccessStatus.ACTIVE);
+        member.setStaffAccessActivatedAt(now);
+        if (member.getStaffAccessAssignedAt() == null) {
+            member.setStaffAccessAssignedAt(now);
+        }
         member.setPhoneVerifiedAt(now);
         member.setPasswordHash(passwordEncoder.encode(password));
         member.setSignatureText(normalizedSignature);
@@ -125,8 +131,8 @@ public class MinorAdminInvitationService {
         invitation.setClaimedAt(now);
         invitationRepository.save(invitation);
 
-        log.info("Staff invitation claimed for memberId={} memberNo={}",
-            member.getId(), member.getMemberNo());
+        log.info("Staff invitation claimed for memberId={} staffNo={}",
+            member.getId(), member.getStaffNo());
         return member;
     }
 
@@ -191,15 +197,17 @@ public class MinorAdminInvitationService {
             .ifPresent(member -> {
                 invitationRepository.delete(invitation);
                 memberRepository.delete(member);
-                log.info("Removed expired unclaimed staff invitation memberId={} memberNo={} expiredAt={} cleanupAt={}",
-                    member.getId(), member.getMemberNo(), invitation.getExpiresAt(), now);
+                log.info("Removed expired unclaimed staff invitation memberId={} staffNo={} expiredAt={} cleanupAt={}",
+                    member.getId(), member.getStaffNo(), invitation.getExpiresAt(), now);
             });
     }
 
     private void sendInviteEmail(Member member, String rawToken, int ttlHours) {
         String link = buildClaimUrl(rawToken);
+        String staffNo = member.getStaffNo() == null || member.getStaffNo().isBlank() ? member.getMemberNo() : member.getStaffNo();
         String body = "Hello " + member.getFullName() + "," + System.lineSeparator() + System.lineSeparator()
             + "A Super Admin has registered a staff account for you on SACCO " + member.getSaccoId() + "." + System.lineSeparator()
+            + "Your Staff Member Number is " + staffNo + "." + System.lineSeparator()
             + "To activate your account, open the link below within " + ttlHours + " hours, request a one-time code, and create your password:" + System.lineSeparator()
             + link + System.lineSeparator() + System.lineSeparator()
             + "After activation, you can sign in with your staff member number and password or with an email sign-in code." + System.lineSeparator() + System.lineSeparator()

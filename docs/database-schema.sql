@@ -437,6 +437,7 @@ CREATE TABLE public.members (
     email character varying(255),
     full_name character varying(255) NOT NULL,
     member_no character varying(255) NOT NULL,
+    staff_no character varying(255),
     password_hash character varying(255) NOT NULL,
     phone character varying(255),
     "position" character varying(255) NOT NULL,
@@ -449,6 +450,9 @@ CREATE TABLE public.members (
     signature_registered_at timestamp(6) with time zone,
     signature_text character varying(255),
     phone_verified_at timestamp with time zone,
+    staff_access_status character varying(64) DEFAULT 'NONE'::character varying NOT NULL,
+    staff_access_assigned_at timestamp(6) with time zone,
+    staff_access_activated_at timestamp(6) with time zone,
     CONSTRAINT members_phone_format_check CHECK (((phone IS NULL) OR ((phone)::text ~ '^255[0-9]{9}$'::text))),
     CONSTRAINT members_position_check CHECK ((("position")::text = ANY (ARRAY[('MEMBER'::character varying)::text, ('MINOR_ADMIN'::character varying)::text, ('MANAGER'::character varying)::text, ('ACCOUNTANT'::character varying)::text, ('DISBURSEMENT_OFFICER'::character varying)::text, ('CHAIRPERSON'::character varying)::text, ('BOARD'::character varying)::text, ('CREDIT_COMMITTEE'::character varying)::text, ('LOAN_OFFICER'::character varying)::text, ('ADMIN'::character varying)::text]))),
     CONSTRAINT members_status_check CHECK (((status)::text = ANY (ARRAY[('INVITED'::character varying)::text, ('ACTIVE'::character varying)::text, ('INACTIVE'::character varying)::text])))
@@ -1327,6 +1331,13 @@ CREATE INDEX ix_loan_applications_product_setting ON public.loan_applications US
 --
 
 CREATE INDEX ix_loan_applications_sacco_station ON public.loan_applications USING btree (sacco_id, station_id);
+
+
+--
+-- Name: uk_members_staff_no; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_members_staff_no ON public.members USING btree (lower((staff_no)::text)) WHERE (staff_no IS NOT NULL);
 
 
 --

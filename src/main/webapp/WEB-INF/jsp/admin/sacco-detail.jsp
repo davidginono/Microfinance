@@ -254,7 +254,8 @@
                                    value="${selectedMemberQuery}"
                                    class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
                                    style="height:3rem;min-height:3rem;max-height:3rem;"
-                                   placeholder="User ID, member number, or name" />
+                                   placeholder="User ID, member number, or name"
+                                   title="User ID, member number, or name" />
                         </label>
                         <label class="block min-w-[10rem] flex-[0_1_12rem]">
                             <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Rows Per Page</span>
@@ -274,7 +275,7 @@
                     <table class="erp-table min-w-[1120px]">
                         <thead>
                         <tr>
-                            <th class="whitespace-nowrap">UUID User ID</th>
+                            <th class="whitespace-nowrap">User ID</th>
                             <th class="whitespace-nowrap">Member Number</th>
                             <th class="whitespace-nowrap">Name</th>
                             <th class="whitespace-nowrap">Account Type</th>
@@ -301,7 +302,7 @@
                             <c:otherwise>
                                 <c:forEach items="${saccoMembers}" var="member">
                                     <tr>
-                                        <td class="align-top font-medium text-slate-700 break-all">${member.accountId}</td>
+                                        <td class="align-top whitespace-nowrap font-medium text-slate-700">${member.userIdLabel}</td>
                                         <td class="align-top whitespace-nowrap">${member.loginId}</td>
                                         <td class="align-top font-semibold text-slate-900">${member.fullName}</td>
                                         <td class="align-top whitespace-nowrap">

@@ -84,7 +84,7 @@ public class RoleDirectoryService {
         return memberRepository.findById(memberId)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(member -> saccoId.equals(member.getSaccoId()))
-            .filter(member -> member.getStaffRolesResolved().contains(position))
+            .filter(member -> member.getActiveStaffRolesResolved().contains(position))
             .isPresent();
     }
 
@@ -108,7 +108,7 @@ public class RoleDirectoryService {
         return RoleAccountRef.builder()
             .id(member.getId())
             .saccoId(member.getSaccoId())
-            .identifier(member.getMemberNo())
+            .identifier(member.getStaffNo() == null || member.getStaffNo().isBlank() ? member.getMemberNo() : member.getStaffNo())
             .fullName(member.getFullName())
             .email(member.getEmail())
             .phone(member.getPhone())

@@ -99,6 +99,7 @@ description: UI and navigation governance for SACCOS_LMS. Use when generating or
   - thin neutral border and soft shadow
   - simple close icon in the top-right
   - action buttons grouped at the bottom-right
+- Preserve reload context for workspaces: keep the initial DOM view position and any open modal visible after reloads by using the shared shell/session storage pattern, without adding external storage or changing identifiers.
 - When adding helper text, keep it to one short sentence only if the action would otherwise be ambiguous.
 - Prefer concise confirmation dialogs over long inline explanations.
 - Preserve responsiveness and avoid horizontal overflow on mobile, tablet, laptop, and wide screens.

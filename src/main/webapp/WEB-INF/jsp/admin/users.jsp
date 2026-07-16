@@ -32,6 +32,35 @@
         color: #94a3b8;
     }
 
+    .admin-filter-form input,
+    .admin-filter-form select,
+    .admin-filter-form .app-btn {
+        height: 3rem;
+        min-height: 3rem;
+        max-height: 3rem;
+    }
+
+    .admin-filter-form input,
+    .admin-filter-form select {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .admin-filter-form .app-btn {
+        align-items: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .admin-created-user-id {
+        border: 1px solid #bbf7d0;
+        border-radius: 0.375rem;
+        background: #f0fdf4;
+        color: #166534;
+        padding: 0.75rem 0.9rem;
+    }
+
     @media (min-width: 768px) {
         .admin-claim-text {
             font-size: 0.82rem;
@@ -42,20 +71,24 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users & Roles" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users & Roles" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage access and roles for the current workspace station." /></p>
+    <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage workspace access." /></p>
 </div>
 
 <div class="erp-toolbar">
-    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Add Staff Member is for staff accounts only." /></div>
+    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Staff accounts only." /></div>
     <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
 </div>
+
+<c:if test="${not empty openUserModalKey}">
+    <div hidden data-open-user-modal="${openUserModalKey}"></div>
+</c:if>
 
 <div class="erp-panel overflow-hidden">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
                 <p class="erp-widget-title"><spring:message code="common.filterViewOptions" text="Filter And View Options" /></p>
-                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search users by User ID or name and page the results." /></p>
+                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search and page users." /></p>
             </div>
             <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                 <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
@@ -84,7 +117,8 @@
                    value="${selectedUserQuery}"
                    class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
                    style="height:3rem;min-height:3rem;max-height:3rem;"
-                   placeholder="Enter selected User ID or name" />
+                   placeholder="Enter selected User ID or name"
+                   title="Enter selected User ID or name" />
         </label>
 
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
@@ -107,10 +141,10 @@
     <table class="erp-table min-w-[1420px]">
         <thead>
         <tr>
-            <th class="px-3 py-2 text-left whitespace-nowrap">User</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">User ID</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Member Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Staff Member Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">Names</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Email</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Phone Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Current Roles</th>
@@ -138,12 +172,12 @@
             <c:otherwise>
                 <c:forEach items="${users}" var="user">
                     <tr>
-                        <td class="px-3 py-2 align-top">
-                            <div class="font-semibold text-slate-900">${user.fullName}</div>
-                        </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700">${user.userIdLabel}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.memberNumber}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.staffMemberNumber}</td>
+                        <td class="px-3 py-2 align-top">
+                            <div class="font-semibold text-slate-900">${user.fullName}</div>
+                        </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.phone}</td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
@@ -174,7 +208,7 @@
 
 <div class="erp-toolbar">
     <div class="text-sm text-slate-500">
-        The table is server-paged to keep large user lists manageable.
+        Server-paged list.
     </div>
     <c:if test="${usersPage.totalPages > 1}">
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -228,6 +262,16 @@
                 User ID
                 <input type="text" readonly aria-readonly="true" value="${nextGeneratedUserId}" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" />
             </label>
+
+            <c:if test="${not empty createdStaffUserId}">
+                <div class="admin-created-user-id md:col-span-2" aria-live="polite">
+                    <p class="text-xs font-semibold uppercase tracking-wide">Created Staff User ID</p>
+                    <p class="mt-1 text-sm font-semibold">${createdStaffUserId}</p>
+                    <c:if test="${not empty createdStaffMemberNumber}">
+                        <p class="mt-1 text-xs">Staff Member Number ${createdStaffMemberNumber}</p>
+                    </c:if>
+                </div>
+            </c:if>
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Full Name
@@ -499,20 +543,28 @@
             document.querySelectorAll('[data-user-modal]').forEach((modal) => {
                 modal.classList.add('hidden');
                 modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
             });
             body.classList.remove('overflow-hidden');
+            window.SaccosUiState?.clearOpenModal();
+        }
+
+        function openUserModal(key) {
+            closeAllUserModals();
+            const modal = document.querySelector('[data-user-modal="' + key + '"]');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                body.classList.add('overflow-hidden');
+                window.SaccosUiState?.rememberOpenModal(modal);
+            }
         }
 
         document.querySelectorAll('[data-user-modal-open]').forEach((button) => {
             button.addEventListener('click', () => {
                 const key = button.getAttribute('data-user-modal-open');
-                closeAllUserModals();
-                const modal = document.querySelector('[data-user-modal="' + key + '"]');
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    modal.classList.add('is-open');
-                    body.classList.add('overflow-hidden');
-                }
+                openUserModal(key);
             });
         });
 
@@ -520,13 +572,10 @@
             button.addEventListener('click', closeAllUserModals);
         });
 
-        document.querySelectorAll('[data-user-modal]').forEach((modal) => {
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    closeAllUserModals();
-                }
-            });
-        });
+        const initialModalTarget = document.querySelector('[data-open-user-modal]');
+        if (initialModalTarget) {
+            openUserModal(initialModalTarget.getAttribute('data-open-user-modal'));
+        }
     })();
 </script>
 

@@ -333,13 +333,14 @@ public class AdminService {
         }
 
         Map<String, Object> before = snapshotMember(member);
+        OffsetDateTime now = OffsetDateTime.now();
         boolean saccoChanged = !resolvedSaccoId.equals(member.getSaccoId());
         member.setSaccoId(resolvedSaccoId);
         member.setStationId(resolvedStationId);
         member.setFullName(normalizedFullName);
         if (member.getStatus() == MemberStatus.ACTIVE || member.getSignatureRegisteredAt() != null) {
             member.setSignatureText(nameSignatureService.signatureFromFullName(normalizedFullName));
-            member.setSignatureRegisteredAt(OffsetDateTime.now());
+            member.setSignatureRegisteredAt(now);
         }
         member.setEmail(normalizedEmail);
         if (!java.util.Objects.equals(member.getPhone(), normalizedPhone)) {
@@ -348,6 +349,12 @@ public class AdminService {
         member.setPhone(normalizedPhone);
         member.setPosition(Position.MINOR_ADMIN);
         member.setStaffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)));
+        if (member.getStaffNo() == null || member.getStaffNo().isBlank()) {
+            member.setStaffNo(generateUniqueStaffNo());
+        }
+        member.setStaffAccessStatus(StaffAccessStatus.ACTIVE);
+        member.setStaffAccessAssignedAt(member.getStaffAccessAssignedAt() == null ? now : member.getStaffAccessAssignedAt());
+        member.setStaffAccessActivatedAt(member.getStaffAccessActivatedAt() == null ? now : member.getStaffAccessActivatedAt());
         if (saccoChanged || member.getRank() == null) {
             member.setRank(nextRank(resolvedSaccoId, Position.MINOR_ADMIN));
         }
@@ -367,7 +374,7 @@ public class AdminService {
                 MinorAdminInvitationState state = resolveInvitationState(member, now);
                 return new MinorAdminAccessView(
                     member.getId(),
-                    member.getMemberNo(),
+                    displayStaffNo(member),
                     member.getFullName(),
                     member.getEmail(),
                     member.getPhone(),
@@ -403,28 +410,28 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateUser(String saccoId,
-                           String stationId,
-                           UUID adminId,
-                           Set<Position> actorRoles,
-                           UUID accountId,
-                           List<Position> positions,
-                           MemberStatus status) {
+    public UserUpdateResult updateUser(String saccoId,
+                                       String stationId,
+                                       UUID adminId,
+                                       Set<Position> actorRoles,
+                                       UUID accountId,
+                                       List<Position> positions,
+                                       MemberStatus status) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         List<UserClaim> defaultClaims = new ArrayList<>(userClaimService.defaultClaims(positions, member.isMemberAccess()));
-        updateUser(saccoId, stationId, adminId, actorRoles, accountId, positions, status, defaultClaims);
+        return updateUser(saccoId, stationId, adminId, actorRoles, accountId, positions, status, defaultClaims);
     }
 
     @Transactional
-    public void updateUser(String saccoId,
-                           String stationId,
-                           UUID adminId,
-                           Set<Position> actorRoles,
-                           UUID accountId,
-                           List<Position> positions,
-                           MemberStatus status,
-                           List<UserClaim> claims) {
+    public UserUpdateResult updateUser(String saccoId,
+                                       String stationId,
+                                       UUID adminId,
+                                       Set<Position> actorRoles,
+                                       UUID accountId,
+                                       List<Position> positions,
+                                       MemberStatus status,
+                                       List<UserClaim> claims) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         String normalizedStationId = normalizeOptional(stationId);
@@ -459,6 +466,8 @@ public class AdminService {
 
         Map<String, Object> before = snapshotMember(member);
         Position previousPosition = member.getPosition();
+        OffsetDateTime now = OffsetDateTime.now();
+        UserUpdateResult result = applyStaffAccessState(member, staffRoles, memberAccess, now);
         if (normalizedStationId != null) {
             member.setStationId(normalizedStationId);
         }
@@ -470,12 +479,16 @@ public class AdminService {
             member.setRank(nextRank(saccoId, primaryRole == null ? Position.MEMBER : primaryRole));
         }
         memberRepository.save(member);
-        ensureUserSettings(accountId, OffsetDateTime.now());
+        ensureUserSettings(accountId, now);
         if (memberAccess) {
-            ensureSavingsAccount(accountId, OffsetDateTime.now());
+            ensureSavingsAccount(accountId, now);
         }
         userClaimService.updateClaims(accountId, normalizedClaims);
+        if (result.isStaffAccessPending()) {
+            notifyPendingStaffAccess(member, adminId, now);
+        }
         auditService.log("MEMBER", accountId, "ADMIN_UPDATE_MEMBER", adminId, before, snapshotMember(member));
+        return result;
     }
 
     public List<LoanProductSetting> loanProducts(String saccoId) {
@@ -2114,10 +2127,12 @@ public class AdminService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("saccoId", member.getSaccoId());
         data.put("memberNo", member.getMemberNo());
+        data.put("staffNo", member.getStaffNo());
         data.put("fullName", member.getFullName());
         data.put("stationId", member.getStationId());
         data.put("position", member.getPosition());
         data.put("staffRoles", member.getStaffRolesResolved());
+        data.put("staffAccessStatus", member.getStaffAccessStatus());
         data.put("memberAccount", member.isMemberAccess());
         data.put("status", member.getStatus());
         return data;
@@ -2229,7 +2244,8 @@ public class AdminService {
         return normalizedQuery == null
             || normalizedQuery.isBlank()
             || lower(member.getEmail()).contains(normalizedQuery)
-            || lower(member.getMemberNo()).contains(normalizedQuery);
+            || lower(member.getMemberNo()).contains(normalizedQuery)
+            || lower(member.getStaffNo()).contains(normalizedQuery);
     }
 
     private List<AdminIncident> filterIncidentsByStation(List<AdminIncident> incidents, String stationId) {
@@ -2302,9 +2318,9 @@ public class AdminService {
         return UserAccessView.builder()
             .accountId(member.getId())
             .userIdLabel(formatUserId(member.getId()))
-            .loginId(member.getMemberNo())
+            .loginId(member.isStaffAccessActive() ? displayStaffNo(member) : member.getMemberNo())
             .memberNumber(memberAccess ? displayOrDash(member.getMemberNo()) : "-")
-            .staffMemberNumber(memberAccess ? "-" : displayOrDash(member.getMemberNo()))
+            .staffMemberNumber(displayStaffNo(member))
             .fullName(member.getFullName())
             .email(member.getEmail())
             .phone(displayOrDash(member.getPhone()))
@@ -2355,6 +2371,19 @@ public class AdminService {
         return value == null || value.isBlank() ? "-" : value;
     }
 
+    private String displayStaffNo(Member member) {
+        if (member == null) {
+            return "-";
+        }
+        if (member.getStaffNo() != null && !member.getStaffNo().isBlank()) {
+            return member.getStaffNo();
+        }
+        if (!member.isMemberAccess() || !member.getStaffRolesResolved().isEmpty()) {
+            return displayOrDash(member.getMemberNo());
+        }
+        return "-";
+    }
+
     private String lower(String value) {
         return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
@@ -2385,6 +2414,54 @@ public class AdminService {
         if (existingChairpersons > 0) {
             throw new IllegalStateException("Each SACCO can only have one Chairperson account. Update the existing one instead.");
         }
+    }
+
+    private UserUpdateResult applyStaffAccessState(Member member,
+                                                   LinkedHashSet<Position> staffRoles,
+                                                   boolean memberAccess,
+                                                   OffsetDateTime now) {
+        if (staffRoles == null || staffRoles.isEmpty()) {
+            member.setStaffAccessStatus(StaffAccessStatus.NONE);
+            member.setStaffAccessAssignedAt(null);
+            member.setStaffAccessActivatedAt(null);
+            return UserUpdateResult.noPending(member.getStaffNo());
+        }
+
+        if (member.getStaffNo() == null || member.getStaffNo().isBlank()) {
+            member.setStaffNo(generateUniqueStaffNo());
+        }
+
+        if (!memberAccess) {
+            member.setStaffAccessStatus(StaffAccessStatus.ACTIVE);
+            member.setStaffAccessAssignedAt(member.getStaffAccessAssignedAt() == null ? now : member.getStaffAccessAssignedAt());
+            member.setStaffAccessActivatedAt(member.getStaffAccessActivatedAt() == null ? now : member.getStaffAccessActivatedAt());
+            return UserUpdateResult.noPending(member.getStaffNo());
+        }
+
+        StaffAccessStatus currentStatus = member.getStaffAccessStatus() == null
+            ? StaffAccessStatus.NONE
+            : member.getStaffAccessStatus();
+        if (currentStatus == StaffAccessStatus.ACTIVE) {
+            return UserUpdateResult.noPending(member.getStaffNo());
+        }
+
+        boolean newlyPending = currentStatus != StaffAccessStatus.PENDING_ACKNOWLEDGEMENT;
+        member.setStaffAccessStatus(StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
+        member.setStaffAccessAssignedAt(member.getStaffAccessAssignedAt() == null ? now : member.getStaffAccessAssignedAt());
+        member.setStaffAccessActivatedAt(null);
+        return new UserUpdateResult(newlyPending, member.getStaffNo());
+    }
+
+    private void notifyPendingStaffAccess(Member member, UUID adminId, OffsetDateTime now) {
+        String staffNo = displayStaffNo(member);
+        String subject = "Staff access assigned";
+        String message = "Your SACCO staff access is ready. Confirm it from your member dashboard. Staff Member Number: "
+            + staffNo + ".";
+        String senderName = adminId == null ? "Administrator" : memberRepository.findById(adminId)
+            .map(Member::getFullName)
+            .orElse("Administrator");
+        createNotification(member.getId(), "STAFF_ACCESS_PENDING", "Staff Access", subject, message,
+            adminId, senderName, Map.of("staffNo", staffNo), now);
     }
 
     private Member createStaffAccount(String saccoId,
@@ -2418,7 +2495,8 @@ public class AdminService {
             throw new IllegalStateException("That phone number is already in use.");
         }
 
-        String normalizedMemberNo = generateUniqueUserId();
+        String normalizedStaffNo = generateUniqueStaffNo();
+        String internalMemberNo = internalStaffMemberNo(normalizedStaffNo);
         OffsetDateTime now = OffsetDateTime.now();
         // All staff accounts are provisioned passwordless: they receive an activation
         // email (see MinorAdminInvitationService.issueInvitation) and sign in using
@@ -2428,7 +2506,8 @@ public class AdminService {
         Member user = Member.builder()
             .id(UUID.randomUUID())
             .saccoId(saccoId)
-            .memberNo(normalizedMemberNo)
+            .memberNo(internalMemberNo)
+            .staffNo(normalizedStaffNo)
             .stationId(normalizedStationId)
             .fullName(normalizedFullName)
             .email(normalizedEmail)
@@ -2436,6 +2515,9 @@ public class AdminService {
             .signatureText(null)
             .signatureRegisteredAt(null)
             .memberAccount(false)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .staffAccessAssignedAt(now)
+            .staffAccessActivatedAt(now)
             .status(requiresClaim ? MemberStatus.INVITED : MemberStatus.ACTIVE)
             .position(primaryRole)
             .staffRoles(staffRoles)
@@ -2474,23 +2556,37 @@ public class AdminService {
     }
 
     public String nextGeneratedUserIdPreview() {
-        return generateUniqueUserId();
+        return generateUniqueStaffNo();
     }
 
-    private String generateUniqueUserId() {
-        List<String> existingIds = memberRepository.findFiveDigitMemberNumbers();
-        Set<String> usedIds = existingIds == null
-            ? Set.of()
-            : existingIds.stream()
-                .filter(id -> id != null && id.matches("[0-9]{5}"))
-                .collect(Collectors.toSet());
+    public String userIdLabel(UUID accountId) {
+        return formatUserId(accountId);
+    }
+
+    private String generateUniqueStaffNo() {
+        List<String> existingStaffIds = memberRepository.findFiveDigitStaffNumbers();
+        List<String> existingMemberIds = memberRepository.findFiveDigitMemberNumbers();
+        Set<String> usedIds = java.util.stream.Stream.concat(
+                existingStaffIds == null ? java.util.stream.Stream.empty() : existingStaffIds.stream(),
+                existingMemberIds == null ? java.util.stream.Stream.empty() : existingMemberIds.stream()
+            )
+            .filter(id -> id != null && id.matches("[0-9]{5}"))
+            .collect(Collectors.toSet());
         for (int candidate = FIRST_GENERATED_USER_ID; candidate <= LAST_GENERATED_USER_ID; candidate++) {
             String value = String.valueOf(candidate);
-            if (!usedIds.contains(value)) {
+            if (!usedIds.contains(value) && !memberRepository.existsByStaffNoIgnoreCase(value)) {
                 return value;
             }
         }
-        throw new IllegalStateException("All five-digit user IDs are already in use.");
+        throw new IllegalStateException("All five-digit staff member numbers are already in use.");
+    }
+
+    private String internalStaffMemberNo(String staffNo) {
+        String base = "STAFF-" + staffNo;
+        if (memberRepository.findByMemberNo(base).isEmpty()) {
+            return base;
+        }
+        return "STAFF-" + UUID.randomUUID();
     }
 
     private String requireValue(String value, String message) {
@@ -3135,6 +3231,17 @@ public class AdminService {
             .createdAt(now)
             .updatedAt(now)
             .build());
+    }
+
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class UserUpdateResult {
+        private boolean staffAccessPending;
+        private String staffNo;
+
+        private static UserUpdateResult noPending(String staffNo) {
+            return new UserUpdateResult(false, staffNo);
+        }
     }
 
     @lombok.Getter

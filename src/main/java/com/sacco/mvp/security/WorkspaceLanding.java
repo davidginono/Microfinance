@@ -23,7 +23,7 @@ public final class WorkspaceLanding {
         if (member == null) {
             return memberDashboard();
         }
-        return staffDashboard(Position.primaryRole(member.getStaffRolesResolved(), false), false);
+        return staffDashboard(Position.primaryRole(member.getActiveStaffRolesResolved(), false), false);
     }
 
     public static String staffDashboard(AppUserPrincipal principal) {

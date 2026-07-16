@@ -7,6 +7,8 @@
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
     const scrollRestoreStorageKey = 'saccos:restore-scroll';
+    const modalRestoreStorageKey = 'saccos:open-modal';
+    const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
@@ -137,12 +139,77 @@
         return window.location.pathname + window.location.search;
     };
 
+    const scrollablePositionKey = function (element, index) {
+        if (!element) {
+            return '';
+        }
+        const explicitKey = element.getAttribute('data-view-position-key');
+        if (explicitKey) {
+            return 'view:' + explicitKey;
+        }
+        if (element.id) {
+            return 'id:' + element.id;
+        }
+        const modal = element.closest('.app-modal-overlay');
+        const modalIdentity = identifyModal(modal);
+        if (modalIdentity) {
+            return 'modal:' + modalIdentity.type + ':' + modalIdentity.value + ':' + index;
+        }
+        const role = element.classList.contains('erp-table-scroll')
+            ? 'erp-table-scroll'
+            : element.classList.contains('app-modal-scroll')
+                ? 'app-modal-scroll'
+                : element.classList.contains('shell-sidebar-scroll')
+                    ? 'shell-sidebar-scroll'
+                    : 'scrollable';
+        return role + ':' + index;
+    };
+
+    const scrollableElements = function () {
+        return Array.from(document.querySelectorAll('[data-view-position-key], .erp-table-scroll, .app-modal-scroll, .shell-sidebar-scroll'))
+            .filter(function (element) {
+                return element instanceof HTMLElement;
+            });
+    };
+
+    const collectScrollablePositions = function () {
+        return scrollableElements()
+            .map(function (element, index) {
+                return {
+                    key: scrollablePositionKey(element, index),
+                    left: element.scrollLeft || 0,
+                    top: element.scrollTop || 0
+                };
+            })
+            .filter(function (entry) {
+                return entry.key && (entry.left > 0 || entry.top > 0);
+            });
+    };
+
+    const restoreScrollablePositions = function (positions) {
+        if (!Array.isArray(positions) || positions.length === 0) {
+            return;
+        }
+        const byKey = new Map(positions.map(function (entry) {
+            return [entry.key, entry];
+        }));
+        scrollableElements().forEach(function (element, index) {
+            const entry = byKey.get(scrollablePositionKey(element, index));
+            if (!entry) {
+                return;
+            }
+            element.scrollLeft = Math.max(Number(entry.left) || 0, 0);
+            element.scrollTop = Math.max(Number(entry.top) || 0, 0);
+        });
+    };
+
     const rememberScrollForReload = function () {
         try {
             window.sessionStorage.setItem(scrollRestoreStorageKey, JSON.stringify({
                 path: currentScrollRestorePath(),
                 x: window.scrollX || window.pageXOffset || 0,
                 y: window.scrollY || window.pageYOffset || 0,
+                containers: collectScrollablePositions(),
                 at: Date.now()
             }));
         } catch (ignored) {
@@ -158,13 +225,14 @@
         } catch (ignored) {
             return;
         }
-        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > 60000) {
+        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > restoreStateMaxAgeMs) {
             return;
         }
         const targetX = Math.max(Number(saved.x) || 0, 0);
         const targetY = Math.max(Number(saved.y) || 0, 0);
         const restore = function () {
             window.scrollTo({ left: targetX, top: targetY, behavior: 'auto' });
+            restoreScrollablePositions(saved.containers);
             schedulePageTitleRailUpdate();
         };
         window.requestAnimationFrame(function () {
@@ -172,6 +240,199 @@
             window.setTimeout(restore, 120);
         });
     };
+
+    function identifyModal(modal) {
+        if (!(modal instanceof HTMLElement)) {
+            return null;
+        }
+        const dataKeys = Object.keys(modal.dataset || {});
+        const modalKey = dataKeys.find(function (key) {
+            return /Modal$/.test(key) && modal.dataset[key];
+        });
+        if (modalKey) {
+            return {
+                type: modalKey,
+                value: modal.dataset[modalKey]
+            };
+        }
+        if (modal.id) {
+            return {
+                type: 'id',
+                value: modal.id
+            };
+        }
+        return null;
+    }
+
+    const modalMatchesIdentity = function (modal, identity) {
+        if (!identity || !(modal instanceof HTMLElement)) {
+            return false;
+        }
+        if (identity.type === 'id') {
+            return modal.id === identity.value;
+        }
+        return modal.dataset && modal.dataset[identity.type] === identity.value;
+    };
+
+    const findModalByIdentity = function (identity) {
+        if (!identity) {
+            return null;
+        }
+        if (identity.type === 'id') {
+            return document.getElementById(identity.value);
+        }
+        return Array.from(document.querySelectorAll('.app-modal-overlay')).find(function (modal) {
+            return modalMatchesIdentity(modal, identity);
+        }) || null;
+    };
+
+    const isModalOpen = function (modal) {
+        return modal instanceof HTMLElement
+            && modal.classList.contains('app-modal-overlay')
+            && (modal.classList.contains('is-open') || (modal.getAttribute('aria-hidden') === 'false' && !modal.classList.contains('hidden')));
+    };
+
+    const rememberOpenModal = function (modal) {
+        const identity = identifyModal(modal);
+        if (!identity) {
+            return;
+        }
+        try {
+            window.sessionStorage.setItem(modalRestoreStorageKey, JSON.stringify({
+                path: currentScrollRestorePath(),
+                modal: identity,
+                at: Date.now()
+            }));
+        } catch (ignored) {
+            // Storage can be unavailable in private browsing or strict browser modes.
+        }
+    };
+
+    const clearOpenModal = function (modal) {
+        try {
+            if (!modal) {
+                window.sessionStorage.removeItem(modalRestoreStorageKey);
+                return;
+            }
+            const saved = JSON.parse(window.sessionStorage.getItem(modalRestoreStorageKey) || 'null');
+            if (!saved || modalMatchesIdentity(modal, saved.modal)) {
+                window.sessionStorage.removeItem(modalRestoreStorageKey);
+            }
+        } catch (ignored) {
+            // Storage can be unavailable in private browsing or strict browser modes.
+        }
+    };
+
+    const rememberCurrentOpenModal = function () {
+        const openModal = Array.from(document.querySelectorAll('.app-modal-overlay')).find(isModalOpen);
+        if (openModal) {
+            rememberOpenModal(openModal);
+            return;
+        }
+        clearOpenModal();
+    };
+
+    const openModalElement = function (modal) {
+        if (!(modal instanceof HTMLElement)) {
+            return false;
+        }
+        modal.classList.remove('hidden');
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        rememberOpenModal(modal);
+        return true;
+    };
+
+    const restoreModalAfterReload = function () {
+        let saved;
+        try {
+            saved = JSON.parse(window.sessionStorage.getItem(modalRestoreStorageKey) || 'null');
+        } catch (ignored) {
+            return;
+        }
+        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > restoreStateMaxAgeMs) {
+            clearOpenModal();
+            return;
+        }
+        const modal = findModalByIdentity(saved.modal);
+        if (modal) {
+            openModalElement(modal);
+        }
+    };
+
+    const observeModalState = function (modal) {
+        if (!(modal instanceof HTMLElement) || modal.dataset.stateObserved === 'true') {
+            return;
+        }
+        modal.dataset.stateObserved = 'true';
+        modalStateObserver.observe(modal, {
+            attributes: true,
+            attributeFilter: ['class', 'aria-hidden']
+        });
+    };
+
+    const modalStateObserver = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+            const modal = mutation.target;
+            if (!(modal instanceof HTMLElement)) {
+                return;
+            }
+            if (isModalOpen(modal)) {
+                rememberOpenModal(modal);
+            } else {
+                clearOpenModal(modal);
+            }
+        });
+    });
+
+    const observeExistingModals = function () {
+        document.querySelectorAll('.app-modal-overlay').forEach(observeModalState);
+        const openModal = Array.from(document.querySelectorAll('.app-modal-overlay')).find(isModalOpen);
+        if (openModal) {
+            rememberOpenModal(openModal);
+        }
+    };
+
+    const observeAddedModals = function () {
+        const bodyObserver = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
+                    if (!(node instanceof HTMLElement)) {
+                        return;
+                    }
+                    if (node.classList.contains('app-modal-overlay')) {
+                        observeModalState(node);
+                    }
+                    node.querySelectorAll?.('.app-modal-overlay').forEach(observeModalState);
+                });
+            });
+        });
+        bodyObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    };
+
+    const applyPlaceholderTitles = function () {
+        document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function (field) {
+            const placeholder = field.getAttribute('placeholder');
+            if (placeholder && !field.getAttribute('title')) {
+                field.setAttribute('title', placeholder);
+            }
+        });
+    };
+
+    window.SaccosUiState = Object.assign({}, window.SaccosUiState, {
+        rememberScrollForReload: rememberScrollForReload,
+        rememberOpenModal: rememberOpenModal,
+        clearOpenModal: clearOpenModal,
+        restoreOpenModal: restoreModalAfterReload
+    });
+
+    observeExistingModals();
+    observeAddedModals();
+    applyPlaceholderTitles();
 
     document.addEventListener('submit', function (event) {
         const form = event.target instanceof HTMLFormElement ? event.target : null;
@@ -196,6 +457,21 @@
                 showPageSubmitPreloader(form);
             }
         }, 0);
+    });
+
+    window.addEventListener('pagehide', function () {
+        rememberScrollForReload();
+        rememberCurrentOpenModal();
+    });
+    window.addEventListener('beforeunload', function () {
+        rememberScrollForReload();
+        rememberCurrentOpenModal();
+    });
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') {
+            rememberScrollForReload();
+            rememberCurrentOpenModal();
+        }
     });
 
     window.addEventListener('pageshow', hidePageSubmitPreloader);
@@ -225,9 +501,228 @@
         });
     };
 
+    const initSessionInactivityPrompt = function () {
+        const prompt = document.getElementById('sessionInactivityPrompt');
+        if (!prompt || prompt.dataset.sessionTimerInitialized === 'true' || !document.body) {
+            return;
+        }
+        const stayButton = document.getElementById('sessionInactivityStayButton');
+        const logoutForm = document.getElementById('sessionInactivityLogoutForm');
+        const countdown = document.getElementById('sessionInactivityCountdown');
+        const progress = document.getElementById('sessionInactivityProgress');
+        if (!stayButton || !logoutForm || !countdown || !progress) {
+            return;
+        }
+
+        const configuredPromptMs = Number(prompt.getAttribute('data-prompt-ms'));
+        const configuredGraceMs = Number(prompt.getAttribute('data-grace-ms'));
+        if (!Number.isFinite(configuredPromptMs) || configuredPromptMs <= 0) {
+            return;
+        }
+
+        prompt.dataset.sessionTimerInitialized = 'true';
+        if (prompt.parentElement !== document.body) {
+            document.body.appendChild(prompt);
+        }
+
+        const promptMs = Math.max(configuredPromptMs, 1000);
+        const graceMs = Number.isFinite(configuredGraceMs) && configuredGraceMs > 0
+            ? Math.max(configuredGraceMs, 1000)
+            : 60000;
+        const progressShell = progress.parentElement;
+        const activityEvents = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
+        let promptTimer = null;
+        let countdownTimer = null;
+        let deadline = 0;
+        let keepalivePending = false;
+        let audioContext = null;
+        let tickTimer = null;
+        let tickCount = 0;
+
+        const promptVisible = function () {
+            return !prompt.classList.contains('hidden');
+        };
+
+        const setProgress = function (percent) {
+            const clamped = Math.max(0, Math.min(100, percent));
+            progress.style.width = clamped.toFixed(1) + '%';
+            progressShell?.setAttribute('aria-valuenow', String(Math.round(clamped)));
+        };
+
+        const stopTickTock = function () {
+            if (tickTimer) {
+                window.clearInterval(tickTimer);
+                tickTimer = null;
+            }
+        };
+
+        const playTickTock = function () {
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) {
+                return;
+            }
+            try {
+                if (!audioContext) {
+                    audioContext = new AudioContextConstructor();
+                }
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().catch(function () {});
+                }
+                const now = audioContext.currentTime;
+                const oscillator = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(tickCount % 2 === 0 ? 760 : 520, now);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.exponentialRampToValueAtTime(0.045, now + 0.015);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+                oscillator.connect(gain);
+                gain.connect(audioContext.destination);
+                oscillator.start(now);
+                oscillator.stop(now + 0.18);
+                tickCount += 1;
+            } catch (ignored) {
+                stopTickTock();
+            }
+        };
+
+        const startTickTock = function () {
+            stopTickTock();
+            tickCount = 0;
+            playTickTock();
+            tickTimer = window.setInterval(playTickTock, 1000);
+        };
+
+        const clearCountdown = function () {
+            if (countdownTimer) {
+                window.clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            stopTickTock();
+        };
+
+        const expireSession = function () {
+            clearCountdown();
+            logoutForm.submit();
+        };
+
+        const updateCountdown = function () {
+            const remainingMs = Math.max(deadline - Date.now(), 0);
+            const remainingSeconds = Math.ceil(remainingMs / 1000);
+            countdown.textContent = String(remainingSeconds);
+            setProgress(graceMs > 0 ? (remainingMs / graceMs) * 100 : 0);
+            if (remainingMs <= 0) {
+                expireSession();
+            }
+        };
+
+        const hidePrompt = function () {
+            prompt.classList.add('hidden');
+            prompt.classList.remove('flex');
+            clearCountdown();
+            deadline = 0;
+            countdown.textContent = '--';
+            setProgress(100);
+        };
+
+        const showPrompt = function () {
+            deadline = Date.now() + graceMs;
+            prompt.classList.remove('hidden');
+            prompt.classList.add('flex');
+            updateCountdown();
+            countdownTimer = window.setInterval(updateCountdown, 250);
+            startTickTock();
+            window.setTimeout(function () {
+                try {
+                    stayButton.focus({ preventScroll: true });
+                } catch (ignored) {
+                    stayButton.focus();
+                }
+            }, 0);
+        };
+
+        const keepaliveHeaders = function () {
+            const headers = {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+            const csrfHeader = prompt.getAttribute('data-csrf-header');
+            const csrfToken = prompt.getAttribute('data-csrf-token');
+            if (csrfHeader && csrfToken) {
+                headers[csrfHeader] = csrfToken;
+            }
+            return headers;
+        };
+
+        const setStayPending = function (pending) {
+            stayButton.disabled = pending;
+            stayButton.classList.toggle('opacity-60', pending);
+            stayButton.classList.toggle('cursor-not-allowed', pending);
+        };
+
+        const schedulePrompt = function () {
+            if (promptTimer) {
+                window.clearTimeout(promptTimer);
+            }
+            promptTimer = window.setTimeout(showPrompt, promptMs);
+        };
+
+        const refreshSession = function () {
+            if (keepalivePending) {
+                return;
+            }
+            keepalivePending = true;
+            setStayPending(true);
+            fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
+                method: 'POST',
+                headers: keepaliveHeaders(),
+                credentials: 'same-origin'
+            })
+                .then(function (response) {
+                    if (!response.ok || response.redirected) {
+                        throw new Error('Session keepalive failed');
+                    }
+                    hidePrompt();
+                    schedulePrompt();
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('success', prompt.getAttribute('data-refresh-success-message') || 'Session refreshed.');
+                    }
+                })
+                .catch(function () {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('error', prompt.getAttribute('data-refresh-error-message') || 'We could not refresh your session. Please sign in again if this continues.');
+                    }
+                })
+                .finally(function () {
+                    keepalivePending = false;
+                    setStayPending(false);
+                });
+        };
+
+        const handleActivity = function (event) {
+            if (promptVisible()) {
+                const target = event.target instanceof Node ? event.target : null;
+                if (target && (logoutForm.contains(target) || stayButton.contains(target))) {
+                    return;
+                }
+                refreshSession();
+                return;
+            }
+            schedulePrompt();
+        };
+
+        activityEvents.forEach(function (eventName) {
+            window.addEventListener(eventName, handleActivity, { passive: true });
+        });
+        stayButton.addEventListener('click', refreshSession);
+        logoutForm.addEventListener('submit', clearCountdown);
+        schedulePrompt();
+    };
+
     window.addEventListener('load', function () {
         syncShellNavHeight();
         schedulePageTitleRailUpdate();
+        applyPlaceholderTitles();
         document.querySelectorAll('[data-toast-message]').forEach(function (element) {
             const message = element.getAttribute('data-toast-message');
             if (!message) {
@@ -246,6 +741,8 @@
             window.scrollToFeedback(initialAlert);
         }
         restoreScrollAfterReload();
+        restoreModalAfterReload();
+        initSessionInactivityPrompt();
     });
 
     window.addEventListener('resize', function () {
@@ -257,6 +754,7 @@
         syncShellNavHeight();
         schedulePageTitleRailUpdate();
     });
+    initSessionInactivityPrompt();
 
     const notificationToggle = document.getElementById('notificationToggle');
     const notificationPanel = document.getElementById('notificationPanel');

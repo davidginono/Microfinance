@@ -339,6 +339,24 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </p>
     </div>
 
+    <c:if test="${not empty pendingStaffAccess}">
+        <div class="erp-panel border-cyan-200 bg-cyan-50/70">
+            <div class="erp-panel-body flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p class="erp-widget-title text-cyan-900">Staff Access</p>
+                    <p class="mt-1 text-sm text-slate-700">
+                        Staff Member Number <span class="font-semibold text-slate-900">${pendingStaffAccess.staffNo}</span>
+                        is ready<c:if test="${not empty pendingStaffAccess.roles}"> for ${pendingStaffAccess.roles}</c:if>.
+                    </p>
+                </div>
+                <form action="/app/staff-access/acknowledge" method="post" class="shrink-0">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <button type="submit" class="app-btn btn-primary">Activate Staff Access</button>
+                </form>
+            </div>
+        </div>
+    </c:if>
+
     <div class="erp-stat-grid">
         <a href="/app/loan-applications" class="erp-stat-card erp-stat-card-interactive erp-stat-blue block no-underline">
             <div class="erp-stat-main">

@@ -488,14 +488,6 @@
             button.addEventListener('click', closeSaccoModal);
         });
 
-        document.querySelectorAll('[data-sacco-modal]').forEach((modal) => {
-            modal.addEventListener('click', function (event) {
-                if (event.target === modal) {
-                    closeSaccoModal();
-                }
-            });
-        });
-
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 closeSaccoModal();

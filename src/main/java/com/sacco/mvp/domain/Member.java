@@ -29,6 +29,9 @@ public class Member {
     @Column(name = "member_no", nullable = false, unique = true)
     private String memberNo;
 
+    @Column(name = "staff_no")
+    private String staffNo;
+
     @Column(name = "station_id")
     private String stationId;
 
@@ -50,6 +53,17 @@ public class Member {
 
     @Column(name = "is_member")
     private Boolean memberAccount;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "staff_access_status", nullable = false)
+    private StaffAccessStatus staffAccessStatus = StaffAccessStatus.NONE;
+
+    @Column(name = "staff_access_assigned_at")
+    private OffsetDateTime staffAccessAssignedAt;
+
+    @Column(name = "staff_access_activated_at")
+    private OffsetDateTime staffAccessActivatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -89,5 +103,32 @@ public class Member {
             roles.add(position);
         }
         return roles;
+    }
+
+    @Transient
+    public boolean isStaffAccessActive() {
+        StaffAccessStatus status = staffAccessStatus == null ? StaffAccessStatus.NONE : staffAccessStatus;
+        if (status == StaffAccessStatus.ACTIVE) {
+            return !getStaffRolesResolved().isEmpty();
+        }
+        return status == StaffAccessStatus.NONE
+            && (staffNo == null || staffNo.isBlank())
+            && staffAccessAssignedAt == null
+            && staffAccessActivatedAt == null
+            && !getStaffRolesResolved().isEmpty();
+    }
+
+    @Transient
+    public boolean isStaffAccessPendingAcknowledgement() {
+        StaffAccessStatus status = staffAccessStatus == null ? StaffAccessStatus.NONE : staffAccessStatus;
+        return status == StaffAccessStatus.PENDING_ACKNOWLEDGEMENT
+            && staffNo != null
+            && !staffNo.isBlank()
+            && !getStaffRolesResolved().isEmpty();
+    }
+
+    @Transient
+    public Set<Position> getActiveStaffRolesResolved() {
+        return isStaffAccessActive() ? getStaffRolesResolved() : new LinkedHashSet<>();
     }
 }

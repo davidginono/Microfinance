@@ -5,6 +5,27 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/modal-shell.jspf" %>
+<style>
+    [data-minor-admin-form] input,
+    [data-minor-admin-form] select,
+    [data-minor-admin-form] .app-btn {
+        height: 3rem;
+        min-height: 3rem;
+    }
+
+    [data-minor-admin-form] input,
+    [data-minor-admin-form] select {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    [data-minor-admin-form] .app-btn {
+        align-items: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+</style>
 
 <div class="erp-page-header">
     <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / SACCO Registration / SACCOS Admins Registration" /></p>
@@ -33,7 +54,7 @@
                 </div>
             </div>
 
-            <form action="/admin/saccos/minor-admins" method="post" class="erp-panel-body grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <form action="/admin/saccos/minor-admins" method="post" class="erp-panel-body grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-minor-admin-form>
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -220,7 +241,7 @@
                         </svg>
                     </button>
                 </div>
-                <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}" method="post" class="app-modal-body space-y-4" data-minor-admin-edit-form>
+                <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}" method="post" class="app-modal-body space-y-4" data-minor-admin-edit-form data-minor-admin-form>
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
                     <label class="block text-sm font-semibold text-slate-700">
@@ -299,7 +320,7 @@
                             </svg>
                         </button>
                     </div>
-                    <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/delete" method="post" class="app-modal-body space-y-4">
+                    <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/delete" method="post" class="app-modal-body space-y-4" data-minor-admin-form>
                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                         <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                             Type <span class="font-semibold">delete ${minorAdmin.fullName}</span> to confirm.
@@ -390,14 +411,6 @@
 
         document.querySelectorAll('[data-minor-admin-modal-close]').forEach((button) => {
             button.addEventListener('click', closeMinorAdminModal);
-        });
-
-        document.querySelectorAll('[data-minor-admin-modal]').forEach((modal) => {
-            modal.addEventListener('click', function (event) {
-                if (event.target === modal) {
-                    closeMinorAdminModal();
-                }
-            });
         });
 
         document.addEventListener('keydown', function (event) {

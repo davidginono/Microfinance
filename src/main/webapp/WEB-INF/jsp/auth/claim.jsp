@@ -49,6 +49,9 @@
             <c:otherwise>
                 <div class="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <p><span class="font-semibold">${memberFullName}</span></p>
+                    <c:if test="${not empty staffNo}">
+                        <p class="mt-1 text-xs text-slate-500">Staff Member Number ${staffNo}</p>
+                    </c:if>
                     <p class="text-xs text-slate-500">SACCO ${memberSaccoId}<c:if test="${not empty memberStationId}"> &middot; Station ${memberStationId}</c:if></p>
                     <p class="mt-2 text-xs text-slate-500"><c:out value="${otpDeliveryText}" /></p>
                 </div>

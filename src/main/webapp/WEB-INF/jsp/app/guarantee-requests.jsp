@@ -371,14 +371,6 @@
             button.addEventListener("click", closeAllGuaranteeModals);
         });
 
-        document.querySelectorAll("[data-guarantee-modal]").forEach((modal) => {
-            modal.addEventListener("click", (event) => {
-                if (event.target === modal) {
-                    closeAllGuaranteeModals();
-                }
-            });
-        });
-
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 closeAllGuaranteeModals();

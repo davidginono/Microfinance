@@ -2052,14 +2052,6 @@
             button.addEventListener('click', closeAllProductModals);
         });
 
-        document.querySelectorAll('[data-product-modal]').forEach((modal) => {
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    closeAllProductModals();
-                }
-            });
-        });
-
         const initialModalTarget = document.querySelector('[data-open-product-modal]');
         if (initialModalTarget) {
             const key = initialModalTarget.getAttribute('data-open-product-modal');

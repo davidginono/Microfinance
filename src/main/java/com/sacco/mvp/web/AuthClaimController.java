@@ -39,6 +39,7 @@ public class AuthClaimController {
             model.addAttribute("memberFullName", member.getFullName());
             model.addAttribute("memberSaccoId", member.getSaccoId());
             model.addAttribute("memberStationId", member.getStationId());
+            model.addAttribute("staffNo", member.getStaffNo());
             model.addAttribute("maskedEmail", maskEmail(member.getEmail()));
             model.addAttribute("maskedPhone", maskPhone(member.getPhone()));
             model.addAttribute("invitationExpiresAt", ctx.invitation().getExpiresAt());
@@ -81,7 +82,7 @@ public class AuthClaimController {
                 throw new IllegalStateException("Passwords do not match.");
             }
             Member member = invitationService.claimInvitation(token, otpCode, password);
-            log.info("Staff account activated memberNo={}", member.getMemberNo());
+            log.info("Staff account activated staffNo={}", member.getStaffNo());
             ra.addFlashAttribute("loginMessage",
                 "Your account is now active. Sign in using your staff member number and password or request an email code.");
             return "redirect:/login?claimed";

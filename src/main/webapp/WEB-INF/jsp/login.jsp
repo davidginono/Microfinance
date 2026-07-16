@@ -580,13 +580,63 @@
         if (!toggles.length || !tabs.length) {
             return;
         }
+        const tabValues = {};
+        const fieldNames = ['username', 'password'];
+        function panelFor(key) {
+            return Array.from(tabs).find((panel) => panel.getAttribute('data-login-tab') === key);
+        }
+        function activeKey() {
+            const activeToggle = Array.from(toggles).find((button) => button.dataset.active === 'true');
+            return activeToggle ? activeToggle.getAttribute('data-login-tab-toggle') : null;
+        }
+        function fieldsFor(key) {
+            const panel = panelFor(key);
+            if (!panel) {
+                return {};
+            }
+            return fieldNames.reduce((fields, name) => {
+                fields[name] = panel.querySelector('input[name="' + name + '"]');
+                return fields;
+            }, {});
+        }
+        function captureValues(key) {
+            const fields = fieldsFor(key);
+            tabValues[key] = fieldNames.reduce((values, name) => {
+                values[name] = fields[name] ? fields[name].value : '';
+                return values;
+            }, {});
+        }
+        function applyValues(key, fallbackValues) {
+            const fields = fieldsFor(key);
+            const values = tabValues[key] || fallbackValues || {};
+            fieldNames.forEach((name) => {
+                if (fields[name] && !fields[name].value && values[name]) {
+                    fields[name].value = values[name];
+                }
+            });
+            captureValues(key);
+        }
+        tabs.forEach((panel) => {
+            const key = panel.getAttribute('data-login-tab');
+            fieldNames.forEach((name) => {
+                const field = panel.querySelector('input[name="' + name + '"]');
+                field?.addEventListener('input', () => captureValues(key));
+            });
+            captureValues(key);
+        });
         function activate(key) {
+            const previousKey = activeKey();
+            if (previousKey) {
+                captureValues(previousKey);
+            }
+            const previousValues = previousKey ? tabValues[previousKey] : null;
             toggles.forEach((button) => {
                 button.dataset.active = String(button.getAttribute('data-login-tab-toggle') === key);
             });
             tabs.forEach((panel) => {
                 panel.classList.toggle('hidden', panel.getAttribute('data-login-tab') !== key);
             });
+            applyValues(key, previousValues);
         }
         toggles.forEach((button) => {
             button.addEventListener('click', () => activate(button.getAttribute('data-login-tab-toggle')));
@@ -1004,11 +1054,6 @@
             });
             document.querySelectorAll('[data-forgot-password-close]').forEach((button) => {
                 button.addEventListener('click', close);
-            });
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    close();
-                }
             });
 
             actionButton.addEventListener('click', async () => {

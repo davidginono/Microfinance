@@ -156,6 +156,7 @@ public class StaffMfaService {
         HttpSession session = request.getSession(false);
         UUID memberId = pendingMemberId(session);
         String email = pendingEmail(session);
+        boolean staffLogin = "staff-password".equals(pendingLoginType(session));
         if (memberId == null) {
             throw new IllegalStateException("Your sign-in session expired. Start again from the login page.");
         }
@@ -164,12 +165,15 @@ public class StaffMfaService {
 
         Member member = memberRepository.findById(memberId)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> existing.isMemberAccess() || !existing.getStaffRolesResolved().isEmpty())
+            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
             .orElseThrow(() -> new IllegalStateException("Your account is no longer active. Contact the administrator."));
 
         AppUserPrincipal principal = new AppUserPrincipal(
             member,
-            userClaimService.effectiveClaims(member.getId(), member.getStaffRolesResolved(), member.isMemberAccess())
+            staffLogin
+                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
+                : userClaimService.defaultClaims(java.util.List.of(), true),
+            staffLogin
         );
         installSecurityContext(principal, request);
         clearPending(session);
@@ -195,6 +199,14 @@ public class StaffMfaService {
         return delivery == null || delivery.userMessage() == null || delivery.userMessage().isBlank()
             ? fallback
             : delivery.userMessage();
+    }
+
+    private String pendingLoginType(HttpSession session) {
+        if (session == null) {
+            return "";
+        }
+        Object loginType = session.getAttribute(PENDING_LOGIN_TYPE_ATTR);
+        return loginType instanceof String value ? value : "";
     }
 
     private void storePendingChallenge(HttpSession session, Member member, String landingUrl, String loginType) {

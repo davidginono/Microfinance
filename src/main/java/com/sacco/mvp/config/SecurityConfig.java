@@ -105,7 +105,11 @@ public class SecurityConfig {
                     String redirectTarget = "/login?error";
                     Member auditMember = null;
                     if (username != null && !username.isBlank()) {
-                        java.util.Optional<Member> matchedMember = memberRepository.findByMemberNo(username.trim());
+                        boolean staffPasswordLogin = "staff-password".equals(loginType);
+                        String normalizedUsername = username.trim().toUpperCase(java.util.Locale.ROOT);
+                        java.util.Optional<Member> matchedMember = staffPasswordLogin
+                            ? memberRepository.findByStaffNo(normalizedUsername)
+                            : memberRepository.findByMemberNo(normalizedUsername);
                         auditMember = matchedMember.orElse(null);
                         message = matchedMember
                             .map(member -> {
@@ -123,11 +127,14 @@ public class SecurityConfig {
                                             : "This station workspace has been suspended: " + reason.trim();
                                     })
                                     .orElse(null);
-                                if (suspensionReason != null && !member.getStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)) {
+                                if (suspensionReason != null && !member.getActiveStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)) {
                                     return suspensionReason;
                                 }
-                                if ("staff-password".equals(loginType)) {
-                                    if (member.getStaffRolesResolved().isEmpty()) {
+                                if (staffPasswordLogin) {
+                                    if (member.isStaffAccessPendingAcknowledgement()) {
+                                        return "Staff access is pending acknowledgement. Sign in through Members to activate it.";
+                                    }
+                                    if (!member.isStaffAccessActive()) {
                                         return "This account has no staff access. Sign in through Members instead.";
                                     }
                                     return "Invalid staff number or password.";
@@ -137,7 +144,9 @@ public class SecurityConfig {
                                 }
                                 return "Invalid member number or password.";
                             })
-                            .orElse("No member account was found for that member number. Please register yourself first.");
+                            .orElse(staffPasswordLogin
+                                ? "No active staff account was found for that staff member number."
+                                : "No member account was found for that member number. Please register yourself first.");
                     }
                     if ("staff-password".equals(loginType)) {
                         redirectTarget = "/login?error&tab=staff";
@@ -229,7 +238,7 @@ public class SecurityConfig {
 
                     var ssoMember = memberRepository.findByEmailIgnoreCase(email)
                         .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-                        .filter(member -> member.isMemberAccess() || !member.getStaffRolesResolved().isEmpty())
+                        .filter(member -> member.isMemberAccess() || member.isStaffAccessActive())
                         .orElse(null);
                     if (ssoMember == null) {
                         auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "No active SACCO account is linked to that Google email.");
@@ -237,7 +246,8 @@ public class SecurityConfig {
                         response.sendRedirect("/login?error");
                         return;
                     }
-                    if (!ssoMember.getStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)
+                    boolean ssoStaffSession = !ssoMember.isMemberAccess();
+                    if (!ssoMember.getActiveStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)
                         && ssoMember.getSaccoId() != null
                         && !ssoMember.getSaccoId().isBlank()
                         && ssoMember.getStationId() != null
@@ -256,7 +266,10 @@ public class SecurityConfig {
 
                     AppUserPrincipal principal = new AppUserPrincipal(
                         ssoMember,
-                        userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getStaffRolesResolved(), ssoMember.isMemberAccess())
+                        ssoStaffSession
+                            ? userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getActiveStaffRolesResolved(), ssoMember.isMemberAccess())
+                            : userClaimService.defaultClaims(java.util.List.of(), true),
+                        ssoStaffSession
                     );
 
                     UsernamePasswordAuthenticationToken localAuth =
@@ -334,18 +347,26 @@ public class SecurityConfig {
                 }
             }
 
-            private String resolveCurrentLoginType() {
-                RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-                if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
-                    return "";
-                }
-                HttpServletRequest request = servletAttributes.getRequest();
-                return request == null ? "" : String.valueOf(request.getParameter("loginType"));
-            }
         };
-        provider.setUserDetailsService(userDetailsService);
+        provider.setUserDetailsService(username -> {
+            String loginType = resolveCurrentLoginType();
+            String normalizedUsername = username == null ? "" : username.trim().toUpperCase(java.util.Locale.ROOT);
+            if ("staff-password".equals(loginType)) {
+                return userDetailsService.loadStaffByStaffNo(normalizedUsername);
+            }
+            return userDetailsService.loadMemberByMemberNo(normalizedUsername);
+        });
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
+    }
+
+    private String resolveCurrentLoginType() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return "";
+        }
+        HttpServletRequest request = servletAttributes.getRequest();
+        return request == null ? "" : String.valueOf(request.getParameter("loginType"));
     }
 
     private String suspendedMessage(SaccoStation station) {
@@ -370,8 +391,12 @@ public class SecurityConfig {
         String stationId = principal == null ? (member == null ? null : member.getStationId()) : principal.getStationId();
         boolean staff = principal != null
             ? principal.getStaffRoles() != null && !principal.getStaffRoles().isEmpty()
-            : member != null && !member.getStaffRolesResolved().isEmpty();
-        String memberNo = principal == null ? (member == null ? null : member.getMemberNo()) : principal.getUsername();
+            : member != null && member.isStaffAccessActive();
+        String memberNo = principal == null
+            ? (member == null ? null : (staff && member.getStaffNo() != null && !member.getStaffNo().isBlank()
+                ? member.getStaffNo()
+                : member.getMemberNo()))
+            : principal.getUsername();
         java.util.Map<String, Object> details = new java.util.LinkedHashMap<>();
         details.put("result", status == AuditEventStatus.FAIL ? "ERROR" : "SUCCESS");
         details.put("method", method);

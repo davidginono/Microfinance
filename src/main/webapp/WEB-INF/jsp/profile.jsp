@@ -137,6 +137,9 @@
                 <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <div class="font-semibold text-slate-800">${profileMember.fullName}</div>
                     <div class="mt-1">${profileMember.memberNo}</div>
+                    <c:if test="${not empty profileMember.staffNo}">
+                        <div class="mt-1">Staff Member Number: ${profileMember.staffNo}</div>
+                    </c:if>
                     <c:if test="${not empty profileMember.email}">
                         <div class="mt-1">${profileMember.email}</div>
                     </c:if>

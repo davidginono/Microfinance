@@ -29,6 +29,12 @@ ALTER TABLE IF EXISTS public.audit_log
     ADD COLUMN IF NOT EXISTS reference_value character varying(255),
     ADD COLUMN IF NOT EXISTS request_metadata jsonb;
 
+ALTER TABLE IF EXISTS public.members
+    ADD COLUMN IF NOT EXISTS staff_no character varying(255),
+    ADD COLUMN IF NOT EXISTS staff_access_status character varying(64) NOT NULL DEFAULT 'NONE',
+    ADD COLUMN IF NOT EXISTS staff_access_assigned_at timestamp(6) with time zone,
+    ADD COLUMN IF NOT EXISTS staff_access_activated_at timestamp(6) with time zone;
+
 CREATE INDEX IF NOT EXISTS idx_audit_log_status_created_at
     ON public.audit_log (event_status, created_at DESC);
 
@@ -123,8 +129,16 @@ SET sacco_id = NULL,
     station_id = NULL,
     "position" = 'ADMIN',
     status = 'ACTIVE',
-    is_member = false
+    is_member = false,
+    staff_no = COALESCE(NULLIF(staff_no, ''), member_no),
+    staff_access_status = 'ACTIVE',
+    staff_access_assigned_at = COALESCE(staff_access_assigned_at, created_at, now()),
+    staff_access_activated_at = COALESCE(staff_access_activated_at, now())
 WHERE id IN (SELECT id FROM _reset_keep_members);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_members_staff_no
+    ON public.members (lower(staff_no))
+    WHERE staff_no IS NOT NULL;
 
 DELETE FROM public.sms_usage_ledger;
 DELETE FROM public.station_sms_accounts;
