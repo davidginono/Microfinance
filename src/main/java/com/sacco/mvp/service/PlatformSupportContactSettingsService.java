@@ -41,6 +41,12 @@ public class PlatformSupportContactSettingsService {
             .orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public PlatformSupportContactSettings sidebarContact() {
+        return repository.findById(PlatformSupportContactSettings.DEFAULT_ID)
+            .orElseGet(() -> defaultSettings(OffsetDateTime.now()));
+    }
+
     @Transactional
     public PlatformSupportContactSettings updateContact(String displayName,
                                                         String displayRole,

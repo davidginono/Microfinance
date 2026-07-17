@@ -2662,7 +2662,12 @@ public class AppController {
     }
 
     private String directGuarantorOtpIntro(LoanApplication application) {
+        String applicantName = directOtpApplicantName(application);
+        String loanProductName = directOtpLoanProductName(application);
         List<String> summary = new ArrayList<>();
+        if (applicantName != null) {
+            summary.add("Applicant: " + applicantName);
+        }
         if (application.getApplicationNumber() != null) {
             summary.add("Application #" + application.getApplicationNumber());
         }
@@ -2672,16 +2677,39 @@ public class AppController {
         if (application.getTenorMonths() != null) {
             summary.add("Tenure: " + application.getTenorMonths() + " month(s)");
         }
-        if (application.getLoanType() != null) {
-            summary.add("Product: " + application.getLoanType().getDisplayLabel());
+        if (loanProductName != null) {
+            summary.add("Loan Product: " + loanProductName);
         }
         String requestSummary = summary.isEmpty()
             ? "Loan request details were not available."
             : String.join("; ", summary) + ".";
-        return "Share this OTP with the applicant only if you approve being listed as guarantor for this loan application."
+        return "Share this OTP with " + (applicantName == null ? "the applicant" : applicantName)
+            + " only if you approve being listed as guarantor for this loan application."
             + System.lineSeparator()
             + "Request summary: "
             + requestSummary;
+    }
+
+    private String directOtpApplicantName(LoanApplication application) {
+        if (application == null || application.getApplicantMemberId() == null) {
+            return null;
+        }
+        return memberRepository.findById(application.getApplicantMemberId())
+            .map(Member::getFullName)
+            .map(String::trim)
+            .filter(name -> !name.isBlank())
+            .orElse(null);
+    }
+
+    private String directOtpLoanProductName(LoanApplication application) {
+        if (application == null) {
+            return null;
+        }
+        String productName = loanProductDisplayService.displayName(application);
+        if (productName != null && !productName.isBlank() && !"-".equals(productName.trim())) {
+            return productName.trim();
+        }
+        return application.getLoanType() == null ? null : application.getLoanType().getDisplayLabel();
     }
 
     private void addDirectGuarantorOtpFlash(RedirectAttributes ra, DirectGuarantorOtpIssueSummary summary) {

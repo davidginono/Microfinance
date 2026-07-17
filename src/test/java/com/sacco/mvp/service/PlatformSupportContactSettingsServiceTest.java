@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +52,20 @@ class PlatformSupportContactSettingsServiceTest {
         visible.setEmail("");
 
         assertNull(service.visibleContact());
+    }
+
+    @Test
+    void sidebarContactReturnsDefaultWithoutPersistingWhenMissing() {
+        PlatformSupportContactSettingsRepository repository = Mockito.mock(PlatformSupportContactSettingsRepository.class);
+        when(repository.findById(PlatformSupportContactSettings.DEFAULT_ID)).thenReturn(Optional.empty());
+        PlatformSupportContactSettingsService service = new PlatformSupportContactSettingsService(repository, Mockito.mock(AuditService.class));
+
+        PlatformSupportContactSettings contact = service.sidebarContact();
+
+        assertEquals("Platform Support", contact.getDisplayName());
+        assertEquals("Super Admin Support", contact.getDisplayRole());
+        assertFalse(contact.isVisible());
+        verify(repository, never()).save(any(PlatformSupportContactSettings.class));
     }
 
     @Test

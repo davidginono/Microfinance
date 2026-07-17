@@ -170,7 +170,7 @@ public class CurrentUserModelAdvice {
         boolean workspaceUser = principal.hasRole(Position.MEMBER)
             || principal.hasRole(Position.MINOR_ADMIN)
             || principal.isStaffSession();
-        return workspaceUser ? platformSupportContactSettingsService.visibleContact() : null;
+        return workspaceUser ? platformSupportContactSettingsService.sidebarContact() : null;
     }
 
     private ActiveSaccoBrand resolveActiveSaccoBrand(AppUserPrincipal principal) {

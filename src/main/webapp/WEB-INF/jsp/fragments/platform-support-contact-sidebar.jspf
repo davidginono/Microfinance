@@ -2,23 +2,30 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <c:if test="${not empty platformSupportContact}">
     <div class="mt-2 rounded-md border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 shadow-sm">
-        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="support.platformContact" text="Platform Contact" /></p>
+        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><spring:message code="support.platformContact" text="Contact Details" /></p>
         <p class="mt-1 text-sm font-semibold text-slate-800"><c:out value="${platformSupportContact.displayName}" /></p>
         <c:if test="${not empty platformSupportContact.displayRole}">
             <p class="mt-0.5 text-[11px] font-semibold text-slate-500"><c:out value="${platformSupportContact.displayRole}" /></p>
         </c:if>
-        <div class="mt-2 space-y-1">
-            <c:if test="${not empty platformSupportContact.phone}">
-                <a href="${platformSupportContact.phoneHref}" class="block break-words font-semibold text-cyan-800 hover:text-cyan-900">
-                    <spring:message code="support.platformContact.phone" text="Phone" />: <c:out value="${platformSupportContact.phone}" />
-                </a>
-            </c:if>
-            <c:if test="${not empty platformSupportContact.email}">
-                <a href="${platformSupportContact.emailHref}" class="block break-words font-semibold text-cyan-800 hover:text-cyan-900">
-                    <spring:message code="support.platformContact.email" text="Email" />: <c:out value="${platformSupportContact.email}" />
-                </a>
-            </c:if>
-        </div>
+        <c:choose>
+            <c:when test="${platformSupportContact.visible}">
+                <div class="mt-2 space-y-1">
+                    <c:if test="${not empty platformSupportContact.phone}">
+                        <a href="${platformSupportContact.phoneHref}" class="block break-words font-semibold text-cyan-800 hover:text-cyan-900">
+                            <spring:message code="support.platformContact.phone" text="Phone" />: <c:out value="${platformSupportContact.phone}" />
+                        </a>
+                    </c:if>
+                    <c:if test="${not empty platformSupportContact.email}">
+                        <a href="${platformSupportContact.emailHref}" class="block break-words font-semibold text-cyan-800 hover:text-cyan-900">
+                            <spring:message code="support.platformContact.email" text="Email" />: <c:out value="${platformSupportContact.email}" />
+                        </a>
+                    </c:if>
+                </div>
+            </c:when>
+            <c:otherwise>
+                <p class="mt-2 leading-5 text-slate-500"><spring:message code="support.platformContact.notConfigured" text="Contact details are not configured yet." /></p>
+            </c:otherwise>
+        </c:choose>
         <c:if test="${not empty platformSupportContact.officeHours}">
             <p class="mt-2 leading-5"><span class="font-semibold text-slate-700"><spring:message code="support.platformContact.hours" text="Hours" />:</span> <c:out value="${platformSupportContact.officeHours}" /></p>
         </c:if>

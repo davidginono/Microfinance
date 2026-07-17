@@ -63,7 +63,7 @@ class CurrentUserModelAdviceTest {
             .phone("+255 746 359 369")
             .email("support@example.com")
             .build();
-        when(supportContacts.visibleContact()).thenReturn(contact);
+        when(supportContacts.sidebarContact()).thenReturn(contact);
         CurrentUserModelAdvice advice = advice(
             request,
             mock(AdminScopeService.class),
@@ -78,7 +78,7 @@ class CurrentUserModelAdviceTest {
         assertThat(advice.platformSupportContact(memberPrincipal())).isSameAs(contact);
         assertThat(advice.platformSupportContact(staffPrincipal(Position.MANAGER))).isSameAs(contact);
         assertThat(advice.platformSupportContact(staffPrincipal(Position.MINOR_ADMIN))).isSameAs(contact);
-        verify(supportContacts, org.mockito.Mockito.times(3)).visibleContact();
+        verify(supportContacts, org.mockito.Mockito.times(3)).sidebarContact();
     }
 
     @Test
