@@ -28,15 +28,13 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     }
 
     Optional<Member> findByMemberNo(String memberNo);
+    boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
     Optional<Member> findByStaffNo(String staffNo);
     boolean existsByStaffNoIgnoreCase(String staffNo);
 
-    @Query(value = "select member_no from members where member_no ~ '^[0-9]{5}$'", nativeQuery = true)
-    List<String> findFiveDigitMemberNumbers();
-
-    @Query(value = "select staff_no from members where staff_no ~ '^[0-9]{5}$'", nativeQuery = true)
-    List<String> findFiveDigitStaffNumbers();
+    @Query(value = "select nextval('public.staff_number_seq')", nativeQuery = true)
+    long nextStaffNumberValue();
 
     Optional<Member> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);

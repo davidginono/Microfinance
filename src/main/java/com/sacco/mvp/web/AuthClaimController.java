@@ -84,7 +84,7 @@ public class AuthClaimController {
             Member member = invitationService.claimInvitation(token, otpCode, password);
             log.info("Staff account activated staffNo={}", member.getStaffNo());
             ra.addFlashAttribute("loginMessage",
-                "Your account is now active. Sign in using your staff member number and password or request an email code.");
+                "Your account is now active. Sign in using your staff number and password or request an email code.");
             return "redirect:/login?claimed";
         } catch (IllegalStateException ex) {
             ra.addFlashAttribute("claimError", ex.getMessage());

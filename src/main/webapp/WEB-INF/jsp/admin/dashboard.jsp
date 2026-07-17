@@ -141,7 +141,6 @@
                     <div class="flex items-center justify-between gap-3">
                         <p class="font-semibold text-slate-900">${incident.subject}</p>
                         <div class="flex gap-2 text-xs font-semibold">
-                            <span class="rounded-full bg-rose-50 px-3 py-1 text-rose-700">${incident.severity}</span>
                             <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">${incident.status}</span>
                         </div>
                     </div>

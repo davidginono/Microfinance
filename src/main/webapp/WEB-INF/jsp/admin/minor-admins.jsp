@@ -33,6 +33,13 @@
     <p class="erp-page-subtitle"><spring:message code="admin.minorAdmins.subtitle" text="Register SACCOS Admin accounts under the correct station." /></p>
 </div>
 
+<c:if test="${not empty createdMinorAdminStaffNumber}">
+    <div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800" aria-live="polite">
+        <p class="text-xs font-semibold uppercase tracking-wide">Created SACCOS Admin Staff Number</p>
+        <p class="mt-1 text-sm font-semibold">${createdMinorAdminStaffNumber}</p>
+    </div>
+</c:if>
+
 <c:choose>
     <c:when test="${empty registeredSaccos}">
         <div class="erp-panel overflow-hidden">
@@ -77,11 +84,6 @@
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="admin.saccoRegistry.station" text="Station" />
                     <select id="minorAdminStationSelect" name="stationId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
-                </label>
-
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="admin.users.userId" text="User ID" />
-                    <input type="text" readonly aria-readonly="true" value="${nextGeneratedUserId}" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

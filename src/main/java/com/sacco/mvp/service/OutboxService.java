@@ -28,11 +28,17 @@ public class OutboxService {
      */
     public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
                         Map<String, Object> details) {
-        enqueue(aggregateType, aggregateId, eventType, recipientId, null, null, details);
+        enqueue(aggregateType, aggregateId, eventType, recipientId, null, null, null, details);
     }
 
     public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
                         String saccoId, String stationId,
+                        Map<String, Object> details) {
+        enqueue(aggregateType, aggregateId, eventType, recipientId, null, saccoId, stationId, details);
+    }
+
+    public void enqueue(String aggregateType, UUID aggregateId, String eventType, UUID recipientId,
+                        UUID actorId, String saccoId, String stationId,
                         Map<String, Object> details) {
         if (isDuplicate(aggregateType, aggregateId, eventType, recipientId)) {
             log.info("Skipping duplicate outbox event: aggregateType={}, aggregateId={}, eventType={}, recipientId={}",
@@ -41,6 +47,7 @@ public class OutboxService {
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("recipientId", recipientId);
+        payload.put("actorId", actorId);
         payload.put("eventType", eventType);
         payload.put("saccoId", saccoId);
         payload.put("stationId", stationId);

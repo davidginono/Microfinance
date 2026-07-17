@@ -9,6 +9,12 @@
     const scrollRestoreStorageKey = 'saccos:restore-scroll';
     const modalRestoreStorageKey = 'saccos:open-modal';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
+    const isAdminWorkspacePath = function (path) {
+        return path === '/admin' || path.indexOf('/admin/') === 0;
+    };
+    const isAdminWorkspace = function () {
+        return isAdminWorkspacePath(window.location.pathname || '');
+    };
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
@@ -138,6 +144,13 @@
     const currentScrollRestorePath = function () {
         return window.location.pathname + window.location.search;
     };
+    const scrollRestorePathname = function (path) {
+        try {
+            return new URL(path || '/', window.location.origin).pathname;
+        } catch (ignored) {
+            return '';
+        }
+    };
 
     const scrollablePositionKey = function (element, index) {
         if (!element) {
@@ -186,7 +199,7 @@
             });
     };
 
-    const restoreScrollablePositions = function (positions) {
+    const restoreScrollablePositions = function (positions, behavior) {
         if (!Array.isArray(positions) || positions.length === 0) {
             return;
         }
@@ -198,8 +211,18 @@
             if (!entry) {
                 return;
             }
-            element.scrollLeft = Math.max(Number(entry.left) || 0, 0);
-            element.scrollTop = Math.max(Number(entry.top) || 0, 0);
+            const targetLeft = Math.max(Number(entry.left) || 0, 0);
+            const targetTop = Math.max(Number(entry.top) || 0, 0);
+            if (typeof element.scrollTo === 'function') {
+                element.scrollTo({
+                    left: targetLeft,
+                    top: targetTop,
+                    behavior: behavior || 'auto'
+                });
+            } else {
+                element.scrollLeft = targetLeft;
+                element.scrollTop = targetTop;
+            }
         });
     };
 
@@ -207,6 +230,7 @@
         try {
             window.sessionStorage.setItem(scrollRestoreStorageKey, JSON.stringify({
                 path: currentScrollRestorePath(),
+                pathname: window.location.pathname,
                 x: window.scrollX || window.pageXOffset || 0,
                 y: window.scrollY || window.pageYOffset || 0,
                 containers: collectScrollablePositions(),
@@ -217,6 +241,19 @@
         }
     };
 
+    const shouldRestoreSavedScroll = function (saved) {
+        if (!saved || Date.now() - Number(saved.at || 0) > restoreStateMaxAgeMs) {
+            return false;
+        }
+        if (saved.path === currentScrollRestorePath()) {
+            return true;
+        }
+        const savedPathname = saved.pathname || scrollRestorePathname(saved.path);
+        return isAdminWorkspace()
+            && isAdminWorkspacePath(savedPathname)
+            && savedPathname === window.location.pathname;
+    };
+
     const restoreScrollAfterReload = function () {
         let saved;
         try {
@@ -225,14 +262,15 @@
         } catch (ignored) {
             return;
         }
-        if (!saved || saved.path !== currentScrollRestorePath() || Date.now() - Number(saved.at || 0) > restoreStateMaxAgeMs) {
+        if (!shouldRestoreSavedScroll(saved)) {
             return;
         }
         const targetX = Math.max(Number(saved.x) || 0, 0);
         const targetY = Math.max(Number(saved.y) || 0, 0);
+        const behavior = isAdminWorkspace() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
         const restore = function () {
-            window.scrollTo({ left: targetX, top: targetY, behavior: 'auto' });
-            restoreScrollablePositions(saved.containers);
+            window.scrollTo({ left: targetX, top: targetY, behavior: behavior });
+            restoreScrollablePositions(saved.containers, behavior);
             schedulePageTitleRailUpdate();
         };
         window.requestAnimationFrame(function () {
@@ -459,6 +497,22 @@
         }, 0);
     });
 
+    document.addEventListener('click', function () {
+        if (isAdminWorkspace()) {
+            rememberScrollForReload();
+        }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('change', function (event) {
+        if (!isAdminWorkspace()) {
+            return;
+        }
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+            rememberScrollForReload();
+        }
+    }, { capture: true });
+
     window.addEventListener('pagehide', function () {
         rememberScrollForReload();
         rememberCurrentOpenModal();
@@ -524,6 +578,7 @@
         if (prompt.parentElement !== document.body) {
             document.body.appendChild(prompt);
         }
+        prompt.setAttribute('aria-hidden', 'true');
 
         const promptMs = Math.max(configuredPromptMs, 1000);
         const graceMs = Number.isFinite(configuredGraceMs) && configuredGraceMs > 0
@@ -536,11 +591,12 @@
         let deadline = 0;
         let keepalivePending = false;
         let audioContext = null;
+        let audioUnlocked = false;
         let tickTimer = null;
         let tickCount = 0;
 
         const promptVisible = function () {
-            return !prompt.classList.contains('hidden');
+            return prompt.classList.contains('is-open') && !prompt.classList.contains('hidden');
         };
 
         const setProgress = function (percent) {
@@ -556,6 +612,32 @@
             }
         };
 
+        const unlockTickTockAudio = function () {
+            if (audioUnlocked) {
+                return;
+            }
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) {
+                return;
+            }
+            try {
+                if (!audioContext) {
+                    audioContext = new AudioContextConstructor();
+                }
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume()
+                        .then(function () {
+                            audioUnlocked = true;
+                        })
+                        .catch(function () {});
+                    return;
+                }
+                audioUnlocked = true;
+            } catch (ignored) {
+                audioContext = null;
+            }
+        };
+
         const playTickTock = function () {
             const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextConstructor) {
@@ -566,20 +648,34 @@
                     audioContext = new AudioContextConstructor();
                 }
                 if (audioContext.state === 'suspended') {
-                    audioContext.resume().catch(function () {});
+                    audioContext.resume()
+                        .then(function () {
+                            if (promptVisible()) {
+                                playTickTock();
+                            }
+                        })
+                        .catch(function () {});
+                    return;
                 }
                 const now = audioContext.currentTime;
                 const oscillator = audioContext.createOscillator();
+                const filter = audioContext.createBiquadFilter();
                 const gain = audioContext.createGain();
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(tickCount % 2 === 0 ? 760 : 520, now);
+                const isTick = tickCount % 2 === 0;
+                const duration = isTick ? 0.085 : 0.105;
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(isTick ? 2400 : 1250, now);
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(isTick ? 1800 : 950, now);
+                filter.Q.setValueAtTime(8, now);
                 gain.gain.setValueAtTime(0.0001, now);
-                gain.gain.exponentialRampToValueAtTime(0.045, now + 0.015);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-                oscillator.connect(gain);
+                gain.gain.exponentialRampToValueAtTime(isTick ? 0.12 : 0.1, now + 0.006);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                oscillator.connect(filter);
+                filter.connect(gain);
                 gain.connect(audioContext.destination);
                 oscillator.start(now);
-                oscillator.stop(now + 0.18);
+                oscillator.stop(now + duration + 0.01);
                 tickCount += 1;
             } catch (ignored) {
                 stopTickTock();
@@ -619,6 +715,10 @@
         const hidePrompt = function () {
             prompt.classList.add('hidden');
             prompt.classList.remove('flex');
+            prompt.classList.remove('is-open');
+            prompt.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('session-timeout-active');
+            document.documentElement.classList.remove('session-timeout-active');
             clearCountdown();
             deadline = 0;
             countdown.textContent = '--';
@@ -626,9 +726,20 @@
         };
 
         const showPrompt = function () {
+            if (promptVisible()) {
+                return;
+            }
+            if (promptTimer) {
+                window.clearTimeout(promptTimer);
+                promptTimer = null;
+            }
             deadline = Date.now() + graceMs;
             prompt.classList.remove('hidden');
             prompt.classList.add('flex');
+            prompt.classList.add('is-open');
+            prompt.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('session-timeout-active');
+            document.documentElement.classList.add('session-timeout-active');
             updateCountdown();
             countdownTimer = window.setInterval(updateCountdown, 250);
             startTickTock();
@@ -699,13 +810,8 @@
                 });
         };
 
-        const handleActivity = function (event) {
+        const handleActivity = function () {
             if (promptVisible()) {
-                const target = event.target instanceof Node ? event.target : null;
-                if (target && (logoutForm.contains(target) || stayButton.contains(target))) {
-                    return;
-                }
-                refreshSession();
                 return;
             }
             schedulePrompt();
@@ -713,6 +819,9 @@
 
         activityEvents.forEach(function (eventName) {
             window.addEventListener(eventName, handleActivity, { passive: true });
+        });
+        ['click', 'keydown', 'touchstart'].forEach(function (eventName) {
+            window.addEventListener(eventName, unlockTickTockAudio, { passive: true });
         });
         stayButton.addEventListener('click', refreshSession);
         logoutForm.addEventListener('submit', clearCountdown);

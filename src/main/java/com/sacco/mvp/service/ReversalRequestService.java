@@ -62,6 +62,7 @@ public class ReversalRequestService {
             reversalRequest.getId(),
             "GUARANTOR_UNDO_REQUESTED",
             app.getApplicantMemberId(),
+            guarantorMemberId,
             app.getSaccoId(),
             app.getStationId(),
             Map.of(
@@ -106,6 +107,7 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_REQUESTED",
                 manager.getId(),
+                applicantMemberId,
                 app.getSaccoId(),
                 app.getStationId(),
                 Map.of(
@@ -143,6 +145,7 @@ public class ReversalRequestService {
             reversalRequest.getId(),
             "GUARANTOR_UNDO_APPROVED",
             reversalRequest.getRequesterMemberId(),
+            applicantMemberId,
             app.getSaccoId(),
             app.getStationId(),
             Map.of(
@@ -193,6 +196,7 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_APPROVED",
                 reversalRequest.getRequesterMemberId(),
+                managerMemberId,
                 app.getSaccoId(),
                 app.getStationId(),
                 Map.of(
@@ -207,6 +211,7 @@ public class ReversalRequestService {
                 reversalRequest.getId(),
                 "MANAGER_REVERSAL_REJECTED",
                 reversalRequest.getRequesterMemberId(),
+                managerMemberId,
                 app.getSaccoId(),
                 app.getStationId(),
                 Map.of(

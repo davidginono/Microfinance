@@ -52,8 +52,8 @@ public class WorkflowRoutingService {
         }
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
-        enqueueReviewAssignedEvents(app, firstStage, assignedReviewers);
-        enqueueApplicantStatusChangedEvent(app, nextStatus);
+        enqueueReviewAssignedEvents(app, firstStage, assignedReviewers, actorMemberId);
+        enqueueApplicantStatusChangedEvent(app, nextStatus, actorMemberId);
         return nextStatus;
     }
 
@@ -73,8 +73,8 @@ public class WorkflowRoutingService {
         }
         app.setStatus(nextStatus);
         app.setUpdatedAt(OffsetDateTime.now());
-        enqueueReviewAssignedEvents(app, nextStage, assignedReviewers);
-        enqueueApplicantStatusChangedEvent(app, nextStatus);
+        enqueueReviewAssignedEvents(app, nextStage, assignedReviewers, actorMemberId);
+        enqueueApplicantStatusChangedEvent(app, nextStatus, actorMemberId);
         return nextStatus;
     }
 
@@ -133,14 +133,15 @@ public class WorkflowRoutingService {
 
     private void enqueueReviewAssignedEvents(LoanApplication app,
                                              ApprovalWorkflowStage stage,
-                                             java.util.List<UUID> assignedReviewers) {
+                                             java.util.List<UUID> assignedReviewers,
+                                             UUID actorMemberId) {
         if (stage == null) {
             return;
         }
         String eventType = approvalFlowService.reviewAssignedEventType(stage);
         reviewNotificationRecipients(app, stage, assignedReviewers)
             .forEach(reviewerId -> outboxService.enqueue("LOAN", app.getId(), eventType, reviewerId,
-                app.getSaccoId(), app.getStationId(),
+                actorMemberId, app.getSaccoId(), app.getStationId(),
                 Map.of(
                     "loanId", app.getId().toString(),
                     "reviewStage", stage.name(),
@@ -148,12 +149,12 @@ public class WorkflowRoutingService {
                 )));
     }
 
-    private void enqueueApplicantStatusChangedEvent(LoanApplication app, LoanStatus status) {
+    private void enqueueApplicantStatusChangedEvent(LoanApplication app, LoanStatus status, UUID actorMemberId) {
         if (app.getApplicantMemberId() == null || status == null) {
             return;
         }
         outboxService.enqueue("LOAN", app.getId(), "LOAN_STATUS_" + status.name(), app.getApplicantMemberId(),
-            app.getSaccoId(), app.getStationId(),
+            actorMemberId, app.getSaccoId(), app.getStationId(),
             Map.of(
                 "loanId", app.getId().toString(),
                 "status", status.name()

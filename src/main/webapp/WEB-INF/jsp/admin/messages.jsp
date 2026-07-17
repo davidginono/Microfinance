@@ -1,5 +1,4 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
@@ -12,22 +11,13 @@
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-3">
+    <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2">
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="common.status" text="Status" /></label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                 <option value=""><spring:message code="common.allStatuses" text="All statuses" /></option>
                 <c:forEach items="${incidentStatuses}" var="item">
                     <option value="${item}" ${selectedStatus eq item.name() ? 'selected' : ''}>${item}</option>
-                </c:forEach>
-            </select>
-        </div>
-        <div>
-            <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="admin.incidents.severity" text="Severity" /></label>
-            <select name="severity" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                <option value=""><spring:message code="admin.incidents.allSeverities" text="All severities" /></option>
-                <c:forEach items="${incidentSeverities}" var="item">
-                    <option value="${item}" ${selectedSeverity eq item.name() ? 'selected' : ''}>${item}</option>
                 </c:forEach>
             </select>
         </div>
@@ -38,56 +28,30 @@
     </form>
 </section>
 
-<section class="erp-panel">
-    <div class="erp-panel-header"><p class="erp-panel-title">Incident Inbox</p></div>
-    <div class="erp-panel-body">
-    <div class="erp-table-wrap overflow-x-auto">
-        <table class="erp-table">
-            <thead>
-            <tr><th>Subject</th><th>Message</th><th>Source</th><th>Type</th><th>Severity</th><th>Status</th><th>Incident</th><th>Date</th></tr>
-            </thead>
-            <tbody>
-            <c:forEach items="${messages}" var="item">
-                <c:set var="incidentMeta" value="${messageIncidents[item.incidentId]}" />
-                <tr id="notification-${item.id}" class="${highlightNotificationId eq item.id ? 'bg-amber-50' : (item.unread ? 'bg-sacco-blue/5' : 'bg-white')}">
-                    <td class="px-3 py-2 font-semibold text-slate-900">
-                        <a href="/admin/messages/${item.id}/open" class="hover:text-sacco-blue">
-                            ${item.subject}
-                            <c:if test="${item.unread}">
-                                <span class="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase text-white">Unread</span>
-                            </c:if>
-                        </a>
-                    </td>
-                    <td class="px-3 py-2">
-                        <a href="/admin/messages/${item.id}/open" class="block hover:text-sacco-blue">${item.message}</a>
-                        <c:if test="${not empty item.detailItems}">
-                            <ul class="mt-2 space-y-1 text-xs text-slate-500">
-                                <c:forEach items="${item.detailItems}" var="detail">
-                                    <li>${detail}</li>
-                                </c:forEach>
-                            </ul>
-                        </c:if>
-                    </td>
-                    <td class="px-3 py-2">${item.source}</td>
-                    <td class="px-3 py-2">${item.type}</td>
-                    <td class="px-3 py-2">${incidentMeta != null ? incidentMeta.severity : '-'}</td>
-                    <td class="px-3 py-2">${incidentMeta != null ? incidentMeta.status : '-'}</td>
-                    <td class="px-3 py-2">
-                        <c:if test="${not empty item.incidentId}">
-                            <a href="/admin/messages/${item.id}/open" class="app-btn btn-neutral">Open Incident</a>
-                        </c:if>
-                        <c:if test="${empty item.incidentId}">-</c:if>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap">${item.createdAtLabel}</td>
-                </tr>
-            </c:forEach>
-            <c:if test="${empty messages}">
-                <tr><td colspan="8" class="px-3 py-3 text-slate-500">No member support notifications match the current filters.</td></tr>
-            </c:if>
-            </tbody>
-        </table>
-    </div>
-    </div>
+<section class="erp-table-wrap erp-table-scroll">
+    <table class="erp-table">
+        <thead>
+        <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+        <c:forEach items="${messages}" var="item">
+            <c:set var="incidentMeta" value="${messageIncidents[item.incidentId]}" />
+            <tr>
+                <td class="px-3 py-2">
+                    <div class="font-semibold text-slate-900">${incidentMeta.subject}</div>
+                    <div class="text-xs text-slate-500">${incidentMeta.source}</div>
+                </td>
+                <td class="px-3 py-2">${incidentMeta.category}</td>
+                <td class="px-3 py-2">${incidentMeta.status}</td>
+                <td class="px-3 py-2">${incidentMeta.createdAt}</td>
+                <td class="px-3 py-2"><a href="/admin/messages/${item.id}/open" class="app-btn btn-primary">Open</a></td>
+            </tr>
+        </c:forEach>
+        <c:if test="${empty messages}">
+            <tr><td colspan="5" class="px-3 py-4 text-slate-500">No incidents match the current filters.</td></tr>
+        </c:if>
+        </tbody>
+    </table>
 </section>
 
 <section class="grid gap-4 xl:grid-cols-2">

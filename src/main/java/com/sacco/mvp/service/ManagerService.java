@@ -267,7 +267,7 @@ public class ManagerService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "MANAGER_REJECTED", app.getApplicantMemberId(),
-                app.getSaccoId(), app.getStationId(),
+                managerId, app.getSaccoId(), app.getStationId(),
                 Map.of("reasons", normalizedReasons));
             auditLoanReview(app, managerId, ApprovalWorkflowStage.MANAGER, decision);
             return;
@@ -302,7 +302,7 @@ public class ManagerService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
-                app.getSaccoId(), app.getStationId(),
+                accountantId, app.getSaccoId(), app.getStationId(),
                 Map.of("reasons", normalizedReasons));
             auditLoanReview(app, accountantId, ApprovalWorkflowStage.ACCOUNTANT, decision);
             return;
@@ -400,7 +400,7 @@ public class ManagerService {
         details.put("applicationId", applicationId.toString());
         details.put("loanId", app.getLoanId());
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
-            app.getSaccoId(), app.getStationId(),
+            disbursementOfficerId, app.getSaccoId(), app.getStationId(),
             details);
         auditLoan(app, disbursementOfficerId, "LOAN_DISBURSED", "Loan disbursed",
             Map.of("loanId", app.getLoanId(), "disbursementDate", String.valueOf(app.getDisbursementDate())));

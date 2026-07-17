@@ -2,6 +2,7 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.PlatformSupportContactSettings;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.MemberRepository;
@@ -10,6 +11,7 @@ import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.web.view.CurrentUserView;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,6 +34,7 @@ public class CurrentUserModelAdvice {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoStationRepository saccoStationRepository;
     private final SaccoLogoStorageService saccoLogoStorageService;
+    private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
     private final ObjectMapper objectMapper;
     private final ObjectFactory<HttpServletRequest> requestFactory;
 
@@ -157,6 +160,17 @@ public class CurrentUserModelAdvice {
         }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
         return brand == null ? null : brand.logoUrl();
+    }
+
+    @ModelAttribute("platformSupportContact")
+    public PlatformSupportContactSettings platformSupportContact(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null || isJsonRequest() || isPlatformAdminIdentity(principal)) {
+            return null;
+        }
+        boolean workspaceUser = principal.hasRole(Position.MEMBER)
+            || principal.hasRole(Position.MINOR_ADMIN)
+            || principal.isStaffSession();
+        return workspaceUser ? platformSupportContactSettingsService.visibleContact() : null;
     }
 
     private ActiveSaccoBrand resolveActiveSaccoBrand(AppUserPrincipal principal) {

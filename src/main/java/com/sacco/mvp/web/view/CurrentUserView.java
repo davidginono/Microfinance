@@ -20,4 +20,8 @@ public class CurrentUserView {
     private Position position;
     private boolean memberAccess;
     private boolean staffSession;
+
+    public String getDisplayRole() {
+        return position == null ? "" : position.getDisplayName();
+    }
 }

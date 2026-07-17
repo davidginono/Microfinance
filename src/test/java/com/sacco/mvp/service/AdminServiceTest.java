@@ -162,6 +162,9 @@ class AdminServiceTest {
             .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
         lenient().when(foresightDirectoryService.lookupMemberProfileByEmailV2(any()))
             .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
+        AtomicInteger staffNumberSequence = new AtomicInteger(10000);
+        lenient().when(memberRepository.nextStaffNumberValue())
+            .thenAnswer(invocation -> (long) staffNumberSequence.getAndIncrement());
 
         adminService = new AdminService(
             memberRepository,
@@ -1192,6 +1195,67 @@ class AdminServiceTest {
     }
 
     @Test
+    void cancelStaffInvitationMarksAccountInactive() {
+        UUID accountId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("STAFF-10002")
+            .staffNo("10002")
+            .fullName("Loan Officer")
+            .email("loan.officer@example.com")
+            .position(Position.LOAN_OFFICER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .passwordHash("OTP_ONLY_LOGIN")
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        adminService.cancelStaffInvitation("SACCO-01", "ST-1", adminId, Set.of(Position.ADMIN), accountId);
+
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.INACTIVE);
+        assertThat(revokedInvitationCount.get()).isEqualTo(1);
+        assertThat(lastRevokedMemberId.get()).isEqualTo(accountId);
+        assertThat(lastRevokedBy.get()).isEqualTo(adminId);
+        verify(memberRepository).save(member);
+    }
+
+    @Test
+    void cancelStaffInvitationRejectsStaffOutsideStationScope() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-2")
+            .memberNo("STAFF-10003")
+            .staffNo("10003")
+            .fullName("Board Member")
+            .email("board@example.com")
+            .position(Position.BOARD)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.BOARD)))
+            .memberAccount(false)
+            .status(MemberStatus.INVITED)
+            .passwordHash("OTP_ONLY_LOGIN")
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.cancelStaffInvitation("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN), accountId))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Staff member not found in this station.");
+
+        assertThat(revokedInvitationCount.get()).isZero();
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
     void deactivateMinorAdminOnlyWorksForActiveAccount() {
         UUID accountId = UUID.randomUUID();
         Member member = Member.builder()
@@ -1246,7 +1310,7 @@ class AdminServiceTest {
     @Test
     void createUserForNonMinorAdminStaffAlsoIssuesInvitation() {
         UUID adminId = UUID.randomUUID();
-        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of("10000", "10001"));
+        when(memberRepository.nextStaffNumberValue()).thenReturn(10002L);
         when(memberRepository.existsByEmailIgnoreCase("manager@example.com")).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1270,6 +1334,30 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
         verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000001");
         verify(foresightDirectoryService).lookupMemberProfileByEmailV2("manager@example.com");
+    }
+
+    @Test
+    void createUserSkipsGeneratedStaffNumberAlreadyInUse() {
+        UUID adminId = UUID.randomUUID();
+        when(memberRepository.nextStaffNumberValue()).thenReturn(10002L, 10003L);
+        when(memberRepository.existsByStaffNoIgnoreCase("10002")).thenReturn(true);
+        when(memberRepository.existsByEmailIgnoreCase("manager@example.com")).thenReturn(false);
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        adminService.createUser(
+            "SACCO-01",
+            null,
+            adminId,
+            Set.of(Position.ADMIN),
+            "Mary Manager",
+            "manager@example.com",
+            "255700000001",
+            List.of(Position.MANAGER)
+        );
+
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStaffNo()).isEqualTo("10003");
+        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("STAFF-10003");
     }
 
     @Test
@@ -1386,7 +1474,7 @@ class AdminServiceTest {
         when(registeredSaccoRepository.findById("SACCO-01")).thenReturn(Optional.of(registeredSacco));
         when(saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-01", "ST-1")).thenReturn(Optional.of(station));
         when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN)).thenReturn(false);
-        when(memberRepository.findFiveDigitMemberNumbers()).thenReturn(List.of("10000"));
+        when(memberRepository.nextStaffNumberValue()).thenReturn(10001L);
         when(memberRepository.existsByEmailIgnoreCase("minor@example.com")).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

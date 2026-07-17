@@ -145,7 +145,7 @@ public class SecurityConfig {
                                 return "Invalid member number or password.";
                             })
                             .orElse(staffPasswordLogin
-                                ? "No active staff account was found for that staff member number."
+                                ? "No active staff account was found for that staff number."
                                 : "No member account was found for that member number. Please register yourself first.");
                     }
                     if ("staff-password".equals(loginType)) {

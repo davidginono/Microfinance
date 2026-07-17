@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 @ControllerAdvice
 public class SessionInactivityModelAdvice {
-    @Value("${app.session.inactivity-prompt-ms:600000}")
+    @Value("${app.session.inactivity-prompt-ms:60000}")
     private long inactivityPromptMs;
 
     @Value("${app.session.inactivity-grace-ms:60000}")

@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.PlatformSupportContactSettings;
+import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -37,15 +40,64 @@ class CurrentUserModelAdviceTest {
         SaccoSettingsRepository settings = mock(SaccoSettingsRepository.class);
         SaccoStationRepository stations = mock(SaccoStationRepository.class);
         SaccoLogoStorageService logos = mock(SaccoLogoStorageService.class);
-        CurrentUserModelAdvice advice = advice(request, scopes, members, registeredSaccos, settings, stations, logos);
+        PlatformSupportContactSettingsService supportContacts = mock(PlatformSupportContactSettingsService.class);
+        CurrentUserModelAdvice advice = advice(request, scopes, members, registeredSaccos, settings, stations, logos, supportContacts);
         AppUserPrincipal principal = memberPrincipal();
 
         assertThat(advice.adminScope(principal)).isNull();
         assertThat(advice.headerStation(principal)).isNull();
         assertThat(advice.activeSaccoName(principal)).isNull();
         assertThat(advice.activeSaccoLogoUrl(principal)).isNull();
+        assertThat(advice.platformSupportContact(principal)).isNull();
 
-        verifyNoInteractions(scopes, registeredSaccos, settings, stations, logos);
+        verifyNoInteractions(scopes, registeredSaccos, settings, stations, logos, supportContacts);
+    }
+
+    @Test
+    void workspaceUsersReceiveVisiblePlatformSupportContact() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        PlatformSupportContactSettingsService supportContacts = mock(PlatformSupportContactSettingsService.class);
+        PlatformSupportContactSettings contact = PlatformSupportContactSettings.builder()
+            .displayName("Platform Support")
+            .displayRole("Super Admin Support")
+            .phone("+255 746 359 369")
+            .email("support@example.com")
+            .build();
+        when(supportContacts.visibleContact()).thenReturn(contact);
+        CurrentUserModelAdvice advice = advice(
+            request,
+            mock(AdminScopeService.class),
+            mock(MemberRepository.class),
+            mock(RegisteredSaccoRepository.class),
+            mock(SaccoSettingsRepository.class),
+            mock(SaccoStationRepository.class),
+            mock(SaccoLogoStorageService.class),
+            supportContacts
+        );
+
+        assertThat(advice.platformSupportContact(memberPrincipal())).isSameAs(contact);
+        assertThat(advice.platformSupportContact(staffPrincipal(Position.MANAGER))).isSameAs(contact);
+        assertThat(advice.platformSupportContact(staffPrincipal(Position.MINOR_ADMIN))).isSameAs(contact);
+        verify(supportContacts, org.mockito.Mockito.times(3)).visibleContact();
+    }
+
+    @Test
+    void platformAdminDoesNotReceiveSidebarSupportContact() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        PlatformSupportContactSettingsService supportContacts = mock(PlatformSupportContactSettingsService.class);
+        CurrentUserModelAdvice advice = advice(
+            request,
+            mock(AdminScopeService.class),
+            mock(MemberRepository.class),
+            mock(RegisteredSaccoRepository.class),
+            mock(SaccoSettingsRepository.class),
+            mock(SaccoStationRepository.class),
+            mock(SaccoLogoStorageService.class),
+            supportContacts
+        );
+
+        assertThat(advice.platformSupportContact(staffPrincipal(Position.ADMIN))).isNull();
+        verifyNoInteractions(supportContacts);
     }
 
     private CurrentUserModelAdvice advice(MockHttpServletRequest request,
@@ -54,7 +106,8 @@ class CurrentUserModelAdviceTest {
                                           RegisteredSaccoRepository registeredSaccos,
                                           SaccoSettingsRepository settings,
                                           SaccoStationRepository stations,
-                                          SaccoLogoStorageService logos) {
+                                          SaccoLogoStorageService logos,
+                                          PlatformSupportContactSettingsService supportContacts) {
         ObjectFactory<HttpServletRequest> requestFactory = () -> request;
         return new CurrentUserModelAdvice(
             scopes,
@@ -63,6 +116,7 @@ class CurrentUserModelAdviceTest {
             settings,
             stations,
             logos,
+            supportContacts,
             new ObjectMapper(),
             requestFactory
         );
@@ -82,5 +136,24 @@ class CurrentUserModelAdviceTest {
             .passwordHash("hash")
             .build();
         return new AppUserPrincipal(member, Collections.emptySet());
+    }
+
+    private AppUserPrincipal staffPrincipal(Position role) {
+        Member member = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .stationId("ST01")
+            .memberNo("MEM-2")
+            .staffNo("STF-2")
+            .fullName("Staff One")
+            .email("staff@example.com")
+            .memberAccount(false)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .staffRoles(java.util.Set.of(role))
+            .position(role)
+            .status(MemberStatus.ACTIVE)
+            .passwordHash("hash")
+            .build();
+        return new AppUserPrincipal(member, Collections.emptySet(), true);
     }
 }

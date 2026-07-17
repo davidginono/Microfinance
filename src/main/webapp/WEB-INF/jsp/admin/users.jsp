@@ -83,6 +83,16 @@
     <div hidden data-open-user-modal="${openUserModalKey}"></div>
 </c:if>
 
+<c:if test="${not empty createdStaffUserId}">
+    <div class="admin-created-user-id mb-4" aria-live="polite">
+        <p class="text-xs font-semibold uppercase tracking-wide">Created Staff User ID</p>
+        <p class="mt-1 text-sm font-semibold">${createdStaffUserId}</p>
+        <c:if test="${not empty createdStaffMemberNumber}">
+            <p class="mt-1 text-xs">Staff Number ${createdStaffMemberNumber}</p>
+        </c:if>
+    </div>
+</c:if>
+
 <div class="erp-panel overflow-hidden">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -143,7 +153,7 @@
         <tr>
             <th class="px-3 py-2 text-left whitespace-nowrap">User ID</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Member Number</th>
-            <th class="px-3 py-2 text-left whitespace-nowrap">Staff Member Number</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">Staff Number</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Names</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Email</th>
             <th class="px-3 py-2 text-left whitespace-nowrap">Phone Number</th>
@@ -259,21 +269,6 @@
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                User ID
-                <input type="text" readonly aria-readonly="true" value="${nextGeneratedUserId}" class="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" />
-            </label>
-
-            <c:if test="${not empty createdStaffUserId}">
-                <div class="admin-created-user-id md:col-span-2" aria-live="polite">
-                    <p class="text-xs font-semibold uppercase tracking-wide">Created Staff User ID</p>
-                    <p class="mt-1 text-sm font-semibold">${createdStaffUserId}</p>
-                    <c:if test="${not empty createdStaffMemberNumber}">
-                        <p class="mt-1 text-xs">Staff Member Number ${createdStaffMemberNumber}</p>
-                    </c:if>
-                </div>
-            </c:if>
-
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Full Name
                 <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
             </label>
@@ -329,7 +324,7 @@
                             <p class="mt-1 text-xs text-slate-500">Member Number ${user.memberNumber}</p>
                         </c:when>
                         <c:otherwise>
-                            <p class="mt-1 text-xs text-slate-500">Staff Member Number ${user.staffMemberNumber}</p>
+                            <p class="mt-1 text-xs text-slate-500">Staff Number ${user.staffMemberNumber}</p>
                         </c:otherwise>
                     </c:choose>
                 </div>
@@ -406,6 +401,22 @@
                 </c:choose>
 
                 <div class="app-modal-actions">
+                    <c:if test="${user.status eq 'INVITED'}">
+                        <button type="submit"
+                                class="app-btn btn-reject"
+                                formaction="/admin/users/${user.accountId}/cancel-invite"
+                                formmethod="post"
+                                onclick="return confirm('Cancel this invitation? The staff member will be marked inactive.');">
+                            Cancel Invite
+                        </button>
+                    </c:if>
+                    <c:if test="${user.canDeleteStaffRecord}">
+                        <button type="button"
+                                class="app-btn btn-reject"
+                                data-user-modal-open="delete-user-${user.accountId}">
+                            Delete
+                        </button>
+                    </c:if>
                     <button type="button"
                             class="app-btn btn-neutral"
                             data-user-modal-close="user-${user.accountId}">
@@ -417,6 +428,45 @@
             </div>
         </div>
     </div>
+</c:forEach>
+
+<c:forEach items="${users}" var="user">
+    <c:if test="${user.canDeleteStaffRecord}">
+        <div class="app-modal-overlay hidden"
+             data-user-modal="delete-user-${user.accountId}">
+            <div class="app-modal-panel app-modal-panel--compact">
+                <div class="app-modal-scroll">
+                    <div class="app-modal-header">
+                        <div>
+                            <p class="erp-widget-title">Delete Staff Member</p>
+                            <h2 class="mt-1 text-xl font-bold text-sacco-ink">${user.fullName}</h2>
+                            <p class="mt-1 text-sm text-slate-500">This permanently removes the cancelled staff invitation record.</p>
+                        </div>
+                        <button type="button" class="app-modal-close" data-user-modal-close="delete-user-${user.accountId}" aria-label="Close modal">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <form action="/admin/users/${user.accountId}/delete" method="post" class="app-modal-body space-y-4">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                        <div class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                            Type <span class="font-semibold">delete ${user.fullName}</span> to confirm.
+                        </div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Confirmation
+                            <input name="confirmation" type="text" required autocomplete="off" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                        </label>
+                        <div class="app-modal-actions">
+                            <button type="button" class="app-btn btn-neutral" data-user-modal-close="delete-user-${user.accountId}">Cancel</button>
+                            <button type="submit" class="app-btn btn-reject">Delete</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </c:if>
 </c:forEach>
 
 <script>

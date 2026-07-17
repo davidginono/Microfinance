@@ -98,6 +98,7 @@ class WorkflowRoutingServiceTest {
             eq(appId),
             eq("LOAN_OFFICER_REVIEW_ASSIGNED"),
             eq(loanOfficerId),
+            eq(actorId),
             eq("SACCO-1"),
             eq((String) null),
             any()
@@ -161,7 +162,7 @@ class WorkflowRoutingServiceTest {
         assertThat(captor.getAllValues())
             .extracting(com.sacco.mvp.domain.BoardReview::getReviewStage)
             .containsOnly(ApprovalWorkflowStage.CREDIT_COMMITTEE);
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerOne), eq("SACCO-1"), eq("AR704"), any());
-        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerTwo), eq("SACCO-1"), eq("AR704"), any());
+        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerOne), eq(actorId), eq("SACCO-1"), eq("AR704"), any());
+        verify(outboxService).enqueue(eq("LOAN"), eq(appId), eq("CREDIT_COMMITTEE_REVIEW_ASSIGNED"), eq(reviewerTwo), eq(actorId), eq("SACCO-1"), eq("AR704"), any());
     }
 }

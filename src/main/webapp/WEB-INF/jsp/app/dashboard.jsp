@@ -345,7 +345,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div>
                     <p class="erp-widget-title text-cyan-900">Staff Access</p>
                     <p class="mt-1 text-sm text-slate-700">
-                        Staff Member Number <span class="font-semibold text-slate-900">${pendingStaffAccess.staffNo}</span>
+                        Staff Number <span class="font-semibold text-slate-900">${pendingStaffAccess.staffNo}</span>
                         is ready<c:if test="${not empty pendingStaffAccess.roles}"> for ${pendingStaffAccess.roles}</c:if>.
                     </p>
                 </div>

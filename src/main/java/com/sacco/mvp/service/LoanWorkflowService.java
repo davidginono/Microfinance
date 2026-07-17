@@ -1170,7 +1170,7 @@ public class LoanWorkflowService {
 
             if (!isDirectOtpGuarantorApproval(app)) {
                 outboxService.enqueue("GUARANTOR_REQUEST", app.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
-                    app.getSaccoId(), app.getStationId(),
+                    applicantId, app.getSaccoId(), app.getStationId(),
                     Map.of("loanId", app.getId().toString()));
             }
         }

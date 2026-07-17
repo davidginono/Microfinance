@@ -1,7 +1,6 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.MemberStatus;
-import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
@@ -22,6 +21,7 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.PlatformBrandingSettingsService;
+import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.SmsUsageManagementService;
@@ -70,6 +70,7 @@ public class AdminController {
     private final StationOtpSettingsService stationOtpSettingsService;
     private final SaccoDataDeletionService saccoDataDeletionService;
     private final PlatformBrandingSettingsService platformBrandingSettingsService;
+    private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
@@ -201,6 +202,7 @@ public class AdminController {
     public String platformSettings(Model model) {
         model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
+        model.addAttribute("supportContactSettings", platformSupportContactSettingsService.settings());
         return "admin/platform-settings";
     }
 
@@ -229,6 +231,33 @@ public class AdminController {
         return "redirect:/admin/platform-settings";
     }
 
+    @PostMapping("/platform-settings/support-contact")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String updateSupportContact(@AuthenticationPrincipal AppUserPrincipal principal,
+                                       @RequestParam(required = false) String displayName,
+                                       @RequestParam(required = false) String displayRole,
+                                       @RequestParam(required = false) String phone,
+                                       @RequestParam(required = false) String email,
+                                       @RequestParam(required = false) String officeHours,
+                                       @RequestParam(required = false) String supportNote,
+                                       RedirectAttributes ra) {
+        try {
+            platformSupportContactSettingsService.updateContact(
+                displayName,
+                displayRole,
+                phone,
+                email,
+                officeHours,
+                supportNote,
+                principal.getMemberId()
+            );
+            ra.addFlashAttribute("message", "Platform support contact updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     @ResponseBody
@@ -251,10 +280,9 @@ public class AdminController {
     @GetMapping("/messages")
     @PreAuthorize("@authz.workspaceAdminOnly(principal)")
     public String messages(@AuthenticationPrincipal AppUserPrincipal principal,
-                           @RequestParam(required = false) IncidentStatus status,
-                           @RequestParam(required = false) IncidentSeverity severity,
-                           @RequestParam(required = false) UUID highlight,
-                           Model model) {
+                            @RequestParam(required = false) IncidentStatus status,
+                            @RequestParam(required = false) UUID highlight,
+                            Model model) {
         String stationId = adminScopeService.currentStationId(principal);
         java.util.List<com.sacco.mvp.service.NotificationViewService.NotificationView> allMessages =
             adminService.adminMessages(principal.getMemberId());
@@ -265,8 +293,7 @@ public class AdminController {
                 if (incident == null) {
                     return false;
                 }
-                return (status == null || incident.getStatus() == status)
-                    && (severity == null || incident.getSeverity() == severity);
+                return status == null || incident.getStatus() == status;
             })
             .toList();
         model.addAttribute("messages", filteredMessages);
@@ -274,9 +301,7 @@ public class AdminController {
         model.addAttribute("members", adminService.activeMembers(adminScopeService.currentSaccoId(principal), stationId));
         model.addAttribute("highlightNotificationId", highlight);
         model.addAttribute("incidentStatuses", IncidentStatus.values());
-        model.addAttribute("incidentSeverities", IncidentSeverity.values());
         model.addAttribute("selectedStatus", status == null ? "" : status.name());
-        model.addAttribute("selectedSeverity", severity == null ? "" : severity.name());
         return "admin/messages";
     }
 
@@ -350,10 +375,9 @@ public class AdminController {
     @GetMapping("/incidents")
     @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
     public String incidents(@AuthenticationPrincipal AppUserPrincipal principal,
-                            @RequestParam(required = false) IncidentStatus status,
-                            @RequestParam(required = false) IncidentSeverity severity,
-                            @RequestParam(required = false) String saccoId,
-                            @RequestParam(required = false) String stationId,
+                             @RequestParam(required = false) IncidentStatus status,
+                             @RequestParam(required = false) String saccoId,
+                             @RequestParam(required = false) String stationId,
                             Model model) {
         boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
         String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
@@ -363,22 +387,20 @@ public class AdminController {
                 scopedSaccoId.isBlank() ? null : scopedSaccoId,
                 scopedStationId.isBlank() ? null : scopedStationId,
                 status,
-                severity
+                null
             )
             : adminService.incidents(
                 scopedSaccoId.isBlank() ? null : scopedSaccoId,
                 scopedStationId.isBlank() ? null : scopedStationId,
                 status,
-                severity
+                null
             ));
         addAdminScopeFilters(model, scopedSaccoId, scopedStationId, superAdmin);
         if (superAdmin) {
             model.addAttribute("minorAdmins", adminService.minorAdmins());
         }
         model.addAttribute("incidentStatuses", IncidentStatus.values());
-        model.addAttribute("incidentSeverities", IncidentSeverity.values());
         model.addAttribute("selectedStatus", status == null ? "" : status.name());
-        model.addAttribute("selectedSeverity", severity == null ? "" : severity.name());
         return "admin/incidents";
     }
 
@@ -416,18 +438,16 @@ public class AdminController {
         model.addAttribute("selectedStationId", superAdmin ? normalizeTextParam(stationId) : "");
         model.addAttribute("reporterMembers", superAdmin ? java.util.List.of() : java.util.List.of());
         model.addAttribute("incidentStatuses", IncidentStatus.values());
-        model.addAttribute("incidentSeverities", IncidentSeverity.values());
         return "admin/incident-detail";
     }
 
     @PostMapping("/incidents/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
     public String updateIncident(@PathVariable UUID id,
-                                 @AuthenticationPrincipal AppUserPrincipal principal,
-                                 @RequestParam IncidentSeverity severity,
-                                 @RequestParam IncidentStatus status,
-                                 @RequestParam(required = false) String resolutionNote,
-                                 RedirectAttributes ra) {
+                                  @AuthenticationPrincipal AppUserPrincipal principal,
+                                  @RequestParam IncidentStatus status,
+                                  @RequestParam(required = false) String resolutionNote,
+                                  RedirectAttributes ra) {
         boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
         if (superAdmin) {
             adminService.platformSupportIncident(null, null, id);
@@ -437,7 +457,6 @@ public class AdminController {
             superAdmin ? null : adminScopeService.currentStationId(principal),
             principal.getMemberId(),
             id,
-            severity,
             status,
             resolutionNote
         );
@@ -622,7 +641,6 @@ public class AdminController {
         model.addAttribute("selectedUserSearchBy", selectedSearchBy);
         model.addAttribute("selectedPageSize", usersPage.getSize());
         model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize()));
-        model.addAttribute("nextGeneratedUserId", adminService.nextGeneratedUserIdPreview());
         model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
             ? Position.staffAssignableRoles()
             : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
@@ -653,8 +671,7 @@ public class AdminController {
             String createdUserId = adminService.userIdLabel(createdUser.getId());
             ra.addFlashAttribute("createdStaffUserId", createdUserId);
             ra.addFlashAttribute("createdStaffMemberNumber", createdUser.getStaffNo());
-            ra.addFlashAttribute("openUserModalKey", "create-user");
-            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUserId + " and Staff Member Number " + createdUser.getStaffNo() + ". Invite email sent and waiting for activation.");
+            ra.addFlashAttribute("message", "Staff member created with User ID " + createdUserId + " and Staff Number " + createdUser.getStaffNo() + ". Invite email sent and waiting for activation.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -681,12 +698,55 @@ public class AdminController {
                 claims
             );
             if (result.isStaffAccessPending()) {
-                ra.addFlashAttribute("message", "User updated. Staff Member Number " + result.getStaffNo() + " is pending member acknowledgement.");
+                ra.addFlashAttribute("message", "User updated. Staff Number " + result.getStaffNo() + " is pending member acknowledgement.");
             } else {
                 ra.addFlashAttribute("message", "User updated.");
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+
+    @PostMapping("/users/{id}/cancel-invite")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String cancelStaffInvite(@PathVariable UUID id,
+                                    @AuthenticationPrincipal AppUserPrincipal principal,
+                                    RedirectAttributes ra) {
+        try {
+            adminService.cancelStaffInvitation(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                principal.getMemberId(),
+                principal.getGrantedPositions(),
+                id
+            );
+            ra.addFlashAttribute("openUserModalKey", "user-" + id);
+            ra.addFlashAttribute("message", "Invitation cancelled. The staff member record can now be deleted.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+
+    @PostMapping("/users/{id}/delete")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    public String deleteStaffUser(@PathVariable UUID id,
+                                  @AuthenticationPrincipal AppUserPrincipal principal,
+                                  @RequestParam String confirmation,
+                                  RedirectAttributes ra) {
+        try {
+            saccoDataDeletionService.deleteInactiveStaffMember(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                principal.getGrantedPositions(),
+                id,
+                confirmation
+            );
+            ra.addFlashAttribute("message", "Staff member record deleted.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("openUserModalKey", "delete-user-" + id);
         }
         return "redirect:/admin/users";
     }
@@ -1608,7 +1668,6 @@ public class AdminController {
         model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
         model.addAttribute("minorAdmins", adminService.minorAdmins());
         model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
-        model.addAttribute("nextGeneratedUserId", adminService.nextGeneratedUserIdPreview());
         model.addAttribute("superAdmin", true);
         return "admin/minor-admins";
     }
@@ -1644,7 +1703,8 @@ public class AdminController {
                 registrationForm.getEmail(),
                 registrationForm.getPhone()
             );
-            ra.addFlashAttribute("message", "SACCOS Admin invited with User ID " + createdAdmin.getMemberNo() + ". A password setup link has been emailed to them.");
+            ra.addFlashAttribute("createdMinorAdminStaffNumber", createdAdmin.getStaffNo());
+            ra.addFlashAttribute("message", "SACCOS Admin invited with Staff Number " + createdAdmin.getStaffNo() + ". A password setup link has been emailed to them.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -1979,7 +2039,9 @@ public class AdminController {
                                            String stationId,
                                            boolean superAdmin,
                                            Page<com.sacco.mvp.domain.OutboxEvent> eventsPage) {
-        model.addAttribute("events", eventsPage.getContent());
+        List<com.sacco.mvp.domain.OutboxEvent> events = eventsPage.getContent();
+        model.addAttribute("events", events);
+        model.addAttribute("outboxActorPrefixes", adminService.outboxActorPrefixes(events));
         model.addAttribute("eventsPage", eventsPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));

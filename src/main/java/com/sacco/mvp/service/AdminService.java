@@ -281,6 +281,39 @@ public class AdminService {
     }
 
     @Transactional
+    public void cancelStaffInvitation(String saccoId,
+                                      String stationId,
+                                      UUID adminId,
+                                      Set<Position> actorRoles,
+                                      UUID accountId) {
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Staff member not found."));
+        String normalizedStationId = normalizeOptional(stationId);
+        if (saccoId == null || member.getSaccoId() == null || !saccoId.equalsIgnoreCase(member.getSaccoId())) {
+            throw new IllegalArgumentException("Staff member not found in this SACCO.");
+        }
+        if (normalizedStationId != null && !normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId()))) {
+            throw new IllegalArgumentException("Staff member not found in this station.");
+        }
+        if (member.isMemberAccess() || member.getStaffRolesResolved().isEmpty()) {
+            throw new IllegalStateException("Only staff invitations can be cancelled.");
+        }
+        boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
+        if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
+            throw new IllegalStateException("Only super admins can cancel Super Admin invitations.");
+        }
+        if (member.getStatus() != MemberStatus.INVITED) {
+            throw new IllegalStateException("Only pending invitations can be cancelled.");
+        }
+
+        Map<String, Object> before = snapshotMember(member);
+        minorAdminInvitationService.revokeInvitation(member.getId(), adminId);
+        member.setStatus(MemberStatus.INACTIVE);
+        memberRepository.save(member);
+        auditService.log("STAFF_USER", member.getId(), "ADMIN_CANCEL_STAFF_INVITE", adminId, before, snapshotMember(member));
+    }
+
+    @Transactional
     public Member registerMinorAdmin(UUID adminId,
                                      String saccoId,
                                      String stationId,
@@ -1820,17 +1853,15 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateIncident(String saccoId, UUID adminId, UUID incidentId, IncidentSeverity severity,
-                               IncidentStatus status, String resolutionNote) {
-        updateIncident(saccoId, null, adminId, incidentId, severity, status, resolutionNote);
+    public void updateIncident(String saccoId, UUID adminId, UUID incidentId, IncidentStatus status, String resolutionNote) {
+        updateIncident(saccoId, null, adminId, incidentId, status, resolutionNote);
     }
 
     @Transactional
-    public void updateIncident(String saccoId, String stationId, UUID adminId, UUID incidentId, IncidentSeverity severity,
+    public void updateIncident(String saccoId, String stationId, UUID adminId, UUID incidentId,
                                IncidentStatus status, String resolutionNote) {
         AdminIncident incident = incident(saccoId, stationId, incidentId);
         Map<String, Object> before = snapshotIncident(incident);
-        incident.setSeverity(severity);
         incident.setStatus(status);
         incident.setResolutionNote(resolutionNote == null ? null : resolutionNote.trim());
         incident.setUpdatedAt(OffsetDateTime.now());
@@ -1987,6 +2018,86 @@ public class AdminService {
             normalizedLoanApplicationId,
             pageRequest
         );
+    }
+
+    public Map<UUID, String> outboxActorPrefixes(List<OutboxEvent> events) {
+        Map<UUID, String> actorPrefixes = new LinkedHashMap<>();
+        if (events == null || events.isEmpty()) {
+            return actorPrefixes;
+        }
+        for (OutboxEvent event : events) {
+            if (event == null || event.getId() == null) {
+                continue;
+            }
+            actorPrefixes.put(event.getId(), outboxActorPrefix(event));
+        }
+        return actorPrefixes;
+    }
+
+    private String outboxActorPrefix(OutboxEvent event) {
+        Map<String, Object> payload = readOutboxPayload(event.getPayload());
+        return formatUserIdPrefix(firstOutboxValue(
+            outboxPayloadValue(payload, "actorId"),
+            outboxDetailsValue(payload, "actorId"),
+            outboxDetailsValue(payload, "managerId"),
+            outboxDetailsValue(payload, "applicantMemberId"),
+            outboxDetailsValue(payload, "requesterMemberId")
+        ));
+    }
+
+    private Map<String, Object> readOutboxPayload(String payload) {
+        String normalized = normalizeOptional(payload);
+        if (normalized == null) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(normalized, new TypeReference<Map<String, Object>>() {});
+        } catch (JsonProcessingException ex) {
+            return Map.of();
+        }
+    }
+
+    private String outboxPayloadValue(Map<String, Object> payload, String key) {
+        return payloadValueToString(payload == null ? null : payload.get(key));
+    }
+
+    private String outboxDetailsValue(Map<String, Object> payload, String key) {
+        if (payload == null || !(payload.get("details") instanceof Map<?, ?> details)) {
+            return null;
+        }
+        return payloadValueToString(details.get(key));
+    }
+
+    private String payloadValueToString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = normalizeOptional(String.valueOf(value));
+        if (normalized == null || "null".equalsIgnoreCase(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String firstOutboxValue(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            String normalized = normalizeOptional(value);
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    private String formatUserIdPrefix(String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            return "-";
+        }
+        return normalized.substring(0, Math.min(8, normalized.length()));
     }
 
     @Transactional
@@ -2331,7 +2442,16 @@ public class AdminService {
             .displayStatus(displayUserStatus(member.getStatus()))
             .membershipLabel(resolveMembershipLabel(member))
             .memberAccess(memberAccess)
+            .canDeleteStaffRecord(canDeleteStaffRecord(member))
             .build();
+    }
+
+    private boolean canDeleteStaffRecord(Member member) {
+        return member != null
+            && member.getStatus() == MemberStatus.INACTIVE
+            && !member.isMemberAccess()
+            && !member.getStaffRolesResolved().isEmpty()
+            && INVITED_ACCOUNT_PASSWORD_PLACEHOLDER.equals(member.getPasswordHash());
     }
 
     private String normalizeUserSearchBy(String searchBy) {
@@ -2455,7 +2575,7 @@ public class AdminService {
     private void notifyPendingStaffAccess(Member member, UUID adminId, OffsetDateTime now) {
         String staffNo = displayStaffNo(member);
         String subject = "Staff access assigned";
-        String message = "Your SACCO staff access is ready. Confirm it from your member dashboard. Staff Member Number: "
+        String message = "Your SACCO staff access is ready. Confirm it from your member dashboard. Staff Number: "
             + staffNo + ".";
         String senderName = adminId == null ? "Administrator" : memberRepository.findById(adminId)
             .map(Member::getFullName)
@@ -2555,35 +2675,31 @@ public class AdminService {
         return lookup != null && lookup.isNotFound();
     }
 
-    public String nextGeneratedUserIdPreview() {
-        return generateUniqueStaffNo();
-    }
-
     public String userIdLabel(UUID accountId) {
         return formatUserId(accountId);
     }
 
     private String generateUniqueStaffNo() {
-        List<String> existingStaffIds = memberRepository.findFiveDigitStaffNumbers();
-        List<String> existingMemberIds = memberRepository.findFiveDigitMemberNumbers();
-        Set<String> usedIds = java.util.stream.Stream.concat(
-                existingStaffIds == null ? java.util.stream.Stream.empty() : existingStaffIds.stream(),
-                existingMemberIds == null ? java.util.stream.Stream.empty() : existingMemberIds.stream()
-            )
-            .filter(id -> id != null && id.matches("[0-9]{5}"))
-            .collect(Collectors.toSet());
-        for (int candidate = FIRST_GENERATED_USER_ID; candidate <= LAST_GENERATED_USER_ID; candidate++) {
+        int candidateCount = LAST_GENERATED_USER_ID - FIRST_GENERATED_USER_ID + 1;
+        for (int attempt = 0; attempt < candidateCount; attempt++) {
+            long candidate = memberRepository.nextStaffNumberValue();
+            if (candidate > LAST_GENERATED_USER_ID) {
+                break;
+            }
             String value = String.valueOf(candidate);
-            if (!usedIds.contains(value) && !memberRepository.existsByStaffNoIgnoreCase(value)) {
+            if (candidate >= FIRST_GENERATED_USER_ID
+                && !memberRepository.existsByStaffNoIgnoreCase(value)
+                && !memberRepository.existsByMemberNoIgnoreCase(value)
+                && !memberRepository.existsByMemberNoIgnoreCase("STAFF-" + value)) {
                 return value;
             }
         }
-        throw new IllegalStateException("All five-digit staff member numbers are already in use.");
+        throw new IllegalStateException("All five-digit staff numbers are already in use.");
     }
 
     private String internalStaffMemberNo(String staffNo) {
         String base = "STAFF-" + staffNo;
-        if (memberRepository.findByMemberNo(base).isEmpty()) {
+        if (!memberRepository.existsByMemberNoIgnoreCase(base)) {
             return base;
         }
         return "STAFF-" + UUID.randomUUID();
@@ -3264,6 +3380,7 @@ public class AdminService {
         private String displayStatus;
         private String membershipLabel;
         private boolean memberAccess;
+        private boolean canDeleteStaffRecord;
     }
 
     @lombok.Getter

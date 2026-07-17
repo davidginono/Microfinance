@@ -36,7 +36,7 @@ public class StaffAccessController {
                 true
             );
             installSecurityContext(staffPrincipal, request);
-            ra.addFlashAttribute("message", "Staff access activated. Staff Member Number " + member.getStaffNo() + " is now active.");
+            ra.addFlashAttribute("message", "Staff access activated. Staff Number " + member.getStaffNo() + " is now active.");
             return "redirect:" + WorkspaceLanding.staffDashboard(member);
         } catch (IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());

@@ -18,7 +18,6 @@
                 <p class="mt-2 text-sm text-slate-600">${incident.message}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                <span class="rounded-full bg-rose-50 px-3 py-1 text-rose-700">${incident.severity}</span>
                 <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">${incident.status}</span>
             </div>
         </div>
@@ -41,14 +40,6 @@
         <h5 class="erp-panel-title">Update Incident</h5>
         <form action="/admin/incidents/${incident.id}" method="post" class="mt-4 space-y-4">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div>
-                <label class="mb-1 block text-sm font-semibold text-slate-700">Severity</label>
-                <select name="severity" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
-                    <c:forEach items="${incidentSeverities}" var="item">
-                        <option value="${item}" ${incident.severity eq item ? 'selected' : ''}>${item}</option>
-                    </c:forEach>
-                </select>
-            </div>
             <div>
                 <label class="mb-1 block text-sm font-semibold text-slate-700">Resolution Status</label>
                 <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">

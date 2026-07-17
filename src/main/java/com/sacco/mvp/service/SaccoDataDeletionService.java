@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class SaccoDataDeletionService {
+    private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
+
     private final JdbcTemplate jdbcTemplate;
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final MemberRepository memberRepository;
@@ -43,6 +46,37 @@ public class SaccoDataDeletionService {
         }
         if (member.getStatus() == MemberStatus.ACTIVE || member.getStatus() == MemberStatus.INVITED) {
             throw new IllegalStateException("Only revoked or inactive SACCOS Admin records can be deleted.");
+        }
+        requireExactConfirmation(confirmation, "delete " + member.getFullName());
+
+        deleteMemberScopedRows(member.getId(), member.getEmail());
+    }
+
+    @Transactional
+    public void deleteInactiveStaffMember(String saccoId,
+                                          String stationId,
+                                          Set<Position> actorRoles,
+                                          UUID accountId,
+                                          String confirmation) {
+        String normalizedSaccoId = normalizeSaccoId(saccoId);
+        String normalizedStationId = normalizeOptional(stationId);
+        Member member = memberRepository.findById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Staff member record not found."));
+        if (!normalizedSaccoId.equalsIgnoreCase(member.getSaccoId())) {
+            throw new IllegalArgumentException("Staff member record not found in this SACCO.");
+        }
+        if (normalizedStationId != null && !normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId()))) {
+            throw new IllegalArgumentException("Staff member record not found in this station.");
+        }
+        if (member.isMemberAccess() || member.getStaffRolesResolved().isEmpty()) {
+            throw new IllegalStateException("Only staff invitation records can be deleted here.");
+        }
+        boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
+        if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
+            throw new IllegalStateException("Only super admins can delete Super Admin invitation records.");
+        }
+        if (member.getStatus() != MemberStatus.INACTIVE || !INVITED_ACCOUNT_PASSWORD_PLACEHOLDER.equals(member.getPasswordHash())) {
+            throw new IllegalStateException("Cancel the staff invitation before deleting this record.");
         }
         requireExactConfirmation(confirmation, "delete " + member.getFullName());
 
@@ -164,5 +198,9 @@ public class SaccoDataDeletionService {
             throw new IllegalArgumentException("SACCO ID is required.");
         }
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeOptional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

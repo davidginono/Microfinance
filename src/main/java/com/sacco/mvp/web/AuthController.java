@@ -569,7 +569,7 @@ public class AuthController {
             return memberRepository.findByStaffNo(normalizedUsername)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
-                .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff member number."));
+                .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff number."));
         }
         Member member = memberRepository.findByMemberNo(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)

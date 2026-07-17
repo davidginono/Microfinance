@@ -152,7 +152,7 @@
 <div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Action</th></tr>
+        <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${events}" var="event">
@@ -161,21 +161,12 @@
                 <td class="px-3 py-2">${event.aggregateType}<div class="text-xs text-slate-500">${event.aggregateId}</div></td>
                 <td class="px-3 py-2">${event.status}</td>
                 <td class="px-3 py-2">${event.createdAt}</td>
-                <td class="px-3 py-2">
-                    <c:if test="${event.status eq 'FAILED'}">
-                        <form action="/admin/outbox/${event.id}/retry" method="post">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <input type="hidden" name="dateFrom" value="${selectedDateFrom}" />
-                            <input type="hidden" name="dateTo" value="${selectedDateTo}" />
-                            <input type="hidden" name="loanApplicationId" value="${selectedLoanApplicationId}" />
-                            <input type="hidden" name="saccoId" value="${selectedSaccoId}" />
-                            <input type="hidden" name="stationId" value="${selectedStationId}" />
-                            <input type="hidden" name="size" value="${selectedPageSize}" />
-                            <input type="hidden" name="page" value="${eventsPage.number}" />
-                            <button type="submit" class="app-btn btn-primary">Retry</button>
-                        </form>
-                    </c:if>
-                    <c:if test="${event.status ne 'FAILED'}">-</c:if>
+                <td class="px-3 py-2 font-mono text-xs text-slate-700">
+                    <c:set var="actorPrefix" value="${outboxActorPrefixes[event.id]}" />
+                    <c:choose>
+                        <c:when test="${not empty actorPrefix}">${actorPrefix}</c:when>
+                        <c:otherwise>-</c:otherwise>
+                    </c:choose>
                 </td>
             </tr>
         </c:forEach>

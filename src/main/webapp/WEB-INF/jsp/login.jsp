@@ -339,7 +339,7 @@
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="staff-password" />
                                 <div>
-                                    <label class="mb-2 block auth-section-label">Staff Member Number</label>
+                                    <label class="mb-2 block auth-section-label">Staff Number</label>
                                     <input name="username" class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
@@ -1007,11 +1007,11 @@
                     : document.querySelector('[data-login-tab="member"] input[name="username"]')?.value;
                 usernameInput.value = (loginUsername || '').trim();
                 if (usernameLabel) {
-                    usernameLabel.textContent = accountTypeInput.value === 'staff' ? 'Staff Member Number' : 'Member Number';
+                    usernameLabel.textContent = accountTypeInput.value === 'staff' ? 'Staff Number' : 'Member Number';
                 }
                 if (subtitle) {
                     subtitle.textContent = accountTypeInput.value === 'staff'
-                        ? 'Enter your staff member number. The code goes to the email saved on your account.'
+                        ? 'Enter your staff number. The code goes to the email saved on your account.'
                         : 'Enter your member number. The code goes to the email saved on your account.';
                 }
                 otpInput.value = '';

@@ -115,7 +115,7 @@
                     <p class="mt-0.5 text-xs font-medium text-white/85">
                         <c:choose>
                             <c:when test="${not empty currentMember and currentMember.staffSession}">
-                                <spring:message code="profile.staffMemberNo" text="Staff Member Number" />
+                                <spring:message code="profile.staffMemberNo" text="Staff Number" />
                             </c:when>
                             <c:when test="${not empty currentMember and currentMember.memberAccess}">
                                 <spring:message code="profile.memberNo" />
@@ -171,7 +171,12 @@
                                     <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
                                 </c:choose>
                             </p>
-                            <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500"><sec:authentication property="principal.position" /></p>
+                            <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
+                                </c:choose>
+                            </p>
                             <c:if test="${not empty currentMember and not empty currentMember.email}">
                                 <p class="mt-1 truncate text-xs text-slate-500">${currentMember.email}</p>
                             </c:if>
@@ -185,7 +190,7 @@
                             <span class="text-slate-500">
                                 <c:choose>
                                     <c:when test="${not empty currentMember and currentMember.staffSession}">
-                                        <spring:message code="profile.staffMemberNo" text="Staff Member Number" />
+                                        <spring:message code="profile.staffMemberNo" text="Staff Number" />
                                     </c:when>
                                     <c:when test="${not empty currentMember and currentMember.memberAccess}">
                                         <spring:message code="profile.memberNo" />
@@ -203,7 +208,12 @@
                         </div>
                         <div class="flex items-center justify-between gap-4">
                             <span class="text-slate-500"><spring:message code="profile.role" /></span>
-                            <span class="font-semibold text-slate-800"><sec:authentication property="principal.position" /></span>
+                            <span class="font-semibold text-slate-800">
+                                <c:choose>
+                                    <c:when test="${not empty currentMember and not empty currentMember.displayRole}">${currentMember.displayRole}</c:when>
+                                    <c:otherwise><sec:authentication property="principal.position" /></c:otherwise>
+                                </c:choose>
+                            </span>
                         </div>
                         <c:if test="${not empty currentMember and currentMember.memberAccess}">
                             <div class="flex items-center justify-between gap-4">
@@ -213,7 +223,7 @@
                         </c:if>
                         <c:if test="${not empty currentMember and not empty currentMember.staffNo}">
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-slate-500"><spring:message code="profile.staffMemberNo" text="Staff Member Number" /></span>
+                                <span class="text-slate-500"><spring:message code="profile.staffMemberNo" text="Staff Number" /></span>
                                 <span class="font-semibold text-slate-800">${currentMember.staffNo}</span>
                             </div>
                         </c:if>
@@ -252,4 +262,4 @@
 <div class="relative min-h-screen" style="padding-top: var(--shell-nav-height); overflow-x: clip;">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260716-session-timeout-modal' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260716-admin-scroll-session-overlay' />" defer></script>

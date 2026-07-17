@@ -177,7 +177,7 @@ public class BoardService {
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, nextStatus.name(), app.getApplicantMemberId(),
-                app.getSaccoId(), app.getStationId(),
+                actorMemberId, app.getSaccoId(), app.getStationId(),
                 Map.of("loanId", loanId.toString()));
         }
     }

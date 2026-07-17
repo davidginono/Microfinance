@@ -92,15 +92,6 @@
                 </c:forEach>
             </select>
         </div>
-        <div class="admin-filter-field min-w-0">
-            <label class="mb-1 block text-sm font-semibold text-slate-700">Severity</label>
-            <select name="severity" class="w-full border border-slate-300 px-3 py-2.5 focus:border-sacco-blue focus:outline-none">
-                <option value="">All severities</option>
-                <c:forEach items="${incidentSeverities}" var="item">
-                    <option value="${item}" ${selectedSeverity eq item.name() ? 'selected' : ''}>${item}</option>
-                </c:forEach>
-            </select>
-        </div>
         <div class="admin-filter-actions flex flex-wrap items-end gap-2">
             <button type="submit" class="app-btn btn-primary">Apply Filters</button>
             <a href="/admin/incidents" class="app-btn btn-neutral">Clear</a>
@@ -111,7 +102,7 @@
 <section class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Subject</th><th>Category</th><th>Severity</th><th>Status</th><th>Created</th><th>Action</th></tr>
+        <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th>Action</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${incidents}" var="incident">
@@ -121,14 +112,13 @@
                     <div class="text-xs text-slate-500">${incident.source}</div>
                 </td>
                 <td class="px-3 py-2">${incident.category}</td>
-                <td class="px-3 py-2">${incident.severity}</td>
                 <td class="px-3 py-2">${incident.status}</td>
                 <td class="px-3 py-2">${incident.createdAt}</td>
                 <td class="px-3 py-2"><a href="/admin/incidents/${incident.id}" class="app-btn btn-primary">Open</a></td>
             </tr>
         </c:forEach>
         <c:if test="${empty incidents}">
-            <tr><td colspan="6" class="px-3 py-4 text-slate-500">No incidents match the current filters.</td></tr>
+            <tr><td colspan="5" class="px-3 py-4 text-slate-500">No incidents match the current filters.</td></tr>
         </c:if>
         </tbody>
     </table>

@@ -141,6 +141,7 @@
                         <a href="/app/support/replies" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/support/replies' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                             <spring:message code="support.replies" text="Replies" />
                         </a>
+                        <%@ include file="platform-support-contact-sidebar.jspf" %>
                     </div>
                 </div>
             </sec:authorize>
@@ -268,6 +269,7 @@
                                 <a href="/admin/support" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.newMessage" text="New Message" /></a>
                                 <a href="/admin/support/archive" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support/archive' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.sentArchive" text="Sent Archive" /></a>
                                 <a href="/admin/support/replies" class="block rounded-md px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/support/replies' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="support.replies" text="Replies" /></a>
+                                <%@ include file="platform-support-contact-sidebar.jspf" %>
                             </div>
                         </div>
                     </c:otherwise>
@@ -366,6 +368,26 @@
                         </a>
                     </div>
                 </div>
+                <c:if test="${not empty platformSupportContact}">
+                    <div class="shell-sidebar-group space-y-1">
+                        <button type="button"
+                                id="staffSupportToggle"
+                                class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                aria-expanded="false"
+                                aria-controls="staffSupportPanel">
+                            <span class="inline-flex h-7 w-7 items-center justify-center border border-slate-200 bg-white text-slate-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 10c0 3.866-3.582 7-8 7a8.84 8.84 0 01-4.083-.97L2 17l1.338-3.122A6.48 6.48 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7z"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1"><spring:message code="menu.support" text="Support" /></span>
+                            <svg id="staffSupportChevron" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                        <div id="staffSupportPanel" class="mt-1 hidden space-y-1 rounded-md border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                            <%@ include file="platform-support-contact-sidebar.jspf" %>
+                        </div>
+                    </div>
+                </c:if>
             </c:if>
             <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
                 <c:set var="managerOfficeActive" value="${fn:startsWith(requestUri, '/manager')}" />
