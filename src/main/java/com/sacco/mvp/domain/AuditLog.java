@@ -176,6 +176,11 @@ public class AuditLog {
     }
 
     @Transient
+    public String getActorMemberIdText() {
+        return actorMemberId == null ? "" : actorMemberId.toString();
+    }
+
+    @Transient
     public String getDisplayStatus() {
         return eventStatus == AuditEventStatus.FAIL ? "Fail" : "Success";
     }

@@ -144,7 +144,8 @@
             <th>Status</th>
             <th>Entity</th>
             <th>Reference</th>
-            <th>Actor</th>
+            <th>Actor ID</th>
+            <th>Name</th>
             <th>Date</th>
         </tr>
         </thead>
@@ -153,7 +154,13 @@
             <tr>
                 <td class="px-3 py-2 font-semibold text-slate-900">${entry.displayAction}</td>
                 <c:if test="${superAdminScopeFilters}">
-                    <td class="px-3 py-2">${entry.saccoReferenceLabel}</td>
+                    <c:set var="entrySaccoName" value="${registeredSaccoNamesById[entry.saccoId]}" />
+                    <td class="px-3 py-2">
+                        <c:choose>
+                            <c:when test="${not empty entrySaccoName}"><c:out value="${entrySaccoName}" /></c:when>
+                            <c:otherwise>${entry.saccoReferenceLabel}</c:otherwise>
+                        </c:choose>
+                    </td>
                 </c:if>
                 <td class="px-3 py-2">
                     <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.statusBadgeClass}">${entry.displayStatus}</span>
@@ -161,11 +168,19 @@
                 <td class="px-3 py-2">${entry.displayEntityType}</td>
                 <td class="px-3 py-2">${entry.shortEntityReference}</td>
                 <td class="px-3 py-2">${entry.actorReferenceLabel}</td>
+                <c:set var="actorName" value="${actorNamesById[entry.actorMemberIdText]}" />
+                <td class="px-3 py-2">
+                    <c:choose>
+                        <c:when test="${empty entry.actorMemberId}">System</c:when>
+                        <c:when test="${not empty actorName}"><c:out value="${actorName}" /></c:when>
+                        <c:otherwise>Unknown actor</c:otherwise>
+                    </c:choose>
+                </td>
                 <td class="px-3 py-2 whitespace-nowrap">${entry.createdAtLabel}</td>
             </tr>
         </c:forEach>
         <c:if test="${empty entries}">
-            <tr><td colspan="${superAdminScopeFilters ? 7 : 6}" class="px-3 py-3 text-slate-500">No events recorded yet.</td></tr>
+            <tr><td colspan="${superAdminScopeFilters ? 8 : 7}" class="px-3 py-3 text-slate-500">No events recorded yet.</td></tr>
         </c:if>
         </tbody>
     </table>

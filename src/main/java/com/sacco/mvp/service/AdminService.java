@@ -2034,15 +2034,57 @@ public class AdminService {
         return actorPrefixes;
     }
 
+    public Map<UUID, String> outboxActorNames(List<OutboxEvent> events) {
+        Map<UUID, UUID> actorIdsByEventId = new LinkedHashMap<>();
+        if (events == null || events.isEmpty()) {
+            return Map.of();
+        }
+        for (OutboxEvent event : events) {
+            if (event == null || event.getId() == null) {
+                continue;
+            }
+            UUID actorId = parseUuid(outboxActorValue(event));
+            if (actorId != null) {
+                actorIdsByEventId.put(event.getId(), actorId);
+            }
+        }
+        if (actorIdsByEventId.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> actorNamesByActorId = memberRepository.findAllById(new LinkedHashSet<>(actorIdsByEventId.values())).stream()
+            .filter(member -> member.getFullName() != null && !member.getFullName().isBlank())
+            .collect(Collectors.toMap(
+                Member::getId,
+                Member::getFullName,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        Map<UUID, String> actorNamesByEventId = new LinkedHashMap<>();
+        actorIdsByEventId.forEach((eventId, actorId) -> {
+            String actorName = actorNamesByActorId.get(actorId);
+            if (actorName != null) {
+                actorNamesByEventId.put(eventId, actorName);
+            }
+        });
+        return actorNamesByEventId;
+    }
+
     private String outboxActorPrefix(OutboxEvent event) {
+        return formatUserIdPrefix(outboxActorValue(event));
+    }
+
+    private String outboxActorValue(OutboxEvent event) {
+        if (event == null) {
+            return null;
+        }
         Map<String, Object> payload = readOutboxPayload(event.getPayload());
-        return formatUserIdPrefix(firstOutboxValue(
+        return firstOutboxValue(
             outboxPayloadValue(payload, "actorId"),
             outboxDetailsValue(payload, "actorId"),
             outboxDetailsValue(payload, "managerId"),
             outboxDetailsValue(payload, "applicantMemberId"),
             outboxDetailsValue(payload, "requesterMemberId")
-        ));
+        );
     }
 
     private Map<String, Object> readOutboxPayload(String payload) {
@@ -2098,6 +2140,18 @@ public class AdminService {
             return "-";
         }
         return normalized.substring(0, Math.min(8, normalized.length()));
+    }
+
+    private UUID parseUuid(String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(normalized);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     @Transactional
@@ -2161,6 +2215,27 @@ public class AdminService {
                                        String saccoId,
                                        String stationId) {
         return auditEntries(page, size, dateFrom, dateTo, actorId, saccoId, stationId);
+    }
+
+    public Map<String, String> actorNamesForEvents(List<AuditLog> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashSet<UUID> actorIds = entries.stream()
+            .map(AuditLog::getActorMemberId)
+            .filter(id -> id != null)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (actorIds.isEmpty()) {
+            return Map.of();
+        }
+        return memberRepository.findAllById(actorIds).stream()
+            .filter(member -> member.getFullName() != null && !member.getFullName().isBlank())
+            .collect(Collectors.toMap(
+                member -> member.getId().toString(),
+                Member::getFullName,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
     }
 
     public ReportData reports(String saccoId, String statusFilter, String loanTypeFilter, String dateFrom, String dateTo) {

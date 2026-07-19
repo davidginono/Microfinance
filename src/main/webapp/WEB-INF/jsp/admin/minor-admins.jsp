@@ -160,7 +160,13 @@
                                     </c:otherwise>
                                 </c:choose>
                             </td>
-                            <td class="align-top whitespace-nowrap">${minorAdmin.saccoId}</td>
+                            <c:set var="minorAdminSaccoName" value="${registeredSaccoNamesById[minorAdmin.saccoId]}" />
+                            <td class="align-top whitespace-nowrap">
+                                <c:choose>
+                                    <c:when test="${not empty minorAdminSaccoName}"><c:out value="${minorAdminSaccoName}" /></c:when>
+                                    <c:otherwise>${minorAdmin.saccoId}</c:otherwise>
+                                </c:choose>
+                            </td>
                             <td class="align-top whitespace-nowrap"><c:choose><c:when test="${empty minorAdmin.stationId}"><spring:message code="common.notSet" text="Not set" /></c:when><c:otherwise>${minorAdmin.stationId}</c:otherwise></c:choose></td>
                             <td class="align-top whitespace-nowrap">
                                 <c:choose>

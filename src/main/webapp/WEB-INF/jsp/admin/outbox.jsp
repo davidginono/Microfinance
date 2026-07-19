@@ -152,7 +152,7 @@
 <div class="erp-table-wrap erp-table-scroll">
     <table class="erp-table">
         <thead>
-        <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor</th></tr>
+        <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor ID</th><th>Name</th></tr>
         </thead>
         <tbody>
         <c:forEach items="${events}" var="event">
@@ -168,10 +168,17 @@
                         <c:otherwise>-</c:otherwise>
                     </c:choose>
                 </td>
+                <c:set var="outboxActorName" value="${outboxActorNames[event.id]}" />
+                <td class="px-3 py-2">
+                    <c:choose>
+                        <c:when test="${not empty outboxActorName}"><c:out value="${outboxActorName}" /></c:when>
+                        <c:otherwise>-</c:otherwise>
+                    </c:choose>
+                </td>
             </tr>
         </c:forEach>
         <c:if test="${empty events}">
-            <tr><td colspan="5" class="px-3 py-3 text-slate-500">No outbox events found for this view.</td></tr>
+            <tr><td colspan="6" class="px-3 py-3 text-slate-500">No outbox events found for this view.</td></tr>
         </c:if>
         </tbody>
     </table>

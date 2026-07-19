@@ -1665,7 +1665,9 @@ public class AdminController {
     @GetMapping("/saccos/minor-admins")
     @PreAuthorize("@authz.platformAdminIdentity(principal)")
     public String minorAdmins(Model model) {
-        model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
+        List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos();
+        model.addAttribute("registeredSaccos", registeredSaccos);
+        model.addAttribute("registeredSaccoNamesById", registeredSaccoNamesById(registeredSaccos));
         model.addAttribute("minorAdmins", adminService.minorAdmins());
         model.addAttribute("registrationForm", new MinorAdminRegistrationForm());
         model.addAttribute("superAdmin", true);
@@ -2042,6 +2044,7 @@ public class AdminController {
         List<com.sacco.mvp.domain.OutboxEvent> events = eventsPage.getContent();
         model.addAttribute("events", events);
         model.addAttribute("outboxActorPrefixes", adminService.outboxActorPrefixes(events));
+        model.addAttribute("outboxActorNames", adminService.outboxActorNames(events));
         model.addAttribute("eventsPage", eventsPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
@@ -2067,7 +2070,9 @@ public class AdminController {
                                            String stationId,
                                            boolean superAdmin,
                                            Page<com.sacco.mvp.domain.AuditLog> entriesPage) {
-        model.addAttribute("entries", entriesPage.getContent());
+        List<com.sacco.mvp.domain.AuditLog> entries = entriesPage.getContent();
+        model.addAttribute("entries", entries);
+        model.addAttribute("actorNamesById", adminService.actorNamesForEvents(entries));
         model.addAttribute("entriesPage", entriesPage);
         model.addAttribute("selectedDateFrom", normalizeDateParam(dateFrom));
         model.addAttribute("selectedDateTo", normalizeDateParam(dateTo));
@@ -2090,9 +2095,24 @@ public class AdminController {
             .orElse(java.util.List.of());
         model.addAttribute("superAdminScopeFilters", superAdmin);
         model.addAttribute("registeredSaccos", saccos);
+        model.addAttribute("registeredSaccoNamesById", registeredSaccoNamesById(saccos));
         model.addAttribute("selectedSaccoId", selectedSaccoId);
         model.addAttribute("selectedStationId", selectedStationId);
         model.addAttribute("selectedStationOptions", stationOptions);
+    }
+
+    private Map<String, String> registeredSaccoNamesById(List<SaccoRegistryService.RegisteredSaccoView> saccos) {
+        Map<String, String> namesById = new LinkedHashMap<>();
+        if (saccos == null || saccos.isEmpty()) {
+            return namesById;
+        }
+        for (SaccoRegistryService.RegisteredSaccoView sacco : saccos) {
+            if (sacco == null || sacco.saccoId() == null || sacco.saccoName() == null || sacco.saccoName().isBlank()) {
+                continue;
+            }
+            namesById.put(sacco.saccoId(), sacco.saccoName());
+        }
+        return namesById;
     }
 
     private String resolveFilterErrorMessage(RuntimeException ex, String fallback) {
