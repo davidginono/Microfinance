@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.OutboxEvent;
@@ -43,7 +43,7 @@ public class OutboxPublisherScheduler {
         for (OutboxEvent event : events) {
             try {
                 JsonNode payload = objectMapper.readTree(event.getPayload());
-                UUID recipientId = UUID.fromString(payload.get("recipientId").asText());
+                UUID recipientId = UUID.fromString(payload.get("recipientId").asString());
                 String saccoId = textOrNull(payload, "saccoId");
                 String stationId = textOrNull(payload, "stationId");
 
@@ -104,6 +104,7 @@ public class OutboxPublisherScheduler {
 
     private String textOrNull(JsonNode payload, String field) {
         JsonNode value = payload == null ? null : payload.get(field);
-        return value == null || value.isNull() || value.asText().isBlank() ? null : value.asText();
+        String text = value == null || value.isNull() ? null : value.asString();
+        return text == null || text.isBlank() ? null : text;
     }
 }

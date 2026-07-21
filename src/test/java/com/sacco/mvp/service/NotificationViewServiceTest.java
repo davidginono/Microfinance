@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.repository.MemberRepository;

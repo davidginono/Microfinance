@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.repository.NotificationRepository;
 import org.junit.jupiter.api.Test;

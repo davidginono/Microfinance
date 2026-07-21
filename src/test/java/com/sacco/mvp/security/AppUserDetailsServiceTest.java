@@ -1,6 +1,6 @@
 package com.sacco.mvp.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;

@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.AuditLog;
 import com.sacco.mvp.repository.AuditLogRepository;

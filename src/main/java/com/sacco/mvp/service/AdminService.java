@@ -1,9 +1,9 @@
 package com.sacco.mvp.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.repository.*;
@@ -2094,7 +2094,7 @@ public class AdminService {
         }
         try {
             return objectMapper.readValue(normalized, new TypeReference<Map<String, Object>>() {});
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             return Map.of();
         }
     }
@@ -3525,7 +3525,7 @@ public class AdminService {
     private String writeLoanProductSnapshot(LoanProductSnapshot snapshot) {
         try {
             return objectMapper.writeValueAsString(snapshot);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Unable to save loan product version snapshot.", ex);
         }
     }
@@ -3533,7 +3533,7 @@ public class AdminService {
     private String writeLoanProductsSnapshot(LoanProductsSnapshot snapshot) {
         try {
             return objectMapper.writeValueAsString(snapshot);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Unable to save loan products version snapshot.", ex);
         }
     }
@@ -3541,7 +3541,7 @@ public class AdminService {
     private LoanProductSnapshot parseLoanProductSnapshot(String snapshotJson) {
         try {
             return objectMapper.readValue(snapshotJson, LoanProductSnapshot.class);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Unable to read loan product version snapshot.", ex);
         }
     }
@@ -3549,7 +3549,7 @@ public class AdminService {
     private LoanProductsSnapshot parseLoanProductsSnapshot(String snapshotJson) {
         try {
             return objectMapper.readValue(snapshotJson, LoanProductsSnapshot.class);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Unable to read loan products version snapshot.", ex);
         }
     }

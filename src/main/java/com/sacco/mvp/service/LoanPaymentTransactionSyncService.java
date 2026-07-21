@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanPaymentTransaction;
@@ -330,7 +330,7 @@ public class LoanPaymentTransactionSyncService {
     private String writeSummaryJson(LoanPaymentSummaryDto summary) {
         try {
             return objectMapper.writeValueAsString(summary);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Unable to persist loan payment summary.", ex);
         }
     }

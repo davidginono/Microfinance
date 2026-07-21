@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Notification;

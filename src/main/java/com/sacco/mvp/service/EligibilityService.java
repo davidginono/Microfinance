@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
@@ -116,7 +116,7 @@ public class EligibilityService {
         }
         try {
             return objectMapper.writeValueAsString(snapshot);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to save policy snapshot", e);
         }
     }

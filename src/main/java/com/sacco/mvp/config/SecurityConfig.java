@@ -75,8 +75,11 @@ public class SecurityConfig {
                                                    StationOtpSettingsService stationOtpSettingsService,
                                                    UserClaimService userClaimService,
                                                    AppUsageAnalyticsService appUsageAnalyticsService,
-                                                   AuditService auditService) throws Exception {
+                                                   AuditService auditService,
+                                                   AppUserDetailsService userDetailsService,
+                                                   PasswordEncoder passwordEncoder) throws Exception {
         http
+            .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                 .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/error", "/error/**").permitAll()
@@ -324,10 +327,17 @@ public class SecurityConfig {
         };
     }
 
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider(AppUserDetailsService userDetailsService,
-                                                            PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider() {
+    private DaoAuthenticationProvider authenticationProvider(AppUserDetailsService userDetailsService,
+                                                             PasswordEncoder passwordEncoder) {
+        org.springframework.security.core.userdetails.UserDetailsService loginUserDetailsService = username -> {
+            String loginType = resolveCurrentLoginType();
+            String normalizedUsername = username == null ? "" : username.trim().toUpperCase(java.util.Locale.ROOT);
+            if ("staff-password".equals(loginType)) {
+                return userDetailsService.loadStaffByStaffNo(normalizedUsername);
+            }
+            return userDetailsService.loadMemberByMemberNo(normalizedUsername);
+        };
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(loginUserDetailsService) {
             @Override
             protected void additionalAuthenticationChecks(UserDetails userDetails,
                                                           org.springframework.security.authentication.UsernamePasswordAuthenticationToken authentication) {
@@ -348,14 +358,6 @@ public class SecurityConfig {
             }
 
         };
-        provider.setUserDetailsService(username -> {
-            String loginType = resolveCurrentLoginType();
-            String normalizedUsername = username == null ? "" : username.trim().toUpperCase(java.util.Locale.ROOT);
-            if ("staff-password".equals(loginType)) {
-                return userDetailsService.loadStaffByStaffNo(normalizedUsername);
-            }
-            return userDetailsService.loadMemberByMemberNo(normalizedUsername);
-        });
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }

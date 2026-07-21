@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AdminIncident;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.IncidentSeverity;

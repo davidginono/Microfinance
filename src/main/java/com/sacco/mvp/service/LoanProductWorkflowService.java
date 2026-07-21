@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;

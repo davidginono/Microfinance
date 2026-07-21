@@ -73,7 +73,7 @@ public class ForesightDirectoryService {
                 throw new UpstreamAvailabilityException(
                     "External account summary service is temporarily unavailable.", ex);
             }
-            throw new IllegalStateException("External account summary lookup failed with status " + ex.getRawStatusCode() + ".", ex);
+            throw new IllegalStateException("External account summary lookup failed with status " + ex.getStatusCode().value() + ".", ex);
         } catch (ResourceAccessException ex) {
             log.warn("Foresight account-summary lookup could not reach the external directory: {}", ex.getMessage());
             throw new UpstreamAvailabilityException("Unable to reach the external member directory.", ex);
@@ -100,8 +100,8 @@ public class ForesightDirectoryService {
         } catch (RestClientResponseException ex) {
             log.warn("Foresight member-profile lookup failed for {} with status {}. Response body: {}",
                 paramName, ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new ExternalDirectoryLookupException(ex.getRawStatusCode(),
-                "External member profile lookup failed with status " + ex.getRawStatusCode() + ".", ex);
+            throw new ExternalDirectoryLookupException(ex.getStatusCode().value(),
+                "External member profile lookup failed with status " + ex.getStatusCode().value() + ".", ex);
         } catch (ResourceAccessException ex) {
             log.warn("Foresight member-profile lookup could not reach the external directory: {}", ex.getMessage());
             throw new IllegalStateException("Unable to reach the external member directory.", ex);

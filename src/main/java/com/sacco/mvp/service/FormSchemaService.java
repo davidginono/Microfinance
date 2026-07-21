@@ -1,12 +1,11 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -49,27 +48,25 @@ public class FormSchemaService {
             JsonNode schema = objectMapper.readTree(schemaJson);
             Set<String> requiredNames = new HashSet<>();
             if (schema.has("required")) {
-                schema.get("required").forEach(n -> requiredNames.add(n.asText()));
+                schema.get("required").forEach(n -> requiredNames.add(n.asString()));
             }
             List<FormField> fields = new ArrayList<>();
             JsonNode properties = schema.path("properties");
-            Iterator<Map.Entry<String, JsonNode>> iterator = properties.fields();
-            while (iterator.hasNext()) {
-                Map.Entry<String, JsonNode> entry = iterator.next();
+            for (Map.Entry<String, JsonNode> entry : properties.properties()) {
                 String name = entry.getKey();
                 if (shouldExcludeField(name)) {
                     continue;
                 }
                 JsonNode field = entry.getValue();
-                String type = field.path("type").asText("text");
-                if ("textarea".equalsIgnoreCase(field.path("format").asText())) {
+                String type = field.path("type").asString("text");
+                if ("textarea".equalsIgnoreCase(field.path("format").asString())) {
                     type = "textarea";
                 }
                 List<String> options = null;
                 if (field.has("enum")) {
                     options = new ArrayList<>();
                     for (JsonNode enumValue : field.get("enum")) {
-                        options.add(enumValue.asText());
+                        options.add(enumValue.asString());
                     }
                     type = "select";
                 }
@@ -85,7 +82,7 @@ public class FormSchemaService {
                     .build());
             }
             return FormModel.builder().fields(fields).build();
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Invalid schema JSON", e);
         }
     }
@@ -94,13 +91,13 @@ public class FormSchemaService {
         try {
             JsonNode schemaNode = objectMapper.readTree(schemaJson);
             JsonNode dataNode = objectMapper.valueToTree(formData);
-            JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
-            JsonSchema schema = factory.getSchema(schemaNode);
-            Set<ValidationMessage> errors = schema.validate(dataNode);
+            SchemaRegistry registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+            Schema schema = registry.getSchema(schemaNode);
+            List<com.networknt.schema.Error> errors = schema.validate(dataNode);
             if (!errors.isEmpty()) {
                 throw new IllegalArgumentException("Form validation failed: " + errors.iterator().next().getMessage());
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to parse JSON", e);
         }
     }
@@ -119,11 +116,11 @@ public class FormSchemaService {
                 }
                 String raw = v.trim();
                 JsonNode property = properties.path(k);
-                String type = property.path("type").asText("string");
+                String type = property.path("type").asString("string");
                 cleaned.put(k, coerceValue(k, raw, type));
             });
             return cleaned;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Invalid schema JSON", e);
         }
     }
@@ -144,7 +141,7 @@ public class FormSchemaService {
     public String toJson(Map<String, Object> data) {
         try {
             return objectMapper.writeValueAsString(data);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to serialize form data", e);
         }
     }

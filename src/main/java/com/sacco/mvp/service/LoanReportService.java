@@ -1,7 +1,8 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.GuarantorRequest;
@@ -1359,7 +1360,7 @@ public class LoanReportService {
         try {
             Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
             return readBigDecimal(raw.get(key));
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             return null;
         }
     }
@@ -1370,7 +1371,7 @@ public class LoanReportService {
         }
         try {
             return objectMapper.readValue(loan.getLoanPaymentSummaryJson(), LoanPaymentSummaryDto.class);
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             return null;
         }
     }

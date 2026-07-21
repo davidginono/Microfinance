@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AdminIncident;
 import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
@@ -135,7 +135,7 @@ public class AdminAlertService {
         }
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return "{\"subject\":\"System Alert\",\"message\":\"Unable to serialize payload\"}";
         }
     }
@@ -146,7 +146,7 @@ public class AdminAlertService {
         }
         try {
             return objectMapper.writeValueAsString(details);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return "{}";
         }
     }

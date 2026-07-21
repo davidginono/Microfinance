@@ -17,8 +17,8 @@ import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.UserClaimService;
 import com.sacco.mvp.web.form.MemberRegistrationForm;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -596,7 +596,7 @@ public class AuthController {
         model.addAttribute("registrationSaccos", options);
         try {
             model.addAttribute("registrationSaccosJson", objectMapper.writeValueAsString(options));
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             model.addAttribute("registrationSaccosJson", "[]");
         }
     }

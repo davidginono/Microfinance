@@ -1,8 +1,8 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.StoredUpload;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -173,7 +173,7 @@ public class LoanAttachmentService {
     private String writeJson(List<Map<String, Object>> attachments) {
         try {
             return objectMapper.writeValueAsString(attachments);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to save attachment metadata", e);
         }
     }

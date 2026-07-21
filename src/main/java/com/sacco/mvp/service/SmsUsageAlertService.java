@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.Position;
@@ -145,7 +145,7 @@ public class SmsUsageAlertService {
                 "message", message,
                 "details", details
             ));
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             return "{\"source\":\"SMS Usage Control\",\"subject\":\"SMS usage alert\",\"message\":\"Review station SMS usage.\"}";
         }
     }

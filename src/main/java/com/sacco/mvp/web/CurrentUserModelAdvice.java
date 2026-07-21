@@ -14,8 +14,8 @@ import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.web.view.CurrentUserView;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectFactory;
@@ -125,7 +125,7 @@ public class CurrentUserModelAdvice {
         }
         try {
             return objectMapper.writeValueAsString(scope.getOptions());
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             return "[]";
         }
     }

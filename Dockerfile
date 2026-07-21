@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+FROM maven:3.9.11-eclipse-temurin-25 AS build
 
 WORKDIR /workspace
 
@@ -12,7 +12,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -Dmaven.test.skip=true package
 
-FROM eclipse-temurin:21-jdk-alpine AS runtime
+FROM eclipse-temurin:25-jdk-alpine AS runtime
 
 RUN jlink \
     --add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,jdk.charsets,jdk.crypto.ec,jdk.localedata,jdk.management,jdk.unsupported,jdk.zipfs \

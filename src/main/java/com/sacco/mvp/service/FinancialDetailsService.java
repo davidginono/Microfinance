@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
@@ -103,7 +103,7 @@ public class FinancialDetailsService {
     public String toJson(Map<String, Object> snapshot) {
         try {
             return objectMapper.writeValueAsString(snapshot);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to prepare financial details", e);
         }
     }

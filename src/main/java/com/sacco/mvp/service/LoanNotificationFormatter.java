@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
@@ -208,7 +208,7 @@ public class LoanNotificationFormatter {
         if (reasons == null || reasons.isNull()) {
             return "";
         }
-        return reasons.asText("").trim();
+        return reasons.asString("").trim();
     }
 
     private String applicationReference(LoanApplication app) {

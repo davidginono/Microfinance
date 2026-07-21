@@ -1,6 +1,6 @@
 package com.sacco.mvp.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;

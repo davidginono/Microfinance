@@ -1,6 +1,6 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;

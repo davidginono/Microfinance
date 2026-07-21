@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.AuditLog;
 import com.sacco.mvp.repository.AuditLogRepository;
@@ -326,7 +326,7 @@ public class AuditService {
         }
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return String.valueOf(value);
         }
     }

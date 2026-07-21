@@ -14,8 +14,8 @@ This repository supports a multi-role SACCO workflow covering:
 
 ## Stack
 
-- Java 21
-- Spring Boot 3.4.3
+- Java 25
+- Spring Boot 4.1.0
 - Spring MVC with JSP/JSTL
 - Spring Security with session-based authentication
 - Spring Data JPA + Hibernate
@@ -130,7 +130,7 @@ Important notes:
 
 ### Prerequisites
 
-- Java 21
+- Java 25
 - Maven 3.9+
 - PostgreSQL
 - Mailpit for local email capture

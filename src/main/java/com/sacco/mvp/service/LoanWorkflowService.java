@@ -5,9 +5,9 @@ import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -918,7 +918,7 @@ public class LoanWorkflowService {
     private String toJson(List<UUID> values) {
         try {
             return objectMapper.writeValueAsString(values);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to save selected guarantors", e);
         }
     }
@@ -957,7 +957,7 @@ public class LoanWorkflowService {
         }
         try {
             return objectMapper.writeValueAsString(rows);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to save selected guarantors", e);
         }
     }

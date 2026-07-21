@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.OutboxEvent;
 import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.repository.OutboxEventRepository;
@@ -63,7 +63,7 @@ public class OutboxService {
                 .status(OutboxStatus.NEW)
                 .createdAt(OffsetDateTime.now())
                 .build());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Unable to write outbox payload", e);
         } catch (Exception e) {
             log.warn("Outbox enqueue skipped for {} due to persistence issue: {}", eventType, e.getMessage());

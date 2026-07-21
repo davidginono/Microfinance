@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -115,9 +115,9 @@ public class BenterSmsGateway implements SmsGateway {
             return SmsSendResult.acceptanceUnknown("Benter Group SMS returned an empty response");
         }
         JsonNode root = objectMapper.readTree(response);
-        String errorCode = root.path("ErrorCode").asText();
+        String errorCode = root.path("ErrorCode").asString();
         if (!"0".equals(errorCode) && !"000".equals(errorCode)) {
-            String errorDescription = root.path("ErrorDescription").asText("Unknown Benter Group SMS error");
+            String errorDescription = root.path("ErrorDescription").asString("Unknown Benter Group SMS error");
             return SmsSendResult.rejected("Benter Group SMS failed: " + errorDescription);
         }
         JsonNode firstMessage = root.path("Data").isArray() && root.path("Data").size() > 0
@@ -127,10 +127,10 @@ public class BenterSmsGateway implements SmsGateway {
             return SmsSendResult.acceptanceUnknown("Benter Group SMS returned no message result");
         }
         if (firstMessage.path("MessageErrorCode").asInt(-1) != 0) {
-            String description = firstMessage.path("MessageErrorDescription").asText("Unknown Benter Group SMS message error");
+            String description = firstMessage.path("MessageErrorDescription").asString("Unknown Benter Group SMS message error");
             return SmsSendResult.rejected("Benter Group SMS failed: " + description);
         }
-        String messageId = firstMessage.path("MessageId").asText(response);
+        String messageId = firstMessage.path("MessageId").asString(response);
         return SmsSendResult.sent(messageId);
     }
 

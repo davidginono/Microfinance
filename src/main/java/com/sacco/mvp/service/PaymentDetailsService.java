@@ -1,7 +1,7 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.MemberPaymentDetails;
 import com.sacco.mvp.domain.PaymentDestinationType;
@@ -72,7 +72,7 @@ public class PaymentDetailsService {
         try {
             PaymentDetailsView view = objectMapper.readValue(snapshot, PaymentDetailsView.class);
             return view == null ? PaymentDetailsView.empty() : view;
-        } catch (JsonProcessingException ignored) {
+        } catch (JacksonException ignored) {
             return PaymentDetailsView.empty();
         }
     }
@@ -80,7 +80,7 @@ public class PaymentDetailsService {
     private String toJson(PaymentDetailsView view) {
         try {
             return objectMapper.writeValueAsString(view);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Financial details for the disbursement deposit could not be captured.", ex);
         }
     }

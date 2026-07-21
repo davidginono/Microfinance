@@ -1,6 +1,6 @@
 package com.sacco.mvp.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;

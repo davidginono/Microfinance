@@ -16,7 +16,7 @@ This guide explains how the codebase is structured around the main business work
 
 | Area | Technology |
 | --- | --- |
-| Backend runtime | Spring Boot 3.x |
+| Backend runtime | Spring Boot 4.1.x |
 | Language | Java |
 | Web layer | Spring MVC |
 | View layer | JSP + JSTL |
