@@ -459,6 +459,10 @@ public class NotificationViewService {
                     .toList();
         }
 
+        public List<String> detailItems() {
+            return getDetailItems();
+        }
+
         public String getStatus() {
             return status;
         }

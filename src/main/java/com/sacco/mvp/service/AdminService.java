@@ -3972,6 +3972,10 @@ public class AdminService {
         public String getReadLabel() {
             return readBySuperAdmin ? "Read by Super Admin" : "Not read yet";
         }
+
+        public String readLabel() {
+            return getReadLabel();
+        }
     }
 
     public record AdminDashboard(
@@ -4030,8 +4034,16 @@ public class AdminService {
             return memberCounts.getOrDefault(MemberStatus.ACTIVE, 0L);
         }
 
+        public long activeMemberCount() {
+            return getActiveMemberCount();
+        }
+
         public long getInactiveMemberCount() {
             return memberCounts.getOrDefault(MemberStatus.INACTIVE, 0L);
+        }
+
+        public long inactiveMemberCount() {
+            return getInactiveMemberCount();
         }
 
         public long getOnReviewByManagerCount() {
@@ -4089,6 +4101,10 @@ public class AdminService {
                 label.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
             }
             return label.length() == 0 ? status.name() : label.toString();
+        }
+
+        public String statusLabel() {
+            return getStatusLabel();
         }
     }
 

@@ -448,6 +448,10 @@ public class SaccoRegistryService {
         public String getAddressLocationLabel() {
             return addressLocation == null || addressLocation.isBlank() ? "Location not set" : addressLocation;
         }
+
+        public String addressLocationLabel() {
+            return getAddressLocationLabel();
+        }
     }
 
     public record RegisteredSaccoView(
@@ -496,12 +500,20 @@ public class SaccoRegistryService {
             return getAccessStatus() == SaccoAccessStatus.SUSPENDED;
         }
 
+        public boolean accessSuspended() {
+            return isAccessSuspended();
+        }
+
         public String getAccessStatusLabel() {
             return switch (getAccessStatus()) {
                 case ACTIVE -> "Station Access Active";
                 case PAYMENT_DUE -> "Station Payment Due";
                 case SUSPENDED -> "Station Access Suspended";
             };
+        }
+
+        public String accessStatusLabel() {
+            return getAccessStatusLabel();
         }
 
         public String getAccessBadgeClass() {
@@ -512,12 +524,24 @@ public class SaccoRegistryService {
             };
         }
 
+        public String accessBadgeClass() {
+            return getAccessBadgeClass();
+        }
+
         public String getStationIdsText() {
             return String.join(System.lineSeparator(), stationIds());
         }
 
+        public String stationIdsText() {
+            return getStationIdsText();
+        }
+
         public String getStationListLabel() {
             return String.join(", ", stationIds());
+        }
+
+        public String stationListLabel() {
+            return getStationListLabel();
         }
     }
 }

@@ -541,6 +541,10 @@ public class PlatformAdminService {
         public String getTotalDisbursedPrincipalLabel() {
             return PlatformAdminService.formatCompactMoney(totalDisbursedPrincipal);
         }
+
+        public String totalDisbursedPrincipalLabel() {
+            return getTotalDisbursedPrincipalLabel();
+        }
     }
 
     public record SaccoDetailView(
@@ -587,6 +591,10 @@ public class PlatformAdminService {
 
         public boolean isStationScoped() {
             return selectedStationId != null && !selectedStationId.isBlank();
+        }
+
+        public boolean stationScoped() {
+            return isStationScoped();
         }
     }
 
@@ -727,8 +735,16 @@ public class PlatformAdminService {
             return "sw".equalsIgnoreCase(getDefaultLanguage()) ? "Kiswahili" : "English";
         }
 
+        public String defaultLanguageLabel() {
+            return getDefaultLanguageLabel();
+        }
+
         public boolean isAccessSuspended() {
             return getAccessStatus() == SaccoAccessStatus.SUSPENDED;
+        }
+
+        public boolean accessSuspended() {
+            return isAccessSuspended();
         }
 
         public String getAccessStatusLabel() {
@@ -739,12 +755,24 @@ public class PlatformAdminService {
             };
         }
 
+        public String accessStatusLabel() {
+            return getAccessStatusLabel();
+        }
+
         public String getPaymentDueDateLabel() {
             return paymentDueDate == null ? "Not set" : paymentDueDate.format(DATE_LABEL);
         }
 
+        public String paymentDueDateLabel() {
+            return getPaymentDueDateLabel();
+        }
+
         public String getAccessSuspendedAtLabel() {
             return accessSuspendedAt == null ? "Not suspended" : accessSuspendedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
+        }
+
+        public String accessSuspendedAtLabel() {
+            return getAccessSuspendedAtLabel();
         }
 
         public String getAccessBadgeClass() {
@@ -755,52 +783,104 @@ public class PlatformAdminService {
             };
         }
 
+        public String accessBadgeClass() {
+            return getAccessBadgeClass();
+        }
+
         public int getStationCount() {
             return stationIds == null ? 0 : stationIds.size();
+        }
+
+        public int stationCount() {
+            return getStationCount();
         }
 
         public String getStationListLabel() {
             return stationIds == null || stationIds.isEmpty() ? "No stations yet" : String.join(", ", stationIds);
         }
 
+        public String stationListLabel() {
+            return getStationListLabel();
+        }
+
         public String getTotalDisbursedPrincipalLabel() {
             return PlatformAdminService.formatCompactMoney(totalDisbursedPrincipal);
+        }
+
+        public String totalDisbursedPrincipalLabel() {
+            return getTotalDisbursedPrincipalLabel();
         }
 
         public String getTotalDisbursedPrincipalFullLabel() {
             return PlatformAdminService.formatFullMoney(totalDisbursedPrincipal);
         }
 
+        public String totalDisbursedPrincipalFullLabel() {
+            return getTotalDisbursedPrincipalFullLabel();
+        }
+
         public String getTotalSavingsLabel() {
             return PlatformAdminService.formatCompactMoney(totalSavings);
+        }
+
+        public String totalSavingsLabel() {
+            return getTotalSavingsLabel();
         }
 
         public String getTotalSavingsFullLabel() {
             return PlatformAdminService.formatFullMoney(totalSavings);
         }
 
+        public String totalSavingsFullLabel() {
+            return getTotalSavingsFullLabel();
+        }
+
         public String getActiveExposureLabel() {
             return PlatformAdminService.formatCompactMoney(activeExposure);
+        }
+
+        public String activeExposureLabel() {
+            return getActiveExposureLabel();
         }
 
         public String getActiveExposureFullLabel() {
             return PlatformAdminService.formatFullMoney(activeExposure);
         }
 
+        public String activeExposureFullLabel() {
+            return getActiveExposureFullLabel();
+        }
+
         public String getRepaymentPercentLabel() {
             return PlatformAdminService.formatPercent(repaymentPercent);
+        }
+
+        public String repaymentPercentLabel() {
+            return getRepaymentPercentLabel();
         }
 
         public String getDefaultPercentLabel() {
             return PlatformAdminService.formatPercent(defaultPercent);
         }
 
+        public String defaultPercentLabel() {
+            return getDefaultPercentLabel();
+        }
+
         public String getLiquidityRatioLabel() {
             return PlatformAdminService.formatRatio(liquidityRatio);
         }
 
+        public String liquidityRatioLabel() {
+            return getLiquidityRatioLabel();
+        }
+
         public String getLogoFallbackText() {
             return PlatformAdminService.initialsForName(saccoName);
+        }
+
+        public String logoFallbackText() {
+            return getLogoFallbackText();
         }
 
         public String getToneBadgeClass() {
@@ -812,6 +892,10 @@ public class PlatformAdminService {
             };
         }
 
+        public String toneBadgeClass() {
+            return getToneBadgeClass();
+        }
+
         public String getToneDotClass() {
             return switch (healthTone) {
                 case "green" -> "bg-emerald-500";
@@ -821,6 +905,10 @@ public class PlatformAdminService {
             };
         }
 
+        public String toneDotClass() {
+            return getToneDotClass();
+        }
+
         public String getToneCardClass() {
             return switch (healthTone) {
                 case "green" -> "border-emerald-200";
@@ -828,6 +916,10 @@ public class PlatformAdminService {
                 case "red" -> "border-rose-200";
                 default -> "border-slate-200";
             };
+        }
+
+        public String toneCardClass() {
+            return getToneCardClass();
         }
     }
 
@@ -867,20 +959,40 @@ public class PlatformAdminService {
             return PlatformAdminService.shortId(loanId);
         }
 
+        public String loanReference() {
+            return getLoanReference();
+        }
+
         public String getAmountLabel() {
             return PlatformAdminService.formatCompactMoney(amount);
+        }
+
+        public String amountLabel() {
+            return getAmountLabel();
         }
 
         public String getStatusLabel() {
             return status == null ? "Unknown" : status.name().replace('_', ' ');
         }
 
+        public String statusLabel() {
+            return getStatusLabel();
+        }
+
         public String getUpdatedAtLabel() {
             return updatedAt == null ? "—" : updatedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"));
         }
 
+        public String updatedAtLabel() {
+            return getUpdatedAtLabel();
+        }
+
         public String getFinalDueDateLabel() {
             return finalDueDate == null ? "—" : finalDueDate.format(DATE_LABEL);
+        }
+
+        public String finalDueDateLabel() {
+            return getFinalDueDateLabel();
         }
     }
 

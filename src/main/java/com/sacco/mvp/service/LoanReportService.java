@@ -3140,16 +3140,32 @@ public class LoanReportService {
             return formatMoneyPlainStatic(totalInterestPaid);
         }
 
+        public String totalInterestPaidLabel() {
+            return getTotalInterestPaidLabel();
+        }
+
         public String getTotalInterestUnpaidLabel() {
             return formatMoneyPlainStatic(totalInterestUnpaid);
+        }
+
+        public String totalInterestUnpaidLabel() {
+            return getTotalInterestUnpaidLabel();
         }
 
         public String getTotalLoanAmountPaidLabel() {
             return formatMoneyPlainStatic(totalLoanAmountPaid);
         }
 
+        public String totalLoanAmountPaidLabel() {
+            return getTotalLoanAmountPaidLabel();
+        }
+
         public String getTotalLoanAmountUnpaidLabel() {
             return formatMoneyPlainStatic(totalLoanAmountUnpaid);
+        }
+
+        public String totalLoanAmountUnpaidLabel() {
+            return getTotalLoanAmountUnpaidLabel();
         }
     }
 

@@ -26,6 +26,7 @@ import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.MemberProfileImageService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,15 +42,19 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Controller
 @RequiredArgsConstructor
 public class LoanDocumentController {
+    private static final Pattern UNSAFE_HEADER_FILENAME_CHARACTERS = Pattern.compile("[\\r\\n\\u0000-\\u001F\\u007F]");
+
     private final LoanApplicationRepository loanApplicationRepository;
     private final MemberRepository memberRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
@@ -185,8 +190,15 @@ public class LoanDocumentController {
         auditLoanDocument(app, principal, "ATTACHMENT_DOWNLOADED", "Attachment downloaded");
         return ResponseEntity.ok()
             .contentType(mediaType)
-            .header(HttpHeaders.CONTENT_DISPOSITION, (inline ? "inline" : "attachment") + "; filename=\"" + resource.getOriginalName() + "\"")
+            .header(HttpHeaders.CONTENT_DISPOSITION, attachmentContentDisposition(resource.getOriginalName(), inline))
             .body(resource.getContent());
+    }
+
+    static String attachmentContentDisposition(String fileName, boolean inline) {
+        String safeFileName = fileName == null || fileName.isBlank() ? "attachment" : fileName;
+        safeFileName = UNSAFE_HEADER_FILENAME_CHARACTERS.matcher(safeFileName).replaceAll("_");
+        ContentDisposition.Builder builder = inline ? ContentDisposition.inline() : ContentDisposition.attachment();
+        return builder.filename(safeFileName, StandardCharsets.UTF_8).build().toString();
     }
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}/view")
