@@ -22,6 +22,13 @@
             0% { opacity: 1; transform: translateY(0) scale(1); }
             100% { opacity: 0; transform: translateY(-10px) scale(0.96); }
         }
+        @keyframes auth-submit-spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes auth-submit-panel-in {
+            0% { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
 
         .otp-checkmark-pop {
             animation: otp-pop 180ms ease-out;
@@ -149,6 +156,53 @@
             transform: translateY(-1px);
             background: #0ea5b7;
         }
+        .auth-submit-spinner {
+            width: 1rem;
+            height: 1rem;
+            flex: 0 0 1rem;
+            border-radius: 9999px;
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            border-top-color: #ffffff;
+            animation: auth-submit-spin 720ms linear infinite;
+        }
+        .auth-submit-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 95;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.24);
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+        }
+        .auth-submit-overlay.hidden {
+            display: none;
+        }
+        .auth-submit-panel {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid #d8e0e8;
+            border-radius: 0.5rem;
+            background: #ffffff;
+            padding: 0.85rem 1rem;
+            color: #172033;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+            animation: auth-submit-panel-in 180ms ease-out both;
+        }
+        .auth-submit-panel .auth-submit-spinner {
+            border-color: rgba(20, 184, 196, 0.22);
+            border-top-color: #14b8c4;
+        }
+        body.auth-login-submitting {
+            overflow: hidden;
+        }
+        body.auth-login-submitting .auth-frame {
+            pointer-events: none;
+            user-select: none;
+        }
         .auth-secondary-btn {
             border-radius: 0.85rem;
             border: 1px solid #d7e1ef;
@@ -228,6 +282,12 @@
             max-height: calc(100vh - 3rem);
             overflow-y: auto;
         }
+        @media (prefers-reduced-motion: reduce) {
+            .auth-submit-spinner,
+            .auth-submit-panel {
+                animation: none;
+            }
+        }
         @media (max-width: 640px) {
             .auth-heading {
                 font-size: 1.85rem;
@@ -241,6 +301,12 @@
 <body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
 <div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
+<div id="loginSubmitOverlay" class="auth-submit-overlay hidden" aria-hidden="true" role="status" aria-live="polite" tabindex="-1">
+    <div class="auth-submit-panel">
+        <span class="auth-submit-spinner" aria-hidden="true"></span>
+        <span class="text-sm font-semibold">Signing in...</span>
+    </div>
+</div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
@@ -290,21 +356,27 @@
                             <div>
                                 <p class="auth-mode-title">Member Number &amp; Password</p>
                             </div>
-                            <form action="/login" method="post" class="space-y-4">
+                            <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <div>
                                     <label class="mb-2 block auth-section-label">Member Number</label>
-                                    <input name="username" class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <input name="username" autocomplete="username" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
-                                    <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
                                     <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="member">Forgot password?</button>
                                 </div>
-                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in</button>
+                                <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
+                                    <span data-login-submit-label>Log in</span>
+                                    <span class="hidden items-center gap-2" data-login-submit-loading>
+                                        <span class="auth-submit-spinner" aria-hidden="true"></span>
+                                        <span>Signing in...</span>
+                                    </span>
+                                </button>
                             </form>
                         </div>
 
@@ -335,22 +407,28 @@
                             <div>
                                 <p class="auth-mode-title">Member Number &amp; Password</p>
                             </div>
-                            <form action="/login" method="post" class="space-y-4">
+                            <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="staff-password" />
                                 <div>
                                     <label class="mb-2 block auth-section-label">Staff Number</label>
-                                    <input name="username" class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <input name="username" autocomplete="username" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div>
                                     <label class="mb-2 block auth-section-label">Password</label>
-                                    <input type="password" name="password" class="auth-input w-full px-4 py-3.5 text-slate-900" />
+                                    <input type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
                                     <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="staff">Forgot password?</button>
                                 </div>
-                                <button class="auth-primary-btn w-full px-4 py-3.5 text-sm font-semibold" type="submit">Log in as Staff</button>
+                                <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
+                                    <span data-login-submit-label>Log in as Staff</span>
+                                    <span class="hidden items-center gap-2" data-login-submit-loading>
+                                        <span class="auth-submit-spinner" aria-hidden="true"></span>
+                                        <span>Signing in...</span>
+                                    </span>
+                                </button>
                             </form>
                         </div>
 
@@ -574,6 +652,98 @@
                 window.loginPageScrollToFeedback(initialAlert);
             }
         });
+
+        function bindPasswordLoginSubmitGuard() {
+            const overlay = document.getElementById('loginSubmitOverlay');
+            const forms = Array.from(document.querySelectorAll('[data-login-password-form]'));
+            if (!overlay || !forms.length) {
+                return;
+            }
+
+            let locked = false;
+            const lockButtons = Array.from(document.querySelectorAll('[data-login-tab-toggle], [data-forgot-password-open]'));
+
+            const resetSubmitting = () => {
+                locked = false;
+                document.body.classList.remove('auth-login-submitting');
+                overlay.classList.add('hidden');
+                overlay.setAttribute('aria-hidden', 'true');
+                forms.forEach((form) => {
+                    form.removeAttribute('aria-busy');
+                    form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
+                        input.readOnly = false;
+                        input.removeAttribute('aria-readonly');
+                    });
+                    const button = form.querySelector('[data-login-submit-button]');
+                    const label = form.querySelector('[data-login-submit-label]');
+                    const loading = form.querySelector('[data-login-submit-loading]');
+                    if (button) {
+                        button.disabled = false;
+                        button.removeAttribute('aria-disabled');
+                    }
+                    label?.classList.remove('hidden');
+                    loading?.classList.add('hidden');
+                    loading?.classList.remove('inline-flex');
+                });
+                lockButtons.forEach((button) => {
+                    button.disabled = false;
+                    button.removeAttribute('aria-disabled');
+                });
+            };
+
+            const setSubmitting = (activeForm) => {
+                locked = true;
+                document.body.classList.add('auth-login-submitting');
+                overlay.classList.remove('hidden');
+                overlay.setAttribute('aria-hidden', 'false');
+                forms.forEach((form) => {
+                    form.setAttribute('aria-busy', String(form === activeForm));
+                    form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
+                        input.readOnly = true;
+                        input.setAttribute('aria-readonly', 'true');
+                    });
+                    const button = form.querySelector('[data-login-submit-button]');
+                    const label = form.querySelector('[data-login-submit-label]');
+                    const loading = form.querySelector('[data-login-submit-loading]');
+                    if (button) {
+                        button.disabled = true;
+                        button.setAttribute('aria-disabled', 'true');
+                    }
+                    if (form === activeForm) {
+                        label?.classList.add('hidden');
+                        loading?.classList.remove('hidden');
+                        loading?.classList.add('inline-flex');
+                    }
+                });
+                lockButtons.forEach((button) => {
+                    button.disabled = true;
+                    button.setAttribute('aria-disabled', 'true');
+                });
+                window.setTimeout(() => {
+                    try {
+                        overlay.focus({ preventScroll: true });
+                    } catch (ignored) {
+                        overlay.focus();
+                    }
+                }, 0);
+            };
+
+            forms.forEach((form) => {
+                form.addEventListener('submit', (event) => {
+                    if (locked) {
+                        event.preventDefault();
+                        return;
+                    }
+                    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                        return;
+                    }
+                    setSubmitting(form);
+                });
+            });
+            window.addEventListener('pageshow', resetSubmitting);
+        }
+
+        bindPasswordLoginSubmitGuard();
 
         const toggles = document.querySelectorAll('[data-login-tab-toggle]');
         const tabs = document.querySelectorAll('[data-login-tab]');
