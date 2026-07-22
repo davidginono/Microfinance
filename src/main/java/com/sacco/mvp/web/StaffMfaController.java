@@ -34,6 +34,11 @@ public class StaffMfaController {
         if (!staffMfaService.hasPendingChallenge(session)) {
             return "redirect:/login";
         }
+        StaffMfaService.ChallengeCompletion completion = staffMfaService.continueWithoutChallengeIfNoLongerRequired(request);
+        if (completion != null) {
+            auditLogin(completion.principal(), "Password login, MFA no longer required");
+            return "redirect:" + redirectUrl(completion);
+        }
         model.addAttribute("maskedEmail", maskEmail(staffMfaService.pendingEmail(session)));
         model.addAttribute("deliveryMessage", staffMfaService.pendingDeliveryMessage(session));
         return "auth/staff-mfa";
@@ -48,6 +53,11 @@ public class StaffMfaController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> resend(HttpServletRequest request) {
         try {
+            StaffMfaService.ChallengeCompletion completion = staffMfaService.continueWithoutChallengeIfNoLongerRequired(request);
+            if (completion != null) {
+                auditLogin(completion.principal(), "Password login, MFA no longer required");
+                return completedChallengeResponse(completion);
+            }
             staffMfaService.resendChallenge(request);
             HttpSession session = request.getSession(false);
             String deliveryMessage = staffMfaService.pendingDeliveryMessage(session);
@@ -69,6 +79,11 @@ public class StaffMfaController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> sendEmail(HttpServletRequest request) {
         try {
+            StaffMfaService.ChallengeCompletion completion = staffMfaService.continueWithoutChallengeIfNoLongerRequired(request);
+            if (completion != null) {
+                auditLogin(completion.principal(), "Password login, MFA no longer required");
+                return completedChallengeResponse(completion);
+            }
             staffMfaService.sendChallengeToEmail(request);
             HttpSession session = request.getSession(false);
             String deliveryMessage = staffMfaService.pendingDeliveryMessage(session);
@@ -91,6 +106,11 @@ public class StaffMfaController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verify(@RequestParam String otpCode,
                                                       HttpServletRequest request) {
+        StaffMfaService.ChallengeCompletion completion = staffMfaService.continueWithoutChallengeIfNoLongerRequired(request);
+        if (completion != null) {
+            auditLogin(completion.principal(), "Password login, MFA no longer required");
+            return completedChallengeResponse(completion);
+        }
         if (otpCode == null || otpCode.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -121,6 +141,11 @@ public class StaffMfaController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> check(@RequestParam String otpCode,
                                                      HttpServletRequest request) {
+        StaffMfaService.ChallengeCompletion completion = staffMfaService.continueWithoutChallengeIfNoLongerRequired(request);
+        if (completion != null) {
+            auditLogin(completion.principal(), "Password login, MFA no longer required");
+            return completedChallengeResponse(completion);
+        }
         if (otpCode == null || otpCode.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                 "valid", false,
@@ -162,12 +187,16 @@ public class StaffMfaController {
     }
 
     private void auditLogin(AppUserPrincipal principal) {
+        auditLogin(principal, "Password login with MFA");
+    }
+
+    private void auditLogin(AppUserPrincipal principal, String method) {
         if (principal == null) {
             return;
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("result", "SUCCESS");
-        details.put("method", "Password login with MFA");
+        details.put("method", method);
         details.put("saccoId", principal.getSaccoId());
         details.put("stationId", principal.getStationId());
         details.put("memberNo", principal.getUsername());
@@ -184,5 +213,22 @@ public class StaffMfaController {
             principal.getStationId(),
             details
         );
+    }
+
+    private ResponseEntity<Map<String, Object>> completedChallengeResponse(StaffMfaService.ChallengeCompletion completion) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("valid", true);
+        payload.put("message", "Sign-in verification is no longer required for this station.");
+        payload.put("redirectUrl", redirectUrl(completion));
+        return ResponseEntity.ok(payload);
+    }
+
+    private String redirectUrl(StaffMfaService.ChallengeCompletion completion) {
+        if (completion == null || completion.principal() == null) {
+            return "/";
+        }
+        return completion.landing() != null && !completion.landing().isBlank()
+            ? completion.landing()
+            : WorkspaceLanding.authenticatedDefault(completion.principal());
     }
 }

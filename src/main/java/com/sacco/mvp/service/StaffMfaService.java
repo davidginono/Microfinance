@@ -31,6 +31,7 @@ public class StaffMfaService {
     private final MemberRepository memberRepository;
     private final EmailOtpService emailOtpService;
     private final UserClaimService userClaimService;
+    private final StationOtpSettingsService stationOtpSettingsService;
 
     public void startChallenge(AppUserPrincipal principal, String landingUrl, HttpServletRequest request) {
         startChallenge(principal, landingUrl, null, request);
@@ -163,21 +164,33 @@ public class StaffMfaService {
 
         emailOtpService.consumeOtp(email, EmailOtpPurpose.LOGIN_MFA, memberId, otpCode);
 
-        Member member = memberRepository.findById(memberId)
-            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
-            .orElseThrow(() -> new IllegalStateException("Your account is no longer active. Contact the administrator."));
-
-        AppUserPrincipal principal = new AppUserPrincipal(
-            member,
-            staffLogin
-                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
-                : userClaimService.defaultClaims(java.util.List.of(), true),
-            staffLogin
-        );
+        Member member = activePendingMember(memberId, staffLogin);
+        AppUserPrincipal principal = principalFor(member, staffLogin);
         installSecurityContext(principal, request);
         clearPending(session);
         return principal;
+    }
+
+    public ChallengeCompletion continueWithoutChallengeIfNoLongerRequired(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        UUID memberId = pendingMemberId(session);
+        if (memberId == null) {
+            return null;
+        }
+        boolean staffLogin = "staff-password".equals(pendingLoginType(session));
+        Member member = memberRepository.findById(memberId)
+            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
+            .orElse(null);
+        if (member == null || stillRequiresLoginMfa(member)) {
+            return null;
+        }
+
+        String landing = pendingLanding(session);
+        AppUserPrincipal principal = principalFor(member, staffLogin);
+        installSecurityContext(principal, request);
+        clearPending(session);
+        return new ChallengeCompletion(principal, landing);
     }
 
     public void validateChallenge(String otpCode, HttpServletRequest request) {
@@ -221,6 +234,34 @@ public class StaffMfaService {
         }
     }
 
+    private Member activePendingMember(UUID memberId, boolean staffLogin) {
+        return memberRepository.findById(memberId)
+            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
+            .orElseThrow(() -> new IllegalStateException("Your account is no longer active. Contact the administrator."));
+    }
+
+    private AppUserPrincipal principalFor(Member member, boolean staffLogin) {
+        return new AppUserPrincipal(
+            member,
+            staffLogin
+                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
+                : userClaimService.defaultClaims(java.util.List.of(), true),
+            staffLogin
+        );
+    }
+
+    private boolean stillRequiresLoginMfa(Member member) {
+        if (member == null
+            || member.getSaccoId() == null
+            || member.getSaccoId().isBlank()
+            || member.getStationId() == null
+            || member.getStationId().isBlank()) {
+            return true;
+        }
+        return stationOtpSettingsService.requiresLoginMfa(member.getSaccoId(), member.getStationId());
+    }
+
     private void clearPending(HttpSession session) {
         if (session == null) {
             return;
@@ -240,5 +281,8 @@ public class StaffMfaService {
         SecurityContextHolder.setContext(context);
         request.getSession(true)
             .setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    }
+
+    public record ChallengeCompletion(AppUserPrincipal principal, String landing) {
     }
 }

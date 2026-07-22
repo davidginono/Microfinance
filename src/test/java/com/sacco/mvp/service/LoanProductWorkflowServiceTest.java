@@ -161,6 +161,74 @@ class LoanProductWorkflowServiceTest {
     }
 
     @Test
+    void resolvesDraftWorkflowFromCurrentProductSettingsInsteadOfSavedSnapshot() {
+        LoanProductWorkflowService service = new LoanProductWorkflowService(
+            new ObjectMapper(),
+            loanProductSettingRepository,
+            saccoSettingsRepository
+        );
+        LoanProductSetting selectedProduct = product(false, true, false, false, ApprovalWorkflowStage.LOAN_OFFICER);
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-01")
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .loanProductSettingId(selectedProduct.getId())
+            .status(LoanStatus.DRAFT)
+            .policySnapshot("""
+                {
+                  "approvalFlow": ["MANAGER", "ACCOUNTANT", "DISBURSEMENT_OFFICER"],
+                  "workflowStartStage": "MANAGER",
+                  "managerReviewRequired": true,
+                  "accountantReviewRequired": true
+                }
+                """)
+            .build();
+        when(loanProductSettingRepository.findByIdAndSaccoId(selectedProduct.getId(), "SACCO-01"))
+            .thenReturn(Optional.of(selectedProduct));
+
+        LoanProductWorkflowService.WorkflowDefinition definition = service.resolveForApplication(app);
+
+        assertThat(definition.stages()).containsExactly(
+            ApprovalWorkflowStage.LOAN_OFFICER,
+            ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+        );
+    }
+
+    @Test
+    void resolvesAwaitingGuarantorsWorkflowFromCurrentProductSettingsBeforeStaffReview() {
+        LoanProductWorkflowService service = new LoanProductWorkflowService(
+            new ObjectMapper(),
+            loanProductSettingRepository,
+            saccoSettingsRepository
+        );
+        LoanProductSetting selectedProduct = product(false, true, false, false, ApprovalWorkflowStage.LOAN_OFFICER);
+        selectedProduct.setLoanType(LoanType.EDUCATION_LOAN);
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-01")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .status(LoanStatus.AWAITING_GUARANTORS)
+            .policySnapshot("""
+                {
+                  "approvalFlow": ["MANAGER", "ACCOUNTANT", "DISBURSEMENT_OFFICER"],
+                  "workflowStartStage": "MANAGER",
+                  "managerReviewRequired": true,
+                  "accountantReviewRequired": true
+                }
+                """)
+            .build();
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType("SACCO-01", LoanType.EDUCATION_LOAN))
+            .thenReturn(Optional.of(selectedProduct));
+
+        LoanProductWorkflowService.WorkflowDefinition definition = service.resolveForApplication(app);
+
+        assertThat(definition.stages()).containsExactly(
+            ApprovalWorkflowStage.LOAN_OFFICER,
+            ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+        );
+    }
+
+    @Test
     void resolvesApplicationWorkflowByStoredProductIdWhenLoanTypesAreShared() {
         LoanProductWorkflowService service = new LoanProductWorkflowService(
             new ObjectMapper(),

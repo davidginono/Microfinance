@@ -4,6 +4,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
+import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -91,14 +92,29 @@ public class LoanProductWorkflowService {
         if (app == null) {
             return fallbackDefinition(null);
         }
+        if (shouldResolveFromCurrentSettings(app.getStatus())) {
+            return resolveFromCurrentSettings(app);
+        }
         WorkflowDefinition snapshotDefinition = fromPolicySnapshot(app.getPolicySnapshot());
         if (snapshotDefinition != null) {
             return snapshotDefinition;
         }
+        return resolveFromCurrentSettings(app);
+    }
+
+    private WorkflowDefinition resolveFromCurrentSettings(LoanApplication app) {
         LoanProductSetting product = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType()).orElse(null)
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId()).orElse(null);
         return resolveForProduct(app.getSaccoId(), product);
+    }
+
+    private boolean shouldResolveFromCurrentSettings(LoanStatus status) {
+        return status == null
+            || status == LoanStatus.DRAFT
+            || status == LoanStatus.SUBMITTED
+            || status == LoanStatus.AWAITING_GUARANTORS
+            || status == LoanStatus.ALL_GUARANTORS_APPROVED;
     }
 
     public Map<String, Object> snapshotData(WorkflowDefinition definition) {

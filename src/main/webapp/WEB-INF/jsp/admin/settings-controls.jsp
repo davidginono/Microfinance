@@ -555,21 +555,21 @@
                     <input name="loanOfficerReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.loanOfficerReviewRequired ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.loanOfficerRequired" text="Require Loan Officer Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Adds a single assigned Loan Officer stage between Manager and Board or Accountant." /></span>
+                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Sets the tenant default for products that inherit Loan Officer review." /></span>
                     </span>
                 </label>
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.boardRequired" text="Require Credit Committee Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.boardHelp" text="Adds the committee stage before Accountant review for SACCOs that need group approval." /></span>
+                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.boardHelp" text="Sets the tenant default for products that inherit Credit Committee review." /></span>
                     </span>
                 </label>
             </div>
 
             <div class="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Required Board Members Per Review
+                    Default Committee Reviewers Per Review
                     <input name="boardQuorum"
                            type="number"
                            min="1"
@@ -577,7 +577,7 @@
                            class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                            value="${settings.boardQuorum}" />
                     <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                        Used only when Credit Committee review is enabled.
+                        Used when a workflow falls back to tenant Credit Committee settings.
                     </span>
                 </label>
 
@@ -920,7 +920,7 @@
                     <div>
                         <p class="erp-widget-title"><spring:message code="admin.settings.loanControls" text="Loan Controls" /></p>
                         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.editApplicationFee" text="Edit Application Fee" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.applicationFeeHelp" text="This fee is deducted from every loan application in this SACCO." /></p>
+                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.applicationFeeHelp" text="Default fee used when a loan product has no product-specific application fee." /></p>
                     </div>
                     <button type="button" class="app-modal-close" data-product-modal-close="application-fee" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -956,7 +956,7 @@
                                class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
                                value="${settings.resolvedApplicationFee}" />
                         <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                            Deducted from every loan application, regardless of product type.
+                            Used as the default when a loan product does not have its own application fee.
                         </span>
                     </label>
 

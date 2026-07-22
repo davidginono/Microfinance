@@ -254,6 +254,10 @@
                     window.SaccosOtp?.focusBoxes(otpInput);
                     return;
                 }
+                if (result.payload.redirectUrl) {
+                    window.location.href = result.payload.redirectUrl;
+                    return;
+                }
                 verifiedCode = code;
                 setOtpStatus('valid', result.payload.message || 'OTP code verified.');
             } catch (error) {
@@ -340,6 +344,10 @@
                 const result = await postForm('/login/mfa/resend');
                 if (!result.response.ok || !result.payload.valid) {
                     setMessage(errorBox, result.payload.message || 'We could not send a new code.');
+                    return;
+                }
+                if (result.payload.redirectUrl) {
+                    window.location.href = result.payload.redirectUrl;
                     return;
                 }
                 if (otpInput) {
