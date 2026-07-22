@@ -3,15 +3,22 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <c:set var="requestUri" value="${pageContext.request.requestURI}" />
+<c:set var="memberWorkspace" value="${not empty currentMember and currentMember.memberAccess and not currentMember.staffSession}" />
+<c:set var="staffWorkspace" value="${not empty currentMember and currentMember.staffSession}" />
 <aside id="appSidebar" class="shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0" style="top: var(--shell-nav-height); border-color: #d7dde3;">
     <div class="shell-sidebar-panel flex h-full flex-col overflow-hidden border-r border-slate-200/60 bg-transparent">
         <div class="shell-sidebar-toggle-row hidden lg:flex">
-            <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
+            <c:if test="${memberWorkspace}">
                 <span class="shell-sidebar-toggle-label"><spring:message code="menu.main" text="Main Menu" /></span>
-            </sec:authorize>
-            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
-                <span class="shell-sidebar-toggle-label"><spring:message code="admin.tools" text="Admin Tools" /></span>
-            </sec:authorize>
+            </c:if>
+            <c:if test="${staffWorkspace}">
+                <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                    <span class="shell-sidebar-toggle-label"><spring:message code="admin.tools" text="Admin Tools" /></span>
+                </sec:authorize>
+                <sec:authorize access="!hasAnyRole('ADMIN','MINOR_ADMIN')">
+                    <span class="shell-sidebar-toggle-label"><spring:message code="menu.staffWorkspace" text="Staff Workspace" /></span>
+                </sec:authorize>
+            </c:if>
             <button id="desktopSidebarToggle" type="button" class="desktop-sidebar-toggle" aria-label="Collapse sidebar" aria-pressed="false" title="Collapse sidebar">
                 <svg class="desktop-sidebar-toggle__collapse" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zM7.5 4.5v11h7.75a.25.25 0 00.25-.25V4.75a.25.25 0 00-.25-.25H7.5zm-1.5 0H4.75a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25H6v-11z" clip-rule="evenodd"/>
@@ -24,7 +31,8 @@
             </button>
         </div>
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
-            <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
+            <c:if test="${memberWorkspace}">
+                <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                     <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 1.707a1 1 0 00-1.414 0l-8 8A1 1 0 002 11.414V17a2 2 0 002 2h4a1 1 0 001-1v-4h2v4a1 1 0 001 1h4a2 2 0 002-2v-5.586a1 1 0 00-.293-.707l-8-8z"/></svg>
@@ -144,11 +152,13 @@
                         <%@ include file="platform-support-contact-sidebar.jspf" %>
                     </div>
                 </div>
-            </sec:authorize>
+                </sec:authorize>
+            </c:if>
 
-            <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
-                <c:choose>
-                    <c:when test="${pageContext.request.isUserInRole('ROLE_ADMIN')}">
+            <c:if test="${staffWorkspace}">
+                <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                    <c:choose>
+                        <c:when test="${pageContext.request.isUserInRole('ROLE_ADMIN')}">
                         <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
                         <c:set var="platformSettingsActive" value="${requestUri eq '/admin/platform-settings'}" />
                         <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
@@ -272,21 +282,24 @@
                                 <%@ include file="platform-support-contact-sidebar.jspf" %>
                             </div>
                         </div>
-                    </c:otherwise>
-                </c:choose>
-            </sec:authorize>
+                        </c:otherwise>
+                    </c:choose>
+                </sec:authorize>
+            </c:if>
 
-            <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel or showChairpersonPanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
-                <c:set var="hasDisbursementQueueClaim" value="true" />
-            </sec:authorize>
-            <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-            <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}">
+            <c:if test="${staffWorkspace}">
+                <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel or showChairpersonPanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:set var="hasDisbursementQueueClaim" value="false" />
+                <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
+                    <c:set var="hasDisbursementQueueClaim" value="true" />
+                </sec:authorize>
+                <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}">
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.reviewPanels" text="Review Panels" /></p>
                 </div>
@@ -559,6 +572,7 @@
                     </div>
                 </div>
             </sec:authorize>
+            </c:if>
         </nav>
 
         <div class="border-t px-4 py-3 text-xs font-medium text-slate-600" style="border-color: rgba(214, 226, 238, 0.88);">
