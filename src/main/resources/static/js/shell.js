@@ -592,8 +592,8 @@
         let keepalivePending = false;
         let audioContext = null;
         let audioUnlocked = false;
-        let tickTimer = null;
-        let tickCount = 0;
+        let dingTimer = null;
+        let dingCount = 0;
 
         const promptVisible = function () {
             return prompt.classList.contains('is-open') && !prompt.classList.contains('hidden');
@@ -605,14 +605,14 @@
             progressShell?.setAttribute('aria-valuenow', String(Math.round(clamped)));
         };
 
-        const stopTickTock = function () {
-            if (tickTimer) {
-                window.clearInterval(tickTimer);
-                tickTimer = null;
+        const stopSessionDings = function () {
+            if (dingTimer) {
+                window.clearInterval(dingTimer);
+                dingTimer = null;
             }
         };
 
-        const unlockTickTockAudio = function () {
+        const unlockSessionAudio = function () {
             if (audioUnlocked) {
                 return;
             }
@@ -638,7 +638,7 @@
             }
         };
 
-        const playTickTock = function () {
+        const playSessionDing = function () {
             const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextConstructor) {
                 return;
@@ -651,42 +651,59 @@
                     audioContext.resume()
                         .then(function () {
                             if (promptVisible()) {
-                                playTickTock();
+                                playSessionDing();
                             }
                         })
                         .catch(function () {});
                     return;
                 }
                 const now = audioContext.currentTime;
-                const oscillator = audioContext.createOscillator();
-                const filter = audioContext.createBiquadFilter();
-                const gain = audioContext.createGain();
-                const isTick = tickCount % 2 === 0;
-                const duration = isTick ? 0.085 : 0.105;
-                oscillator.type = 'square';
-                oscillator.frequency.setValueAtTime(isTick ? 2400 : 1250, now);
-                filter.type = 'bandpass';
-                filter.frequency.setValueAtTime(isTick ? 1800 : 950, now);
-                filter.Q.setValueAtTime(8, now);
-                gain.gain.setValueAtTime(0.0001, now);
-                gain.gain.exponentialRampToValueAtTime(isTick ? 0.12 : 0.1, now + 0.006);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-                oscillator.connect(filter);
-                filter.connect(gain);
-                gain.connect(audioContext.destination);
-                oscillator.start(now);
-                oscillator.stop(now + duration + 0.01);
-                tickCount += 1;
+                const duration = 0.2;
+                const baseFrequency = dingCount % 2 === 0 ? 3600 : 4200;
+                const masterGain = audioContext.createGain();
+                const compressor = audioContext.createDynamicsCompressor();
+
+                compressor.threshold.setValueAtTime(-18, now);
+                compressor.knee.setValueAtTime(12, now);
+                compressor.ratio.setValueAtTime(4, now);
+                compressor.attack.setValueAtTime(0.002, now);
+                compressor.release.setValueAtTime(0.08, now);
+                masterGain.gain.setValueAtTime(0.0001, now);
+                masterGain.gain.exponentialRampToValueAtTime(0.34, now + 0.006);
+                masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+                [baseFrequency, baseFrequency * 1.5].forEach(function (frequency, index) {
+                    const oscillator = audioContext.createOscillator();
+                    const toneGain = audioContext.createGain();
+                    oscillator.type = index === 0 ? 'triangle' : 'sine';
+                    oscillator.frequency.setValueAtTime(frequency, now);
+                    oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.82, now + duration);
+                    toneGain.gain.setValueAtTime(index === 0 ? 1 : 0.45, now);
+                    oscillator.connect(toneGain);
+                    toneGain.connect(masterGain);
+                    oscillator.start(now);
+                    oscillator.stop(now + duration + 0.02);
+                });
+
+                masterGain.connect(compressor);
+                compressor.connect(audioContext.destination);
+                window.setTimeout(function () {
+                    try {
+                        masterGain.disconnect();
+                        compressor.disconnect();
+                    } catch (ignored) {}
+                }, Math.ceil((duration + 0.06) * 1000));
+                dingCount += 1;
             } catch (ignored) {
-                stopTickTock();
+                stopSessionDings();
             }
         };
 
-        const startTickTock = function () {
-            stopTickTock();
-            tickCount = 0;
-            playTickTock();
-            tickTimer = window.setInterval(playTickTock, 1000);
+        const startSessionDings = function () {
+            stopSessionDings();
+            dingCount = 0;
+            playSessionDing();
+            dingTimer = window.setInterval(playSessionDing, 1000);
         };
 
         const clearCountdown = function () {
@@ -694,7 +711,7 @@
                 window.clearInterval(countdownTimer);
                 countdownTimer = null;
             }
-            stopTickTock();
+            stopSessionDings();
         };
 
         const expireSession = function () {
@@ -742,7 +759,7 @@
             document.documentElement.classList.add('session-timeout-active');
             updateCountdown();
             countdownTimer = window.setInterval(updateCountdown, 250);
-            startTickTock();
+            startSessionDings();
             window.setTimeout(function () {
                 try {
                     stayButton.focus({ preventScroll: true });
@@ -821,7 +838,7 @@
             window.addEventListener(eventName, handleActivity, { passive: true });
         });
         ['click', 'keydown', 'touchstart'].forEach(function (eventName) {
-            window.addEventListener(eventName, unlockTickTockAudio, { passive: true });
+            window.addEventListener(eventName, unlockSessionAudio, { passive: true });
         });
         stayButton.addEventListener('click', refreshSession);
         logoutForm.addEventListener('submit', clearCountdown);
