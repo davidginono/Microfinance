@@ -262,4 +262,4 @@
 <div class="relative min-h-screen" style="padding-top: var(--shell-nav-height); overflow-x: clip;">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260727-session-timeout-stopwatch' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260727-session-timeout-motion' />" defer></script>
