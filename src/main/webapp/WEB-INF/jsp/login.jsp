@@ -25,10 +25,6 @@
         @keyframes auth-submit-spin {
             to { transform: rotate(360deg); }
         }
-        @keyframes auth-submit-panel-in {
-            0% { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
 
         .otp-checkmark-pop {
             animation: otp-pop 180ms ease-out;
@@ -165,44 +161,6 @@
             border-top-color: #ffffff;
             animation: auth-submit-spin 720ms linear infinite;
         }
-        .auth-submit-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 95;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-            background: rgba(15, 23, 42, 0.24);
-            -webkit-backdrop-filter: blur(2px);
-            backdrop-filter: blur(2px);
-        }
-        .auth-submit-overlay.hidden {
-            display: none;
-        }
-        .auth-submit-panel {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            border: 1px solid #d8e0e8;
-            border-radius: 0.5rem;
-            background: #ffffff;
-            padding: 0.85rem 1rem;
-            color: #172033;
-            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
-            animation: auth-submit-panel-in 180ms ease-out both;
-        }
-        .auth-submit-panel .auth-submit-spinner {
-            border-color: rgba(20, 184, 196, 0.22);
-            border-top-color: #14b8c4;
-        }
-        body.auth-login-submitting {
-            overflow: hidden;
-        }
-        body.auth-login-submitting .auth-frame {
-            pointer-events: none;
-            user-select: none;
-        }
         .auth-secondary-btn {
             border-radius: 0.85rem;
             border: 1px solid #d7e1ef;
@@ -283,8 +241,7 @@
             overflow-y: auto;
         }
         @media (prefers-reduced-motion: reduce) {
-            .auth-submit-spinner,
-            .auth-submit-panel {
+            .auth-submit-spinner {
                 animation: none;
             }
         }
@@ -301,12 +258,6 @@
 <body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
 <div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
-<div id="loginSubmitOverlay" class="auth-submit-overlay hidden" aria-hidden="true" role="status" aria-live="polite" tabindex="-1">
-    <div class="auth-submit-panel">
-        <span class="auth-submit-spinner" aria-hidden="true"></span>
-        <span class="text-sm font-semibold">Signing in...</span>
-    </div>
-</div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
@@ -374,7 +325,7 @@
                                     <span data-login-submit-label>Log in</span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span>Signing in...</span>
+                                        <span>Logging in...</span>
                                     </span>
                                 </button>
                             </form>
@@ -426,7 +377,7 @@
                                     <span data-login-submit-label>Log in as Staff</span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span>Signing in...</span>
+                                        <span>Logging in...</span>
                                     </span>
                                 </button>
                             </form>
@@ -654,9 +605,8 @@
         });
 
         function bindPasswordLoginSubmitGuard() {
-            const overlay = document.getElementById('loginSubmitOverlay');
             const forms = Array.from(document.querySelectorAll('[data-login-password-form]'));
-            if (!overlay || !forms.length) {
+            if (!forms.length) {
                 return;
             }
 
@@ -665,9 +615,6 @@
 
             const resetSubmitting = () => {
                 locked = false;
-                document.body.classList.remove('auth-login-submitting');
-                overlay.classList.add('hidden');
-                overlay.setAttribute('aria-hidden', 'true');
                 forms.forEach((form) => {
                     form.removeAttribute('aria-busy');
                     form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
@@ -693,9 +640,6 @@
 
             const setSubmitting = (activeForm) => {
                 locked = true;
-                document.body.classList.add('auth-login-submitting');
-                overlay.classList.remove('hidden');
-                overlay.setAttribute('aria-hidden', 'false');
                 forms.forEach((form) => {
                     form.setAttribute('aria-busy', String(form === activeForm));
                     form.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
@@ -719,13 +663,6 @@
                     button.disabled = true;
                     button.setAttribute('aria-disabled', 'true');
                 });
-                window.setTimeout(() => {
-                    try {
-                        overlay.focus({ preventScroll: true });
-                    } catch (ignored) {
-                        overlay.focus();
-                    }
-                }, 0);
             };
 
             forms.forEach((form) => {

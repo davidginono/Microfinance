@@ -592,11 +592,12 @@
         let keepalivePending = false;
         let audioContext = null;
         let audioUnlocked = false;
-        let dingTimer = null;
-        let dingCount = 0;
+        let stopwatchTickTimer = null;
+        let stopwatchTickCount = 0;
 
         const promptVisible = function () {
-            return prompt.classList.contains('is-open') && !prompt.classList.contains('hidden');
+            return !prompt.classList.contains('hidden')
+                && (prompt.classList.contains('is-open') || prompt.classList.contains('is-entering'));
         };
 
         const setProgress = function (percent) {
@@ -605,10 +606,10 @@
             progressShell?.setAttribute('aria-valuenow', String(Math.round(clamped)));
         };
 
-        const stopSessionDings = function () {
-            if (dingTimer) {
-                window.clearInterval(dingTimer);
-                dingTimer = null;
+        const stopStopwatchTicks = function () {
+            if (stopwatchTickTimer) {
+                window.clearInterval(stopwatchTickTimer);
+                stopwatchTickTimer = null;
             }
         };
 
@@ -638,7 +639,7 @@
             }
         };
 
-        const playSessionDing = function () {
+        const playStopwatchTick = function () {
             const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextConstructor) {
                 return;
@@ -650,60 +651,112 @@
                 if (audioContext.state === 'suspended') {
                     audioContext.resume()
                         .then(function () {
+                            audioUnlocked = true;
                             if (promptVisible()) {
-                                playSessionDing();
+                                playStopwatchTick();
                             }
                         })
                         .catch(function () {});
                     return;
                 }
+                audioUnlocked = true;
                 const now = audioContext.currentTime;
-                const duration = 0.2;
-                const baseFrequency = dingCount % 2 === 0 ? 3600 : 4200;
+                const duration = 0.055;
+                const sampleRate = audioContext.sampleRate || 44100;
+                const frameCount = Math.max(1, Math.ceil(sampleRate * duration));
+                const noiseBuffer = audioContext.createBuffer(1, frameCount, sampleRate);
+                const noiseData = noiseBuffer.getChannelData(0);
+                const tickFrequency = stopwatchTickCount % 2 === 0 ? 2800 : 3400;
                 const masterGain = audioContext.createGain();
                 const compressor = audioContext.createDynamicsCompressor();
+                const noise = audioContext.createBufferSource();
+                const highpass = audioContext.createBiquadFilter();
+                const bandpass = audioContext.createBiquadFilter();
+                const noiseGain = audioContext.createGain();
+                const clickOscillator = audioContext.createOscillator();
+                const clickGain = audioContext.createGain();
+                const recoilOscillator = audioContext.createOscillator();
+                const recoilGain = audioContext.createGain();
 
-                compressor.threshold.setValueAtTime(-18, now);
-                compressor.knee.setValueAtTime(12, now);
-                compressor.ratio.setValueAtTime(4, now);
-                compressor.attack.setValueAtTime(0.002, now);
-                compressor.release.setValueAtTime(0.08, now);
+                for (let index = 0; index < frameCount; index += 1) {
+                    const fade = 1 - (index / frameCount);
+                    noiseData[index] = (Math.random() * 2 - 1) * Math.pow(fade, 5);
+                }
+
+                compressor.threshold.setValueAtTime(-8, now);
+                compressor.knee.setValueAtTime(0, now);
+                compressor.ratio.setValueAtTime(18, now);
+                compressor.attack.setValueAtTime(0.001, now);
+                compressor.release.setValueAtTime(0.045, now);
                 masterGain.gain.setValueAtTime(0.0001, now);
-                masterGain.gain.exponentialRampToValueAtTime(0.34, now + 0.006);
-                masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                masterGain.gain.exponentialRampToValueAtTime(0.98, now + 0.003);
+                masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + 0.035);
 
-                [baseFrequency, baseFrequency * 1.5].forEach(function (frequency, index) {
-                    const oscillator = audioContext.createOscillator();
-                    const toneGain = audioContext.createGain();
-                    oscillator.type = index === 0 ? 'triangle' : 'sine';
-                    oscillator.frequency.setValueAtTime(frequency, now);
-                    oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.82, now + duration);
-                    toneGain.gain.setValueAtTime(index === 0 ? 1 : 0.45, now);
-                    oscillator.connect(toneGain);
-                    toneGain.connect(masterGain);
-                    oscillator.start(now);
-                    oscillator.stop(now + duration + 0.02);
-                });
+                highpass.type = 'highpass';
+                highpass.frequency.setValueAtTime(1500, now);
+                highpass.Q.setValueAtTime(0.9, now);
+                bandpass.type = 'bandpass';
+                bandpass.frequency.setValueAtTime(tickFrequency * 1.7, now);
+                bandpass.Q.setValueAtTime(10, now);
+                noiseGain.gain.setValueAtTime(0.9, now);
+
+                clickOscillator.type = 'square';
+                clickOscillator.frequency.setValueAtTime(tickFrequency, now);
+                clickOscillator.frequency.exponentialRampToValueAtTime(tickFrequency * 1.45, now + 0.016);
+                clickGain.gain.setValueAtTime(0.0001, now);
+                clickGain.gain.exponentialRampToValueAtTime(1, now + 0.002);
+                clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+
+                recoilOscillator.type = 'triangle';
+                recoilOscillator.frequency.setValueAtTime(tickFrequency * 1.9, now + 0.026);
+                recoilOscillator.frequency.exponentialRampToValueAtTime(tickFrequency * 1.25, now + 0.07);
+                recoilGain.gain.setValueAtTime(0.0001, now + 0.024);
+                recoilGain.gain.exponentialRampToValueAtTime(0.55, now + 0.029);
+                recoilGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+
+                noise.buffer = noiseBuffer;
+                noise.connect(highpass);
+                highpass.connect(bandpass);
+                bandpass.connect(noiseGain);
+                noiseGain.connect(masterGain);
+                clickOscillator.connect(clickGain);
+                clickGain.connect(masterGain);
+                recoilOscillator.connect(recoilGain);
+                recoilGain.connect(masterGain);
 
                 masterGain.connect(compressor);
                 compressor.connect(audioContext.destination);
+                noise.start(now);
+                noise.stop(now + duration);
+                clickOscillator.start(now);
+                clickOscillator.stop(now + 0.04);
+                recoilOscillator.start(now + 0.024);
+                recoilOscillator.stop(now + 0.09);
                 window.setTimeout(function () {
                     try {
+                        noise.disconnect();
+                        highpass.disconnect();
+                        bandpass.disconnect();
+                        noiseGain.disconnect();
+                        clickOscillator.disconnect();
+                        clickGain.disconnect();
+                        recoilOscillator.disconnect();
+                        recoilGain.disconnect();
                         masterGain.disconnect();
                         compressor.disconnect();
                     } catch (ignored) {}
-                }, Math.ceil((duration + 0.06) * 1000));
-                dingCount += 1;
+                }, Math.ceil((duration + 0.12) * 1000));
+                stopwatchTickCount += 1;
             } catch (ignored) {
-                stopSessionDings();
+                stopStopwatchTicks();
             }
         };
 
-        const startSessionDings = function () {
-            stopSessionDings();
-            dingCount = 0;
-            playSessionDing();
-            dingTimer = window.setInterval(playSessionDing, 1000);
+        const startStopwatchTicks = function () {
+            stopStopwatchTicks();
+            stopwatchTickCount = 0;
+            playStopwatchTick();
+            stopwatchTickTimer = window.setInterval(playStopwatchTick, 250);
         };
 
         const clearCountdown = function () {
@@ -711,7 +764,7 @@
                 window.clearInterval(countdownTimer);
                 countdownTimer = null;
             }
-            stopSessionDings();
+            stopStopwatchTicks();
         };
 
         const expireSession = function () {
@@ -732,6 +785,7 @@
         const hidePrompt = function () {
             prompt.classList.add('hidden');
             prompt.classList.remove('flex');
+            prompt.classList.remove('is-entering');
             prompt.classList.remove('is-open');
             prompt.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('session-timeout-active');
@@ -753,13 +807,22 @@
             deadline = Date.now() + graceMs;
             prompt.classList.remove('hidden');
             prompt.classList.add('flex');
-            prompt.classList.add('is-open');
+            prompt.classList.add('is-entering');
+            prompt.classList.remove('is-open');
             prompt.setAttribute('aria-hidden', 'false');
             document.body.classList.add('session-timeout-active');
             document.documentElement.classList.add('session-timeout-active');
             updateCountdown();
             countdownTimer = window.setInterval(updateCountdown, 250);
-            startSessionDings();
+            startStopwatchTicks();
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    if (!prompt.classList.contains('hidden')) {
+                        prompt.classList.add('is-open');
+                        prompt.classList.remove('is-entering');
+                    }
+                });
+            });
             window.setTimeout(function () {
                 try {
                     stayButton.focus({ preventScroll: true });
@@ -837,7 +900,7 @@
         activityEvents.forEach(function (eventName) {
             window.addEventListener(eventName, handleActivity, { passive: true });
         });
-        ['click', 'keydown', 'touchstart'].forEach(function (eventName) {
+        ['click', 'keydown', 'mousedown', 'pointerdown', 'touchstart'].forEach(function (eventName) {
             window.addEventListener(eventName, unlockSessionAudio, { passive: true });
         });
         stayButton.addEventListener('click', refreshSession);
