@@ -4,9 +4,10 @@ import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.service.AccessControlService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,8 +28,17 @@ class AuthzServiceTest {
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
 
-    @InjectMocks
     private AuthzService authzService;
+
+    @BeforeEach
+    void setUp() {
+        authzService = new AuthzService(
+            loanApplicationRepository,
+            guarantorRequestRepository,
+            boardReviewRepository,
+            new AccessControlService()
+        );
+    }
 
     @Test
     void ownershipAndAssignmentsAreEnforced() {
@@ -39,9 +49,15 @@ class AuthzServiceTest {
 
         Member member = Member.builder().id(memberId).saccoId(saccoId).memberNo("MEM1").fullName("A")
             .status(MemberStatus.ACTIVE).position(Position.BOARD)
+            .staffNo("BOARD-1")
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
             .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.BOARD)))
             .passwordHash("x").createdAt(OffsetDateTime.now()).build();
-        AppUserPrincipal principal = new AppUserPrincipal(member, java.util.Set.of(UserClaim.REVIEW_BOARD_QUEUE));
+        AppUserPrincipal principal = new AppUserPrincipal(member, java.util.Set.of(
+            UserClaim.MEMBER_LOANS_VIEW,
+            UserClaim.GUARANTOR_REQUESTS_VIEW,
+            UserClaim.BOARD_QUEUE_VIEW
+        ));
 
         LoanApplication app = LoanApplication.builder().id(loanId).saccoId(saccoId).applicantMemberId(memberId)
             .loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN).tenorMonths(1).status(LoanStatus.DRAFT)
@@ -83,7 +99,7 @@ class AuthzServiceTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        AppUserPrincipal principal = new AppUserPrincipal(admin, java.util.Set.of(UserClaim.ACCESS_DISBURSEMENT_QUEUE));
+        AppUserPrincipal principal = new AppUserPrincipal(admin, java.util.Set.of(UserClaim.DISBURSEMENT_QUEUE_VIEW));
 
         LoanApplication app = LoanApplication.builder()
             .id(loanId)
@@ -104,23 +120,24 @@ class AuthzServiceTest {
 
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
 
-        assertThat(authzService.canViewLoan(loanId, principal)).isTrue();
+        assertThat(authzService.canViewLoan(loanId, principal)).isFalse();
         assertThat(authzService.notAdminClass(principal)).isFalse();
     }
 
     @Test
     void staffAnalyticsAccessIsLimitedToWorkspaceStaffRoles() {
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.LOAN_OFFICER, false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MANAGER, false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.ACCOUNTANT, false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.DISBURSEMENT_OFFICER, false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.BOARD, false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWithRoles(List.of(Position.MINOR_ADMIN, Position.MANAGER), false))).isTrue();
-        assertThat(authzService.staffAnalyticsAccess(principalWithRoles(List.of(Position.MINOR_ADMIN, Position.DISBURSEMENT_OFFICER), false))).isTrue();
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.MANAGER), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isTrue();
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.DISBURSEMENT_OFFICER), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isTrue();
 
+        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MANAGER, false))).isFalse();
         assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MEMBER, true))).isFalse();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.ADMIN, false))).isFalse();
-        assertThat(authzService.staffAnalyticsAccess(principalWith(Position.MINOR_ADMIN, false))).isFalse();
+        assertThat(authzService.staffAnalyticsAccess(
+            principalWithClaims(List.of(Position.ADMIN), false, java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW))
+        )).isFalse();
 
         Member claimOnlyMember = Member.builder()
             .id(UUID.randomUUID())
@@ -135,7 +152,7 @@ class AuthzServiceTest {
             .build();
         AppUserPrincipal claimOnlyPrincipal = new AppUserPrincipal(
             claimOnlyMember,
-            java.util.Set.of(UserClaim.ACCESS_DISBURSEMENT_QUEUE)
+            java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW)
         );
 
         assertThat(authzService.staffAnalyticsAccess(claimOnlyPrincipal)).isFalse();
@@ -151,6 +168,10 @@ class AuthzServiceTest {
     }
 
     private AppUserPrincipal principalWithRoles(List<Position> positions, boolean memberAccess) {
+        return principalWithClaims(positions, memberAccess, Collections.emptySet());
+    }
+
+    private AppUserPrincipal principalWithClaims(List<Position> positions, boolean memberAccess, java.util.Set<UserClaim> claims) {
         java.util.LinkedHashSet<Position> staffRoles = new java.util.LinkedHashSet<>();
         if (positions != null) {
             positions.stream()
@@ -170,6 +191,6 @@ class AuthzServiceTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, Collections.emptySet());
+        return new AppUserPrincipal(member, claims == null ? Collections.emptySet() : claims);
     }
 }

@@ -1,14 +1,16 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.ManagerDecision;
+import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RepaymentFrequency;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
@@ -29,6 +31,7 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -70,14 +73,64 @@ class ManagerServiceTest {
             .build();
 
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(roleDirectoryService.hasActiveRoleInSacco(managerId, "SACCO-A", Position.MANAGER)).thenReturn(false);
+        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_REJECT)).thenReturn(false);
 
-        assertThatThrownBy(() -> managerService.decide(loanId, managerId, ManagerDecision.REJECT, "No", "Manager Signature", OffsetDateTime.now()))
+        assertThatThrownBy(() -> managerService.decide(
+            loanId,
+            managerId,
+            ManagerDecision.REJECT,
+            "No",
+            "M. Manager",
+            OffsetDateTime.parse("2026-07-01T09:00:00Z")
+        ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Forbidden");
 
         verify(managerReviewRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(loanApplicationRepository, never()).save(org.mockito.ArgumentMatchers.any(LoanApplication.class));
+    }
+
+    @Test
+    void rejectStoresManagerSignatureSnapshotAndClearsApplicantAcknowledgement() {
+        UUID loanId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        OffsetDateTime acknowledgedAt = OffsetDateTime.parse("2026-06-30T09:00:00Z");
+        OffsetDateTime signatureVerifiedAt = OffsetDateTime.parse("2026-07-01T09:00:00Z");
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .applicantMemberId(UUID.randomUUID())
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .requiredGuarantors(0)
+            .applicantRejectionAcknowledgedAt(acknowledgedAt)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_REJECT)).thenReturn(true);
+
+        managerService.decide(
+            loanId,
+            managerId,
+            ManagerDecision.REJECT,
+            "  Insufficient capacity  ",
+            "  M. Manager  ",
+            signatureVerifiedAt
+        );
+
+        org.mockito.ArgumentCaptor<ManagerReview> reviewCaptor = org.mockito.ArgumentCaptor.forClass(ManagerReview.class);
+        verify(managerReviewRepository).save(reviewCaptor.capture());
+        ManagerReview review = reviewCaptor.getValue();
+        assertThat(review.getReviewStage()).isEqualTo(ApprovalWorkflowStage.MANAGER);
+        assertThat(review.getDecision()).isEqualTo(ManagerDecision.REJECT);
+        assertThat(review.getReasons()).isEqualTo("Insufficient capacity");
+        assertThat(review.getManagerSignatureText()).isEqualTo("M. Manager");
+        assertThat(review.getManagerSignatureVerifiedAt()).isEqualTo(signatureVerifiedAt);
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.MANAGER_REJECTED);
+        assertThat(app.getApplicantRejectionAcknowledgedAt()).isNull();
+        verify(loanApplicationRepository).save(app);
     }
 
     @Test
@@ -111,6 +164,8 @@ class ManagerServiceTest {
 
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
+            .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(true).build()));
         when(loanApplicationRepository.existsBySaccoIdAndLoanId("SACCO-A", "12345")).thenReturn(false);
@@ -165,6 +220,8 @@ class ManagerServiceTest {
 
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
+            .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(false).build()));
         when(repaymentScheduleService.buildSchedule(
@@ -210,6 +267,8 @@ class ManagerServiceTest {
 
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
+            .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(true).build()));
 

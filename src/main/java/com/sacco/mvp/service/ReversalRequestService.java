@@ -100,7 +100,10 @@ public class ReversalRequestService {
             .build());
 
         List<RoleDirectoryService.RoleAccountRef> managers = roleDirectoryService
-            .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.MANAGER);
+            .activeByAnyClaimInStation(app.getSaccoId(), app.getStationId(), List.of(
+                UserClaim.MANAGER_QUEUE_APPROVE,
+                UserClaim.MANAGER_QUEUE_REJECT
+            ));
         for (RoleDirectoryService.RoleAccountRef manager : managers) {
             outboxService.enqueue(
                 "REVERSAL_REQUEST",
@@ -173,7 +176,8 @@ public class ReversalRequestService {
         if (reversalRequest.getStatus() != ReversalRequestStatus.PENDING) {
             throw new IllegalStateException("This reversal request has already been decided.");
         }
-        if (!roleDirectoryService.hasActiveRoleInSacco(managerMemberId, reversalRequest.getSaccoId(), Position.MANAGER)) {
+        UserClaim requiredClaim = approve ? UserClaim.MANAGER_QUEUE_APPROVE : UserClaim.MANAGER_QUEUE_REJECT;
+        if (!roleDirectoryService.hasActiveClaimInSacco(managerMemberId, reversalRequest.getSaccoId(), requiredClaim)) {
             throw new IllegalArgumentException("Forbidden");
         }
 

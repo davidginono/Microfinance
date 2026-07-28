@@ -238,7 +238,7 @@ public class ManagerService {
                        String reasons,
                        String signatureText,
                        OffsetDateTime signatureVerifiedAt) {
-        LoanApplication app = getManagedApplication(loanId, managerId);
+        LoanApplication app = getManagedApplication(loanId, managerId, managerDecisionClaim(decision));
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
         }
@@ -294,7 +294,7 @@ public class ManagerService {
                                  String reasons,
                                  String signatureText,
                                  OffsetDateTime signatureVerifiedAt) {
-        LoanApplication app = getAccountantApplication(loanId, accountantId);
+        LoanApplication app = getAccountantApplication(loanId, accountantId, accountantDecisionClaim(decision));
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
             throw new IllegalStateException("Application is not ready for accountant review");
         }
@@ -336,11 +336,11 @@ public class ManagerService {
     }
 
     private String normalizeSignature(String signatureText, OffsetDateTime signatureVerifiedAt) {
-        String normalized = signatureText == null ? "" : signatureText.trim();
-        if (normalized.isBlank() || signatureVerifiedAt == null) {
-            throw new IllegalStateException("Save and verify your signature before recording this decision.");
+        String normalizedSignature = signatureText == null ? "" : signatureText.trim();
+        if (normalizedSignature.isBlank() || signatureVerifiedAt == null) {
+            throw new IllegalStateException("Save and verify your staff signature before recording this decision.");
         }
-        return normalized;
+        return normalizedSignature;
     }
 
     @Transactional
@@ -509,18 +509,26 @@ public class ManagerService {
     }
 
     private LoanApplication getManagedApplication(UUID loanId, UUID managerId) {
+        return getManagedApplication(loanId, managerId, UserClaim.MANAGER_QUEUE_VIEW);
+    }
+
+    private LoanApplication getManagedApplication(UUID loanId, UUID managerId, UserClaim requiredClaim) {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (!roleDirectoryService.hasActiveRoleInSacco(managerId, app.getSaccoId(), Position.MANAGER)) {
+        if (!roleDirectoryService.hasActiveClaimInSacco(managerId, app.getSaccoId(), requiredClaim)) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
     }
 
     private LoanApplication getAccountantApplication(UUID loanId, UUID accountantId) {
+        return getAccountantApplication(loanId, accountantId, UserClaim.ACCOUNTANT_QUEUE_VIEW);
+    }
+
+    private LoanApplication getAccountantApplication(UUID loanId, UUID accountantId, UserClaim requiredClaim) {
         LoanApplication app = loanApplicationRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (!roleDirectoryService.hasActiveRoleInSacco(accountantId, app.getSaccoId(), Position.ACCOUNTANT)) {
+        if (!roleDirectoryService.hasActiveClaimInSacco(accountantId, app.getSaccoId(), requiredClaim)) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
@@ -533,10 +541,23 @@ public class ManagerService {
             .orElseThrow(() -> new IllegalArgumentException("Forbidden"));
         if (actor.getStatus() != MemberStatus.ACTIVE
             || !app.getSaccoId().equals(actor.getSaccoId())
-            || !matchesApplicantStation(app, actor.getStationId())) {
+            || !matchesApplicantStation(app, actor.getStationId())
+            || !roleDirectoryService.hasActiveClaimInSacco(disbursementActorId, app.getSaccoId(), UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
+    }
+
+    private UserClaim managerDecisionClaim(ManagerDecision decision) {
+        return decision == ManagerDecision.REJECT
+            ? UserClaim.MANAGER_QUEUE_REJECT
+            : UserClaim.MANAGER_QUEUE_APPROVE;
+    }
+
+    private UserClaim accountantDecisionClaim(ManagerDecision decision) {
+        return decision == ManagerDecision.REJECT
+            ? UserClaim.ACCOUNTANT_QUEUE_REJECT
+            : UserClaim.ACCOUNTANT_QUEUE_APPROVE;
     }
 
     private void validateDisbursement(LocalDate disbursementDate,

@@ -56,7 +56,7 @@ import java.util.UUID;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/admin")
-@PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+@PreAuthorize("@access.canAccessAdminArea(principal)")
 public class AdminController {
     private final AdminService adminService;
     private final AdminScopeService adminScopeService;
@@ -73,11 +73,11 @@ public class AdminController {
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
 
     @GetMapping("/scope/select")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_VIEW')")
     public String selectScope(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam(required = false) String next,
                               Model model) {
-        if (principal != null && principal.hasRole(Position.MINOR_ADMIN) && !principal.hasRole(Position.ADMIN)) {
+        if (principal != null && principal.isWorkspaceAdminScope() && !principal.isPlatformIdentity()) {
             return "redirect:" + normalizeAdminNextPath(next);
         }
         model.addAttribute("scopeSelection", adminScopeService.currentScope(principal));
@@ -86,8 +86,9 @@ public class AdminController {
     }
 
     @GetMapping("/dashboard")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        if (principal != null && principal.hasRole(Position.ADMIN)) {
+        if (principal != null && principal.isPlatformIdentity()) {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-dashboard";
         }
@@ -100,7 +101,7 @@ public class AdminController {
     }
 
     @GetMapping("/sms-usage")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SMS_USAGE_VIEW')")
     public String smsUsage(@AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) String saccoId,
                            @RequestParam(required = false) String stationId,
@@ -109,7 +110,7 @@ public class AdminController {
                            @RequestParam(defaultValue = "0") int page,
                            @RequestParam(defaultValue = "0") int historyPage,
                            Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         int safePage = Math.max(0, page);
         int safeHistoryPage = Math.max(0, historyPage);
         model.addAttribute("superAdmin", superAdmin);
@@ -165,7 +166,7 @@ public class AdminController {
     }
 
     @PostMapping("/sms-usage/allocations")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SMS_USAGE_ADD')")
     public String allocateSmsUnits(@AuthenticationPrincipal AppUserPrincipal principal,
                                    @RequestParam String saccoId,
                                    @RequestParam String stationId,
@@ -183,7 +184,7 @@ public class AdminController {
     }
 
     @PostMapping("/sms-usage/thresholds")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SMS_USAGE_CONFIGURE')")
     public String updateSmsThresholds(@AuthenticationPrincipal AppUserPrincipal principal,
                                       @RequestParam int lowPercent,
                                       @RequestParam int criticalPercent,
@@ -198,7 +199,7 @@ public class AdminController {
     }
 
     @GetMapping("/platform-settings")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_VIEW')")
     public String platformSettings(Model model) {
         model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
@@ -207,7 +208,7 @@ public class AdminController {
     }
 
     @PostMapping("/platform-settings/logo-policy")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String updateLogoPolicy(@AuthenticationPrincipal AppUserPrincipal principal,
                                    @RequestParam int minWidthPx,
                                    @RequestParam int minHeightPx,
@@ -232,7 +233,7 @@ public class AdminController {
     }
 
     @PostMapping("/platform-settings/support-contact")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
     public String updateSupportContact(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam(required = false) String displayName,
                                        @RequestParam(required = false) String displayRole,
@@ -259,17 +260,18 @@ public class AdminController {
     }
 
     @GetMapping(value = "/dashboard/database-utilization", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
     @ResponseBody
     public DatabaseUtilizationService.DatabaseUtilizationPayload databaseUtilization(@AuthenticationPrincipal AppUserPrincipal principal) {
         return databaseUtilizationService.snapshot();
     }
 
     @GetMapping(value = "/dashboard/usage-activity", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
     @ResponseBody
     public AppUsageAnalyticsService.UsageDashboardPayload usageActivity(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                         @RequestParam(defaultValue = "today") String range) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         return appUsageAnalyticsService.dashboard(
             range,
             superAdmin ? null : adminScopeService.currentSaccoId(principal),
@@ -278,7 +280,7 @@ public class AdminController {
     }
 
     @GetMapping("/messages")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String messages(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam(required = false) IncidentStatus status,
                             @RequestParam(required = false) UUID highlight,
@@ -306,13 +308,12 @@ public class AdminController {
     }
 
     @GetMapping("/messages/{id}/open")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String openMessage(@PathVariable UUID id,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/admin/messages");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/admin/messages");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/admin/messages";
@@ -320,34 +321,32 @@ public class AdminController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        model.addAttribute("notifications", notificationInboxService.allViews(principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "admin/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openAdminNotification(@PathVariable UUID id,
                                         @AuthenticationPrincipal AppUserPrincipal principal,
                                         RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(),
-                principal.hasRole(Position.ADMIN) ? "/admin/incidents" : "/admin/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, principal.isPlatformIdentity() ? "/admin/incidents" : "/admin/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return principal != null && principal.hasRole(Position.ADMIN)
+            return principal != null && principal.isPlatformIdentity()
                 ? "redirect:/admin/incidents"
                 : "redirect:/admin/notifications";
         }
     }
 
     @PostMapping("/messages/mark-all-read")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE') and @access.has(principal, 'SUPPORT_VIEW')")
     public String markAllMessagesRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                       RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -360,26 +359,26 @@ public class AdminController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllAdminNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                                 RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
         ra.addFlashAttribute("message", updated > 0
             ? "All notifications have been marked as read."
             : "There were no unread notifications.");
-        return principal != null && principal.hasRole(Position.ADMIN)
+        return principal != null && principal.isPlatformIdentity()
             ? "redirect:/admin/incidents"
             : "redirect:/admin/notifications";
     }
 
     @GetMapping("/incidents")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String incidents(@AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam(required = false) IncidentStatus status,
                              @RequestParam(required = false) String saccoId,
                              @RequestParam(required = false) String stationId,
                             Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
         String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
         model.addAttribute("incidents", superAdmin
@@ -405,13 +404,13 @@ public class AdminController {
     }
 
     @GetMapping("/incidents/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String incidentDetail(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam(required = false) String saccoId,
                                  @RequestParam(required = false) String stationId,
                                  Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         com.sacco.mvp.domain.AdminIncident incident = superAdmin
             ? adminService.platformSupportIncident(
                 normalizeTextParam(saccoId).isBlank() ? null : normalizeTextParam(saccoId),
@@ -442,13 +441,13 @@ public class AdminController {
     }
 
     @PostMapping("/incidents/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String updateIncident(@PathVariable UUID id,
                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                   @RequestParam IncidentStatus status,
                                   @RequestParam(required = false) String resolutionNote,
                                   RedirectAttributes ra) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         if (superAdmin) {
             adminService.platformSupportIncident(null, null, id);
         }
@@ -465,13 +464,13 @@ public class AdminController {
     }
 
     @PostMapping("/incidents/{id}/reply")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String replyToSupportReporter(@PathVariable UUID id,
                                          @AuthenticationPrincipal AppUserPrincipal principal,
                                          @RequestParam String subject,
                                          @RequestParam String message,
                                          RedirectAttributes ra) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         if (superAdmin) {
             adminService.replyToPlatformSupportReporter(id, principal.getMemberId(), subject, message);
             ra.addFlashAttribute("message", "Reply sent to the SACCO admin.");
@@ -490,7 +489,7 @@ public class AdminController {
     }
 
     @PostMapping("/incidents/broadcast-minor-admins")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String broadcastToMinorAdmins(@AuthenticationPrincipal AppUserPrincipal principal,
                                          @RequestParam String subject,
                                          @RequestParam String message,
@@ -501,7 +500,7 @@ public class AdminController {
     }
 
     @PostMapping("/incidents/reply-minor-admin")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String replyToMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam UUID memberId,
                                     @RequestParam String subject,
@@ -513,13 +512,13 @@ public class AdminController {
     }
 
     @GetMapping("/support")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String adminSupport() {
         return "admin/support";
     }
 
     @GetMapping("/support/archive")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String adminSupportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
                                       Model model) {
         model.addAttribute("supportArchive", adminService.platformSupportArchive(principal.getMemberId()));
@@ -527,7 +526,7 @@ public class AdminController {
     }
 
     @GetMapping("/support/replies")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String adminSupportReplies(@AuthenticationPrincipal AppUserPrincipal principal,
                                       @RequestParam(required = false) UUID highlight,
                                       Model model) {
@@ -538,13 +537,12 @@ public class AdminController {
     }
 
     @GetMapping("/support/replies/{id}/open")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String openAdminSupportReply(@PathVariable UUID id,
                                         @AuthenticationPrincipal AppUserPrincipal principal,
                                         RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/admin/support/replies");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/admin/support/replies");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/admin/support/replies";
@@ -552,7 +550,7 @@ public class AdminController {
     }
 
     @PostMapping("/support/replies/mark-all-read")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE') and @access.has(principal, 'SUPPORT_VIEW')")
     public String markAllAdminSupportRepliesRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                                  RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsReadByTypes(
@@ -566,7 +564,7 @@ public class AdminController {
     }
 
     @PostMapping("/support")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_CREATE')")
     public String sendAdminSupport(@AuthenticationPrincipal AppUserPrincipal principal,
                                    @RequestParam String subject,
                                    @RequestParam String message,
@@ -583,7 +581,7 @@ public class AdminController {
     }
 
     @PostMapping("/messages/reply")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String reply(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam UUID memberId,
                         @RequestParam String subject,
@@ -602,7 +600,7 @@ public class AdminController {
     }
 
     @PostMapping("/messages/broadcast")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_UPDATE')")
     public String broadcast(@AuthenticationPrincipal AppUserPrincipal principal,
                             @RequestParam String subject,
                             @RequestParam String message,
@@ -619,7 +617,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_VIEW')")
     public String users(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam(required = false) String query,
                         @RequestParam(required = false, defaultValue = "userId") String searchBy,
@@ -641,16 +639,18 @@ public class AdminController {
         model.addAttribute("selectedUserSearchBy", selectedSearchBy);
         model.addAttribute("selectedPageSize", usersPage.getSize());
         model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize()));
-        model.addAttribute("staffPositions", principal != null && principal.hasRole(Position.ADMIN)
+        model.addAttribute("staffPositions", principal != null && principal.isPlatformIdentity()
             ? Position.staffAssignableRoles()
             : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
         model.addAttribute("availableClaims", UserClaim.values());
+        model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
+        model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
         model.addAttribute("statuses", MemberStatus.values());
         return "admin/users";
     }
 
     @PostMapping("/users")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_CREATE')")
     public String createUser(@AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam String fullName,
                              @RequestParam String email,
@@ -679,7 +679,7 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String updateUser(@PathVariable UUID id,
                              @AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
@@ -709,7 +709,7 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}/cancel-invite")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String cancelStaffInvite(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                     RedirectAttributes ra) {
@@ -730,7 +730,7 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}/delete")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_DELETE')")
     public String deleteStaffUser(@PathVariable UUID id,
                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                   @RequestParam String confirmation,
@@ -752,7 +752,7 @@ public class AdminController {
     }
 
     @GetMapping({"/loan-products", "/settings-controls"})
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'WORKSPACE_SETTINGS_VIEW', 'LOAN_PRODUCTS_VIEW', 'APPROVAL_FLOW_VIEW')")
     public String loanProducts(@AuthenticationPrincipal AppUserPrincipal principal,
                                @RequestParam(required = false, defaultValue = "loan") String section,
                                @RequestParam(required = false) String modal,
@@ -806,7 +806,7 @@ public class AdminController {
     }
 
     @PostMapping({"/loan-products/{id}", "/settings-controls/{id}"})
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_UPDATE')")
     public String updateLoanProduct(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam(required = false) String productCode,
@@ -883,7 +883,7 @@ public class AdminController {
     }
 
     @GetMapping("/settings-controls/loan-products/{id}/edit")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_VIEW')")
     public String editLoanProduct(@PathVariable UUID id,
                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                   Model model) {
@@ -909,7 +909,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/loan-products/{id}/required-attachments")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CONFIGURE')")
     public String createRequiredAttachment(@PathVariable UUID id,
                                            @AuthenticationPrincipal AppUserPrincipal principal,
                                            @RequestParam(required = false) String attachmentName,
@@ -928,7 +928,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/loan-products/{id}/required-attachments/{requirementId}/delete")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CONFIGURE')")
     public String deleteRequiredAttachment(@PathVariable UUID id,
                                            @PathVariable UUID requirementId,
                                            @AuthenticationPrincipal AppUserPrincipal principal,
@@ -944,7 +944,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/loan-products/{id}/delete")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_DELETE')")
     public String deleteLoanProduct(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                     RedirectAttributes ra) {
@@ -958,7 +958,7 @@ public class AdminController {
     }
 
     @PostMapping({"/loan-products", "/settings-controls/loan-products"})
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CREATE')")
     public String createLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @RequestParam(required = false) String productCode,
                                               @RequestParam(required = false) String productName,
@@ -1070,7 +1070,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/loan-rules")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateLoanRules(@AuthenticationPrincipal AppUserPrincipal principal,
                                   @RequestParam BigDecimal applicationFee,
                                   @RequestParam(required = false) String modalKey,
@@ -1090,7 +1090,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/language")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateWorkspaceDefaultLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                                  @RequestParam String defaultLanguage,
                                                  RedirectAttributes ra) {
@@ -1108,7 +1108,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/otp-delivery")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateOtpDelivery(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam OtpDeliveryChannel otpDeliveryChannel,
                                     @RequestParam(defaultValue = "LOGIN_MFA_ONLY") OtpRequirementMode otpRequirementMode,
@@ -1129,7 +1129,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/qualification-policies")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
                                               @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
@@ -1154,7 +1154,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/station-qualification-policies")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateStationQualificationPolicies(@AuthenticationPrincipal AppUserPrincipal principal,
                                                      @RequestParam String stationId,
                                                      @RequestParam(required = false) Integer applicantMaxDefaultedLoans,
@@ -1416,7 +1416,7 @@ public class AdminController {
     }
 
     @PostMapping("/settings-controls/{id}/versions/{versionId}/rollback")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String rollbackLoanProductVersion(@PathVariable UUID id,
                                              @PathVariable UUID versionId,
                                              @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1432,13 +1432,13 @@ public class AdminController {
     }
 
     @GetMapping("/reports")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'LOAN_REPORTS_VIEW')")
     public String reports() {
         return "admin/reports";
     }
 
     @PostMapping("/settings-controls/review-rules")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'APPROVAL_FLOW_CONFIGURE')")
     public String updateReviewRules(@AuthenticationPrincipal AppUserPrincipal principal,
                                     @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
                                     @RequestParam(defaultValue = "false") boolean boardReviewRequired,
@@ -1456,7 +1456,7 @@ public class AdminController {
     }
 
     @GetMapping("/outbox")
-    @PreAuthorize("hasAnyRole('ADMIN','MINOR_ADMIN') and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'OUTBOX_VIEW')")
     public String outbox(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
                          @RequestParam(required = false) String loanApplicationId,
@@ -1467,7 +1467,7 @@ public class AdminController {
                          @RequestParam(defaultValue = "50") int size,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
         String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
         String selectedLoanApplicationId = firstNonBlank(loanApplicationId, loanId);
@@ -1497,7 +1497,7 @@ public class AdminController {
     }
 
     @PostMapping("/outbox/{id}/retry")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_OUTBOX_MONITOR')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'OUTBOX_UPDATE')")
     public String retryOutbox(@PathVariable UUID id,
                               @RequestParam(required = false) String dateFrom,
                               @RequestParam(required = false) String dateTo,
@@ -1516,6 +1516,7 @@ public class AdminController {
     }
 
     @GetMapping("/events")
+    @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
     public String events(@RequestParam(required = false) String dateFrom,
                          @RequestParam(required = false) String dateTo,
                          @RequestParam(required = false) String actorId,
@@ -1525,7 +1526,7 @@ public class AdminController {
                          @RequestParam(defaultValue = "50") int size,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         String scopedSaccoId = superAdmin ? normalizeTextParam(saccoId) : adminScopeService.currentSaccoId(principal);
         String scopedStationId = superAdmin ? normalizeTextParam(stationId) : adminScopeService.currentStationId(principal);
         Map<String, String> dateErrors = validateDateRangeInputs(dateFrom, dateTo);
@@ -1555,7 +1556,7 @@ public class AdminController {
     @GetMapping("/saccos")
     public String saccos(@AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         if (superAdmin) {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-saccos";
@@ -1570,7 +1571,7 @@ public class AdminController {
     }
 
     @GetMapping("/saccos/registry")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_VIEW')")
     public String saccoRegistry(Model model) {
         model.addAttribute("registeredSaccos", saccoRegistryService.listRegisteredSaccos());
         model.addAttribute("superAdmin", true);
@@ -1579,7 +1580,7 @@ public class AdminController {
     }
 
     @GetMapping("/saccos/{saccoId}")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_VIEW')")
     public String saccoDetail(@PathVariable String saccoId,
                               @RequestParam(required = false) String section,
                               @RequestParam(required = false) String stationId,
@@ -1638,7 +1639,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/language")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updatePlatformSaccoDefaultLanguage(@PathVariable String saccoId,
                                                      @RequestParam String defaultLanguage,
                                                      @RequestParam(required = false) String section,
@@ -1663,7 +1664,7 @@ public class AdminController {
     }
 
     @GetMapping("/saccos/minor-admins")
-    @PreAuthorize("@authz.platformAdminIdentity(principal)")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_VIEW')")
     public String minorAdmins(Model model) {
         List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos();
         model.addAttribute("registeredSaccos", registeredSaccos);
@@ -1675,7 +1676,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_CREATE')")
     public String registerSacco(@RequestParam String saccoName,
                                 @RequestParam String stationIds,
                                 @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
@@ -1692,7 +1693,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_CREATE')")
     public String registerMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
                                      @ModelAttribute MinorAdminRegistrationForm registrationForm,
                                      RedirectAttributes ra) {
@@ -1714,7 +1715,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String updateMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
                                    @PathVariable UUID accountId,
                                    @RequestParam String saccoId,
@@ -1741,7 +1742,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}/resend-invite")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String resendMinorAdminInvite(@AuthenticationPrincipal AppUserPrincipal principal,
                                          @PathVariable UUID accountId,
                                          RedirectAttributes ra) {
@@ -1755,7 +1756,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}/revoke-invite")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String revokeMinorAdminInvite(@AuthenticationPrincipal AppUserPrincipal principal,
                                          @PathVariable UUID accountId,
                                          RedirectAttributes ra) {
@@ -1769,7 +1770,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}/deactivate")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String deactivateMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @PathVariable UUID accountId,
                                        RedirectAttributes ra) {
@@ -1783,7 +1784,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}/reinvite")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String reinviteMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
                                      @PathVariable UUID accountId,
                                      RedirectAttributes ra) {
@@ -1797,7 +1798,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/minor-admins/{accountId}/delete")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_DELETE')")
     public String deleteMinorAdmin(@PathVariable UUID accountId,
                                    @RequestParam String confirmation,
                                    RedirectAttributes ra) {
@@ -1811,7 +1812,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_UPDATE')")
     public String updateSacco(@PathVariable String saccoId,
                               @AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String saccoName,
@@ -1821,7 +1822,7 @@ public class AdminController {
                               @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
                               RedirectAttributes ra) {
         try {
-            if (principal != null && principal.hasRole(Position.ADMIN)) {
+            if (principal != null && principal.isPlatformIdentity()) {
                 saccoRegistryService.updateSacco(
                     saccoId,
                     saccoName,
@@ -1835,17 +1836,17 @@ public class AdminController {
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return principal != null && principal.hasRole(Position.ADMIN)
+            return principal != null && principal.isPlatformIdentity()
                 ? "redirect:/admin/saccos/registry"
                 : "redirect:/admin/saccos";
         }
-        return principal != null && principal.hasRole(Position.ADMIN)
+        return principal != null && principal.isPlatformIdentity()
             ? "redirect:/admin/saccos/registry"
             : "redirect:/admin/saccos";
     }
 
     @PostMapping("/saccos/{saccoId}/logo")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateWorkspaceSaccoLogo(@PathVariable String saccoId,
                                            @AuthenticationPrincipal AppUserPrincipal principal,
                                            @RequestParam(name = "logoFile", required = false) MultipartFile logoFile,
@@ -1864,11 +1865,11 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/logo/delete")
-    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("(@authz.platformAdminIdentity(principal) or @authz.workspaceAdminOnly(principal)) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String deleteWorkspaceSaccoLogo(@PathVariable String saccoId,
                                            @AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
-        boolean superAdmin = principal != null && principal.hasRole(Position.ADMIN);
+        boolean superAdmin = principal != null && principal.isPlatformIdentity();
         try {
             String targetSaccoId = saccoId == null ? "" : saccoId.trim();
             if (!superAdmin) {
@@ -1887,7 +1888,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/delete")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_DELETE')")
     public String deleteSacco(@PathVariable String saccoId,
                               @RequestParam String confirmation,
                               RedirectAttributes ra) {
@@ -1901,7 +1902,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/access/suspend")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_UPDATE')")
     public String suspendStationAccess(@PathVariable String saccoId,
                                        @AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam String stationId,
@@ -1918,7 +1919,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/access/restore")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_UPDATE')")
     public String restoreStationAccess(@PathVariable String saccoId,
                                       @AuthenticationPrincipal AppUserPrincipal principal,
                                       @RequestParam String stationId,
@@ -1933,7 +1934,7 @@ public class AdminController {
     }
 
     @PostMapping("/saccos/{saccoId}/stations")
-    @PreAuthorize("@authz.platformAdminIdentity(principal) and @userClaims.has(principal, 'ACCESS_ADMIN_SETTINGS')")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'SACCO_REGISTRY_UPDATE')")
     public String addStation(@PathVariable String saccoId,
                              @AuthenticationPrincipal AppUserPrincipal principal,
                              @RequestParam String stationId,
@@ -1944,11 +1945,11 @@ public class AdminController {
             ra.addFlashAttribute("message", "Station added.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
-            return principal != null && principal.hasRole(Position.ADMIN)
+            return principal != null && principal.isPlatformIdentity()
                 ? "redirect:/admin/saccos/registry"
                 : "redirect:/admin/saccos";
         }
-        return principal != null && principal.hasRole(Position.ADMIN)
+        return principal != null && principal.isPlatformIdentity()
             ? "redirect:/admin/saccos/registry"
             : "redirect:/admin/saccos";
     }
@@ -1980,14 +1981,14 @@ public class AdminController {
     }
 
     @PostMapping("/scope")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal)")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_CONFIGURE')")
     public String updateScope(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String saccoId,
                               @RequestParam String stationId,
                               @RequestParam(required = false) String next,
                               RedirectAttributes ra) {
         adminScopeService.updateScope(principal, saccoId, stationId);
-        ra.addFlashAttribute("message", principal != null && principal.hasRole(Position.ADMIN)
+        ra.addFlashAttribute("message", principal != null && principal.isPlatformIdentity()
             ? "You are now working under the selected SACCO and station."
             : "You are now working under the selected station.");
         return "redirect:" + normalizeAdminNextPath(next);

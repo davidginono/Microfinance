@@ -684,15 +684,15 @@ public class AdminService {
     }
 
     public int activeBoardMemberCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.BOARD).size();
+        return roleDirectoryService.activeByClaim(saccoId, UserClaim.BOARD_QUEUE_APPROVE).size();
     }
 
     public int activeCreditCommitteeMemberCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.CREDIT_COMMITTEE).size();
+        return roleDirectoryService.activeByClaim(saccoId, UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE).size();
     }
 
     public int activeChairpersonCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.CHAIRPERSON).size();
+        return roleDirectoryService.activeByClaim(saccoId, UserClaim.CHAIRPERSON_QUEUE_APPROVE).size();
     }
 
     public List<BoardReviewerOption> activeBoardReviewerOptions(String saccoId) {
@@ -704,7 +704,8 @@ public class AdminService {
     }
 
     private List<BoardReviewerOption> activeReviewerOptions(String saccoId, Position role) {
-        return roleDirectoryService.activeByRole(saccoId, role).stream()
+        UserClaim reviewerClaim = reviewerClaimForRole(role);
+        return roleDirectoryService.activeByClaim(saccoId, reviewerClaim).stream()
             .map(ref -> new BoardReviewerOption(
                 ref.getId(),
                 ref.getFullName(),
@@ -740,28 +741,23 @@ public class AdminService {
     }
 
     public int activeLoanOfficerCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.LOAN_OFFICER).size();
+        return roleDirectoryService.activeByAnyClaim(saccoId, List.of(
+            UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
+            UserClaim.LOAN_OFFICER_QUEUE_APPROVE
+        )).size();
     }
 
     public int activeAccountantCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.ACCOUNTANT).size();
+        return roleDirectoryService.activeByClaim(saccoId, UserClaim.ACCOUNTANT_QUEUE_APPROVE).size();
     }
 
     public int activeDisbursementOfficerCount(String saccoId) {
-        return roleDirectoryService.activeByRole(saccoId, Position.DISBURSEMENT_OFFICER).size();
+        return roleDirectoryService.activeByClaim(saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE).size();
     }
 
     public int activeDisbursementClaimHolderCount(String saccoId) {
-        return (int) memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE).stream()
-            .filter(member -> {
-                Set<UserClaim> claims = userClaimService.effectiveClaims(
-                    member.getId(),
-                    member.getStaffRolesResolved(),
-                    member.isMemberAccess()
-                );
-                return claims.contains(UserClaim.ACCESS_DISBURSEMENT_QUEUE)
-                    && claims.contains(UserClaim.DISBURSE_LOAN);
-            })
+        return (int) roleDirectoryService.activeByClaim(saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE).stream()
+            .filter(ref -> roleDirectoryService.hasActiveClaimInSacco(ref.getId(), saccoId, UserClaim.DISBURSEMENT_QUEUE_VIEW))
             .count();
     }
 
@@ -1827,7 +1823,8 @@ public class AdminService {
     public void broadcastToMinorAdmins(UUID adminId, String subject, String message) {
         Member admin = memberRepository.findById(adminId)
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
-        List<RoleDirectoryService.RoleAccountRef> recipients = roleDirectoryService.activeGlobalByRole(Position.MINOR_ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> recipients =
+            roleDirectoryService.activeRoleHoldersByClaim(Position.MINOR_ADMIN, UserClaim.NOTIFICATIONS_VIEW);
         OffsetDateTime now = OffsetDateTime.now();
         for (RoleDirectoryService.RoleAccountRef recipient : recipients) {
             createNotification(recipient.getId(), "ADMIN_BROADCAST", "Platform Admin Broadcast", subject, message,
@@ -1843,7 +1840,8 @@ public class AdminService {
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
         Member recipient = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Recipient admin not found"));
-        if (!recipient.getStaffRolesResolved().contains(Position.MINOR_ADMIN)) {
+        if (!recipient.getStaffRolesResolved().contains(Position.MINOR_ADMIN)
+            || !roleDirectoryService.hasActiveStaffClaim(memberId, UserClaim.NOTIFICATIONS_VIEW)) {
             throw new IllegalArgumentException("Recipient admin not found");
         }
         createNotification(memberId, "ADMIN_REPLY", "Platform Admin Reply", subject, message,
@@ -1929,10 +1927,10 @@ public class AdminService {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
         String normalizedStationId = normalizeOptional(sender.getStationId());
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRoleInStation(
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeWorkspaceAdminsByAnyClaimInStation(
             saccoId,
             normalizedStationId,
-            List.of(Position.MINOR_ADMIN)
+            List.of(UserClaim.SUPPORT_VIEW, UserClaim.SUPPORT_UPDATE)
         );
         if (admins.isEmpty()) {
             throw new IllegalStateException("No active SACCOS Admin is configured for your station");
@@ -2348,23 +2346,29 @@ public class AdminService {
     private List<UserClaim> normalizeAssignableClaims(Set<Position> staffRoles,
                                                       boolean memberAccess,
         List<UserClaim> requestedClaims) {
-        Set<UserClaim> defaults = userClaimService.defaultClaims(staffRoles, memberAccess);
-        if (staffRoles.contains(Position.ADMIN)) {
-            return new ArrayList<>(defaults);
-        }
-        LinkedHashSet<UserClaim> normalized = new LinkedHashSet<>(defaults);
+        LinkedHashSet<UserClaim> normalized = new LinkedHashSet<>();
         if (requestedClaims != null) {
             requestedClaims.stream()
                 .filter(java.util.Objects::nonNull)
                 .forEach(normalized::add);
+        } else {
+            normalized.addAll(userClaimService.defaultClaims(staffRoles, memberAccess));
         }
         if (!memberAccess) {
-            normalized.remove(UserClaim.APPLY_LOANS);
-            normalized.remove(UserClaim.APPROVE_GUARANTOR_REQUESTS);
+            normalized.removeIf(claim -> claim.getFeature() == AccessFeature.MEMBER_LOANS
+                || claim.getFeature() == AccessFeature.GUARANTOR_REQUESTS);
         }
-        if (normalized.contains(UserClaim.DISBURSE_LOAN)) {
-            normalized.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
+        if (normalized.contains(UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
+            normalized.add(UserClaim.DISBURSEMENT_QUEUE_VIEW);
         }
+        List<UserClaim> impliedViewClaims = normalized.stream()
+            .filter(claim -> claim.getAction() != AccessAction.VIEW)
+            .map(UserClaim::getFeature)
+            .distinct()
+            .map(feature -> UserClaim.forFeatureAction(feature, AccessAction.VIEW))
+            .flatMap(java.util.Optional::stream)
+            .toList();
+        normalized.addAll(impliedViewClaims);
         return new ArrayList<>(normalized);
     }
 
@@ -3335,15 +3339,16 @@ public class AdminService {
         if (!reviewRequired) {
             return;
         }
-        int activeRoleMembers = roleDirectoryService.activeByRole(saccoId, role).size();
-        if (activeRoleMembers <= 0) {
-            throw new IllegalStateException("No active " + roleLabel + "s are configured for this SACCO yet.");
+        UserClaim reviewerClaim = reviewerClaimForRole(role);
+        int activeReviewerClaimHolders = roleDirectoryService.activeByClaim(saccoId, reviewerClaim).size();
+        if (activeReviewerClaimHolders <= 0) {
+            throw new IllegalStateException("No active " + roleLabel + "s have the required access claim for this SACCO yet.");
         }
         if (assignedReviewerCount <= 0) {
             throw new IllegalStateException("Assign at least one active " + roleLabel + " before using this stage.");
         }
-        if (assignedReviewerCount > activeRoleMembers) {
-            throw new IllegalStateException("Assigned " + roleLabel + "s cannot exceed the active " + roleLabel + " count.");
+        if (assignedReviewerCount > activeReviewerClaimHolders) {
+            throw new IllegalStateException("Assigned " + roleLabel + "s cannot exceed the active " + roleLabel + " claim-holder count.");
         }
     }
 
@@ -3357,12 +3362,13 @@ public class AdminService {
         if (uniqueIds.isEmpty()) {
             return List.of();
         }
-        Set<UUID> activeReviewerIds = roleDirectoryService.activeByRole(saccoId, role).stream()
+        UserClaim reviewerClaim = reviewerClaimForRole(role);
+        Set<UUID> activeReviewerIds = roleDirectoryService.activeByClaim(saccoId, reviewerClaim).stream()
             .map(RoleDirectoryService.RoleAccountRef::getId)
             .collect(Collectors.toSet());
         for (UUID reviewerId : uniqueIds) {
             if (!activeReviewerIds.contains(reviewerId)) {
-                throw new IllegalArgumentException("Selected reviewer is not active in the required role for this SACCO.");
+                throw new IllegalArgumentException("Selected reviewer does not have the required access claim for this SACCO.");
             }
         }
         if (uniqueIds.size() > MAX_WORKFLOW_COUNT) {
@@ -3375,7 +3381,8 @@ public class AdminService {
         if (!reviewRequired) {
             return List.of();
         }
-        List<RoleDirectoryService.RoleAccountRef> activeChairpersons = roleDirectoryService.activeByRole(saccoId, Position.CHAIRPERSON);
+        List<RoleDirectoryService.RoleAccountRef> activeChairpersons =
+            roleDirectoryService.activeByClaim(saccoId, UserClaim.CHAIRPERSON_QUEUE_APPROVE);
         if (activeChairpersons.isEmpty()) {
             return List.of();
         }
@@ -3383,6 +3390,18 @@ public class AdminService {
             throw new IllegalStateException("Only one active Chairperson can be configured for this SACCO.");
         }
         return List.of(activeChairpersons.get(0).getId());
+    }
+
+    private UserClaim reviewerClaimForRole(Position role) {
+        if (role == null) {
+            throw new IllegalArgumentException("Reviewer access claim is required.");
+        }
+        return switch (role) {
+            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_APPROVE;
+            case BOARD -> UserClaim.BOARD_QUEUE_APPROVE;
+            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE;
+            default -> throw new IllegalArgumentException("Unsupported reviewer access role.");
+        };
     }
 
     private List<UUID> reviewerIds(UUID productId, ApprovalWorkflowStage stage) {

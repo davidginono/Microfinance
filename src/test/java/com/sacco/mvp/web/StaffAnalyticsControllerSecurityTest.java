@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
@@ -18,6 +19,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
@@ -50,6 +52,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -83,7 +86,7 @@ class StaffAnalyticsControllerSecurityTest {
 
     @Test
     void managerCanReachStaffAnalytics() throws Exception {
-        AppUserPrincipal principal = principal(Position.MANAGER, false);
+        AppUserPrincipal principal = principal(Position.MANAGER, false, Set.of(UserClaim.STAFF_ANALYTICS_VIEW));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
         when(loanAnalyticsService.forStation(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO));
@@ -145,7 +148,7 @@ class StaffAnalyticsControllerSecurityTest {
 
     @Test
     void suspendedStaffIsRedirectedBeforeAnalyticsRuns() throws Exception {
-        AppUserPrincipal principal = principal(Position.MANAGER, false);
+        AppUserPrincipal principal = principal(Position.MANAGER, false, Set.of(UserClaim.STAFF_ANALYTICS_VIEW));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.SUSPENDED)));
 
         mockMvc.perform(get("/staff/analytics").with(authentication(authenticationFor(principal))))
@@ -160,6 +163,10 @@ class StaffAnalyticsControllerSecurityTest {
     }
 
     private AppUserPrincipal principal(Position position, boolean memberAccess) {
+        return principal(position, memberAccess, Collections.emptySet());
+    }
+
+    private AppUserPrincipal principal(Position position, boolean memberAccess, Set<UserClaim> claims) {
         LinkedHashSet<Position> staffRoles = new LinkedHashSet<>();
         if (position != null && position.isStaffRole()) {
             staffRoles.add(position);
@@ -177,7 +184,7 @@ class StaffAnalyticsControllerSecurityTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, Collections.emptySet());
+        return new AppUserPrincipal(member, claims);
     }
 
     private SaccoStation station(SaccoAccessStatus accessStatus) {
@@ -214,7 +221,17 @@ class StaffAnalyticsControllerSecurityTest {
         AuthzService authzService(LoanApplicationRepository loanApplicationRepository,
                                   GuarantorRequestRepository guarantorRequestRepository,
                                   BoardReviewRepository boardReviewRepository) {
-            return new AuthzService(loanApplicationRepository, guarantorRequestRepository, boardReviewRepository);
+            return new AuthzService(
+                loanApplicationRepository,
+                guarantorRequestRepository,
+                boardReviewRepository,
+                accessControlService()
+            );
+        }
+
+        @Bean
+        AccessControlService accessControlService() {
+            return new AccessControlService();
         }
 
         @Bean

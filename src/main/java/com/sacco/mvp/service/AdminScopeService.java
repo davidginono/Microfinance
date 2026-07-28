@@ -1,6 +1,5 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -114,8 +113,8 @@ public class AdminScopeService {
 
     private boolean isAdminWorkspaceUser(AppUserPrincipal principal) {
         return principal != null
-            && principal.hasRole(Position.MINOR_ADMIN)
-            && !principal.hasRole(Position.ADMIN);
+            && principal.isWorkspaceAdminScope()
+            && !principal.isPlatformIdentity();
     }
 
     private List<SaccoRegistryService.RegisteredSaccoView> availableOptions(AppUserPrincipal principal) {

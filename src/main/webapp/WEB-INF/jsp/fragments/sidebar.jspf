@@ -12,10 +12,10 @@
                 <span class="shell-sidebar-toggle-label"><spring:message code="menu.main" text="Main Menu" /></span>
             </c:if>
             <c:if test="${staffWorkspace}">
-                <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                <sec:authorize access="@access.isAdminScope(principal)">
                     <span class="shell-sidebar-toggle-label"><spring:message code="admin.tools" text="Admin Tools" /></span>
                 </sec:authorize>
-                <sec:authorize access="!hasAnyRole('ADMIN','MINOR_ADMIN')">
+                <sec:authorize access="!@access.isAdminScope(principal)">
                     <span class="shell-sidebar-toggle-label"><spring:message code="menu.staffWorkspace" text="Staff Workspace" /></span>
                 </sec:authorize>
             </c:if>
@@ -32,14 +32,14 @@
         </div>
         <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
             <c:if test="${memberWorkspace}">
-                <sec:authorize access="hasRole('MEMBER') and !hasRole('ADMIN') and !hasRole('MINOR_ADMIN')">
+                <sec:authorize access="@access.canAccessMemberArea(principal)">
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                     <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 1.707a1 1 0 00-1.414 0l-8 8A1 1 0 002 11.414V17a2 2 0 002 2h4a1 1 0 001-1v-4h2v4a1 1 0 001 1h4a2 2 0 002-2v-5.586a1 1 0 00-.293-.707l-8-8z"/></svg>
                     </span>
                     <spring:message code="menu.dashboard" />
                 </a>
-                <sec:authorize access="principal.claims.contains('APPLY_LOANS')">
+                <sec:authorize access="@access.has(principal, 'MEMBER_LOANS_VIEW')">
                     <a href="/app/loan-products" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/loan-products' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/loan-products' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 00-2 2v2h16V5a2 2 0 00-2-2H4z"/><path d="M18 9H2v6a2 2 0 002 2h12a2 2 0 002-2V9z"/></svg>
@@ -110,7 +110,7 @@
                         </div>
                     </div>
                 </sec:authorize>
-                <sec:authorize access="principal.claims.contains('APPROVE_GUARANTOR_REQUESTS')">
+                <sec:authorize access="@access.has(principal, 'GUARANTOR_REQUESTS_VIEW')">
                     <a href="/app/guarantee-requests" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/guarantee-requests' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
                         <span class="inline-flex h-6 w-6 items-center justify-center border lg:h-7 lg:w-7 ${requestUri eq '/app/guarantee-requests' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v5a3 3 0 003 3h8a3 3 0 003-3v-5a2 2 0 00-2-2h-1V6a4 4 0 00-4-4z"/></svg>
@@ -156,9 +156,9 @@
             </c:if>
 
             <c:if test="${staffWorkspace}">
-                <sec:authorize access="hasAnyRole('ADMIN','MINOR_ADMIN')">
+                <sec:authorize access="@access.isAdminScope(principal)">
                     <c:choose>
-                        <c:when test="${pageContext.request.isUserInRole('ROLE_ADMIN')}">
+                        <c:when test="${isPlatformAdminIdentity}">
                         <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
                         <c:set var="platformSettingsActive" value="${requestUri eq '/admin/platform-settings'}" />
                         <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
@@ -288,17 +288,35 @@
             </c:if>
 
             <c:if test="${staffWorkspace}">
-                <c:set var="showManagerPanel" value="${pageContext.request.isUserInRole('ROLE_MANAGER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="showCreditCommitteePanel" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="showChairpersonPanel" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="showBoardPanel" value="${(pageContext.request.isUserInRole('ROLE_BOARD') or showCreditCommitteePanel or showChairpersonPanel) and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="showLoanOfficerPanel" value="${pageContext.request.isUserInRole('ROLE_LOAN_OFFICER') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="showAccountantPanel" value="${pageContext.request.isUserInRole('ROLE_ACCOUNTANT') and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
-                <c:set var="hasDisbursementQueueClaim" value="false" />
-                <sec:authorize access="principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
-                    <c:set var="hasDisbursementQueueClaim" value="true" />
+                <c:set var="showManagerPanel" value="false" />
+                <c:set var="showCreditCommitteePanel" value="false" />
+                <c:set var="showChairpersonPanel" value="false" />
+                <c:set var="showBoardPanel" value="false" />
+                <c:set var="showLoanOfficerPanel" value="false" />
+                <c:set var="showAccountantPanel" value="false" />
+                <c:set var="showDisbursementPanel" value="false" />
+                <sec:authorize access="@access.canAccessManagerArea(principal)">
+                    <c:set var="showManagerPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
                 </sec:authorize>
-                <c:set var="showDisbursementPanel" value="${hasDisbursementQueueClaim and not pageContext.request.isUserInRole('ROLE_ADMIN') and currentMember ne null}" />
+                <sec:authorize access="@access.canAccessCreditCommitteeArea(principal)">
+                    <c:set var="showCreditCommitteePanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
+                <sec:authorize access="@access.canAccessChairpersonArea(principal)">
+                    <c:set var="showChairpersonPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
+                <sec:authorize access="@access.canAccessBoardArea(principal)">
+                    <c:set var="showBoardPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
+                <c:set var="showBoardPanel" value="${(showBoardPanel or showCreditCommitteePanel or showChairpersonPanel) and not isPlatformAdminIdentity and currentMember ne null}" />
+                <sec:authorize access="@access.canAccessLoanOfficerArea(principal)">
+                    <c:set var="showLoanOfficerPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
+                <sec:authorize access="@access.canAccessAccountantArea(principal)">
+                    <c:set var="showAccountantPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
+                <sec:authorize access="@access.canAccessDisbursementArea(principal)">
+                    <c:set var="showDisbursementPanel" value="${not isPlatformAdminIdentity and currentMember ne null}" />
+                </sec:authorize>
                 <c:if test="${showManagerPanel or showBoardPanel or showLoanOfficerPanel or showAccountantPanel or showDisbursementPanel}">
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.reviewPanels" text="Review Panels" /></p>
@@ -402,7 +420,7 @@
                     </div>
                 </c:if>
             </c:if>
-            <sec:authorize access="hasRole('MANAGER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_MANAGER_QUEUE')">
+            <sec:authorize access="@access.canAccessManagerArea(principal)">
                 <c:set var="managerOfficeActive" value="${fn:startsWith(requestUri, '/manager')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.manager" text="Manager" /></p>
@@ -427,9 +445,15 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="((hasRole('BOARD') and principal.claims.contains('REVIEW_BOARD_QUEUE')) or (hasRole('CHAIRPERSON') and principal.claims.contains('REVIEW_CHAIRPERSON_QUEUE')) or (hasRole('CREDIT_COMMITTEE') and principal.claims.contains('REVIEW_CREDIT_COMMITTEE_QUEUE'))) and !hasRole('ADMIN')">
-                <c:set var="chairpersonOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CHAIRPERSON')}" />
-                <c:set var="creditCommitteeOfficeActive" value="${pageContext.request.isUserInRole('ROLE_CREDIT_COMMITTEE')}" />
+            <sec:authorize access="(@access.canAccessBoardArea(principal) or @access.canAccessChairpersonArea(principal) or @access.canAccessCreditCommitteeArea(principal))">
+                <c:set var="chairpersonOfficeActive" value="false" />
+                <c:set var="creditCommitteeOfficeActive" value="false" />
+                <sec:authorize access="@access.canAccessChairpersonArea(principal)">
+                    <c:set var="chairpersonOfficeActive" value="true" />
+                </sec:authorize>
+                <sec:authorize access="@access.canAccessCreditCommitteeArea(principal)">
+                    <c:set var="creditCommitteeOfficeActive" value="true" />
+                </sec:authorize>
                 <c:set var="reviewOfficeBasePath" value="${chairpersonOfficeActive ? '/chairperson' : (creditCommitteeOfficeActive ? '/credit-committee' : '/board')}" />
                 <c:set var="reviewDashboardPath" value="${reviewOfficeBasePath}/dashboard" />
                 <c:set var="reviewQueuePath" value="${reviewOfficeBasePath}/queue" />
@@ -497,7 +521,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="hasRole('LOAN_OFFICER') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_LOAN_OFFICER_QUEUE')">
+            <sec:authorize access="@access.canAccessLoanOfficerArea(principal)">
                 <c:set var="loanOfficerOfficeActive" value="${fn:startsWith(requestUri, '/loan-officer')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.loanOfficer" text="Loan Officer" /></p>
@@ -522,7 +546,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="hasRole('ACCOUNTANT') and !hasRole('ADMIN') and principal.claims.contains('REVIEW_ACCOUNTANT_QUEUE')">
+            <sec:authorize access="@access.canAccessAccountantArea(principal)">
                 <c:set var="accountantOfficeActive" value="${fn:startsWith(requestUri, '/accountant')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>
@@ -547,7 +571,7 @@
                     </div>
                 </div>
             </sec:authorize>
-            <sec:authorize access="!hasRole('ADMIN') and principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')">
+            <sec:authorize access="@access.canAccessDisbursementArea(principal)">
                 <c:set var="disbursementOfficeActive" value="${fn:startsWith(requestUri, '/disbursement')}" />
                 <div class="px-3 pb-1 pt-3">
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.disbursement" text="Disbursement" /></p>

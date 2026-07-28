@@ -1,7 +1,8 @@
 package com.sacco.mvp.web;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,9 +11,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.UUID;
 
 @Controller
+@RequiredArgsConstructor
 public class LoanNotificationOpenController {
-    private static final String DISBURSEMENT_ACCESS_CLAIM = "ACCESS_DISBURSEMENT_QUEUE";
-    private static final String DISBURSE_LOAN_CLAIM = "DISBURSE_LOAN";
+    private final AccessControlService access;
 
     @GetMapping("/loan-notifications/{loanId}/open")
     public String openLoan(@PathVariable UUID loanId, @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -20,22 +21,24 @@ public class LoanNotificationOpenController {
             return "redirect:/login";
         }
         String suffix = "/loan-applications/" + loanId;
-        if (principal.getClaims().contains(DISBURSEMENT_ACCESS_CLAIM) || principal.getClaims().contains(DISBURSE_LOAN_CLAIM)) {
+        if (access.canAccessDisbursementArea(principal)) {
             return "redirect:/disbursement" + suffix;
         }
-        if (principal.hasRole(Position.MANAGER)) {
+        if (access.canAccessManagerArea(principal)) {
             return "redirect:/manager" + suffix;
         }
-        if (principal.hasRole(Position.LOAN_OFFICER)) {
+        if (access.canAccessLoanOfficerArea(principal)) {
             return "redirect:/loan-officer" + suffix;
         }
-        if (principal.hasRole(Position.ACCOUNTANT)) {
+        if (access.canAccessAccountantArea(principal)) {
             return "redirect:/accountant" + suffix;
         }
-        if (principal.hasRole(Position.BOARD) || principal.hasRole(Position.CHAIRPERSON) || principal.hasRole(Position.CREDIT_COMMITTEE)) {
+        if (access.canAccessBoardArea(principal)
+            || access.canAccessChairpersonArea(principal)
+            || access.canAccessCreditCommitteeArea(principal)) {
             return "redirect:/board" + suffix;
         }
-        if (principal.hasRole(Position.MEMBER)) {
+        if (access.canAccessMemberArea(principal)) {
             return "redirect:/app" + suffix;
         }
         return "redirect:/login";

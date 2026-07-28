@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/manager")
-@PreAuthorize("hasRole('MANAGER') and @userClaims.has(principal, 'REVIEW_MANAGER_QUEUE')")
+@PreAuthorize("@access.canAccessManagerArea(principal)")
 public class ManagerController {
     private static final DateTimeFormatter REPORT_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final ManagerService managerService;
@@ -309,7 +309,7 @@ public class ManagerController {
         model.addAttribute("disbursementNotesLabel", message("review.manager.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("allowPaymentSync", false);
+        model.addAttribute("allowPaymentSync", true);
         model.addAttribute("allowDefaultedPaymentRecheck", false);
         addReviewDisplayAttributes(model, app, managerReason);
         return "manager/detail";
@@ -347,6 +347,7 @@ public class ManagerController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.canDecide(principal, #decision, 'MANAGER_QUEUE_APPROVE', 'MANAGER_QUEUE_REJECT')")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
@@ -386,6 +387,7 @@ public class ManagerController {
     }
 
     @PostMapping("/loan-applications/{id}/request-decision-otp")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.hasAny(principal, 'MANAGER_QUEUE_APPROVE', 'MANAGER_QUEUE_REJECT')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestDecisionOtp(@PathVariable UUID id,
                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -418,6 +420,7 @@ public class ManagerController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-decision-otp")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.hasAny(principal, 'MANAGER_QUEUE_APPROVE', 'MANAGER_QUEUE_REJECT')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyDecisionOtp(@PathVariable UUID id,
                                                                  @AuthenticationPrincipal AppUserPrincipal principal,
@@ -447,6 +450,7 @@ public class ManagerController {
     }
 
     @PostMapping("/loan-applications/{loanId}/reversal-requests/{requestId}/approve")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_APPROVE')")
     public String approveReversalRequest(@PathVariable UUID loanId,
                                          @PathVariable UUID requestId,
                                          @AuthenticationPrincipal AppUserPrincipal principal,
@@ -462,6 +466,7 @@ public class ManagerController {
     }
 
     @PostMapping("/loan-applications/{loanId}/reversal-requests/{requestId}/reject")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_REJECT')")
     public String rejectReversalRequest(@PathVariable UUID loanId,
                                         @PathVariable UUID requestId,
                                         @AuthenticationPrincipal AppUserPrincipal principal,
@@ -492,6 +497,7 @@ public class ManagerController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_EXPORT')")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -531,12 +537,14 @@ public class ManagerController {
     }
 
     @GetMapping("/settings")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_VIEW')")
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         model.addAttribute("settings", managerService.getSettings(principal.getSaccoId()));
         return "manager/settings";
     }
 
     @PostMapping("/settings")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
     public String updateSettings(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam Integer requiredGuarantors,
                                  @RequestParam Integer boardSize,
@@ -550,25 +558,22 @@ public class ManagerController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        model.addAttribute("notifications", notificationInboxService.allViews(
-            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "manager/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), "/manager/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/manager/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/manager/notifications";
@@ -576,7 +581,7 @@ public class ManagerController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -778,7 +783,8 @@ public class ManagerController {
     }
 
     private Member requireMemberWithSavedSignature(UUID memberId, String missingSignatureMessage) {
-        Member member = requireMemberWithEmail(memberId, missingSignatureMessage);
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
             throw new IllegalStateException(missingSignatureMessage);
         }

@@ -7,6 +7,7 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.MemberAccessClaimRepository;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.service.UserClaimService;
@@ -30,6 +31,7 @@ class AppUserDetailsServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private SaccoStationRepository saccoStationRepository;
     @Mock private UserSettingsRepository userSettingsRepository;
+    @Mock private MemberAccessClaimRepository memberAccessClaimRepository;
 
     @Test
     void suspendedSaccoBlocksWorkspaceUserLogin() {
@@ -51,7 +53,7 @@ class AppUserDetailsServiceTest {
         AppUserDetailsService service = new AppUserDetailsService(
             memberRepository,
             saccoStationRepository,
-            new UserClaimService(userSettingsRepository, new ObjectMapper())
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
         assertThatThrownBy(() -> service.loadUserByUsername("MEM001"))
@@ -73,11 +75,12 @@ class AppUserDetailsServiceTest {
             .passwordHash("secret")
             .build();
         when(memberRepository.findByMemberNo("ADM001")).thenReturn(Optional.of(admin));
+        when(memberAccessClaimRepository.findByIdMemberId(admin.getId())).thenReturn(List.of());
 
         AppUserDetailsService service = new AppUserDetailsService(
             memberRepository,
             saccoStationRepository,
-            new UserClaimService(userSettingsRepository, new ObjectMapper())
+            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
         service.loadUserByUsername("ADM001");

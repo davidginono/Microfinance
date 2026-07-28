@@ -15,6 +15,7 @@ import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -60,7 +61,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/accountant")
-@PreAuthorize("hasRole('ACCOUNTANT') and @userClaims.has(principal, 'REVIEW_ACCOUNTANT_QUEUE')")
+@PreAuthorize("@access.canAccessAccountantArea(principal)")
 public class AccountantController {
     private final ManagerService managerService;
     private final ManagerReviewRepository managerReviewRepository;
@@ -78,6 +79,7 @@ public class AccountantController {
     private final MessageSource messageSource;
     private final EmailOtpService emailOtpService;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final AccessControlService access;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -105,7 +107,7 @@ public class AccountantController {
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildAccountantDashboardChartRows(
                 dashboard.statusBreakdown(),
-                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+                access.canAccessDisbursementArea(principal)
             ));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
@@ -205,6 +207,7 @@ public class AccountantController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'ACCOUNTANT_QUEUE_EXPORT')")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -363,6 +366,7 @@ public class AccountantController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.canDecide(principal, #decision, 'ACCOUNTANT_QUEUE_APPROVE', 'ACCOUNTANT_QUEUE_REJECT')")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam ManagerDecision decision,
@@ -391,6 +395,7 @@ public class AccountantController {
     }
 
     @PostMapping("/loan-applications/{id}/request-decision-otp")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.hasAny(principal, 'ACCOUNTANT_QUEUE_APPROVE', 'ACCOUNTANT_QUEUE_REJECT')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestDecisionOtp(@PathVariable UUID id,
                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -423,6 +428,7 @@ public class AccountantController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-decision-otp")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.hasAny(principal, 'ACCOUNTANT_QUEUE_APPROVE', 'ACCOUNTANT_QUEUE_REJECT')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyDecisionOtp(@PathVariable UUID id,
                                                                  @AuthenticationPrincipal AppUserPrincipal principal,
@@ -452,25 +458,22 @@ public class AccountantController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('ACCOUNTANT')")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        model.addAttribute("notifications", notificationInboxService.allViews(
-            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "accountant/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("hasRole('ACCOUNTANT')")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), "/accountant/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/accountant/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/accountant/notifications";
@@ -478,7 +481,7 @@ public class AccountantController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("hasRole('ACCOUNTANT')")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -578,7 +581,8 @@ public class AccountantController {
     }
 
     private Member requireMemberWithSavedSignature(UUID memberId, String message) {
-        Member member = requireMemberWithEmail(memberId, message);
+        Member member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
             throw new IllegalStateException(message);
         }

@@ -112,6 +112,7 @@ public class AppController {
     private final StationOtpSettingsService stationOtpSettingsService;
 
     @GetMapping("/dashboard")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         LoanWorkflowService.MemberDashboardData dashboard = loanWorkflowService.memberDashboard(principal.getMemberId());
         Map<LoanStatus, Long> statusCounts = dashboard.statusCounts();
@@ -122,7 +123,8 @@ public class AppController {
             .sum();
         long currentApplicationCount = statusCounts.values().stream().mapToLong(Long::longValue).sum()
             - archivedApplicationCount
-            + dashboard.unacknowledgedDisbursedApplicationCount();
+            + dashboard.unacknowledgedDisbursedApplicationCount()
+            + dashboard.unacknowledgedRejectedApplicationCount();
         long rejectedLoans = statusCounts.entrySet().stream()
             .filter(entry -> isRejectedStatus(entry.getKey()))
             .mapToLong(Map.Entry::getValue)
@@ -151,6 +153,8 @@ public class AppController {
         model.addAttribute("archivedApplicationCount", archivedApplicationCount);
         model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading(message("loan.loadingLiveBalances")));
         model.addAttribute("currentWorkflowApplication", currentWorkflowApplication);
+        model.addAttribute("currentWorkflowRejectionAcknowledgementRequired",
+            requiresRejectionAcknowledgement(currentWorkflowApplication));
         model.addAttribute("currentWorkflowApplicationNumber",
             currentWorkflowApplication == null || currentWorkflowApplication.getApplicationNumber() == null
                 ? "-"
@@ -183,7 +187,7 @@ public class AppController {
     }
 
     @GetMapping("/dashboard/external-account-status")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> dashboardExternalAccountStatus(@AuthenticationPrincipal AppUserPrincipal principal) {
         Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
@@ -191,7 +195,7 @@ public class AppController {
     }
 
     @PostMapping("/dashboard/active-loans/{loanId}/seen")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#loanId, principal)")
     public String markExpiredActiveLoanChartSeen(@AuthenticationPrincipal AppUserPrincipal principal,
                                                  @PathVariable UUID loanId,
                                                  RedirectAttributes ra) {
@@ -210,7 +214,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-products")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE')")
     public String products(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<LoanProductSetting> products = loanWorkflowService.listProducts(principal.getSaccoId());
         model.addAttribute("products", products);
@@ -233,7 +237,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
     public String listMyApps(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         LoanWorkflowService.MemberApplicationListData applications = loanWorkflowService.memberApplicationList(principal.getMemberId());
         List<LoanApplication> apps = applications.currentApplications();
@@ -252,7 +256,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/acknowledge-disbursement")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
     public String acknowledgeDisbursement(@AuthenticationPrincipal AppUserPrincipal principal,
                                           @PathVariable UUID id,
                                           @RequestParam(defaultValue = "applications") String returnTo,
@@ -271,7 +275,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/acknowledge-rejection")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
     public String acknowledgeRejection(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @PathVariable UUID id,
                                        @RequestParam(defaultValue = "applications") String returnTo,
@@ -290,7 +294,7 @@ public class AppController {
     }
 
     @GetMapping("/archives")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.hasAny(principal, 'MEMBER_LOANS_VIEW', 'GUARANTOR_REQUESTS_VIEW')")
     public String archives(@AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false, defaultValue = "loans") String section,
                            @RequestParam(required = false) String loanArchiveQuery,
@@ -337,7 +341,7 @@ public class AppController {
     }
 
     @GetMapping("/reports")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'LOAN_REPORTS_VIEW')")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) LocalDate fromDate,
                           @RequestParam(required = false) LocalDate toDate,
@@ -949,7 +953,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/new")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE')")
     public String newApp(@AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam(required = false) UUID loanProductId,
                          @RequestParam(required = false) LoanType loanType,
@@ -988,7 +992,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/{id}/edit")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
     public String editDraft(@PathVariable UUID id,
                             @AuthenticationPrincipal AppUserPrincipal principal,
                             Model model,
@@ -1020,7 +1024,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and ((#applicationId == null and @access.has(principal, 'MEMBER_LOANS_CREATE')) or (#applicationId != null and @access.has(principal, 'MEMBER_LOANS_UPDATE')))")
     public String createDraft(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam(required = false) UUID loanProductId,
                               @RequestParam(required = false) LoanType loanType,
@@ -1133,7 +1137,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/{id}")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @authz.isLoanOwner(#id, principal)")
     public String viewMine(@PathVariable UUID id, Model model) {
         LoanApplication app = loanApplicationRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
@@ -1227,7 +1231,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/{id}/applicant-financial-status")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @authz.isLoanOwner(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -1317,7 +1321,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/submit")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
     public String submit(@PathVariable UUID id, @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam(required = false) String applicantSignatureOtpCode,
                          @RequestParam(required = false) String termsAccepted,
@@ -1382,7 +1386,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/cancel")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
     public String cancelSubmission(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
@@ -1402,7 +1406,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/{id}/guarantors")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#id, principal)")
     public String guarantorSelection(@PathVariable UUID id,
                                      @AuthenticationPrincipal AppUserPrincipal principal,
                                      @RequestParam(defaultValue = "") String q,
@@ -1414,7 +1418,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/guarantors")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#id, principal)")
     public String saveGuarantors(@PathVariable UUID id,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam(required = false) List<UUID> guarantorIds,
@@ -1425,7 +1429,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{id}/delete")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_DELETE') and @authz.isLoanOwner(#id, principal)")
     public String deleteApplication(@PathVariable UUID id,
                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                     RedirectAttributes ra) {
@@ -1440,6 +1444,7 @@ public class AppController {
     }
 
     @GetMapping("/guarantors/search")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.hasAny(principal, 'MEMBER_LOANS_CREATE', 'MEMBER_LOANS_UPDATE', 'MEMBER_LOANS_ASSIGN')")
     @ResponseBody
     public List<Map<String, String>> searchGuarantors(@AuthenticationPrincipal AppUserPrincipal principal,
                                                       @RequestParam(defaultValue = "") String q,
@@ -1501,6 +1506,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/financial-preview")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.hasAny(principal, 'MEMBER_LOANS_CREATE', 'MEMBER_LOANS_UPDATE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> financialPreview(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) UUID loanProductId,
@@ -1555,6 +1561,7 @@ public class AppController {
     }
 
     @GetMapping("/loan-applications/external-eligibility-summary")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_CREATE')")
     @ResponseBody
     public Map<String, Object> externalEligibilitySummary(@AuthenticationPrincipal AppUserPrincipal principal,
                                                           @RequestParam(required = false) UUID loanProductId,
@@ -1585,7 +1592,7 @@ public class AppController {
     }
 
     @GetMapping("/guarantee-requests")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_VIEW')")
     public String myGuarantorRequests(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<GuarantorRequest> requests = loanWorkflowService.myActiveGuarantorRequests(principal.getMemberId());
         model.addAttribute("requests", requests);
@@ -1615,7 +1622,7 @@ public class AppController {
     }
 
     @GetMapping("/guaranteed-loans")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_VIEW')")
     public String guaranteedLoans(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<GuarantorRequest> requests = loanWorkflowService.myActiveGuaranteedLoans(principal.getMemberId());
         Map<UUID, LoanApplication> loansById = loanApplicationsById(requests);
@@ -1637,7 +1644,7 @@ public class AppController {
     }
 
     @PostMapping("/guarantee-requests/{requestId}/approve")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS') and @authz.isGuarantorAssignee(#requestId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_APPROVE') and @authz.isGuarantorAssignee(#requestId, principal)")
     public String approveRequest(@PathVariable UUID requestId,
                                  @AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam(required = false, defaultValue = "false") boolean guarantorDeclarationAccepted,
@@ -1677,7 +1684,7 @@ public class AppController {
     }
 
     @PostMapping("/guarantee-requests/request-signature-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_APPROVE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestGuarantorSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                             @RequestParam(required = false) UUID requestId) {
@@ -1722,7 +1729,7 @@ public class AppController {
     }
 
     @PostMapping("/guarantee-requests/verify-signature-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_APPROVE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyGuarantorSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                            @RequestParam UUID requestId,
@@ -1761,7 +1768,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/request-signature-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestApplicantSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                             @RequestParam UUID applicationId) {
@@ -1792,7 +1799,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/verify-signature-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyApplicantSignatureOtp(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                            @RequestParam UUID applicationId,
@@ -1820,7 +1827,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{loanId}/guarantors/{requestId}/request-confirmation-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
     public String requestApplicantGuarantorConfirmationOtp(@PathVariable UUID loanId,
                                                            @PathVariable UUID requestId,
                                                            @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1844,7 +1851,7 @@ public class AppController {
     }
 
     @PostMapping(value = "/loan-applications/{loanId}/guarantors/{requestId}/request-confirmation-otp-json", produces = "application/json")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestApplicantGuarantorConfirmationOtpJson(@PathVariable UUID loanId,
                                                                                              @PathVariable UUID requestId,
@@ -1870,7 +1877,7 @@ public class AppController {
     }
 
     @PostMapping(value = "/loan-applications/{loanId}/guarantors/{requestId}/verify-confirmation-otp", produces = "application/json")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyApplicantGuarantorConfirmationOtp(@PathVariable UUID loanId,
                                                                                        @PathVariable UUID requestId,
@@ -1908,7 +1915,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{loanId}/guarantors/{requestId}/confirm-with-otp")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
     public String confirmApplicantGuarantorOtp(@PathVariable UUID loanId,
                                                @PathVariable UUID requestId,
                                                @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1948,7 +1955,7 @@ public class AppController {
     }
 
     @PostMapping("/guarantee-requests/{requestId}/reject")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS') and @authz.isGuarantorAssignee(#requestId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_REJECT') and @authz.isGuarantorAssignee(#requestId, principal)")
     public String rejectRequest(@PathVariable UUID requestId,
                                 @AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) String reason,
@@ -1963,7 +1970,7 @@ public class AppController {
     }
 
     @PostMapping("/guarantee-requests/{requestId}/undo")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPROVE_GUARANTOR_REQUESTS') and @authz.isGuarantorAssignee(#requestId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'GUARANTOR_REQUESTS_UPDATE') and @authz.isGuarantorAssignee(#requestId, principal)")
     public String undoGuarantorDecision(@PathVariable UUID requestId,
                                         @AuthenticationPrincipal AppUserPrincipal principal,
                                         RedirectAttributes ra) {
@@ -1977,7 +1984,7 @@ public class AppController {
     }
 
     @PostMapping("/loan-applications/{loanId}/guarantor-reversal-requests/{requestId}/approve")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#loanId, principal)")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
     public String approveGuarantorUndoRequest(@PathVariable UUID loanId,
                                               @PathVariable UUID requestId,
                                               @AuthenticationPrincipal AppUserPrincipal principal,
@@ -1992,21 +1999,22 @@ public class AppController {
     }
 
     @GetMapping("/notifications")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        model.addAttribute("notifications", notificationInboxService.allViews(principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "app/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/app/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/app/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/app/notifications";
@@ -2014,11 +2022,13 @@ public class AppController {
     }
 
     @GetMapping("/support")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String support() {
         return "app/support";
     }
 
     @GetMapping("/support/archive")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String supportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
                                  Model model) {
         model.addAttribute("supportArchive", adminService.memberSupportArchive(principal.getMemberId()));
@@ -2026,6 +2036,7 @@ public class AppController {
     }
 
     @GetMapping("/support/replies")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String supportReplies(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam(required = false) UUID highlight,
                                  Model model) {
@@ -2036,12 +2047,12 @@ public class AppController {
     }
 
     @GetMapping("/support/replies/{id}/open")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String openSupportReply(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(), principal.getPosition(), "/app/support/replies");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/app/support/replies");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/app/support/replies";
@@ -2049,6 +2060,7 @@ public class AppController {
     }
 
     @PostMapping("/support/replies/mark-all-read")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE') and @access.has(principal, 'SUPPORT_VIEW')")
     public String markAllSupportRepliesRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                             RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsReadByTypes(
@@ -2062,7 +2074,7 @@ public class AppController {
     }
 
     @GetMapping("/settings")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.hasAny(principal, 'MEMBER_SETTINGS_VIEW', 'PAYMENT_DETAILS_VIEW')")
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) String section,
                            Model model) {
@@ -2091,7 +2103,7 @@ public class AppController {
     }
 
     @PostMapping("/settings/language")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_SETTINGS_UPDATE')")
     public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam String language,
                                  HttpServletRequest request,
@@ -2120,7 +2132,7 @@ public class AppController {
     }
 
     @PostMapping("/settings/payment-details")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'PAYMENT_DETAILS_UPDATE')")
     public String updatePaymentDetails(@AuthenticationPrincipal AppUserPrincipal principal,
                                        @RequestParam PaymentDestinationType destinationType,
                                        @RequestParam String provider,
@@ -2155,7 +2167,7 @@ public class AppController {
     }
 
     @PostMapping("/settings/payment-details/request-otp")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'PAYMENT_DETAILS_UPDATE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestPaymentDetailsOtp(
         @AuthenticationPrincipal AppUserPrincipal principal
@@ -2185,6 +2197,7 @@ public class AppController {
     }
 
     @PostMapping("/notifications/mark-all-read")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -2197,6 +2210,7 @@ public class AppController {
     }
 
     @PostMapping("/support")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_CREATE')")
     public String sendSupport(@AuthenticationPrincipal AppUserPrincipal principal,
                               @RequestParam String subject,
                               @RequestParam String message,

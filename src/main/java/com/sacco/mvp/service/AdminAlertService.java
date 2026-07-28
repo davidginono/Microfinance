@@ -7,7 +7,7 @@ import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
-import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.AdminIncidentRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,14 +30,15 @@ public class AdminAlertService {
     private final ObjectMapper objectMapper;
 
     public void alertAllAdmins(String source, String subject, String message, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeGlobalByRole(Position.ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> admins =
+            roleDirectoryService.activePlatformAdminsByClaim(UserClaim.ADMIN_DASHBOARD_VIEW);
         notifyAdmins(admins, "SYSTEM_ALERT", source, subject, message, IncidentSeverity.HIGH, null, null, details);
     }
 
     public void alertSaccoAdmins(String saccoId, String source, String subject, String message, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeWorkspaceAdminsByAnyClaim(
             saccoId,
-            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+            List.of(UserClaim.ADMIN_DASHBOARD_VIEW)
         );
         notifyAdmins(admins, "SYSTEM_ALERT", source, subject, message, IncidentSeverity.HIGH, saccoId, null, details);
     }
@@ -79,9 +80,9 @@ public class AdminAlertService {
 
     public AdminIncident openSupportIncident(String saccoId, UUID memberId, String source, String subject, String message,
                                              IncidentSeverity severity, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeByAnyRole(
+        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeWorkspaceAdminsByAnyClaim(
             saccoId,
-            List.of(Position.ADMIN, Position.MINOR_ADMIN)
+            List.of(UserClaim.SUPPORT_VIEW, UserClaim.SUPPORT_UPDATE)
         );
         return openSupportIncidentForAdmins(admins, saccoId, memberId, source, subject, message, severity, details);
     }
@@ -94,7 +95,8 @@ public class AdminAlertService {
 
     public AdminIncident openPlatformSupportIncident(String saccoId, UUID memberId, String source, String subject, String message,
                                                      IncidentSeverity severity, Map<String, Object> details) {
-        List<RoleDirectoryService.RoleAccountRef> admins = roleDirectoryService.activeGlobalByRole(Position.ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> admins =
+            roleDirectoryService.activePlatformAdminsByClaim(UserClaim.SUPPORT_VIEW);
         return notifyAdmins(admins, "SUPPORT_MESSAGE", source, subject, message, severity, saccoId, memberId, details);
     }
 

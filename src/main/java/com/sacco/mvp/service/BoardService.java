@@ -216,11 +216,11 @@ public class BoardService {
     }
 
     private String normalizeSignature(String signatureText, OffsetDateTime verifiedAt) {
-        String normalized = signatureText == null ? "" : signatureText.trim();
-        if (normalized.isBlank() || verifiedAt == null) {
-            throw new IllegalStateException("Save and verify your signature before recording this review.");
+        String normalizedSignature = signatureText == null ? "" : signatureText.trim();
+        if (normalizedSignature.isBlank() || verifiedAt == null) {
+            throw new IllegalStateException("Save and verify your staff signature before recording this decision.");
         }
-        return normalized;
+        return normalizedSignature;
     }
 
     private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {

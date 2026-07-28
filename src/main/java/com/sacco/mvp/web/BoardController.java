@@ -10,12 +10,12 @@ import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
@@ -75,6 +75,7 @@ public class BoardController {
     private final LoanReportService loanReportService;
     private final ApplicationClock applicationClock;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final AccessControlService access;
 
     @GetMapping("/assigned")
     public String assigned(@AuthenticationPrincipal AppUserPrincipal principal) {
@@ -108,7 +109,7 @@ public class BoardController {
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildBoardDashboardChartRows(
                 dashboard.statusBreakdown(),
-                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+                access.canAccessDisbursementArea(principal)
             ));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
@@ -197,6 +198,7 @@ public class BoardController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("(@access.canAccessBoardArea(principal) and @access.has(principal, 'BOARD_QUEUE_EXPORT')) or (@access.canAccessChairpersonArea(principal) and @access.has(principal, 'CHAIRPERSON_QUEUE_EXPORT')) or (@access.canAccessCreditCommitteeArea(principal) and @access.has(principal, 'CREDIT_COMMITTEE_QUEUE_EXPORT'))")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -383,7 +385,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")
-    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.canPrepareBoardDecision(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestBoardSignatureOtp(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -423,7 +425,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-signature-otp")
-    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.canPrepareBoardDecision(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyBoardSignatureOtp(@PathVariable UUID id,
                                                                        @AuthenticationPrincipal AppUserPrincipal principal,
@@ -461,7 +463,7 @@ public class BoardController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
-    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
+    @PreAuthorize("@authz.canSubmitBoardDecision(#id, principal, #decision)")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam BoardDecision decision,
@@ -499,26 +501,25 @@ public class BoardController {
     }
 
     @GetMapping("/notifications")
+    @PreAuthorize("@authz.isBoardReviewer(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
         applyBoardUi(model, principal);
         model.addAttribute("notificationBreadcrumb", reviewPanelLabel(principal) + " Panel / Notifications");
         model.addAttribute("notificationSubtitle", "Workflow updates and alerts for your review queue in one place.");
-        model.addAttribute("notifications", notificationInboxService.allViews(
-            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "board/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
+    @PreAuthorize("@authz.isBoardReviewer(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), reviewBasePath(principal) + "/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, reviewBasePath(principal) + "/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:" + reviewBasePath(principal) + "/notifications";
@@ -526,6 +527,7 @@ public class BoardController {
     }
 
     @PostMapping("/notifications/mark-all-read")
+    @PreAuthorize("@authz.isBoardReviewer(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());
@@ -554,19 +556,13 @@ public class BoardController {
 
     private List<ApprovalWorkflowStage> reviewerStages(AppUserPrincipal principal) {
         List<ApprovalWorkflowStage> stages = new java.util.ArrayList<>();
-        if (principal != null
-            && principal.hasRole(Position.CHAIRPERSON)
-            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")) {
+        if (access.canAccessChairpersonArea(principal)) {
             stages.add(ApprovalWorkflowStage.CHAIRPERSON);
         }
-        if (principal != null
-            && principal.hasRole(Position.BOARD)
-            && principal.getClaims().contains("REVIEW_BOARD_QUEUE")) {
+        if (access.canAccessBoardArea(principal)) {
             stages.add(ApprovalWorkflowStage.BOARD);
         }
-        if (principal != null
-            && principal.hasRole(Position.CREDIT_COMMITTEE)
-            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")) {
+        if (access.canAccessCreditCommitteeArea(principal)) {
             stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
         }
         return stages;
@@ -614,15 +610,9 @@ public class BoardController {
     }
 
     private String reviewPanelLabel(AppUserPrincipal principal) {
-        boolean board = principal != null
-            && principal.hasRole(Position.BOARD)
-            && principal.getClaims().contains("REVIEW_BOARD_QUEUE");
-        boolean chairperson = principal != null
-            && principal.hasRole(Position.CHAIRPERSON)
-            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE");
-        boolean credit = principal != null
-            && principal.hasRole(Position.CREDIT_COMMITTEE)
-            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE");
+        boolean board = access.canAccessBoardArea(principal);
+        boolean chairperson = access.canAccessChairpersonArea(principal);
+        boolean credit = access.canAccessCreditCommitteeArea(principal);
         if ((chairperson && board) || (chairperson && credit) || (board && credit)) {
             return "Review";
         }
@@ -641,14 +631,10 @@ public class BoardController {
     }
 
     private String reviewBasePath(AppUserPrincipal principal) {
-        if (principal != null
-            && principal.hasRole(Position.CHAIRPERSON)
-            && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")) {
+        if (access.canAccessChairpersonArea(principal)) {
             return "/chairperson";
         }
-        if (principal != null
-            && principal.hasRole(Position.CREDIT_COMMITTEE)
-            && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")) {
+        if (access.canAccessCreditCommitteeArea(principal)) {
             return "/credit-committee";
         }
         return "/board";
@@ -845,7 +831,7 @@ public class BoardController {
 
     private void requireSavedSignature(Member member, ApprovalWorkflowStage reviewStage) {
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
-            throw new IllegalStateException("Register your signature first before approving "
+            throw new IllegalStateException("Register your signature first before recording "
                 + reviewOtpAudienceLabel(reviewStage) + " reviews.");
         }
     }

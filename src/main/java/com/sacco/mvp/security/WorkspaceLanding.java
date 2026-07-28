@@ -1,17 +1,9 @@
 package com.sacco.mvp.security;
 
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.UserClaim;
 
 public final class WorkspaceLanding {
-    private static final String MANAGER_REVIEW_CLAIM = "REVIEW_MANAGER_QUEUE";
-    private static final String ACCOUNTANT_REVIEW_CLAIM = "REVIEW_ACCOUNTANT_QUEUE";
-    private static final String BOARD_REVIEW_CLAIM = "REVIEW_BOARD_QUEUE";
-    private static final String CREDIT_COMMITTEE_REVIEW_CLAIM = "REVIEW_CREDIT_COMMITTEE_QUEUE";
-    private static final String CHAIRPERSON_REVIEW_CLAIM = "REVIEW_CHAIRPERSON_QUEUE";
-    private static final String LOAN_OFFICER_REVIEW_CLAIM = "REVIEW_LOAN_OFFICER_QUEUE";
-    private static final String DISBURSEMENT_ACCESS_CLAIM = "ACCESS_DISBURSEMENT_QUEUE";
-
     private WorkspaceLanding() {
     }
 
@@ -23,26 +15,19 @@ public final class WorkspaceLanding {
         if (member == null) {
             return memberDashboard();
         }
-        return staffDashboard(Position.primaryRole(member.getActiveStaffRolesResolved(), false), false);
+        return staffDashboard(UserClaim.defaultClaims(member.getActiveStaffRolesResolved(), member.isMemberAccess()));
     }
 
     public static String staffDashboard(AppUserPrincipal principal) {
         if (principal == null) {
             return memberDashboard();
         }
-        if (principal.hasRole(Position.ADMIN) || principal.hasRole(Position.MINOR_ADMIN)) {
+        if (hasClaim(principal, UserClaim.ADMIN_DASHBOARD_VIEW)) {
             return "/admin/dashboard";
         }
-        Position primaryRole = Position.primaryRole(principal.getStaffRoles(), false);
-        String primaryLanding = staffDashboardForRole(primaryRole, principal);
-        if (primaryLanding != null) {
-            return primaryLanding;
-        }
-        for (Position role : principal.getStaffRoles()) {
-            String landing = staffDashboardForRole(role, principal);
-            if (landing != null) {
-                return landing;
-            }
+        String landing = staffDashboard(principal.getClaims());
+        if (landing != null) {
+            return landing;
         }
         return principal.isMemberAccess() ? memberDashboard() : "/login";
     }
@@ -54,47 +39,45 @@ public final class WorkspaceLanding {
         if (principal.isMemberAccess()) {
             return memberDashboard();
         }
-        if (principal.getStaffRoles() != null && !principal.getStaffRoles().isEmpty()) {
+        if (principal.isStaffSession()) {
             return staffDashboard(principal);
         }
         return "/login";
     }
 
-    private static String staffDashboard(Position role, boolean hasDisbursementAccess) {
-        if (role == null) {
-            return hasDisbursementAccess ? "/disbursement/dashboard" : memberDashboard();
+    private static String staffDashboard(java.util.Collection<?> claims) {
+        if (hasClaim(claims, UserClaim.LOAN_OFFICER_QUEUE_VIEW)) {
+            return "/loan-officer/dashboard";
         }
-        return switch (role) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case LOAN_OFFICER -> "/loan-officer/dashboard";
-            case MANAGER -> "/manager/dashboard";
-            case ACCOUNTANT -> "/accountant/dashboard";
-            case DISBURSEMENT_OFFICER -> "/disbursement/dashboard";
-            case CHAIRPERSON -> "/chairperson/dashboard";
-            case BOARD -> "/board/dashboard";
-            case CREDIT_COMMITTEE -> "/credit-committee/dashboard";
-            case MEMBER -> memberDashboard();
-        };
+        if (hasClaim(claims, UserClaim.MANAGER_QUEUE_VIEW)) {
+            return "/manager/dashboard";
+        }
+        if (hasClaim(claims, UserClaim.ACCOUNTANT_QUEUE_VIEW)) {
+            return "/accountant/dashboard";
+        }
+        if (hasClaim(claims, UserClaim.DISBURSEMENT_QUEUE_VIEW) || hasClaim(claims, UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
+            return "/disbursement/dashboard";
+        }
+        if (hasClaim(claims, UserClaim.CHAIRPERSON_QUEUE_VIEW)) {
+            return "/chairperson/dashboard";
+        }
+        if (hasClaim(claims, UserClaim.BOARD_QUEUE_VIEW)) {
+            return "/board/dashboard";
+        }
+        if (hasClaim(claims, UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW)) {
+            return "/credit-committee/dashboard";
+        }
+        return null;
     }
 
-    private static String staffDashboardForRole(Position role, AppUserPrincipal principal) {
-        if (role == null || principal == null) {
-            return null;
-        }
-        return switch (role) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case LOAN_OFFICER -> hasClaim(principal, LOAN_OFFICER_REVIEW_CLAIM) ? "/loan-officer/dashboard" : null;
-            case MANAGER -> hasClaim(principal, MANAGER_REVIEW_CLAIM) ? "/manager/dashboard" : null;
-            case ACCOUNTANT -> hasClaim(principal, ACCOUNTANT_REVIEW_CLAIM) ? "/accountant/dashboard" : null;
-            case DISBURSEMENT_OFFICER -> hasClaim(principal, DISBURSEMENT_ACCESS_CLAIM) ? "/disbursement/dashboard" : null;
-            case CHAIRPERSON -> hasClaim(principal, CHAIRPERSON_REVIEW_CLAIM) ? "/chairperson/dashboard" : null;
-            case BOARD -> hasClaim(principal, BOARD_REVIEW_CLAIM) ? "/board/dashboard" : null;
-            case CREDIT_COMMITTEE -> hasClaim(principal, CREDIT_COMMITTEE_REVIEW_CLAIM) ? "/credit-committee/dashboard" : null;
-            case MEMBER -> memberDashboard();
-        };
+    private static boolean hasClaim(AppUserPrincipal principal, UserClaim claim) {
+        return principal.getClaims() != null && principal.getClaims().contains(claim.name());
     }
 
-    private static boolean hasClaim(AppUserPrincipal principal, String claim) {
-        return principal.getClaims() != null && principal.getClaims().contains(claim);
+    private static boolean hasClaim(java.util.Collection<?> claims, UserClaim claim) {
+        if (claims == null || claim == null) {
+            return false;
+        }
+        return claims.contains(claim) || claims.contains(claim.name());
     }
 }

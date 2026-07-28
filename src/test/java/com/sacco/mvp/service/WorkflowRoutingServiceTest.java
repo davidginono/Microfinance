@@ -8,6 +8,7 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanProductBoardReviewerRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -75,7 +76,10 @@ class WorkflowRoutingServiceTest {
                 4
             )
         );
-        when(roleDirectoryService.activeByRoleInStation("SACCO-1", null, Position.LOAN_OFFICER)).thenReturn(List.of(
+        when(roleDirectoryService.activeByAnyClaimInStation("SACCO-1", null, List.of(
+            UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
+            UserClaim.LOAN_OFFICER_QUEUE_APPROVE
+        ))).thenReturn(List.of(
             RoleDirectoryService.RoleAccountRef.builder()
                 .id(loanOfficerId)
                 .saccoId("SACCO-1")
@@ -148,8 +152,8 @@ class WorkflowRoutingServiceTest {
                 LoanProductBoardReviewer.builder().boardMemberId(reviewerOne).build(),
                 LoanProductBoardReviewer.builder().boardMemberId(reviewerTwo).build()
             ));
-        when(roleDirectoryService.hasActiveRoleInSacco(reviewerOne, "SACCO-1", Position.CREDIT_COMMITTEE)).thenReturn(true);
-        when(roleDirectoryService.hasActiveRoleInSacco(reviewerTwo, "SACCO-1", Position.CREDIT_COMMITTEE)).thenReturn(true);
+        when(roleDirectoryService.hasActiveClaimInSacco(reviewerOne, "SACCO-1", UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE)).thenReturn(true);
+        when(roleDirectoryService.hasActiveClaimInSacco(reviewerTwo, "SACCO-1", UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE)).thenReturn(true);
 
         workflowRoutingService.moveToFirstReviewStage(app, actorId);
 

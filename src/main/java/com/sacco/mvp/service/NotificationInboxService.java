@@ -4,7 +4,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.LoanApplication;
-import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,44 +21,41 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class NotificationInboxService {
-    private static final EnumSet<Position> MEMBER_SIDE_POSITIONS = EnumSet.of(
-        Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER,
-        Position.CHAIRPERSON, Position.BOARD, Position.CREDIT_COMMITTEE, Position.LOAN_OFFICER
-    );
     private static final List<String> MEMBER_SIDE_HIDDEN_TYPES = List.of("SYSTEM_ALERT", "SUPPORT_MESSAGE");
 
     private final NotificationRepository notificationRepository;
     private final NotificationViewService notificationViewService;
     private final LoanApplicationRepository loanApplicationRepository;
     private final ObjectMapper objectMapper;
+    private final AccessControlService access;
 
-    public long unreadCount(UUID memberId, Collection<Position> positions) {
-        if (memberId == null || positions == null || positions.isEmpty()) {
+    public long unreadCount(AppUserPrincipal principal) {
+        if (principal == null) {
             return 0;
         }
-        if (Position.containsAdminRole(positions)) {
-            return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(memberId);
+        if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
+            return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(principal.getMemberId());
         }
-        if (positions.stream().anyMatch(MEMBER_SIDE_POSITIONS::contains)) {
+        if (notificationViewService.isMemberSidePrincipal(principal)) {
             return notificationRepository.countByRecipientMemberIdAndReadAtIsNullAndTypeNotIn(
-                memberId,
+                principal.getMemberId(),
                 MEMBER_SIDE_HIDDEN_TYPES
             );
         }
-        return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(memberId);
+        return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(principal.getMemberId());
     }
 
     public long unreadIncidentCount(UUID memberId) {
         return unreadIncidentViews(memberId).size();
     }
 
-    public List<NotificationViewService.NotificationView> unreadViews(UUID memberId, Collection<Position> positions) {
-        if (memberId == null || positions == null || positions.isEmpty()) {
+    public List<NotificationViewService.NotificationView> unreadViews(AppUserPrincipal principal) {
+        if (principal == null) {
             return Collections.emptyList();
         }
-        return notificationViewService.toViewsForPosition(
-            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId),
-            positions
+        return notificationViewService.toViewsForPrincipal(
+            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(principal.getMemberId()),
+            principal
         );
     }
 
@@ -74,13 +70,13 @@ public class NotificationInboxService {
             .toList();
     }
 
-    public List<NotificationViewService.HeaderNotificationView> unreadHeaderViews(UUID memberId, Collection<Position> positions) {
-        if (memberId == null || positions == null || positions.isEmpty()) {
+    public List<NotificationViewService.HeaderNotificationView> unreadHeaderViews(AppUserPrincipal principal) {
+        if (principal == null) {
             return Collections.emptyList();
         }
-        return notificationViewService.toHeaderViewsForPosition(
-            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(memberId),
-            positions
+        return notificationViewService.toHeaderViewsForPrincipal(
+            notificationRepository.findTop10ByRecipientMemberIdAndReadAtIsNullOrderByCreatedAtDesc(principal.getMemberId()),
+            principal
         );
     }
 
@@ -93,13 +89,13 @@ public class NotificationInboxService {
         );
     }
 
-    public List<NotificationViewService.NotificationView> allViews(UUID memberId, Collection<Position> positions) {
-        if (memberId == null || positions == null || positions.isEmpty()) {
+    public List<NotificationViewService.NotificationView> allViews(AppUserPrincipal principal) {
+        if (principal == null) {
             return Collections.emptyList();
         }
-        return notificationViewService.toViewsForPosition(
-            notificationRepository.findTop50ByRecipientMemberIdOrderByCreatedAtDesc(memberId),
-            positions
+        return notificationViewService.toViewsForPrincipal(
+            notificationRepository.findTop50ByRecipientMemberIdOrderByCreatedAtDesc(principal.getMemberId()),
+            principal
         );
     }
 
@@ -136,43 +132,64 @@ public class NotificationInboxService {
     }
 
     @Transactional
-    public String openForMember(UUID notificationId, UUID memberId, Collection<Position> positions, Position primaryPosition, String defaultTarget) {
-        Notification notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
-        if (!notification.getRecipientMemberId().equals(memberId)) {
+    public String openForMember(UUID notificationId, AppUserPrincipal principal, String defaultTarget) {
+        if (principal == null) {
             throw new IllegalArgumentException("Notification not found");
         }
-        if (!notificationViewService.isVisibleToPosition(notification.getType(), positions)) {
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        if (!notification.getRecipientMemberId().equals(principal.getMemberId())) {
+            throw new IllegalArgumentException("Notification not found");
+        }
+        if (!notificationViewService.isVisibleToPrincipal(notification.getType(), principal)) {
             throw new IllegalArgumentException("Notification not available");
         }
         if (notification.getReadAt() == null) {
             notification.setReadAt(OffsetDateTime.now());
             notificationRepository.save(notification);
         }
-        return resolveTarget(notification, primaryPosition, defaultTarget);
+        return resolveTarget(notification, principal, defaultTarget);
     }
 
-    private String resolveTarget(Notification notification, Position position, String defaultTarget) {
+    private String resolveTarget(Notification notification, AppUserPrincipal principal, String defaultTarget) {
         Map<String, Object> payload = parse(notification.getPayload());
         Map<String, Object> details = toMap(payload.get("details"));
         String applicationId = resolveApplicationId(details, notification.getRecipientMemberId());
         String incidentId = stringValue(details.get("incidentId"));
 
-        if (position != null && position.isAdminRole() && "SUPPORT_MESSAGE".equals(notification.getType()) && !incidentId.isBlank()) {
+        if ((principal.isPlatformIdentity() || principal.isWorkspaceAdminScope())
+            && "SUPPORT_MESSAGE".equals(notification.getType())
+            && !incidentId.isBlank()) {
             return "/admin/incidents/" + incidentId;
         }
         if (!applicationId.isBlank()) {
-            return switch (position) {
-                case ADMIN, MINOR_ADMIN -> defaultTarget;
-                case MANAGER -> "/manager/loan-applications/" + applicationId;
-                case ACCOUNTANT -> "/accountant/loan-applications/" + applicationId;
-                case DISBURSEMENT_OFFICER -> "/disbursement/loan-applications/" + applicationId;
-                case CHAIRPERSON -> "/chairperson/loan-applications/" + applicationId;
-                case CREDIT_COMMITTEE -> "/credit-committee/loan-applications/" + applicationId;
-                case BOARD -> "/board/loan-applications/" + applicationId;
-                case LOAN_OFFICER -> "/loan-officer/loan-applications/" + applicationId;
-                case MEMBER -> "/app/loan-applications/" + applicationId;
-            };
+            if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
+                return defaultTarget;
+            }
+            if (access.canAccessManagerArea(principal)) {
+                return "/manager/loan-applications/" + applicationId;
+            }
+            if (access.canAccessAccountantArea(principal)) {
+                return "/accountant/loan-applications/" + applicationId;
+            }
+            if (access.canAccessDisbursementArea(principal)) {
+                return "/disbursement/loan-applications/" + applicationId;
+            }
+            if (access.canAccessChairpersonArea(principal)) {
+                return "/chairperson/loan-applications/" + applicationId;
+            }
+            if (access.canAccessCreditCommitteeArea(principal)) {
+                return "/credit-committee/loan-applications/" + applicationId;
+            }
+            if (access.canAccessBoardArea(principal)) {
+                return "/board/loan-applications/" + applicationId;
+            }
+            if (access.canAccessLoanOfficerArea(principal)) {
+                return "/loan-officer/loan-applications/" + applicationId;
+            }
+            if (access.canAccessMemberArea(principal)) {
+                return "/app/loan-applications/" + applicationId;
+            }
         }
         return defaultTarget;
     }

@@ -13,6 +13,7 @@ import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.StaffMfaService;
@@ -38,7 +39,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.SavedRequest;
@@ -71,6 +71,7 @@ public class SecurityConfig {
                                                    AdminScopeService adminScopeService,
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
+                                                   AccessControlService accessControlService,
                                                    StaffMfaService staffMfaService,
                                                    StationOtpSettingsService stationOtpSettingsService,
                                                    UserClaimService userClaimService,
@@ -83,21 +84,56 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                 .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/error", "/error/**").permitAll()
-                .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MINOR_ADMIN")
-                .requestMatchers("/loan-officer/**").hasRole("LOAN_OFFICER")
-                .requestMatchers("/manager/**").hasRole("MANAGER")
-                .requestMatchers("/accountant/**").hasRole("ACCOUNTANT")
-                .requestMatchers("/disbursement/**").access(new WebExpressionAuthorizationManager(
-                    "isAuthenticated() and !hasRole('ADMIN') and (principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE') or principal.claims.contains('DISBURSE_LOAN'))"))
-                .requestMatchers("/chairperson/**").hasRole("CHAIRPERSON")
-                .requestMatchers("/credit-committee/**").hasRole("CREDIT_COMMITTEE")
-                .requestMatchers("/board/**").hasRole("BOARD")
+                .requestMatchers("/admin/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessAdminArea(appUser));
+                })
+                .requestMatchers("/loan-officer/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessLoanOfficerArea(appUser));
+                })
+                .requestMatchers("/manager/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessManagerArea(appUser));
+                })
+                .requestMatchers("/accountant/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessAccountantArea(appUser));
+                })
+                .requestMatchers("/disbursement/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessDisbursementArea(appUser));
+                })
+                .requestMatchers("/chairperson/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessChairpersonArea(appUser));
+                })
+                .requestMatchers("/credit-committee/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessCreditCommitteeArea(appUser));
+                })
+                .requestMatchers("/board/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessBoardArea(appUser));
+                })
                 .requestMatchers("/staff/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && authzService.staffAnalyticsAccess(appUser));
                 })
-                .requestMatchers("/app/**").hasRole("MEMBER")
+                .requestMatchers("/app/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canAccessMemberArea(appUser));
+                })
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")
@@ -164,8 +200,8 @@ public class SecurityConfig {
                         : null;
                     String loginType = request.getParameter("loginType");
                     boolean staffPasswordLogin = "staff-password".equals(loginType);
-                    boolean isSuperAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.ADMIN);
-                    boolean isMinorAdmin = principal != null && principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN);
+                    boolean isSuperAdmin = principal != null && principal.isPlatformIdentity();
+                    boolean isMinorAdmin = principal != null && principal.isWorkspaceAdminScope();
                     String savedTarget = savedRequestTarget(request);
 
                     // Layer 2a — Step-up MFA. Privileged staff (ADMIN, MINOR_ADMIN) must
@@ -282,7 +318,7 @@ public class SecurityConfig {
                     SecurityContextHolder.setContext(context);
                     request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
-                    if (principal.hasRole(com.sacco.mvp.domain.Position.ADMIN)) {
+                    if (principal.isPlatformIdentity()) {
                         adminScopeService.clearScope();
                     }
                     String savedTarget = savedRequestTarget(request);

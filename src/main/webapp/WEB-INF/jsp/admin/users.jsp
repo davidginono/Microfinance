@@ -7,29 +7,11 @@
 <%@ include file="../fragments/modal-shell.jspf" %>
 <style>
     .admin-user-edit-panel {
-        width: min(100%, 48rem);
+        width: min(100%, 72rem);
     }
 
-    .admin-claim-option {
-        min-width: 0;
-        align-items: center;
-    }
-
-    .admin-claim-text {
-        display: block;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 0.76rem;
-        line-height: 1.25rem;
-    }
-
-    .admin-claim-note {
-        margin-left: 0.35rem;
-        font-size: 0.68rem;
-        font-weight: 500;
-        color: #94a3b8;
+    .admin-access-matrix {
+        --erp-table-height: min(34rem, 68vh);
     }
 
     .admin-filter-form input,
@@ -62,8 +44,8 @@
     }
 
     @media (min-width: 768px) {
-        .admin-claim-text {
-            font-size: 0.82rem;
+        .admin-access-matrix .erp-table {
+            min-width: max(100%, 64rem);
         }
     }
 </style>
@@ -355,25 +337,63 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Claims</p>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                        <c:forEach items="${availableClaims}" var="claim">
-                            <c:set var="memberOnlyClaimDisabled" value="${(claim eq 'APPLY_LOANS' or claim eq 'APPROVE_GUARANTOR_REQUESTS') and not user.memberAccess}" />
-                            <label class="admin-claim-option flex gap-3 overflow-hidden rounded border border-slate-200 bg-slate-50 px-3 py-2 font-medium ${memberOnlyClaimDisabled ? 'text-slate-400' : 'text-slate-700'}">
-                                <input type="checkbox"
-                                       name="claims"
-                                       value="${claim}"
-                                       ${user.claims.contains(claim) ? 'checked' : ''}
-                                       ${memberOnlyClaimDisabled ? 'disabled' : ''}
-                                       class="h-4 w-4 flex-shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span class="admin-claim-text flex-1" title="${claim}">
-                                    ${claim}
-                                    <c:if test="${memberOnlyClaimDisabled}">
-                                        <span class="admin-claim-note">Members only</span>
-                                    </c:if>
-                                </span>
-                            </label>
-                        </c:forEach>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Access Matrix</p>
+                    <div class="admin-access-matrix erp-table-wrap erp-table-scroll mt-2">
+                        <table class="erp-table">
+                            <thead>
+                            <tr>
+                                <th class="whitespace-nowrap">
+                                    <span class="inline-flex items-center gap-2">
+                                        Feature
+                                    </span>
+                                </th>
+                                <c:forEach items="${accessActions}" var="action">
+                                    <th class="whitespace-nowrap text-center">
+                                        <label class="inline-flex items-center gap-2">
+                                            <span>${action.displayName}</span>
+                                            <input type="checkbox"
+                                                   data-access-column-toggle="${action}"
+                                                   class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                        </label>
+                                    </th>
+                                </c:forEach>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <c:forEach items="${accessMatrixRows}" var="row">
+                                <tr>
+                                    <td class="whitespace-nowrap font-semibold text-slate-700">
+                                        <label class="inline-flex items-center gap-2">
+                                            <input type="checkbox"
+                                                   data-access-row-toggle="${row.feature}"
+                                                   class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                            <span>${row.label}</span>
+                                        </label>
+                                    </td>
+                                    <c:forEach items="${accessActions}" var="action">
+                                        <c:set var="matrixClaim" value="${row.claimsByAction[action]}" />
+                                        <td class="text-center">
+                                            <c:choose>
+                                                <c:when test="${not empty matrixClaim}">
+                                                    <input type="checkbox"
+                                                           name="claims"
+                                                           value="${matrixClaim}"
+                                                           data-access-row="${row.feature}"
+                                                           data-access-column="${action}"
+                                                           title="${matrixClaim.displayName}"
+                                                           ${user.claims.contains(matrixClaim) ? 'checked' : ''}
+                                                           class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="text-slate-300">-</span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                    </c:forEach>
+                                </tr>
+                            </c:forEach>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -497,96 +517,59 @@
             });
         }
 
-        const defaultClaimsByRole = {
-            "MANAGER": ["REVIEW_MANAGER_QUEUE"],
-            "ACCOUNTANT": ["REVIEW_ACCOUNTANT_QUEUE"],
-            "DISBURSEMENT_OFFICER": ["ACCESS_DISBURSEMENT_QUEUE", "DISBURSE_LOAN"],
-            "BOARD": ["REVIEW_BOARD_QUEUE"],
-            "CHAIRPERSON": ["REVIEW_CHAIRPERSON_QUEUE"],
-            "CREDIT_COMMITTEE": ["REVIEW_CREDIT_COMMITTEE_QUEUE"],
-            "LOAN_OFFICER": ["REVIEW_LOAN_OFFICER_QUEUE"],
-            "ADMIN": ["ACCESS_ADMIN_SETTINGS", "ACCESS_OUTBOX_MONITOR"],
-            "MINOR_ADMIN": ["ACCESS_ADMIN_SETTINGS", "ACCESS_OUTBOX_MONITOR"]
-        };
-
-        function claimInput(form, claim) {
-            return form.querySelector('input[name="claims"][value="' + claim + '"]');
-        }
-
-        function checkClaim(form, claim) {
-            const input = claimInput(form, claim);
-            if (input && !input.disabled) {
-                input.checked = true;
-            }
-        }
-
-        function uncheckClaim(form, claim) {
-            const input = claimInput(form, claim);
-            if (input && !input.disabled) {
-                input.checked = false;
-            }
-        }
-
-        function checkedRolesForForm(form) {
-            return Array.from(form.querySelectorAll('[data-staff-role-checkbox]:checked')).map((input) => input.value);
-        }
-
-        function otherCheckedRoleNeedsClaim(form, uncheckedRole, claim) {
-            return checkedRolesForForm(form)
-                .filter((role) => role !== uncheckedRole)
-                .some((role) => (defaultClaimsByRole[role] || []).includes(claim));
-        }
-
-        function applyDefaultClaimsForRole(roleCheckbox) {
-            const form = roleCheckbox.closest('form');
-            if (!form) {
-                return;
-            }
-            (defaultClaimsByRole[roleCheckbox.value] || []).forEach((claim) => {
-                if (roleCheckbox.checked) {
-                    checkClaim(form, claim);
-                } else if (!otherCheckedRoleNeedsClaim(form, roleCheckbox.value, claim)) {
-                    uncheckClaim(form, claim);
-                }
-            });
-        }
-
         const initializedRoleGroups = new Set();
         document.querySelectorAll('[data-staff-role-checkbox]').forEach((checkbox) => {
             const groupKey = checkbox.getAttribute('data-staff-role-checkbox');
-            checkbox.addEventListener('change', () => {
-                syncSuperAdminRoleGroup(groupKey);
-                applyDefaultClaimsForRole(checkbox);
-            });
+            checkbox.addEventListener('change', () => syncSuperAdminRoleGroup(groupKey));
             if (!initializedRoleGroups.has(groupKey)) {
                 initializedRoleGroups.add(groupKey);
                 syncSuperAdminRoleGroup(groupKey);
             }
         });
 
-        document.querySelectorAll('form').forEach((form) => {
-            const disburseLoan = claimInput(form, 'DISBURSE_LOAN');
-            const accessQueue = claimInput(form, 'ACCESS_DISBURSEMENT_QUEUE');
-            if (!disburseLoan || !accessQueue) {
+        function syncMatrixToggle(toggle, inputs) {
+            if (!toggle || !inputs.length) {
                 return;
             }
-            function setDisbursementPair(checked) {
-                if (!accessQueue.disabled) {
-                    accessQueue.checked = checked;
-                }
-                if (!disburseLoan.disabled) {
-                    disburseLoan.checked = checked;
-                }
-            }
-            function ensureDisbursementSubmitPair() {
-                if (disburseLoan.checked && !accessQueue.disabled) {
-                    accessQueue.checked = true;
-                }
-            }
-            disburseLoan.addEventListener('change', () => setDisbursementPair(disburseLoan.checked));
-            accessQueue.addEventListener('change', () => setDisbursementPair(accessQueue.checked));
-            form.addEventListener('submit', ensureDisbursementSubmitPair);
-            ensureDisbursementSubmitPair();
+            const checkedCount = inputs.filter((input) => input.checked).length;
+            toggle.checked = checkedCount === inputs.length;
+            toggle.indeterminate = checkedCount > 0 && checkedCount < inputs.length;
+        }
+
+        function syncMatrixState(form) {
+            form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
+                const row = toggle.getAttribute('data-access-row-toggle');
+                syncMatrixToggle(toggle, Array.from(form.querySelectorAll('[data-access-row="' + row + '"]')));
+            });
+            form.querySelectorAll('[data-access-column-toggle]').forEach((toggle) => {
+                const column = toggle.getAttribute('data-access-column-toggle');
+                syncMatrixToggle(toggle, Array.from(form.querySelectorAll('[data-access-column="' + column + '"]')));
+            });
+        }
+
+        document.querySelectorAll('form').forEach((form) => {
+            form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
+                toggle.addEventListener('change', () => {
+                    const row = toggle.getAttribute('data-access-row-toggle');
+                    form.querySelectorAll('[data-access-row="' + row + '"]').forEach((input) => {
+                        input.checked = toggle.checked;
+                    });
+                    syncMatrixState(form);
+                });
+            });
+            form.querySelectorAll('[data-access-column-toggle]').forEach((toggle) => {
+                toggle.addEventListener('change', () => {
+                    const column = toggle.getAttribute('data-access-column-toggle');
+                    form.querySelectorAll('[data-access-column="' + column + '"]').forEach((input) => {
+                        input.checked = toggle.checked;
+                    });
+                    syncMatrixState(form);
+                });
+            });
+            form.querySelectorAll('[data-access-row][data-access-column]').forEach((input) => {
+                input.addEventListener('change', () => syncMatrixState(form));
+            });
+            syncMatrixState(form);
         });
 
         function closeAllUserModals() {

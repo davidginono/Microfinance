@@ -1,7 +1,6 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.MemberProfileImageService;
@@ -98,8 +97,8 @@ public class ProfileController {
     }
 
     private boolean isStaffOrAdmin(AppUserPrincipal principal) {
-        return principal.hasRole(Position.ADMIN)
-            || principal.hasRole(Position.MINOR_ADMIN)
+        return principal.isPlatformIdentity()
+            || principal.isWorkspaceAdminScope()
             || !principal.getStaffRoles().isEmpty();
     }
 }

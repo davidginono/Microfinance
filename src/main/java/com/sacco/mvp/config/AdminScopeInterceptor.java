@@ -1,7 +1,7 @@
 package com.sacco.mvp.config;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.AdminScopeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class AdminScopeInterceptor implements HandlerInterceptor {
     private final AdminScopeService adminScopeService;
+    private final AccessControlService accessControlService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -25,7 +26,7 @@ public class AdminScopeInterceptor implements HandlerInterceptor {
             return true;
         }
         Object principal = authentication.getPrincipal();
-        if (!(principal instanceof AppUserPrincipal userPrincipal) || userPrincipal.hasRole(Position.ADMIN)) {
+        if (!(principal instanceof AppUserPrincipal userPrincipal) || accessControlService.isPlatformIdentity(userPrincipal)) {
             return true;
         }
         if (adminScopeService.hasExplicitScopeSelection()) {

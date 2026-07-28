@@ -48,14 +48,14 @@ class StaffMfaServiceTest {
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(stationOtpSettingsService.requiresLoginMfa("SACCO-01", "ST-01")).thenReturn(false);
         when(userClaimService.effectiveClaims(eq(memberId), anyCollection(), eq(false)))
-            .thenReturn(Set.of(UserClaim.REVIEW_MANAGER_QUEUE));
+            .thenReturn(Set.of(UserClaim.MANAGER_QUEUE_VIEW));
 
         StaffMfaService.ChallengeCompletion completion =
             service.continueWithoutChallengeIfNoLongerRequired(request);
 
         assertThat(completion).isNotNull();
         assertThat(completion.landing()).isEqualTo("/manager/loan-applications");
-        assertThat(completion.principal().hasRole(Position.MANAGER)).isTrue();
+        assertThat(completion.principal().hasMetadataRole(Position.MANAGER)).isTrue();
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
             .isInstanceOf(AppUserPrincipal.class);
         HttpSession session = request.getSession(false);

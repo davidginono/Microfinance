@@ -13,6 +13,7 @@ import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.LoanProductVersion;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.MemberAccessClaim;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
@@ -32,6 +33,7 @@ import com.sacco.mvp.repository.LoanProductsVersionRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.LoanProductVersionRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
+import com.sacco.mvp.repository.MemberAccessClaimRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import com.sacco.mvp.repository.OutboxEventRepository;
@@ -95,6 +97,7 @@ class AdminServiceTest {
     @Mock private AdminIncidentRepository adminIncidentRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
+    @Mock private MemberAccessClaimRepository memberAccessClaimRepository;
     @Mock private ForesightDirectoryService foresightDirectoryService;
 
     private AdminService adminService;
@@ -114,7 +117,8 @@ class AdminServiceTest {
         lastRevokedMemberId = new AtomicReference<>();
         lastRevokedBy = new AtomicReference<>();
         ObjectMapper objectMapper = new ObjectMapper();
-        RoleDirectoryService roleDirectoryService = new RoleDirectoryService(memberRepository);
+        UserClaimService userClaimService = new UserClaimService(memberAccessClaimRepository, userSettingsRepository, objectMapper);
+        RoleDirectoryService roleDirectoryService = new RoleDirectoryService(memberRepository, userClaimService);
         AuditService auditService = new AuditService(auditLogRepository, objectMapper);
         AdminAlertService adminAlertService = new AdminAlertService(
             roleDirectoryService,
@@ -122,8 +126,7 @@ class AdminServiceTest {
             adminIncidentRepository,
             objectMapper
         );
-        NotificationViewService notificationViewService = new NotificationViewService(objectMapper, memberRepository);
-        UserClaimService userClaimService = new UserClaimService(userSettingsRepository, objectMapper);
+        NotificationViewService notificationViewService = new NotificationViewService(objectMapper, memberRepository, new AccessControlService());
         SaccoConfigurationService saccoConfigurationService = new SaccoConfigurationService(loanProductSettingRepository);
         NameSignatureService nameSignatureService = new NameSignatureService();
         SaccoRegistryService saccoRegistryService = new SaccoRegistryService(
@@ -165,6 +168,8 @@ class AdminServiceTest {
         AtomicInteger staffNumberSequence = new AtomicInteger(10000);
         lenient().when(memberRepository.nextStaffNumberValue())
             .thenAnswer(invocation -> (long) staffNumberSequence.getAndIncrement());
+        lenient().when(memberAccessClaimRepository.findByIdMemberId(any()))
+            .thenReturn(List.of());
 
         adminService = new AdminService(
             memberRepository,
@@ -340,10 +345,28 @@ class AdminServiceTest {
     private void stubActiveRoleDirectory(String saccoId, List<Member> activeMembers) {
         lenient().when(memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE))
             .thenReturn(activeMembers);
+        activeMembers.forEach(member -> lenient().when(memberRepository.findById(member.getId())).thenReturn(Optional.of(member)));
         lenient().when(memberRepository.findActiveRoleMembers(eq(saccoId), any())).thenAnswer(invocation -> {
             Position position = invocation.getArgument(1);
             return activeMembers.stream()
                 .filter(member -> member.getStaffRolesResolved().contains(position))
+                .toList();
+        });
+        lenient().when(memberRepository.findActiveRoleMembersInStation(eq(saccoId), any(), any())).thenAnswer(invocation -> {
+            String stationId = invocation.getArgument(1);
+            Position position = invocation.getArgument(2);
+            return activeMembers.stream()
+                .filter(member -> stationId == null || stationId.equalsIgnoreCase(member.getStationId()))
+                .filter(member -> member.getStaffRolesResolved().contains(position))
+                .toList();
+        });
+        lenient().when(memberRepository.findActiveMembersWithClaimInStation(eq(saccoId), any(), any())).thenAnswer(invocation -> {
+            String stationId = invocation.getArgument(1);
+            String claimName = invocation.getArgument(2);
+            UserClaim claim = UserClaim.valueOf(claimName);
+            return activeMembers.stream()
+                .filter(member -> stationId == null || stationId.equalsIgnoreCase(member.getStationId()))
+                .filter(member -> UserClaim.defaultClaims(member.getStaffRolesResolved(), member.isMemberAccess()).contains(claim))
                 .toList();
         });
     }
@@ -417,8 +440,7 @@ class AdminServiceTest {
         AtomicReference<AdminIncident> savedIncident = new AtomicReference<>();
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        when(memberRepository.findActiveMembersWithAnyRoleInStation(eq("SACCO-01"), eq("AR704"), any()))
-            .thenReturn(List.of(sameStationAdmin));
+        stubActiveRoleDirectory("SACCO-01", List.of(sameStationAdmin, otherStationAdmin));
         when(adminIncidentRepository.save(any(AdminIncident.class))).thenAnswer(invocation -> {
             AdminIncident incident = invocation.getArgument(0);
             savedIncident.set(incident);
@@ -633,25 +655,22 @@ class AdminServiceTest {
             accountId,
             staffRoles,
             MemberStatus.ACTIVE,
-            List.of(UserClaim.ACCESS_ADMIN_SETTINGS)
+            null
         );
 
         verify(memberRepository).save(argThat(saved ->
             saved.getStaffRolesResolved().containsAll(staffRoles)
                 && saved.getPosition() == Position.MINOR_ADMIN
         ));
-        verify(userSettingsRepository).save(argThat(saved ->
-            saved.getNotificationPrefs().contains("ACCESS_ADMIN_SETTINGS")
-                && saved.getNotificationPrefs().contains("ACCESS_OUTBOX_MONITOR")
-                && saved.getNotificationPrefs().contains("REVIEW_MANAGER_QUEUE")
-                && saved.getNotificationPrefs().contains("REVIEW_CHAIRPERSON_QUEUE")
-                && saved.getNotificationPrefs().contains("REVIEW_BOARD_QUEUE")
-                && saved.getNotificationPrefs().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")
-                && saved.getNotificationPrefs().contains("REVIEW_LOAN_OFFICER_QUEUE")
-                && saved.getNotificationPrefs().contains("REVIEW_ACCOUNTANT_QUEUE")
-                && saved.getNotificationPrefs().contains("ACCESS_DISBURSEMENT_QUEUE")
-                && saved.getNotificationPrefs().contains("DISBURSE_LOAN")
-        ));
+        verify(memberAccessClaimRepository).deleteByMemberId(accountId);
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.WORKSPACE_SETTINGS_CONFIGURE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.BOARD_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_OFFICER_QUEUE_ASSIGN));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.ACCOUNTANT_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.DISBURSEMENT_QUEUE_DISBURSE));
     }
 
     @Test
@@ -727,14 +746,13 @@ class AdminServiceTest {
             accountId,
             List.of(Position.MANAGER),
             MemberStatus.ACTIVE,
-            List.of(UserClaim.APPLY_LOANS, UserClaim.APPROVE_GUARANTOR_REQUESTS, UserClaim.REVIEW_MANAGER_QUEUE)
+            List.of(UserClaim.MEMBER_LOANS_VIEW, UserClaim.GUARANTOR_REQUESTS_VIEW, UserClaim.MANAGER_QUEUE_APPROVE)
         );
 
-        verify(userSettingsRepository).save(argThat(saved ->
-            saved.getNotificationPrefs().contains("REVIEW_MANAGER_QUEUE")
-                && !saved.getNotificationPrefs().contains("APPLY_LOANS")
-                && !saved.getNotificationPrefs().contains("APPROVE_GUARANTOR_REQUESTS")
-        ));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_VIEW));
+        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.MEMBER_LOANS_VIEW));
+        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.GUARANTOR_REQUESTS_VIEW));
     }
 
     @Test
@@ -1072,12 +1090,19 @@ class AdminServiceTest {
             accountId,
             List.of(Position.LOAN_OFFICER),
             MemberStatus.INVITED,
-            List.of(UserClaim.REVIEW_LOAN_OFFICER_QUEUE)
+            List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE)
         );
 
         assertThat(member.getStatus()).isEqualTo(MemberStatus.INVITED);
         assertThat(member.getStaffRolesResolved()).contains(Position.LOAN_OFFICER);
         verify(memberRepository).save(member);
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_OFFICER_QUEUE_APPROVE));
+    }
+
+    private MemberAccessClaim claimNamed(UserClaim claim) {
+        return argThat(saved -> saved != null
+            && saved.getId() != null
+            && claim.name().equals(saved.getId().getClaimName()));
     }
 
     @Test

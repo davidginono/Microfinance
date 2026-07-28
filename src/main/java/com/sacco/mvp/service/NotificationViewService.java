@@ -3,16 +3,14 @@ package com.sacco.mvp.service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
-import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,13 +20,10 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class NotificationViewService {
-    private static final EnumSet<Position> MEMBER_SIDE_POSITIONS = EnumSet.of(
-        Position.MEMBER, Position.MANAGER, Position.ACCOUNTANT, Position.DISBURSEMENT_OFFICER,
-        Position.BOARD, Position.CHAIRPERSON, Position.CREDIT_COMMITTEE, Position.LOAN_OFFICER
-    );
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final ObjectMapper objectMapper;
     private final MemberRepository memberRepository;
+    private final AccessControlService access;
 
     public List<NotificationView> toViews(List<Notification> notifications) {
         if (notifications == null) {
@@ -37,18 +32,18 @@ public class NotificationViewService {
         return notifications.stream().map(this::toView).toList();
     }
 
-    public List<NotificationView> toViewsForPosition(List<Notification> notifications, Collection<Position> positions) {
+    public List<NotificationView> toViewsForPrincipal(List<Notification> notifications, AppUserPrincipal principal) {
         return toViews(notifications).stream()
-            .filter(view -> isVisibleToPosition(view.type(), positions))
+            .filter(view -> isVisibleToPrincipal(view.type(), principal))
             .toList();
     }
 
-    public List<HeaderNotificationView> toHeaderViewsForPosition(List<Notification> notifications, Collection<Position> positions) {
+    public List<HeaderNotificationView> toHeaderViewsForPrincipal(List<Notification> notifications, AppUserPrincipal principal) {
         if (notifications == null) {
             return Collections.emptyList();
         }
         return notifications.stream()
-            .filter(notification -> isVisibleToPosition(notification.getType(), positions))
+            .filter(notification -> isVisibleToPrincipal(notification.getType(), principal))
             .map(this::toHeaderView)
             .toList();
     }
@@ -64,17 +59,29 @@ public class NotificationViewService {
             .toList();
     }
 
-    public boolean isVisibleToPosition(String type, Collection<Position> positions) {
-        if (positions == null || positions.isEmpty()) {
+    public boolean isVisibleToPrincipal(String type, AppUserPrincipal principal) {
+        if (principal == null) {
             return false;
         }
-        if (Position.containsAdminRole(positions)) {
+        if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
             return true;
         }
-        if (positions.stream().anyMatch(MEMBER_SIDE_POSITIONS::contains)) {
+        if (isMemberSidePrincipal(principal)) {
             return !"SYSTEM_ALERT".equals(type) && !"SUPPORT_MESSAGE".equals(type);
         }
         return true;
+    }
+
+    public boolean isMemberSidePrincipal(AppUserPrincipal principal) {
+        return principal != null
+            && (access.canAccessMemberArea(principal)
+                || access.canAccessManagerArea(principal)
+                || access.canAccessAccountantArea(principal)
+                || access.canAccessDisbursementArea(principal)
+                || access.canAccessBoardArea(principal)
+                || access.canAccessChairpersonArea(principal)
+                || access.canAccessCreditCommitteeArea(principal)
+                || access.canAccessLoanOfficerArea(principal));
     }
 
     public NotificationView toView(Notification notification) {

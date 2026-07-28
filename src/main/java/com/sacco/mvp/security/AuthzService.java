@@ -1,12 +1,15 @@
 package com.sacco.mvp.security;
 
-import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.ApprovalWorkflowStage;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
+import com.sacco.mvp.service.AccessControlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Component("authz")
@@ -15,6 +18,7 @@ public class AuthzService {
     private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
+    private final AccessControlService access;
 
     /**
      * Separation of Duties: Super Admins (ADMIN) MUST NOT perform SACCO-workspace
@@ -22,34 +26,23 @@ public class AuthzService {
      * They register, suspend and audit tenants from the platform layer only.
      */
     public boolean notSuperAdmin(AppUserPrincipal principal) {
-        return principal != null && !principal.hasRole(Position.ADMIN);
+        return access.notPlatformIdentity(principal);
     }
 
     public boolean notAdminClass(AppUserPrincipal principal) {
-        return principal != null
-            && !principal.hasRole(Position.ADMIN)
-            && !principal.hasRole(Position.MINOR_ADMIN);
+        return access.notAdminScope(principal);
     }
 
     public boolean staffAnalyticsAccess(AppUserPrincipal principal) {
-        return notSuperAdmin(principal)
-            && (principal.hasRole(Position.LOAN_OFFICER)
-                || principal.hasRole(Position.MANAGER)
-                || principal.hasRole(Position.ACCOUNTANT)
-                || principal.hasRole(Position.DISBURSEMENT_OFFICER)
-                || principal.hasRole(Position.CHAIRPERSON)
-                || principal.hasRole(Position.BOARD)
-                || principal.hasRole(Position.CREDIT_COMMITTEE));
+        return access.staffAnalyticsAccess(principal);
     }
 
     public boolean platformAdminIdentity(AppUserPrincipal principal) {
-        return principal != null && principal.hasRole(Position.ADMIN);
+        return access.isPlatformIdentity(principal);
     }
 
     public boolean workspaceAdminOnly(AppUserPrincipal principal) {
-        return principal != null
-            && principal.hasRole(Position.MINOR_ADMIN)
-            && !principal.hasRole(Position.ADMIN);
+        return access.isWorkspaceAdminScope(principal);
     }
 
     /**
@@ -57,73 +50,84 @@ public class AuthzService {
      * controls (registering SACCOs, creating other SACCOS Admins, switching tenant scope).
      */
     public boolean platformAdminOnly(AppUserPrincipal principal) {
-        return principal != null
-            && principal.hasRole(Position.ADMIN);
+        return access.isPlatformIdentity(principal);
     }
 
     public boolean isLoanOwner(UUID loanId, AppUserPrincipal principal) {
+        if (principal == null || !access.has(principal, UserClaim.MEMBER_LOANS_VIEW)) {
+            return false;
+        }
         return loanApplicationRepository.findById(loanId)
             .map(app -> app.getApplicantMemberId().equals(principal.getMemberId()))
             .orElse(false);
     }
 
     public boolean isGuarantorAssignee(UUID requestId, AppUserPrincipal principal) {
+        if (principal == null || !access.has(principal, UserClaim.GUARANTOR_REQUESTS_VIEW)) {
+            return false;
+        }
         return guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
             .map(req -> true)
             .orElse(false);
     }
 
     public boolean isBoardAssignee(UUID loanId, AppUserPrincipal principal) {
-        if (principal == null) {
-            return false;
-        }
-        return (principal.hasRole(Position.CHAIRPERSON)
-                && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE")
-                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.CHAIRPERSON))
-            || (principal.hasRole(Position.BOARD)
-                && principal.getClaims().contains("REVIEW_BOARD_QUEUE")
-                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.BOARD))
-            || (principal.hasRole(Position.CREDIT_COMMITTEE)
-                && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")
-                && hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.CREDIT_COMMITTEE));
+        return assignedReviewStage(loanId, principal).isPresent();
     }
 
     public boolean isBoardReviewer(AppUserPrincipal principal) {
-        return principal != null
-            && ((principal.hasRole(Position.CHAIRPERSON) && principal.getClaims().contains("REVIEW_CHAIRPERSON_QUEUE"))
-                || (principal.hasRole(Position.BOARD) && principal.getClaims().contains("REVIEW_BOARD_QUEUE"))
-                || (principal.hasRole(Position.CREDIT_COMMITTEE)
-                    && principal.getClaims().contains("REVIEW_CREDIT_COMMITTEE_QUEUE")));
+        return access.canAccessChairpersonArea(principal)
+            || access.canAccessBoardArea(principal)
+            || access.canAccessCreditCommitteeArea(principal);
+    }
+
+    public boolean canPrepareBoardDecision(UUID loanId, AppUserPrincipal principal) {
+        return assignedReviewStage(loanId, principal)
+            .map(stage -> access.hasAny(principal, boardApproveClaim(stage), boardRejectClaim(stage)))
+            .orElse(false);
+    }
+
+    public boolean canSubmitBoardDecision(UUID loanId, AppUserPrincipal principal, Object decision) {
+        return assignedReviewStage(loanId, principal)
+            .map(stage -> access.canDecide(principal, decision, boardApproveClaim(stage), boardRejectClaim(stage)))
+            .orElse(false);
     }
 
     public boolean isLoanOfficerAssignee(UUID loanId, AppUserPrincipal principal) {
-        return hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.LOAN_OFFICER);
+        return access.canAccessLoanOfficerArea(principal)
+            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.LOAN_OFFICER);
     }
 
     public boolean canViewLoan(UUID loanId, AppUserPrincipal principal) {
+        if (principal == null) {
+            return false;
+        }
         return loanApplicationRepository.findById(loanId)
             .map(app -> {
-                if (app.getApplicantMemberId().equals(principal.getMemberId())) {
+                if (app.getApplicantMemberId().equals(principal.getMemberId())
+                    && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)) {
                     return true;
                 }
-                if (principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN)
+                if (access.isWorkspaceAdminScope(principal)
+                    && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
                     && app.getSaccoId().equals(principal.getSaccoId())
                     && sameStationScope(app, principal)) {
                     return true;
                 }
-                if ((principal.hasRole(com.sacco.mvp.domain.Position.MANAGER)
-                    || principal.hasRole(com.sacco.mvp.domain.Position.ACCOUNTANT)
-                    || principal.hasRole(com.sacco.mvp.domain.Position.DISBURSEMENT_OFFICER)
-                    || (!principal.hasRole(com.sacco.mvp.domain.Position.MINOR_ADMIN)
-                        && principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")))
+                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
+                    && (access.canAccessManagerArea(principal)
+                    || access.canAccessAccountantArea(principal)
+                    || access.canAccessDisbursementArea(principal))
                     && app.getSaccoId().equals(principal.getSaccoId())
                     && sameStationScope(app, principal)) {
                     return true;
                 }
-                if (principal.hasRole(com.sacco.mvp.domain.Position.LOAN_OFFICER)) {
-                    return hasAssignedReviewInScope(loanId, principal, com.sacco.mvp.domain.ApprovalWorkflowStage.LOAN_OFFICER);
+                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
+                    && access.canAccessLoanOfficerArea(principal)) {
+                    return hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.LOAN_OFFICER);
                 }
-                if (isBoardAssignee(loanId, principal)) {
+                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
+                    && isBoardAssignee(loanId, principal)) {
                     return true;
                 }
                 return false;
@@ -133,7 +137,7 @@ public class AuthzService {
 
     private boolean hasAssignedReviewInScope(UUID loanId,
                                              AppUserPrincipal principal,
-                                             com.sacco.mvp.domain.ApprovalWorkflowStage stage) {
+                                             ApprovalWorkflowStage stage) {
         if (principal == null) {
             return false;
         }
@@ -143,6 +147,43 @@ public class AuthzService {
             .filter(app -> app.getSaccoId().equals(principal.getSaccoId()))
             .filter(app -> sameStationScope(app, principal))
             .isPresent();
+    }
+
+    private Optional<ApprovalWorkflowStage> assignedReviewStage(UUID loanId, AppUserPrincipal principal) {
+        if (principal == null) {
+            return Optional.empty();
+        }
+        if (access.canAccessChairpersonArea(principal)
+            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.CHAIRPERSON)) {
+            return Optional.of(ApprovalWorkflowStage.CHAIRPERSON);
+        }
+        if (access.canAccessBoardArea(principal)
+            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.BOARD)) {
+            return Optional.of(ApprovalWorkflowStage.BOARD);
+        }
+        if (access.canAccessCreditCommitteeArea(principal)
+            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.CREDIT_COMMITTEE)) {
+            return Optional.of(ApprovalWorkflowStage.CREDIT_COMMITTEE);
+        }
+        return Optional.empty();
+    }
+
+    private String boardApproveClaim(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_APPROVE.name();
+            case BOARD -> UserClaim.BOARD_QUEUE_APPROVE.name();
+            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE.name();
+            default -> "";
+        };
+    }
+
+    private String boardRejectClaim(ApprovalWorkflowStage stage) {
+        return switch (stage) {
+            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_REJECT.name();
+            case BOARD -> UserClaim.BOARD_QUEUE_REJECT.name();
+            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_REJECT.name();
+            default -> "";
+        };
     }
 
     private boolean sameStationScope(com.sacco.mvp.domain.LoanApplication app, AppUserPrincipal principal) {

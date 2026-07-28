@@ -178,15 +178,15 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         value = """
             select distinct m.*
             from members m
-            join user_settings us on us.member_id = m.id
             where m.sacco_id = :saccoId
               and m.status = 'ACTIVE'
               and m.staff_access_status = 'ACTIVE'
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and exists (
                 select 1
-                from jsonb_array_elements_text(coalesce(us.notification_prefs -> 'claims', '[]'::jsonb)) claim
-                where claim = :claimName
+                from member_access_claims mac
+                where mac.member_id = m.id
+                  and mac.claim_name = :claimName
               )
             order by m.full_name asc
             """,

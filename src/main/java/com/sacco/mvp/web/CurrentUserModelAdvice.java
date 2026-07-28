@@ -167,8 +167,8 @@ public class CurrentUserModelAdvice {
         if (principal == null || isJsonRequest() || isPlatformAdminIdentity(principal)) {
             return null;
         }
-        boolean workspaceUser = principal.hasRole(Position.MEMBER)
-            || principal.hasRole(Position.MINOR_ADMIN)
+        boolean workspaceUser = principal.isMemberAccess()
+            || principal.isWorkspaceAdminScope()
             || principal.isStaffSession();
         return workspaceUser ? platformSupportContactSettingsService.sidebarContact() : null;
     }
@@ -250,7 +250,7 @@ public class CurrentUserModelAdvice {
     }
 
     private boolean isPlatformAdminIdentity(AppUserPrincipal principal) {
-        return principal != null && principal.hasRole(Position.ADMIN);
+        return principal != null && principal.isPlatformIdentity();
     }
 
     private boolean isJsonRequest() {

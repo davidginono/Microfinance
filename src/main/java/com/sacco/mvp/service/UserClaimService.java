@@ -2,9 +2,12 @@ package com.sacco.mvp.service;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.MemberAccessClaim;
+import com.sacco.mvp.domain.MemberAccessClaimId;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.UserSettings;
+import com.sacco.mvp.repository.MemberAccessClaimRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,10 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service("userClaims")
 @RequiredArgsConstructor
 public class UserClaimService {
+    private final MemberAccessClaimRepository memberAccessClaimRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final ObjectMapper objectMapper;
 
@@ -31,6 +36,12 @@ public class UserClaimService {
         Set<UserClaim> defaults = defaultClaims(staffRoles, memberAccess);
         if (memberId == null) {
             return defaults;
+        }
+        List<MemberAccessClaim> storedClaims = memberAccessClaimRepository.findByIdMemberId(memberId);
+        if (!storedClaims.isEmpty()) {
+            return storedClaims.stream()
+                .flatMap(claim -> UserClaim.fromStoredName(claim.getId().getClaimName()).stream())
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(UserClaim.class)));
         }
         return userSettingsRepository.findById(memberId)
             .map(UserSettings::getNotificationPrefs)
@@ -44,22 +55,34 @@ public class UserClaimService {
         if (principal == null || claimName == null || claimName.isBlank()) {
             return false;
         }
-        return principal.getClaims().contains(claimName);
+        if (principal.getClaims().contains(claimName)) {
+            return true;
+        }
+        return UserClaim.fromStoredName(claimName).stream()
+            .map(UserClaim::name)
+            .anyMatch(principal.getClaims()::contains);
     }
 
     @Transactional
     public void updateClaims(UUID memberId, List<UserClaim> claims) {
-        UserSettings settings = userSettingsRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("User settings not found"));
-        Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
-        List<String> claimNames = new ArrayList<>();
-        if (claims != null) {
-            claims.stream().distinct().forEach(claim -> claimNames.add(claim.name()));
+        if (memberId == null) {
+            return;
         }
-        prefs.put("claims", claimNames);
-        settings.setNotificationPrefs(writePrefs(prefs));
-        settings.setUpdatedAt(OffsetDateTime.now());
-        userSettingsRepository.save(settings);
+        memberAccessClaimRepository.deleteByMemberId(memberId);
+        List<UserClaim> normalizedClaims = claims == null ? List.of() : claims.stream()
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+        normalizedClaims.forEach(claim -> memberAccessClaimRepository.save(MemberAccessClaim.builder()
+            .id(new MemberAccessClaimId(memberId, claim.name()))
+            .build()));
+        userSettingsRepository.findById(memberId).ifPresent(settings -> {
+            Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
+            prefs.remove("claims");
+            settings.setNotificationPrefs(writePrefs(prefs));
+            settings.setUpdatedAt(OffsetDateTime.now());
+            userSettingsRepository.save(settings);
+        });
     }
 
     public Set<UserClaim> parseClaims(String notificationPrefs) {
@@ -77,41 +100,13 @@ public class UserClaimService {
             if (item == null) {
                 continue;
             }
-            try {
-                claims.add(UserClaim.valueOf(String.valueOf(item)));
-            } catch (IllegalArgumentException ignored) {
-            }
+            claims.addAll(UserClaim.fromStoredName(String.valueOf(item)));
         }
         return claims;
     }
 
     public Set<UserClaim> defaultClaims(Collection<Position> staffRoles, boolean memberAccess) {
-        EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
-        if (memberAccess) {
-            claims.add(UserClaim.APPLY_LOANS);
-            claims.add(UserClaim.APPROVE_GUARANTOR_REQUESTS);
-        }
-        for (Position position : Position.normalizeStaffRoles(staffRoles)) {
-            switch (position) {
-                case MEMBER -> {
-                }
-                case MANAGER -> claims.add(UserClaim.REVIEW_MANAGER_QUEUE);
-                case ACCOUNTANT -> claims.add(UserClaim.REVIEW_ACCOUNTANT_QUEUE);
-                case DISBURSEMENT_OFFICER -> {
-                    claims.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
-                    claims.add(UserClaim.DISBURSE_LOAN);
-                }
-                case CHAIRPERSON -> claims.add(UserClaim.REVIEW_CHAIRPERSON_QUEUE);
-                case BOARD -> claims.add(UserClaim.REVIEW_BOARD_QUEUE);
-                case CREDIT_COMMITTEE -> claims.add(UserClaim.REVIEW_CREDIT_COMMITTEE_QUEUE);
-                case LOAN_OFFICER -> claims.add(UserClaim.REVIEW_LOAN_OFFICER_QUEUE);
-                case ADMIN, MINOR_ADMIN -> {
-                    claims.add(UserClaim.ACCESS_ADMIN_SETTINGS);
-                    claims.add(UserClaim.ACCESS_OUTBOX_MONITOR);
-                }
-            }
-        }
-        return claims;
+        return UserClaim.defaultClaims(staffRoles, memberAccess);
     }
 
     private Map<String, Object> parsePrefs(String json) {

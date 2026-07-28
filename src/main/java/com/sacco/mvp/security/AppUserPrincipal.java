@@ -5,13 +5,10 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.UserClaim;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -56,8 +53,10 @@ public class AppUserPrincipal implements UserDetails {
         this.grantedPositions = resolveGrantedPositions(this.staffRoles, this.memberAccess);
         this.username = this.staffSession && hasText(member.getStaffNo()) ? member.getStaffNo() : member.getMemberNo();
         this.password = member.getPasswordHash();
-        this.authorities = buildAuthorities(this.grantedPositions);
-        this.claims = filterClaims(claims, this.grantedPositions, this.memberAccess);
+        this.authorities = java.util.Collections.emptyList();
+        this.claims = claims == null || claims.isEmpty()
+            ? java.util.Collections.emptySet()
+            : claims.stream().map(UserClaim::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private Set<Position> resolveGrantedPositions(Set<Position> staffRoles, boolean memberAccess) {
@@ -68,60 +67,20 @@ public class AppUserPrincipal implements UserDetails {
         return java.util.Collections.unmodifiableSet(granted);
     }
 
-    private Set<String> filterClaims(Set<UserClaim> claims, Set<Position> grantedPositions, boolean memberAccess) {
-        if (claims == null || claims.isEmpty()) {
-            return java.util.Collections.emptySet();
-        }
-        Set<UserClaim> allowedClaims = allowedClaims(grantedPositions, memberAccess);
-        return claims.stream()
-            .filter(allowedClaims::contains)
-            .map(UserClaim::name)
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
-    }
-
-    private Set<UserClaim> allowedClaims(Set<Position> grantedPositions, boolean memberAccess) {
-        java.util.EnumSet<UserClaim> allowed = java.util.EnumSet.noneOf(UserClaim.class);
-        if (memberAccess && grantedPositions.contains(Position.MEMBER)) {
-            allowed.add(UserClaim.APPLY_LOANS);
-            allowed.add(UserClaim.APPROVE_GUARANTOR_REQUESTS);
-        }
-        for (Position position : Position.normalizeStaffRoles(grantedPositions)) {
-            switch (position) {
-                case MEMBER -> {
-                }
-                case MANAGER -> allowed.add(UserClaim.REVIEW_MANAGER_QUEUE);
-                case ACCOUNTANT -> allowed.add(UserClaim.REVIEW_ACCOUNTANT_QUEUE);
-                case DISBURSEMENT_OFFICER -> {
-                    allowed.add(UserClaim.ACCESS_DISBURSEMENT_QUEUE);
-                    allowed.add(UserClaim.DISBURSE_LOAN);
-                }
-                case CHAIRPERSON -> allowed.add(UserClaim.REVIEW_CHAIRPERSON_QUEUE);
-                case BOARD -> allowed.add(UserClaim.REVIEW_BOARD_QUEUE);
-                case CREDIT_COMMITTEE -> allowed.add(UserClaim.REVIEW_CREDIT_COMMITTEE_QUEUE);
-                case LOAN_OFFICER -> allowed.add(UserClaim.REVIEW_LOAN_OFFICER_QUEUE);
-                case ADMIN, MINOR_ADMIN -> {
-                    allowed.add(UserClaim.ACCESS_ADMIN_SETTINGS);
-                    allowed.add(UserClaim.ACCESS_OUTBOX_MONITOR);
-                }
-            }
-        }
-        return allowed;
-    }
-
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
-    private Collection<? extends GrantedAuthority> buildAuthorities(Set<Position> grantedPositions) {
-        List<GrantedAuthority> granted = new ArrayList<>();
-        grantedPositions.stream()
-            .map(position -> new SimpleGrantedAuthority("ROLE_" + position.name()))
-            .forEach(granted::add);
-        return granted;
+    public boolean hasMetadataRole(Position role) {
+        return role != null && grantedPositions.contains(role);
     }
 
-    public boolean hasRole(Position role) {
-        return role != null && grantedPositions.contains(role);
+    public boolean isPlatformIdentity() {
+        return hasMetadataRole(Position.ADMIN);
+    }
+
+    public boolean isWorkspaceAdminScope() {
+        return hasMetadataRole(Position.MINOR_ADMIN) && !isPlatformIdentity();
     }
 
     @Override

@@ -8,7 +8,6 @@ import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
@@ -42,7 +41,9 @@ public class LoanAnalyticsService {
     private static final EnumSet<LoanStatus> REJECTED_STATUSES = EnumSet.of(
         LoanStatus.MANAGER_REJECTED,
         LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.CHAIRPERSON_REJECTED,
         LoanStatus.BOARD_REJECTED,
+        LoanStatus.CREDIT_COMMITTEE_REJECTED,
         LoanStatus.ACCOUNTANT_REJECTED,
         LoanStatus.REJECTED
     );
@@ -60,6 +61,7 @@ public class LoanAnalyticsService {
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
+    private final AccessControlService access;
     private final ApplicationClock applicationClock;
 
     public MemberLoanAnalytics forMember(UUID memberId, LocalDate fromDate, LocalDate toDate) {
@@ -592,13 +594,13 @@ public class LoanAnalyticsService {
 
     private List<ApprovalWorkflowStage> managerStagesFor(AppUserPrincipal principal) {
         List<ApprovalWorkflowStage> stages = new ArrayList<>();
-        if (principal.hasRole(Position.MANAGER)) {
+        if (access.canAccessManagerArea(principal)) {
             stages.add(ApprovalWorkflowStage.MANAGER);
         }
-        if (principal.hasRole(Position.ACCOUNTANT)) {
+        if (access.canAccessAccountantArea(principal)) {
             stages.add(ApprovalWorkflowStage.ACCOUNTANT);
         }
-        if (principal.hasRole(Position.DISBURSEMENT_OFFICER)) {
+        if (access.canAccessDisbursementArea(principal)) {
             stages.add(ApprovalWorkflowStage.DISBURSEMENT_OFFICER);
         }
         return stages;
@@ -606,13 +608,13 @@ public class LoanAnalyticsService {
 
     private List<ApprovalWorkflowStage> boardStagesFor(AppUserPrincipal principal) {
         List<ApprovalWorkflowStage> stages = new ArrayList<>();
-        if (principal.hasRole(Position.LOAN_OFFICER)) {
+        if (access.canAccessLoanOfficerArea(principal)) {
             stages.add(ApprovalWorkflowStage.LOAN_OFFICER);
         }
-        if (principal.hasRole(Position.BOARD)) {
+        if (access.canAccessBoardArea(principal)) {
             stages.add(ApprovalWorkflowStage.BOARD);
         }
-        if (principal.hasRole(Position.CREDIT_COMMITTEE)) {
+        if (access.canAccessCreditCommitteeArea(principal)) {
             stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
         }
         return stages;

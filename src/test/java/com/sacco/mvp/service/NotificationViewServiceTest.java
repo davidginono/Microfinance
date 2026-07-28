@@ -16,7 +16,11 @@ class NotificationViewServiceTest {
 
     @Test
     void loanStatusEventsHaveReadableFallbackText() {
-        NotificationViewService service = new NotificationViewService(new ObjectMapper(), mock(MemberRepository.class));
+        NotificationViewService service = new NotificationViewService(
+            new ObjectMapper(),
+            mock(MemberRepository.class),
+            new AccessControlService()
+        );
         Notification notification = Notification.builder()
             .id(UUID.randomUUID())
             .recipientMemberId(UUID.randomUUID())

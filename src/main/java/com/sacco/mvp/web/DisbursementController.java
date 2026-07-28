@@ -15,6 +15,7 @@ import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -58,7 +59,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/disbursement")
-@PreAuthorize("@authz.notSuperAdmin(principal) and (@userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE') or @userClaims.has(principal, 'DISBURSE_LOAN'))")
+@PreAuthorize("@access.canAccessDisbursementArea(principal)")
 public class DisbursementController {
     private final ManagerService managerService;
     private final ManagerReviewRepository managerReviewRepository;
@@ -75,6 +76,7 @@ public class DisbursementController {
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
     private final MessageSource messageSource;
+    private final AccessControlService access;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -211,6 +213,7 @@ public class DisbursementController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_EXPORT')")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -324,14 +327,14 @@ public class DisbursementController {
         model.addAttribute("rejectActionLabel", "Reject");
         model.addAttribute("showReviewDecisionForm", false);
         model.addAttribute("showManagerReversalRequests", false);
-        boolean canDisburseLoan = principal.getClaims().contains("DISBURSE_LOAN");
+        boolean canDisburseLoan = access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE");
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("showDisbursementPermissionMessage", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && !canDisburseLoan);
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("allowPaymentSync", false);
-        model.addAttribute("allowDefaultedPaymentRecheck", false);
+        model.addAttribute("allowPaymentSync", true);
+        model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";
     }
@@ -362,7 +365,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/finalize")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
     public String finalize(@PathVariable UUID id,
                            @AuthenticationPrincipal AppUserPrincipal principal,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disbursementDate,
@@ -398,7 +401,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/request-disbursement-otp")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestDisbursementOtp(@PathVariable UUID id,
                                                                       @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -428,7 +431,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-disbursement-otp")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifyDisbursementOtp(@PathVariable UUID id,
                                                                      @AuthenticationPrincipal AppUserPrincipal principal,
@@ -452,25 +455,22 @@ public class DisbursementController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
-        model.addAttribute("notifications", notificationInboxService.allViews(
-            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "disbursement/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), "/disbursement/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/disbursement/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/disbursement/notifications";
@@ -478,7 +478,7 @@ public class DisbursementController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());

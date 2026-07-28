@@ -1,10 +1,11 @@
 package com.sacco.mvp.web;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.NotificationViewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,16 +17,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HeaderNotificationController {
     private final NotificationInboxService notificationInboxService;
+    private final AccessControlService access;
 
     @GetMapping("/header/notifications")
+    @PreAuthorize("@access.has(principal, 'NOTIFICATIONS_VIEW')")
     public HeaderNotificationPayload notifications(@AuthenticationPrincipal AppUserPrincipal principal) {
-        boolean platformAdmin = principal.hasRole(Position.ADMIN);
+        boolean platformAdmin = principal.isPlatformIdentity();
         List<NotificationViewService.HeaderNotificationView> views = platformAdmin
             ? notificationInboxService.unreadIncidentHeaderViews(principal.getMemberId())
-            : notificationInboxService.unreadHeaderViews(principal.getMemberId(), principal.getGrantedPositions());
+            : notificationInboxService.unreadHeaderViews(principal);
         long count = platformAdmin
             ? views.size()
-            : notificationInboxService.unreadCount(principal.getMemberId(), principal.getGrantedPositions());
+            : notificationInboxService.unreadCount(principal);
         String targetUrl = notificationTargetUrl(principal);
         List<HeaderNotificationItem> items = views.stream()
             .map(view -> new HeaderNotificationItem(
@@ -43,7 +46,7 @@ public class HeaderNotificationController {
     private String notificationHref(AppUserPrincipal principal,
                                     String targetUrl,
                                     NotificationViewService.HeaderNotificationView view) {
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
+        if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
             return "/admin/notifications/" + view.id() + "/open";
         }
         return targetUrl + (targetUrl.contains("?") ? "&" : "?")
@@ -51,40 +54,51 @@ public class HeaderNotificationController {
     }
 
     private String notificationTargetUrl(AppUserPrincipal principal) {
-        if (principal.hasRole(Position.ADMIN)) {
+        if (principal.isPlatformIdentity()) {
             return "/admin/incidents";
         }
-        if (principal.hasRole(Position.MINOR_ADMIN)) {
+        if (principal.isWorkspaceAdminScope()) {
             return "/admin/notifications";
         }
-        return switch (principal.getPosition()) {
-            case ADMIN, MINOR_ADMIN -> "/admin/dashboard";
-            case MANAGER -> "/manager/notifications";
-            case ACCOUNTANT -> "/accountant/notifications";
-            case DISBURSEMENT_OFFICER -> "/disbursement/notifications";
-            case CHAIRPERSON -> "/chairperson/notifications";
-            case CREDIT_COMMITTEE -> "/credit-committee/notifications";
-            case BOARD -> "/board/notifications";
-            case LOAN_OFFICER -> "/loan-officer/notifications";
-            case MEMBER -> "/app/notifications";
-        };
+        if (access.canAccessManagerArea(principal)) {
+            return "/manager/notifications";
+        }
+        if (access.canAccessAccountantArea(principal)) {
+            return "/accountant/notifications";
+        }
+        if (access.canAccessDisbursementArea(principal)) {
+            return "/disbursement/notifications";
+        }
+        if (access.canAccessChairpersonArea(principal)) {
+            return "/chairperson/notifications";
+        }
+        if (access.canAccessCreditCommitteeArea(principal)) {
+            return "/credit-committee/notifications";
+        }
+        if (access.canAccessBoardArea(principal)) {
+            return "/board/notifications";
+        }
+        if (access.canAccessLoanOfficerArea(principal)) {
+            return "/loan-officer/notifications";
+        }
+        return "/app/notifications";
     }
 
     private String panelSubtitle(AppUserPrincipal principal) {
-        if (principal.hasRole(Position.ADMIN)) {
+        if (principal.isPlatformIdentity()) {
             return "Latest SACCO support incidents requiring platform attention";
         }
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
+        if (principal.isWorkspaceAdminScope()) {
             return "Latest member support incidents requiring admin attention";
         }
         return "Latest updates from the loan workflow";
     }
 
     private String panelEmptyState(AppUserPrincipal principal) {
-        if (principal.hasRole(Position.ADMIN)) {
+        if (principal.isPlatformIdentity()) {
             return "No SACCO support incidents yet.";
         }
-        if (principal.getPosition() != null && principal.getPosition().isAdminRole()) {
+        if (principal.isWorkspaceAdminScope()) {
             return "No member support incidents yet.";
         }
         return "No notifications yet.";

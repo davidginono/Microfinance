@@ -24,7 +24,7 @@ public class StaffAccessController {
     private final UserClaimService userClaimService;
 
     @PostMapping("/app/staff-access/acknowledge")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("@access.canAccessMemberArea(principal)")
     public String acknowledge(@AuthenticationPrincipal AppUserPrincipal principal,
                               HttpServletRequest request,
                               RedirectAttributes ra) {

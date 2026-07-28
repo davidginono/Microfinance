@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.SmsUnitStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.NotificationRepository;
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +34,8 @@ class SmsUsageAlertServiceTest {
             .phone("255712345678")
             .phoneVerifiedAt(OffsetDateTime.now())
             .build();
-        when(roleDirectory.activeGlobalByRole(any())).thenReturn(List.of());
-        when(roleDirectory.activeByRoleInStation("SACCO-1", "ST-1", com.sacco.mvp.domain.Position.MINOR_ADMIN))
+        when(roleDirectory.activePlatformAdminsByClaim(UserClaim.SMS_USAGE_VIEW)).thenReturn(List.of());
+        when(roleDirectory.activeWorkspaceAdminsByAnyClaimInStation("SACCO-1", "ST-1", List.of(UserClaim.SMS_USAGE_VIEW)))
             .thenReturn(List.of(minorAdmin));
         when(unitService.reserveAlert("SACCO-1", "ST-1", SmsUnitStatus.DEPLETED))
             .thenReturn(new SmsUnitTransactionService.ReservationResult(true, accountId, ledgerId, null, false, null, 0));
@@ -58,8 +59,8 @@ class SmsUsageAlertServiceTest {
             .identifier("MINOR001")
             .phone("255712345678")
             .build();
-        when(roleDirectory.activeGlobalByRole(any())).thenReturn(List.of());
-        when(roleDirectory.activeByRoleInStation("SACCO-1", "ST-1", com.sacco.mvp.domain.Position.MINOR_ADMIN))
+        when(roleDirectory.activePlatformAdminsByClaim(UserClaim.SMS_USAGE_VIEW)).thenReturn(List.of());
+        when(roleDirectory.activeWorkspaceAdminsByAnyClaimInStation("SACCO-1", "ST-1", List.of(UserClaim.SMS_USAGE_VIEW)))
             .thenReturn(List.of(minorAdmin));
         SmsGateway smsGateway = mock(SmsGateway.class);
         SmsUnitTransactionService unitService = mock(SmsUnitTransactionService.class);

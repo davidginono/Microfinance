@@ -1,6 +1,5 @@
 package com.sacco.mvp.config;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.UserSettings;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.UserSettingsRepository;
@@ -59,7 +58,7 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
             || path.startsWith(contextPath + "/loan-officer/")
             || path.startsWith(contextPath + "/accountant/")
             || path.startsWith(contextPath + "/disbursement/");
-        if (path.startsWith(adminPrefix) && principal.getStaffRoles().stream().anyMatch(Position::isAdminRole)) {
+        if (path.startsWith(adminPrefix) && (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope())) {
             String saccoId = principal.getSaccoId();
             if (saccoId == null || saccoId.isBlank()) {
                 return null;
@@ -68,10 +67,10 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
                 .map(settings -> resolveLocale(settings.getDefaultLanguage()))
                 .orElse(Locale.ENGLISH);
         }
-        if (path.startsWith(appPrefix) && principal.hasRole(Position.MEMBER)) {
+        if (path.startsWith(appPrefix) && principal.isMemberAccess()) {
             return resolveUserLocale(request, principal.getMemberId());
         }
-        if (staffPath && !principal.hasRole(Position.ADMIN) && !principal.hasRole(Position.MINOR_ADMIN)) {
+        if (staffPath && !principal.isPlatformIdentity() && !principal.isWorkspaceAdminScope()) {
             return resolveUserLocale(request, principal.getMemberId());
         }
         return null;

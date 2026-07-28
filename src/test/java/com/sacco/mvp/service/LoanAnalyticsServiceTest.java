@@ -10,6 +10,8 @@ import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.StaffAccessStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
@@ -51,6 +53,7 @@ class LoanAnalyticsServiceTest {
             managerReviewRepository,
             boardReviewRepository,
             loanProductSettingRepository,
+            new AccessControlService(),
             new ApplicationClock("Africa/Nairobi")
         );
 
@@ -96,6 +99,7 @@ class LoanAnalyticsServiceTest {
             managerReviewRepository,
             boardReviewRepository,
             loanProductSettingRepository,
+            new AccessControlService(),
             new ApplicationClock("Africa/Nairobi")
         );
         when(managerReviewRepository.findForAnalytics(any(), any(), any(), any()))
@@ -137,15 +141,17 @@ class LoanAnalyticsServiceTest {
             .saccoId("SACCO-01")
             .stationId("ST-1")
             .memberNo("STAFF1")
+            .staffNo("STAFF1")
             .fullName("Staff One")
             .memberAccount(true)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
             .status(MemberStatus.ACTIVE)
             .position(position)
             .staffRoles(new LinkedHashSet<>(List.of(position)))
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, Collections.emptySet());
+        return new AppUserPrincipal(member, Collections.singleton(UserClaim.MANAGER_QUEUE_VIEW));
     }
 
     private ManagerReview review(UUID loanId, UUID staffId, ManagerDecision decision, OffsetDateTime createdAt) {

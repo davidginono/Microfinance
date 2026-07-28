@@ -37,10 +37,10 @@ class SidebarWorkspaceFilterTest {
         assertGateBefore(sidebar, "<c:if test=\"${staffWorkspace}\">", "<a href=\"/admin/dashboard\"");
         assertGateBefore(sidebar, "<c:if test=\"${staffWorkspace}\">", "<c:set var=\"showManagerPanel\"");
         assertThat(sidebar).contains(
-            "principal.claims.contains('REVIEW_MANAGER_QUEUE')",
-            "principal.claims.contains('REVIEW_LOAN_OFFICER_QUEUE')",
-            "principal.claims.contains('REVIEW_ACCOUNTANT_QUEUE')",
-            "principal.claims.contains('ACCESS_DISBURSEMENT_QUEUE')"
+            "@access.canAccessManagerArea(principal)",
+            "@access.canAccessLoanOfficerArea(principal)",
+            "@access.canAccessAccountantArea(principal)",
+            "@access.canAccessDisbursementArea(principal)"
         );
     }
 

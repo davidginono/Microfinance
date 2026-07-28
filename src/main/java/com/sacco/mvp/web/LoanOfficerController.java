@@ -15,6 +15,7 @@ import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
@@ -57,7 +58,7 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/loan-officer")
-@PreAuthorize("hasRole('LOAN_OFFICER') and @userClaims.has(principal, 'REVIEW_LOAN_OFFICER_QUEUE')")
+@PreAuthorize("@access.canAccessLoanOfficerArea(principal)")
 public class LoanOfficerController {
     private static final ApprovalWorkflowStage STAGE = ApprovalWorkflowStage.LOAN_OFFICER;
 
@@ -78,6 +79,7 @@ public class LoanOfficerController {
     private final LoanReportService loanReportService;
     private final ApplicationClock applicationClock;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final AccessControlService access;
 
     @GetMapping("/assigned")
     public String assigned() {
@@ -110,7 +112,7 @@ public class LoanOfficerController {
         model.addAttribute("dashboardStatusChartRows",
             workflowStatusPresentationService.buildLoanOfficerDashboardChartRows(
                 dashboard.statusBreakdown(),
-                principal.getClaims().contains("ACCESS_DISBURSEMENT_QUEUE")
+                access.canAccessDisbursementArea(principal)
             ));
         model.addAttribute("dashboardDisbursementRows", dashboard.recentDisbursements().stream()
             .map(loan -> {
@@ -193,6 +195,7 @@ public class LoanOfficerController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'LOAN_OFFICER_QUEUE_EXPORT')")
     public String reports(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -235,7 +238,7 @@ public class LoanOfficerController {
     }
 
     @GetMapping("/loan-applications/{id}")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @authz.isLoanOfficerAssignee(#id, principal)")
     public String detail(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
@@ -306,7 +309,7 @@ public class LoanOfficerController {
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
     @ResponseBody
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#loanId, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @authz.isLoanOfficerAssignee(#loanId, principal)")
     public ResponseEntity<Map<String, Object>> guarantorFinancialStatus(@PathVariable UUID loanId,
                                                                         @PathVariable UUID guarantorId,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -329,7 +332,7 @@ public class LoanOfficerController {
 
     @GetMapping("/loan-applications/{id}/applicant-financial-status")
     @ResponseBody
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @authz.isLoanOfficerAssignee(#id, principal)")
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
         boardService.getMyReview(id, principal.getMemberId(), STAGE);
@@ -340,7 +343,7 @@ public class LoanOfficerController {
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.hasAny(principal, 'LOAN_OFFICER_QUEUE_APPROVE', 'LOAN_OFFICER_QUEUE_REJECT') and @authz.isLoanOfficerAssignee(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestSignatureOtp(@PathVariable UUID id,
                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -378,7 +381,7 @@ public class LoanOfficerController {
     }
 
     @PostMapping("/loan-applications/{id}/verify-signature-otp")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.hasAny(principal, 'LOAN_OFFICER_QUEUE_APPROVE', 'LOAN_OFFICER_QUEUE_REJECT') and @authz.isLoanOfficerAssignee(#id, principal)")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> verifySignatureOtp(@PathVariable UUID id,
                                                                   @AuthenticationPrincipal AppUserPrincipal principal,
@@ -414,7 +417,7 @@ public class LoanOfficerController {
     }
 
     @PostMapping("/loan-applications/{id}/decision")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @authz.isLoanOfficerAssignee(#id, principal)")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.canDecide(principal, #decision, 'LOAN_OFFICER_QUEUE_APPROVE', 'LOAN_OFFICER_QUEUE_REJECT') and @authz.isLoanOfficerAssignee(#id, principal)")
     public String decide(@PathVariable UUID id,
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          @RequestParam BoardDecision decision,
@@ -449,28 +452,25 @@ public class LoanOfficerController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('LOAN_OFFICER')")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,
                                 @RequestParam(required = false) UUID highlight,
                                 Model model) {
         applyLoanOfficerUi(model);
         model.addAttribute("notificationBreadcrumb", "Loan Officer Panel / Notifications");
         model.addAttribute("notificationSubtitle", "Workflow updates and alerts for the loan officer queue in one place.");
-        model.addAttribute("notifications", notificationInboxService.allViews(
-            principal.getMemberId(), principal.getGrantedPositions()));
+        model.addAttribute("notifications", notificationInboxService.allViews(principal));
         model.addAttribute("highlightNotificationId", highlight);
         return "board/notifications";
     }
 
     @GetMapping("/notifications/{id}/open")
-    @PreAuthorize("hasRole('LOAN_OFFICER')")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String openNotification(@PathVariable UUID id,
                                    @AuthenticationPrincipal AppUserPrincipal principal,
                                    RedirectAttributes ra) {
         try {
-            return "redirect:" + notificationInboxService.openForMember(
-                id, principal.getMemberId(), principal.getGrantedPositions(),
-                principal.getPosition(), "/loan-officer/notifications");
+            return "redirect:" + notificationInboxService.openForMember(id, principal, "/loan-officer/notifications");
         } catch (IllegalArgumentException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             return "redirect:/loan-officer/notifications";
@@ -478,7 +478,7 @@ public class LoanOfficerController {
     }
 
     @PostMapping("/notifications/mark-all-read")
-    @PreAuthorize("hasRole('LOAN_OFFICER')")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'NOTIFICATIONS_UPDATE')")
     public String markAllNotificationsRead(@AuthenticationPrincipal AppUserPrincipal principal,
                                            RedirectAttributes ra) {
         int updated = notificationInboxService.markAllAsRead(principal.getMemberId());

@@ -8,7 +8,6 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.repository.BoardReviewRepository;
@@ -25,6 +24,7 @@ import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.MemberProfileImageService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
+import com.sacco.mvp.service.AccessControlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -68,9 +68,10 @@ public class LoanDocumentController {
     private final MemberProfileImageService memberProfileImageService;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final AuditService auditService;
+    private final AccessControlService access;
 
     @GetMapping("/documents/loan-applications/{loanId}/print")
-    @PreAuthorize("@authz.canViewLoan(#loanId, principal)")
+    @PreAuthorize("@authz.canViewLoan(#loanId, principal) and @access.has(principal, 'LOAN_DOCUMENTS_EXPORT')")
     public ResponseEntity<byte[]> downloadPrintable(@PathVariable UUID loanId,
                                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                                     @RequestParam(name = "signatureMode", defaultValue = "signed") String signatureMode) {
@@ -224,7 +225,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/member-loans.pdf")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'LOAN_REPORTS_EXPORT')")
     public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -241,7 +242,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/member-loans.xlsx")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS')")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'LOAN_REPORTS_EXPORT')")
     public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -258,7 +259,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/staff-loan-analytics.pdf")
-    @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
+    @PreAuthorize("@authz.staffAnalyticsAccess(principal) and @access.has(principal, 'STAFF_ANALYTICS_EXPORT')")
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsPdf(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -302,7 +303,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/staff-loan-analytics.xlsx")
-    @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
+    @PreAuthorize("@authz.staffAnalyticsAccess(principal) and @access.has(principal, 'STAFF_ANALYTICS_EXPORT')")
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsExcel(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -346,7 +347,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/manager-loans.pdf")
-    @PreAuthorize("hasRole('MANAGER') and @userClaims.has(principal, 'REVIEW_MANAGER_QUEUE')")
+    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -363,16 +364,14 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/board-loans.pdf")
-    @PreAuthorize("@authz.isBoardReviewer(principal)")
+    @PreAuthorize("(@access.canAccessBoardArea(principal) and @access.has(principal, 'BOARD_QUEUE_EXPORT')) or (@access.canAccessChairpersonArea(principal) and @access.has(principal, 'CHAIRPERSON_QUEUE_EXPORT')) or (@access.canAccessCreditCommitteeArea(principal) and @access.has(principal, 'CREDIT_COMMITTEE_QUEUE_EXPORT'))")
     public ResponseEntity<byte[]> downloadBoardLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                                                           @RequestParam(required = false) String decisionFilter) {
         LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
             principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
-            principal.hasRole(Position.CREDIT_COMMITTEE) && !principal.hasRole(Position.BOARD)
-                ? ApprovalWorkflowStage.CREDIT_COMMITTEE
-                : ApprovalWorkflowStage.BOARD,
+            boardReportStage(principal),
             fromDate, toDate, decisionFilter);
         byte[] pdf = loanReportService.buildBoardWorkflowPdf(report);
         auditReportExport(principal, "board-reviewed-loans", "PDF", report.fromDate(), report.toDate());
@@ -384,7 +383,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/loan-officer-loans.pdf")
-    @PreAuthorize("hasRole('LOAN_OFFICER') and @userClaims.has(principal, 'REVIEW_LOAN_OFFICER_QUEUE')")
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'LOAN_OFFICER_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadLoanOfficerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -402,7 +401,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/accountant-loans.pdf")
-    @PreAuthorize("hasRole('ACCOUNTANT') and @userClaims.has(principal, 'REVIEW_ACCOUNTANT_QUEUE')")
+    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'ACCOUNTANT_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadAccountantLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
@@ -419,7 +418,7 @@ public class LoanDocumentController {
     }
 
     @GetMapping("/documents/reports/disbursement-loans.pdf")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'ACCESS_DISBURSEMENT_QUEUE')")
+    @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadDisbursementLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
@@ -460,6 +459,16 @@ public class LoanDocumentController {
             principal == null ? null : principal.getStationId(),
             details
         );
+    }
+
+    private ApprovalWorkflowStage boardReportStage(AppUserPrincipal principal) {
+        if (access.canAccessChairpersonArea(principal)) {
+            return ApprovalWorkflowStage.CHAIRPERSON;
+        }
+        if (access.canAccessBoardArea(principal)) {
+            return ApprovalWorkflowStage.BOARD;
+        }
+        return ApprovalWorkflowStage.CREDIT_COMMITTEE;
     }
 
     private void auditLoanDocument(LoanApplication app,

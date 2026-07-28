@@ -5,7 +5,6 @@ import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
@@ -85,7 +84,10 @@ public class WorkflowRoutingService {
         boardReviewRepository.flush();
         if (stage == ApprovalWorkflowStage.LOAN_OFFICER) {
             RoleDirectoryService.RoleAccountRef loanOfficer = roleDirectoryService
-                .activeByRoleInStation(app.getSaccoId(), app.getStationId(), Position.LOAN_OFFICER).stream()
+                .activeByAnyClaimInStation(app.getSaccoId(), app.getStationId(), java.util.List.of(
+                    UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
+                    UserClaim.LOAN_OFFICER_QUEUE_APPROVE
+                )).stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No active loan officer is configured for this station."));
             boardReviewRepository.save(BoardReview.builder()
@@ -115,18 +117,14 @@ public class WorkflowRoutingService {
     }
 
     private java.util.List<UUID> productReviewerIds(LoanApplication app, ApprovalWorkflowStage stage) {
-        Position requiredRole = switch (stage) {
-            case CREDIT_COMMITTEE -> Position.CREDIT_COMMITTEE;
-            case CHAIRPERSON -> Position.CHAIRPERSON;
-            default -> Position.BOARD;
-        };
+        UserClaim requiredClaim = reviewerClaimFor(stage);
         java.util.Optional<com.sacco.mvp.domain.LoanProductSetting> selectedProduct = app.getLoanProductSettingId() == null
             ? loanProductSettingRepository.findBySaccoIdAndLoanType(app.getSaccoId(), app.getLoanType())
             : loanProductSettingRepository.findByIdAndSaccoId(app.getLoanProductSettingId(), app.getSaccoId());
         return selectedProduct
             .map(productSetting -> loanProductBoardReviewerRepository.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(productSetting.getId(), stage).stream()
                 .map(com.sacco.mvp.domain.LoanProductBoardReviewer::getBoardMemberId)
-                .filter(boardMemberId -> roleDirectoryService.hasActiveRoleInSacco(boardMemberId, app.getSaccoId(), requiredRole))
+                .filter(boardMemberId -> roleDirectoryService.hasActiveClaimInSacco(boardMemberId, app.getSaccoId(), requiredClaim))
                 .toList())
             .orElse(java.util.List.of());
     }
@@ -167,37 +165,37 @@ public class WorkflowRoutingService {
         if (assignedReviewers != null && !assignedReviewers.isEmpty()) {
             return assignedReviewers.stream().distinct().toList();
         }
-        Position role = reviewRoleFor(stage);
-        if (role == null) {
+        UserClaim recipientClaim = reviewerClaimFor(stage);
+        if (recipientClaim == null) {
             return java.util.List.of();
         }
         LinkedHashSet<UUID> recipients = new LinkedHashSet<>();
-        roleDirectoryService.activeByRoleInStation(app.getSaccoId(), app.getStationId(), role).stream()
+        roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), recipientClaim).stream()
             .map(RoleDirectoryService.RoleAccountRef::getId)
             .forEach(recipients::add);
         if (stage == ApprovalWorkflowStage.DISBURSEMENT_OFFICER) {
-            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.ACCESS_DISBURSEMENT_QUEUE).stream()
+            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.DISBURSEMENT_QUEUE_VIEW).stream()
                 .map(RoleDirectoryService.RoleAccountRef::getId)
                 .forEach(recipients::add);
-            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.DISBURSE_LOAN).stream()
+            roleDirectoryService.activeByClaimInStation(app.getSaccoId(), app.getStationId(), UserClaim.DISBURSEMENT_QUEUE_DISBURSE).stream()
                 .map(RoleDirectoryService.RoleAccountRef::getId)
                 .forEach(recipients::add);
         }
         return java.util.List.copyOf(recipients);
     }
 
-    private Position reviewRoleFor(ApprovalWorkflowStage stage) {
+    private UserClaim reviewerClaimFor(ApprovalWorkflowStage stage) {
         if (stage == null) {
             return null;
         }
         return switch (stage) {
-            case MANAGER -> Position.MANAGER;
-            case LOAN_OFFICER -> Position.LOAN_OFFICER;
-            case CHAIRPERSON -> Position.CHAIRPERSON;
-            case BOARD -> Position.BOARD;
-            case CREDIT_COMMITTEE -> Position.CREDIT_COMMITTEE;
-            case ACCOUNTANT -> Position.ACCOUNTANT;
-            case DISBURSEMENT_OFFICER -> Position.DISBURSEMENT_OFFICER;
+            case MANAGER -> UserClaim.MANAGER_QUEUE_APPROVE;
+            case LOAN_OFFICER -> UserClaim.LOAN_OFFICER_QUEUE_APPROVE;
+            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_APPROVE;
+            case BOARD -> UserClaim.BOARD_QUEUE_APPROVE;
+            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE;
+            case ACCOUNTANT -> UserClaim.ACCOUNTANT_QUEUE_APPROVE;
+            case DISBURSEMENT_OFFICER -> UserClaim.DISBURSEMENT_QUEUE_VIEW;
         };
     }
 

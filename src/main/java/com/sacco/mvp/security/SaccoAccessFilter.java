@@ -1,6 +1,5 @@
 package com.sacco.mvp.security;
 
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.SaccoStationRepository;
 import jakarta.servlet.FilterChain;
@@ -47,7 +46,7 @@ public class SaccoAccessFilter extends OncePerRequestFilter {
     }
 
     private Optional<SaccoStation> suspendedStation(AppUserPrincipal appUser) {
-        if (appUser == null || appUser.hasRole(Position.ADMIN)) {
+        if (appUser == null || appUser.isPlatformIdentity()) {
             return Optional.empty();
         }
         String saccoId = appUser.getSaccoId();

@@ -4,8 +4,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SmsUnitStatus;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,20 +40,20 @@ public class SmsUsageAlertService {
             case DEPLETED -> "SMS units for " + saccoId + " / " + stationId + " are depleted. Further SMS notifications are blocked.";
             case HEALTHY -> "";
         };
-        List<RoleDirectoryService.RoleAccountRef> stationMinorAdmins =
-            roleDirectoryService.activeByRoleInStation(saccoId, stationId, Position.MINOR_ADMIN);
+        List<RoleDirectoryService.RoleAccountRef> stationSmsAdmins =
+            roleDirectoryService.activeWorkspaceAdminsByAnyClaimInStation(saccoId, stationId, List.of(UserClaim.SMS_USAGE_VIEW));
         notifyRecipients(
-            recipientsForStation(saccoId, stationId, stationMinorAdmins),
+            recipientsForStation(saccoId, stationId, stationSmsAdmins),
             subject,
             message,
             Map.of("saccoId", saccoId, "stationId", stationId, "status", status.name(), "availableUnits", availableUnits)
         );
-        sendStationFundedSmsAlert(saccoId, stationId, status, message, stationMinorAdmins);
+        sendStationFundedSmsAlert(saccoId, stationId, status, message, stationSmsAdmins);
     }
 
     public void alertInvalidScope(String saccoId, String stationId, String eventType, String reason) {
         notifyRecipients(
-            roleDirectoryService.activeGlobalByRole(Position.ADMIN),
+            roleDirectoryService.activePlatformAdminsByClaim(UserClaim.SMS_USAGE_VIEW),
             "SMS notification blocked",
             "An SMS notification was blocked because its originating SACCO-station scope was missing or invalid.",
             Map.of(
@@ -68,11 +68,11 @@ public class SmsUsageAlertService {
     private List<RoleDirectoryService.RoleAccountRef> recipientsForStation(
         String saccoId,
         String stationId,
-        List<RoleDirectoryService.RoleAccountRef> stationMinorAdmins
+        List<RoleDirectoryService.RoleAccountRef> stationSmsAdmins
     ) {
         LinkedHashMap<UUID, RoleDirectoryService.RoleAccountRef> recipients = new LinkedHashMap<>();
-        roleDirectoryService.activeGlobalByRole(Position.ADMIN).forEach(ref -> recipients.put(ref.getId(), ref));
-        stationMinorAdmins.forEach(ref -> recipients.put(ref.getId(), ref));
+        roleDirectoryService.activePlatformAdminsByClaim(UserClaim.SMS_USAGE_VIEW).forEach(ref -> recipients.put(ref.getId(), ref));
+        stationSmsAdmins.forEach(ref -> recipients.put(ref.getId(), ref));
         return List.copyOf(recipients.values());
     }
 
@@ -80,8 +80,8 @@ public class SmsUsageAlertService {
                                            String stationId,
                                            SmsUnitStatus status,
                                            String message,
-                                           List<RoleDirectoryService.RoleAccountRef> stationMinorAdmins) {
-        for (RoleDirectoryService.RoleAccountRef recipient : stationMinorAdmins) {
+                                           List<RoleDirectoryService.RoleAccountRef> stationSmsAdmins) {
+        for (RoleDirectoryService.RoleAccountRef recipient : stationSmsAdmins) {
             if (recipient.getPhoneVerifiedAt() == null || TanzaniaPhoneNumber.normalizeOptional(recipient.getPhone()) == null) {
                 continue;
             }

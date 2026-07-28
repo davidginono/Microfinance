@@ -3,6 +3,7 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,8 +22,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RoleDirectoryService {
     private final MemberRepository memberRepository;
+    private final UserClaimService userClaimService;
 
-    public List<RoleAccountRef> activeByRole(String saccoId, Position position) {
+    private List<RoleAccountRef> activeByRole(String saccoId, Position position) {
         if (saccoId == null || saccoId.isBlank() || position == null) {
             return List.of();
         }
@@ -31,7 +34,7 @@ public class RoleDirectoryService {
         return toRoleRefs(memberRepository.findActiveRoleMembers(saccoId, position));
     }
 
-    public List<RoleAccountRef> activeByRoleInStation(String saccoId, String stationId, Position position) {
+    private List<RoleAccountRef> activeByRoleInStation(String saccoId, String stationId, Position position) {
         if (saccoId == null || saccoId.isBlank() || position == null) {
             return List.of();
         }
@@ -43,22 +46,11 @@ public class RoleDirectoryService {
         return toRoleRefs(memberRepository.findActiveRoleMembersInStation(saccoId, stationId.trim(), position));
     }
 
-    public List<RoleAccountRef> activeByAnyRole(String saccoId, java.util.Collection<Position> positions) {
-        if (saccoId == null || saccoId.isBlank() || positions == null || positions.isEmpty()) {
-            return List.of();
-        }
-        return toRoleRefs(memberRepository.findActiveMembersWithAnyRole(saccoId, positions));
+    public List<RoleAccountRef> activeByClaim(String saccoId, UserClaim claim) {
+        return activeByClaimInStation(saccoId, null, claim);
     }
 
-    public List<RoleAccountRef> activeByAnyRoleInStation(String saccoId, String stationId, java.util.Collection<Position> positions) {
-        if (saccoId == null || saccoId.isBlank() || positions == null || positions.isEmpty() || stationId == null || stationId.isBlank()) {
-            return List.of();
-        }
-        String normalizedStationId = stationId.trim();
-        return toRoleRefs(memberRepository.findActiveMembersWithAnyRoleInStation(saccoId, normalizedStationId, positions));
-    }
-
-    public List<RoleAccountRef> activeByClaimInStation(String saccoId, String stationId, com.sacco.mvp.domain.UserClaim claim) {
+    public List<RoleAccountRef> activeByClaimInStation(String saccoId, String stationId, UserClaim claim) {
         if (saccoId == null || saccoId.isBlank() || claim == null) {
             return List.of();
         }
@@ -66,7 +58,29 @@ public class RoleDirectoryService {
         return toRoleRefs(memberRepository.findActiveMembersWithClaimInStation(saccoId, normalizedStationId, claim.name()));
     }
 
-    public List<RoleAccountRef> activeGlobalByRole(Position position) {
+    public List<RoleAccountRef> activeByAnyClaim(String saccoId, Collection<UserClaim> claims) {
+        if (saccoId == null || saccoId.isBlank() || claims == null || claims.isEmpty()) {
+            return List.of();
+        }
+        List<RoleAccountRef> refs = new ArrayList<>();
+        claims.stream()
+            .filter(java.util.Objects::nonNull)
+            .forEach(claim -> refs.addAll(activeByClaim(saccoId, claim)));
+        return deduplicateAndSort(refs);
+    }
+
+    public List<RoleAccountRef> activeByAnyClaimInStation(String saccoId, String stationId, Collection<UserClaim> claims) {
+        if (saccoId == null || saccoId.isBlank() || claims == null || claims.isEmpty()) {
+            return List.of();
+        }
+        List<RoleAccountRef> refs = new ArrayList<>();
+        claims.stream()
+            .filter(java.util.Objects::nonNull)
+            .forEach(claim -> refs.addAll(activeByClaimInStation(saccoId, stationId, claim)));
+        return deduplicateAndSort(refs);
+    }
+
+    private List<RoleAccountRef> activeGlobalByRole(Position position) {
         if (position == null) {
             return List.of();
         }
@@ -77,15 +91,96 @@ public class RoleDirectoryService {
         return toRoleRefs(memberRepository.findActiveGlobalRoleMembers(position));
     }
 
-    public boolean hasActiveRoleInSacco(UUID memberId, String saccoId, Position position) {
-        if (memberId == null || saccoId == null || position == null) {
+    public List<RoleAccountRef> activeRoleHoldersByClaim(Position position, UserClaim claim) {
+        if (position == null || claim == null) {
+            return List.of();
+        }
+        return activeGlobalByRole(position).stream()
+            .filter(ref -> hasActiveStaffClaim(ref.getId(), claim))
+            .toList();
+    }
+
+    public List<RoleAccountRef> activeRoleHoldersByClaimInStation(String saccoId,
+                                                                  String stationId,
+                                                                  Position position,
+                                                                  UserClaim claim) {
+        if (saccoId == null || saccoId.isBlank() || position == null || claim == null) {
+            return List.of();
+        }
+        return activeByRoleInStation(saccoId, stationId, position).stream()
+            .filter(ref -> hasActiveStaffClaim(ref.getId(), claim))
+            .toList();
+    }
+
+    public List<RoleAccountRef> activeRoleHoldersByAnyClaim(String saccoId,
+                                                            Position position,
+                                                            Collection<UserClaim> claims) {
+        if (saccoId == null || saccoId.isBlank() || position == null || claims == null || claims.isEmpty()) {
+            return List.of();
+        }
+        return activeByRole(saccoId, position).stream()
+            .filter(ref -> hasAnyActiveStaffClaim(ref.getId(), claims))
+            .toList();
+    }
+
+    public List<RoleAccountRef> activeRoleHoldersByAnyClaimInStation(String saccoId,
+                                                                     String stationId,
+                                                                     Position position,
+                                                                     Collection<UserClaim> claims) {
+        if (saccoId == null || saccoId.isBlank() || position == null || claims == null || claims.isEmpty()) {
+            return List.of();
+        }
+        return activeByRoleInStation(saccoId, stationId, position).stream()
+            .filter(ref -> hasAnyActiveStaffClaim(ref.getId(), claims))
+            .toList();
+    }
+
+    public List<RoleAccountRef> activePlatformAdminsByClaim(UserClaim claim) {
+        return activeRoleHoldersByClaim(Position.ADMIN, claim);
+    }
+
+    public List<RoleAccountRef> activeWorkspaceAdminsByAnyClaim(String saccoId, Collection<UserClaim> claims) {
+        return activeRoleHoldersByAnyClaim(saccoId, Position.MINOR_ADMIN, claims);
+    }
+
+    public List<RoleAccountRef> activeWorkspaceAdminsByAnyClaimInStation(String saccoId,
+                                                                         String stationId,
+                                                                         Collection<UserClaim> claims) {
+        return activeRoleHoldersByAnyClaimInStation(saccoId, stationId, Position.MINOR_ADMIN, claims);
+    }
+
+    public boolean hasActiveClaimInSacco(UUID memberId, String saccoId, UserClaim claim) {
+        if (memberId == null || saccoId == null || claim == null) {
             return false;
         }
         return memberRepository.findById(memberId)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(member -> saccoId.equals(member.getSaccoId()))
-            .filter(member -> member.getActiveStaffRolesResolved().contains(position))
-            .isPresent();
+            .filter(member -> member.isMemberAccess() || member.isStaffAccessActive())
+            .map(member -> userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()))
+            .map(claims -> claims.contains(claim))
+            .orElse(false);
+    }
+
+    public boolean hasActiveStaffClaim(UUID memberId, UserClaim claim) {
+        if (memberId == null || claim == null) {
+            return false;
+        }
+        return memberRepository.findById(memberId)
+            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+            .filter(Member::isStaffAccessActive)
+            .map(member -> userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()))
+            .map(claims -> claims.contains(claim))
+            .orElse(false);
+    }
+
+    private boolean hasAnyActiveStaffClaim(UUID memberId, Collection<UserClaim> claims) {
+        if (memberId == null || claims == null || claims.isEmpty()) {
+            return false;
+        }
+        return claims.stream()
+            .filter(java.util.Objects::nonNull)
+            .anyMatch(claim -> hasActiveStaffClaim(memberId, claim));
     }
 
     private List<RoleAccountRef> deduplicateAndSort(List<RoleAccountRef> refs) {

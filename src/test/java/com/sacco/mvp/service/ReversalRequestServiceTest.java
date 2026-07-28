@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.ReversalRequest;
 import com.sacco.mvp.domain.ReversalRequestStatus;
 import com.sacco.mvp.domain.ReversalRequestType;
+import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.ReversalRequestRepository;
@@ -52,7 +53,7 @@ class ReversalRequestServiceTest {
             .build();
 
         when(reversalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
-        when(roleDirectoryService.hasActiveRoleInSacco(managerId, "SACCO-A", Position.MANAGER)).thenReturn(false);
+        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_APPROVE)).thenReturn(false);
 
         assertThatThrownBy(() -> reversalRequestService.decideManagerStageWithdrawal(requestId, managerId, true))
             .isInstanceOf(IllegalArgumentException.class)
@@ -83,7 +84,7 @@ class ReversalRequestServiceTest {
             .build();
 
         when(reversalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
-        when(roleDirectoryService.hasActiveRoleInSacco(managerId, "SACCO-A", Position.MANAGER)).thenReturn(true);
+        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_REJECT)).thenReturn(true);
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
 
         assertThatThrownBy(() -> reversalRequestService.decideManagerStageWithdrawal(requestId, managerId, false, " "))
