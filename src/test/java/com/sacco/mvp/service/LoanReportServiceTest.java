@@ -4,7 +4,6 @@ import tools.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.LoanApplication;
-import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
@@ -12,7 +11,6 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -50,7 +48,6 @@ import static org.mockito.Mockito.when;
 class LoanReportServiceTest {
 
     @Mock private LoanApplicationRepository loanApplicationRepository;
-    @Mock private LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
@@ -67,7 +64,6 @@ class LoanReportServiceTest {
     void setUp() {
         loanReportService = new LoanReportService(
             loanApplicationRepository,
-            loanPaymentTransactionRepository,
             loanProductSettingRepository,
             memberRepository,
             guarantorRequestRepository,
@@ -251,27 +247,9 @@ class LoanReportServiceTest {
             .amount(new BigDecimal("700000.00"))
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2025-01-10T08:00:00Z"))
-            .loanPaymentSummaryJson("""
-                {
-                  "principalAmount": 700000.00,
-                  "interestAmount": 70000.00,
-                  "outstandingPrincipal": 200000.00,
-                  "outstandingInterest": 10000.00,
-                  "totalOutstanding": 210000.00
-                }
+            .financialSnapshot("""
+                {"interestAmount":70000.00}
                 """)
-            .build();
-        LoanPaymentTransaction inRangePayment = LoanPaymentTransaction.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(loanId)
-            .saccoId("IAA")
-            .externalLoanId("LN-1")
-            .principalPaid(new BigDecimal("500000.00"))
-            .interestPaid(new BigDecimal("60000.00"))
-            .totalPaid(new BigDecimal("560000.00"))
-            .receiptDate(LocalDate.of(2026, 7, 8))
-            .outstandingBalance(new BigDecimal("210000.00"))
-            .fetchedAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
             .build();
         LoanAnalyticsService.MemberLoanAnalytics analytics =
             new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO);
@@ -286,8 +264,6 @@ class LoanReportServiceTest {
             .thenReturn(List.of());
         when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
             .thenReturn(List.of(olderActiveLoan));
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of(inRangePayment));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
@@ -311,11 +287,11 @@ class LoanReportServiceTest {
             .orElseThrow();
 
         assertThat(productRow.applied()).isZero();
-        assertThat(productRow.interestPaid()).isEqualByComparingTo("60000.00");
-        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("60000.00");
-        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("10000.00");
-        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("500000.00");
-        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("200000.00");
+        assertThat(productRow.interestPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("70000.00");
+        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("700000.00");
     }
 
     @Test
@@ -347,17 +323,6 @@ class LoanReportServiceTest {
             .financialSnapshot("""
                 {"interestAmount":70000.00}
                 """)
-            .loanPaymentSummaryJson("""
-                {
-                  "principalAmount": 700000.00,
-                  "interestAmount": 24500.00,
-                  "totalPrincipalPaid": 500000.00,
-                  "totalInterestPaid": 60000.00,
-                  "outstandingPrincipal": 200000.00,
-                  "outstandingInterest": -35500.00,
-                  "totalOutstanding": 164500.00
-                }
-                """)
             .build();
         LoanAnalyticsService.MemberLoanAnalytics analytics =
             new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO);
@@ -372,8 +337,6 @@ class LoanReportServiceTest {
             .thenReturn(List.of());
         when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
             .thenReturn(List.of(activeLoan));
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of());
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
@@ -396,11 +359,11 @@ class LoanReportServiceTest {
             .filter(row -> row.label().equals("Education Loan (Mkopo wa Elimu)"))
             .findFirst()
             .orElseThrow()
-            .interestPaid()).isEqualByComparingTo("60000.00");
-        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("60000.00");
-        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("10000.00");
-        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("500000.00");
-        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("200000.00");
+            .interestPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalInterestPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("70000.00");
+        assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("0.00");
+        assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("700000.00");
     }
 
     @Test
@@ -421,26 +384,10 @@ class LoanReportServiceTest {
             .financialSnapshot("""
                 {"interestAmount":28000.00}
                 """)
-            .loanPaymentSummaryJson("""
-                {"totalOutstanding":772000.00,"outstandingInterest":13000.00}
-                """)
-            .build();
-        LoanPaymentTransaction transaction = LoanPaymentTransaction.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(loanId)
-            .saccoId("IAA")
-            .externalLoanId("1001")
-            .receiptDate(LocalDate.of(2026, 6, 17))
-            .principalPaid(new BigDecimal("28000.00"))
-            .interestPaid(new BigDecimal("15000.00"))
-            .totalPaid(new BigDecimal("43000.00"))
-            .fetchedAt(OffsetDateTime.parse("2026-06-17T10:05:00Z"))
             .build();
 
         when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
             .thenReturn(List.of(loan));
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of(transaction));
         when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
             .thenReturn(Optional.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
@@ -451,9 +398,10 @@ class LoanReportServiceTest {
         assertThat(rows.getFirst().loanId()).isEqualTo("LN-1001");
         assertThat(rows.getFirst().loanProduct()).isEqualTo("Loan Advance (Mkopo wa Chapchap)");
         assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("28,000");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("28,000");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("15,000");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("13,000");
+        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("828,000");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("0");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("0");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("28,000");
     }
 
     @Test
@@ -474,23 +422,10 @@ class LoanReportServiceTest {
             .financialSnapshot("""
                 {"interestAmount":70000.00}
                 """)
-            .loanPaymentSummaryJson("""
-                {
-                  "principalAmount": 700000.00,
-                  "interestAmount": 24500.00,
-                  "totalPrincipalPaid": 500000.00,
-                  "totalInterestPaid": 60000.00,
-                  "outstandingPrincipal": 200000.00,
-                  "outstandingInterest": -35500.00,
-                  "totalOutstanding": 164500.00
-                }
-                """)
             .build();
 
         when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
             .thenReturn(List.of(loan));
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of());
         when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
             .thenReturn(Optional.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
 
@@ -499,11 +434,11 @@ class LoanReportServiceTest {
 
         assertThat(rows).hasSize(1);
         assertThat(rows.getFirst().loanAmount()).isEqualTo("700,000");
-        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("164,500");
+        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("770,000");
         assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("70,000");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("500,000");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("60,000");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("10,000");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("0");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("0");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("70,000");
     }
 
     @Test
@@ -534,6 +469,9 @@ class LoanReportServiceTest {
             .createdAt(OffsetDateTime.parse("2026-02-10T08:00:00Z"))
             .updatedAt(OffsetDateTime.parse("2026-04-10T08:00:00Z"))
             .paidAt(OffsetDateTime.parse("2026-04-10T08:00:00Z"))
+            .financialSnapshot("""
+                {"interestAmount":12000.00}
+                """)
             .build();
         LoanApplication activeLoan = LoanApplication.builder()
             .id(activeLoanId)
@@ -553,25 +491,6 @@ class LoanReportServiceTest {
         when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
             .thenReturn(List.of(paidLoan, activeLoan));
         when(memberRepository.countActiveMemberAccountsForScope("IAA", "AR704")).thenReturn(10L);
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of(
-                LoanPaymentTransaction.builder()
-                    .id(UUID.randomUUID())
-                    .loanApplicationId(paidLoanId)
-                    .receiptDate(LocalDate.of(2026, 4, 10))
-                    .interestPaid(new BigDecimal("12000.00"))
-                    .principalPaid(BigDecimal.ZERO)
-                    .totalPaid(new BigDecimal("12000.00"))
-                    .build(),
-                LoanPaymentTransaction.builder()
-                    .id(UUID.randomUUID())
-                    .loanApplicationId(activeLoanId)
-                    .receiptDate(LocalDate.of(2026, 4, 12))
-                    .interestPaid(new BigDecimal("3000.00"))
-                    .principalPaid(BigDecimal.ZERO)
-                    .totalPaid(new BigDecimal("3000.00"))
-                    .build()
-            ));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
@@ -592,9 +511,9 @@ class LoanReportServiceTest {
                 assertThat(row.metric()).isEqualTo("Applied Loans");
                 assertThat(row.count()).isEqualTo(2);
                 assertThat(row.applicantCount()).isEqualTo(2);
-            });
+        });
         assertThat(report.productRows()).hasSize(1);
-        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("15000.00");
+        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("12000.00");
         assertThat(report.productRows().getFirst().fullyPaidLoanInterest()).isEqualByComparingTo("12000.00");
         assertThat(report.yearlyRows().getFirst().totalPaidLoans()).isEqualTo(1);
         assertThat(report.yearlyRows().getFirst().fullyPaidLoanInterest()).isEqualByComparingTo("12000.00");
@@ -615,10 +534,8 @@ class LoanReportServiceTest {
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
             .updatedAt(OffsetDateTime.parse("2026-07-13T10:00:00Z"))
-            .loanPaymentSummaryJson("""
-                {
-                  "totalInterestPaid": 60000.00
-                }
+            .financialSnapshot("""
+                {"interestAmount":60000.00}
                 """)
             .build();
 
@@ -627,8 +544,6 @@ class LoanReportServiceTest {
         when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
             .thenReturn(List.of(activeLoan));
         when(memberRepository.countActiveMemberAccountsForScope("TAHA", "AR704")).thenReturn(3L);
-        when(loanPaymentTransactionRepository.findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(any(), any(), any()))
-            .thenReturn(List.of());
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("TAHA"))
             .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
         when(registeredSaccoRepository.findById("TAHA"))
@@ -651,10 +566,10 @@ class LoanReportServiceTest {
         );
 
         assertThat(report.saccoName()).isEqualTo("TAHA SACCOS");
-        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("60000.00");
+        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("0.00");
         assertThat(report.yearlyRows()).anySatisfy(row -> {
             assertThat(row.year()).isEqualTo(2026);
-            assertThat(row.totalPaidInterestAccumulated()).isEqualByComparingTo("60000.00");
+            assertThat(row.totalPaidInterestAccumulated()).isEqualByComparingTo("0.00");
         });
     }
 

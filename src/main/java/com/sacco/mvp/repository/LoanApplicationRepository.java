@@ -108,6 +108,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     List<LoanApplication> findByStatusAndFinalDueDateIsNotNull(LoanStatus status);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
     long countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(UUID applicantMemberId, LoanStatus status);
+    long countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(UUID applicantMemberId, Collection<LoanStatus> statuses);
 
     @Query("""
         select l
@@ -119,11 +120,16 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
               l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
               and l.applicantDisbursementAcknowledgedAt is null
             )
+            or (
+              l.status in :rejectedStatuses
+              and l.applicantRejectionAcknowledgedAt is null
+            )
           )
         order by l.createdAt desc
         """)
     List<LoanApplication> findVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
-                                                         @Param("statuses") Collection<LoanStatus> statuses);
+                                                         @Param("statuses") Collection<LoanStatus> statuses,
+                                                         @Param("rejectedStatuses") Collection<LoanStatus> rejectedStatuses);
 
     @Query("""
         select l
@@ -134,12 +140,17 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
             or (
               l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
               and l.applicantDisbursementAcknowledgedAt is null
+            )
+            or (
+              l.status in :rejectedStatuses
+              and l.applicantRejectionAcknowledgedAt is null
             )
           )
         order by l.updatedAt desc, l.createdAt desc
         """)
     List<LoanApplication> findLatestVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
                                                                @Param("statuses") Collection<LoanStatus> statuses,
+                                                               @Param("rejectedStatuses") Collection<LoanStatus> rejectedStatuses,
                                                                Pageable pageable);
 
     Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(

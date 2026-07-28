@@ -13,7 +13,6 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
@@ -76,7 +75,6 @@ public class LoanOfficerController {
     private final ManagerService managerService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
-    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final LoanReportService loanReportService;
     private final ApplicationClock applicationClock;
     private final StationOtpSettingsService stationOtpSettingsService;
@@ -270,16 +268,8 @@ public class LoanOfficerController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
-        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
-        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
-        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
-        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
-        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
-            app,
-            repaymentTransactions,
-            paymentSummary));
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews", loanPresentationService.previousApprovedReviews(app, STAGE));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
@@ -438,20 +428,16 @@ public class LoanOfficerController {
             UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
                 ? emailOtpService.validateOtp(reviewer.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode)
                 : null;
-            if (decision == BoardDecision.APPROVED) {
-                requireSavedSignature(reviewer);
-                boardService.decide(
-                    id,
-                    principal.getMemberId(),
-                    STAGE,
-                    decision,
-                    comment,
-                    reviewer.getSignatureText(),
-                    OffsetDateTime.now()
-                );
-            } else {
-                boardService.decide(id, principal.getMemberId(), STAGE, decision, comment, null, null);
-            }
+            requireSavedSignature(reviewer);
+            boardService.decide(
+                id,
+                principal.getMemberId(),
+                STAGE,
+                decision,
+                comment,
+                reviewer.getSignatureText(),
+                OffsetDateTime.now()
+            );
             if (otpTokenId != null) {
                 emailOtpService.consumeOtpById(otpTokenId);
             }
@@ -673,7 +659,7 @@ public class LoanOfficerController {
 
     private void requireSavedSignature(Member member) {
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
-            throw new IllegalStateException("Register your signature first before approving loan officer reviews.");
+            throw new IllegalStateException("Register your signature first before recording loan officer reviews.");
         }
     }
 

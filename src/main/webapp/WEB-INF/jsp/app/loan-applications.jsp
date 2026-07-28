@@ -61,6 +61,9 @@
                         <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
                             <div class="mt-1 text-xs font-semibold text-emerald-700"><spring:message code="loan.disbursement.awaitingAcknowledgement" text="Awaiting your acknowledgement" /></div>
                         </c:if>
+                        <c:if test="${rejectionAcknowledgementRequiredById[app.id]}">
+                            <div class="mt-1 text-xs font-semibold text-rose-700"><spring:message code="loan.rejection.awaitingAcknowledgement" text="Awaiting your acknowledgement" /></div>
+                        </c:if>
                     </td>
                     <td class="px-3 py-2">
                         <c:choose>
@@ -77,6 +80,12 @@
                             </a>
                             <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
                                 <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
+                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                    <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
+                                </form>
+                            </c:if>
+                            <c:if test="${rejectionAcknowledgementRequiredById[app.id]}">
+                                <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-rejection" class="m-0">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                     <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
                                 </form>

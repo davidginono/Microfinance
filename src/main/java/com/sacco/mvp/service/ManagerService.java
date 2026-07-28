@@ -39,7 +39,6 @@ public class ManagerService {
     private final OutboxService outboxService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final RoleDirectoryService roleDirectoryService;
-    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final LoanAttachmentService loanAttachmentService;
     private final WorkflowRoutingService workflowRoutingService;
     private final AuditService auditService;
@@ -233,7 +232,12 @@ public class ManagerService {
     }
 
     @Transactional
-    public void decide(UUID loanId, UUID managerId, ManagerDecision decision, String reasons) {
+    public void decide(UUID loanId,
+                       UUID managerId,
+                       ManagerDecision decision,
+                       String reasons,
+                       String signatureText,
+                       OffsetDateTime signatureVerifiedAt) {
         LoanApplication app = getManagedApplication(loanId, managerId);
         if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
             throw new IllegalStateException("Application is not ready for manager review");
@@ -242,6 +246,8 @@ public class ManagerService {
         if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
             throw new IllegalStateException("Add a reason before rejecting this loan application.");
         }
+        String normalizedSignature = normalizeSignature(signatureText, signatureVerifiedAt);
+        OffsetDateTime now = OffsetDateTime.now();
         int requiredGuarantors = app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0);
         if (requiredGuarantors > 0) {
             long approvals = guarantorRequestRepository.countByLoanApplicationIdAndStatus(
@@ -259,12 +265,15 @@ public class ManagerService {
             .reviewStage(ApprovalWorkflowStage.MANAGER)
             .decision(decision)
             .reasons(normalizedReasons)
-            .createdAt(OffsetDateTime.now())
+            .managerSignatureText(normalizedSignature)
+            .managerSignatureVerifiedAt(signatureVerifiedAt)
+            .createdAt(now)
             .build());
 
         if (decision == ManagerDecision.REJECT) {
             app.setStatus(LoanStatus.MANAGER_REJECTED);
-            app.setUpdatedAt(OffsetDateTime.now());
+            app.setApplicantRejectionAcknowledgedAt(null);
+            app.setUpdatedAt(now);
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "MANAGER_REJECTED", app.getApplicantMemberId(),
                 managerId, app.getSaccoId(), app.getStationId(),
@@ -279,7 +288,12 @@ public class ManagerService {
     }
 
     @Transactional
-    public void decideAccountant(UUID loanId, UUID accountantId, ManagerDecision decision, String reasons) {
+    public void decideAccountant(UUID loanId,
+                                 UUID accountantId,
+                                 ManagerDecision decision,
+                                 String reasons,
+                                 String signatureText,
+                                 OffsetDateTime signatureVerifiedAt) {
         LoanApplication app = getAccountantApplication(loanId, accountantId);
         if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
             throw new IllegalStateException("Application is not ready for accountant review");
@@ -288,6 +302,8 @@ public class ManagerService {
         if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
             throw new IllegalStateException("Add a reason before rejecting this loan application.");
         }
+        String normalizedSignature = normalizeSignature(signatureText, signatureVerifiedAt);
+        OffsetDateTime now = OffsetDateTime.now();
         managerReviewRepository.save(ManagerReview.builder()
             .id(UUID.randomUUID())
             .loanApplicationId(loanId)
@@ -295,11 +311,14 @@ public class ManagerService {
             .reviewStage(ApprovalWorkflowStage.ACCOUNTANT)
             .decision(decision)
             .reasons(normalizedReasons)
-            .createdAt(OffsetDateTime.now())
+            .managerSignatureText(normalizedSignature)
+            .managerSignatureVerifiedAt(signatureVerifiedAt)
+            .createdAt(now)
             .build());
         if (decision == ManagerDecision.REJECT) {
             app.setStatus(LoanStatus.ACCOUNTANT_REJECTED);
-            app.setUpdatedAt(OffsetDateTime.now());
+            app.setApplicantRejectionAcknowledgedAt(null);
+            app.setUpdatedAt(now);
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
                 accountantId, app.getSaccoId(), app.getStationId(),
@@ -314,6 +333,14 @@ public class ManagerService {
 
     private String normalizeDecisionReasons(String reasons) {
         return reasons == null ? "" : reasons.trim();
+    }
+
+    private String normalizeSignature(String signatureText, OffsetDateTime signatureVerifiedAt) {
+        String normalized = signatureText == null ? "" : signatureText.trim();
+        if (normalized.isBlank() || signatureVerifiedAt == null) {
+            throw new IllegalStateException("Save and verify your signature before recording this decision.");
+        }
+        return normalized;
     }
 
     @Transactional
@@ -404,23 +431,6 @@ public class ManagerService {
             details);
         auditLoan(app, disbursementOfficerId, "LOAN_DISBURSED", "Loan disbursed",
             Map.of("loanId", app.getLoanId(), "disbursementDate", String.valueOf(app.getDisbursementDate())));
-    }
-
-    /**
-     * Manager-triggered full payment-history reconciliation. Returns the number
-     * of inserted or removed rows so the caller can surface it as a flash message.
-     */
-    public int syncLoanPayments(UUID applicationId, UUID managerId) {
-        LoanApplication app = getManagedApplication(applicationId, managerId);
-        if (app.getLoanId() == null || app.getLoanId().isBlank()) {
-            throw new IllegalStateException("This loan has not been disbursed yet.");
-        }
-        if (app.getStatus() == LoanStatus.DEFAULTED) {
-            throw new IllegalStateException("Defaulted loan recovery is available in the Disbursement/Teller workspace.");
-        }
-        int syncedRows = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
-        auditLoan(app, managerId, "LOAN_PAYMENT_SYNC", "Loan payment sync", Map.of("syncedRows", syncedRows));
-        return syncedRows;
     }
 
     public boolean matchesApplicantStation(LoanApplication loan, String stationId) {

@@ -13,17 +13,14 @@ import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryDto;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -99,7 +96,9 @@ public class LoanReportService {
     private static final List<LoanStatus> REJECTED_STATUSES = List.of(
         LoanStatus.MANAGER_REJECTED,
         LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.CHAIRPERSON_REJECTED,
         LoanStatus.BOARD_REJECTED,
+        LoanStatus.CREDIT_COMMITTEE_REJECTED,
         LoanStatus.ACCOUNTANT_REJECTED,
         LoanStatus.REJECTED
     );
@@ -111,7 +110,6 @@ public class LoanReportService {
     private static final DateTimeFormatter HUMAN_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
 
     private final LoanApplicationRepository loanApplicationRepository;
-    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final MemberRepository memberRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
@@ -468,12 +466,11 @@ public class LoanReportService {
             .filter(loan -> loan.getStatus() != LoanStatus.DRAFT)
             .toList();
         List<LoanApplication> financialLoans = filterByLoanProductId(stationFinancialLoans(saccoId, stationId, loanType), loanProductId);
-        Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan = paymentTransactionsByLoan(financialLoans, effectiveFrom, effectiveTo);
         long activeMembers = memberRepository.countActiveMemberAccountsForScope(saccoId, stationId);
         StationParticipationSummary participation = buildStationParticipation(activeMembers, appliedLoans);
         List<StationStatusRow> statusRows = stationStatusRows(appliedLoans);
-        List<StationProductRow> productRows = stationProductRows(appliedLoans, financialLoans, paymentsByLoan, loanType);
-        List<StationYearlySummaryRow> yearlyRows = stationYearlyRows(appliedLoans, financialLoans, paymentsByLoan, effectiveFrom, effectiveTo);
+        List<StationProductRow> productRows = stationProductRows(appliedLoans, financialLoans, loanType);
+        List<StationYearlySummaryRow> yearlyRows = stationYearlyRows(appliedLoans, financialLoans, effectiveFrom, effectiveTo);
 
         return new StationAnalyticsExportReport(
             saccoId,
@@ -633,7 +630,6 @@ public class LoanReportService {
             .stream()
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .toList(), loanProductId);
-        Map<UUID, PaymentTotals> paymentTotalsByLoanId = paymentTotalsByLoanId(loans, range);
         LoanAnalyticsService.MemberLoanAnalytics analytics =
             loanAnalyticsService.forMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
@@ -655,12 +651,12 @@ public class LoanReportService {
             member,
             analytics,
             memberPortfolio(analytics),
-            productRowsFromLoans(loans, paymentTotalsByLoanId),
-            productFinancialRowsFromLoans(loans, paymentTotalsByLoanId),
+            productRowsFromLoans(loans),
+            productFinancialRowsFromLoans(loans),
             null,
             trendSeries,
             recentActivityRows(loans),
-            activeLoanRowsFromLoans(loans, paymentTotalsByLoanId),
+            activeLoanRowsFromLoans(loans),
             financialSummary(loans, analytics),
             observations(analytics),
             "This report summarizes the loan performance and status of the member within the selected period."
@@ -677,7 +673,7 @@ public class LoanReportService {
             .stream()
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .toList();
-        return activeLoanRowsFromLoans(loans, paymentTotalsByLoanId(loans, range));
+        return activeLoanRowsFromLoans(loans);
     }
 
     public AnalyticsExportReport staffAnalyticsExportReport(AppUserPrincipal principal,
@@ -715,9 +711,8 @@ public class LoanReportService {
         List<LoanApplication> financialLoans = stationWideStaffView
             ? filterByLoanProductId(stationFinancialLoans(principal.getSaccoId(), principal.getStationId(), loanType), loanProductId)
             : stationLoans;
-        Map<UUID, PaymentTotals> paymentTotalsByLoanId = paymentTotalsByLoanId(financialLoans, range);
-        List<ProductPerformanceRow> productRows = productRowsFromLoans(stationLoans, financialLoans, paymentTotalsByLoanId);
-        List<ProductFinancialBreakdownRow> productFinancialRows = productFinancialRowsFromLoans(financialLoans, paymentTotalsByLoanId);
+        List<ProductPerformanceRow> productRows = productRowsFromLoans(stationLoans, financialLoans);
+        List<ProductFinancialBreakdownRow> productFinancialRows = productFinancialRowsFromLoans(financialLoans);
         ExportContext context = exportContext(principal, range, loanType);
         return new AnalyticsExportReport(
             stationWideStaffView ? ReportKind.STATION : ReportKind.STAFF,
@@ -1082,32 +1077,12 @@ public class LoanReportService {
         );
     }
 
-    private Map<UUID, PaymentTotals> paymentTotalsByLoanId(List<LoanApplication> loans, DateRange range) {
-        List<UUID> loanIds = loans.stream()
-            .map(LoanApplication::getId)
-            .filter(Objects::nonNull)
-            .toList();
-        if (loanIds.isEmpty()) {
-            return Map.of();
-        }
-        Map<UUID, PaymentTotals> totalsByLoanId = new LinkedHashMap<>();
-        loanPaymentTransactionRepository
-            .findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(loanIds, range.fromDate(), range.toDate())
-            .forEach(transaction -> totalsByLoanId.merge(
-                transaction.getLoanApplicationId(),
-                PaymentTotals.from(transaction),
-                PaymentTotals::plus
-            ));
-        return totalsByLoanId;
-    }
-
-    private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
-        return productRowsFromLoans(loans, loans, paymentTotalsByLoanId);
+    private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> loans) {
+        return productRowsFromLoans(loans, loans);
     }
 
     private List<ProductPerformanceRow> productRowsFromLoans(List<LoanApplication> countLoans,
-                                                             List<LoanApplication> financialLoans,
-                                                             Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+                                                             List<LoanApplication> financialLoans) {
         List<ProductRef> productRefs = configuredProductRefs(countLoans, financialLoans);
         if (productRefs.isEmpty()) {
             return List.of();
@@ -1125,11 +1100,11 @@ public class LoanReportService {
                 long defaulted = values.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
                 long rejected = values.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count();
                 BigDecimal interestPaid = financialValues.stream()
-                    .map(loan -> interestPaidAmount(loanPaymentSummary(loan), paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO)))
+                    .map(this::interestPaidAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
                 BigDecimal fullyPaidInterest = financialValues.stream()
                     .filter(loan -> loan.getStatus() == LoanStatus.PAID)
-                    .map(loan -> interestPaidAmount(loanPaymentSummary(loan), paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO)))
+                    .map(this::interestPaidAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
                 return new ProductPerformanceRow(product.label(), applied, active, disbursed, paid, defaulted, rejected, interestPaid, fullyPaidInterest);
             })
@@ -1146,7 +1121,7 @@ public class LoanReportService {
             .toList();
     }
 
-    private List<ProductFinancialBreakdownRow> productFinancialRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+    private List<ProductFinancialBreakdownRow> productFinancialRowsFromLoans(List<LoanApplication> loans) {
         List<ProductRef> productRefs = configuredProductRefs(loans);
         if (productRefs.isEmpty()) {
             return List.of();
@@ -1162,12 +1137,10 @@ public class LoanReportService {
                     if (!DISBURSED_STATUSES.contains(loan.getStatus())) {
                         continue;
                     }
-                    LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
-                    PaymentTotals totals = paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO);
-                    interestPaid = interestPaid.add(interestPaidAmount(summary, totals));
-                    interestUnpaid = interestUnpaid.add(interestUnpaidAmount(loan, summary, totals));
-                    loanAmountPaid = loanAmountPaid.add(principalPaidAmount(summary, totals));
-                    loanAmountUnpaid = loanAmountUnpaid.add(outstandingPrincipalAmount(loan, summary, totals));
+                    interestPaid = interestPaid.add(interestPaidAmount(loan));
+                    interestUnpaid = interestUnpaid.add(interestUnpaidAmount(loan));
+                    loanAmountPaid = loanAmountPaid.add(principalPaidAmount(loan));
+                    loanAmountUnpaid = loanAmountUnpaid.add(outstandingPrincipalAmount(loan));
                 }
                 return new ProductFinancialBreakdownRow(product.label(), interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
             })
@@ -1243,114 +1216,67 @@ public class LoanReportService {
             .toList();
     }
 
-    private List<ActiveLoanDetailRow> activeLoanRowsFromLoans(List<LoanApplication> loans, Map<UUID, PaymentTotals> paymentTotalsByLoanId) {
+    private List<ActiveLoanDetailRow> activeLoanRowsFromLoans(List<LoanApplication> loans) {
         return loans.stream()
             .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .map(loan -> {
-                LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
-                PaymentTotals totals = paymentTotalsByLoanId.getOrDefault(loan.getId(), PaymentTotals.ZERO);
-                BigDecimal outstanding = outstandingBalanceAmount(loan, summary, totals);
-                BigDecimal requiredInterest = requiredInterestAmount(loan, summary);
-                BigDecimal remainingInterest = interestUnpaidAmount(loan, summary, totals);
+                BigDecimal outstanding = outstandingBalanceAmount(loan);
+                BigDecimal requiredInterest = requiredInterestAmount(loan);
+                BigDecimal remainingInterest = interestUnpaidAmount(loan);
                 return new ActiveLoanDetailRow(
                     loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
                     loanProductName(loan),
                     moneyPlain(loan.getAmount()),
                     moneyPlain(outstanding),
                     moneyPlain(requiredInterest),
-                    moneyPlain(principalPaidAmount(summary, totals)),
-                    moneyPlain(interestPaidAmount(summary, totals)),
+                    moneyPlain(principalPaidAmount(loan)),
+                    moneyPlain(interestPaidAmount(loan)),
                     moneyPlain(remainingInterest)
                 );
             })
             .toList();
     }
 
-    private BigDecimal requiredInterestAmount(LoanApplication loan, LoanPaymentSummaryDto summary) {
+    private BigDecimal requiredInterestAmount(LoanApplication loan) {
         BigDecimal snapshotInterest = financialSnapshotAmount(loan, "interestAmount");
-        if (snapshotInterest != null) {
-            return snapshotInterest;
-        }
-        return summary == null || summary.interestAmount() == null ? BigDecimal.ZERO : summary.interestAmount();
+        return snapshotInterest == null ? BigDecimal.ZERO : snapshotInterest;
     }
 
-    private BigDecimal outstandingBalanceAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
-        if (summary != null && summary.totalOutstanding() != null) {
-            return summary.totalOutstanding();
-        }
-        if (totals != null && totals.outstandingBalance() != null) {
-            return totals.outstandingBalance();
-        }
+    private BigDecimal outstandingBalanceAmount(LoanApplication loan) {
+        return outstandingPrincipalAmount(loan).add(interestUnpaidAmount(loan)).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal outstandingPrincipalAmount(LoanApplication loan) {
         if (loan != null && loan.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO;
         }
-        BigDecimal principal = loan == null || loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
-        BigDecimal requiredTotal = principal.add(requiredInterestAmount(loan, summary));
-        BigDecimal paid = totalPaidAmount(summary, totals);
-        return requiredTotal.subtract(paid).max(BigDecimal.ZERO);
+        if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
+            return BigDecimal.ZERO;
+        }
+        return loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
     }
 
-    private BigDecimal outstandingPrincipalAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
+    private BigDecimal interestPaidAmount(LoanApplication loan) {
+        return loan != null && loan.getStatus() == LoanStatus.PAID
+            ? requiredInterestAmount(loan)
+            : BigDecimal.ZERO;
+    }
+
+    private BigDecimal principalPaidAmount(LoanApplication loan) {
+        return loan != null && loan.getStatus() == LoanStatus.PAID && loan.getAmount() != null
+            ? loan.getAmount()
+            : BigDecimal.ZERO;
+    }
+
+    private BigDecimal interestUnpaidAmount(LoanApplication loan) {
         if (loan != null && loan.getStatus() == LoanStatus.PAID) {
             return BigDecimal.ZERO;
         }
-        if (totals != null && totals.outstandingPrincipal() != null) {
-            return totals.outstandingPrincipal();
-        }
-        if (summary != null && summary.outstandingPrincipal() != null) {
-            return summary.outstandingPrincipal();
-        }
-        BigDecimal principal = summary != null && summary.principalAmount() != null
-            ? summary.principalAmount()
-            : loan == null || loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
-        BigDecimal paid = summary != null && summary.totalPrincipalPaid() != null
-            ? summary.totalPrincipalPaid()
-            : totals == null || totals.principalPaid() == null ? BigDecimal.ZERO : totals.principalPaid();
-        return principal.subtract(paid).max(BigDecimal.ZERO);
-    }
-
-    private BigDecimal interestPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
-        if (totals != null && totals.interestPaid() != null && totals.interestPaid().signum() > 0) {
-            return totals.interestPaid();
-        }
-        if (summary != null && summary.totalInterestPaid() != null) {
-            return summary.totalInterestPaid();
-        }
-        return totals == null || totals.interestPaid() == null ? BigDecimal.ZERO : totals.interestPaid();
-    }
-
-    private BigDecimal principalPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
-        if (totals != null && totals.principalPaid() != null && totals.principalPaid().signum() > 0) {
-            return totals.principalPaid();
-        }
-        if (summary != null && summary.totalPrincipalPaid() != null) {
-            return summary.totalPrincipalPaid();
-        }
-        return totals == null || totals.principalPaid() == null ? BigDecimal.ZERO : totals.principalPaid();
-    }
-
-    private BigDecimal totalPaidAmount(LoanPaymentSummaryDto summary, PaymentTotals totals) {
-        if (totals != null && totals.totalPaid() != null && totals.totalPaid().signum() > 0) {
-            return totals.totalPaid();
-        }
-        BigDecimal principalPaid = principalPaidAmount(summary, totals);
-        BigDecimal interestPaid = interestPaidAmount(summary, totals);
-        return principalPaid.add(interestPaid);
-    }
-
-    private BigDecimal interestUnpaidAmount(LoanApplication loan, LoanPaymentSummaryDto summary, PaymentTotals totals) {
-        if (loan != null && loan.getStatus() == LoanStatus.PAID) {
+        if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
             return BigDecimal.ZERO;
         }
-        if (totals != null && totals.outstandingInterest() != null && totals.outstandingInterest().signum() >= 0) {
-            return totals.outstandingInterest();
-        }
-        if (summary != null && summary.outstandingInterest() != null && summary.outstandingInterest().signum() >= 0) {
-            return summary.outstandingInterest();
-        }
-        BigDecimal required = requiredInterestAmount(loan, summary);
-        return required.subtract(interestPaidAmount(summary, totals)).max(BigDecimal.ZERO);
+        return requiredInterestAmount(loan);
     }
 
     private BigDecimal financialSnapshotAmount(LoanApplication loan, String key) {
@@ -1360,17 +1286,6 @@ public class LoanReportService {
         try {
             Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
             return readBigDecimal(raw.get(key));
-        } catch (JacksonException ex) {
-            return null;
-        }
-    }
-
-    private LoanPaymentSummaryDto loanPaymentSummary(LoanApplication loan) {
-        if (loan == null || loan.getLoanPaymentSummaryJson() == null || loan.getLoanPaymentSummaryJson().isBlank()) {
-            return null;
-        }
-        try {
-            return objectMapper.readValue(loan.getLoanPaymentSummaryJson(), LoanPaymentSummaryDto.class);
         } catch (JacksonException ex) {
             return null;
         }
@@ -2610,26 +2525,6 @@ public class LoanReportService {
         return "No board committee decision details available";
     }
 
-    private Map<UUID, List<LoanPaymentTransaction>> paymentTransactionsByLoan(List<LoanApplication> loans,
-                                                                               LocalDate fromDate,
-                                                                               LocalDate toDate) {
-        List<UUID> loanIds = loans.stream()
-            .map(LoanApplication::getId)
-            .filter(java.util.Objects::nonNull)
-            .toList();
-        if (loanIds.isEmpty()) {
-            return Map.of();
-        }
-        return loanPaymentTransactionRepository
-            .findByLoanApplicationIdInAndReceiptDateBetweenOrderByReceiptDateAsc(loanIds, fromDate, toDate)
-            .stream()
-            .collect(Collectors.groupingBy(
-                LoanPaymentTransaction::getLoanApplicationId,
-                LinkedHashMap::new,
-                Collectors.toList()
-            ));
-    }
-
     private StationParticipationSummary buildStationParticipation(long activeMembers, List<LoanApplication> appliedLoans) {
         Map<UUID, Long> applicationsByApplicant = appliedLoans.stream()
             .filter(loan -> loan.getApplicantMemberId() != null)
@@ -2678,14 +2573,12 @@ public class LoanReportService {
     }
 
     private List<StationProductRow> stationProductRows(List<LoanApplication> loans,
-                                                       Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                        LoanType selectedLoanType) {
-        return stationProductRows(loans, loans, paymentsByLoan, selectedLoanType);
+        return stationProductRows(loans, loans, selectedLoanType);
     }
 
     private List<StationProductRow> stationProductRows(List<LoanApplication> loans,
                                                        List<LoanApplication> financialLoans,
-                                                       Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                        LoanType selectedLoanType) {
         List<ProductRef> productRefs = configuredProductRefs(loans, financialLoans).stream()
             .filter(product -> selectedLoanType == null || product.loanType() == selectedLoanType)
@@ -2712,23 +2605,21 @@ public class LoanReportService {
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count(),
                 typedLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count(),
                 typedLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count(),
-                sumInterest(typedFinancialLoans, paymentsByLoan, false),
-                sumInterest(typedFinancialLoans, paymentsByLoan, true)
+                sumInterest(typedFinancialLoans, false),
+                sumInterest(typedFinancialLoans, true)
             ));
         }
         return rows;
     }
 
     private List<StationYearlySummaryRow> stationYearlyRows(List<LoanApplication> loans,
-                                                            Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                             LocalDate fromDate,
                                                             LocalDate toDate) {
-        return stationYearlyRows(loans, loans, paymentsByLoan, fromDate, toDate);
+        return stationYearlyRows(loans, loans, fromDate, toDate);
     }
 
     private List<StationYearlySummaryRow> stationYearlyRows(List<LoanApplication> loans,
                                                             List<LoanApplication> financialLoans,
-                                                            Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                                             LocalDate fromDate,
                                                             LocalDate toDate) {
         List<StationYearlySummaryRow> rows = new ArrayList<>();
@@ -2758,8 +2649,8 @@ public class LoanReportService {
                 : BigDecimal.valueOf(defaulted)
                     .multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(yearlyApplicationLoans.size()), 2, RoundingMode.HALF_UP);
-            BigDecimal paidInterest = sumInterestForYear(financialLoans, paymentsByLoan, currentYear, false);
-            BigDecimal fullyPaidInterest = sumInterestForYear(financialLoans, paymentsByLoan, currentYear, true);
+            BigDecimal paidInterest = sumInterestForYear(financialLoans, currentYear, false);
+            BigDecimal fullyPaidInterest = sumInterestForYear(financialLoans, currentYear, true);
             rows.add(new StationYearlySummaryRow(
                 currentYear,
                 yearlyApplicationLoans.size(),
@@ -2784,50 +2675,34 @@ public class LoanReportService {
         return loan.getCreatedAt() == null ? 0 : loan.getCreatedAt().getYear();
     }
 
-    private BigDecimal sumInterest(List<LoanApplication> loans,
-                                   Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
-                                   boolean fullyPaidOnly) {
+    private BigDecimal sumInterest(List<LoanApplication> loans, boolean fullyPaidOnly) {
         return loans.stream()
             .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
-            .map(loan -> stationInterestPaidAmount(loan, paymentsByLoan.getOrDefault(loan.getId(), List.of())))
+            .map(this::stationInterestPaidAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumInterestForYear(List<LoanApplication> loans,
-                                          Map<UUID, List<LoanPaymentTransaction>> paymentsByLoan,
                                           int year,
                                           boolean fullyPaidOnly) {
         return loans.stream()
             .filter(loan -> !fullyPaidOnly || loan.getStatus() == LoanStatus.PAID)
-            .map(loan -> stationInterestPaidForYear(loan, paymentsByLoan.getOrDefault(loan.getId(), List.of()), year))
+            .map(loan -> stationInterestPaidForYear(loan, year))
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal stationInterestPaidAmount(LoanApplication loan, List<LoanPaymentTransaction> transactions) {
-        BigDecimal transactionInterest = transactions == null ? BigDecimal.ZERO : transactions.stream()
-            .map(LoanPaymentTransaction::getInterestPaid)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return transactionInterest.signum() > 0 ? transactionInterest : stationSummaryInterestPaidAmount(loan);
+    private BigDecimal stationInterestPaidAmount(LoanApplication loan) {
+        return loan == null || loan.getStatus() != LoanStatus.PAID
+            ? BigDecimal.ZERO
+            : requiredInterestAmount(loan);
     }
 
-    private BigDecimal stationInterestPaidForYear(LoanApplication loan, List<LoanPaymentTransaction> transactions, int year) {
-        BigDecimal transactionInterest = transactions == null ? BigDecimal.ZERO : transactions.stream()
-            .filter(transaction -> transaction.getReceiptDate() != null && transaction.getReceiptDate().getYear() == year)
-            .map(LoanPaymentTransaction::getInterestPaid)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (transactionInterest.signum() > 0) {
-            return transactionInterest;
-        }
-        return loanYear(loan) == year ? stationSummaryInterestPaidAmount(loan) : BigDecimal.ZERO;
-    }
-
-    private BigDecimal stationSummaryInterestPaidAmount(LoanApplication loan) {
-        LoanPaymentSummaryDto summary = loanPaymentSummary(loan);
-        return summary == null || summary.totalInterestPaid() == null ? BigDecimal.ZERO : summary.totalInterestPaid();
+    private BigDecimal stationInterestPaidForYear(LoanApplication loan, int year) {
+        return loan != null && loan.getStatus() == LoanStatus.PAID && loanYear(loan) == year
+            ? requiredInterestAmount(loan)
+            : BigDecimal.ZERO;
     }
 
     private int writeTitle(XSSFSheet sheet, CellStyle titleStyle, String title) {
@@ -3068,42 +2943,6 @@ public class LoanReportService {
     ) {}
 
     private record ProductRef(UUID loanProductId, LoanType loanType, String label) {}
-
-    private record PaymentTotals(
-        BigDecimal principalPaid,
-        BigDecimal interestPaid,
-        BigDecimal totalPaid,
-        BigDecimal outstandingBalance,
-        BigDecimal outstandingPrincipal,
-        BigDecimal outstandingInterest
-    ) {
-        private static final PaymentTotals ZERO = new PaymentTotals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null);
-
-        private static PaymentTotals from(LoanPaymentTransaction transaction) {
-            return new PaymentTotals(
-                transaction.getPrincipalPaid() == null ? BigDecimal.ZERO : transaction.getPrincipalPaid(),
-                transaction.getInterestPaid() == null ? BigDecimal.ZERO : transaction.getInterestPaid(),
-                transaction.getTotalPaid() == null ? BigDecimal.ZERO : transaction.getTotalPaid(),
-                transaction.getOutstandingBalance(),
-                transaction.getOutstandingPrincipal(),
-                transaction.getOutstandingInterest()
-            );
-        }
-
-        private PaymentTotals plus(PaymentTotals other) {
-            if (other == null) {
-                return this;
-            }
-            return new PaymentTotals(
-                principalPaid.add(other.principalPaid == null ? BigDecimal.ZERO : other.principalPaid),
-                interestPaid.add(other.interestPaid == null ? BigDecimal.ZERO : other.interestPaid),
-                totalPaid.add(other.totalPaid == null ? BigDecimal.ZERO : other.totalPaid),
-                other.outstandingBalance == null ? outstandingBalance : other.outstandingBalance,
-                other.outstandingPrincipal == null ? outstandingPrincipal : other.outstandingPrincipal,
-                other.outstandingInterest == null ? outstandingInterest : other.outstandingInterest
-            );
-        }
-    }
 
     public record ProductPerformanceRow(
         String label,

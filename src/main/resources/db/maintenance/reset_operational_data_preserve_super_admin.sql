@@ -91,7 +91,6 @@ DELETE FROM public.email_otp_tokens;
 DELETE FROM public.minor_admin_invitations;
 
 DELETE FROM public.reversal_requests;
-DELETE FROM public.loan_payment_transactions;
 DELETE FROM public.board_reviews;
 DELETE FROM public.manager_reviews;
 DELETE FROM public.guarantor_requests;

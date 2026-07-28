@@ -10,15 +10,11 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.SaccoSettings;
-import com.sacco.mvp.integration.memberportal.LoanPaymentSummaryClient;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
-import com.sacco.mvp.integration.memberportal.LoanPaymentLookupException;
-import com.sacco.mvp.service.LoanPaymentTransactionSyncService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
@@ -45,6 +41,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.*;
@@ -67,9 +64,6 @@ public class ManagerController {
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
     private final LoanApplicationRepository loanApplicationRepository;
-    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
-    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
-    private final LoanPaymentSummaryClient loanPaymentSummaryClient;
     private final ManagerReviewRepository managerReviewRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
@@ -248,13 +242,6 @@ public class ManagerController {
             app.getStatus() == LoanStatus.MANAGER_REJECTED ? loanPresentationService.latestManagerReason(id) : "";
         List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
-            .collect(Collectors.toMap(
-                com.sacco.mvp.domain.LoanApplication::getId,
-                this::storedActiveLoanPaymentSummary,
-                (left, right) -> left,
-                LinkedHashMap::new
-            ));
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
@@ -269,16 +256,8 @@ public class ManagerController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
-        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
-        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
-        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
-        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
-        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
-            app,
-            repaymentTransactions,
-            paymentSummary));
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews",
             loanPresentationService.previousApprovedReviews(app, ApprovalWorkflowStage.MANAGER));
@@ -299,10 +278,7 @@ public class ManagerController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", activeLoanSummaries.getOrDefault(
-                    loan.getId(),
-                    LoanPresentationService.LoanPaymentSummaryView.empty()
-                ).totalOutstandingLabel());
+                row.put("outstandingBalance", loan.getStatus() == LoanStatus.PAID ? formatMoney(BigDecimal.ZERO) : formatMoney(loan.getAmount()));
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -333,7 +309,7 @@ public class ManagerController {
         model.addAttribute("disbursementNotesLabel", message("review.manager.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("allowPaymentSync", true);
+        model.addAttribute("allowPaymentSync", false);
         model.addAttribute("allowDefaultedPaymentRecheck", false);
         addReviewDisplayAttributes(model, app, managerReason);
         return "manager/detail";
@@ -346,26 +322,6 @@ public class ManagerController {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
-    }
-
-    @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
-                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
-        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
-        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
-        List<com.sacco.mvp.domain.LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        List<Map<String, String>> rows = activeApplicantLoans.stream()
-            .map(loan -> {
-                LoanPresentationService.LoanPaymentSummaryView summary = resolveActiveLoanPaymentSummary(loan, applicant);
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", loan.getId().toString());
-                row.put("outstandingBalance", summary.totalOutstandingLabel());
-                return row;
-            })
-            .toList();
-        return ResponseEntity.ok(Map.of("rows", rows));
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
@@ -402,7 +358,10 @@ public class ManagerController {
             UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
                 ? validateStaffDecisionOtp(principal.getMemberId(), managerDecisionOtpCode)
                 : null;
-            managerService.decide(id, principal.getMemberId(), decision, reasons);
+            Member manager = requireMemberWithSavedSignature(
+                principal.getMemberId(),
+                "Save your staff signature before recording this decision.");
+            managerService.decide(id, principal.getMemberId(), decision, reasons, manager.getSignatureText(), OffsetDateTime.now());
             if (otpTokenId != null) {
                 emailOtpService.consumeOtpById(otpTokenId);
             }
@@ -529,28 +488,6 @@ public class ManagerController {
                            @RequestParam(required = false) MultipartFile disbursementProofFile,
                            RedirectAttributes ra) {
         ra.addFlashAttribute("error", "Managers can no longer disburse loans. Use the Disbursement/Teller Officer queue instead.");
-        return "redirect:/manager/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/sync-payments")
-    public String syncPayments(@PathVariable UUID id,
-                               @AuthenticationPrincipal AppUserPrincipal principal,
-                               RedirectAttributes ra) {
-        try {
-            var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
-            if (app.getStatus() == LoanStatus.DEFAULTED) {
-                throw new IllegalStateException("Defaulted loan recovery is available in the Disbursement/Teller workspace.");
-            }
-            int changes = managerService.syncLoanPayments(id, principal.getMemberId());
-            ra.addFlashAttribute("message",
-                changes == 0
-                    ? "Payments have already been reloaded and synchronised with the payment records"
-                    : "Payment history refreshed; " + changes + " record change(s) were reconciled.");
-        } catch (LoanPaymentLookupException ex) {
-            ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
         return "redirect:/manager/loan-applications/" + id;
     }
 
@@ -720,31 +657,6 @@ public class ManagerController {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(Locale.ROOT);
     }
 
-    private LoanPresentationService.LoanPaymentSummaryView resolveActiveLoanPaymentSummary(com.sacco.mvp.domain.LoanApplication loan,
-                                                                                           Member applicant) {
-        LoanPresentationService.LoanPaymentSummaryView fallback =
-            loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
-        if (loan == null || applicant == null || loan.getLoanId() == null || loan.getLoanId().isBlank()) {
-            return fallback;
-        }
-        String stationId = loan.getStationId();
-        if (applicant.getMemberNo() == null || applicant.getMemberNo().isBlank()
-            || stationId == null || stationId.isBlank()) {
-            return fallback;
-        }
-        try {
-            return loanPaymentSummaryClient.fetchSummary(applicant.getMemberNo(), stationId, loan.getLoanId())
-                .map(loanPresentationService::toLoanPaymentSummaryView)
-                .orElse(fallback);
-        } catch (LoanPaymentLookupException ex) {
-            return fallback;
-        }
-    }
-
-    private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(com.sacco.mvp.domain.LoanApplication loan) {
-        return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
-    }
-
     private String dashboardStatusLabel(LoanStatus status) {
         return workflowStatusPresentationService.dashboardStatusLabel(status);
     }
@@ -861,6 +773,14 @@ public class ManagerController {
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException(missingEmailMessage);
+        }
+        return member;
+    }
+
+    private Member requireMemberWithSavedSignature(UUID memberId, String missingSignatureMessage) {
+        Member member = requireMemberWithEmail(memberId, missingSignatureMessage);
+        if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
+            throw new IllegalStateException(missingSignatureMessage);
         }
         return member;
     }

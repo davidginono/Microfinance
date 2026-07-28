@@ -10,10 +10,8 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
-import com.sacco.mvp.integration.memberportal.LoanPaymentLookupException;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -21,7 +19,6 @@ import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
-import com.sacco.mvp.service.LoanPaymentTransactionSyncService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -74,8 +71,6 @@ public class DisbursementController {
     private final LoanReportService loanReportService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
-    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
-    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
@@ -267,13 +262,6 @@ public class DisbursementController {
             .collect(Collectors.toMap(Member::getId, member -> member));
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
-            .collect(Collectors.toMap(
-                LoanApplication::getId,
-                this::storedActiveLoanPaymentSummary,
-                (left, right) -> left,
-                LinkedHashMap::new
-            ));
 
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
@@ -289,16 +277,8 @@ public class DisbursementController {
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
-        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
-        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
-        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
-        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
-        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(
-            app,
-            repaymentTransactions,
-            paymentSummary));
+        model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews",
             loanPresentationService.previousApprovedReviews(app, ApprovalWorkflowStage.DISBURSEMENT_OFFICER));
@@ -318,10 +298,7 @@ public class DisbursementController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", activeLoanSummaries.getOrDefault(
-                    loan.getId(),
-                    LoanPresentationService.LoanPaymentSummaryView.empty()
-                ).totalOutstandingLabel());
+                row.put("outstandingBalance", loan.getStatus() == LoanStatus.PAID ? formatMoney(BigDecimal.ZERO) : formatMoney(loan.getAmount()));
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -353,8 +330,8 @@ public class DisbursementController {
         model.addAttribute("disbursementNotesLabel", message("loan.disbursement.notes"));
         model.addAttribute("disbursementActionLabel", message("loan.disbursement.action"));
         model.addAttribute("disbursementProofRequired", managerService.isDisbursementProofRequired(app));
-        model.addAttribute("allowPaymentSync", true);
-        model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
+        model.addAttribute("allowPaymentSync", false);
+        model.addAttribute("allowDefaultedPaymentRecheck", false);
         addReviewDisplayAttributes(model, app);
         return "manager/detail";
     }
@@ -366,25 +343,6 @@ public class DisbursementController {
         LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
-    }
-
-    @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
-                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
-        LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
-        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        List<Map<String, String>> rows = activeApplicantLoans.stream()
-            .map(loan -> {
-                LoanPresentationService.LoanPaymentSummaryView summary = storedActiveLoanPaymentSummary(loan);
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", loan.getId().toString());
-                row.put("outstandingBalance", summary.totalOutstandingLabel());
-                return row;
-            })
-            .toList();
-        return ResponseEntity.ok(Map.of("rows", rows));
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
@@ -433,56 +391,6 @@ public class DisbursementController {
             );
             emailOtpService.consumeOtpById(otpTokenId);
             ra.addFlashAttribute("message", "Loan disbursed successfully.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/disbursement/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/sync-payments")
-    public String syncPayments(@PathVariable UUID id,
-                               @AuthenticationPrincipal AppUserPrincipal principal,
-                               RedirectAttributes ra) {
-        try {
-            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
-            if (app.getLoanId() == null || app.getLoanId().isBlank()) {
-                throw new IllegalStateException("This loan has not been disbursed yet.");
-            }
-            int changes = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
-            ra.addFlashAttribute("message",
-                changes == 0
-                    ? "Payments have already been reloaded and synchronised with the payment records"
-                    : "Payment history refreshed; " + changes + " record change(s) were reconciled.");
-        } catch (LoanPaymentLookupException ex) {
-            ra.addFlashAttribute("error", "Payment transactions could not be fetched: " + ex.getMessage());
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/disbursement/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/recheck-defaulted-payment")
-    @PreAuthorize("@authz.notSuperAdmin(principal) and @userClaims.has(principal, 'DISBURSE_LOAN')")
-    public String recheckDefaultedPayment(@PathVariable UUID id,
-                                          @AuthenticationPrincipal AppUserPrincipal principal,
-                                          RedirectAttributes ra) {
-        try {
-            LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
-            if (app.getStatus() != LoanStatus.DEFAULTED) {
-                throw new IllegalStateException("Only defaulted loans can be rechecked with this action.");
-            }
-            if (app.getLoanId() == null || app.getLoanId().isBlank()) {
-                throw new IllegalStateException("This defaulted loan does not have a loan ID to verify.");
-            }
-            int changes = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
-            ra.addFlashAttribute("message",
-                app.getStatus() == LoanStatus.PAID
-                    ? "Payment status rechecked. Outstanding balance is zero, so this loan is now marked as PAID."
-                    : (changes == 0
-                        ? "Payment status rechecked. The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."
-                        : "Payment status rechecked with " + changes + " reconciled record change(s). The loan is still marked as " + app.getStatus().name().replace('_', ' ') + "."));
-        } catch (LoanPaymentLookupException ex) {
-            ra.addFlashAttribute("error", "Payment status could not be verified: " + ex.getMessage());
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -678,10 +586,6 @@ public class DisbursementController {
 
     private String humanizeEnum(String value) {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(Locale.ROOT);
-    }
-
-    private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(LoanApplication loan) {
-        return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
     }
 
     private void addReviewDisplayAttributes(Model model, LoanApplication app) {

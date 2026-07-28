@@ -135,7 +135,6 @@ public class SaccoDataDeletionService {
         update("delete from app_usage_page_metrics where sacco_id = ?", saccoId);
 
         update("delete from reversal_requests where sacco_id = ? or loan_application_id in (select id from loan_applications where sacco_id = ?)", saccoId, saccoId);
-        update("delete from loan_payment_transactions where sacco_id = ? or loan_application_id in (select id from loan_applications where sacco_id = ?)", saccoId, saccoId);
         update("delete from board_reviews where loan_application_id in (select id from loan_applications where sacco_id = ?) or board_member_id in (select id from members where sacco_id = ?)", saccoId, saccoId);
         update("delete from manager_reviews where loan_application_id in (select id from loan_applications where sacco_id = ?) or manager_member_id in (select id from members where sacco_id = ?)", saccoId, saccoId);
         update("delete from guarantor_requests where loan_application_id in (select id from loan_applications where sacco_id = ?) or guarantor_member_id in (select id from members where sacco_id = ?)", saccoId, saccoId);

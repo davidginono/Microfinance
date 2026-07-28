@@ -96,8 +96,10 @@ class LoanWorkflowServiceTest {
         when(loanApplicationRepository.countByStatusForApplicant(memberId)).thenReturn(List.of(currentCount, paidCount));
         when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
             .thenReturn(List.of(activeLoan));
-        when(loanApplicationRepository.findLatestVisibleCurrentForApplicant(eq(memberId), any(), any()))
+        when(loanApplicationRepository.findLatestVisibleCurrentForApplicant(eq(memberId), any(), any(), any()))
             .thenReturn(List.of(currentLoan));
+        when(loanApplicationRepository.countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(eq(memberId), any()))
+            .thenReturn(1L);
         when(guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId)).thenReturn(4L);
 
         LoanWorkflowService.MemberDashboardData dashboard = loanWorkflowService.memberDashboard(memberId);
@@ -107,6 +109,7 @@ class LoanWorkflowServiceTest {
             .containsEntry(LoanStatus.PAID, 3L);
         assertThat(dashboard.activeLoans()).containsExactly(activeLoan);
         assertThat(dashboard.latestCurrentApplication()).isEqualTo(currentLoan);
+        assertThat(dashboard.unacknowledgedRejectedApplicationCount()).isEqualTo(1L);
         assertThat(dashboard.pendingGuaranteeCount()).isEqualTo(4L);
         verify(loanApplicationRepository, never()).findByApplicantMemberIdOrderByCreatedAtDesc(memberId);
         verify(guarantorRequestRepository, never()).findByGuarantorMemberIdOrderByCreatedAtDesc(memberId);
@@ -128,7 +131,7 @@ class LoanWorkflowServiceTest {
         when(paidCount.getTotal()).thenReturn(3L);
         when(rejectedCount.getStatus()).thenReturn(LoanStatus.REJECTED);
         when(rejectedCount.getTotal()).thenReturn(2L);
-        when(loanApplicationRepository.findVisibleCurrentForApplicant(eq(memberId), any()))
+        when(loanApplicationRepository.findVisibleCurrentForApplicant(eq(memberId), any(), any()))
             .thenReturn(List.of(currentLoan));
         when(loanApplicationRepository.countByStatusForApplicant(memberId))
             .thenReturn(List.of(currentCount, paidCount, rejectedCount));
@@ -174,6 +177,43 @@ class LoanWorkflowServiceTest {
         assertThatThrownBy(() -> loanWorkflowService.acknowledgeDisbursement(appId, memberId))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Only disbursed loans can be acknowledged.");
+        verify(loanApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void acknowledgeRejectionMarksRejectedApplicationAsSeenByApplicant() {
+        UUID memberId = UUID.randomUUID();
+        UUID appId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.CREDIT_COMMITTEE_REJECTED)
+            .updatedAt(OffsetDateTime.now().minusDays(1))
+            .build();
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        loanWorkflowService.acknowledgeRejection(appId, memberId);
+
+        assertThat(app.getApplicantRejectionAcknowledgedAt()).isNotNull();
+        assertThat(app.getUpdatedAt()).isEqualTo(app.getApplicantRejectionAcknowledgedAt());
+        verify(loanApplicationRepository).save(app);
+    }
+
+    @Test
+    void acknowledgeRejectionRejectsNonRejectedLoan() {
+        UUID memberId = UUID.randomUUID();
+        UUID appId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .status(LoanStatus.DISBURSED)
+            .build();
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> loanWorkflowService.acknowledgeRejection(appId, memberId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Only rejected loan applications can be acknowledged.");
         verify(loanApplicationRepository, never()).save(any());
     }
 

@@ -280,9 +280,6 @@ public class BoardController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        var generatedRepaymentRows = loanPresentationService.generatedRepaymentRows(app);
-        model.addAttribute("generatedRepaymentRows", generatedRepaymentRows);
-        model.addAttribute("generatedRepaymentRowsArePaymentRecords", !generatedRepaymentRows.isEmpty());
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
@@ -293,13 +290,6 @@ public class BoardController {
         model.addAttribute("guarantorMembersById", guarantorMembersById);
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        Map<UUID, LoanPresentationService.LoanPaymentSummaryView> activeLoanSummaries = activeApplicantLoans.stream()
-            .collect(Collectors.toMap(
-                LoanApplication::getId,
-                this::storedActiveLoanPaymentSummary,
-                (left, right) -> left,
-                LinkedHashMap::new
-            ));
         Map<com.sacco.mvp.domain.LoanType, String> activeLoanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
         model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
             .map(loan -> {
@@ -312,10 +302,7 @@ public class BoardController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", activeLoanSummaries.getOrDefault(
-                    loan.getId(),
-                    LoanPresentationService.LoanPaymentSummaryView.empty()
-                ).totalOutstandingLabel());
+                row.put("outstandingBalance", loan.getStatus() == LoanStatus.PAID ? formatMoney(BigDecimal.ZERO) : formatMoney(loan.getAmount()));
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -393,28 +380,6 @@ public class BoardController {
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
-    }
-
-    @GetMapping("/loan-applications/{id}/active-loans/outstanding-balances")
-    @ResponseBody
-    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
-    public ResponseEntity<Map<String, Object>> activeLoanOutstandingBalances(@PathVariable UUID id,
-                                                                             @AuthenticationPrincipal AppUserPrincipal principal) {
-        resolveMyReview(id, principal);
-        LoanApplication app = loanApplicationRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
-            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
-        List<Map<String, String>> rows = activeApplicantLoans.stream()
-            .map(loan -> {
-                LoanPresentationService.LoanPaymentSummaryView summary = storedActiveLoanPaymentSummary(loan);
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", loan.getId().toString());
-                row.put("outstandingBalance", summary.totalOutstandingLabel());
-                return row;
-            })
-            .toList();
-        return ResponseEntity.ok(Map.of("rows", rows));
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")
@@ -513,20 +478,16 @@ public class BoardController {
                 otpTokenId = emailOtpService.validateOtp(
                     boardMember.getEmail(), EmailOtpPurpose.BOARD_SIGNATURE, boardSignatureOtpCode);
             }
-            if (decision == BoardDecision.APPROVED) {
-                requireSavedSignature(boardMember, myReview.getReviewStage());
-                boardService.decide(
-                    id,
-                    principal.getMemberId(),
-                    myReview.getReviewStage(),
-                    decision,
-                    comment,
-                    boardMember.getSignatureText(),
-                    OffsetDateTime.now()
-                );
-            } else {
-                boardService.decide(id, principal.getMemberId(), myReview.getReviewStage(), decision, comment, null, null);
-            }
+            requireSavedSignature(boardMember, myReview.getReviewStage());
+            boardService.decide(
+                id,
+                principal.getMemberId(),
+                myReview.getReviewStage(),
+                decision,
+                comment,
+                boardMember.getSignatureText(),
+                OffsetDateTime.now()
+            );
             if (otpTokenId != null) {
                 emailOtpService.consumeOtpById(otpTokenId);
             }
@@ -870,10 +831,6 @@ public class BoardController {
 
     private String humanizeEnum(String value) {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
-    }
-
-    private LoanPresentationService.LoanPaymentSummaryView storedActiveLoanPaymentSummary(LoanApplication loan) {
-        return loanPresentationService.parseLoanPaymentSummaryView(loan.getLoanPaymentSummaryJson());
     }
 
     private Member requireMemberWithEmail(UUID memberId, ApprovalWorkflowStage reviewStage) {

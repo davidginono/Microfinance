@@ -105,13 +105,14 @@ class BoardServiceTest {
     }
 
     @Test
-    void rejectDecisionDoesNotStoreSignature() {
-        // Scenario: rejected board decisions must not retain approval signature metadata.
+    void rejectDecisionStoresSignatureAndClearsApplicantAcknowledgement() {
+        // Scenario: rejected board decisions retain signature metadata for system-signed exports.
         // Given a board member rejects the loan
         // When the decision is stored
-        // Then any submitted signature text is discarded.
+        // Then the submitted signature text is retained and applicant acknowledgement is reset.
         UUID loanId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
+        OffsetDateTime signatureVerifiedAt = OffsetDateTime.parse("2026-07-01T09:00:00Z");
 
         BoardReview review = BoardReview.builder()
             .id(UUID.randomUUID())
@@ -132,6 +133,7 @@ class BoardServiceTest {
             .formData("{}")
             .requiredGuarantors(3)
             .policySnapshot("{}")
+            .applicantRejectionAcknowledgedAt(OffsetDateTime.parse("2026-06-30T09:00:00Z"))
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .version(0)
@@ -157,11 +159,14 @@ class BoardServiceTest {
             4
         ));
 
-        boardService.decide(loanId, boardId, BoardDecision.REJECTED, "Insufficient support", "Should Clear", OffsetDateTime.now());
+        boardService.decide(loanId, boardId, BoardDecision.REJECTED, "Insufficient support", "Board Rejector", signatureVerifiedAt);
 
-        assertThat(review.getBoardSignatureText()).isNull();
-        assertThat(review.getBoardSignatureVerifiedAt()).isNull();
+        assertThat(review.getBoardSignatureText()).isEqualTo("Board Rejector");
+        assertThat(review.getBoardSignatureVerifiedAt()).isEqualTo(signatureVerifiedAt);
         assertThat(review.getDecision()).isEqualTo(BoardDecision.REJECTED);
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.BOARD_REJECTED);
+        assertThat(app.getApplicantRejectionAcknowledgedAt()).isNull();
+        verify(loanApplicationRepository).save(app);
     }
 
     @Test

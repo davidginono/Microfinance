@@ -7,7 +7,6 @@ import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
-import com.sacco.mvp.domain.LoanPaymentTransaction;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.ManagerDecision;
@@ -17,7 +16,6 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
-import com.sacco.mvp.repository.LoanPaymentTransactionRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +45,6 @@ class LoanPresentationServiceTest {
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private com.sacco.mvp.repository.MemberRepository memberRepository;
-    @Mock private LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
 
@@ -70,7 +67,6 @@ class LoanPresentationServiceTest {
             managerReviewRepository,
             boardReviewRepository,
             memberRepository,
-            loanPaymentTransactionRepository,
             loanAttachmentService,
             loanProductWorkflowService,
             messageSource
@@ -429,174 +425,7 @@ class LoanPresentationServiceTest {
     }
 
     @Test
-    void parseRepaymentRowsUsesSyncedPrincipalPaymentsForOutstandingBalance() {
-        String scheduleJson = """
-            {
-              "schedule": [
-                {
-                  "installmentNumber": 1,
-                  "dueDate": "2026-05-30",
-                  "amount": 30000.00,
-                  "principalComponent": 24000.00,
-                  "interestComponent": 6000.00,
-                  "outstandingBalance": 270000.00,
-                  "status": "UPCOMING"
-                },
-                {
-                  "installmentNumber": 2,
-                  "dueDate": "2026-06-30",
-                  "amount": 30000.00,
-                  "principalComponent": 25000.00,
-                  "interestComponent": 5000.00,
-                  "outstandingBalance": 240000.00,
-                  "status": "UPCOMING"
-                },
-                {
-                  "installmentNumber": 3,
-                  "dueDate": "2026-07-30",
-                  "amount": 30000.00,
-                  "principalComponent": 26000.00,
-                  "interestComponent": 4000.00,
-                  "outstandingBalance": 210000.00,
-                  "status": "UPCOMING"
-                }
-              ]
-            }
-            """;
-
-        List<LoanPaymentTransaction> transactions = List.of(
-            LoanPaymentTransaction.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(UUID.randomUUID())
-                .saccoId("SACCO-1")
-                .externalLoanId("1001")
-                .receiptDate(LocalDate.of(2026, 5, 15))
-                .principalPaid(new BigDecimal("12000.00"))
-                .interestPaid(new BigDecimal("3000.00"))
-                .totalPaid(new BigDecimal("15000.00"))
-                .fetchedAt(OffsetDateTime.now())
-                .build(),
-            LoanPaymentTransaction.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(UUID.randomUUID())
-                .saccoId("SACCO-1")
-                .externalLoanId("1001")
-                .receiptDate(LocalDate.of(2026, 7, 10))
-                .principalPaid(new BigDecimal("18000.00"))
-                .interestPaid(new BigDecimal("2000.00"))
-                .totalPaid(new BigDecimal("20000.00"))
-                .fetchedAt(OffsetDateTime.now())
-                .build()
-        );
-
-        LoanPresentationService.LoanPaymentSummaryView paymentSummary = new LoanPresentationService.LoanPaymentSummaryView(
-            true,
-            "Personal Loan",
-            LocalDate.of(2026, 7, 10),
-            "2026-07-10",
-            new BigDecimal("60000.00"),
-            "TSh 60,000",
-            "TSh 60,000",
-            "TSh 0",
-            "TSh 30,000",
-            "TSh 5,000"
-        );
-
-        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson, transactions, paymentSummary);
-
-        assertThat(rows).hasSize(3);
-        assertThat(rows.get(0))
-            .containsEntry("installmentNumber", "1")
-            .containsEntry("pmtNo", "1")
-            .containsEntry("payment", "TSh 30,000")
-            .containsEntry("loanAmount", "TSh 24,000")
-            .containsEntry("interest", "TSh 6,000")
-            .containsEntry("scheduledBreakdown", "Principal: TSh 24,000\nInterest: TSh 6,000")
-            .containsEntry("outstandingBalance", "-")
-            .containsEntry("principalPaid", "TSh 24,000")
-            .containsEntry("interestPaid", "TSh 5,000")
-            .containsEntry("totalPaid", "TSh 29,000")
-            .containsEntry("paymentDate", "2026-07-10")
-            .doesNotContainKey("paymentStatus");
-        assertThat(rows.get(1))
-            .containsEntry("scheduledBreakdown", "Principal: TSh 25,000\nInterest: TSh 5,000")
-            .containsEntry("outstandingBalance", "TSh 60,000")
-            .containsEntry("principalPaid", "TSh 6,000")
-            .containsEntry("interestPaid", "TSh 0")
-            .containsEntry("totalPaid", "TSh 6,000")
-            .containsEntry("paymentDate", "2026-07-10")
-            .doesNotContainKey("paymentStatus");
-        assertThat(rows.get(2))
-            .containsEntry("scheduledBreakdown", "Principal: TSh 26,000\nInterest: TSh 4,000")
-            .containsEntry("outstandingBalance", "-")
-            .containsEntry("principalPaid", "-")
-            .containsEntry("paymentDate", "-")
-            .doesNotContainKey("paymentStatus");
-        assertThat(rows.get(0)).doesNotContainKey("status");
-    }
-
-    @Test
-    void parseRepaymentRowsKeepsLiveOutstandingWhenScheduleAllocationLooksFullyPaid() {
-        String scheduleJson = """
-            {
-              "schedule": [
-                {
-                  "installmentNumber": 1,
-                  "dueDate": "2026-05-30",
-                  "amount": 10000.00,
-                  "principalComponent": 8000.00,
-                  "interestComponent": 2000.00
-                },
-                {
-                  "installmentNumber": 2,
-                  "dueDate": "2026-06-30",
-                  "amount": 10000.00,
-                  "principalComponent": 8000.00,
-                  "interestComponent": 2000.00
-                }
-              ]
-            }
-            """;
-
-        List<LoanPaymentTransaction> transactions = List.of(
-            LoanPaymentTransaction.builder()
-                .id(UUID.randomUUID())
-                .loanApplicationId(UUID.randomUUID())
-                .saccoId("SACCO-1")
-                .externalLoanId("1001")
-                .receiptDate(LocalDate.of(2026, 5, 10))
-                .principalPaid(new BigDecimal("16000.00"))
-                .interestPaid(new BigDecimal("4000.00"))
-                .totalPaid(new BigDecimal("20000.00"))
-                .fetchedAt(OffsetDateTime.now())
-                .build()
-        );
-        LoanPresentationService.LoanPaymentSummaryView paymentSummary = new LoanPresentationService.LoanPaymentSummaryView(
-            true,
-            "Personal Loan",
-            LocalDate.of(2026, 5, 10),
-            "2026-05-10",
-            new BigDecimal("3500.00"),
-            "TSh 3,500",
-            "TSh 3,500",
-            "TSh 0",
-            "TSh 16,000",
-            "TSh 4,000"
-        );
-
-        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson, transactions, paymentSummary);
-
-        assertThat(rows).hasSize(2);
-        assertThat(rows.get(1))
-            .containsEntry("principalPaid", "TSh 8,000")
-            .containsEntry("interestPaid", "TSh 2,000")
-            .containsEntry("totalPaid", "TSh 10,000")
-            .doesNotContainKey("paymentStatus")
-            .containsEntry("outstandingBalance", "TSh 3,500");
-    }
-
-    @Test
-    void generatedRepaymentRowsUseSnapshotBreakdownWhenStoredScheduleComponentsAreStale() {
+    void calculatedRepaymentRowsUseSnapshotBreakdownWhenStoredScheduleComponentsAreStale() {
         LoanApplication app = LoanApplication.builder()
             .amount(new BigDecimal("700000.00"))
             .tenorMonths(6)
@@ -671,7 +500,7 @@ class LoanPresentationServiceTest {
     }
 
     @Test
-    void parseRepaymentRowsLeavesOutstandingBalanceEmptyWhenNoTransactionsExist() {
+    void parseRepaymentRowsUsesStoredScheduleWithoutPaymentRecordFields() {
         String scheduleJson = """
             {
               "schedule": [
@@ -685,17 +514,17 @@ class LoanPresentationServiceTest {
             }
             """;
 
-        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(
-            scheduleJson,
-            List.of(),
-            LoanPresentationService.LoanPaymentSummaryView.empty()
-        );
+        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson);
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0))
-            .containsEntry("outstandingBalance", "-")
-            .containsEntry("principalPaid", "-")
-            .containsEntry("paymentDate", "-")
+            .containsEntry("installmentNumber", "1")
+            .containsEntry("payment", "TSh 30,000")
+            .containsEntry("loanAmount", "TSh 30,000")
+            .containsEntry("scheduledBreakdown", "Principal: TSh 30,000")
+            .doesNotContainKey("outstandingBalance")
+            .doesNotContainKey("principalPaid")
+            .doesNotContainKey("paymentDate")
             .doesNotContainKey("paymentStatus");
     }
 
@@ -1136,7 +965,7 @@ class LoanPresentationServiceTest {
         try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(unverifiedStaffSignaturePdf)) {
             assertThat(new PDFTextStripper().getText(document))
                 .contains("Review Stage")
-                .doesNotContain("S. Loan Officer");
+                .contains("S. Loan Officer");
         }
     }
 
@@ -1355,89 +1184,6 @@ class LoanPresentationServiceTest {
         }
     }
 
-    @Test
-    void generatedRepaymentRowsRenderOneChronologicalRowPerFetchedTransaction() {
-        LoanApplication app = repaymentApplication(LocalDate.of(2099, 12, 31), LoanStatus.DISBURSED);
-        List<LoanPaymentTransaction> transactions = List.of(
-            paymentTransaction(LocalDate.of(2026, 3, 5), "10000.00", "2000.00"),
-            paymentTransaction(LocalDate.of(2026, 1, 5), "8000.00", "1500.00"),
-            paymentTransaction(LocalDate.of(2026, 5, 5), "12000.00", "2500.00")
-        );
-
-        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(
-            app,
-            transactions,
-            paymentSummary("50000.00")
-        );
-
-        assertThat(rows).hasSize(3);
-        assertThat(rows).extracting(row -> row.get("installment"))
-            .containsExactly("Installment 1", "Installment 2", "Installment 3");
-        assertThat(rows).extracting(row -> row.get("paymentDate"))
-            .containsExactly("2026-01-05", "2026-03-05", "2026-05-05");
-    }
-
-    @Test
-    void generatedRepaymentRowsUseStoredTransactionBalances() {
-        LoanPaymentTransaction first = paymentTransaction(LocalDate.of(2025, 7, 10), "20000", "3000");
-        first.setOutstandingBalance(new BigDecimal("177000"));
-        first.setOutstandingPrincipal(new BigDecimal("165000"));
-        first.setOutstandingInterest(new BigDecimal("12000"));
-        LoanPaymentTransaction second = paymentTransaction(LocalDate.of(2025, 8, 10), "22000", "3000");
-        second.setOutstandingBalance(new BigDecimal("152000"));
-        second.setOutstandingPrincipal(new BigDecimal("143000"));
-        second.setOutstandingInterest(new BigDecimal("9000"));
-
-        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(
-            LoanApplication.builder().id(UUID.randomUUID()).build(),
-            List.of(first, second),
-            LoanPresentationService.LoanPaymentSummaryView.empty());
-
-        assertThat(rows).extracting(row -> row.get("outstandingBalance"))
-            .containsExactly("TSh 177,000", "TSh 152,000");
-        assertThat(rows).extracting(row -> row.get("outstandingPrincipal"))
-            .containsExactly("TSh 165,000", "TSh 143,000");
-        assertThat(rows).extracting(row -> row.get("outstandingInterest"))
-            .containsExactly("TSh 12,000", "TSh 9,000");
-    }
-
-    @Test
-    void generatedRepaymentRowsOmitPaymentStatusWhenOutstandingIsZero() {
-        LoanPaymentTransaction transaction = paymentTransaction(LocalDate.of(2026, 1, 5), "10000.00", "2000.00");
-        transaction.setOutstandingBalance(BigDecimal.ZERO);
-        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(
-            repaymentApplication(LocalDate.of(2099, 12, 31), LoanStatus.DISBURSED),
-            List.of(transaction),
-            paymentSummary("0.00")
-        );
-
-        assertThat(rows).allSatisfy(row -> assertThat(row).doesNotContainKey("paymentStatus"));
-        assertThat(rows).extracting(row -> row.get("outstandingBalance"))
-            .contains("TSh 0");
-    }
-
-    @Test
-    void generatedRepaymentRowsOmitPaymentStatusBeforeFinalDueDate() {
-        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(
-            repaymentApplication(LocalDate.of(2099, 12, 31), LoanStatus.DISBURSED),
-            List.of(paymentTransaction(LocalDate.of(2026, 1, 5), "10000.00", "2000.00")),
-            paymentSummary("50000.00")
-        );
-
-        assertThat(rows).allSatisfy(row -> assertThat(row).doesNotContainKey("paymentStatus"));
-    }
-
-    @Test
-    void generatedRepaymentRowsOmitPaymentStatusAfterFinalDueDate() {
-        List<Map<String, Object>> rows = loanPresentationService.generatedRepaymentRows(
-            repaymentApplication(LocalDate.of(2020, 12, 31), LoanStatus.DISBURSED),
-            List.of(paymentTransaction(LocalDate.of(2026, 1, 5), "10000.00", "2000.00")),
-            paymentSummary("50000.00")
-        );
-
-        assertThat(rows).allSatisfy(row -> assertThat(row).doesNotContainKey("paymentStatus"));
-    }
-
     private LoanApplication basicPrintableApplication() {
         return LoanApplication.builder()
             .id(UUID.randomUUID())
@@ -1486,38 +1232,6 @@ class LoanPresentationServiceTest {
                 }
                 """)
             .build();
-    }
-
-    private LoanPaymentTransaction paymentTransaction(LocalDate receiptDate, String principalPaid, String interestPaid) {
-        BigDecimal principal = new BigDecimal(principalPaid);
-        BigDecimal interest = new BigDecimal(interestPaid);
-        return LoanPaymentTransaction.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(UUID.randomUUID())
-            .saccoId("SACCO-1")
-            .externalLoanId("LN-001")
-            .receiptDate(receiptDate)
-            .principalPaid(principal)
-            .interestPaid(interest)
-            .totalPaid(principal.add(interest))
-            .fetchedAt(OffsetDateTime.parse("2026-07-10T09:00:00+03:00"))
-            .build();
-    }
-
-    private LoanPresentationService.LoanPaymentSummaryView paymentSummary(String outstanding) {
-        BigDecimal totalOutstanding = new BigDecimal(outstanding);
-        return new LoanPresentationService.LoanPaymentSummaryView(
-            true,
-            "Loan",
-            LocalDate.of(2026, 1, 5),
-            "2026-01-05",
-            totalOutstanding,
-            totalOutstanding.toPlainString(),
-            "-",
-            "-",
-            "-",
-            "-"
-        );
     }
 
     private Member basicApplicant() {

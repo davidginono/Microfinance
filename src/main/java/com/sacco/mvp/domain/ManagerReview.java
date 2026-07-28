@@ -33,6 +33,12 @@ public class ManagerReview {
 
     private String reasons;
 
+    @Column(name = "manager_signature_text")
+    private String managerSignatureText;
+
+    @Column(name = "manager_signature_verified_at")
+    private OffsetDateTime managerSignatureVerifiedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 }

@@ -487,6 +487,16 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     </form>
                                 </div>
                             </c:if>
+                            <c:if test="${currentWorkflowRejectionAcknowledgementRequired}">
+                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                                    <span><spring:message code="loan.rejection.readyAck" text="This loan application was rejected. Acknowledge the decision to clear it from your progress view." /></span>
+                                    <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${currentWorkflowApplication.id}/acknowledge-rejection" class="m-0">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                        <input type="hidden" name="returnTo" value="dashboard" />
+                                        <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
+                                    </form>
+                                </div>
+                            </c:if>
 
                             <%@ include file="../fragments/member-application-progress.jspf" %>
                         </div>

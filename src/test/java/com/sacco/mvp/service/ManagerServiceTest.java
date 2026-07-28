@@ -49,7 +49,6 @@ class ManagerServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private RepaymentScheduleService repaymentScheduleService;
     @Mock private RoleDirectoryService roleDirectoryService;
-    @Mock private LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private WorkflowRoutingService workflowRoutingService;
     @Mock private AuditService auditService;
@@ -73,7 +72,7 @@ class ManagerServiceTest {
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
         when(roleDirectoryService.hasActiveRoleInSacco(managerId, "SACCO-A", Position.MANAGER)).thenReturn(false);
 
-        assertThatThrownBy(() -> managerService.decide(loanId, managerId, ManagerDecision.REJECT, "No"))
+        assertThatThrownBy(() -> managerService.decide(loanId, managerId, ManagerDecision.REJECT, "No", "Manager Signature", OffsetDateTime.now()))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Forbidden");
 

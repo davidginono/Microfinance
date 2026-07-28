@@ -118,15 +118,11 @@ public class BoardService {
         if (decision == BoardDecision.REJECTED && normalizedComment == null) {
             throw new IllegalArgumentException("Add a comment before rejecting this review.");
         }
+        String normalizedSignature = normalizeSignature(signatureText, verifiedAt);
         review.setDecision(decision);
         review.setComment(normalizedComment);
-        if (decision == BoardDecision.APPROVED) {
-            review.setBoardSignatureText(signatureText == null ? null : signatureText.trim());
-            review.setBoardSignatureVerifiedAt(verifiedAt);
-        } else {
-            review.setBoardSignatureText(null);
-            review.setBoardSignatureVerifiedAt(null);
-        }
+        review.setBoardSignatureText(normalizedSignature);
+        review.setBoardSignatureVerifiedAt(verifiedAt);
         review.setDecidedAt(OffsetDateTime.now());
         boardReviewRepository.save(review);
         evaluateOutcome(app, stage, boardMemberId);
@@ -174,6 +170,7 @@ public class BoardService {
             return;
         } else if (rejections >= rejectionThreshold || (totalDecisions >= minimumVotes && approvals < approvalThreshold)) {
             app.setStatus(nextStatus);
+            app.setApplicantRejectionAcknowledgedAt(null);
             app.setUpdatedAt(OffsetDateTime.now());
             loanApplicationRepository.save(app);
             outboxService.enqueue("LOAN", loanId, nextStatus.name(), app.getApplicantMemberId(),
@@ -216,6 +213,14 @@ public class BoardService {
         }
         String normalized = comment.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeSignature(String signatureText, OffsetDateTime verifiedAt) {
+        String normalized = signatureText == null ? "" : signatureText.trim();
+        if (normalized.isBlank() || verifiedAt == null) {
+            throw new IllegalStateException("Save and verify your signature before recording this review.");
+        }
+        return normalized;
     }
 
     private LoanStatus pendingStatusFor(ApprovalWorkflowStage stage) {

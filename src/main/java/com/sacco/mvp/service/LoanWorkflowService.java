@@ -48,6 +48,15 @@ public class LoanWorkflowService {
         LoanStatus.DISBURSED,
         LoanStatus.DEFAULTED
     );
+    private static final List<LoanStatus> REJECTED_ACKNOWLEDGEMENT_STATUSES = List.of(
+        LoanStatus.MANAGER_REJECTED,
+        LoanStatus.LOAN_OFFICER_REJECTED,
+        LoanStatus.CHAIRPERSON_REJECTED,
+        LoanStatus.BOARD_REJECTED,
+        LoanStatus.CREDIT_COMMITTEE_REJECTED,
+        LoanStatus.ACCOUNTANT_REJECTED,
+        LoanStatus.REJECTED
+    );
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
@@ -60,7 +69,6 @@ public class LoanWorkflowService {
     private final OutboxService outboxService;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
-    private final LoanPaymentTransactionSyncService loanPaymentTransactionSyncService;
     private final FinancialDetailsService financialDetailsService;
     private final ObjectMapper objectMapper;
     private final ForesightDirectoryService foresightDirectoryService;
@@ -91,27 +99,30 @@ public class LoanWorkflowService {
         List<LoanApplication> activeLoans = loanApplicationRepository
             .findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(memberId, ACTIVE_LOAN_LOCK_STATUSES);
         LoanApplication latestCurrentApplication = loanApplicationRepository
-            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, PageRequest.of(0, 1))
+            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, REJECTED_ACKNOWLEDGEMENT_STATUSES, PageRequest.of(0, 1))
             .stream()
             .findFirst()
             .orElse(null);
         long unacknowledgedDisbursedApplicationCount = loanApplicationRepository
             .countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(memberId, LoanStatus.DISBURSED);
+        long unacknowledgedRejectedApplicationCount = loanApplicationRepository
+            .countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(memberId, REJECTED_ACKNOWLEDGEMENT_STATUSES);
         long pendingGuaranteeCount = guarantorRequestRepository.countVisiblePendingByGuarantorMemberId(memberId);
         return new MemberDashboardData(
             statusCounts,
             activeLoans,
             latestCurrentApplication,
             unacknowledgedDisbursedApplicationCount,
+            unacknowledgedRejectedApplicationCount,
             pendingGuaranteeCount
         );
     }
 
     public MemberApplicationListData memberApplicationList(UUID memberId) {
         List<LoanApplication> currentApplications = loanApplicationRepository
-            .findVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES);
+            .findVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, REJECTED_ACKNOWLEDGEMENT_STATUSES);
         LoanApplication latestCurrentApplication = loanApplicationRepository
-            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, PageRequest.of(0, 1))
+            .findLatestVisibleCurrentForApplicant(memberId, APPLICATION_IN_PROGRESS_LOCK_STATUSES, REJECTED_ACKNOWLEDGEMENT_STATUSES, PageRequest.of(0, 1))
             .stream()
             .findFirst()
             .orElse(null);
@@ -136,6 +147,20 @@ public class LoanWorkflowService {
         if (app.getApplicantDisbursementAcknowledgedAt() == null) {
             OffsetDateTime now = OffsetDateTime.now();
             app.setApplicantDisbursementAcknowledgedAt(now);
+            app.setUpdatedAt(now);
+            loanApplicationRepository.save(app);
+        }
+    }
+
+    @Transactional
+    public void acknowledgeRejection(UUID appId, UUID memberId) {
+        LoanApplication app = getMine(appId, memberId);
+        if (!REJECTED_ACKNOWLEDGEMENT_STATUSES.contains(app.getStatus())) {
+            throw new IllegalStateException("Only rejected loan applications can be acknowledged.");
+        }
+        if (app.getApplicantRejectionAcknowledgedAt() == null) {
+            OffsetDateTime now = OffsetDateTime.now();
+            app.setApplicantRejectionAcknowledgedAt(now);
             app.setUpdatedAt(now);
             loanApplicationRepository.save(app);
         }
@@ -602,17 +627,6 @@ public class LoanWorkflowService {
         app.setApplicantSignatureVerifiedAt(verifiedAt);
         app.setUpdatedAt(OffsetDateTime.now());
         loanApplicationRepository.save(app);
-    }
-
-    @Transactional
-    public int syncLoanPayments(UUID appId, UUID memberId) {
-        LoanApplication app = getMine(appId, memberId);
-        if (app.getLoanId() == null || app.getLoanId().isBlank()) {
-            throw new IllegalStateException("This loan has not been disbursed yet.");
-        }
-        int syncedRows = loanPaymentTransactionSyncService.syncAllAndRefreshSummary(app);
-        auditLoan(app, memberId, "LOAN_PAYMENT_SYNC", "Loan payment sync", Map.of("syncedRows", syncedRows));
-        return syncedRows;
     }
 
     public Page<Member> searchGuarantors(String saccoId, String stationId, UUID applicantId, String q, int page, int size) {
@@ -1477,6 +1491,7 @@ public class LoanWorkflowService {
         List<LoanApplication> activeLoans,
         LoanApplication latestCurrentApplication,
         long unacknowledgedDisbursedApplicationCount,
+        long unacknowledgedRejectedApplicationCount,
         long pendingGuaranteeCount
     ) {
     }

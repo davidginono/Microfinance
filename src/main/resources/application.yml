@@ -99,7 +99,7 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
   time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
   session:
-    inactivity-prompt-ms: ${APP_SESSION_INACTIVITY_PROMPT_MS:60000}
+    inactivity-prompt-ms: ${APP_SESSION_INACTIVITY_PROMPT_MS:6000000}
     inactivity-grace-ms: ${APP_SESSION_INACTIVITY_GRACE_MS:60000}
   mail:
     from-address: no-reply@foresight.co.tz
@@ -116,13 +116,6 @@ app:
     enabled: ${APP_UPLOAD_MIGRATION_ENABLED:false}
     loan-root: ${APP_UPLOAD_MIGRATION_LOAN_ROOT:loan-uploads/applications}
     logo-root: ${APP_UPLOAD_MIGRATION_LOGO_ROOT:branding/sacco-logos}
-  loan-payments:
-    sync-enabled: ${APP_LOAN_PAYMENTS_SYNC_ENABLED:true}
-    sync-cron: "${APP_LOAN_PAYMENTS_SYNC_CRON:0 0 10 1 * *}"
-    recent-sync-cron: "${APP_LOAN_PAYMENTS_RECENT_SYNC_CRON:0 0 8,14 * * *}"
-    retry-delay: ${APP_LOAN_PAYMENTS_RETRY_DELAY:2m}
-    sync-page-size: ${APP_LOAN_PAYMENTS_SYNC_PAGE_SIZE:100}
-    sync-zone: ${APP_LOAN_PAYMENTS_SYNC_ZONE:Africa/Nairobi}
   sms:
     enabled: ${APP_SMS_ENABLED:true}
     connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}
@@ -152,7 +145,3 @@ app:
 external:
   foresight:
     base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}
-  memberportal:
-    base-url: ${EXTERNAL_MEMBERPORTAL_BASE_URL:https://api.foresightfin.app}
-    connect-timeout: ${EXTERNAL_MEMBERPORTAL_CONNECT_TIMEOUT:3s}
-    read-timeout: ${EXTERNAL_MEMBERPORTAL_READ_TIMEOUT:8s}

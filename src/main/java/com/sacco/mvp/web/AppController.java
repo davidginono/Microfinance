@@ -2,7 +2,6 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.config.MemberLocaleInterceptor;
-import com.sacco.mvp.integration.memberportal.LoanPaymentLookupException;
 import com.sacco.mvp.repository.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EligibilityService;
@@ -106,7 +105,6 @@ public class AppController {
     private final BoardReviewRepository boardReviewRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final UserSettingsRepository userSettingsRepository;
-    private final LoanPaymentTransactionRepository loanPaymentTransactionRepository;
     private final ForesightDirectoryService foresightDirectoryService;
     private final ObjectMapper objectMapper;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
@@ -248,6 +246,7 @@ public class AppController {
             ? List.of()
             : buildDashboardWorkflowSteps(currentWorkflowApplication));
         model.addAttribute("managerReasons", loanPresentationService.rejectionFeedbackReasons(apps));
+        model.addAttribute("rejectionAcknowledgementRequiredById", rejectionAcknowledgementRequiredById(apps));
         model.addAttribute("archiveCount", applications.archiveCount());
         return "app/loan-applications";
     }
@@ -261,6 +260,25 @@ public class AppController {
         try {
             loanWorkflowService.acknowledgeDisbursement(id, principal.getMemberId());
             ra.addFlashAttribute("message", "Disbursement update acknowledged.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return switch (returnTo) {
+            case "dashboard" -> "redirect:/app/dashboard";
+            case "detail" -> "redirect:/app/loan-applications/" + id;
+            default -> "redirect:/app/loan-applications";
+        };
+    }
+
+    @PostMapping("/loan-applications/{id}/acknowledge-rejection")
+    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
+    public String acknowledgeRejection(@AuthenticationPrincipal AppUserPrincipal principal,
+                                       @PathVariable UUID id,
+                                       @RequestParam(defaultValue = "applications") String returnTo,
+                                       RedirectAttributes ra) {
+        try {
+            loanWorkflowService.acknowledgeRejection(id, principal.getMemberId());
+            ra.addFlashAttribute("message", "Rejection decision acknowledged.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -418,8 +436,6 @@ public class AppController {
             .sorted(Comparator.comparing(LoanApplication::getFinalDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
             .filter(app -> !hasRepaymentTimeframeEnded(app) || !dismissedChartIds.contains(app.getId()))
             .map(app -> {
-                LoanPresentationService.LoanPaymentSummaryView paymentSummary =
-                    loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
                 Map<String, Object> row = new LinkedHashMap<>();
                 long daysLeft = app.getFinalDueDate() == null ? 0 : Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, app.getFinalDueDate()));
                 long totalDays = 0L;
@@ -448,18 +464,17 @@ public class AppController {
                 row.put("countdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
                 row.put("canDismiss", hasRepaymentTimeframeEnded(app));
                 row.put("repaymentStateCode", app.getStatus().name());
-                row.put("repaymentStateLabel", repaymentStateLabel(app, paymentSummary, today));
-                row.put("repaymentStateClasses", repaymentStateClasses(app, paymentSummary, today));
-                row.put("paymentSummaryAvailable", paymentSummary.available());
-                row.put("loanDescription", paymentSummary.loanDescription());
-                row.put("lastPaymentDate", paymentSummary.lastPaymentDateLabel());
-                row.put("totalOutstanding", paymentSummary.totalOutstandingLabel());
-                row.put("paidAmount", paymentSummary.totalPrincipalPaidLabel());
-                row.put("currentBalance", paymentSummary.totalOutstandingLabel());
-                row.put("outstandingPrincipal", paymentSummary.outstandingPrincipalLabel());
-                row.put("outstandingInterest", paymentSummary.outstandingInterestLabel());
-                row.put("totalPrincipalPaid", paymentSummary.totalPrincipalPaidLabel());
-                row.put("totalInterestPaid", paymentSummary.totalInterestPaidLabel());
+                row.put("repaymentStateLabel", repaymentStateLabel(app, today));
+                row.put("repaymentStateClasses", repaymentStateClasses(app, today));
+                row.put("loanDescription", loanProductName(app, loanProductNames));
+                row.put("lastPaymentDate", "-");
+                row.put("totalOutstanding", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("paidAmount", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));
+                row.put("currentBalance", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("outstandingPrincipal", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("outstandingInterest", "-");
+                row.put("totalPrincipalPaid", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));
+                row.put("totalInterestPaid", "-");
                 return row;
             })
             .toList();
@@ -1180,19 +1195,12 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("decisionFeedback", isRejectedStatus(app.getStatus()) ? loanPresentationService.rejectionFeedback(id) : List.of());
-        var repaymentTransactions = loanPaymentTransactionRepository.findByLoanApplicationIdOrderByReceiptDateAscProviderOrderDesc(app.getId());
-        var paymentSummary = loanPresentationService.parseLoanPaymentSummaryView(app.getLoanPaymentSummaryJson());
-        boolean hasPaymentRecords = !repaymentTransactions.isEmpty();
-        model.addAttribute("generatedRepaymentRows", loanPresentationService.generatedRepaymentRows(app, repaymentTransactions, paymentSummary));
-        model.addAttribute("generatedRepaymentRowsArePaymentRecords", hasPaymentRecords);
         model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
-        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(
-            app.getRepaymentScheduleJson(),
-            repaymentTransactions,
-            paymentSummary));
+        model.addAttribute("repaymentRows", loanPresentationService.parseRepaymentRows(app.getRepaymentScheduleJson()));
+        model.addAttribute("rejectionAcknowledgementRequired", requiresRejectionAcknowledgement(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("repaymentDaysLeft",
             app.getFinalDueDate() == null ? null : java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), app.getFinalDueDate()));
@@ -1413,25 +1421,6 @@ public class AppController {
                                  RedirectAttributes ra) {
         loanWorkflowService.selectGuarantors(id, principal.getMemberId(), guarantorIds);
         ra.addFlashAttribute("message", "Guarantors assigned successfully");
-        return "redirect:/app/loan-applications/" + id;
-    }
-
-    @PostMapping("/loan-applications/{id}/sync-payments")
-    @PreAuthorize("hasRole('MEMBER') and @userClaims.has(principal, 'APPLY_LOANS') and @authz.isLoanOwner(#id, principal)")
-    public String syncLoanPayments(@PathVariable UUID id,
-                                   @AuthenticationPrincipal AppUserPrincipal principal,
-                                   RedirectAttributes ra) {
-        try {
-            int changes = loanWorkflowService.syncLoanPayments(id, principal.getMemberId());
-            ra.addFlashAttribute("message",
-                changes == 0
-                    ? "Repayment history refreshed; it already matched the payment system."
-                    : "Repayment history refreshed; " + changes + " record change(s) were reconciled.");
-        } catch (LoanPaymentLookupException ex) {
-            ra.addFlashAttribute("error", "Repayment data could not be fetched: " + ex.getMessage());
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
         return "redirect:/app/loan-applications/" + id;
     }
 
@@ -2973,9 +2962,7 @@ public class AppController {
         return normalized.isBlank() ? null : normalized;
     }
 
-    private String repaymentStateLabel(LoanApplication app,
-                                       LoanPresentationService.LoanPaymentSummaryView paymentSummary,
-                                       LocalDate today) {
+    private String repaymentStateLabel(LoanApplication app, LocalDate today) {
         if (app.getStatus() == LoanStatus.PAID) {
             return message("analytics.paid");
         }
@@ -2983,27 +2970,16 @@ public class AppController {
             return message("analytics.defaulted");
         }
         if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
-            if (paymentSummary.available()
-                && paymentSummary.totalOutstanding() != null
-                && paymentSummary.totalOutstanding().compareTo(BigDecimal.ZERO) > 0) {
-                return message("analytics.defaulted");
-            }
             return message("loan.repayment.overdue");
         }
         return message("analytics.active");
     }
 
-    private String repaymentStateClasses(LoanApplication app,
-                                         LoanPresentationService.LoanPaymentSummaryView paymentSummary,
-                                         LocalDate today) {
+    private String repaymentStateClasses(LoanApplication app, LocalDate today) {
         if (app.getStatus() == LoanStatus.PAID) {
             return "border-emerald-200 bg-emerald-50 text-emerald-700";
         }
-        if (app.getStatus() == LoanStatus.DEFAULTED
-            || (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)
-            && paymentSummary.available()
-            && paymentSummary.totalOutstanding() != null
-            && paymentSummary.totalOutstanding().compareTo(BigDecimal.ZERO) > 0)) {
+        if (app.getStatus() == LoanStatus.DEFAULTED) {
             return "border-rose-200 bg-rose-50 text-rose-700";
         }
         if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
@@ -3156,9 +3132,28 @@ public class AppController {
     private boolean isRejectedStatus(LoanStatus status) {
         return status == LoanStatus.MANAGER_REJECTED
             || status == LoanStatus.LOAN_OFFICER_REJECTED
+            || status == LoanStatus.CHAIRPERSON_REJECTED
             || status == LoanStatus.BOARD_REJECTED
+            || status == LoanStatus.CREDIT_COMMITTEE_REJECTED
             || status == LoanStatus.ACCOUNTANT_REJECTED
             || status == LoanStatus.REJECTED;
+    }
+
+    private boolean requiresRejectionAcknowledgement(LoanApplication app) {
+        return app != null
+            && isRejectedStatus(app.getStatus())
+            && app.getApplicantRejectionAcknowledgedAt() == null;
+    }
+
+    private Map<UUID, Boolean> rejectionAcknowledgementRequiredById(List<LoanApplication> apps) {
+        if (apps == null || apps.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, Boolean> requiredById = new HashMap<>();
+        for (LoanApplication app : apps) {
+            requiredById.put(app.getId(), requiresRejectionAcknowledgement(app));
+        }
+        return requiredById;
     }
 
     private Map<String, Object> externalAccountStatusPayload(ExternalAccountStatusService.ExternalAccountStatusView status) {

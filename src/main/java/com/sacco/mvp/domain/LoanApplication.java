@@ -117,6 +117,9 @@ public class LoanApplication {
     @Column(name = "applicant_disbursement_acknowledged_at")
     private OffsetDateTime applicantDisbursementAcknowledgedAt;
 
+    @Column(name = "applicant_rejection_acknowledged_at")
+    private OffsetDateTime applicantRejectionAcknowledgedAt;
+
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 
@@ -126,13 +129,6 @@ public class LoanApplication {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "repayment_schedule_json", columnDefinition = "jsonb")
     private String repaymentScheduleJson;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "loan_payment_summary_json", columnDefinition = "jsonb")
-    private String loanPaymentSummaryJson;
-
-    @Column(name = "loan_payment_summary_fetched_at")
-    private OffsetDateTime loanPaymentSummaryFetchedAt;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

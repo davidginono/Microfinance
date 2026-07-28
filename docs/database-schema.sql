@@ -227,11 +227,10 @@ CREATE TABLE public.loan_applications (
     paid_marked_by_manager_id uuid,
     loan_id character varying(20),
     application_number bigint NOT NULL,
-    loan_payment_summary_fetched_at timestamp(6) with time zone,
-    loan_payment_summary_json jsonb,
     station_id character varying(255) NOT NULL,
     payment_details_snapshot jsonb,
     applicant_disbursement_acknowledged_at timestamp with time zone,
+    applicant_rejection_acknowledged_at timestamp with time zone,
     deposit_amount numeric(18,2),
     loan_product_setting_id uuid,
     CONSTRAINT loan_applications_loan_type_check CHECK (((loan_type)::text = ANY (ARRAY['LOAN_ADVANCE'::text, 'EDUCATION_LOAN'::text, 'EMERGENCY_LOAN'::text, 'DEVELOPMENT_LOAN'::text, 'CUSTOMIZED_LOAN'::text]))),
@@ -240,29 +239,6 @@ CREATE TABLE public.loan_applications (
 );
 
 
---
--- Name: loan_payment_transactions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.loan_payment_transactions (
-    id uuid NOT NULL,
-    external_loan_id character varying(20) NOT NULL,
-    fetched_at timestamp(6) with time zone NOT NULL,
-    interest_paid numeric(18,2) NOT NULL,
-    loan_application_id uuid NOT NULL,
-    principal_paid numeric(18,2) NOT NULL,
-    receipt_date date NOT NULL,
-    sacco_id character varying(64) NOT NULL,
-    total_paid numeric(18,2) NOT NULL,
-    outstanding_balance numeric(18,2),
-    outstanding_principal numeric(18,2),
-    outstanding_interest numeric(18,2),
-    provider_order integer DEFAULT 0 NOT NULL,
-    duplicate_occurrence integer DEFAULT 0 NOT NULL
-);
-
-
---
 -- Name: loan_product_board_reviewers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -394,6 +370,8 @@ CREATE TABLE public.manager_reviews (
     decision character varying(255) NOT NULL,
     loan_application_id uuid NOT NULL,
     manager_member_id uuid NOT NULL,
+    manager_signature_text character varying(255),
+    manager_signature_verified_at timestamp(6) with time zone,
     reasons character varying(255),
     review_stage character varying(255) NOT NULL,
     CONSTRAINT manager_reviews_decision_check CHECK (((decision)::text = ANY (ARRAY[('ACCEPT'::character varying)::text, ('REJECT'::character varying)::text])))
@@ -869,15 +847,6 @@ ALTER TABLE ONLY public.loan_applications
     ADD CONSTRAINT loan_applications_pkey PRIMARY KEY (id);
 
 
---
--- Name: loan_payment_transactions loan_payment_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.loan_payment_transactions
-    ADD CONSTRAINT loan_payment_transactions_pkey PRIMARY KEY (id);
-
-
---
 -- Name: loan_product_board_reviewers loan_product_board_reviewers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1221,14 +1190,6 @@ CREATE INDEX idx_audit_log_scope_created_at ON public.audit_log USING btree (sac
 CREATE INDEX idx_audit_log_status_created_at ON public.audit_log USING btree (event_status, created_at DESC);
 
 
---
--- Name: idx_loan_payment_transaction_history_order; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_loan_payment_transaction_history_order ON public.loan_payment_transactions USING btree (loan_application_id, receipt_date, provider_order DESC);
-
-
---
 -- Name: idx_loan_product_board_reviewers_member; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1320,6 +1281,13 @@ CREATE INDEX ix_loan_applications_applicant_disbursement_ack ON public.loan_appl
 
 
 --
+-- Name: ix_loan_applications_applicant_rejection_ack; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_loan_applications_applicant_rejection_ack ON public.loan_applications USING btree (applicant_member_id, status, applicant_rejection_acknowledged_at, updated_at DESC);
+
+
+--
 -- Name: ix_loan_applications_product_setting; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1347,14 +1315,6 @@ CREATE UNIQUE INDEX uk_members_staff_no ON public.members USING btree (lower((st
 CREATE INDEX ix_stored_uploads_owner_category ON public.stored_uploads USING btree (owner_type, owner_id, category);
 
 
---
--- Name: uk_loan_payment_transaction_occurrence; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_loan_payment_transaction_occurrence ON public.loan_payment_transactions USING btree (loan_application_id, receipt_date, principal_paid, interest_paid, total_paid, duplicate_occurrence);
-
-
---
 -- Name: ux_loan_applications_sacco_appnum; Type: INDEX; Schema: public; Owner: -
 --
 

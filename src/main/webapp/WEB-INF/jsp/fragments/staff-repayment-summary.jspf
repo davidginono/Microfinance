@@ -43,90 +43,10 @@
                 </c:forEach>
             </div>
 
-            <c:if test="${not empty generatedRepaymentRows or not empty calculatedRepaymentRows}">
-                <c:if test="${allowPaymentSync and not empty app.loanId}">
-                    <div class="flex flex-wrap items-center justify-end gap-2">
-                        <c:if test="${allowDefaultedPaymentRecheck and app.status eq 'DEFAULTED'}">
-                            <form action="${reviewBasePath}/loan-applications/${app.id}/recheck-defaulted-payment"
-                                  method="post"
-                                  data-confirm-title="<spring:message code='loan.repayment.recheckDefaulted' text='Recheck Defaulted Loan' />"
-                                  data-confirm-message="<spring:message code='loan.repayment.recheckDefaultedConfirm' text='Verify this defaulted loan against the payment system now? If the outstanding balance is zero, the status will change to PAID and guarantor capacity will be released.' />"
-                                  data-confirm-proceed="<spring:message code='loan.repayment.recheckLoan' text='Recheck Loan' />">
-                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                <button type="submit" class="app-btn btn-primary"><spring:message code="loan.repayment.recheckDefaulted" text="Recheck Defaulted Loan" /></button>
-                            </form>
-                        </c:if>
-                        <form action="${reviewBasePath}/loan-applications/${app.id}/sync-payments" method="post">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                            <button type="submit" class="app-btn btn-neutral"><spring:message code="loan.repayment.refresh" text="Refresh Payments" /></button>
-                        </form>
-                    </div>
-                </c:if>
-                <c:if test="${not empty generatedRepaymentRows or not repaymentSummaryEstimated}">
-                <c:set var="showGeneratedScheduleColumns" value="${not generatedRepaymentRowsArePaymentRecords and not empty generatedRepaymentRows}" />
-                <div class="erp-table-wrap erp-table-scroll">
-                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                        <div class="text-sm font-semibold text-slate-900">
-                            <c:choose>
-                                <c:when test="${generatedRepaymentRowsArePaymentRecords}"><spring:message code="loan.repayment.paymentRecords" text="Record of Payments" /></c:when>
-                                <c:otherwise><spring:message code="loan.repayment.paymentRecords" text="Record of Payments" /></c:otherwise>
-                            </c:choose>
-                        </div>
-                    </div>
-                    <table class="erp-table">
-                        <thead>
-                            <tr>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.installment" text="Installment" /></th>
-                                <c:if test="${showGeneratedScheduleColumns}">
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.dueDate" text="Due Date" /></th>
-                                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.scheduledAmount" text="Scheduled Amount" /></th>
-                                </c:if>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingPrincipal" text="Outstanding Principal" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingInterest" text="Outstanding Interest" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.principalPaid" text="Principal Paid" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.interestPaid" text="Interest Paid" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.totalPaid" text="Total Paid" /></th>
-                                <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.paymentDate" text="Payment Date" /></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                        <c:forEach items="${generatedRepaymentRows}" var="row">
-                            <tr>
-                                <td class="px-3 py-2">${row.installment}</td>
-                                <c:if test="${showGeneratedScheduleColumns}">
-                                    <td class="px-3 py-2">${row.dueDate}</td>
-                                    <td class="px-3 py-2">
-                                        <div>${row.amount}</div>
-                                        <c:if test="${not empty row.scheduledBreakdown}">
-                                            <div class="mt-1 text-xs text-slate-500">${row.scheduledBreakdown}</div>
-                                        </c:if>
-                                    </td>
-                                </c:if>
-                                <td class="px-3 py-2">${row.outstandingBalance}</td>
-                                <td class="px-3 py-2">${row.outstandingPrincipal}</td>
-                                <td class="px-3 py-2">${row.outstandingInterest}</td>
-                                <td class="px-3 py-2">${row.principalPaid}</td>
-                                <td class="px-3 py-2">${row.interestPaid}</td>
-                                <td class="px-3 py-2">${row.totalPaid}</td>
-                                <td class="px-3 py-2">${row.paymentDate}</td>
-                            </tr>
-                        </c:forEach>
-                        <c:if test="${empty generatedRepaymentRows}">
-                            <tr>
-                                <td colspan="${showGeneratedScheduleColumns ? 10 : 8}" class="px-3 py-3 text-slate-500">
-                                    <spring:message code="loan.repayment.paymentRecords.empty" text="No payment records have been received yet." />
-                                </td>
-                            </tr>
-                        </c:if>
-                        </tbody>
-                    </table>
-                </div>
-                </c:if>
-                <c:if test="${not empty calculatedRepaymentRows}">
-                <details class="expected-schedule-details rounded-md border border-slate-200 bg-white">
+            <c:if test="${not empty calculatedRepaymentRows}">
+                <details class="expected-schedule-details rounded-md border border-slate-200 bg-white" open>
                     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
-                        <span><spring:message code="loan.repayment.expectedScheduleToggle" text="See Expected Schedule From Loan Calculator" /></span>
+                        <span><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></span>
                         <svg class="expected-schedule-chevron h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                         </svg>
@@ -160,7 +80,6 @@
                         </table>
                     </div>
                 </details>
-                </c:if>
             </c:if>
         </div>
     </section>

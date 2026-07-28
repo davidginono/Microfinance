@@ -315,7 +315,7 @@
                     </td>
                     <td class="px-3 py-2 text-slate-700">
                         <c:choose>
-                            <c:when test="${assessor.decision eq 'APPROVED' and not empty assessor.signatureText}">
+                            <c:when test="${not empty assessor.signatureText}">
                                 <div class="text-xl text-slate-900" style="font-family:'Brush Script MT','Segoe Script','Lucida Handwriting',cursive;">${assessor.signatureText}</div>
                                 <c:if test="${not empty assessor.signatureVerifiedAt}">
                                     <div class="mt-1 text-xs text-slate-500">${fn:replace(fn:substring(assessor.signatureVerifiedAt, 0, 16), 'T', ' ')}</div>
@@ -811,32 +811,4 @@
 <%@ include file="../fragments/guarantor-financial-fetch.jspf" %>
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
 <%@ include file="../fragments/loan-export-modal.jspf" %>
-<script>
-    (() => {
-        const url = "${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/active-loans/outstanding-balances";
-        const cells = document.querySelectorAll("[data-active-loan-outstanding]");
-        if (!cells.length) {
-            return;
-        }
-        fetch(url, {
-            headers: {
-                "Accept": "application/json"
-            },
-            credentials: "same-origin"
-        })
-            .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
-            .then(({ ok, payload }) => {
-                if (!ok || !payload || !Array.isArray(payload.rows)) {
-                    return;
-                }
-                payload.rows.forEach((row) => {
-                    const cell = document.querySelector('[data-active-loan-outstanding="' + row.id + '"]');
-                    if (cell && row.outstandingBalance) {
-                        cell.textContent = row.outstandingBalance;
-                    }
-                });
-            })
-            .catch(() => {});
-    })();
-</script>
 <%@ include file="../fragments/footer.jspf" %>
