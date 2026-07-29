@@ -14,6 +14,8 @@ import java.util.UUID;
 
 @Getter
 public class AppUserPrincipal implements UserDetails {
+    private static final long serialVersionUID = -4042803929349064595L;
+
     private final UUID memberId;
     private final String saccoId;
     private final String stationId;
@@ -72,7 +74,24 @@ public class AppUserPrincipal implements UserDetails {
     }
 
     public boolean hasMetadataRole(Position role) {
-        return role != null && grantedPositions.contains(role);
+        return role != null && grantedPositions != null && grantedPositions.contains(role);
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities == null ? java.util.Collections.emptyList() : authorities;
+    }
+
+    public Set<String> getClaims() {
+        return claims == null ? java.util.Collections.emptySet() : claims;
+    }
+
+    public Set<Position> getGrantedPositions() {
+        return grantedPositions == null ? java.util.Collections.emptySet() : grantedPositions;
+    }
+
+    public Set<Position> getStaffRoles() {
+        return staffRoles == null ? java.util.Collections.emptySet() : staffRoles;
     }
 
     public boolean isPlatformIdentity() {
