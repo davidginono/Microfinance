@@ -11,6 +11,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ClaimsOnlyAccessMigrationTest {
 
     @Test
+    void initialMigrationIgnoresOrphanedLegacyUserSettings() throws IOException {
+        String migration = Files.readString(Path.of(
+            "src/main/resources/db/migration/V17__member_access_claim_matrix.sql"
+        ));
+
+        assertThat(migration).contains(
+            "FROM public.user_settings us",
+            "JOIN public.members m ON m.id = us.member_id"
+        );
+    }
+
+    @Test
     void repairMigrationCoversEveryStaffWorkspaceAndAdministratorRecoveryClaim() throws IOException {
         String migration = Files.readString(Path.of(
             "src/main/resources/db/migration/V21__repair_required_workspace_access_claims.sql"
