@@ -49,23 +49,35 @@ public class SaccoRegistryService {
         }
     }
 
+    public List<RegisteredSaccoView> listRegisteredSaccosFresh() {
+        return loadRegisteredSaccos();
+    }
+
+    public java.util.Optional<RegisteredSaccoView> findRegisteredSaccoView(String saccoId) {
+        return registeredSaccoRepository.findById(normalizeSaccoId(saccoId))
+            .filter(RegisteredSacco::isActive)
+            .map(this::toRegisteredSaccoView);
+    }
+
     private List<RegisteredSaccoView> loadRegisteredSaccos() {
         return registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
             .filter(sacco -> !"PLATFORM".equalsIgnoreCase(sacco.getSaccoId()))
-            .map(sacco -> {
-                List<SaccoStation> stations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
-                return new RegisteredSaccoView(
-                    sacco.getSaccoId(),
-                    sacco.getSaccoName(),
-                    stations.stream()
-                        .map(station -> new StationView(station.getStationId(), station.getAddressLocation()))
-                        .toList(),
-                    saccoLogoStorageService.hasLogo(sacco.getSaccoId()),
-                    saccoLogoStorageService.publicLogoUrl(sacco.getSaccoId(), sacco.getUpdatedAt()),
-                    aggregateStationAccess(stations)
-                );
-            })
+            .map(this::toRegisteredSaccoView)
             .toList();
+    }
+
+    private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco) {
+        List<SaccoStation> stations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
+        return new RegisteredSaccoView(
+            sacco.getSaccoId(),
+            sacco.getSaccoName(),
+            stations.stream()
+                .map(station -> new StationView(station.getStationId(), station.getAddressLocation()))
+                .toList(),
+            saccoLogoStorageService.hasLogo(sacco.getSaccoId()),
+            saccoLogoStorageService.publicLogoUrl(sacco.getSaccoId(), sacco.getUpdatedAt()),
+            aggregateStationAccess(stations)
+        );
     }
 
     public void invalidateRegisteredSaccoCache() {

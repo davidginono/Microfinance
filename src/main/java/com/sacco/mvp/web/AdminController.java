@@ -1707,7 +1707,7 @@ public class AdminController {
     @GetMapping("/saccos/minor-admins")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_VIEW')")
     public String minorAdmins(Model model) {
-        List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos();
+        List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccosFresh();
         model.addAttribute("registeredSaccos", registeredSaccos);
         model.addAttribute("registeredSaccoNamesById", registeredSaccoNamesById(registeredSaccos));
         model.addAttribute("minorAdmins", adminService.minorAdmins());

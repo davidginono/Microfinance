@@ -1,5 +1,8 @@
 package com.sacco.mvp.service;
 
+import com.sacco.mvp.domain.Member;
+import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -18,6 +21,7 @@ public class AdminScopeService {
 
     private final ObjectFactory<HttpServletRequest> requestFactory;
     private final SaccoRegistryService saccoRegistryService;
+    private final MemberRepository memberRepository;
 
     public AdminScopeView currentScope(AppUserPrincipal principal) {
         if (!isAdminWorkspaceUser(principal)) {
@@ -28,38 +32,37 @@ public class AdminScopeService {
         if (cachedScope instanceof AdminScopeView scopeView) {
             return scopeView;
         }
-        List<SaccoRegistryService.RegisteredSaccoView> options = availableOptions(principal);
+        WorkspaceAssignment assignment = currentAssignment(principal);
+        List<SaccoRegistryService.RegisteredSaccoView> options = availableOptions(assignment.saccoId());
         if (options.isEmpty()) {
-            return null;
+            throw new IllegalStateException(
+                "Your assigned SACCO is not active. Ask a platform administrator to restore it, then refresh this page."
+            );
         }
 
         HttpSession session = request.getSession(true);
-        String selectedSaccoId = principal.getSaccoId();
+        String selectedSaccoId = assignment.saccoId();
         SaccoRegistryService.RegisteredSaccoView selectedSacco = options.stream()
             .filter(option -> option.saccoId().equals(selectedSaccoId))
             .findFirst()
             .orElse(options.getFirst());
 
-        String selectedStationId = attributeAsString(session.getAttribute(SESSION_STATION_ID));
-        if (selectedStationId == null || !selectedSacco.stationIds().contains(selectedStationId)) {
-            selectedStationId = principal.getStationId() != null && selectedSacco.stationIds().contains(principal.getStationId())
-                ? principal.getStationId()
-                : selectedSacco.stationIds().getFirst();
-        }
+        SaccoRegistryService.StationView selectedStation = selectedSacco.getStations().stream()
+            .filter(station -> station.stationId().equalsIgnoreCase(assignment.stationId()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(
+                "Your assigned station is not active for this SACCO. Ask a platform administrator to correct the assignment, then refresh this page."
+            ));
+        String selectedStationId = selectedStation.stationId();
 
         session.setAttribute(SESSION_SACCO_ID, selectedSacco.saccoId());
         session.setAttribute(SESSION_STATION_ID, selectedStationId);
-        String currentStationId = selectedStationId;
 
         AdminScopeView scopeView = new AdminScopeView(
             selectedSacco.saccoId(),
             selectedSacco.saccoName(),
             selectedStationId,
-            selectedSacco.getStations().stream()
-                .filter(station -> station.stationId().equals(currentStationId))
-                .findFirst()
-                .map(SaccoRegistryService.StationView::getAddressLocationLabel)
-                .orElse("Location not set"),
+            selectedStation.getAddressLocationLabel(),
             options
         );
         request.setAttribute(REQUEST_SCOPE_VIEW, scopeView);
@@ -80,8 +83,13 @@ public class AdminScopeService {
         if (!isAdminWorkspaceUser(principal)) {
             throw new IllegalStateException("Admin workspace access is not available for this account.");
         }
-        String resolvedSaccoId = principal.getSaccoId();
-        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
+        WorkspaceAssignment assignment = currentAssignment(principal);
+        if (saccoId == null || !assignment.saccoId().equalsIgnoreCase(saccoId.trim())
+            || stationId == null || !assignment.stationId().equalsIgnoreCase(stationId.trim())) {
+            throw new IllegalStateException("Your workspace is locked to the SACCO and station assigned to your account.");
+        }
+        String resolvedSaccoId = assignment.saccoId();
+        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, assignment.stationId());
         HttpSession session = requestFactory.getObject().getSession(true);
         session.setAttribute(SESSION_SACCO_ID, resolvedSaccoId);
         session.setAttribute(SESSION_STATION_ID, resolvedStationId);
@@ -117,12 +125,29 @@ public class AdminScopeService {
             && !principal.isPlatformIdentity();
     }
 
-    private List<SaccoRegistryService.RegisteredSaccoView> availableOptions(AppUserPrincipal principal) {
-        List<SaccoRegistryService.RegisteredSaccoView> options = saccoRegistryService.listRegisteredSaccos();
-        return options.stream()
-            .filter(option -> option.saccoId().equals(principal.getSaccoId()))
-            .toList();
+    private List<SaccoRegistryService.RegisteredSaccoView> availableOptions(String saccoId) {
+        return saccoRegistryService.findRegisteredSaccoView(saccoId)
+            .map(List::of)
+            .orElseGet(List::of);
     }
+
+    private WorkspaceAssignment currentAssignment(AppUserPrincipal principal) {
+        Member member = memberRepository.findById(principal.getMemberId())
+            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
+            .orElseThrow(() -> new IllegalStateException(
+                "Your admin account is no longer active. Sign out and contact a platform administrator."
+            ));
+        String saccoId = attributeAsString(member.getSaccoId());
+        String stationId = attributeAsString(member.getStationId());
+        if (saccoId == null || stationId == null) {
+            throw new IllegalStateException(
+                "Your admin account has no complete SACCO and station assignment. Ask a platform administrator to correct it, then refresh this page."
+            );
+        }
+        return new WorkspaceAssignment(saccoId, stationId);
+    }
+
+    private record WorkspaceAssignment(String saccoId, String stationId) {}
 
     @lombok.Getter
     @lombok.AllArgsConstructor
