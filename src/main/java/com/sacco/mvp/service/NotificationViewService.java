@@ -29,7 +29,10 @@ public class NotificationViewService {
         if (notifications == null) {
             return Collections.emptyList();
         }
-        return notifications.stream().map(this::toView).toList();
+        return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
+            .map(this::toView)
+            .toList();
     }
 
     public List<NotificationView> toViewsForPrincipal(List<Notification> notifications, AppUserPrincipal principal) {
@@ -43,6 +46,7 @@ public class NotificationViewService {
             return Collections.emptyList();
         }
         return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
             .filter(notification -> isVisibleToPrincipal(notification.getType(), principal))
             .map(this::toHeaderView)
             .toList();
@@ -53,10 +57,27 @@ public class NotificationViewService {
             return Collections.emptyList();
         }
         return notifications.stream()
+            .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
             .filter(notification -> "SUPPORT_MESSAGE".equals(notification.getType()))
             .map(this::toHeaderView)
             .filter(view -> view.incidentId() != null)
             .toList();
+    }
+
+    public boolean isVisibleToPrincipal(Notification notification, AppUserPrincipal principal) {
+        return notification != null
+            && !isObsoleteRepaymentSyncNotification(notification)
+            && isVisibleToPrincipal(notification.getType(), principal);
+    }
+
+    public boolean isObsoleteRepaymentSyncNotification(Notification notification) {
+        return notification != null
+            && isObsoleteRepaymentSyncNotification(notification.getPayload());
+    }
+
+    public boolean isObsoleteRepaymentSyncNotification(String payloadJson) {
+        Map<String, Object> details = toMap(parse(payloadJson).get("details"));
+        return "SYNC".equalsIgnoreCase(stringValue(details.get("source")));
     }
 
     public boolean isVisibleToPrincipal(String type, AppUserPrincipal principal) {
@@ -242,12 +263,7 @@ public class NotificationViewService {
                     ? "Your loan application has been disbursed."
                     : "Your loan has been disbursed. First repayment: " + firstRepaymentDate + ". Final due date: " + finalDueDate;
             }
-            case "PAID" -> {
-                String source = stringValue(details.get("source"));
-                yield "SYNC".equalsIgnoreCase(source)
-                    ? "Your loan was automatically marked as fully paid after repayment sync."
-                    : "Your manager marked this disbursed loan as fully paid.";
-            }
+            case "PAID" -> "Your manager marked this disbursed loan as fully paid.";
             case "DEFAULTED" -> "Your loan has passed the final due date and remains unpaid.";
             case "REJECTED" -> "Your loan application has been rejected.";
             case "LOAN_READY_FOR_MANAGER" -> "A loan application requires your manager review.";

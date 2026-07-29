@@ -7,6 +7,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,11 +17,7 @@ class NotificationViewServiceTest {
 
     @Test
     void loanStatusEventsHaveReadableFallbackText() {
-        NotificationViewService service = new NotificationViewService(
-            new ObjectMapper(),
-            mock(MemberRepository.class),
-            new AccessControlService()
-        );
+        NotificationViewService service = service();
         Notification notification = Notification.builder()
             .id(UUID.randomUUID())
             .recipientMemberId(UUID.randomUUID())
@@ -36,5 +33,47 @@ class NotificationViewServiceTest {
 
         assertThat(view.getSubject()).isEqualTo("Loan Status Updated");
         assertThat(view.getMessage()).isEqualTo("Your loan application status changed to Awaiting Accountant.");
+    }
+
+    @Test
+    void obsoleteSyncNotificationsAreRemovedButValidPaidNotificationRemains() {
+        NotificationViewService service = service();
+        Notification syncPaid = notification("PAID", """
+            {"details":{"source":"SYNC","loanId":"LN-1"}}
+            """);
+        Notification syncDefaulted = notification("DEFAULTED", """
+            {"details":{"source":"sync","loanId":"LN-2"}}
+            """);
+        Notification validPaid = notification("PAID", """
+            {"details":{"source":"MANAGER","loanId":"LN-3"}}
+            """);
+
+        List<NotificationViewService.NotificationView> views =
+            service.toViews(List.of(syncPaid, syncDefaulted, validPaid));
+
+        assertThat(views).singleElement().satisfies(view -> {
+            assertThat(view.getType()).isEqualTo("PAID");
+            assertThat(view.getMessage()).isEqualTo("Your manager marked this disbursed loan as fully paid.");
+            assertThat(view.getMessage()).doesNotContainIgnoringCase("sync");
+        });
+    }
+
+    private NotificationViewService service() {
+        return new NotificationViewService(
+            new ObjectMapper(),
+            mock(MemberRepository.class),
+            new AccessControlService()
+        );
+    }
+
+    private Notification notification(String type, String payload) {
+        return Notification.builder()
+            .id(UUID.randomUUID())
+            .recipientMemberId(UUID.randomUUID())
+            .type(type)
+            .payload(payload)
+            .status(NotificationStatus.SENT)
+            .createdAt(OffsetDateTime.now())
+            .build();
     }
 }

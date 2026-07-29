@@ -19,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -497,6 +498,7 @@ public class AdminService {
             ensureChairpersonSlotAvailable(saccoId, accountId);
         }
         List<UserClaim> normalizedClaims = normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
+        validateRequiredAccessClaims(staffRoles, normalizedClaims);
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
         if (accountId.equals(adminId) && (!Position.containsAdminRole(staffRoles) || status != MemberStatus.ACTIVE)) {
@@ -2376,6 +2378,27 @@ public class AdminService {
             .toList();
         normalized.addAll(impliedViewClaims);
         return new ArrayList<>(normalized);
+    }
+
+    private void validateRequiredAccessClaims(Set<Position> staffRoles, Collection<UserClaim> claims) {
+        Set<UserClaim> assignedClaims = claims == null
+            ? java.util.Collections.emptySet()
+            : new LinkedHashSet<>(claims);
+        for (Position role : Position.normalizeStaffRoles(staffRoles)) {
+            UserClaim.requiredWorkspaceViewClaim(role)
+                .filter(requiredClaim -> !assignedClaims.contains(requiredClaim))
+                .ifPresent(requiredClaim -> {
+                    throw new IllegalStateException(
+                        role.getDisplayName() + " access requires " + requiredClaim.getDisplayName()
+                            + ". Select that permission or use Restore Default Permissions.");
+                });
+        }
+        if (Position.containsAdminRole(staffRoles)
+            && !assignedClaims.containsAll(UserClaim.administratorRecoveryClaims())) {
+            throw new IllegalStateException(
+                "Administrator access requires Admin Dashboard - View, Access Matrix - View and Update, "
+                    + "and User Access - View and Update. Select these permissions or use Restore Default Permissions.");
+        }
     }
 
     private String formatRoleSummary(Set<Position> staffRoles, boolean memberAccess) {

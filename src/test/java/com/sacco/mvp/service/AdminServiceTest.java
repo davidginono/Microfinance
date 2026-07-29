@@ -73,6 +73,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -793,6 +794,82 @@ class AdminServiceTest {
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_VIEW));
         verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.MEMBER_LOANS_VIEW));
         verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.GUARANTOR_REQUESTS_VIEW));
+    }
+
+    @Test
+    void updateUserRejectsStaffRoleWithoutItsQueueViewClaim() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("MGR002")
+            .fullName("Manager User")
+            .email("manager@example.com")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .build();
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.MANAGER),
+            MemberStatus.ACTIVE,
+            List.of(UserClaim.NOTIFICATIONS_VIEW)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Manager access requires Manager Queue - View. Select that permission or use Restore Default Permissions.");
+
+        verify(memberRepository, never()).save(any(Member.class));
+        verifyNoInteractions(memberAccessClaimRepository);
+    }
+
+    @Test
+    void updateUserRejectsAdministratorWithoutRecoveryClaims() {
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("ADMIN002")
+            .fullName("SACCOS Admin")
+            .email("admin@example.com")
+            .status(MemberStatus.ACTIVE)
+            .position(Position.MINOR_ADMIN)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
+            .memberAccount(false)
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .build();
+        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
+        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(
+            "SACCO-01", "ST-1", Position.MINOR_ADMIN, accountId
+        )).thenReturn(false);
+
+        assertThatThrownBy(() -> adminService.updateUser(
+            "SACCO-01",
+            "ST-1",
+            accountId,
+            Set.of(Position.MINOR_ADMIN),
+            accountId,
+            List.of(Position.MINOR_ADMIN),
+            MemberStatus.ACTIVE,
+            List.of(UserClaim.USER_ACCESS_UPDATE)
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage(
+                "Administrator access requires Admin Dashboard - View, Access Matrix - View and Update, "
+                    + "and User Access - View and Update. Select these permissions or use Restore Default Permissions."
+            );
+
+        verify(memberRepository, never()).save(any(Member.class));
+        verifyNoInteractions(memberAccessClaimRepository);
     }
 
     @Test

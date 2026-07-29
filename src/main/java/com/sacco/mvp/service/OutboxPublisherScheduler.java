@@ -43,6 +43,13 @@ public class OutboxPublisherScheduler {
         for (OutboxEvent event : events) {
             try {
                 JsonNode payload = objectMapper.readTree(event.getPayload());
+                if (notificationViewService.isObsoleteRepaymentSyncNotification(event.getPayload())) {
+                    log.info("Discarding obsolete repayment-sync outbox event {}", event.getId());
+                    event.setStatus(OutboxStatus.PUBLISHED);
+                    event.setPublishedAt(OffsetDateTime.now());
+                    outboxEventRepository.save(event);
+                    continue;
+                }
                 UUID recipientId = UUID.fromString(payload.get("recipientId").asString());
                 String saccoId = textOrNull(payload, "saccoId");
                 String stationId = textOrNull(payload, "stationId");

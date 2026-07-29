@@ -56,4 +56,35 @@ class UserClaimTest {
             );
         assertThat(UserClaim.fromStoredName("MANAGER_QUEUE_UPDATE")).isEmpty();
     }
+
+    @Test
+    void everyOperationalStaffWorkspaceHasARequiredViewClaim() {
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.LOAN_OFFICER))
+            .contains(UserClaim.LOAN_OFFICER_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.MANAGER))
+            .contains(UserClaim.MANAGER_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.ACCOUNTANT))
+            .contains(UserClaim.ACCOUNTANT_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.DISBURSEMENT_OFFICER))
+            .contains(UserClaim.DISBURSEMENT_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.CHAIRPERSON))
+            .contains(UserClaim.CHAIRPERSON_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.BOARD))
+            .contains(UserClaim.BOARD_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.CREDIT_COMMITTEE))
+            .contains(UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.MINOR_ADMIN)).isEmpty();
+        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.ADMIN)).isEmpty();
+    }
+
+    @Test
+    void administratorRecoveryClaimsKeepTheAccessMatrixReachable() {
+        assertThat(UserClaim.administratorRecoveryClaims()).containsExactlyInAnyOrder(
+            UserClaim.ADMIN_DASHBOARD_VIEW,
+            UserClaim.ACCESS_MATRIX_VIEW,
+            UserClaim.ACCESS_MATRIX_UPDATE,
+            UserClaim.USER_ACCESS_VIEW,
+            UserClaim.USER_ACCESS_UPDATE
+        );
+    }
 }

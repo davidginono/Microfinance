@@ -34,15 +34,15 @@ public class NotificationInboxService {
             return 0;
         }
         if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
-            return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(principal.getMemberId());
+            return notificationRepository.countUnreadExcludingRepaymentSync(principal.getMemberId());
         }
         if (notificationViewService.isMemberSidePrincipal(principal)) {
-            return notificationRepository.countByRecipientMemberIdAndReadAtIsNullAndTypeNotIn(
+            return notificationRepository.countUnreadExcludingRepaymentSyncAndTypeNotIn(
                 principal.getMemberId(),
                 MEMBER_SIDE_HIDDEN_TYPES
             );
         }
-        return notificationRepository.countByRecipientMemberIdAndReadAtIsNull(principal.getMemberId());
+        return notificationRepository.countUnreadExcludingRepaymentSync(principal.getMemberId());
     }
 
     public long unreadIncidentCount(UUID memberId) {
@@ -141,7 +141,7 @@ public class NotificationInboxService {
         if (!notification.getRecipientMemberId().equals(principal.getMemberId())) {
             throw new IllegalArgumentException("Notification not found");
         }
-        if (!notificationViewService.isVisibleToPrincipal(notification.getType(), principal)) {
+        if (!notificationViewService.isVisibleToPrincipal(notification, principal)) {
             throw new IllegalArgumentException("Notification not available");
         }
         if (notification.getReadAt() == null) {

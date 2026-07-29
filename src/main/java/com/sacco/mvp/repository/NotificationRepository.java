@@ -14,8 +14,32 @@ import java.util.UUID;
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
     List<Notification> findByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
     long countByRecipientMemberId(UUID recipientMemberId);
-    long countByRecipientMemberIdAndReadAtIsNull(UUID recipientMemberId);
-    long countByRecipientMemberIdAndReadAtIsNullAndTypeNotIn(UUID recipientMemberId, Collection<String> types);
+
+    @Query(
+        value = """
+            select count(*)
+            from notifications n
+            where n.recipient_member_id = :recipientId
+              and n.read_at is null
+              and upper(coalesce(n.payload -> 'details' ->> 'source', '')) <> 'SYNC'
+            """,
+        nativeQuery = true
+    )
+    long countUnreadExcludingRepaymentSync(@Param("recipientId") UUID recipientId);
+
+    @Query(
+        value = """
+            select count(*)
+            from notifications n
+            where n.recipient_member_id = :recipientId
+              and n.read_at is null
+              and n.type not in (:types)
+              and upper(coalesce(n.payload -> 'details' ->> 'source', '')) <> 'SYNC'
+            """,
+        nativeQuery = true
+    )
+    long countUnreadExcludingRepaymentSyncAndTypeNotIn(@Param("recipientId") UUID recipientId,
+                                                       @Param("types") Collection<String> types);
 
     long countByStatus(com.sacco.mvp.domain.NotificationStatus status);
 

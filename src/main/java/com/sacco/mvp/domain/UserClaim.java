@@ -273,6 +273,32 @@ public enum UserClaim {
         return claims;
     }
 
+    public static Optional<UserClaim> requiredWorkspaceViewClaim(Position position) {
+        if (position == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(switch (position) {
+            case LOAN_OFFICER -> LOAN_OFFICER_QUEUE_VIEW;
+            case MANAGER -> MANAGER_QUEUE_VIEW;
+            case ACCOUNTANT -> ACCOUNTANT_QUEUE_VIEW;
+            case DISBURSEMENT_OFFICER -> DISBURSEMENT_QUEUE_VIEW;
+            case CHAIRPERSON -> CHAIRPERSON_QUEUE_VIEW;
+            case BOARD -> BOARD_QUEUE_VIEW;
+            case CREDIT_COMMITTEE -> CREDIT_COMMITTEE_QUEUE_VIEW;
+            case MEMBER, MINOR_ADMIN, ADMIN -> null;
+        });
+    }
+
+    public static Set<UserClaim> administratorRecoveryClaims() {
+        return Set.of(
+            ADMIN_DASHBOARD_VIEW,
+            ACCESS_MATRIX_VIEW,
+            ACCESS_MATRIX_UPDATE,
+            USER_ACCESS_VIEW,
+            USER_ACCESS_UPDATE
+        );
+    }
+
     private static void addReviewClaims(EnumSet<UserClaim> claims, UserClaim... queueClaims) {
         addAll(claims, queueClaims);
         addAll(claims,
