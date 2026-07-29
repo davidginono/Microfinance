@@ -107,6 +107,23 @@ class UserClaimServiceTest {
     }
 
     @Test
+    void defaultClaimsCombineMultipleRolesAndMemberAccess() {
+        Set<UserClaim> claims = userClaimService.defaultClaims(
+            List.of(Position.MANAGER, Position.DISBURSEMENT_OFFICER),
+            true
+        );
+
+        assertThat(claims).contains(
+            UserClaim.MEMBER_LOANS_VIEW,
+            UserClaim.GUARANTOR_REQUESTS_APPROVE,
+            UserClaim.MANAGER_QUEUE_APPROVE,
+            UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
+            UserClaim.LOAN_DOCUMENTS_VIEW,
+            UserClaim.NOTIFICATIONS_UPDATE
+        );
+    }
+
+    @Test
     void updateClaimsPersistsMatrixRowsAndRemovesLegacyJsonClaims() {
         UUID memberId = UUID.randomUUID();
         UserSettings settings = UserSettings.builder()

@@ -183,6 +183,12 @@ public class AdminService {
             .map(this::toUserAccessView);
     }
 
+    public UserAccessView userAccess(String saccoId, String stationId, UUID accountId) {
+        Member member = memberRepository.findUserAccessByScope(saccoId, normalizeOptional(stationId), accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Member not found in this SACCO."));
+        return toUserAccessView(member);
+    }
+
     public Page<UserAccessView> saccoDetailMembersPage(String saccoId, String stationId, String query, int page, int size) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         int safePage = Math.max(page, 0);
@@ -2725,6 +2731,7 @@ public class AdminService {
             .build();
 
         Member saved = memberRepository.save(user);
+        userClaimService.updateClaims(saved.getId(), new ArrayList<>(userClaimService.defaultClaims(staffRoles, saved.isMemberAccess())));
         auditService.log("STAFF_USER", saved.getId(), auditAction, adminId, null, snapshotMember(saved));
         if (requiresClaim) {
             minorAdminInvitationService.issueInvitation(saved, adminId);

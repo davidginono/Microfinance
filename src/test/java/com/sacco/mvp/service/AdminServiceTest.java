@@ -299,6 +299,46 @@ class AdminServiceTest {
     }
 
     @Test
+    void userAccessLoadsSingleUserInsideSaccoAndStationScope() {
+        UUID accountId = UUID.fromString("12345678-1234-1234-1234-123456789abc");
+        Member staff = Member.builder()
+            .id(accountId)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .memberNo("STAFF-10002")
+            .staffNo("10002")
+            .fullName("Manager User")
+            .email("manager@example.com")
+            .phone("255712345678")
+            .position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
+            .memberAccount(false)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now())
+            .build();
+
+        when(memberRepository.findUserAccessByScope("SACCO-1", "ST-1", accountId))
+            .thenReturn(Optional.of(staff));
+
+        AdminService.UserAccessView view = adminService.userAccess("SACCO-1", "ST-1", accountId);
+
+        assertThat(view.getAccountId()).isEqualTo(accountId);
+        assertThat(view.getStaffMemberNumber()).isEqualTo("10002");
+        assertThat(view.getRoleSummary()).isEqualTo("Manager");
+    }
+
+    @Test
+    void userAccessRejectsUsersOutsideSaccoOrStationScope() {
+        UUID accountId = UUID.randomUUID();
+        when(memberRepository.findUserAccessByScope("SACCO-1", "ST-1", accountId))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adminService.userAccess("SACCO-1", "ST-1", accountId))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Member not found in this SACCO.");
+    }
+
+    @Test
     void saccoDetailMembersPageUsesCombinedSearchAndAccountLabels() {
         UUID accountId = UUID.fromString("abcdef12-1234-1234-1234-123456789abc");
         Member staffMember = Member.builder()
@@ -1357,6 +1397,9 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("STAFF-10002");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
+        verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
         verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000001");
         verify(foresightDirectoryService).lookupMemberProfileByEmailV2("manager@example.com");
     }

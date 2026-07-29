@@ -48,6 +48,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -639,14 +640,37 @@ public class AdminController {
         model.addAttribute("selectedUserSearchBy", selectedSearchBy);
         model.addAttribute("selectedPageSize", usersPage.getSize());
         model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize()));
-        model.addAttribute("staffPositions", principal != null && principal.isPlatformIdentity()
-            ? Position.staffAssignableRoles()
-            : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList());
-        model.addAttribute("availableClaims", UserClaim.values());
-        model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
-        model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
-        model.addAttribute("statuses", MemberStatus.values());
+        model.addAttribute("staffPositions", staffPositionsFor(principal));
+        model.addAttribute("canEditUsers", principal != null && principal.getClaims().contains(UserClaim.USER_ACCESS_UPDATE.name()));
         return "admin/users";
+    }
+
+    @GetMapping("/users/{id}/edit")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
+    public String editUser(@PathVariable UUID id,
+                           @AuthenticationPrincipal AppUserPrincipal principal,
+                           Model model,
+                           RedirectAttributes ra) {
+        try {
+            AdminService.UserAccessView user = adminService.userAccess(
+                adminScopeService.currentSaccoId(principal),
+                adminScopeService.currentStationId(principal),
+                id
+            );
+            List<Position> staffPositions = staffPositionsFor(principal);
+            model.addAttribute("user", user);
+            model.addAttribute("staffPositions", staffPositions);
+            model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
+            model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
+            model.addAttribute("statuses", MemberStatus.values());
+            model.addAttribute("roleDefaultClaimsJson", roleDefaultClaimsJson(staffPositions));
+            model.addAttribute("memberDefaultClaimsJson", claimsJson(UserClaim.defaultClaims(List.of(), true)));
+            model.addAttribute("canDeleteUsers", principal != null && principal.getClaims().contains(UserClaim.USER_ACCESS_DELETE.name()));
+            return "admin/user-edit";
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+            return "redirect:/admin/users";
+        }
     }
 
     @PostMapping("/users")
@@ -705,7 +729,7 @@ public class AdminController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/admin/users";
+        return "redirect:/admin/users/" + id + "/edit";
     }
 
     @PostMapping("/users/{id}/cancel-invite")
@@ -721,12 +745,11 @@ public class AdminController {
                 principal.getGrantedPositions(),
                 id
             );
-            ra.addFlashAttribute("openUserModalKey", "user-" + id);
             ra.addFlashAttribute("message", "Invitation cancelled. The staff member record can now be deleted.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
-        return "redirect:/admin/users";
+        return "redirect:/admin/users/" + id + "/edit";
     }
 
     @PostMapping("/users/{id}/delete")
@@ -747,6 +770,7 @@ public class AdminController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
             ra.addFlashAttribute("openUserModalKey", "delete-user-" + id);
+            return "redirect:/admin/users/" + id + "/edit";
         }
         return "redirect:/admin/users";
     }
@@ -2211,6 +2235,39 @@ public class AdminController {
             query.append("&query=").append(UriUtils.encode(queryText.trim(), StandardCharsets.UTF_8));
         }
         return query.toString();
+    }
+
+    private List<Position> staffPositionsFor(AppUserPrincipal principal) {
+        return principal != null && principal.isPlatformIdentity()
+            ? Position.staffAssignableRoles()
+            : Position.staffAssignableRoles().stream().filter(position -> position != Position.ADMIN).toList();
+    }
+
+    private String roleDefaultClaimsJson(List<Position> staffPositions) {
+        StringBuilder json = new StringBuilder("{");
+        boolean firstRole = true;
+        for (Position position : staffPositions == null ? List.<Position>of() : staffPositions) {
+            if (!firstRole) {
+                json.append(',');
+            }
+            firstRole = false;
+            json.append('"').append(position.name()).append('"').append(':')
+                .append(claimsJson(UserClaim.defaultClaims(List.of(position), false)));
+        }
+        return json.append('}').toString();
+    }
+
+    private String claimsJson(Collection<UserClaim> claims) {
+        StringBuilder json = new StringBuilder("[");
+        boolean firstClaim = true;
+        for (UserClaim claim : claims == null ? List.<UserClaim>of() : claims) {
+            if (!firstClaim) {
+                json.append(',');
+            }
+            firstClaim = false;
+            json.append('"').append(claim.name()).append('"');
+        }
+        return json.append(']').toString();
     }
 
     private String buildSaccoMembersPaginationQuery(String stationId, String memberQuery, int size) {

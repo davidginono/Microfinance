@@ -76,7 +76,11 @@ public class UserClaimService {
         normalizedClaims.forEach(claim -> memberAccessClaimRepository.save(MemberAccessClaim.builder()
             .id(new MemberAccessClaimId(memberId, claim.name()))
             .build()));
-        userSettingsRepository.findById(memberId).ifPresent(settings -> {
+        java.util.Optional<UserSettings> settingsResult = userSettingsRepository.findById(memberId);
+        if (settingsResult == null) {
+            return;
+        }
+        settingsResult.ifPresent(settings -> {
             Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
             prefs.remove("claims");
             settings.setNotificationPrefs(writePrefs(prefs));

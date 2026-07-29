@@ -1,19 +1,10 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/modal-shell.jspf" %>
 <style>
-    .admin-user-edit-panel {
-        width: min(100%, 72rem);
-    }
-
-    .admin-access-matrix {
-        --erp-table-height: min(34rem, 68vh);
-    }
-
     .admin-filter-form input,
     .admin-filter-form select,
     .admin-filter-form .app-btn {
@@ -42,17 +33,11 @@
         color: #166534;
         padding: 0.75rem 0.9rem;
     }
-
-    @media (min-width: 768px) {
-        .admin-access-matrix .erp-table {
-            min-width: max(100%, 64rem);
-        }
-    }
 </style>
 
 <div class="erp-page-header">
-    <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users & Roles" /></p>
-    <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users & Roles" /></h1>
+    <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
+    <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage workspace access." /></p>
 </div>
 
@@ -61,16 +46,12 @@
     <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
 </div>
 
-<c:if test="${not empty openUserModalKey}">
-    <div hidden data-open-user-modal="${openUserModalKey}"></div>
-</c:if>
-
 <c:if test="${not empty createdStaffUserId}">
     <div class="admin-created-user-id mb-4" aria-live="polite">
         <p class="text-xs font-semibold uppercase tracking-wide">Created Staff User ID</p>
-        <p class="mt-1 text-sm font-semibold">${createdStaffUserId}</p>
+        <p class="mt-1 text-sm font-semibold"><c:out value="${createdStaffUserId}" /></p>
         <c:if test="${not empty createdStaffMemberNumber}">
-            <p class="mt-1 text-xs">Staff Number ${createdStaffMemberNumber}</p>
+            <p class="mt-1 text-xs">Staff Number <c:out value="${createdStaffMemberNumber}" /></p>
         </c:if>
     </div>
 </c:if>
@@ -152,7 +133,7 @@
                     <td colspan="10" class="px-4 py-5 text-sm text-slate-500">
                         <c:choose>
                             <c:when test="${not empty selectedUserQuery}">
-                                No users matched the selected search for <span class="font-semibold text-slate-700">${selectedUserQuery}</span>. Adjust the search and try again.
+                                No users matched the selected search for <span class="font-semibold text-slate-700"><c:out value="${selectedUserQuery}" /></span>. Adjust the search and try again.
                             </c:when>
                             <c:otherwise>
                                 No users are available in the current slice.
@@ -164,31 +145,34 @@
             <c:otherwise>
                 <c:forEach items="${users}" var="user">
                     <tr>
-                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700">${user.userIdLabel}</td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.memberNumber}</td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.staffMemberNumber}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700"><c:out value="${user.userIdLabel}" /></td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.memberNumber}" /></td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.staffMemberNumber}" /></td>
                         <td class="px-3 py-2 align-top">
-                            <div class="font-semibold text-slate-900">${user.fullName}</div>
+                            <div class="font-semibold text-slate-900"><c:out value="${user.fullName}" /></div>
                         </td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.email}</td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.phone}</td>
-                        <td class="px-3 py-2 align-top whitespace-nowrap">${user.roleSummary}</td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.email}" /></td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.phone}" /></td>
+                        <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.roleSummary}" /></td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.membershipLabel eq 'Staff' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}">
-                                ${user.membershipLabel}
+                                <c:out value="${user.membershipLabel}" />
                             </span>
                         </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <span class="inline-flex rounded border px-2 py-1 text-xs font-semibold ${user.status eq 'INVITED' ? 'border-amber-200 bg-amber-50 text-amber-700' : user.status eq 'ACTIVE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}">
-                                ${user.displayStatus}
+                                <c:out value="${user.displayStatus}" />
                             </span>
                         </td>
                         <td class="px-3 py-2 align-top whitespace-nowrap">
-                            <button type="button"
-                                    class="app-btn btn-primary"
-                                    data-user-modal-open="user-${user.accountId}">
-                                Edit
-                            </button>
+                            <c:choose>
+                                <c:when test="${canEditUsers}">
+                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-primary">Edit</a>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="app-btn btn-neutral pointer-events-none opacity-50">View Only</span>
+                                </c:otherwise>
+                            </c:choose>
                         </td>
                     </tr>
                 </c:forEach>
@@ -231,43 +215,42 @@
     </c:if>
 </div>
 
-<div class="app-modal-overlay hidden"
-     data-user-modal="create-user">
+<div class="app-modal-overlay hidden" data-user-modal="create-user">
     <div class="app-modal-panel app-modal-panel--compact">
         <div class="app-modal-scroll">
-        <div class="app-modal-header">
-            <div>
-                <p class="erp-widget-title">Add Staff Member</p>
-                <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Staff Member</h2>
+            <div class="app-modal-header">
+                <div>
+                    <p class="erp-widget-title">Add Staff Member</p>
+                    <h2 class="mt-1 text-xl font-bold text-sacco-ink">Create Staff Member</h2>
+                </div>
+                <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="Close modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
             </div>
-            <button type="button" class="app-modal-close" data-user-modal-close="create-user" aria-label="Close modal">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-            </button>
-        </div>
 
-        <form action="/admin/users" method="post" class="app-modal-body grid gap-4 md:grid-cols-2">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <form action="/admin/users" method="post" class="app-modal-body grid gap-4 md:grid-cols-2">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Full Name
-                <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
-            </label>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Full Name
+                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                </label>
 
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Email
-                <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-            </label>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Email
+                    <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                </label>
 
-            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Phone
-                <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                <span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
-            </label>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Phone
+                    <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
+                </label>
 
-            <div class="md:col-span-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff Roles</p>
+                <div class="md:col-span-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff Roles</p>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2">
                         <c:forEach items="${staffPositions}" var="position">
                             <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
@@ -282,212 +265,14 @@
                     </div>
                 </div>
 
-            <div class="app-modal-actions md:col-span-2">
-                <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
-                <button type="submit" class="app-btn btn-primary">Create Staff Member</button>
-            </div>
-        </form>
+                <div class="app-modal-actions md:col-span-2">
+                    <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
+                    <button type="submit" class="app-btn btn-primary">Create Staff Member</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-
-<c:forEach items="${users}" var="user">
-    <div class="app-modal-overlay hidden"
-         data-user-modal="user-${user.accountId}">
-        <div class="app-modal-panel admin-user-edit-panel">
-            <div class="app-modal-scroll">
-            <div class="app-modal-header">
-                <div>
-                    <p class="erp-widget-title">Edit User</p>
-                    <h2 class="mt-1 text-xl font-bold text-sacco-ink">${user.fullName}</h2>
-                    <p class="mt-1 text-sm text-slate-500">User ID ${user.userIdLabel}</p>
-                    <c:choose>
-                        <c:when test="${user.memberAccess}">
-                            <p class="mt-1 text-xs text-slate-500">Member Number ${user.memberNumber}</p>
-                        </c:when>
-                        <c:otherwise>
-                            <p class="mt-1 text-xs text-slate-500">Staff Number ${user.staffMemberNumber}</p>
-                        </c:otherwise>
-                    </c:choose>
-                </div>
-                <button type="button" class="app-modal-close" data-user-modal-close="user-${user.accountId}" aria-label="Close modal">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
-            </div>
-
-            <form id="user-form-${user.accountId}" action="/admin/users/${user.accountId}" method="post" class="app-modal-body space-y-4">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff Roles</p>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                        <c:forEach items="${staffPositions}" var="position">
-                            <label class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                                <input type="checkbox"
-                                       name="positions"
-                                       value="${position}"
-                                       data-staff-role-checkbox="user-${user.accountId}"
-                                       ${user.staffRoles.contains(position) ? 'checked' : ''}
-                                       class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                <span>${position.displayName}</span>
-                            </label>
-                        </c:forEach>
-                    </div>
-                </div>
-
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Access Matrix</p>
-                    <div class="admin-access-matrix erp-table-wrap erp-table-scroll mt-2">
-                        <table class="erp-table">
-                            <thead>
-                            <tr>
-                                <th class="whitespace-nowrap">
-                                    <span class="inline-flex items-center gap-2">
-                                        Feature
-                                    </span>
-                                </th>
-                                <c:forEach items="${accessActions}" var="action">
-                                    <th class="whitespace-nowrap text-center">
-                                        <label class="inline-flex items-center gap-2">
-                                            <span>${action.displayName}</span>
-                                            <input type="checkbox"
-                                                   data-access-column-toggle="${action}"
-                                                   class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                        </label>
-                                    </th>
-                                </c:forEach>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <c:forEach items="${accessMatrixRows}" var="row">
-                                <tr>
-                                    <td class="whitespace-nowrap font-semibold text-slate-700">
-                                        <label class="inline-flex items-center gap-2">
-                                            <input type="checkbox"
-                                                   data-access-row-toggle="${row.feature}"
-                                                   class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                            <span>${row.label}</span>
-                                        </label>
-                                    </td>
-                                    <c:forEach items="${accessActions}" var="action">
-                                        <c:set var="matrixClaim" value="${row.claimsByAction[action]}" />
-                                        <td class="text-center">
-                                            <c:choose>
-                                                <c:when test="${not empty matrixClaim}">
-                                                    <input type="checkbox"
-                                                           name="claims"
-                                                           value="${matrixClaim}"
-                                                           data-access-row="${row.feature}"
-                                                           data-access-column="${action}"
-                                                           title="${matrixClaim.displayName}"
-                                                           ${user.claims.contains(matrixClaim) ? 'checked' : ''}
-                                                           class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
-                                                </c:when>
-                                                <c:otherwise>
-                                                    <span class="text-slate-300">-</span>
-                                                </c:otherwise>
-                                            </c:choose>
-                                        </td>
-                                    </c:forEach>
-                                </tr>
-                            </c:forEach>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <c:choose>
-                    <c:when test="${user.status eq 'INVITED'}">
-                        <input type="hidden" name="status" value="INVITED" />
-                        <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Status</p>
-                            <p class="mt-1 text-sm font-semibold text-amber-800">${user.displayStatus}</p>
-                            <p class="mt-1 text-xs leading-5 text-amber-700">This account becomes active only after the invite form is completed.</p>
-                        </div>
-                    </c:when>
-                    <c:otherwise>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Status
-                            <select name="status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                                <c:forEach items="${statuses}" var="status">
-                                    <c:if test="${status ne 'INVITED'}">
-                                        <option value="${status}" ${user.status eq status ? 'selected' : ''}>${status}</option>
-                                    </c:if>
-                                </c:forEach>
-                            </select>
-                        </label>
-                    </c:otherwise>
-                </c:choose>
-
-                <div class="app-modal-actions">
-                    <c:if test="${user.status eq 'INVITED'}">
-                        <button type="submit"
-                                class="app-btn btn-reject"
-                                formaction="/admin/users/${user.accountId}/cancel-invite"
-                                formmethod="post"
-                                onclick="return confirm('Cancel this invitation? The staff member will be marked inactive.');">
-                            Cancel Invite
-                        </button>
-                    </c:if>
-                    <c:if test="${user.canDeleteStaffRecord}">
-                        <button type="button"
-                                class="app-btn btn-reject"
-                                data-user-modal-open="delete-user-${user.accountId}">
-                            Delete
-                        </button>
-                    </c:if>
-                    <button type="button"
-                            class="app-btn btn-neutral"
-                            data-user-modal-close="user-${user.accountId}">
-                        Cancel
-                    </button>
-                    <button type="submit" class="app-btn btn-primary">Save</button>
-                </div>
-            </form>
-            </div>
-        </div>
-    </div>
-</c:forEach>
-
-<c:forEach items="${users}" var="user">
-    <c:if test="${user.canDeleteStaffRecord}">
-        <div class="app-modal-overlay hidden"
-             data-user-modal="delete-user-${user.accountId}">
-            <div class="app-modal-panel app-modal-panel--compact">
-                <div class="app-modal-scroll">
-                    <div class="app-modal-header">
-                        <div>
-                            <p class="erp-widget-title">Delete Staff Member</p>
-                            <h2 class="mt-1 text-xl font-bold text-sacco-ink">${user.fullName}</h2>
-                            <p class="mt-1 text-sm text-slate-500">This permanently removes the cancelled staff invitation record.</p>
-                        </div>
-                        <button type="button" class="app-modal-close" data-user-modal-close="delete-user-${user.accountId}" aria-label="Close modal">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <form action="/admin/users/${user.accountId}/delete" method="post" class="app-modal-body space-y-4">
-                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                        <div class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                            Type <span class="font-semibold">delete ${user.fullName}</span> to confirm.
-                        </div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Confirmation
-                            <input name="confirmation" type="text" required autocomplete="off" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                        </label>
-                        <div class="app-modal-actions">
-                            <button type="button" class="app-btn btn-neutral" data-user-modal-close="delete-user-${user.accountId}">Cancel</button>
-                            <button type="submit" class="app-btn btn-reject">Delete</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </c:if>
-</c:forEach>
 
 <script>
     (() => {
@@ -502,9 +287,6 @@
 
         function syncSuperAdminRoleGroup(groupKey) {
             const checkboxes = Array.from(document.querySelectorAll('[data-staff-role-checkbox="' + groupKey + '"]'));
-            if (!checkboxes.length) {
-                return;
-            }
             const superAdminCheckbox = checkboxes.find((checkbox) => checkbox.value === 'ADMIN');
             if (!superAdminCheckbox) {
                 return;
@@ -525,51 +307,6 @@
                 initializedRoleGroups.add(groupKey);
                 syncSuperAdminRoleGroup(groupKey);
             }
-        });
-
-        function syncMatrixToggle(toggle, inputs) {
-            if (!toggle || !inputs.length) {
-                return;
-            }
-            const checkedCount = inputs.filter((input) => input.checked).length;
-            toggle.checked = checkedCount === inputs.length;
-            toggle.indeterminate = checkedCount > 0 && checkedCount < inputs.length;
-        }
-
-        function syncMatrixState(form) {
-            form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
-                const row = toggle.getAttribute('data-access-row-toggle');
-                syncMatrixToggle(toggle, Array.from(form.querySelectorAll('[data-access-row="' + row + '"]')));
-            });
-            form.querySelectorAll('[data-access-column-toggle]').forEach((toggle) => {
-                const column = toggle.getAttribute('data-access-column-toggle');
-                syncMatrixToggle(toggle, Array.from(form.querySelectorAll('[data-access-column="' + column + '"]')));
-            });
-        }
-
-        document.querySelectorAll('form').forEach((form) => {
-            form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
-                toggle.addEventListener('change', () => {
-                    const row = toggle.getAttribute('data-access-row-toggle');
-                    form.querySelectorAll('[data-access-row="' + row + '"]').forEach((input) => {
-                        input.checked = toggle.checked;
-                    });
-                    syncMatrixState(form);
-                });
-            });
-            form.querySelectorAll('[data-access-column-toggle]').forEach((toggle) => {
-                toggle.addEventListener('change', () => {
-                    const column = toggle.getAttribute('data-access-column-toggle');
-                    form.querySelectorAll('[data-access-column="' + column + '"]').forEach((input) => {
-                        input.checked = toggle.checked;
-                    });
-                    syncMatrixState(form);
-                });
-            });
-            form.querySelectorAll('[data-access-row][data-access-column]').forEach((input) => {
-                input.addEventListener('change', () => syncMatrixState(form));
-            });
-            syncMatrixState(form);
         });
 
         function closeAllUserModals() {
@@ -595,20 +332,12 @@
         }
 
         document.querySelectorAll('[data-user-modal-open]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const key = button.getAttribute('data-user-modal-open');
-                openUserModal(key);
-            });
+            button.addEventListener('click', () => openUserModal(button.getAttribute('data-user-modal-open')));
         });
 
         document.querySelectorAll('[data-user-modal-close]').forEach((button) => {
             button.addEventListener('click', closeAllUserModals);
         });
-
-        const initialModalTarget = document.querySelector('[data-open-user-modal]');
-        if (initialModalTarget) {
-            openUserModal(initialModalTarget.getAttribute('data-open-user-modal'));
-        }
     })();
 </script>
 

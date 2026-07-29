@@ -290,6 +290,17 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                           @Param("query") String query,
                                           Pageable pageable);
 
+    @Query("""
+        select m
+        from Member m
+        where m.id = :accountId
+          and m.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
+        """)
+    Optional<Member> findUserAccessByScope(@Param("saccoId") String saccoId,
+                                           @Param("stationId") String stationId,
+                                           @Param("accountId") UUID accountId);
+
     @Query(
         value = """
             select m.*
