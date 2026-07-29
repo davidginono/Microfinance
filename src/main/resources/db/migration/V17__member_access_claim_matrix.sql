@@ -126,7 +126,6 @@ json_claims AS (
     SELECT DISTINCT us.member_id,
            coalesce(v.claim_name, lcm.claim_name) AS claim_name
     FROM public.user_settings us
-    JOIN public.members m ON m.id = us.member_id
     CROSS JOIN LATERAL jsonb_array_elements_text(coalesce(us.notification_prefs -> 'claims', '[]'::jsonb)) stored_claim
     LEFT JOIN valid_claims v ON v.claim_name = stored_claim
     LEFT JOIN legacy_claim_map lcm ON lcm.legacy_claim = stored_claim

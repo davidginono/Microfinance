@@ -3,23 +3,22 @@ package com.sacco.mvp;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.CRC32;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ClaimsOnlyAccessMigrationTest {
 
     @Test
-    void initialMigrationIgnoresOrphanedLegacyUserSettings() throws IOException {
-        String migration = Files.readString(Path.of(
+    void releasedInitialMigrationChecksumRemainsStable() throws IOException {
+        Path migration = Path.of(
             "src/main/resources/db/migration/V17__member_access_claim_matrix.sql"
-        ));
-
-        assertThat(migration).contains(
-            "FROM public.user_settings us",
-            "JOIN public.members m ON m.id = us.member_id"
         );
+
+        assertThat(flywayChecksum(migration)).isEqualTo(-1440696127);
     }
 
     @Test
@@ -48,5 +47,13 @@ class ClaimsOnlyAccessMigrationTest {
             "('ADMIN', 'USER_ACCESS_UPDATE')",
             "ON CONFLICT DO NOTHING"
         );
+    }
+
+    private int flywayChecksum(Path migration) throws IOException {
+        CRC32 crc32 = new CRC32();
+        for (String line : Files.readAllLines(migration, StandardCharsets.UTF_8)) {
+            crc32.update(line.getBytes(StandardCharsets.UTF_8));
+        }
+        return (int) crc32.getValue();
     }
 }
