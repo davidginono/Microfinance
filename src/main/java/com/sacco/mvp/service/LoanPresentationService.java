@@ -2132,33 +2132,6 @@ public class LoanPresentationService {
             drawAttachmentPreviews(attachments);
         }
 
-        private void drawAttachmentSection(String title, List<Map<String, Object>> attachments) throws IOException {
-            if (attachments == null || attachments.isEmpty()) {
-                return;
-            }
-            List<String[]> rows = new ArrayList<>();
-            for (Map<String, Object> attachment : attachments) {
-                rows.add(new String[]{
-                    sanitizePdfText(String.valueOf(attachment.getOrDefault("originalName", "-"))),
-                    sanitizePdfText(String.valueOf(attachment.getOrDefault("sizeLabel", "-"))),
-                    sanitizePdfText(attachmentUploadedAtLabel(attachment))
-                });
-            }
-            String[] headers = new String[]{"File", "Size", "Uploaded"};
-            float[] widths = new float[]{contentWidth() * 0.50f, contentWidth() * 0.18f, contentWidth() * 0.32f};
-            ensureSectionTableStartSpace(headers, widths, rows, BODY_SIZE, BODY_SIZE, CELL_PADDING_Y, 2f);
-            drawSectionStrip(title, null);
-            drawTable(
-                headers,
-                widths,
-                rows,
-                BODY_SIZE,
-                BODY_SIZE,
-                14f
-            );
-            drawAttachmentPreviews(attachments);
-        }
-
         private void drawAttachmentPreviews(List<Map<String, Object>> attachments) throws IOException {
             if (attachments == null || attachments.isEmpty()) {
                 return;
@@ -2284,15 +2257,6 @@ public class LoanPresentationService {
                 }
             }
             return "-";
-        }
-
-        private String repaymentAmountWithBreakdown(Map<String, Object> row) {
-            String amount = sanitizePdfText(String.valueOf(row.get("amount")));
-            String breakdown = sanitizePdfText(String.valueOf(row.get("scheduledBreakdown")));
-            if ("-".equals(breakdown)) {
-                return amount;
-            }
-            return amount + "\n" + breakdown;
         }
 
         private void drawGuarantorSection() throws IOException {

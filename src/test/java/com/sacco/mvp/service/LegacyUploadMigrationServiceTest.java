@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +47,7 @@ class LegacyUploadMigrationServiceTest {
             .attachmentsJson("[{\"id\":\"" + attachmentId + "\",\"storedName\":\"" + attachmentId + ".pdf\",\"originalName\":\"proof.pdf\",\"contentType\":\"application/pdf\"}]")
             .build()));
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(anyString(), any(Class.class), any())).thenReturn(0);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(0);
         LegacyUploadMigrationService service = service(storage, loans, jdbc, loanRoot);
 
         LegacyUploadMigrationService.MigrationSummary summary = service.migrate();
@@ -71,7 +72,7 @@ class LegacyUploadMigrationServiceTest {
         LoanApplicationRepository loans = mock(LoanApplicationRepository.class);
         when(loans.findAll()).thenReturn(List.of(LoanApplication.builder().id(loanId).build()));
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(anyString(), any(Class.class), any())).thenReturn(0);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(0);
 
         LegacyUploadMigrationService.MigrationSummary summary = service(storage, loans, jdbc, loanRoot).migrate();
 
@@ -82,7 +83,7 @@ class LegacyUploadMigrationServiceTest {
     @Test
     void isNoOpAfterSuccessfulMigrationMarker() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(anyString(), any(Class.class), any())).thenReturn(1);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(1);
         LegacyUploadMigrationService service = service(
             mock(StoredUploadStorageService.class), mock(LoanApplicationRepository.class), jdbc, tempDir.resolve("loans"));
 

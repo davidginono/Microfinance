@@ -242,26 +242,6 @@ public class StaffAnalyticsController {
         }
     }
 
-    private LoanAnalyticsService.StaffPortfolioSummary memberPortfolio(LoanAnalyticsService.MemberLoanAnalytics analytics) {
-        BigDecimal defaultedRate = analytics.disbursedLoans() == 0
-            ? BigDecimal.ZERO
-            : BigDecimal.valueOf(analytics.defaultedLoans())
-                .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(analytics.disbursedLoans()), 2, java.math.RoundingMode.HALF_UP);
-        String riskLevel = defaultedRate.compareTo(BigDecimal.valueOf(10)) >= 0
-            ? "High"
-            : defaultedRate.compareTo(BigDecimal.valueOf(5)) >= 0 ? "Moderate" : "Low";
-        return new LoanAnalyticsService.StaffPortfolioSummary(
-            analytics.appliedLoans(),
-            analytics.disbursedLoans(),
-            analytics.rejectedLoans(),
-            analytics.disbursedLoans(),
-            analytics.defaultedLoans(),
-            defaultedRate,
-            riskLevel
-        );
-    }
-
     public record AnalyticsMetricCard(String key, String label, long value, String tone, String sparkName) {
         public String getKey() {
             return key;

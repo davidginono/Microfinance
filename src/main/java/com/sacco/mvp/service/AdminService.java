@@ -2404,17 +2404,6 @@ public class AdminService {
             .toList();
     }
 
-    private List<LoanApplication> filterApplicationsByStation(List<LoanApplication> applications,
-                                                              String stationId) {
-        String normalizedStationId = normalizeOptional(stationId);
-        if (normalizedStationId == null) {
-            return applications;
-        }
-        return applications.stream()
-            .filter(app -> normalizedStationId.equalsIgnoreCase(normalizeOptional(app.getStationId())))
-            .toList();
-    }
-
     private List<Member> scopedUserAccessMembers(String saccoId, String stationId) {
         List<Member> saccoMembers = memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId);
         String normalizedStationId = normalizeOptional(stationId);
@@ -2434,14 +2423,6 @@ public class AdminService {
         return mergedById.values().stream()
             .sorted(Comparator.comparing(Member::getFullName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
             .toList();
-    }
-
-    private boolean matchesUserDirectoryQuery(Member member, String normalizedQuery) {
-        return normalizedQuery == null
-            || normalizedQuery.isBlank()
-            || lower(member.getEmail()).contains(normalizedQuery)
-            || lower(member.getMemberNo()).contains(normalizedQuery)
-            || lower(member.getStaffNo()).contains(normalizedQuery);
     }
 
     private List<AdminIncident> filterIncidentsByStation(List<AdminIncident> incidents, String stationId) {
@@ -2852,13 +2833,6 @@ public class AdminService {
         return normalized;
     }
 
-    private String limitText(String value, int maxLength) {
-        if (value == null || value.length() <= maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength);
-    }
-
     private String normalizeProductName(LoanType loanType, String productName) {
         String normalized = normalizeOptional(productName);
         if (normalized == null) {
@@ -3016,16 +2990,6 @@ public class AdminService {
             throw new IllegalStateException("Application fee cannot be negative.");
         }
         return applicationFee.setScale(2, java.math.RoundingMode.HALF_UP);
-    }
-
-    private Integer nonNegative(Integer value, String message) {
-        if (value == null) {
-            return null;
-        }
-        if (value < 0) {
-            throw new IllegalStateException(message);
-        }
-        return value;
     }
 
     private Integer limitedCount(Integer value, String label, int minimum) {

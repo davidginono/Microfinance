@@ -123,29 +123,6 @@ public class ManagerService {
         );
     }
 
-    private boolean isDisbursedLoan(LoanApplication loan) {
-        return loan.getStatus() == LoanStatus.DISBURSED
-            || loan.getStatus() == LoanStatus.DEFAULTED
-            || loan.getStatus() == LoanStatus.PAID;
-    }
-
-    private LocalDate dashboardDisbursementDate(LoanApplication loan) {
-        if (loan.getDisbursementDate() != null) {
-            return loan.getDisbursementDate();
-        }
-        return loan.getCreatedAt() == null ? null : loan.getCreatedAt().toLocalDate();
-    }
-
-    private LocalDate dashboardDefaultedDate(LoanApplication loan) {
-        if (loan.getUpdatedAt() != null) {
-            return loan.getUpdatedAt().toLocalDate();
-        }
-        if (loan.getFinalDueDate() != null) {
-            return loan.getFinalDueDate();
-        }
-        return loan.getCreatedAt() == null ? null : loan.getCreatedAt().toLocalDate();
-    }
-
     public List<LoanApplication> queue(String saccoId, LoanStatus status) {
         if (status == null) {
             return loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
@@ -585,26 +562,8 @@ public class ManagerService {
         return normalized;
     }
 
-    private boolean matchesQueueSearch(LoanApplication app, String lookup, boolean searchByLoanId) {
-        if (searchByLoanId) {
-            String loanId = blankToNull(app.getLoanId());
-            return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(lookup);
-        }
-        Long applicationNumber = app.getApplicationNumber();
-        return applicationNumber != null && String.valueOf(applicationNumber).contains(lookup);
-    }
-
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private List<LoanApplication> filterLoansByApplicantStation(List<LoanApplication> loans, String stationId) {
-        if (stationId == null || stationId.isBlank() || loans.isEmpty()) {
-            return loans;
-        }
-        return loans.stream()
-            .filter(loan -> stationId.equalsIgnoreCase(blankToNull(loan.getStationId())))
-            .toList();
     }
 
     @Transactional

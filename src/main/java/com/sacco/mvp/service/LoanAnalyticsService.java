@@ -829,15 +829,6 @@ public class LoanAnalyticsService {
         return new MetricTrendSeries(name, color, dataPoints);
     }
 
-    private boolean withinRange(OffsetDateTime value, LocalDate fromDate, LocalDate toDate) {
-        if (value == null) {
-            return false;
-        }
-        OffsetDateTime from = fromDate == null ? null : fromDate.atStartOfDay().atOffset(ZoneOffset.UTC);
-        OffsetDateTime to = toDate == null ? null : toDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-        return (from == null || !value.isBefore(from)) && (to == null || value.isBefore(to));
-    }
-
     private OffsetDateTime startOfDay(LocalDate value) {
         return value == null ? null : value.atStartOfDay().atOffset(ZoneOffset.UTC);
     }

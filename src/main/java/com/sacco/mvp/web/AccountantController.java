@@ -133,7 +133,7 @@ public class AccountantController {
                         @RequestParam(required = false) String searchId,
                         Model model) {
         QueueFilter currentFilter = resolveQueueFilter(filter);
-        String normalizedSearchId = normalizeQueueSearch(searchId);
+        String normalizedSearchId = StaffQueueViewSupport.normalizeSearch(searchId);
         List<LoanApplication> apps = managerService.queue(
             principal.getSaccoId(),
             currentFilter.statuses(),
@@ -162,7 +162,7 @@ public class AccountantController {
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
-        String normalizedSearchId = normalizeQueueSearch(searchId);
+        String normalizedSearchId = StaffQueueViewSupport.normalizeSearch(searchId);
         boolean loanIdSearch = currentFilter.usesLoanId();
         org.springframework.data.domain.Page<ManagerReview> archivePage = managerReviewRepository.findLatestArchivePage(
             principal.getMemberId(),
@@ -178,7 +178,7 @@ public class AccountantController {
             org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
         );
         List<ManagerReview> latestReviews = archivePage.getContent();
-        Map<UUID, LoanApplication> loanMap = loadLoansById(latestReviews.stream()
+        Map<UUID, LoanApplication> loanMap = StaffQueueViewSupport.loadLoansById(loanApplicationRepository, latestReviews.stream()
             .map(ManagerReview::getLoanApplicationId)
             .toList());
         List<ArchiveEntry> entries = latestReviews.stream()
@@ -188,7 +188,7 @@ public class AccountantController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = loadApplicantNames(entries.stream()
+        Map<UUID, String> applicantNames = StaffQueueViewSupport.loadApplicantNames(memberRepository, entries.stream()
             .map(entry -> entry.loan().getApplicantMemberId())
             .toList());
 
@@ -642,36 +642,6 @@ public class AccountantController {
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected", ManagerDecision.REJECT, false);
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, false);
         };
-    }
-
-    private String normalizeQueueSearch(String searchId) {
-        return searchId == null ? "" : searchId.trim();
-    }
-
-    private Map<UUID, LoanApplication> loadLoansById(List<UUID> loanIds) {
-        return loanIds.isEmpty()
-            ? Collections.emptyMap()
-            : loanApplicationRepository.findAllById(loanIds).stream()
-                .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
-    }
-
-    private Map<UUID, String> loadApplicantNames(List<UUID> applicantIds) {
-        return applicantIds.isEmpty()
-            ? Collections.emptyMap()
-            : memberRepository.findAllById(applicantIds).stream()
-                .collect(Collectors.toMap(Member::getId, Member::getFullName, (left, right) -> left, LinkedHashMap::new));
-    }
-
-    private boolean matchesArchiveSearch(LoanApplication app, String searchId, boolean loanIdSearch) {
-        if (searchId == null || searchId.isBlank()) {
-            return true;
-        }
-        if (loanIdSearch) {
-            String loanId = app.getLoanId();
-            return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(searchId.toLowerCase(Locale.ENGLISH));
-        }
-        Long applicationNumber = app.getApplicationNumber();
-        return applicationNumber != null && String.valueOf(applicationNumber).contains(searchId);
     }
 
     private String message(String code) {

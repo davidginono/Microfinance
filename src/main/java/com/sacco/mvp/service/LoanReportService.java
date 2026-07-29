@@ -1111,16 +1111,6 @@ public class LoanReportService {
             .toList();
     }
 
-    private List<ProductPerformanceRow> productRowsFromPerformance(List<LoanAnalyticsService.LoanProductPerformance> performance) {
-        return performance.stream()
-            .map(item -> {
-                long active = Math.max(0, item.totalLoans() - item.paidLoans() - item.rejectedLoans());
-                long disbursed = Math.max(0, item.totalLoans() - item.rejectedLoans());
-                return new ProductPerformanceRow(item.label(), item.totalLoans(), active, disbursed, item.paidLoans(), item.defaultedLoans(), item.rejectedLoans(), BigDecimal.ZERO, BigDecimal.ZERO);
-            })
-            .toList();
-    }
-
     private List<ProductFinancialBreakdownRow> productFinancialRowsFromLoans(List<LoanApplication> loans) {
         List<ProductRef> productRefs = configuredProductRefs(loans);
         if (productRefs.isEmpty()) {

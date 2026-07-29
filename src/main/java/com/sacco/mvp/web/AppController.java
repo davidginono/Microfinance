@@ -1308,40 +1308,6 @@ public class AppController {
         };
     }
 
-    private int memberLoanProgressStep(LoanStatus status) {
-        if (status == null) {
-            return 1;
-        }
-        return switch (status) {
-            case DRAFT -> 1;
-            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 2;
-            case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 3;
-            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
-                AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
-                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
-                AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED, CREDIT_COMMITTEE_APPROVED,
-                AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 4;
-            case REJECTED, DISBURSED, DEFAULTED, PAID -> 5;
-        };
-    }
-
-    private int memberLoanProgressPercent(LoanStatus status) {
-        if (status == null) {
-            return 8;
-        }
-        return switch (status) {
-            case DRAFT -> 10;
-            case SUBMITTED, AWAITING_GUARANTORS, ALL_GUARANTORS_APPROVED -> 35;
-            case READY_FOR_MANAGER, MANAGER_REJECTED, MANAGER_ACCEPTED -> 58;
-            case AWAITING_LOAN_OFFICER, LOAN_OFFICER_REJECTED, LOAN_OFFICER_APPROVED,
-                AWAITING_CHAIRPERSON, CHAIRPERSON_REJECTED, CHAIRPERSON_APPROVED,
-                AWAITING_BOARD, BOARD_REJECTED, BOARD_APPROVED,
-                AWAITING_CREDIT_COMMITTEE, CREDIT_COMMITTEE_REJECTED, CREDIT_COMMITTEE_APPROVED,
-                AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> 80;
-            case REJECTED, DISBURSED, DEFAULTED, PAID -> 100;
-        };
-    }
-
     private String memberLoanStatusBadgeClass(LoanStatus status) {
         if (status == null) {
             return "bg-slate-100 text-slate-700";
@@ -2804,13 +2770,6 @@ public class AppController {
         if (application.getRequiredGuarantors() <= 0 && application.getStatus() != LoanStatus.DRAFT) {
             throw new IllegalStateException("This application is no longer waiting for applicant OTP confirmation.");
         }
-    }
-
-    private boolean canRequestApplicantOtp(LoanApplication app) {
-        return app != null && (
-            (app.getRequiredGuarantors() > 0 && app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED)
-                || (app.getRequiredGuarantors() <= 0 && app.getStatus() == LoanStatus.DRAFT)
-        );
     }
 
     private String resolveSavedSignatureText(UUID memberId) {

@@ -127,7 +127,7 @@ public class DisbursementController {
                         @RequestParam(required = false) String searchId,
                         Model model) {
         QueueFilter currentFilter = resolveQueueFilter(filter);
-        String normalizedSearchId = normalizeQueueSearch(searchId);
+        String normalizedSearchId = StaffQueueViewSupport.normalizeSearch(searchId);
         List<LoanApplication> apps = managerService.queue(
             principal.getSaccoId(),
             currentFilter.statuses(),
@@ -158,7 +158,7 @@ public class DisbursementController {
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
-        String normalizedSearchId = normalizeQueueSearch(searchId);
+        String normalizedSearchId = StaffQueueViewSupport.normalizeSearch(searchId);
         List<String> statuses = currentFilter.status() == null
             ? List.of(LoanStatus.DRAFT.name())
             : List.of(currentFilter.status().name());
@@ -176,7 +176,7 @@ public class DisbursementController {
             org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
         );
         List<ManagerReview> latestReviews = archivePage.getContent();
-        Map<UUID, LoanApplication> loanMap = loadLoansById(latestReviews.stream()
+        Map<UUID, LoanApplication> loanMap = StaffQueueViewSupport.loadLoansById(loanApplicationRepository, latestReviews.stream()
             .map(ManagerReview::getLoanApplicationId)
             .toList());
         List<ArchiveEntry> entries = latestReviews.stream()
@@ -186,7 +186,7 @@ public class DisbursementController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = loadApplicantNames(entries.stream()
+        Map<UUID, String> applicantNames = StaffQueueViewSupport.loadApplicantNames(memberRepository, entries.stream()
             .map(entry -> entry.loan().getApplicantMemberId())
             .toList());
         Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
@@ -629,32 +629,6 @@ public class DisbursementController {
             case "DISBURSED" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", LoanStatus.DISBURSED);
             default -> new ArchiveFilter("ALL", "All Disbursed Loans", null);
         };
-    }
-
-    private String normalizeQueueSearch(String searchId) {
-        return searchId == null ? "" : searchId.trim();
-    }
-
-    private Map<UUID, LoanApplication> loadLoansById(List<UUID> loanIds) {
-        return loanIds.isEmpty()
-            ? Collections.emptyMap()
-            : loanApplicationRepository.findAllById(loanIds).stream()
-                .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
-    }
-
-    private Map<UUID, String> loadApplicantNames(List<UUID> applicantIds) {
-        return applicantIds.isEmpty()
-            ? Collections.emptyMap()
-            : memberRepository.findAllById(applicantIds).stream()
-                .collect(Collectors.toMap(Member::getId, Member::getFullName, (left, right) -> left, LinkedHashMap::new));
-    }
-
-    private boolean matchesArchiveSearch(LoanApplication app, String searchId) {
-        if (searchId == null || searchId.isBlank()) {
-            return true;
-        }
-        String loanId = app.getLoanId();
-        return loanId != null && loanId.toLowerCase(Locale.ENGLISH).contains(searchId.toLowerCase(Locale.ENGLISH));
     }
 
     private String message(String code) {
