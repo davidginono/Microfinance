@@ -22,6 +22,8 @@ class AdminUsersJspLayoutTest {
         String editJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp"));
 
         assertThat(editJsp).contains("data-restore-default-claims");
+        assertThat(editJsp).contains("admin-access-matrix-restore");
+        assertThat(editJsp).contains("width: auto");
         assertThat(editJsp).contains("disabled");
         assertThat(editJsp).contains("No supported claim");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");

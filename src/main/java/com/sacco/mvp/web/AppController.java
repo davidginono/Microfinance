@@ -619,9 +619,14 @@ public class AppController {
             dashboardDisbursedDate(app)
         );
         List<Map<String, Object>> steps = new ArrayList<>();
+        boolean workflowRejected = app != null && isRejectedStatus(app.getStatus());
         for (int i = 0; i < labels.size(); i++) {
             String stateKey;
-            if (i < currentIndex || (workflowFinished && i == currentIndex)) {
+            if (workflowRejected && i == currentIndex) {
+                stateKey = "rejected";
+            } else if (workflowRejected && i > currentIndex) {
+                stateKey = "closed";
+            } else if (i < currentIndex || (workflowFinished && i == currentIndex)) {
                 stateKey = "completed";
             } else if (i == currentIndex) {
                 stateKey = "current";
@@ -635,12 +640,17 @@ public class AppController {
             step.put("stateKey", stateKey);
             step.put("stateLabel", dashboardWorkflowStateLabel(i, stateKey, app));
             step.put("metaLabel", dashboardWorkflowMetaLabel(stateKey));
-            step.put("dateLabel", "pending".equals(stateKey) ? "" : stageDates.get(i));
+            step.put("metaClasses", workflowMetaClasses(stateKey));
+            String dateLabel = "pending".equals(stateKey) || "closed".equals(stateKey) ? "" : stageDates.get(i);
+            if ("rejected".equals(stateKey) && (dateLabel == null || dateLabel.isBlank())) {
+                dateLabel = formatDashboardWorkflowTimestamp(app.getUpdatedAt());
+            }
+            step.put("dateLabel", dateLabel);
             step.put("nodeClasses", workflowNodeClasses(stateKey));
             step.put("textClasses", workflowTextClasses(stateKey));
             step.put("numberClasses", workflowNumberClasses(stateKey));
             step.put("iconClasses", workflowIconClasses(stateKey));
-            step.put("connectorClasses", workflowConnectorClasses(i, currentIndex));
+            step.put("connectorClasses", workflowConnectorClasses(i, currentIndex, workflowRejected));
             step.put("iconKey", iconKeys.get(i));
             steps.add(step);
         }
@@ -761,6 +771,12 @@ public class AppController {
     }
 
     private String dashboardWorkflowStateLabel(int index, String stateKey, LoanApplication app) {
+        if ("rejected".equals(stateKey)) {
+            return "Rejected";
+        }
+        if ("closed".equals(stateKey)) {
+            return "Closed";
+        }
         if ("completed".equals(stateKey)) {
             return switch (index) {
                 case 0 -> "Submitted";
@@ -791,13 +807,26 @@ public class AppController {
     }
 
     private String dashboardWorkflowMetaLabel(String stateKey) {
+        if ("rejected".equals(stateKey)) {
+            return "Rejected Stage";
+        }
         return "current".equals(stateKey) ? "Current Stage" : "";
+    }
+
+    private String workflowMetaClasses(String stateKey) {
+        return switch (stateKey) {
+            case "rejected" -> "member-dashboard-flow-meta--rejected";
+            case "current" -> "member-dashboard-flow-meta--current";
+            default -> "";
+        };
     }
 
     private String workflowNodeClasses(String stateKey) {
         return switch (stateKey) {
             case "completed" -> "member-dashboard-flow-node--completed";
             case "current" -> "member-dashboard-flow-node--current";
+            case "rejected" -> "member-dashboard-flow-node--rejected";
+            case "closed" -> "member-dashboard-flow-node--closed";
             default -> "member-dashboard-flow-node--pending";
         };
     }
@@ -806,6 +835,8 @@ public class AppController {
         return switch (stateKey) {
             case "completed" -> "member-dashboard-flow-text--completed";
             case "current" -> "member-dashboard-flow-text--current";
+            case "rejected" -> "member-dashboard-flow-text--rejected";
+            case "closed" -> "member-dashboard-flow-text--closed";
             case "pending" -> "member-dashboard-flow-text--pending";
             default -> "member-dashboard-flow-text--not-started";
         };
@@ -815,6 +846,8 @@ public class AppController {
         return switch (stateKey) {
             case "completed" -> "member-dashboard-flow-number--completed";
             case "current" -> "member-dashboard-flow-number--current";
+            case "rejected" -> "member-dashboard-flow-number--rejected";
+            case "closed" -> "member-dashboard-flow-number--closed";
             default -> "member-dashboard-flow-number--pending";
         };
     }
@@ -823,13 +856,18 @@ public class AppController {
         return switch (stateKey) {
             case "completed" -> "member-dashboard-flow-icon--completed";
             case "current" -> "member-dashboard-flow-icon--current";
+            case "rejected" -> "member-dashboard-flow-icon--rejected";
+            case "closed" -> "member-dashboard-flow-icon--closed";
             default -> "member-dashboard-flow-icon--pending";
         };
     }
 
-    private String workflowConnectorClasses(int index, int currentIndex) {
+    private String workflowConnectorClasses(int index, int currentIndex, boolean workflowRejected) {
         if (index < currentIndex) {
             return "member-dashboard-flow-connector--completed";
+        }
+        if (workflowRejected && index >= currentIndex) {
+            return "member-dashboard-flow-connector--pending";
         }
         if (index == currentIndex) {
             return "member-dashboard-flow-connector--current";

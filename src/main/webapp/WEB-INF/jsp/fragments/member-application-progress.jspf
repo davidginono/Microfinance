@@ -16,7 +16,7 @@
                 </c:if>
                 <p class="member-dashboard-mobile-status ${step.textClasses}">${step.stateLabel}</p>
                 <c:if test="${not empty step.metaLabel}">
-                    <p class="member-dashboard-mobile-meta">${step.metaLabel}</p>
+                    <p class="member-dashboard-mobile-meta ${step.metaClasses}">${step.metaLabel}</p>
                 </c:if>
                 <c:if test="${not empty step.dateLabel}">
                     <p class="member-dashboard-mobile-date">${step.dateLabel}</p>
@@ -42,7 +42,7 @@
                         </c:if>
                         <p class="member-dashboard-flow-status ${step.textClasses}">${step.stateLabel}</p>
                         <c:if test="${not empty step.metaLabel}">
-                            <p class="member-dashboard-flow-meta member-dashboard-flow-meta--current">${step.metaLabel}</p>
+                            <p class="member-dashboard-flow-meta ${step.metaClasses}">${step.metaLabel}</p>
                         </c:if>
                         <c:if test="${not empty step.dateLabel}">
                             <p class="member-dashboard-flow-date">${step.dateLabel}</p>
@@ -69,6 +69,10 @@
     <span class="member-dashboard-flow-legend-item">
         <span class="member-dashboard-flow-dot member-dashboard-flow-dot--pending"></span>
         Pending
+    </span>
+    <span class="member-dashboard-flow-legend-item">
+        <span class="member-dashboard-flow-dot member-dashboard-flow-dot--closed"></span>
+        Closed
     </span>
     <span class="member-dashboard-flow-legend-item">
         <span class="member-dashboard-flow-dot member-dashboard-flow-dot--not-started"></span>

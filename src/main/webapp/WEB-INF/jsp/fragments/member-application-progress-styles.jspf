@@ -61,6 +61,28 @@
         background: radial-gradient(circle at top, #f8fbff 0%, #eaf3ff 100%);
         color: #2563eb;
     }
+    .member-dashboard-flow-node--rejected {
+        border-color: #fda4af;
+        background: radial-gradient(circle at top, #fff7f7 0%, #ffe4e6 100%);
+        color: #e11d48;
+    }
+    .member-dashboard-flow-node--rejected::after {
+        content: "\00d7";
+        font-size: 3.9rem;
+    }
+    .member-dashboard-flow-node--closed {
+        border-color: #d1d5db;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        color: #9ca3af;
+    }
+    .member-dashboard-flow-node--closed::after {
+        content: "\00d7";
+        font-size: 3.9rem;
+    }
+    .member-dashboard-mobile-node.member-dashboard-flow-node--closed::after,
+    .member-dashboard-mobile-node.member-dashboard-flow-node--rejected::after {
+        font-size: 2.65rem;
+    }
     .member-dashboard-flow-node--pending {
         border-color: #d1d5db;
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -95,6 +117,12 @@
     .member-dashboard-flow-number--current {
         color: #2563eb;
     }
+    .member-dashboard-flow-number--rejected {
+        color: #e11d48;
+    }
+    .member-dashboard-flow-number--closed {
+        color: #4b5563;
+    }
     .member-dashboard-flow-number--pending {
         color: #4b5563;
     }
@@ -122,6 +150,12 @@
     .member-dashboard-flow-text--current {
         color: #2563eb;
     }
+    .member-dashboard-flow-text--rejected {
+        color: #e11d48;
+    }
+    .member-dashboard-flow-text--closed {
+        color: #64748b;
+    }
     .member-dashboard-flow-text--pending {
         color: #f59e0b;
     }
@@ -144,6 +178,9 @@
     }
     .member-dashboard-flow-meta--current {
         color: #2563eb;
+    }
+    .member-dashboard-flow-meta--rejected {
+        color: #e11d48;
     }
     .member-dashboard-flow-date {
         margin-top: 0.45rem;
@@ -182,6 +219,21 @@
     }
     .member-dashboard-flow-dot--not-started {
         background: #d1d5db;
+    }
+    .member-dashboard-flow-dot--closed {
+        position: relative;
+        border: 2px solid #d1d5db;
+        background: #ffffff;
+    }
+    .member-dashboard-flow-dot--closed::after {
+        content: "\00d7";
+        position: absolute;
+        inset: -0.42rem 0 0;
+        text-align: center;
+        font-size: 1rem;
+        line-height: 1;
+        font-weight: 800;
+        color: #9ca3af;
     }
     .member-dashboard-mobile-flow {
         display: none;
@@ -261,6 +313,9 @@
         line-height: 1.2;
         font-weight: 600;
         color: #2563eb;
+    }
+    .member-dashboard-mobile-meta.member-dashboard-flow-meta--rejected {
+        color: #e11d48;
     }
     .member-dashboard-mobile-date {
         margin-top: 0.35rem;

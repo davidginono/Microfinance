@@ -103,6 +103,7 @@ Default local URL:
   - `SACCOs` should remain a focused portfolio/workspace view
   - `SACCO Registry` should be its own sidebar destination and view
 - Keep visual changes consistent with the current ERP-style admin/member layout.
+- Keep panel-header and toolbar action buttons compact by default. Do not stretch actions such as Restore Default Permissions to full width unless a specific mobile form flow explicitly calls for it.
 - Use one shared modal language across the app. Default to the shared modal shell with calm white surfaces, modest system-aligned corner radii, thin grey borders, light shadows, right-aligned footer actions, and a simple top-right close icon.
 - Reduce short-term memory overload:
   - keep page-header explanations brief

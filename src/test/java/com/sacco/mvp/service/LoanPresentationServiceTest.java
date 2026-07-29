@@ -970,6 +970,89 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void printablePdfMarksFutureReviewStagesClosedAfterRejection() throws IOException {
+        UUID loanId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        UUID committeeId = UUID.randomUUID();
+        LoanApplication app = basicPrintableApplication();
+        app.setId(loanId);
+        app.setRequiredGuarantors(0);
+        app.setStatus(LoanStatus.CREDIT_COMMITTEE_REJECTED);
+        Member applicant = basicApplicant();
+        Member manager = Member.builder()
+            .id(managerId)
+            .fullName("Branch Manager")
+            .memberNo("BM-001")
+            .signatureText("Branch M")
+            .build();
+        Member committeeMember = Member.builder()
+            .id(committeeId)
+            .fullName("Credit Member")
+            .memberNo("CC-001")
+            .signatureText("Credit M")
+            .build();
+        ManagerReview managerReview = ManagerReview.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .managerMemberId(managerId)
+            .reviewStage(ApprovalWorkflowStage.MANAGER)
+            .decision(ManagerDecision.ACCEPT)
+            .reasons("Application details confirmed")
+            .managerSignatureText("Branch M")
+            .managerSignatureVerifiedAt(OffsetDateTime.parse("2026-07-21T05:38:00+03:00"))
+            .createdAt(OffsetDateTime.parse("2026-07-21T05:38:00+03:00"))
+            .build();
+        BoardReview committeeReview = BoardReview.builder()
+            .id(UUID.randomUUID())
+            .loanApplicationId(loanId)
+            .boardMemberId(committeeId)
+            .reviewStage(ApprovalWorkflowStage.CREDIT_COMMITTEE)
+            .decision(BoardDecision.REJECTED)
+            .comment("TOO HIGH")
+            .boardSignatureText("Credit M")
+            .boardSignatureVerifiedAt(OffsetDateTime.parse("2026-07-29T07:05:00+03:00"))
+            .decidedAt(OffsetDateTime.parse("2026-07-29T07:05:00+03:00"))
+            .createdAt(OffsetDateTime.parse("2026-07-29T07:05:00+03:00"))
+            .build();
+        when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(
+            workflow(
+                ApprovalWorkflowStage.MANAGER,
+                ApprovalWorkflowStage.CREDIT_COMMITTEE,
+                ApprovalWorkflowStage.ACCOUNTANT,
+                ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+            )
+        );
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            null,
+            null,
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(managerReview),
+            Map.of(managerId, manager),
+            List.of(committeeReview),
+            Map.of(committeeId, committeeMember),
+            "TOO HIGH",
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .containsSubsequence("Branch Manager", "Approved")
+                .containsSubsequence("Credit Committee", "Rejected")
+                .containsSubsequence("Accountant", "Closed")
+                .doesNotContain("Accountant\n-\nPending");
+        }
+    }
+
+    @Test
     void printablePdfIncludesGuarantorMemberNumberColumn() throws IOException {
         UUID loanId = UUID.randomUUID();
         UUID guarantorId = UUID.randomUUID();

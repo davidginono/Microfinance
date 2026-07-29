@@ -22,6 +22,19 @@
         cursor: not-allowed;
         opacity: 0.35;
     }
+
+    .admin-access-matrix-restore {
+        align-self: flex-start;
+        flex: 0 0 auto;
+        max-width: 100%;
+        width: auto;
+    }
+
+    @media (min-width: 768px) {
+        .admin-access-matrix-restore {
+            align-self: center;
+        }
+    }
 </style>
 
 <c:if test="${not empty openUserModalKey}">
@@ -122,7 +135,7 @@
                     <p class="erp-widget-title">Access Matrix</p>
                     <p class="mt-1 text-sm text-slate-500">Unsupported combinations are shown but cannot be selected.</p>
                 </div>
-                <button type="button" class="app-btn btn-neutral" data-restore-default-claims>
+                <button type="button" class="admin-access-matrix-restore app-btn btn-neutral" data-restore-default-claims>
                     Restore Default Permissions
                 </button>
             </div>

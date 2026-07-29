@@ -948,6 +948,7 @@ public class LoanPresentationService {
             || status == com.sacco.mvp.domain.LoanStatus.LOAN_OFFICER_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.CHAIRPERSON_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.BOARD_REJECTED
+            || status == com.sacco.mvp.domain.LoanStatus.CREDIT_COMMITTEE_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.ACCOUNTANT_REJECTED
             || status == com.sacco.mvp.domain.LoanStatus.REJECTED;
     }
@@ -2387,6 +2388,10 @@ public class LoanPresentationService {
         private void drawSystemSignedReviewTable(List<ApprovalWorkflowStage> stages) throws IOException {
             List<String[]> rows = new ArrayList<>();
             for (ApprovalWorkflowStage stage : stages) {
+                if (stageClosedAfterRejection(stage, stages)) {
+                    rows.add(new String[]{stage.getDisplayLabel(), "-", "Closed", "-", "-", "-"});
+                    continue;
+                }
                 if (boardStyleReviewStage(stage)) {
                     List<BoardReview> stageReviews = boardReviewsForStage(stage);
                     if (stageReviews.isEmpty()) {
@@ -2445,6 +2450,19 @@ public class LoanPresentationService {
         }
 
         private void drawStaffSignOffPanel(ApprovalWorkflowStage stage) throws IOException {
+            if (stageClosedAfterRejection(stage)) {
+                drawRoleSignOffCard(
+                    stage.getDisplayLabel(),
+                    "CLOSED",
+                    "-",
+                    "-",
+                    "Closed",
+                    null,
+                    "-",
+                    MUTED_COLOR
+                );
+                return;
+            }
             ManagerReview review = latestStaffReview(stage);
             Member reviewer = review == null ? null : staffReviewers.get(review.getManagerMemberId());
             drawRoleSignOffCard(
@@ -2516,6 +2534,19 @@ public class LoanPresentationService {
         }
 
         private void drawBoardSignOffPanel(ApprovalWorkflowStage stage) throws IOException {
+            if (stageClosedAfterRejection(stage)) {
+                drawRoleSignOffCard(
+                    stage.getDisplayLabel(),
+                    "CLOSED",
+                    "-",
+                    "-",
+                    "Closed",
+                    null,
+                    "-",
+                    MUTED_COLOR
+                );
+                return;
+            }
             List<BoardReview> stageReviews = boardReviewsForStage(stage);
             if (stageReviews.isEmpty()) {
                 drawRoleSignOffCard(
@@ -2563,6 +2594,35 @@ public class LoanPresentationService {
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DISBURSED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAID;
+        }
+
+        private boolean stageClosedAfterRejection(ApprovalWorkflowStage stage) {
+            return stageClosedAfterRejection(stage, configuredReviewStages());
+        }
+
+        private boolean stageClosedAfterRejection(ApprovalWorkflowStage stage, List<ApprovalWorkflowStage> stages) {
+            ApprovalWorkflowStage rejectedStage = rejectedReviewStage();
+            if (stage == null || rejectedStage == null || stages == null || stages.isEmpty()) {
+                return false;
+            }
+            int rejectedIndex = stages.indexOf(rejectedStage);
+            int stageIndex = stages.indexOf(stage);
+            return rejectedIndex >= 0 && stageIndex > rejectedIndex;
+        }
+
+        private ApprovalWorkflowStage rejectedReviewStage() {
+            if (app == null || app.getStatus() == null || !isRejectedStatus(app.getStatus())) {
+                return null;
+            }
+            return switch (app.getStatus()) {
+                case MANAGER_REJECTED -> ApprovalWorkflowStage.MANAGER;
+                case LOAN_OFFICER_REJECTED -> ApprovalWorkflowStage.LOAN_OFFICER;
+                case CHAIRPERSON_REJECTED -> ApprovalWorkflowStage.CHAIRPERSON;
+                case BOARD_REJECTED -> ApprovalWorkflowStage.BOARD;
+                case CREDIT_COMMITTEE_REJECTED -> ApprovalWorkflowStage.CREDIT_COMMITTEE;
+                case ACCOUNTANT_REJECTED -> ApprovalWorkflowStage.ACCOUNTANT;
+                default -> null;
+            };
         }
 
         private ManagerReview latestStaffReview(ApprovalWorkflowStage stage) {
