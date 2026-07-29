@@ -12,10 +12,12 @@ import com.sacco.mvp.security.AppUsageTrackingFilter;
 import com.sacco.mvp.security.AuthzService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
+import com.sacco.mvp.security.SessionTimeoutPolicyFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
+import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
@@ -76,6 +78,7 @@ public class SecurityConfig {
                                                    StationOtpSettingsService stationOtpSettingsService,
                                                    UserClaimService userClaimService,
                                                    AppUsageAnalyticsService appUsageAnalyticsService,
+                                                   PlatformSessionSettingsService platformSessionSettingsService,
                                                    AuditService auditService,
                                                    AppUserDetailsService userDetailsService,
                                                    PasswordEncoder passwordEncoder) throws Exception {
@@ -260,6 +263,7 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex.accessDeniedPage("/error/403"))
             .csrf(Customizer.withDefaults())
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
+            .addFilterAfter(new SessionTimeoutPolicyFilter(platformSessionSettingsService), AuthorizationFilter.class)
             .addFilterAfter(new AppUsageTrackingFilter(appUsageAnalyticsService), AuthorizationFilter.class);
 
         if (isGoogleSsoConfigured()) {

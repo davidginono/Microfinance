@@ -21,6 +21,7 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.PlatformBrandingSettingsService;
+import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
@@ -71,6 +72,7 @@ public class AdminController {
     private final StationOtpSettingsService stationOtpSettingsService;
     private final SaccoDataDeletionService saccoDataDeletionService;
     private final PlatformBrandingSettingsService platformBrandingSettingsService;
+    private final PlatformSessionSettingsService platformSessionSettingsService;
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
 
     @GetMapping("/scope/select")
@@ -204,8 +206,23 @@ public class AdminController {
     public String platformSettings(Model model) {
         model.addAttribute("brandingSettings", platformBrandingSettingsService.settings());
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
+        model.addAttribute("platformSessionSettings", platformSessionSettingsService.settings());
         model.addAttribute("supportContactSettings", platformSupportContactSettingsService.settings());
         return "admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/session-timeout")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String updateSessionTimeout(@AuthenticationPrincipal AppUserPrincipal principal,
+                                       @RequestParam int timeoutMinutes,
+                                       RedirectAttributes ra) {
+        try {
+            platformSessionSettingsService.updateTimeout(timeoutMinutes, principal.getMemberId());
+            ra.addFlashAttribute("message", "Session timeout settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
     }
 
     @PostMapping("/platform-settings/logo-policy")

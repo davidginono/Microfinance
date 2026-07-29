@@ -3,6 +3,7 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.config.SecurityConfig;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.domain.PlatformSessionSettings;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
@@ -27,9 +28,11 @@ import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.PlatformBrandingSettingsService;
+import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
+import com.sacco.mvp.service.SessionTimeoutPolicy;
 import com.sacco.mvp.service.SmsUsageManagementService;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.StationOtpSettingsService;
@@ -65,8 +68,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -76,12 +82,15 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private AdminService adminService;
     @Autowired private AdminScopeService adminScopeService;
     @Autowired private SaccoStationRepository saccoStationRepository;
+    @Autowired private PlatformSessionSettingsService platformSessionSettingsService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(adminService, adminScopeService, saccoStationRepository);
+        Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService);
+        when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+        when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -134,6 +143,54 @@ class AdminControllerUserAccessSecurityTest {
         verify(adminService).usersPage("SACCO-01", "ST-1", "userId", null, 0, 25);
     }
 
+    @Test
+    void platformSettingsAllowsPlatformAdminWithViewClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+
+        mockMvc.perform(get("/admin/platform-settings")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isOk())
+            .andExpect(view().name("admin/platform-settings"));
+
+        verify(platformSessionSettingsService).settings();
+    }
+
+    @Test
+    void platformSettingsDeniesPlatformAdminWithoutViewClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.ADMIN_DASHBOARD_VIEW));
+
+        mockMvc.perform(get("/admin/platform-settings")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateSessionTimeoutAllowsPlatformAdminWithUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/session-timeout")
+                .param("timeoutMinutes", "45")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"));
+
+        verify(platformSessionSettingsService).updateTimeout(45, principal.getMemberId());
+    }
+
+    @Test
+    void updateSessionTimeoutDeniesPlatformAdminWithoutUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+
+        mockMvc.perform(post("/admin/platform-settings/session-timeout")
+                .param("timeoutMinutes", "45")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verify(platformSessionSettingsService, never()).updateTimeout(any(Integer.class), any());
+    }
+
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {
         return new UsernamePasswordAuthenticationToken(principal, principal.getPassword(), principal.getAuthorities());
     }
@@ -155,6 +212,35 @@ class AdminControllerUserAccessSecurityTest {
             .createdAt(OffsetDateTime.now())
             .build();
         return new AppUserPrincipal(member, claims, true);
+    }
+
+    private AppUserPrincipal platformPrincipal(Set<UserClaim> claims) {
+        Member member = Member.builder()
+            .id(UUID.randomUUID())
+            .saccoId("PLATFORM")
+            .stationId(null)
+            .memberNo("ADMIN-1")
+            .staffNo("ADMIN-1")
+            .fullName("Platform Admin")
+            .memberAccount(false)
+            .status(MemberStatus.ACTIVE)
+            .position(Position.ADMIN)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .passwordHash("x")
+            .createdAt(OffsetDateTime.now())
+            .build();
+        return new AppUserPrincipal(member, claims, true);
+    }
+
+    private PlatformSessionSettings platformSessionSettings(int timeoutMinutes) {
+        OffsetDateTime now = OffsetDateTime.now();
+        return PlatformSessionSettings.builder()
+            .id(PlatformSessionSettings.DEFAULT_ID)
+            .timeoutMinutes(timeoutMinutes)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 
     private SaccoStation station() {
@@ -208,6 +294,7 @@ class AdminControllerUserAccessSecurityTest {
                                         StationOtpSettingsService stationOtpSettingsService,
                                         SaccoDataDeletionService saccoDataDeletionService,
                                         PlatformBrandingSettingsService platformBrandingSettingsService,
+                                        PlatformSessionSettingsService platformSessionSettingsService,
                                         PlatformSupportContactSettingsService platformSupportContactSettingsService) {
             return new AdminController(
                 adminService,
@@ -222,6 +309,7 @@ class AdminControllerUserAccessSecurityTest {
                 stationOtpSettingsService,
                 saccoDataDeletionService,
                 platformBrandingSettingsService,
+                platformSessionSettingsService,
                 platformSupportContactSettingsService
             );
         }
@@ -273,6 +361,12 @@ class AdminControllerUserAccessSecurityTest {
         @Bean StationOtpSettingsService stationOtpSettingsService() { return Mockito.mock(StationOtpSettingsService.class); }
         @Bean SaccoDataDeletionService saccoDataDeletionService() { return Mockito.mock(SaccoDataDeletionService.class); }
         @Bean PlatformBrandingSettingsService platformBrandingSettingsService() { return Mockito.mock(PlatformBrandingSettingsService.class); }
+        @Bean
+        PlatformSessionSettingsService platformSessionSettingsService() {
+            PlatformSessionSettingsService service = Mockito.mock(PlatformSessionSettingsService.class);
+            when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+            return service;
+        }
         @Bean PlatformSupportContactSettingsService platformSupportContactSettingsService() { return Mockito.mock(PlatformSupportContactSettingsService.class); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }

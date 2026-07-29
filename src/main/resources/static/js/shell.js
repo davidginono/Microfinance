@@ -568,9 +568,9 @@
             return;
         }
 
-        const configuredPromptMs = Number(prompt.getAttribute('data-prompt-ms'));
-        const configuredGraceMs = Number(prompt.getAttribute('data-grace-ms'));
-        if (!Number.isFinite(configuredPromptMs) || configuredPromptMs <= 0) {
+        const configuredTimeoutMs = Number(prompt.getAttribute('data-timeout-ms'));
+        const configuredWarningMs = Number(prompt.getAttribute('data-warning-ms'));
+        if (!Number.isFinite(configuredTimeoutMs) || configuredTimeoutMs <= 0) {
             return;
         }
 
@@ -580,16 +580,18 @@
         }
         prompt.setAttribute('aria-hidden', 'true');
 
-        const promptMs = Math.max(configuredPromptMs, 1000);
-        const graceMs = Number.isFinite(configuredGraceMs) && configuredGraceMs > 0
-            ? Math.max(configuredGraceMs, 1000)
+        const warningMs = Number.isFinite(configuredWarningMs) && configuredWarningMs > 0
+            ? Math.max(configuredWarningMs, 1000)
             : 60000;
+        const timeoutMs = Math.max(configuredTimeoutMs, warningMs + 1000);
         const progressShell = progress.parentElement;
-        const activityEvents = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
-        let promptTimer = null;
+        const activityEvents = ['click', 'keydown', 'mousedown', 'mousemove', 'pointerdown', 'touchstart', 'scroll', 'wheel'];
+        let checkTimer = null;
         let countdownTimer = null;
         let deadline = 0;
         let keepalivePending = false;
+        let cycleStartedAt = Date.now();
+        let activityInCycle = false;
         let audioContext = null;
         let audioUnlocked = false;
         let stopwatchTickTimer = null;
@@ -776,7 +778,7 @@
             const remainingMs = Math.max(deadline - Date.now(), 0);
             const remainingSeconds = Math.ceil(remainingMs / 1000);
             countdown.textContent = String(remainingSeconds);
-            setProgress(graceMs > 0 ? (remainingMs / graceMs) * 100 : 0);
+            setProgress(warningMs > 0 ? (remainingMs / warningMs) * 100 : 0);
             if (remainingMs <= 0) {
                 expireSession();
             }
@@ -800,11 +802,11 @@
             if (promptVisible()) {
                 return;
             }
-            if (promptTimer) {
-                window.clearTimeout(promptTimer);
-                promptTimer = null;
+            if (checkTimer) {
+                window.clearTimeout(checkTimer);
+                checkTimer = null;
             }
-            deadline = Date.now() + graceMs;
+            deadline = Date.now() + warningMs;
             prompt.classList.remove('hidden');
             prompt.classList.add('flex');
             prompt.classList.add('is-entering');
@@ -851,19 +853,36 @@
             stayButton.classList.toggle('cursor-not-allowed', pending);
         };
 
-        const schedulePrompt = function () {
-            if (promptTimer) {
-                window.clearTimeout(promptTimer);
-            }
-            promptTimer = window.setTimeout(showPrompt, promptMs);
+        const finalCheckAt = function () {
+            return cycleStartedAt + timeoutMs - warningMs;
         };
 
-        const refreshSession = function () {
+        const cycleDeadline = function () {
+            return cycleStartedAt + timeoutMs;
+        };
+
+        const scheduleFinalMinuteCheck = function () {
+            if (checkTimer) {
+                window.clearTimeout(checkTimer);
+            }
+            const delayMs = Math.max(finalCheckAt() - Date.now(), 0);
+            checkTimer = window.setTimeout(runFinalMinuteCheck, delayMs);
+        };
+
+        const startSessionCycle = function () {
+            cycleStartedAt = Date.now();
+            activityInCycle = false;
+            scheduleFinalMinuteCheck();
+        };
+
+        const refreshSession = function (silent) {
             if (keepalivePending) {
                 return;
             }
             keepalivePending = true;
-            setStayPending(true);
+            if (!silent) {
+                setStayPending(true);
+            }
             fetch(prompt.getAttribute('data-keepalive-url') || '/session/keepalive', {
                 method: 'POST',
                 headers: keepaliveHeaders(),
@@ -874,27 +893,73 @@
                         throw new Error('Session keepalive failed');
                     }
                     hidePrompt();
-                    schedulePrompt();
-                    if (typeof window.showToast === 'function') {
+                    startSessionCycle();
+                    if (!silent && typeof window.showToast === 'function') {
                         window.showToast('success', prompt.getAttribute('data-refresh-success-message') || 'Session refreshed.');
                     }
                 })
                 .catch(function () {
-                    if (typeof window.showToast === 'function') {
+                    if (silent && !promptVisible()) {
+                        showPrompt();
+                    }
+                    if (!silent && typeof window.showToast === 'function') {
                         window.showToast('error', prompt.getAttribute('data-refresh-error-message') || 'We could not refresh your session. Please sign in again if this continues.');
                     }
                 })
                 .finally(function () {
                     keepalivePending = false;
-                    setStayPending(false);
+                    if (!silent) {
+                        setStayPending(false);
+                    }
                 });
         };
+
+        function runFinalMinuteCheck() {
+            if (checkTimer) {
+                window.clearTimeout(checkTimer);
+                checkTimer = null;
+            }
+            if (promptVisible()) {
+                return;
+            }
+            const now = Date.now();
+            if (now >= cycleDeadline()) {
+                expireSession();
+                return;
+            }
+            if (now < finalCheckAt()) {
+                scheduleFinalMinuteCheck();
+                return;
+            }
+            if (activityInCycle) {
+                refreshSession(true);
+                return;
+            }
+            showPrompt();
+        }
 
         const handleActivity = function () {
             if (promptVisible()) {
                 return;
             }
-            schedulePrompt();
+            activityInCycle = true;
+        };
+
+        const handleWake = function () {
+            if (promptVisible()) {
+                updateCountdown();
+                return;
+            }
+            const now = Date.now();
+            if (now >= cycleDeadline()) {
+                expireSession();
+                return;
+            }
+            if (now >= finalCheckAt()) {
+                runFinalMinuteCheck();
+                return;
+            }
+            scheduleFinalMinuteCheck();
         };
 
         activityEvents.forEach(function (eventName) {
@@ -903,9 +968,20 @@
         ['click', 'keydown', 'mousedown', 'pointerdown', 'touchstart'].forEach(function (eventName) {
             window.addEventListener(eventName, unlockSessionAudio, { passive: true });
         });
-        stayButton.addEventListener('click', refreshSession);
+        window.addEventListener('focus', function () {
+            handleActivity();
+            handleWake();
+        }, { passive: true });
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) {
+                handleWake();
+            }
+        });
+        stayButton.addEventListener('click', function () {
+            refreshSession(false);
+        });
         logoutForm.addEventListener('submit', clearCountdown);
-        schedulePrompt();
+        startSessionCycle();
     };
 
     window.addEventListener('load', function () {

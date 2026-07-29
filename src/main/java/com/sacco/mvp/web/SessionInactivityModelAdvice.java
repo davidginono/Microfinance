@@ -1,24 +1,27 @@
 package com.sacco.mvp.web;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.sacco.mvp.service.PlatformSessionSettingsService;
+import com.sacco.mvp.service.SessionTimeoutPolicy;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 @ControllerAdvice
+@RequiredArgsConstructor
 public class SessionInactivityModelAdvice {
-    @Value("${app.session.inactivity-prompt-ms:60000}")
-    private long inactivityPromptMs;
+    private final PlatformSessionSettingsService platformSessionSettingsService;
 
-    @Value("${app.session.inactivity-grace-ms:60000}")
-    private long inactivityGraceMs;
-
-    @ModelAttribute("sessionInactivityPromptMs")
-    public long sessionInactivityPromptMs() {
-        return inactivityPromptMs;
+    @ModelAttribute("sessionTimeoutMs")
+    public long sessionTimeoutMs() {
+        return policy().timeoutMs();
     }
 
-    @ModelAttribute("sessionInactivityGraceMs")
-    public long sessionInactivityGraceMs() {
-        return inactivityGraceMs;
+    @ModelAttribute("sessionTimeoutWarningMs")
+    public long sessionTimeoutWarningMs() {
+        return policy().warningMs();
+    }
+
+    private SessionTimeoutPolicy policy() {
+        return platformSessionSettingsService.policy();
     }
 }

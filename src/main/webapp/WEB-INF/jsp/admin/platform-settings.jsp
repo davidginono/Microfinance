@@ -96,8 +96,34 @@
 <div class="erp-page-header">
     <p class="erp-breadcrumb">Admin Tools / Platform Settings</p>
     <h1 class="erp-page-title">Platform Settings</h1>
-    <p class="erp-page-subtitle">Manage platform-wide support contact and branding rules for SACCO workspaces.</p>
+    <p class="erp-page-subtitle">Manage platform-wide session, support, and branding rules for SACCO workspaces.</p>
 </div>
+
+<section class="erp-panel overflow-hidden">
+    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <p class="erp-widget-title">Session</p>
+        <h2 class="mt-1 text-xl font-bold text-sacco-ink">Session Timeout</h2>
+        <p class="mt-1 text-sm text-slate-500">The reminder appears only in the final minute when no activity is detected.</p>
+    </div>
+    <form action="/admin/platform-settings/session-timeout" method="post" class="erp-panel-body platform-settings-form">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <div class="platform-settings-grid">
+            <div class="platform-settings-card rounded-md border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Inactivity</p>
+                <label class="platform-settings-field mt-3">
+                    Session timeout (minutes)
+                    <input name="timeoutMinutes" type="number" min="2" max="480" required
+                           class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                           value="${platformSessionSettings.timeoutMinutes}" />
+                </label>
+            </div>
+        </div>
+        <div class="platform-settings-actions mt-5 relative flex flex-row items-center justify-between gap-3 flex-wrap border-t border-slate-200 pt-5">
+            <p class="min-w-[16rem] flex-[1_1_24rem] text-sm text-slate-500">Choose between 2 and 480 minutes. Active users are refreshed silently before the final warning minute.</p>
+            <button type="submit" class="app-btn btn-primary shrink-0 min-w-[10rem]" style="height:3rem;">Save Timeout</button>
+        </div>
+    </form>
+</section>
 
 <section class="erp-panel overflow-hidden">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">

@@ -25,6 +25,8 @@ import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.PlatformSessionSettingsService;
+import com.sacco.mvp.service.SessionTimeoutPolicy;
 import com.sacco.mvp.service.StaffMfaService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
@@ -250,6 +252,12 @@ class StaffAnalyticsControllerSecurityTest {
         @Bean LoanAnalyticsService loanAnalyticsService() { return Mockito.mock(LoanAnalyticsService.class); }
         @Bean LoanReportService loanReportService() { return Mockito.mock(LoanReportService.class); }
         @Bean AppUsageAnalyticsService appUsageAnalyticsService() { return Mockito.mock(AppUsageAnalyticsService.class); }
+        @Bean
+        PlatformSessionSettingsService platformSessionSettingsService() {
+            PlatformSessionSettingsService service = Mockito.mock(PlatformSessionSettingsService.class);
+            when(service.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
+            return service;
+        }
         @Bean AuditService auditService() { return Mockito.mock(AuditService.class); }
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }

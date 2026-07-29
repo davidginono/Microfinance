@@ -747,8 +747,8 @@
      aria-hidden="true"
      aria-labelledby="sessionInactivityTitle"
      aria-describedby="sessionInactivityMessage"
-     data-prompt-ms="${sessionInactivityPromptMs}"
-     data-grace-ms="${sessionInactivityGraceMs}"
+     data-timeout-ms="${sessionTimeoutMs}"
+     data-warning-ms="${sessionTimeoutWarningMs}"
      data-keepalive-url="<c:url value='/session/keepalive' />"
      data-csrf-header="${_csrf.headerName}"
      data-csrf-token="${_csrf.token}"
@@ -763,11 +763,11 @@
             </span>
             <div class="min-w-0 flex-1">
                 <p class="erp-widget-title"><spring:message code="session.timeout.eyebrow" text="Session Security" /></p>
-                <h2 id="sessionInactivityTitle" class="mt-1 text-base font-bold text-sacco-ink"><spring:message code="session.timeout.title" text="Session Expiring Soon" /></h2>
+                <h2 id="sessionInactivityTitle" class="mt-1 text-base font-bold text-sacco-ink"><spring:message code="session.timeout.title" text="Are you still there?" /></h2>
             </div>
         </div>
         <div class="session-timeout-body">
-            <p id="sessionInactivityMessage" class="text-sm leading-5 text-slate-600"><spring:message code="session.timeout.message" text="You have been inactive for a while. For your security, you will be automatically logged out in:" /></p>
+            <p id="sessionInactivityMessage" class="text-sm leading-5 text-slate-600"><spring:message code="session.timeout.message" text="We have not detected recent activity. For your security, you will be automatically logged out in:" /></p>
             <div class="mt-4 text-center" aria-live="polite" aria-atomic="true">
                 <p id="sessionInactivityCountdown" class="session-timeout-countdown font-display">--</p>
                 <p class="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="session.timeout.seconds" text="Seconds" /></p>
