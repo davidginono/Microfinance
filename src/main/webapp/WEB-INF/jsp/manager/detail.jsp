@@ -5,50 +5,13 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/attachment-dropzone.jspf" %>
-<style>
-    .disbursement-collapsible-trigger {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.35rem;
-        background: #ffffff;
-        padding: 0.95rem 1rem;
-        color: #64748b;
-        font-size: 0.875rem;
-        font-weight: 600;
-        letter-spacing: 0.025em;
-        text-align: left;
-        text-transform: uppercase;
-    }
-    .disbursement-collapsible-trigger:hover,
-    .disbursement-collapsible-trigger:focus-visible {
-        border-color: #d7e1ea;
-        background: #f8fafc;
-        outline: none;
-    }
-    .disbursement-collapsible-chevron {
-        flex: 0 0 auto;
-        color: #64748b;
-        transition: transform 180ms ease;
-    }
-    .disbursement-collapsible-trigger[aria-expanded="true"] .disbursement-collapsible-chevron {
-        transform: rotate(180deg);
-    }
-    .disbursement-collapsible-content[hidden] {
-        display: none !important;
-    }
-</style>
 
 <c:set var="isDisbursementReview" value="${reviewBasePath eq '/disbursement'}" />
 <c:set var="hideDisbursementSupportSections" value="${isDisbursementReview and app.status eq 'READY_FOR_DISBURSEMENT'}" />
 
-<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
     <div>
         <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
         <h1 class="erp-page-title">${reviewPanelTitle}</h1>
@@ -290,7 +253,7 @@
                     <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
                 </div>
             </div>
-            <div class="mt-5 erp-table-wrap overflow-x-auto">
+<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
                 <table class="erp-table">
                     <thead>
                     <tr>

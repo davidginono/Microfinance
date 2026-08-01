@@ -4,76 +4,14 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .admin-filter-bar {
-        align-items: flex-end;
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 0.75rem;
-        overflow-x: visible;
-        width: 100%;
-    }
-    .admin-filter-field {
-        flex: 1 1 0;
-        min-width: 0;
-        max-width: none;
-    }
-    .admin-filter-field--date {
-        flex: 0.85 1 0;
-    }
-    .admin-filter-field--actor {
-        flex: 1.05 1 0;
-    }
-    .admin-filter-field--rows {
-        flex: 0 0 9.5rem;
-    }
-    .admin-filter-field select,
-    .admin-filter-field input {
-        min-height: 2.75rem;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .admin-filter-field .neo-select-button {
-        min-height: 2.75rem;
-        padding: 0.62rem 0.75rem;
-    }
-    .admin-filter-field--rows .neo-select-button {
-        padding-left: 0.9rem;
-        padding-right: 0.9rem;
-    }
-    .admin-filter-field--rows .neo-select-button-text {
-        font-size: 0.9rem;
-    }
-    .admin-filter-field--rows-label {
-        white-space: nowrap;
-    }
-    .admin-filter-actions {
-        flex: 0 0 auto;
-        white-space: nowrap;
-    }
-    @media (max-width: 900px) {
-        .admin-filter-bar {
-            flex-wrap: wrap;
-            overflow-x: visible;
-        }
-        .admin-filter-field,
-        .admin-filter-field--date,
-        .admin-filter-field--actor,
-        .admin-filter-field--rows {
-            flex: 1 1 11rem;
-            max-width: none;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.events.breadcrumb" text="Admin Tools / Event Log" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.events.title" text="Event Log" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.events.subtitle" text="Review recorded system activity." /></p>
 </div>
 <section class="erp-form-wrap mb-4">
-    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar" data-auto-submit-filter>
+<form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 SACCO
@@ -117,7 +55,7 @@
         </label>
         <label class="admin-filter-field admin-filter-field--actor block min-w-0 text-sm font-semibold text-slate-700">
             Actor / User ID
-            <input type="text" name="actorId" value="${selectedActorId}" placeholder="Search actor UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" data-auto-submit-on-input />
+            <input type="text" name="actorId" value="${selectedActorId}" placeholder="Search actor UUID or prefix" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sacco-blue focus:outline-none" />
         </label>
         <label class="admin-filter-field admin-filter-field--rows block min-w-0 text-sm font-semibold text-slate-700">
             <span class="admin-filter-field--rows-label">Rows Per Page</span>
@@ -133,7 +71,7 @@
         </div>
     </form>
 </section>
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>
@@ -253,5 +191,4 @@
     </script>
 </c:if>
 
-<%@ include file="../fragments/auto-submit-filter.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

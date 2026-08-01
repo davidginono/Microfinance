@@ -3,7 +3,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.settings.breadcrumb" text="Manager Panel / Settings" /></p>
     <h1 class="erp-page-title"><spring:message code="manager.settings.title" text="Manager Settings" /></h1>
     <p class="erp-page-subtitle"><spring:message code="manager.settings.subtitle" text="Maintain the guarantor, board, and language defaults used across your SACCO review workflow." /></p>

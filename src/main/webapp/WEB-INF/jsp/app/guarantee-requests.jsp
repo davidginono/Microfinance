@@ -5,28 +5,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
-<style>
-    @keyframes otp-pop {
-        0% { transform: translateY(4px) scale(0.82); opacity: 0; }
-        100% { transform: translateY(0) scale(1); opacity: 1; }
-    }
 
-    .otp-checkmark-pop {
-        animation: otp-pop 180ms ease-out;
-    }
-
-    .guarantee-modal-subtitle-legacy {
-        display: none;
-    }
-</style>
-
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guaranteeRequests.breadcrumb" text="Member Workspace / Guarantee Requests" /></p>
     <h1 class="erp-page-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
 <table class="erp-table">
     <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>

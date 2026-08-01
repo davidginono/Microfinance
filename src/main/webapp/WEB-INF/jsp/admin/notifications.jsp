@@ -4,7 +4,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.notifications.breadcrumb" text="Admin Tools / Notifications" /></p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.notifications.subtitle" text="View system alerts, support updates, and admin messages in one place." /></p>
@@ -15,7 +15,7 @@
         <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
     </form>
 </div>
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>

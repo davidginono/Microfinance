@@ -6,42 +6,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .board-queue-search-form {
-        width: 100%;
-        display: grid;
-        gap: 0.85rem;
-        padding: 0.9rem 1rem;
-        border-bottom: 1px solid #d7dde3;
-        background: #f8fafc;
-    }
-    .board-queue-search-label {
-        display: block;
-        min-width: 0;
-    }
-    .board-queue-search-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 0.55rem;
-    }
-    @media (min-width: 768px) {
-        .board-queue-search-form {
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: end;
-        }
-        .board-queue-search-actions {
-            justify-content: flex-end;
-        }
-    }
-    @media (max-width: 640px) {
-        .board-queue-search-actions > * {
-            flex: 1 1 auto;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${boardListBreadcrumb}</p>
     <h1 class="erp-page-title">${boardListTitle}</h1>
 </div>
@@ -72,7 +38,7 @@
 </c:if>
 
 <div class="erp-panel overflow-hidden">
-    <form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form">
+<form action="${boardListRoute}" method="get" class="erp-filter-form board-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${archiveView}">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
         </c:if>
@@ -92,7 +58,7 @@
             <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
         </div>
     </form>
-    <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
+<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
         <table class="erp-table">
             <thead>
             <tr>

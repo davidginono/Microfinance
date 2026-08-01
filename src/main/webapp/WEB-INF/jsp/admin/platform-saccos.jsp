@@ -4,7 +4,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.saccos.breadcrumb" text="Admin Tools / SACCOs" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.saccos.title" text="SACCOs" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.saccos.subtitle" text="Portfolio cards for every registered SACCO." /></p>

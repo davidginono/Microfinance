@@ -3,12 +3,12 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Audit Log</p>
     <h1 class="erp-page-title">Audit Log</h1>
     <p class="erp-page-subtitle">Inspect recorded system actions with entity and actor references for administrative tracing.</p>
 </div>
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Action</th><th>Entity</th><th>Entity ID</th><th>Actor</th><th>Date</th></tr>

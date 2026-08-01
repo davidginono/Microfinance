@@ -145,100 +145,6 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 }
 %>
 
-<style>
-    .manager-pie-chart {
-        overflow: visible;
-    }
-    .manager-pie-slice-group {
-        transition: opacity 0.18s ease;
-    }
-    .manager-pie-slice {
-        cursor: pointer;
-        transform-box: fill-box;
-        transform-origin: center;
-        transition: transform 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
-    }
-    .manager-pie-line,
-    .manager-pie-label,
-    .manager-pie-subtext {
-        transition: opacity 0.18s ease, transform 0.18s ease, fill 0.18s ease;
-    }
-    .manager-pie-label {
-        fill: #475569;
-        font-family: Manrope, ui-sans-serif, system-ui;
-        font-size: 13px;
-        font-weight: 700;
-    }
-    .manager-pie-subtext {
-        fill: #64748b;
-        font-family: Manrope, ui-sans-serif, system-ui;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    .manager-pie-tooltip {
-        position: absolute;
-        pointer-events: none;
-        z-index: 20;
-        min-width: 11rem;
-        max-width: 16rem;
-        border: 1px solid rgba(148, 163, 184, 0.7);
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
-        backdrop-filter: blur(8px);
-        border-radius: 0.5rem;
-        padding: 0.75rem 0.85rem;
-        opacity: 0;
-        transform: translate3d(0, 8px, 0);
-        transition: opacity 0.14s ease, transform 0.14s ease;
-    }
-    .manager-pie-tooltip.is-visible {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
-    .manager-pie-tooltip-title {
-        color: #172033;
-        font-family: Manrope, ui-sans-serif, system-ui;
-        font-size: 0.95rem;
-        font-weight: 800;
-        line-height: 1.2;
-    }
-    .manager-pie-tooltip-meta {
-        margin-top: 0.25rem;
-        color: #475569;
-        font-family: Manrope, ui-sans-serif, system-ui;
-        font-size: 0.82rem;
-        font-weight: 700;
-        line-height: 1.25;
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group {
-        opacity: 0.42;
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group.is-active {
-        opacity: 1;
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group.is-active .manager-pie-slice {
-        transform: scale(1.045);
-        filter: drop-shadow(0 16px 26px rgba(15, 23, 42, 0.16));
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group.is-active .manager-pie-label {
-        fill: #172033;
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group.is-active .manager-pie-subtext,
-    .manager-pie-chart.is-hovering .manager-pie-slice-group.is-active .manager-pie-line {
-        opacity: 1;
-    }
-    .manager-pie-chart.is-hovering .manager-pie-slice-group .manager-pie-line,
-    .manager-pie-chart.is-hovering .manager-pie-slice-group .manager-pie-label,
-    .manager-pie-chart.is-hovering .manager-pie-slice-group .manager-pie-subtext {
-        opacity: 0.55;
-    }
-    .manager-recent-disbursements-scroll {
-        max-height: 18rem;
-        overflow-y: auto;
-        padding-right: 0.35rem;
-        scrollbar-gutter: stable;
-    }
-</style>
 
 <spring:message code="manager.dashboard.breadcrumb" text="Manager Panel / Dashboard" var="dashboardDefaultBreadcrumb" />
 <spring:message code="manager.dashboard.title" text="Manager Dashboard" var="dashboardDefaultTitle" />
@@ -283,7 +189,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
 </c:choose>
 <fmt:formatNumber value="${dashboardDisbursementYear}" groupingUsed="false" var="dashboardDisbursementYearLabel" />
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${dashboardBreadcrumbValue}</p>
     <h1 class="erp-page-title">${dashboardPageTitleValue}</h1>
 </div>

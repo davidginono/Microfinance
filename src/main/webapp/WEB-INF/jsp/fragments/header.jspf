@@ -11,10 +11,12 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260710-sidebar-flyout-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v3' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260801-aws-console-v7' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
-<body class="min-h-screen font-sans text-sacco-ink antialiased" style="background: var(--page-bg); overflow-x: clip;">
+<body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
+<a class="aws-skip-link" href="#main-content"><spring:message code="common.skipToContent" text="Skip to main content" /></a>
 <script>
     try {
         if (window.localStorage.getItem("shell:desktopSidebarCollapsed") === "true"
@@ -25,18 +27,18 @@
         // Local storage can be unavailable in strict browser modes.
     }
 </script>
-<div class="min-h-screen w-full max-w-full" style="background: var(--page-bg); overflow-x: clip;">
-<nav id="shellTopNav" class="fixed inset-x-0 top-0 z-50 border-b shadow-sm" style="min-height: var(--shell-nav-height); border-color: #8fbfdf; background: linear-gradient(145deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.24) 23%, rgba(255,255,255,0) 23%), linear-gradient(180deg, #abd5ef 0%, #8fc5e7 100%);">
+<div class="aws-console-root min-h-screen w-full max-w-full">
+<nav id="shellTopNav" class="app-topbar fixed inset-x-0 top-0 z-50">
     <div class="flex items-center justify-between gap-2 px-2.5 py-2 sm:gap-3 sm:px-3 lg:px-4">
         <div class="flex min-w-0 items-center gap-2 sm:gap-2.5">
-            <button id="sidebarToggle" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" style="border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.96);" aria-label="Open menu">
+            <button id="sidebarToggle" type="button" class="aws-mobile-menu-button inline-flex h-10 w-10 items-center justify-center rounded border text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden" aria-label="Open menu">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/queue' : (currentMember.position eq 'CREDIT_COMMITTEE' ? '/credit-committee/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))))}" class="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/queue' : (currentMember.position eq 'CREDIT_COMMITTEE' ? '/credit-committee/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))))}" class="app-global-brand inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
                 <c:choose>
                     <c:when test="${not empty activeSaccoLogoUrl}">
                         <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
@@ -66,6 +68,17 @@
                     </p>
                 </div>
             </a>
+            <label class="app-global-search" aria-label="<spring:message code='common.search' text='Search' />">
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-3.5-3.5"></path>
+                </svg>
+                <input id="consoleNavigationSearch"
+                       type="search"
+                       autocomplete="off"
+                       placeholder="<spring:message code='common.search' text='Search' /> navigation"
+                       aria-label="<spring:message code='common.search' text='Search' /> navigation" />
+            </label>
         </div>
 
         <div class="erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
@@ -259,7 +272,7 @@
 </div>
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/45 lg:hidden"></div>
-<div class="relative min-h-screen" style="padding-top: var(--shell-nav-height); overflow-x: clip;">
+<div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260729-session-timeout-policy' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260801-aws-console-v5' />" defer></script>

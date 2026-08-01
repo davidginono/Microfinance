@@ -4,7 +4,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Member Workspace / Guarantor Selection" /></p>
     <h1 class="erp-page-title"><spring:message code="guarantor.select" /> (${app.requiredGuarantors})</h1>
     <p class="erp-page-subtitle"><spring:message code="guarantor.selection.subtitle" text="Search privately and store the exact guarantor selection required for this application." /></p>

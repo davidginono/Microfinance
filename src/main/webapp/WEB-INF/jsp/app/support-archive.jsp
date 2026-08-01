@@ -4,13 +4,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="support.archive.breadcrumb" text="Member Workspace / Support / Sent Archive" /></p>
     <h1 class="erp-page-title"><spring:message code="support.archive.title" text="Sent Support Archive" /></h1>
     <p class="erp-page-subtitle"><spring:message code="support.archive.subtitle" text="Track messages sent to your station admin." /></p>
 </div>
 
-<section class="erp-table-wrap erp-table-scroll">
+<section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th><spring:message code="common.subject" text="Subject" /></th><th><spring:message code="common.message" text="Message" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="support.archive.stationAdminRead" text="Station Admin Read" /></th><th><spring:message code="support.archive.sent" text="Sent" /></th></tr>

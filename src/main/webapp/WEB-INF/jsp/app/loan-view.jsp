@@ -5,97 +5,9 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
-<style>
-    @keyframes otp-pop {
-        0% { transform: translateY(4px) scale(0.82); opacity: 0; }
-        100% { transform: translateY(0) scale(1); opacity: 1; }
-    }
 
-    .otp-checkmark-pop {
-        animation: otp-pop 180ms ease-out;
-    }
-    .loan-repayment-summary {
-        border: 1px solid #d7e1ea;
-        border-radius: 0.35rem;
-        background: linear-gradient(180deg, #f8fbfc 0%, #ffffff 100%);
-        padding: 1rem 1.05rem;
-    }
-    .loan-repayment-chip {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 9999px;
-        border: 1px solid #cfe5ee;
-        background: #eef7fa;
-        padding: 0.4rem 0.8rem;
-        font-size: 0.8rem;
-        font-weight: 700;
-        color: #1b6f8a;
-        white-space: nowrap;
-    }
-    .loan-repayment-chip.is-paid {
-        border-color: #bbf7d0;
-        background: #f0fdf4;
-        color: #15803d;
-    }
-    .loan-repayment-chip.is-defaulted {
-        border-color: #fecaca;
-        background: #fff1f2;
-        color: #b91c1c;
-    }
-    .loan-repayment-grid {
-        display: grid;
-        gap: 0.85rem;
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    }
-    .loan-repayment-card {
-        border: 1px solid #d7e1ea;
-        border-radius: 0.35rem;
-        background: #ffffff;
-        padding: 0.95rem 1rem;
-    }
-    .loan-repayment-card-value {
-        margin-top: 0.55rem;
-        font-size: 1rem;
-        font-weight: 600;
-        line-height: 1.4;
-        color: #0f172a;
-    }
-    .loan-repayment-meta-grid {
-        display: grid;
-        gap: 0.85rem;
-        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    }
-    .loan-repayment-note {
-        border: 1px solid #d7e1ea;
-        border-radius: 0.35rem;
-        background: #ffffff;
-        padding: 0.95rem 1rem;
-    }
-    .loan-repayment-note-value {
-        margin-top: 0.45rem;
-        font-size: 0.94rem;
-        line-height: 1.55;
-        color: #334155;
-    }
-    .loan-repayment-empty {
-        border: 1px dashed #cbd5e1;
-        border-radius: 0.35rem;
-        background: #f8fafc;
-        padding: 1rem;
-        font-size: 0.94rem;
-        color: #64748b;
-    }
-
-    .loan-submit-to-review-button {
-        min-height: 3.25rem;
-        padding-top: 0.9rem !important;
-        padding-bottom: 0.9rem !important;
-    }
-</style>
-
-<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
     <div>
         <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
         <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
@@ -288,7 +200,7 @@
     <c:when test="${not empty financialFieldSections}">
         <div class="grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialFieldSections}" var="section">
-                <div class="erp-table-wrap overflow-hidden">
+<div class="erp-table-wrap overflow-hidden" data-aws-table-region data-loading-label="Loading results...">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -341,7 +253,7 @@
 </c:choose>
 
 <c:if test="${not empty calculatedRepaymentRows}">
-    <div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></div>
         </div>
@@ -591,7 +503,7 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h5>
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">

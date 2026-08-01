@@ -5,7 +5,7 @@
 <c:set var="requestUri" value="${pageContext.request.requestURI}" />
 <c:set var="memberWorkspace" value="${not empty currentMember and currentMember.memberAccess and not currentMember.staffSession}" />
 <c:set var="staffWorkspace" value="${not empty currentMember and currentMember.staffSession}" />
-<aside id="appSidebar" class="shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0" style="top: var(--shell-nav-height); border-color: #d7dde3;">
+<aside id="appSidebar" class="app-sidebar shell-sidebar fixed bottom-0 left-0 z-40 -translate-x-full border-r transition-transform duration-300 ease-out lg:translate-x-0">
     <div class="shell-sidebar-panel flex h-full flex-col overflow-hidden border-r border-slate-200/60 bg-transparent">
         <div class="shell-sidebar-toggle-row hidden lg:flex">
             <c:if test="${memberWorkspace}">
@@ -30,7 +30,7 @@
                 </svg>
             </button>
         </div>
-        <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0">
+        <nav class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0" data-view-position-key="sidebar-navigation">
             <c:if test="${memberWorkspace}">
                 <sec:authorize access="@access.canAccessMemberArea(principal)">
                 <a href="/app/dashboard" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${requestUri eq '/app/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
@@ -599,7 +599,7 @@
             </c:if>
         </nav>
 
-        <div class="border-t px-4 py-3 text-xs font-medium text-slate-600" style="border-color: rgba(214, 226, 238, 0.88);">
+        <div class="aws-sidebar-footer border-t px-4 py-3 text-xs font-medium text-slate-600">
             <div><spring:message code="app.title" /> &middot; 2026</div>
             <div class="shell-powered-by">
                 <span class="shell-powered-by-label"><spring:message code="shell.poweredBy" text="Powered by" /></span>
@@ -610,5 +610,5 @@
         </div>
     </div>
 </aside>
-<main class="shell-main box-border pb-8 pt-5" style="min-height: calc(100vh - var(--shell-nav-height));">
+<main id="main-content" class="app-main shell-main box-border" tabindex="-1">
     <div class="shell-content-frame mx-auto min-w-0 space-y-4">

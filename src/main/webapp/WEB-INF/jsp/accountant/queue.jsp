@@ -6,34 +6,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .accountant-queue-search-form {
-        width: 100%;
-        display: grid;
-        gap: 0.85rem;
-        padding: 0.9rem 1rem;
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #f8fafc;
-    }
-    .accountant-queue-search-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 0.55rem;
-    }
-    @media (min-width: 768px) {
-        .accountant-queue-search-form {
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: end;
-        }
-        .accountant-queue-search-actions {
-            justify-content: flex-end;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
     <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement/teller officer." /></p>
@@ -50,7 +24,7 @@
                 <spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" />
             </a>
         </div>
-        <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form">
+<form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.applicationId" text="Loan Application ID" />
@@ -70,7 +44,7 @@
         </form>
     </div>
 </div>
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>

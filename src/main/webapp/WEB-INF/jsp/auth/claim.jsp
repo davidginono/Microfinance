@@ -9,26 +9,16 @@
     <title>Activate Your SACCO Admin Account</title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <style>
-        body {
-            font-family: 'Manrope', ui-sans-serif, system-ui;
-            background:
-                radial-gradient(circle at top, rgba(47, 52, 141, 0.08), transparent 34%),
-                linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
-            min-height: 100vh;
-        }
-        .claim-card {
-            box-shadow: 0 24px 48px -24px rgba(15, 23, 42, 0.25);
-        }
-    </style>
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
 </head>
-<body class="text-slate-800">
+<body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
     <div class="claim-card w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-wider text-[#2F348D]">SACCOS Admin Activation</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-900" style="font-family:'Sora',ui-sans-serif,system-ui;">Activate your staff account</h1>
+            <h1 class="mt-1 text-2xl font-bold text-slate-900">Activate your staff account</h1>
             <p class="mt-1 text-sm text-slate-500">Verify your staff account, then create your password.</p>
         </div>
 

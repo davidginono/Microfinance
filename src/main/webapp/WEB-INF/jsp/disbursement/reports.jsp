@@ -5,13 +5,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.reports.breadcrumb" text="Disbursement Panel / Reports" /></p>
     <h1 class="erp-page-title"><spring:message code="disbursement.reports.title" text="Disbursement Reports" /></h1>
     <p class="erp-page-subtitle"><spring:message code="disbursement.reports.subtitle" text="Filter the loans you disbursed by date range and export the report when needed." /></p>
 </div>
 
-<form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
+<form method="get" action="/documents/reports/disbursement-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
     <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
@@ -31,7 +31,7 @@
     </div>
 </form>
 
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>

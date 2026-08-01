@@ -6,57 +6,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .manager-queue-filter-toolbar {
-        display: block;
-    }
-    .manager-queue-filter-stack {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.7rem;
-    }
-    .manager-queue-filter-stack .erp-filter-row {
-        width: 100%;
-    }
-    .manager-queue-search-form {
-        width: 100%;
-        display: grid;
-        gap: 0.85rem;
-        padding: 0.9rem 1rem;
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #f8fafc;
-    }
-    .manager-queue-search-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 0.55rem;
-    }
-    @media (min-width: 768px) {
-        .manager-queue-search-form {
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: end;
-        }
-        .manager-queue-search-actions {
-            justify-content: flex-end;
-        }
-    }
-    @media (max-width: 640px) {
-        .manager-queue-filter-stack .erp-filter-row {
-            flex-direction: column;
-        }
-        .manager-queue-filter-stack .erp-filter-tab {
-            width: 100%;
-        }
-        .manager-queue-search-actions > * {
-            flex: 1 1 auto;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.queue.breadcrumb" text="Manager Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="manager.queue.title" text="Manager Queue" /></h1>
     <p class="erp-page-subtitle"><spring:message code="manager.queue.subtitle" text="Move across workflow stages, inspect applicant details, and finalize the records waiting on manager action." /></p>
@@ -67,7 +18,7 @@
             <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
             <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
         </div>
-        <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form">
+<form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
                 <input type="search"
@@ -86,7 +37,7 @@
         </form>
     </div>
 </div>
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
 <table class="erp-table">
     <thead>
     <tr>

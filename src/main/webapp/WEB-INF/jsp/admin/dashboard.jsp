@@ -4,7 +4,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" text="Admin Tools / Dashboard" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.dashboard.title" text="Admin Dashboard" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.dashboard.subtitle" text="Track incidents, SMS units, and storage." /></p>
@@ -99,7 +99,7 @@
 </section>
 
 <section class="grid items-start gap-4 xl:grid-cols-2">
-    <div class="erp-panel flex min-h-0 flex-col overflow-hidden" style="height: 21rem;">
+    <div class="erp-panel aws-dashboard-panel-fixed flex min-h-0 flex-col overflow-hidden">
         <div class="erp-panel-header">
             <div>
                 <p class="erp-panel-title"><spring:message code="admin.dashboard.recentEvents" text="Recent Events" /></p>
@@ -124,7 +124,7 @@
         </div>
     </div>
 
-    <div class="erp-panel flex min-h-0 flex-col overflow-hidden" style="height: 21rem;">
+    <div class="erp-panel aws-dashboard-panel-fixed flex min-h-0 flex-col overflow-hidden">
         <div class="erp-panel-header">
             <div>
                 <p class="erp-panel-title"><spring:message code="admin.dashboard.recentIncidents" text="Recent Incidents" /></p>
@@ -135,7 +135,7 @@
         <div class="mb-3">
             <a href="/admin/incidents" class="app-btn btn-primary"><spring:message code="admin.dashboard.openIncidents" text="Open Incidents" /></a>
         </div>
-        <div class="space-y-3 overflow-y-auto pr-1" style="height: calc(100% - 3.25rem);">
+        <div class="aws-dashboard-list space-y-3 overflow-y-auto pr-1">
             <c:forEach items="${dashboard.recentIncidents}" var="incident">
                 <a href="/admin/incidents/${incident.id}" class="block rounded border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50">
                     <div class="flex items-center justify-between gap-3">
@@ -158,7 +158,7 @@
 <section class="erp-panel">
     <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="admin.dashboard.failedOutboxEvents" text="Failed Outbox Events" /></p></div>
     <div class="erp-panel-body">
-        <div class="erp-table-wrap max-h-72 overflow-auto">
+<div class="erp-table-wrap max-h-72 overflow-auto" data-aws-table-region data-loading-label="Loading results...">
             <table class="erp-table">
                 <thead>
                 <tr><th><spring:message code="admin.dashboard.event" text="Event" /></th><th><spring:message code="admin.dashboard.aggregate" text="Aggregate" /></th><th><spring:message code="admin.dashboard.created" text="Created" /></th></tr>

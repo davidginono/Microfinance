@@ -20,10 +20,12 @@ class AdminUsersJspLayoutTest {
     @Test
     void editPageRendersDisabledUnsupportedMatrixCells() throws Exception {
         String editJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp"));
+        String componentCss = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(editJsp).contains("data-restore-default-claims");
         assertThat(editJsp).contains("admin-access-matrix-restore");
-        assertThat(editJsp).contains("width: auto");
+        assertThat(componentCss).contains(".admin-access-matrix-restore");
+        assertThat(componentCss).contains("width: auto");
         assertThat(editJsp).contains("disabled");
         assertThat(editJsp).contains("No supported claim");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");

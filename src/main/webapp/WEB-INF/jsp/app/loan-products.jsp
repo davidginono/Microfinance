@@ -4,10 +4,9 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="products.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="products.title" /></h1>
     <p class="erp-page-subtitle"><spring:message code="products.subtitle" /></p>
@@ -43,7 +42,21 @@
             </button>
         </div>
 
-        <div class="app-modal-body space-y-5">
+        <ol class="loan-calculator-steps" aria-label="Loan eligibility calculator progress">
+            <li class="is-current" data-calculator-step="details"><span>1</span><strong>Loan details</strong></li>
+            <li data-calculator-step="eligibility"><span>2</span><strong>Eligibility</strong></li>
+            <li data-calculator-step="repayment"><span>3</span><strong>Repayment plan</strong></li>
+        </ol>
+
+        <div class="app-modal-body loan-calculator-flow space-y-5">
+            <section class="loan-calculator-input-panel" aria-labelledby="loanCalculatorDetailsHeading">
+                <div class="loan-calculator-section-heading">
+                    <span class="loan-calculator-step-number">1</span>
+                    <div>
+                        <h3 id="loanCalculatorDetailsHeading">Choose an amount and repayment period</h3>
+                        <p>Enter only the figures you want to test. You can revise them and calculate again.</p>
+                    </div>
+                </div>
             <div class="grid gap-3 md:grid-cols-2">
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
@@ -82,9 +95,10 @@
                        data-no-year-label="<spring:message code='products.tenor.noWholeYear' text='No full-year tenure for this product. Choose Months.' />"></p>
                 </div>
             </div>
+            </section>
 
             <div class="grid gap-3 md:grid-cols-2">
-                <div class="app-modal-section">
+                <div class="app-modal-section loan-calculator-guidance">
                     <p class="font-semibold text-slate-800"><spring:message code="products.beforeYouApply.title" /></p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
                         <li><spring:message code="products.beforeYouApply.item1" /></li>
@@ -92,7 +106,7 @@
                         <li><spring:message code="products.beforeYouApply.item3" /></li>
                     </ul>
                 </div>
-                <div id="productsEligibilityCard" class="app-modal-section">
+                <div id="productsEligibilityCard" class="app-modal-section loan-calculator-result-summary" aria-live="polite">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="font-semibold text-slate-800"><spring:message code="products.eligibilityResult.title" /></p>
                         <span id="productsEligibilityStatus" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -108,11 +122,19 @@
                 </div>
             </div>
 
-            <div class="app-modal-section flex flex-wrap items-center justify-between gap-3">
+            <div class="app-modal-section loan-calculator-actionbar flex flex-wrap items-center justify-between gap-3">
                 <div class="text-sm text-slate-500"><spring:message code="products.loadHint" /></div>
                 <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary"><spring:message code="products.calculateEligibility.button" /></button>
             </div>
 
+            <div id="productsCalculatorResults" class="hidden loan-calculator-results" tabindex="-1">
+            <div class="loan-calculator-section-heading">
+                <span class="loan-calculator-step-number">2</span>
+                <div>
+                    <h3>Your eligibility and repayment estimate</h3>
+                    <p>Review the decision first, then inspect the supporting figures and repayment schedule.</p>
+                </div>
+            </div>
             <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
             <div id="productsFinancialLoading" class="hidden app-modal-section text-sm text-slate-600">
                 <span class="sr-only"><spring:message code="products.loadingCalculator" /></span>
@@ -128,7 +150,7 @@
                     </div>
                     <div class="skeleton-table-row">
                         <span class="skeleton skeleton-text"></span>
-                        <span class="skeleton skeleton-text" style="width: 72%;"></span>
+                        <span class="skeleton skeleton-text aws-skeleton-wide"></span>
                     </div>
                 </div>
             </div>
@@ -140,7 +162,7 @@
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
                     </div>
                 </div>
-                <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm">
+<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-loading-label="Loading results...">
                     <table class="erp-table">
                         <thead>
                         <tr>
@@ -156,6 +178,13 @@
                         <tbody id="productsRepaymentScheduleBody"></tbody>
                     </table>
                 </div>
+            </div>
+            <div class="loan-calculator-footer-actions">
+                <button type="button" class="app-btn btn-neutral" data-calculator-edit>Change figures</button>
+                <c:if test="${empty applicationLockApp and applicantPolicyEligible ne false}">
+                    <a id="productsCalculatorApplyLink" class="app-btn btn-launch hidden" href="#">Continue to application</a>
+                </c:if>
+            </div>
             </div>
         </div>
         </div>
@@ -190,7 +219,7 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
             <tr>
@@ -259,7 +288,7 @@
                             </button>
                         </c:when>
                         <c:otherwise>
-                            <a class="app-btn btn-primary" href="/app/loan-applications/new?loanProductId=${p.id}">
+                            <a class="app-btn btn-launch" href="/app/loan-applications/new?loanProductId=${p.id}">
                                 <spring:message code="products.apply" />
                             </a>
                         </c:otherwise>
@@ -292,6 +321,10 @@
         const scheduleBody = document.getElementById("productsRepaymentScheduleBody");
         const eligibilityMessage = document.getElementById("productsEligibilityMessage");
         const eligibilityStatus = document.getElementById("productsEligibilityStatus");
+        const resultsRegion = document.getElementById("productsCalculatorResults");
+        const editFiguresButton = document.querySelector("[data-calculator-edit]");
+        const applyLink = document.getElementById("productsCalculatorApplyLink");
+        const calculatorSteps = Array.from(document.querySelectorAll("[data-calculator-step]"));
         const savingsLabel = document.getElementById("productsSavingsLabel");
         const ratioLabel = document.getElementById("productsRatioLabel");
         const maxAllowedLabel = document.getElementById("productsMaxAllowedLabel");
@@ -313,10 +346,17 @@
         let tenureUnit = "MONTHS";
 
         if (modal) {
-            modal.style.position = "fixed";
-            modal.style.inset = "0";
-            modal.style.zIndex = "90";
             document.body.appendChild(modal);
+        }
+
+        function setCalculatorStage(stage) {
+            const order = ["details", "eligibility", "repayment"];
+            const currentIndex = Math.max(0, order.indexOf(stage));
+            calculatorSteps.forEach(function (item) {
+                const itemIndex = order.indexOf(item.dataset.calculatorStep);
+                item.classList.toggle("is-current", itemIndex === currentIndex);
+                item.classList.toggle("is-complete", itemIndex < currentIndex);
+            });
         }
 
         function openModal() {
@@ -529,6 +569,9 @@
             ratioLabel.textContent = "-";
             maxAllowedLabel.textContent = "-";
             feedback.classList.add("hidden");
+            resultsRegion?.classList.add("hidden");
+            applyLink?.classList.add("hidden");
+            setCalculatorStage("details");
         }
 
         function renderFinancialSections(sections) {
@@ -689,6 +732,19 @@
                     : msgAboveEligibility;
                 updateEligibilityStatus(eligibility.eligible === true ? true : eligibility.eligible === false ? false : null);
 
+                resultsRegion?.classList.remove("hidden");
+                setCalculatorStage(scheduleBody.children.length ? "repayment" : "eligibility");
+                if (applyLink && eligibility.eligible === true) {
+                    applyLink.href = "/app/loan-applications/new?loanProductId=" + encodeURIComponent(loanTypeInput.value);
+                    applyLink.classList.remove("hidden");
+                } else {
+                    applyLink?.classList.add("hidden");
+                }
+                window.requestAnimationFrame(function () {
+                    resultsRegion?.focus({ preventScroll: true });
+                    resultsRegion?.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
+
                 showFeedback("success", payload.message || msgLoaded);
             } catch (error) {
                 showFeedback("error", error.message || msgFailedLoad);
@@ -697,6 +753,13 @@
                 loadButton.disabled = false;
                 loadButton.classList.remove("opacity-60", "cursor-not-allowed");
             }
+        });
+
+        editFiguresButton?.addEventListener("click", function () {
+            resultsRegion?.classList.add("hidden");
+            setCalculatorStage("details");
+            amountDisplayInput.focus();
+            amountDisplayInput.scrollIntoView({ behavior: "smooth", block: "center" });
         });
     })();
 </script>

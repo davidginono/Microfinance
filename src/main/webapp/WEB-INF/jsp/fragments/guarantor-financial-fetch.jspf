@@ -1,5 +1,4 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<%@ include file="modal-shell.jspf" %>
 <div id="guarantorFinancialModal" class="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="guarantorFinancialModalTitle" aria-hidden="true">
     <div class="app-modal-panel app-modal-panel--compact">
         <div class="app-modal-scroll">

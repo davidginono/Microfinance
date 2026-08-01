@@ -5,7 +5,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Member Workspace / Guarantees" /></p>
     <h1 class="erp-page-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
     <p class="erp-page-subtitle"><spring:message code="guaranteedLoans.subtitle" text="Current status of active loans linked to your approved guarantees." /></p>
@@ -16,7 +16,7 @@
         <p class="erp-widget-title"><spring:message code="guaranteedLoans.panel" text="Guaranteed Loans" /></p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="guaranteedLoans.activePosition" text="Active Guarantee Position" /></h2>
     </div>
-    <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
+<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>

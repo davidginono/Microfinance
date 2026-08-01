@@ -5,7 +5,7 @@
 <c:url var="previewInlineHref" value="${previewInlineUrl}" />
 <c:url var="previewDownloadHref" value="${previewDownloadUrl}" />
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Documents / Attachment Preview</p>
     <h1 class="erp-page-title">Disbursement Proof Preview</h1>
     <p class="erp-page-subtitle"><c:out value="${previewFileName}" /></p>

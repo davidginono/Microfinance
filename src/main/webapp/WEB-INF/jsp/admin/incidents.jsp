@@ -4,44 +4,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .admin-filter-bar {
-        align-items: flex-end;
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 0.75rem;
-        overflow-x: auto;
-        padding-bottom: 0.1rem;
-    }
-    .admin-filter-field {
-        flex: 0 1 12rem;
-        min-width: 9.5rem;
-        max-width: 12rem;
-    }
-    .admin-filter-field select,
-    .admin-filter-field input {
-        min-height: 2.75rem;
-    }
-    .admin-filter-field .neo-select-button {
-        min-height: 2.75rem;
-        padding: 0.62rem 0.85rem;
-    }
-    .admin-filter-actions {
-        flex: 0 0 auto;
-    }
-    @media (max-width: 1180px) {
-        .admin-filter-bar {
-            flex-wrap: wrap;
-            overflow-x: visible;
-        }
-        .admin-filter-field {
-            flex: 1 1 11rem;
-            max-width: none;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.incidents.breadcrumb" text="Admin Tools / Incidents" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.incidents.subtitle" text="Review support messages from SACCO workspace admins." /></p>
@@ -55,7 +19,7 @@
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar">
+<form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <div class="admin-filter-field min-w-0">
                 <label class="mb-1 block text-sm font-semibold text-slate-700">SACCO</label>
@@ -99,7 +63,7 @@
     </form>
 </section>
 
-<section class="erp-table-wrap erp-table-scroll">
+<section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th>Action</th></tr>

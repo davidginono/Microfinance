@@ -1,17 +1,4 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<style>
-    .expected-schedule-details > summary::-webkit-details-marker {
-        display: none;
-    }
-    .expected-schedule-chevron {
-        flex: 0 0 auto;
-        color: #94a3b8;
-        transition: transform 180ms ease;
-    }
-    .expected-schedule-details[open] .expected-schedule-chevron {
-        transform: rotate(180deg);
-    }
-</style>
 <c:if test="${not empty repaymentSummary}">
     <section class="erp-panel mt-5 overflow-hidden" data-staff-repayment-summary>
         <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">

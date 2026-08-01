@@ -9,255 +9,12 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <style>
-        @keyframes otp-pop {
-            0% { transform: translateY(4px) scale(0.82); opacity: 0; }
-            100% { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes toast-in {
-            0% { opacity: 0; transform: translateY(-14px) scale(0.96); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes toast-out {
-            0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-10px) scale(0.96); }
-        }
-        @keyframes auth-submit-spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .otp-checkmark-pop {
-            animation: otp-pop 180ms ease-out;
-        }
-        .app-toast-enter {
-            animation: toast-in 220ms ease-out;
-        }
-        .app-toast-exit {
-            animation: toast-out 180ms ease-in forwards;
-        }
-        .app-toast-close {
-            position: absolute;
-            top: 0.45rem;
-            right: 0.45rem;
-            z-index: 1;
-            display: inline-flex;
-            width: 1.75rem;
-            height: 1.75rem;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            border-radius: 0.45rem;
-            background: rgba(255, 255, 255, 0.72);
-            color: currentColor;
-            opacity: 0.9;
-            font-size: 1.15rem;
-            font-weight: 800;
-            line-height: 1;
-            transition: background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
-        }
-        .app-toast-close:hover,
-        .app-toast-close:focus-visible {
-            background: rgba(255, 255, 255, 0.96);
-            border-color: rgba(100, 116, 139, 0.4);
-            opacity: 1;
-        }
-        .auth-shell {
-            background:
-                radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
-                linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
-        }
-        .auth-frame {
-            border-radius: 1rem;
-            border: 1px solid #d7e3ee;
-            background: #ffffff;
-            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
-        }
-        .auth-panel-divider {
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .auth-title-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-        .auth-heading {
-            font-family: "Sora", ui-sans-serif, system-ui;
-            font-size: 2.2rem;
-            line-height: 0.98;
-            letter-spacing: -0.05em;
-            color: #0f172a;
-        }
-        .auth-subheading {
-            color: #64748b;
-            font-size: 0.95rem;
-            line-height: 1.6;
-        }
-        .auth-tab-switch {
-            display: inline-flex;
-            border-radius: 0.5rem;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            padding: 0.25rem;
-        }
-        .auth-tab {
-            border-radius: 0.375rem;
-            color: #334155;
-            transition: color 180ms ease, box-shadow 180ms ease;
-        }
-        .auth-tab[data-active="true"] {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-        }
-        .auth-tab:hover {
-            color: #0f172a;
-        }
-        .auth-footer-links .text-slate-300,
-        .auth-footer-links .text-slate-500 {
-            display: none;
-        }
-        .auth-footer-links::after {
-            content: "\00A9 2026";
-            color: #64748b;
-        }
-        .auth-input {
-            border-radius: 0.375rem;
-            border: 1px solid #d7e1ef;
-            background: #f8fbff;
-            color: #0f172a;
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-            transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
-        }
-        .auth-input:focus {
-            outline: none;
-            border-color: #c7d4e4;
-            box-shadow: 0 0 0 1px #c7d4e4;
-            background: #ffffff;
-        }
-        .auth-card {
-            border-radius: 0.75rem;
-            border: 1px solid #e1e8f0;
-            background: #ffffff;
-            box-shadow: 0 8px 26px rgba(15, 23, 42, 0.035);
-        }
-        .auth-primary-btn {
-            border-radius: 0.85rem;
-            border: 1px solid #14b8c4;
-            background: #14b8c4;
-            color: #ffffff;
-            box-shadow: none;
-            transition: background-color 160ms ease, transform 160ms ease;
-        }
-        .auth-primary-btn:hover {
-            transform: translateY(-1px);
-            background: #0ea5b7;
-        }
-        .auth-submit-spinner {
-            width: 1rem;
-            height: 1rem;
-            flex: 0 0 1rem;
-            border-radius: 9999px;
-            border: 2px solid rgba(255, 255, 255, 0.45);
-            border-top-color: #ffffff;
-            animation: auth-submit-spin 720ms linear infinite;
-        }
-        .auth-secondary-btn {
-            border-radius: 0.85rem;
-            border: 1px solid #d7e1ef;
-            background: #ffffff;
-            color: #12304d;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-            transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
-        }
-        .auth-secondary-btn:hover {
-            transform: translateY(-1px);
-            border-color: #b8cfdd;
-            background: #f9fcff;
-        }
-        .auth-primary-btn:disabled,
-        .auth-secondary-btn:disabled {
-            cursor: not-allowed;
-            transform: none;
-            filter: grayscale(0.15);
-            box-shadow: none;
-            opacity: 0.7;
-        }
-        .auth-footer-link {
-            color: #516b84;
-            transition: color 160ms ease;
-        }
-        .auth-footer-link:hover {
-            color: #0f172a;
-        }
-        .auth-mode-card {
-            border: 0;
-            background: transparent;
-            padding: 0;
-        }
-        .auth-mode-title {
-            color: #7b8aa0;
-            font-size: 0.98rem;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            text-align: center;
-        }
-        .auth-or-divider {
-            display: flex;
-            align-items: center;
-            gap: 0.85rem;
-            color: #94a3b8;
-            font-size: 0.74rem;
-            font-weight: 700;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-        .auth-or-divider::before,
-        .auth-or-divider::after {
-            content: "";
-            flex: 1 1 auto;
-            height: 1px;
-            background: #e2e8f0;
-        }
-        .auth-section-label {
-            color: #334155;
-            font-size: 0.88rem;
-            font-weight: 600;
-        }
-        .auth-signup-link {
-            color: #2563eb;
-            font-weight: 700;
-            transition: color 160ms ease;
-        }
-        .auth-signup-link:hover {
-            color: #1d4ed8;
-        }
-        .auth-login-meta .text-slate-300,
-        .auth-login-meta .text-slate-500 {
-            display: none;
-        }
-        .forgot-password-dialog {
-            width: min(100%, 34rem);
-            max-height: calc(100vh - 3rem);
-            overflow-y: auto;
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .auth-submit-spinner {
-                animation: none;
-            }
-        }
-        @media (max-width: 640px) {
-            .auth-heading {
-                font-size: 1.85rem;
-            }
-            .auth-frame {
-                border-radius: 1rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
 </head>
-<body class="auth-shell min-h-screen font-sans text-slate-900 antialiased">
+<body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
-<div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
+<div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
@@ -266,15 +23,23 @@
             </div>
         </div>
         <div class="mb-5">
-            <div class="mb-5 inline-flex rounded-md border border-slate-200 bg-slate-50 p-1 text-sm font-semibold">
+            <div class="auth-tabs mb-5" role="tablist" aria-label="Choose login type">
                 <button type="button"
-                        class="auth-tab rounded px-4 py-2"
+                        id="memberLoginTab"
+                        class="auth-tab ${activeLoginTab eq 'member' ? 'is-active' : ''}"
+                        role="tab"
+                        aria-controls="memberLoginPanel"
+                        aria-selected="${activeLoginTab eq 'member'}"
                         data-login-tab-toggle="member"
                         data-active="${activeLoginTab eq 'member'}">
                     Members
                 </button>
                 <button type="button"
-                        class="auth-tab rounded px-4 py-2"
+                        id="staffLoginTab"
+                        class="auth-tab ${activeLoginTab eq 'staff' ? 'is-active' : ''}"
+                        role="tab"
+                        aria-controls="staffLoginPanel"
+                        aria-selected="${activeLoginTab eq 'staff'}"
                         data-login-tab-toggle="staff"
                         data-active="${activeLoginTab eq 'staff'}">
                     Staff
@@ -302,7 +67,7 @@
                         <div hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></div>
                     </c:if>
 
-                    <div data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5">
+                    <div id="memberLoginPanel" role="tabpanel" aria-labelledby="memberLoginTab" data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'member'}">hidden</c:if>>
                         <div class="auth-mode-card space-y-4">
                             <div>
                                 <p class="auth-mode-title">Member Number &amp; Password</p>
@@ -353,7 +118,7 @@
                         </div>
                     </div>
 
-                    <div data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5">
+                    <div id="staffLoginPanel" role="tabpanel" aria-labelledby="staffLoginTab" data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'staff'}">hidden</c:if>>
                         <div class="auth-mode-card space-y-4">
                             <div>
                                 <p class="auth-mode-title">Member Number &amp; Password</p>
@@ -489,18 +254,13 @@
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const requestedDuration = Number(settings.duration);
             const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (offerEmailFallback ? 0 : (variant === 'error' ? 5200 : 3600));
-            const palette = variant === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : variant === 'error'
-                    ? 'border-rose-200 bg-rose-50 text-rose-700'
-                    : 'border-blue-200 bg-blue-50 text-blue-700';
             const icon = variant === 'success'
                 ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
                 : variant === 'error'
                     ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.5a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.5zm0 7a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z" clip-rule="evenodd"/></svg>'
                     : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>';
             const toast = document.createElement('div');
-            toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg ' + palette;
+            toast.className = 'app-toast-enter auth-notification-bar auth-notification-' + variant;
             toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
             toast.innerHTML =
                 '<div class="flex items-start gap-3">' +
@@ -738,15 +498,35 @@
             }
             const previousValues = previousKey ? tabValues[previousKey] : null;
             toggles.forEach((button) => {
-                button.dataset.active = String(button.getAttribute('data-login-tab-toggle') === key);
+                const active = button.getAttribute('data-login-tab-toggle') === key;
+                button.dataset.active = String(active);
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-selected', String(active));
+                button.tabIndex = active ? 0 : -1;
             });
             tabs.forEach((panel) => {
-                panel.classList.toggle('hidden', panel.getAttribute('data-login-tab') !== key);
+                const active = panel.getAttribute('data-login-tab') === key;
+                panel.classList.toggle('hidden', !active);
+                panel.hidden = !active;
             });
             applyValues(key, previousValues);
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set('tab', key);
+            window.history.replaceState(window.history.state, '', nextUrl);
         }
         toggles.forEach((button) => {
             button.addEventListener('click', () => activate(button.getAttribute('data-login-tab-toggle')));
+            button.addEventListener('keydown', (event) => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+                    return;
+                }
+                event.preventDefault();
+                const next = event.key === 'ArrowRight' ? button.nextElementSibling : button.previousElementSibling;
+                if (next && next.matches('[data-login-tab-toggle]')) {
+                    activate(next.getAttribute('data-login-tab-toggle'));
+                    next.focus();
+                }
+            });
         });
     })();
 

@@ -3,45 +3,12 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
-<style>
-    .admin-user-edit-shell {
-        display: grid;
-        gap: 1rem;
-    }
-
-    .admin-access-matrix {
-        --erp-table-height: min(38rem, 68vh);
-    }
-
-    .admin-access-matrix .erp-table {
-        min-width: max(100%, 64rem);
-    }
-
-    .admin-access-matrix input[type="checkbox"]:disabled {
-        cursor: not-allowed;
-        opacity: 0.35;
-    }
-
-    .admin-access-matrix-restore {
-        align-self: flex-start;
-        flex: 0 0 auto;
-        max-width: 100%;
-        width: auto;
-    }
-
-    @media (min-width: 768px) {
-        .admin-access-matrix-restore {
-            align-self: center;
-        }
-    }
-</style>
 
 <c:if test="${not empty openUserModalKey}">
     <div hidden data-open-user-modal="${openUserModalKey}"></div>
 </c:if>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Users &amp; Roles / Edit User</p>
     <h1 class="erp-page-title">Edit User Access</h1>
     <p class="erp-page-subtitle">Update roles, status, and supported access claims.</p>
@@ -141,7 +108,7 @@
             </div>
         </div>
         <div class="px-5 py-5 sm:px-6">
-            <div class="admin-access-matrix erp-table-wrap erp-table-scroll">
+<div class="admin-access-matrix erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
                 <table class="erp-table">
                     <thead>
                     <tr>

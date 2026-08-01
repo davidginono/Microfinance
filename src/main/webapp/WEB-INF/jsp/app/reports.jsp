@@ -5,331 +5,19 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .loan-analytics-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.65rem;
-    }
-    .loan-analytics-filter {
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: end;
-        gap: 0.8rem;
-    }
-    .loan-analytics-filter-field {
-        flex: 0.95 1 8.75rem;
-        min-width: 0;
-    }
-    .loan-analytics-filter-field.is-wide {
-        flex: 1.08 1 10.5rem;
-        min-width: 0;
-    }
-    .loan-analytics-filter input,
-    .loan-analytics-filter select {
-        height: 2.875rem;
-        min-height: 2.875rem;
-        box-sizing: border-box;
-        line-height: 1.25rem;
-    }
-    .loan-analytics-filter-actions {
-        display: flex;
-        flex: 0 0 auto;
-        gap: 0.6rem;
-    }
-    .loan-analytics-filter-actions .app-btn {
-        min-height: 2.875rem;
-        height: 2.875rem;
-        align-items: center;
-        box-sizing: border-box;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-    .loan-metrics-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        align-items: stretch;
-        grid-auto-rows: 1fr;
-    }
-    .loan-metrics-grid > .loan-metric-card {
-        grid-column: span 1;
-    }
-    .loan-metric-card {
-        min-height: 8.75rem;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 0.7rem;
-        padding: 0.85rem;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-    }
-    .loan-metric-main {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: start;
-        gap: 0.7rem;
-    }
-    .loan-metric-icon {
-        width: 2.55rem;
-        height: 2.55rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.7rem;
-        font-size: 1rem;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-    }
-    .loan-metric-icon svg {
-        width: 1.45rem;
-        height: 1.45rem;
-        stroke-width: 1.9;
-    }
-    .loan-metric-title {
-        color: #0f172a;
-        font-size: 0.68rem;
-        font-weight: 800;
-        line-height: 1.25;
-    }
-    .loan-metric-value {
-        margin-top: 0.25rem;
-        color: #0f172a;
-        font-size: 1.45rem;
-        font-weight: 800;
-        line-height: 1;
-    }
-    .loan-spark-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 0.45rem;
-    }
-    .loan-sparkline {
-        width: 100%;
-        height: 1.55rem;
-    }
-    .loan-sparkline svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-    }
-    .loan-card-info {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 0.9rem;
-        height: 0.9rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 999px;
-        color: #64748b;
-        font-size: 0.56rem;
-        font-weight: 800;
-        line-height: 1;
-    }
-    .tone-blue { background: #eff6ff; color: #2563eb; }
-    .tone-emerald { background: #ecfdf5; color: #059669; }
-    .tone-violet { background: #f5f3ff; color: #7c3aed; }
-    .tone-green { background: #f0fdf4; color: #15803d; }
-    .tone-orange { background: #fff7ed; color: #f97316; }
-    .tone-rose { background: #fff1f2; color: #e11d48; }
-    .tone-slate { background: #f1f5f9; color: #334155; }
-    .loan-risk-card {
-        min-height: 6.7rem;
-        padding: 1.05rem 1.15rem;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-    }
-    .loan-risk-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-    }
-    .loan-risk-badge {
-        border-radius: 999px;
-        background: #dcfce7;
-        color: #166534;
-        padding: 0.18rem 0.65rem;
-        font-size: 0.72rem;
-        font-weight: 800;
-        white-space: nowrap;
-    }
-    .loan-risk-grid {
-        margin-top: 0.95rem;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        border: 1px solid #e2e8f0;
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-    .loan-risk-cell {
-        padding: 0.75rem;
-        border-right: 1px solid #e2e8f0;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .loan-risk-cell:nth-child(3n) {
-        border-right: 0;
-    }
-    .loan-risk-cell:nth-last-child(-n + 3) {
-        border-bottom: 0;
-    }
-    .loan-risk-value {
-        margin-top: 0.35rem;
-        color: #0f172a;
-        font-size: 1rem;
-        font-weight: 800;
-        line-height: 1.25;
-    }
-    .loan-risk-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        color: #047857;
-    }
-    .loan-risk-status.is-review {
-        color: #be123c;
-    }
-    .loan-risk-status svg {
-        width: 1rem;
-        height: 1rem;
-        stroke-width: 2.2;
-    }
-    .loan-risk-note {
-        margin-top: 0;
-        border-radius: 0 0 0.5rem 0.5rem;
-        background: #f0fdf4;
-        padding: 0.75rem;
-        color: #334155;
-        font-size: 0.78rem;
-        line-height: 1.35;
-    }
-    .loan-active-detail-table {
-        width: 100%;
-        min-width: 1040px;
-        border-collapse: collapse;
-    }
-    .loan-active-detail-table th,
-    .loan-active-detail-table td {
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0.75rem 1rem;
-        text-align: left;
-        vertical-align: top;
-    }
-    .loan-active-detail-table th {
-        background: #f8fafc;
-        color: #475569;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-    .loan-active-detail-table td {
-        color: #334155;
-        font-size: 0.875rem;
-        font-weight: 600;
-    }
-    .loan-active-detail-table td:first-child {
-        color: #0f172a;
-    }
-    .loan-chart-box {
-        position: relative;
-        height: 370px;
-        width: 100%;
-    }
-    .loan-chart-box svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-    }
-    .loan-chart-tooltip {
-        position: absolute;
-        z-index: 5;
-        display: none;
-        max-width: 15rem;
-        padding: 0.45rem 0.6rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.375rem;
-        background: #fff;
-        color: #0f172a;
-        font-size: 0.75rem;
-        line-height: 1.3;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.13);
-        pointer-events: none;
-    }
-    @media (max-width: 900px) {
-        .loan-analytics-filter {
-            flex-wrap: wrap;
-        }
-        .loan-analytics-filter-field,
-        .loan-analytics-filter-field.is-wide {
-            flex: 1 1 13rem;
-        }
-    }
-    @media (min-width: 640px) {
-        .loan-metrics-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-    @media (min-width: 1280px) {
-        .loan-metrics-grid {
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-        }
-        .loan-metrics-grid > .loan-metric-card {
-            grid-column: span 3;
-        }
-        .loan-metrics-grid > .loan-metric-card:nth-child(n + 5) {
-            grid-column: span 4;
-        }
-    }
-    @media (max-width: 760px) {
-        .loan-analytics-filter {
-            align-items: stretch;
-        }
-        .loan-analytics-filter-field,
-        .loan-analytics-filter-field.is-wide,
-        .loan-analytics-filter-actions {
-            flex: 1 1 100%;
-        }
-        .loan-analytics-filter-actions {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr);
-        }
-        .loan-risk-grid {
-            grid-template-columns: minmax(0, 1fr);
-        }
-        .loan-risk-cell,
-        .loan-risk-cell:nth-child(3n),
-        .loan-risk-cell:nth-last-child(-n + 3) {
-            border-right: 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .loan-risk-cell:last-child {
-            border-bottom: 0;
-        }
-    }
-</style>
 
 <c:set var="currentQuery" value="fromDate=${fromDate}&toDate=${toDate}&loanProductId=${loanProductId}&loanType=${loanType}" />
 
-<div class="erp-page-header">
-    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-            <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Member Workspace / Reports & Analytics" /></p>
-            <h1 class="erp-page-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
-            <p class="erp-page-subtitle"><spring:message code="reports.member.subtitle" text="View loan performance, status breakdown, and risk indicators within a selected period." /></p>
-        </div>
-        <div class="loan-analytics-actions md:justify-end">
-            <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral"><spring:message code="reports.exportPdf" text="Export PDF" /></a>
-            <a href="/documents/reports/member-loans.xlsx?${currentQuery}" class="app-btn btn-neutral"><spring:message code="reports.exportExcel" text="Export Excel" /></a>
-            <a href="/app/reports" class="app-btn btn-neutral"><spring:message code="common.refresh" text="Refresh" /></a>
-        </div>
+<div class="erp-page-header" data-aws-page-header>
+    <div>
+        <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Member Workspace / Reports & Analytics" /></p>
+        <h1 class="erp-page-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
+        <p class="erp-page-subtitle"><spring:message code="reports.member.subtitle" text="View loan performance, status breakdown, and risk indicators within a selected period." /></p>
     </div>
 </div>
 
-<section class="erp-panel overflow-hidden">
-    <form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter">
+<section class="erp-panel loan-analytics-command-panel overflow-hidden">
+<form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter aws-filter-toolbar" data-aws-filter-toolbar data-aws-filter-pin="true">
         <label class="loan-analytics-filter-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.startDate" text="Start Date" />
             <input name="fromDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" value="${fromDate}" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
@@ -354,6 +42,11 @@
             <a href="/app/reports" class="app-btn btn-neutral justify-center px-6"><spring:message code="common.reset" text="Reset" /></a>
         </div>
     </form>
+    <div class="loan-analytics-actions" data-aws-action-pin="true" aria-label="Report actions">
+        <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral" data-download-action="true"><spring:message code="reports.exportPdf" text="Export PDF" /></a>
+        <a href="/documents/reports/member-loans.xlsx?${currentQuery}" class="app-btn btn-neutral" data-download-action="true"><spring:message code="reports.exportExcel" text="Export Excel" /></a>
+        <a href="/app/reports" class="app-btn btn-neutral"><spring:message code="common.refresh" text="Refresh" /></a>
+    </div>
 </section>
 
 <section class="loan-metrics-grid gap-4">
@@ -443,8 +136,8 @@
         <p class="erp-widget-title"><spring:message code="reports.activeLoanDetails" text="Active Loan Details" /></p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="reports.activeLoanDetailsSummary" text="Active Loans and Interest Summary" /></h2>
     </div>
-    <div class="overflow-x-auto">
-        <table class="loan-active-detail-table">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+        <table class="erp-table loan-active-detail-table">
             <thead>
                 <tr>
                     <th><spring:message code="reports.loanId" text="Loan ID" /></th>

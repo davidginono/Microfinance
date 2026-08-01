@@ -3,7 +3,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Reports</p>
     <h1 class="erp-page-title">Reporting & Export Architecture</h1>
     <p class="erp-page-subtitle">Reference architecture for operational, disbursement, and audit reporting.</p>
@@ -14,8 +14,8 @@
         <p class="erp-widget-title">25.1 Report Categories</p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink">Report Categories</h2>
     </div>
-    <div class="erp-panel-body overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+        <table class="erp-table">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                     <th class="px-4 py-3">Category</th>
@@ -96,8 +96,8 @@
                     Identify approved applications not yet completed with Loan ID and disbursement details.
                 </p>
             </div>
-            <div class="overflow-x-auto rounded-lg border border-slate-200">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+                <table class="erp-table">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="px-4 py-3">Column</th>

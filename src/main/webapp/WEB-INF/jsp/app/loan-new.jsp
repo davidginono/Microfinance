@@ -6,35 +6,8 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/attachment-dropzone.jspf" %>
-<style>
-    @keyframes otp-pop {
-        0% { transform: translateY(4px) scale(0.82); opacity: 0; }
-        100% { transform: translateY(0) scale(1); opacity: 1; }
-    }
 
-    .otp-checkmark-pop {
-        animation: otp-pop 180ms ease-out;
-    }
-
-    .loan-action-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        padding-top: 0.5rem;
-    }
-
-    #loanAmountDisplay::placeholder {
-        color: #cbd5e1;
-        opacity: 1;
-    }
-
-    #guarantorHint:empty {
-        display: none;
-    }
-</style>
-
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="newloan.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="newloan.title" />: <c:out value="${loanProductName}" /></h1>
 </div>
@@ -66,6 +39,23 @@
     <c:if test="${not empty formValues['applicationId']}">
         <input type="hidden" name="applicationId" value="${formValues['applicationId']}" />
     </c:if>
+
+    <nav class="loan-application-steps" aria-label="Loan application steps">
+        <button type="button" class="is-current" data-loan-step-button="1" aria-current="step"><span>1</span><span>Request</span></button>
+        <button type="button" data-loan-step-button="2"><span>2</span><span>Affordability</span></button>
+        <button type="button" data-loan-step-button="3"><span>3</span><span>Documents</span></button>
+        <button type="button" data-loan-step-button="4"><span>4</span><span>Review</span></button>
+    </nav>
+
+    <section class="loan-flow-panel" data-loan-flow-step="1" aria-labelledby="loanFlowStep1Title">
+        <div class="loan-flow-panel-heading">
+            <span class="loan-flow-step-number">1</span>
+            <div>
+                <h2 id="loanFlowStep1Title">Set your loan request</h2>
+                <p>Confirm the amount, repayment period, purpose, and product-specific details.</p>
+            </div>
+        </div>
+        <div class="loan-flow-panel-body">
 
     <c:if test="${not empty topUpSourceLoan}">
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -160,6 +150,21 @@
         </div>
     </c:forEach>
 
+        </div>
+        <div class="loan-flow-navigation">
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to affordability</button>
+        </div>
+    </section>
+
+    <section class="loan-flow-panel" data-loan-flow-step="2" aria-labelledby="loanFlowStep2Title" hidden>
+        <div class="loan-flow-panel-heading">
+            <span class="loan-flow-step-number">2</span>
+            <div>
+                <h2 id="loanFlowStep2Title">Check affordability</h2>
+                <p>Load the same financial snapshot and repayment estimate used by the existing application checks.</p>
+            </div>
+        </div>
+        <div class="loan-flow-panel-body">
     <div class="erp-section-muted">
         <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -184,13 +189,13 @@
                 </div>
                 <div class="skeleton-table-row">
                     <span class="skeleton skeleton-text"></span>
-                    <span class="skeleton skeleton-text" style="width: 72%;"></span>
+                    <span class="skeleton skeleton-text aws-skeleton-wide"></span>
                 </div>
             </div>
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotSections}'>hidden </c:if>mt-4 grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialSnapshotSections}" var="section">
-                <div class="erp-table-wrap overflow-hidden">
+<div class="erp-table-wrap overflow-hidden" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -221,7 +226,7 @@
                 <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
             </div>
         </div>
-        <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm">
+<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
             <table class="erp-table">
                 <thead>
                 <tr>
@@ -251,6 +256,22 @@
         </div>
     </div>
 
+        </div>
+        <div class="loan-flow-navigation">
+            <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Guarantees</button>
+        </div>
+    </section>
+
+    <section class="loan-flow-panel" data-loan-flow-step="3" aria-labelledby="loanFlowStep3Title" hidden>
+        <div class="loan-flow-panel-heading">
+            <span class="loan-flow-step-number">3</span>
+            <div>
+                <h2 id="loanFlowStep3Title">Add guarantors and documents</h2>
+                <p>Complete only the supporting items required for this loan product.</p>
+            </div>
+        </div>
+        <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors gt 0}">
         <div class="erp-section-muted">
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -400,6 +421,22 @@
         </c:if>
     </div>
 
+        </div>
+        <div class="loan-flow-navigation">
+            <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Save&amp;Send</button>
+        </div>
+    </section>
+
+    <section class="loan-flow-panel" data-loan-flow-step="4" aria-labelledby="loanFlowStep4Title" hidden>
+        <div class="loan-flow-panel-heading">
+            <span class="loan-flow-step-number">4</span>
+            <div>
+                <h2 id="loanFlowStep4Title">Review and save</h2>
+                <p>Accept the declaration where required, then save a draft or submit using the existing workflow.</p>
+            </div>
+        </div>
+        <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors le 0}">
     <div class="erp-section-muted">
         <h5 class="erp-panel-title"><spring:message code="newloan.declaration.title" /></h5>
@@ -463,6 +500,7 @@
     </c:if>
 
     <div class="loan-action-row">
+        <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
         <button class="app-btn btn-neutral px-5 py-3 text-sm"
                 type="submit"
                 data-form-action="SAVE_DRAFT">
@@ -487,7 +525,103 @@
             </c:choose>
         </c:if>
     </div>
+        </div>
+    </section>
 </form>
+
+<script>
+    (function () {
+        const form = document.getElementById("loanApplicationForm");
+        const panels = Array.from(form.querySelectorAll("[data-loan-flow-step]"));
+        const stepButtons = Array.from(form.querySelectorAll("[data-loan-step-button]"));
+        if (!panels.length || !stepButtons.length) {
+            return;
+        }
+
+        let currentStep = document.getElementById("guarantorValidationErrorMarker") ? 3 : 1;
+
+        function panelFor(step) {
+            return panels.find(function (panel) {
+                return Number(panel.dataset.loanFlowStep) === Number(step);
+            });
+        }
+
+        function activateStep(step, moveFocus) {
+            const target = panelFor(step);
+            if (!target) {
+                return;
+            }
+            currentStep = Number(step);
+            panels.forEach(function (panel) {
+                panel.hidden = panel !== target;
+            });
+            stepButtons.forEach(function (button) {
+                const buttonStep = Number(button.dataset.loanStepButton);
+                const active = buttonStep === currentStep;
+                button.classList.toggle("is-current", active);
+                button.classList.toggle("is-complete", buttonStep < currentStep);
+                if (active) {
+                    button.setAttribute("aria-current", "step");
+                } else {
+                    button.removeAttribute("aria-current");
+                }
+            });
+            if (moveFocus) {
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+                window.setTimeout(function () {
+                    target.querySelector("input:not([type='hidden']), select, textarea, button")?.focus({ preventScroll: true });
+                }, 220);
+            }
+        }
+
+        function validateCurrentStep() {
+            const panel = panelFor(currentStep);
+            const controls = Array.from(panel.querySelectorAll("input, select, textarea"));
+            const invalid = controls.find(function (control) {
+                return !control.disabled && typeof control.checkValidity === "function" && !control.checkValidity();
+            });
+            if (!invalid) {
+                return true;
+            }
+            invalid.reportValidity();
+            invalid.focus();
+            return false;
+        }
+
+        stepButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                const targetStep = Number(button.dataset.loanStepButton);
+                if (targetStep > currentStep && !validateCurrentStep()) {
+                    return;
+                }
+                activateStep(targetStep, true);
+            });
+        });
+
+        form.querySelectorAll("[data-loan-step-next]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                if (validateCurrentStep()) {
+                    activateStep(Math.min(4, currentStep + 1), true);
+                }
+            });
+        });
+
+        form.querySelectorAll("[data-loan-step-back]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                activateStep(Math.max(1, currentStep - 1), true);
+            });
+        });
+
+        form.addEventListener("invalid", function (event) {
+            const containingPanel = event.target.closest("[data-loan-flow-step]");
+            if (containingPanel && containingPanel.hidden) {
+                activateStep(Number(containingPanel.dataset.loanFlowStep), false);
+            }
+        }, true);
+
+        activateStep(currentStep, false);
+    })();
+</script>
 
 <script>
     (function () {

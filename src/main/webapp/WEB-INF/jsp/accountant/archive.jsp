@@ -6,34 +6,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .accountant-archive-search-form {
-        width: 100%;
-        display: grid;
-        gap: 0.85rem;
-        padding: 0.9rem 1rem;
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #f8fafc;
-    }
-    .accountant-archive-search-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 0.55rem;
-    }
-    @media (min-width: 768px) {
-        .accountant-archive-search-form {
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: end;
-        }
-        .accountant-archive-search-actions {
-            justify-content: flex-end;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.archive.breadcrumb" text="Accountant Panel / Archive" /></p>
     <h1 class="erp-page-title"><spring:message code="accountant.archive.title" text="Accountant Archive" /></h1>
     <p class="erp-page-subtitle"><spring:message code="accountant.archive.subtitle" text="Open the loan applications you have already reviewed and track where they are now." /></p>
@@ -59,7 +33,7 @@
                 <spring:message code="review.rejected" text="Rejected" />
             </a>
         </div>
-        <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form">
+<form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${archiveSearchLabel}
@@ -80,7 +54,7 @@
     </div>
 </div>
 
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>

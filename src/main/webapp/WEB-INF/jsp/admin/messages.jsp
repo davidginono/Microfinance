@@ -4,14 +4,14 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.incidents.breadcrumb" text="Admin Tools / Incidents" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.messages.subtitle" text="Review member incidents and reply where needed." /></p>
 </div>
 
 <section class="erp-form-wrap">
-    <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2">
+<form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2 aws-filter-toolbar" data-aws-filter-toolbar>
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="common.status" text="Status" /></label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
@@ -28,7 +28,7 @@
     </form>
 </section>
 
-<section class="erp-table-wrap erp-table-scroll">
+<section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th>Action</th></tr>

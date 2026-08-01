@@ -5,8 +5,7 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/member-application-progress-styles.jspf" %>
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Application Progress" /></p>
     <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
     <p class="erp-page-subtitle"><spring:message code="apps.subtitle" text="Review your loan applications and track the current workflow progress." /></p>
@@ -25,7 +24,7 @@
         setTimeout(function () { window.location.reload(); }, 3600000);
     </script>
 </c:if>
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
             <tr>

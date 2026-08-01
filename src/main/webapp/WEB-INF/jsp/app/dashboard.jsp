@@ -6,107 +6,6 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/member-application-progress-styles.jspf" %>
-<style>
-    .member-dashboard-dropdown-trigger {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.375rem;
-        background: #f8fafc;
-        padding: 0.85rem 1rem;
-        text-align: left;
-        color: #172033;
-        font-weight: 800;
-    }
-    .member-dashboard-dropdown-trigger--primary {
-        padding: 1rem 1.1rem;
-        font-size: 1rem;
-        line-height: 1.35;
-        font-weight: 700;
-    }
-    .member-dashboard-dropdown-trigger:hover,
-    .member-dashboard-dropdown-trigger:focus-visible {
-        border-color: #bfdbfe;
-        background: #eff6ff;
-        outline: none;
-    }
-    .member-dashboard-dropdown-chevron {
-        flex: 0 0 auto;
-        color: #64748b;
-        transition: transform 180ms ease;
-    }
-    .member-dashboard-dropdown-trigger[aria-expanded="true"] .member-dashboard-dropdown-chevron {
-        transform: rotate(180deg);
-    }
-    .member-dashboard-collapsible[hidden] {
-        display: none !important;
-    }
-    .member-dashboard-summary-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.7rem 1.35rem;
-        align-items: center;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.375rem;
-        background: #f8fafc;
-        padding: 0.9rem 1rem;
-    }
-    .member-dashboard-summary-fact {
-        min-width: min(100%, 12rem);
-        color: #172033;
-        font-size: 0.92rem;
-        line-height: 1.45;
-        overflow-wrap: anywhere;
-    }
-    .member-dashboard-summary-fact-label {
-        font-weight: 800;
-        color: #64748b;
-    }
-    .member-dashboard-summary-fact-value {
-        font-weight: 800;
-        color: #0f172a;
-    }
-    .member-dashboard-active-loans-table {
-        min-width: 860px;
-    }
-    .member-dashboard-active-loans-table th,
-    .member-dashboard-active-loans-table td {
-        white-space: nowrap;
-    }
-    .member-dashboard-active-loans-table td:nth-child(4),
-    .member-dashboard-active-loans-table td:nth-child(5) {
-        white-space: normal;
-        min-width: 9rem;
-    }
-    .member-dashboard-pagination-button {
-        display: inline-flex;
-        height: 2.25rem;
-        min-width: 2.25rem;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.375rem;
-        border: 1px solid #dbe4ef;
-        background: #ffffff;
-        color: #2563eb;
-        font-size: 0.85rem;
-        font-weight: 800;
-    }
-    .member-dashboard-pagination-button:hover:not(:disabled),
-    .member-dashboard-pagination-button[aria-current="page"] {
-        border-color: #2563eb;
-        background: #2563eb;
-        color: #ffffff;
-    }
-    .member-dashboard-pagination-button:disabled {
-        cursor: not-allowed;
-        color: #94a3b8;
-        opacity: 0.65;
-    }
-</style>
 
 <%!
 private static String esc(Object value) {
@@ -324,7 +223,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 %>
 
 <section class="space-y-4">
-    <div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
         <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
         <p class="mt-1 text-lg font-semibold text-sacco-ink">
             <spring:message code="dashboard.welcome" text="Welcome" />,
@@ -415,15 +314,15 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </div>
             </div>
 
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.savings.label" /></p>
-                    <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
+            <div class="aws-status-summary-grid">
+                <div class="aws-status-summary-item">
+                    <p class="aws-status-summary-label"><spring:message code="dashboard.savings.label" /></p>
+                    <p class="aws-status-summary-value" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
                 </div>
 
-                <div class="rounded-md border border-slate-200 bg-white px-4 py-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="dashboard.shares.label" /></p>
-                    <p class="mt-2 text-2xl font-bold text-sacco-ink" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
+                <div class="aws-status-summary-item">
+                    <p class="aws-status-summary-label"><spring:message code="dashboard.shares.label" /></p>
+                    <p class="aws-status-summary-value" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
                 </div>
             </div>
         </div>
@@ -438,7 +337,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <c:choose>
                     <c:when test="${not empty currentWorkflowApplication}">
                         <button type="button"
-                                class="member-dashboard-dropdown-trigger member-dashboard-dropdown-trigger--primary"
+                                class="member-dashboard-dropdown-trigger aws-disclosure-button"
                                 data-dashboard-toggle="currentApplicationStatusPanel"
                                 aria-expanded="false"
                                 aria-controls="currentApplicationStatusPanel">
@@ -447,8 +346,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <div id="currentApplicationStatusPanel" class="member-dashboard-collapsible mt-3 min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-4 sm:p-5" hidden>
-                            <div class="member-dashboard-summary-row">
+                        <div id="currentApplicationStatusPanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
+                            <div class="member-dashboard-summary-row aws-detail-grid">
                                 <div class="member-dashboard-summary-fact">
                                     <span class="member-dashboard-summary-fact-label"><spring:message code="loan.applicationId" text="Loan Application ID" />:</span>
                                     <span class="member-dashboard-summary-fact-value">${currentWorkflowApplicationNumber}</span>
@@ -473,12 +372,12 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </div>
                             </div>
                             <c:if test="${not empty currentWorkflowUpdatedAtLabel}">
-                                <div class="mt-3 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                                <div class="aws-detail-updated">
                                     Updated ${currentWorkflowUpdatedAtLabel}
                                 </div>
                             </c:if>
                             <c:if test="${not empty currentWorkflowApplication and currentWorkflowApplication.status eq 'DISBURSED' and empty currentWorkflowApplication.applicantDisbursementAcknowledgedAt}">
-                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                <div class="aws-inline-notice aws-inline-notice--success">
                                     <span><spring:message code="loan.disbursement.readyAck" text="This loan has been disbursed." /></span>
                                     <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${currentWorkflowApplication.id}/acknowledge-disbursement" class="m-0">
                                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -488,7 +387,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </div>
                             </c:if>
                             <c:if test="${currentWorkflowRejectionAcknowledgementRequired}">
-                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                                <div class="aws-inline-notice aws-inline-notice--danger">
                                     <span><spring:message code="loan.rejection.readyAck" text="This loan application was rejected. Acknowledge the decision to clear it from your progress view." /></span>
                                     <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${currentWorkflowApplication.id}/acknowledge-rejection" class="m-0">
                                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -516,7 +415,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             </div>
             <div class="erp-panel-body min-w-0">
                 <button type="button"
-                        class="member-dashboard-dropdown-trigger member-dashboard-dropdown-trigger--primary"
+                        class="member-dashboard-dropdown-trigger aws-disclosure-button"
                         data-dashboard-toggle="activeLoansTablePanel"
                         aria-expanded="false"
                         aria-controls="activeLoansTablePanel">
@@ -525,10 +424,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                     </svg>
                 </button>
-                <div id="activeLoansTablePanel" class="member-dashboard-collapsible mt-4" hidden>
+                <div id="activeLoansTablePanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
                 <c:choose>
                     <c:when test="${not empty activeLoanChartRows}">
-                        <div class="erp-table-wrap overflow-x-auto rounded-md border border-slate-200 bg-white">
+                        <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
                             <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5">
                                 <thead>
                                     <tr>
@@ -581,7 +480,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </tbody>
                             </table>
                         </div>
-                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                        <div class="aws-table-pagination-footer">
                             <p class="font-semibold text-slate-600" data-active-loans-pagination-summary></p>
                             <div class="flex items-center gap-2" data-active-loans-pagination></div>
                         </div>

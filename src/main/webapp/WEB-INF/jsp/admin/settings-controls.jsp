@@ -5,441 +5,8 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
-<style>
-    .product-builder-form {
-        display: grid;
-        gap: 1rem;
-    }
-    .product-builder-section {
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #ffffff;
-        overflow: hidden;
-    }
-    .product-builder-section-header {
-        padding: 0.95rem 1rem 0.85rem;
-        border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
-    }
-    .product-builder-section-body {
-        padding: 1rem;
-    }
-    .product-builder-grid {
-        display: grid;
-        gap: 1rem;
-    }
-    .product-identity-grid {
-        display: grid;
-        gap: 1rem;
-        align-items: end;
-    }
-    .product-identity-grid input:not([type="checkbox"]):not([type="radio"]),
-    .product-identity-grid select {
-        height: 3.5rem;
-    }
-    .savings-ratio-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        align-items: flex-end;
-    }
-    .savings-ratio-field {
-        flex: 0 1 18rem;
-        min-width: 13rem;
-    }
-    .savings-ratio-grid .settings-checkbox-card {
-        flex: 1 1 22rem;
-    }
-    .savings-multiplier-control {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .savings-multiplier-control input {
-        flex: 0 1 10rem;
-    }
-    .savings-multiplier-control.hidden {
-        display: none !important;
-    }
-    .savings-multiplier-label {
-        min-height: 3rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #64748b;
-        font-weight: 700;
-        text-transform: none;
-        letter-spacing: 0;
-    }
-    .settings-checkbox-card {
-        min-height: 3.5rem;
-    }
-    @media (max-width: 640px) {
-        .savings-ratio-grid {
-            align-items: stretch;
-        }
-        .savings-ratio-field,
-        .savings-ratio-grid .settings-checkbox-card {
-            flex-basis: 100%;
-        }
-    }
-    .product-builder-form input:not([type="checkbox"]):not([type="radio"]),
-    .product-builder-form select {
-        width: 100%;
-        min-height: 3.5rem;
-    }
-    .product-builder-form textarea {
-        width: 100%;
-        min-height: 7.25rem;
-    }
-    .settings-action-bar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.4rem;
-        background: #f8fafc;
-        padding: 0.75rem;
-        min-width: 0;
-        max-width: 100%;
-    }
-    .settings-action-bar {
-        align-items: flex-end;
-        justify-content: space-between;
-    }
-    .settings-action-bar .neo-select-button,
-    .settings-action-bar select,
-    .settings-action-button {
-        box-sizing: border-box;
-        height: 3.5rem;
-    }
-    .settings-action-note {
-        flex: 1 1 22rem;
-        min-width: 0;
-    }
-    .settings-action-button {
-        flex: 0 0 auto;
-        min-width: 11rem;
-        justify-content: center;
-    }
-    .settings-action-bar--end {
-        justify-content: flex-end;
-    }
-    .settings-action-bar--split {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-    }
-    .settings-action-bar--split .settings-action-button {
-        justify-self: end;
-    }
-    @media (max-width: 639px) {
-        .settings-action-bar--split {
-            grid-template-columns: 1fr;
-        }
-        .settings-action-button {
-            flex-basis: 100%;
-        }
-        .settings-action-bar--split .settings-action-button {
-            justify-self: start;
-        }
-    }
-    .workflow-stage-list {
-        display: grid;
-        gap: 0.75rem;
-    }
-    .workflow-stage-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 0.85rem;
-        align-items: start;
-        padding: 0.9rem 1rem;
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #ffffff;
-    }
-    .workflow-stage-priority {
-        min-width: 3rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 9999px;
-        background: #e8f4f8;
-        color: #24556a;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        padding: 0.35rem 0.7rem;
-    }
-    .workflow-stage-copy {
-        min-width: 0;
-    }
-    .workflow-stage-title {
-        color: #0f172a;
-        font-size: 0.95rem;
-        font-weight: 700;
-    }
-    .workflow-stage-note {
-        margin-top: 0.3rem;
-        color: #64748b;
-        font-size: 0.84rem;
-        line-height: 1.5;
-    }
-    .workflow-stage-state {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 9999px;
-        padding: 0.35rem 0.75rem;
-        font-size: 0.78rem;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-    .workflow-state-required,
-    .workflow-state-mandatory {
-        background: #ecfdf5;
-        color: #166534;
-    }
-    .workflow-state-configured {
-        background: #eff6ff;
-        color: #1d4ed8;
-    }
-    .workflow-state-skipped {
-        background: #f1f5f9;
-        color: #475569;
-    }
-    .workflow-state-missing {
-        background: #fff1f2;
-        color: #be123c;
-    }
-    .workflow-warning-stack {
-        display: grid;
-        gap: 0.7rem;
-    }
-    .workflow-warning {
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        padding: 0.85rem 0.95rem;
-        font-size: 0.88rem;
-        line-height: 1.5;
-    }
-    .workflow-warning.is-info {
-        border-color: #cfe5ee;
-        background: #f3fbfe;
-        color: #0f4c5f;
-    }
-    .workflow-warning.is-warn {
-        border-color: #fde68a;
-        background: #fffbeb;
-        color: #92400e;
-    }
-    .workflow-warning.is-danger {
-        border-color: #fecdd3;
-        background: #fff1f2;
-        color: #9f1239;
-    }
-    .field-error-input {
-        border-color: #f43f5e !important;
-        background: #fff7f8 !important;
-        box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.15);
-    }
-    .field-error-container {
-        color: #9f1239;
-    }
-    .workflow-table-cell.field-error-container,
-    .workflow-start-grid.field-error-container,
-    .workflow-checkbox-lock.field-error-container {
-        background: #fff7f8;
-    }
-    .workflow-start-grid.field-error-container {
-        border: 1px solid #fecdd3;
-        border-radius: 0.65rem;
-        padding: 0.85rem;
-    }
-    .workflow-table-cell.field-error-container {
-        border-radius: 0.65rem;
-    }
-    .workflow-checkbox-lock.field-error-container {
-        border-color: #fecdd3;
-        box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.12);
-    }
-    .field-error-text {
-        margin-top: 0.45rem;
-        color: #be123c;
-        font-size: 0.8rem;
-        font-weight: 600;
-        line-height: 1.45;
-        text-transform: none;
-        letter-spacing: normal;
-    }
-    .workflow-preview-shell {
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: linear-gradient(180deg, #f8fbfc 0%, #ffffff 100%);
-        padding: 1rem;
-    }
-    .workflow-preview-runtime {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.45rem;
-    }
-    .workflow-preview-chip {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 9999px;
-        background: #ffffff;
-        border: 1px solid #d7dde3;
-        padding: 0.35rem 0.75rem;
-        color: #0f172a;
-        font-size: 0.82rem;
-        font-weight: 700;
-    }
-    .workflow-preview-arrow {
-        color: #94a3b8;
-        font-size: 0.9rem;
-    }
-    .workflow-subsection + .workflow-subsection {
-        margin-top: 1.25rem;
-    }
-    .workflow-subsection-title {
-        color: #0f172a;
-        font-size: 0.9rem;
-        font-weight: 700;
-        margin-bottom: 0.75rem;
-    }
-    .workflow-start-grid {
-        display: grid;
-        gap: 0.75rem;
-    }
-    .workflow-start-option {
-        display: flex;
-        gap: 0.7rem;
-        align-items: flex-start;
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        background: #ffffff;
-        padding: 0.9rem 1rem;
-        color: #334155;
-        font-size: 0.88rem;
-    }
-    .workflow-start-option input {
-        margin-top: 0.1rem;
-    }
-    .workflow-table {
-        border: 1px solid #d7dde3;
-        border-radius: 0.4rem;
-        overflow: hidden;
-        background: #ffffff;
-    }
-    .workflow-table-head,
-    .workflow-table-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1.25fr) minmax(120px, 0.8fr) minmax(110px, 0.7fr) minmax(0, 1.5fr);
-        gap: 1rem;
-        align-items: start;
-        padding: 0.9rem 1rem;
-    }
-    .workflow-table-head {
-        background: #f8fafc;
-        border-bottom: 1px solid #d7dde3;
-        color: #64748b;
-        font-size: 0.76rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-    .workflow-table-row + .workflow-table-row {
-        border-top: 1px solid #e2e8f0;
-    }
-    .workflow-table-cell {
-        min-width: 0;
-        color: #0f172a;
-        font-size: 0.9rem;
-    }
-    .workflow-table-stage {
-        font-weight: 700;
-    }
-    .workflow-checkbox-lock {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        color: #334155;
-        font-size: 0.88rem;
-        font-weight: 600;
-    }
-    .workflow-priority-select {
-        width: 100%;
-        max-width: 6rem;
-        min-height: 3.5rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.4rem;
-        background: #f8fafc;
-        color: #334155;
-        font-size: 0.88rem;
-        padding: 0.45rem 0.65rem;
-    }
-    .workflow-stage-meta {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 9999px;
-        padding: 0.25rem 0.65rem;
-        font-size: 0.76rem;
-        font-weight: 700;
-        margin-top: 0.55rem;
-    }
-    .workflow-support-grid {
-        display: grid;
-        gap: 0.75rem;
-    }
-    @media (min-width: 768px) {
-        .product-builder-grid.two-up {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .product-identity-grid {
-            grid-template-columns: minmax(8rem, 0.55fr) minmax(16rem, 1.5fr) minmax(12rem, 0.8fr);
-        }
-        .product-identity-description {
-            grid-column: 1 / -1;
-        }
-        .savings-ratio-grid {
-            grid-template-columns: minmax(0, 1fr);
-        }
-        .workflow-start-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .workflow-support-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-    @media (max-width: 640px) {
-        .workflow-stage-row {
-            grid-template-columns: minmax(0, 1fr);
-        }
-        .workflow-table-head {
-            display: none;
-        }
-        .workflow-table-row {
-            grid-template-columns: minmax(0, 1fr);
-            gap: 0.6rem;
-        }
-        .workflow-table-cell::before {
-            content: attr(data-label);
-            display: block;
-            margin-bottom: 0.2rem;
-            color: #64748b;
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.settings.breadcrumb" text="Admin Tools / Settings & Controls" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.settings.title" text="Settings & Controls" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.settings.subtitle" text="Manage loan, guarantor, and board controls." /></p>
@@ -834,28 +401,28 @@
                             <p class="text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.priorityFlowHelp" text="Saved approval order used in the product workflow preview." /></p>
                         </div>
                         <div class="flex flex-col items-end text-right">
-                            <span class="block text-sm font-semibold text-emerald-700" style="order: ${productManagerEnabled ? product.resolvedManagerPriority : 6};">
+                            <span class="workflow-order-${productManagerEnabled ? product.resolvedManagerPriority : 6} block text-sm font-semibold text-emerald-700">
                                 <c:choose>
                                     <c:when test="${productManagerEnabled}">P${product.resolvedManagerPriority} Manager</c:when>
                                     <c:otherwise><spring:message code="admin.settings.managerSkipped" text="Manager Skipped" /></c:otherwise>
                                 </c:choose>
                             </span>
-                            <span class="mt-1 block text-sm font-semibold ${(productLoanOfficerEnabled or productManagerEnabled) ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${productLoanOfficerEnabled ? product.resolvedLoanOfficerPriority : 6};">
+                            <span class="workflow-order-${productLoanOfficerEnabled ? product.resolvedLoanOfficerPriority : 6} mt-1 block text-sm font-semibold ${(productLoanOfficerEnabled or productManagerEnabled) ? 'text-emerald-700' : 'text-slate-500'}">
                                 <c:choose>
                                     <c:when test="${productLoanOfficerEnabled}">P${product.resolvedLoanOfficerPriority} Loan Officer</c:when>
                                     <c:otherwise><spring:message code="admin.settings.loanOfficerSkipped" text="Loan Officer Skipped" /></c:otherwise>
                                 </c:choose>
                             </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.boardReviewRequired ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.boardReviewRequired ? product.resolvedBoardPriority : 6};">
+                            <span class="workflow-order-${product.boardReviewRequired ? product.resolvedBoardPriority : 6} mt-1 block text-sm font-semibold ${product.boardReviewRequired ? 'text-emerald-700' : 'text-slate-500'}">
                                 P${product.resolvedBoardPriority} Board Member ${product.boardReviewRequired ? 'Configured' : 'Skipped'}
                             </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.committeeReviewRequired ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.committeeReviewRequired ? product.resolvedCommitteePriority : 6};">
+                            <span class="workflow-order-${product.committeeReviewRequired ? product.resolvedCommitteePriority : 6} mt-1 block text-sm font-semibold ${product.committeeReviewRequired ? 'text-emerald-700' : 'text-slate-500'}">
                                 P${product.resolvedCommitteePriority} Credit Committee ${product.committeeReviewRequired ? 'Configured' : 'Skipped'}
                             </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.accountantReviewRequired != false ? 'text-emerald-700' : 'text-slate-500'}" style="order: ${product.accountantReviewRequired != false ? product.resolvedAccountantPriority : 6};">
+                            <span class="workflow-order-${product.accountantReviewRequired != false ? product.resolvedAccountantPriority : 6} mt-1 block text-sm font-semibold ${product.accountantReviewRequired != false ? 'text-emerald-700' : 'text-slate-500'}">
                                 P${product.resolvedAccountantPriority} Accountant ${product.accountantReviewRequired != false ? 'Configured' : 'Skipped'}
                             </span>
-                            <span class="mt-1 block text-sm font-semibold ${product.disbursementOfficerRequired != false ? 'text-emerald-700' : 'text-slate-500'}" style="order: 7;">
+                            <span class="workflow-order-7 mt-1 block text-sm font-semibold ${product.disbursementOfficerRequired != false ? 'text-emerald-700' : 'text-slate-500'}">
                                 P5 ${product.disbursementOfficerRequired != false ? 'Disbursement/Teller Officer Required' : 'Disbursement Claim Release'}
                             </span>
                         </div>
@@ -993,8 +560,8 @@
                 </div>
 
                 <div class="app-modal-body">
-                    <div class="overflow-x-auto rounded-lg border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading versions...">
+                        <table class="erp-table">
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <tr>
                                 <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
@@ -1468,7 +1035,7 @@
                                 data-product-modal-close="create-product">
                             <spring:message code="common.cancel" text="Cancel" />
                         </button>
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.loanProducts.add" text="Add loan product" /></button>
+                        <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.loanProducts.add" text="Add loan product" /></button>
                     </div>
                 </form>
             </div>
@@ -1503,8 +1070,8 @@
                             </div>
                         </c:when>
                         <c:otherwise>
-                            <div class="overflow-x-auto rounded-lg border border-slate-200">
-                                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading versions...">
+                                <table class="erp-table">
                                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         <tr>
                                             <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>

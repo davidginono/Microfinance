@@ -1355,10 +1355,10 @@ button:active {
     max-width: min(16rem, calc(100vw - 2rem));
     padding: 0.45rem 0.62rem;
     border: 1px solid #d7dde3;
-    border-radius: 0.32rem;
+    border-radius: 2px;
     background: #ffffff;
     color: #1f2937;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+    box-shadow: 0 2px 4px rgba(0, 28, 36, .2);
     font-size: 0.78rem;
     font-weight: 700;
     line-height: 1.25;
@@ -1377,11 +1377,11 @@ button:active {
     width: min(14.5rem, calc(100vw - 5rem));
     max-height: min(24rem, calc(100vh - 1.25rem));
     overflow-y: auto;
-    padding: 0.45rem;
-    border: 1px solid #d7dde3;
-    border-radius: 0.42rem;
+    padding: 0;
+    border: 1px solid #879596;
+    border-radius: 2px;
     background: #ffffff;
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 2px 4px rgba(0, 28, 36, .2);
     color: #1f2937;
     opacity: 0;
     pointer-events: none;
@@ -1394,43 +1394,50 @@ button:active {
     transform: translateX(0);
 }
 .shell-sidebar-flyout-title {
-    margin: 0 0 0.28rem;
-    padding: 0.4rem 0.5rem 0.48rem;
-    border-bottom: 1px solid #e5e7eb;
-    color: #64748b;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    line-height: 1.2;
-    text-transform: uppercase;
+    margin: 0;
+    padding: 9px 10px;
+    border-bottom: 1px solid #d5dbdb;
+    background: #eaeded;
+    color: #16191f;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 20px;
+    text-transform: none;
 }
 .shell-sidebar-flyout-list {
     display: grid;
-    gap: 0.18rem;
+    gap: 0;
+    padding: 4px 0;
 }
 .shell-sidebar-flyout-link {
     display: block;
     min-width: 0;
-    padding: 0.58rem 0.62rem;
-    border-radius: 0.3rem;
-    color: #334155;
-    font-size: 0.84rem;
-    font-weight: 700;
-    line-height: 1.25;
+    min-height: 32px;
+    padding: 6px 10px 6px 12px;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+    color: #16191f;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
     text-decoration: none;
     white-space: normal;
     overflow-wrap: anywhere;
 }
 .shell-sidebar-flyout-link:hover,
 .shell-sidebar-flyout-link:focus-visible {
-    background: #f8fafc;
-    color: #075985;
-    outline: none;
+    background: #eaeded;
+    color: #0073bb;
+    outline: 2px solid #00a1c9;
+    outline-offset: -2px;
 }
 .shell-sidebar-flyout-link.is-active {
-    background: #eff6ff;
-    color: #075985;
-    box-shadow: inset 0 0 0 1px #bfdbfe;
+    border-left-color: #ec7211;
+    background: #f7f8f8;
+    color: #16191f;
+    font-weight: 700;
+    box-shadow: none;
 }
 @media (min-width: 2560px) {
     :root {
@@ -1507,4 +1514,2121 @@ button:active {
 .shell-sidebar-scroll .shell-review-panel-link:focus-visible {
     background-color: #ffffff !important;
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* AWS Management Console-inspired application theme. */
+:root {
+    --aws-ink: #16191f;
+    --aws-muted: #5f6b7a;
+    --aws-panel: #ffffff;
+    --aws-bg: #eaeded;
+    --aws-line: #d5dbdb;
+    --aws-line-dark: #879596;
+    --aws-blue: #0972d3;
+    --aws-blue-dark: #033160;
+    --aws-orange: #ec7211;
+    --aws-success: #037f0c;
+    --aws-danger: #d13212;
+    --aws-warning: #ff9900;
+    --page-bg: var(--aws-bg);
+    --panel-bg: var(--aws-panel);
+    --panel-border: var(--aws-line);
+    --panel-shadow: 0 1px 1px rgba(0, 28, 36, 0.12);
+    --text-main: var(--aws-ink);
+    --text-muted: var(--aws-muted);
+    --shell-sidebar-width: 188px;
+    --shell-sidebar-collapsed-width: 42px;
+    --shell-content-gap: 10px;
+    --shell-content-max: none;
+    --shell-nav-height: 38px;
+    --shell-topbar-control-height: 28px;
+}
+
+html {
+    background: var(--aws-bg);
+    font-size: 16px;
+}
+
+body.aws-console {
+    margin: 0;
+    overflow-x: clip;
+    background: var(--aws-bg) !important;
+    color: var(--aws-ink);
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.aws-console-root {
+    overflow-x: clip;
+    background: var(--aws-bg);
+}
+
+.aws-skip-link {
+    position: fixed;
+    left: 8px;
+    top: -50px;
+    z-index: 200;
+    border: 2px solid #ffffff;
+    background: var(--aws-blue);
+    color: #ffffff;
+    padding: 6px 10px;
+    font-weight: 700;
+}
+
+.aws-skip-link:focus {
+    top: 4px;
+}
+
+.app-topbar {
+    min-height: var(--shell-nav-height);
+    border: 0;
+    border-bottom: 1px solid #414750;
+    background: var(--aws-ink) !important;
+    box-shadow: none !important;
+}
+
+.app-topbar > div {
+    min-height: 38px;
+    padding: 4px 10px !important;
+}
+
+.app-global-brand {
+    min-width: 160px;
+    color: #ffffff;
+}
+
+.app-global-brand > span:first-child {
+    display: none !important;
+}
+
+.app-global-brand p:first-child {
+    color: #ffffff !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+
+.app-global-brand p:last-child {
+    color: #b6bec9 !important;
+    font-size: 9px !important;
+    letter-spacing: .04em !important;
+}
+
+.app-global-search {
+    position: relative;
+    display: none;
+    width: min(32vw, 420px);
+    height: 28px;
+    margin-left: 8px;
+    align-items: center;
+}
+
+.app-global-search svg {
+    position: absolute;
+    left: 8px;
+    width: 14px;
+    height: 14px;
+    color: #d5dbdb;
+    pointer-events: none;
+}
+
+.app-global-search input {
+    width: 100%;
+    height: 28px;
+    border: 1px solid #687078;
+    border-radius: 2px;
+    background: #242a31;
+    color: #ffffff;
+    padding: 0 8px 0 28px;
+    font: inherit;
+}
+
+.app-global-search input::placeholder {
+    color: #b6bec9;
+}
+
+.app-global-search input:focus {
+    border-color: #539fe5;
+    outline: 2px solid #539fe5;
+    outline-offset: 0;
+}
+
+@media (min-width: 768px) {
+    .app-global-search {
+        display: inline-flex;
+    }
+}
+
+.app-topbar .erp-icon-btn,
+.app-topbar .erp-topbar-btn,
+.app-topbar button {
+    height: 28px !important;
+    min-height: 28px !important;
+    border: 1px solid #687078 !important;
+    border-radius: 2px !important;
+    background: #242a31 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.app-topbar .erp-icon-btn:hover,
+.app-topbar .erp-topbar-btn:hover,
+.app-topbar button:hover {
+    border-color: #aab7b8 !important;
+    background: #343b44 !important;
+}
+
+.app-topbar .profile-icon-btn {
+    border-radius: 50% !important;
+}
+
+.aws-app-shell {
+    overflow-x: clip;
+    padding-top: var(--shell-nav-height);
+}
+
+.shell-sidebar {
+    top: var(--shell-nav-height) !important;
+    width: var(--shell-sidebar-width);
+    border-color: var(--aws-line) !important;
+    background: #f7f8f8 !important;
+}
+
+.shell-sidebar::before,
+.shell-sidebar::after {
+    display: none !important;
+}
+
+.shell-sidebar-panel {
+    border-color: var(--aws-line) !important;
+    background: #f7f8f8 !important;
+}
+
+.shell-sidebar-toggle-row {
+    min-height: 34px;
+    border-bottom: 1px solid var(--aws-line);
+    padding: 4px 6px;
+    background: #eaeded;
+}
+
+.shell-sidebar-toggle-label,
+.shell-sidebar-section-header {
+    color: #414d5c !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .02em !important;
+    text-transform: uppercase;
+}
+
+.desktop-sidebar-toggle {
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
+    border: 1px solid var(--aws-line-dark);
+    border-radius: 2px;
+    background: #ffffff;
+    color: var(--aws-ink);
+}
+
+.shell-sidebar-scroll {
+    padding: 4px 0 12px !important;
+    background: #f7f8f8 !important;
+    scrollbar-color: #879596 #eaeded;
+}
+
+.shell-sidebar-scroll > :not([hidden]) ~ :not([hidden]),
+.shell-sidebar-group > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+}
+
+.shell-sidebar-scroll > a,
+.shell-sidebar-scroll > button,
+.shell-sidebar-scroll > div > a,
+.shell-sidebar-scroll > div > button,
+.shell-sidebar-scroll .shell-review-panel-link {
+    position: relative;
+    min-height: 29px !important;
+    width: 100%;
+    gap: 6px !important;
+    border: 0 !important;
+    border-left: 3px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #414d5c !important;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    line-height: 18px;
+    transform: none !important;
+}
+
+.shell-sidebar-scroll > a:hover,
+.shell-sidebar-scroll > button:hover,
+.shell-sidebar-scroll > div > a:hover,
+.shell-sidebar-scroll > div > button:hover,
+.shell-sidebar-scroll .shell-review-panel-link:hover {
+    background: #eaeded !important;
+    color: var(--aws-ink) !important;
+    text-shadow: none !important;
+}
+
+.shell-sidebar-scroll a[class*="bg-cyan-50"],
+.shell-sidebar-scroll button[class*="bg-cyan-50"],
+.shell-sidebar-scroll a[class*="bg-blue-50"],
+.shell-sidebar-scroll button[class*="bg-blue-50"],
+.shell-sidebar-scroll a[class*="bg-green-50"],
+.shell-sidebar-scroll button[class*="bg-green-50"],
+.shell-sidebar-scroll a[class*="bg-amber-50"],
+.shell-sidebar-scroll button[class*="bg-amber-50"],
+.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"] {
+    border-left-color: var(--aws-orange) !important;
+    background: #ffffff !important;
+    color: #8f4808 !important;
+    font-weight: 700 !important;
+}
+
+.shell-sidebar-scroll > a > span:first-child,
+.shell-sidebar-scroll > button > span:first-child,
+.shell-sidebar-scroll > div > a > span:first-child,
+.shell-sidebar-scroll > div > button > span:first-child {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #5f6b7a !important;
+}
+
+.shell-sidebar-scroll > a > span svg,
+.shell-sidebar-scroll > div > a > span svg,
+.shell-sidebar-scroll button > span svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+.shell-sidebar-group > div {
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: inset 3px 0 0 #d5dbdb !important;
+    padding: 2px 0 2px 20px !important;
+}
+
+.shell-sidebar-group > div a {
+    min-height: 26px;
+    border-radius: 0 !important;
+    padding: 4px 8px !important;
+    color: #414d5c !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+}
+
+.shell-sidebar-group > div a[class*="bg-white"] {
+    color: #8f4808 !important;
+    font-weight: 700 !important;
+}
+
+.shell-powered-by {
+    border-color: var(--aws-line) !important;
+    background: #eaeded !important;
+}
+
+.shell-main {
+    min-height: calc(100vh - var(--shell-nav-height));
+    padding: 10px !important;
+}
+
+.shell-content-frame {
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+.erp-page-header,
+.erp-page-header-sticky {
+    margin: 0 0 10px !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.erp-breadcrumb,
+.erp-page-kicker {
+    margin: 0 0 2px !important;
+    color: var(--aws-muted) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .02em !important;
+    text-transform: uppercase;
+}
+
+.erp-page-title,
+.erp-page-heading,
+.erp-page-header h1 {
+    margin: 0 !important;
+    color: var(--aws-ink) !important;
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0 !important;
+}
+
+.erp-page-subtitle,
+.erp-page-header p:not(.erp-breadcrumb):not(.erp-page-kicker) {
+    max-width: 760px;
+    margin: 2px 0 0 !important;
+    color: var(--aws-muted) !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+}
+
+.erp-panel,
+.erp-form-wrap,
+.erp-toolbar,
+.erp-table-wrap,
+.erp-section,
+.erp-section-muted {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: var(--aws-panel) !important;
+    box-shadow: var(--panel-shadow) !important;
+}
+
+.erp-panel {
+    overflow: visible;
+}
+
+.erp-panel-header,
+.app-table-titlebar {
+    min-height: 39px;
+    border-bottom: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #f7f8f8 !important;
+    padding: 7px 10px !important;
+}
+
+.app-table-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.app-table-heading,
+.app-table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.app-table-heading {
+    min-width: 0;
+}
+
+.app-table-heading h2 {
+    overflow: hidden;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-table-heading > span {
+    color: var(--aws-blue);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.app-table-toolbar {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+}
+
+.aws-console .aws-filter-toolbar {
+    display: flex !important;
+    width: 100%;
+    min-width: max-content;
+    align-items: flex-end !important;
+    flex-flow: row nowrap !important;
+    gap: 8px !important;
+    overflow-x: auto;
+    border: 0 !important;
+    border-bottom: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 8px 10px !important;
+    box-shadow: none !important;
+    scrollbar-width: thin;
+}
+
+.aws-console .aws-filter-toolbar > label,
+.aws-console .aws-filter-toolbar > .staff-analytics-control,
+.aws-console .aws-filter-toolbar > .form-field {
+    min-width: 130px;
+    flex: 0 1 180px;
+    margin: 0 !important;
+}
+
+.aws-console .aws-filter-toolbar > label:has(input[type="search"]),
+.aws-console .aws-filter-toolbar > label:has(input[name*="search" i]),
+.aws-console .aws-filter-toolbar > label:has(input[name*="query" i]) {
+    min-width: 210px;
+    flex: 1 1 280px;
+}
+
+.aws-console .aws-filter-toolbar > .app-btn,
+.aws-console .aws-filter-toolbar button,
+.aws-console .aws-filter-toolbar a {
+    flex: 0 0 auto;
+    margin: 0 !important;
+}
+
+.aws-console .aws-filter-toolbar input,
+.aws-console .aws-filter-toolbar select,
+.aws-console .aws-filter-toolbar .app-btn {
+    height: 31px !important;
+    min-height: 31px !important;
+    max-height: 31px !important;
+}
+
+.aws-console .erp-table-wrap > .aws-filter-toolbar {
+    position: relative;
+    z-index: 2;
+}
+
+.aws-console .erp-table-wrap > .erp-filter-row {
+    margin: 0 !important;
+    border-bottom: 1px solid var(--aws-line);
+    border-radius: 0 !important;
+    background: #f7f8f8 !important;
+    padding: 5px 10px !important;
+}
+
+.app-icon-button {
+    display: inline-flex;
+    width: 31px;
+    height: 31px;
+    min-height: 31px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--aws-line-dark);
+    border-radius: 2px;
+    padding: 0;
+}
+
+.app-icon-button svg {
+    width: 14px;
+    height: 14px;
+}
+
+.erp-panel-title,
+.app-table-heading h2,
+.erp-widget-heading {
+    color: var(--aws-ink) !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+}
+
+.erp-panel-body {
+    padding: 10px !important;
+}
+
+.erp-widget-title,
+.erp-stat-label,
+.fcms-label {
+    color: #414d5c !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .02em !important;
+    text-transform: uppercase;
+}
+
+.erp-stat-grid {
+    gap: 8px !important;
+    margin-bottom: 10px;
+}
+
+.erp-stat-card,
+.erp-stat-blue,
+.erp-stat-green,
+.erp-stat-amber,
+.erp-stat-red {
+    min-height: 86px;
+    overflow: hidden;
+    border: 1px solid var(--aws-line) !important;
+    border-left: 3px solid var(--aws-orange) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+    box-shadow: var(--panel-shadow) !important;
+}
+
+.erp-stat-card:hover,
+.erp-stat-card:focus-visible,
+.erp-stat-card-interactive:hover,
+.erp-stat-card-interactive:focus-visible {
+    border-color: var(--aws-line-dark) !important;
+    border-left-color: var(--aws-orange) !important;
+    background: #f7f8f8 !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.erp-stat-main {
+    min-height: 58px;
+    padding: 9px 10px !important;
+}
+
+.erp-stat-value {
+    color: var(--aws-ink) !important;
+    font-size: 22px !important;
+    line-height: 1.1 !important;
+}
+
+.erp-stat-meta {
+    color: var(--aws-muted) !important;
+    font-size: 11px !important;
+}
+
+.erp-stat-icon {
+    width: 26px !important;
+    height: 26px !important;
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #f2f3f3 !important;
+    color: var(--aws-blue) !important;
+}
+
+.erp-stat-footer {
+    min-height: 26px;
+    border-top: 1px solid var(--aws-line) !important;
+    background: #f7f8f8 !important;
+    color: var(--aws-muted) !important;
+    padding: 5px 10px !important;
+    font-size: 10px !important;
+}
+
+.app-btn,
+.aws-console button:not(.neo-select-button),
+.app-icon-button {
+    min-height: 31px;
+    border-radius: 2px !important;
+    padding: 0 10px;
+    box-shadow: none !important;
+    font-family: inherit;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1;
+    transform: none !important;
+}
+
+.app-btn:hover,
+.aws-console button:not(.neo-select-button):hover,
+.app-icon-button:hover {
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.btn-neutral {
+    border-color: var(--aws-line-dark) !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+}
+
+.btn-neutral:hover {
+    background: #f2f3f3 !important;
+}
+
+.btn-primary {
+    border-color: #075fae !important;
+    background: var(--aws-blue) !important;
+    color: #ffffff !important;
+}
+
+.btn-primary:hover {
+    border-color: var(--aws-blue-dark) !important;
+    background: #075fae !important;
+    color: #ffffff !important;
+}
+
+.btn-launch {
+    border-color: #b65b0a !important;
+    background: var(--aws-orange) !important;
+    color: #ffffff !important;
+}
+
+.btn-launch:hover {
+    border-color: #8f4808 !important;
+    background: #eb5f07 !important;
+    color: #ffffff !important;
+}
+
+.btn-approve {
+    border-color: #056d0c !important;
+    background: var(--aws-success) !important;
+    color: #ffffff !important;
+}
+
+.btn-reject,
+.btn-danger {
+    border-color: #a82a0b !important;
+    background: var(--aws-danger) !important;
+    color: #ffffff !important;
+}
+
+.aws-console input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.aws-console select,
+.aws-console .fcms-control,
+.aws-console .neo-select-button {
+    min-height: 31px !important;
+    height: 31px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+    box-shadow: none !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+}
+
+.aws-console textarea {
+    min-height: 84px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+    box-shadow: none !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+}
+
+.aws-console .app-btn {
+    height: 31px !important;
+    min-height: 31px !important;
+}
+
+.aws-console input:focus,
+.aws-console select:focus,
+.aws-console textarea:focus,
+.aws-console button:focus-visible,
+.aws-console a:focus-visible {
+    outline: 2px solid var(--aws-blue) !important;
+    outline-offset: 1px;
+    box-shadow: none !important;
+}
+
+.erp-table-wrap {
+    position: relative;
+    overflow: hidden;
+    padding: 0 !important;
+}
+
+.erp-table-wrap.is-loading .erp-table tbody {
+    opacity: .28;
+}
+
+.aws-table-loader {
+    position: absolute;
+    inset: 29px 0 0;
+    z-index: 5;
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: rgba(255, 255, 255, .78);
+    color: var(--aws-muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.aws-table-loader__spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--aws-line);
+    border-top-color: var(--aws-blue);
+    border-radius: 50%;
+    animation: aws-console-spin .65s linear infinite;
+}
+
+@keyframes aws-console-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.aws-pagination-chevron {
+    width: 31px !important;
+    min-width: 31px;
+    padding: 0 !important;
+}
+
+.aws-pagination-chevron svg {
+    width: 14px;
+    height: 14px;
+}
+
+.erp-table-scroll {
+    width: 100%;
+    overflow: auto;
+    border: 0 !important;
+    border-radius: 0 !important;
+    scrollbar-color: #879596 #eaeded;
+}
+
+.erp-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--aws-ink);
+    font-size: 12px !important;
+}
+
+.erp-table thead {
+    background: #eaeded !important;
+}
+
+.erp-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 29px;
+    border-color: var(--aws-line) !important;
+    background: #eaeded !important;
+    color: #414d5c !important;
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 18px !important;
+    text-transform: none !important;
+}
+
+.erp-table td {
+    min-height: 29px;
+    border-color: #eaeded !important;
+    background: #ffffff;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+}
+
+.erp-table tbody tr:hover td {
+    background: #f1faff !important;
+}
+
+.erp-table tfoot td {
+    border-top: 1px solid var(--aws-line-dark) !important;
+    background: #eaeded !important;
+    font-weight: 700;
+}
+
+.erp-table-toolbar,
+.erp-filter-form,
+.erp-filter-row {
+    display: flex;
+    min-width: max-content;
+    flex-wrap: nowrap !important;
+    align-items: end;
+    gap: 6px !important;
+}
+
+.erp-table-toolbar,
+.erp-filter-form {
+    border-bottom: 1px solid var(--aws-line);
+    background: #ffffff;
+    padding: 6px 8px !important;
+}
+
+.erp-filter-tab {
+    min-height: 28px;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+    padding: 5px 9px !important;
+    font-size: 11px !important;
+}
+
+.erp-filter-tab.is-active {
+    border-bottom: 2px solid var(--aws-orange) !important;
+    background: #f7f8f8 !important;
+    color: #8f4808 !important;
+    font-weight: 700;
+}
+
+.erp-dropdown,
+.notification-panel,
+.profile-panel {
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(0, 28, 36, .2) !important;
+}
+
+.erp-dropdown-header {
+    border-color: var(--aws-line) !important;
+    background: #eaeded !important;
+    padding: 7px 9px !important;
+}
+
+.erp-dropdown-title {
+    color: var(--aws-ink) !important;
+    font-size: 13px !important;
+}
+
+.app-modal-overlay {
+    background: rgba(22, 25, 31, .55) !important;
+}
+
+.app-modal-panel,
+[role="dialog"] {
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 16px rgba(0, 28, 36, .25) !important;
+}
+
+.app-modal-header {
+    min-height: 39px;
+    border-color: var(--aws-line) !important;
+    background: #eaeded !important;
+    padding: 7px 10px !important;
+}
+
+#appToastContainer {
+    left: var(--shell-sidebar-width) !important;
+    right: 0 !important;
+    top: var(--shell-nav-height) !important;
+    width: auto !important;
+    gap: 0 !important;
+}
+
+#appToastContainer > * {
+    width: 100%;
+    min-height: 30px;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 6px 10px !important;
+}
+
+.app-toast-success {
+    background: var(--aws-success) !important;
+    color: #ffffff !important;
+}
+
+.app-toast-error {
+    background: var(--aws-danger) !important;
+    color: #ffffff !important;
+}
+
+.app-toast-info {
+    background: var(--aws-blue) !important;
+    color: #ffffff !important;
+}
+
+.app-badge,
+.aws-console [class*="rounded-full"] {
+    border-radius: 2px !important;
+}
+
+.page-submit-preloader__panel {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.shell-page-title-rail {
+    top: var(--shell-nav-height) !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.shell-page-title-rail__inner {
+    box-sizing: border-box;
+    width: calc(100vw - var(--shell-page-title-left, 0px) - 10px) !important;
+    max-width: none !important;
+    min-height: 31px;
+    margin-left: var(--shell-page-title-left, 0px) !important;
+    margin-right: 10px !important;
+    border: 1px solid var(--aws-line) !important;
+    border-top: 0 !important;
+    border-radius: 0 !important;
+    background: #eaeded !important;
+    padding: 5px 10px !important;
+    box-shadow: 0 1px 1px rgba(0, 28, 36, .12) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.shell-page-title-rail__text {
+    overflow: hidden;
+    margin: 0 !important;
+    color: var(--aws-ink) !important;
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    line-height: 20px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Page-local components are normalized here so every workspace keeps one console language. */
+.aws-console [class*="rounded-lg"],
+.aws-console [class*="rounded-xl"],
+.aws-console [class*="rounded-2xl"],
+.aws-console [class*="rounded-3xl"] {
+    border-radius: 2px !important;
+}
+
+.aws-console [class*="shadow-lg"],
+.aws-console [class*="shadow-xl"],
+.aws-console [class*="shadow-2xl"] {
+    box-shadow: var(--panel-shadow) !important;
+}
+
+.loan-metric-card,
+.loan-risk-card,
+.loan-view-summary-card,
+.loan-repayment-card,
+.loan-staff-kpi-card,
+.staff-metric-card,
+.staff-financial-breakdown-card,
+.staff-summary-item,
+.platform-settings-card,
+.applicant-info-card,
+.loan-applicant-photo-card,
+.member-dashboard-summary-fact,
+.workflow-preview-shell,
+.workflow-subsection,
+.product-builder-section {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.loan-metric-card,
+.staff-metric-card,
+.staff-summary-item,
+.loan-staff-kpi-card {
+    border-left: 3px solid var(--aws-orange) !important;
+}
+
+.loan-metric-icon,
+.staff-metric-icon,
+.staff-summary-icon,
+.loan-staff-kpi-icon,
+.tone-blue,
+.tone-emerald,
+.tone-violet,
+.tone-green,
+.tone-orange,
+.tone-rose,
+.tone-slate {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #f2f3f3 !important;
+    color: var(--aws-blue) !important;
+}
+
+.loan-risk-badge,
+.loan-repayment-chip,
+.loan-simple-progress-pill,
+.workflow-preview-chip,
+.workflow-stage-state,
+.staff-risk-status {
+    border-radius: 2px !important;
+}
+
+.loan-risk-grid,
+.loan-hero-facts-grid,
+.loan-financial-section-grid,
+.loan-repayment-meta-grid,
+.staff-summary-grid,
+.staff-financial-breakdown-grid,
+.workflow-support-grid,
+.workflow-start-grid,
+.product-builder-grid,
+.product-identity-grid {
+    gap: 8px !important;
+}
+
+.loan-risk-cell,
+.loan-hero-fact,
+.loan-repayment-note,
+.staff-info-bar,
+.workflow-stage-row,
+.workflow-start-option,
+.settings-checkbox-card {
+    border-color: var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #f7f8f8 !important;
+    box-shadow: none !important;
+}
+
+.loan-chart-tooltip,
+.staff-chart-tooltip,
+.manager-pie-tooltip,
+.neo-select-menu,
+.guarantor-financial-modal,
+.forgot-password-dialog {
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(0, 28, 36, .2) !important;
+}
+
+.member-dashboard-flow-shell,
+.member-dashboard-mobile-flow,
+.loan-simple-progress-list {
+    border-color: var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.member-dashboard-flow-node--current,
+.member-dashboard-mobile-node--current,
+.loan-simple-progress-item.is-current {
+    border-color: var(--aws-orange) !important;
+    background: #fff7ed !important;
+}
+
+.accountant-archive-search-form,
+.accountant-queue-search-form,
+.board-queue-search-form,
+.disbursement-archive-search-form,
+.disbursement-queue-search-form,
+.manager-archive-search-form,
+.manager-queue-search-form,
+.admin-filter-form,
+.loan-analytics-filter,
+.staff-analytics-filter {
+    display: flex !important;
+    min-width: max-content;
+    flex-flow: row nowrap !important;
+    align-items: end !important;
+    gap: 6px !important;
+    overflow-x: auto;
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    padding: 6px 8px !important;
+}
+
+.accountant-archive-search-actions,
+.accountant-queue-search-actions,
+.board-queue-search-actions,
+.disbursement-archive-search-actions,
+.disbursement-queue-search-actions,
+.manager-archive-search-actions,
+.manager-queue-search-actions,
+.admin-filter-actions,
+.loan-analytics-filter-actions,
+.staff-filter-actions {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    flex-flow: row nowrap !important;
+    align-items: end !important;
+    gap: 6px !important;
+}
+
+.app-modal-actions,
+.settings-action-bar,
+.member-settings-action-bar,
+.staff-settings-action-bar,
+.platform-settings-actions,
+.loan-action-row,
+.loan-final-action-row,
+.loan-page-bottom-actions,
+.loan-view-action-cluster {
+    display: flex !important;
+    flex-flow: row wrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+}
+
+.app-modal-body,
+.app-modal-section,
+.product-builder-section-body,
+.workflow-subsection {
+    padding: 10px !important;
+}
+
+.product-builder-section-header,
+.guarantor-financial-modal-header,
+.session-timeout-header {
+    min-height: 39px;
+    border-color: var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #eaeded !important;
+    padding: 7px 10px !important;
+}
+
+@media (max-width: 767px) {
+    .aws-console .aws-filter-toolbar {
+        min-width: 0;
+        flex-wrap: wrap !important;
+        overflow-x: visible;
+    }
+
+    .aws-console .aws-filter-toolbar > label,
+    .aws-console .aws-filter-toolbar > .staff-analytics-control,
+    .aws-console .aws-filter-toolbar > .form-field {
+        min-width: min(100%, 150px);
+        flex: 1 1 150px;
+    }
+    .accountant-archive-search-form,
+    .accountant-queue-search-form,
+    .board-queue-search-form,
+    .disbursement-archive-search-form,
+    .disbursement-queue-search-form,
+    .manager-archive-search-form,
+    .manager-queue-search-form,
+    .admin-filter-form,
+    .loan-analytics-filter,
+    .staff-analytics-filter {
+        min-width: 100%;
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
+        overflow-x: visible;
+    }
+
+    .accountant-archive-search-actions,
+    .accountant-queue-search-actions,
+    .board-queue-search-actions,
+    .disbursement-archive-search-actions,
+    .disbursement-queue-search-actions,
+    .manager-archive-search-actions,
+    .manager-queue-search-actions,
+    .admin-filter-actions,
+    .loan-analytics-filter-actions,
+    .staff-filter-actions {
+        flex: 1 1 100% !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+/* AWS console semantic utilities used by JSP markup (no inline style attributes). */
+.aws-console .aws-signature-text {
+    font-family: "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive;
+}
+
+.aws-console .aws-skeleton-wide {
+    width: 72%;
+}
+
+.aws-console .aws-dashboard-panel-fixed {
+    height: 21rem;
+}
+
+.aws-console .aws-dashboard-list {
+    height: calc(100% - 3.25rem);
+}
+
+.aws-console .aws-mobile-menu-button {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.aws-console .aws-sidebar-footer {
+    border-color: rgba(213, 219, 219, 0.9);
+}
+
+.aws-console .aws-usage-range-picker {
+    width: 10rem;
+    max-width: 100%;
+}
+
+.aws-console .aws-usage-chart-panel {
+    height: 20.75rem;
+}
+
+.aws-console .aws-usage-table-panel {
+    height: 18rem;
+}
+
+.aws-console .aws-col-14 { width: 14%; }
+.aws-console .aws-col-18 { width: 18%; }
+.aws-console .aws-col-22 { width: 22%; }
+.aws-console .aws-col-24 { width: 24%; }
+.aws-console .aws-col-26 { width: 26%; }
+.aws-console .aws-col-32 { width: 32%; }
+.aws-console .aws-col-34 { width: 34%; }
+.aws-console .aws-col-48 { width: 48%; }
+.aws-console .aws-col-78 { width: 78%; }
+
+.aws-console .workflow-order-1 { order: 1; }
+.aws-console .workflow-order-2 { order: 2; }
+.aws-console .workflow-order-3 { order: 3; }
+.aws-console .workflow-order-4 { order: 4; }
+.aws-console .workflow-order-5 { order: 5; }
+.aws-console .workflow-order-6 { order: 6; }
+.aws-console .workflow-order-7 { order: 7; }
+
+.aws-console .aws-usage-progress {
+    display: block;
+    width: 100%;
+    height: 0.5rem;
+    overflow: hidden;
+    appearance: none;
+    border: 0;
+    border-radius: 2px;
+    background: var(--aws-line);
+}
+
+.aws-console .aws-usage-progress::-webkit-progress-bar {
+    background: var(--aws-line);
+}
+
+.aws-console .aws-usage-progress::-webkit-progress-value,
+.aws-console .aws-usage-progress::-moz-progress-bar {
+    background: var(--aws-blue);
+}
+
+.aws-console .aws-chart-series-label,
+.aws-console .aws-chart-title {
+    color: var(--aws-blue);
+}
+
+.aws-console .aws-chart-total {
+    color: var(--aws-danger);
+}
+
+@media (min-width: 1024px) {
+    .shell-main {
+        margin-left: var(--shell-sidebar-width) !important;
+        width: calc(100% - var(--shell-sidebar-width)) !important;
+        max-width: calc(100% - var(--shell-sidebar-width)) !important;
+    }
+
+    .shell-sidebar-collapsed .shell-main {
+        margin-left: var(--shell-sidebar-collapsed-width) !important;
+        width: calc(100% - var(--shell-sidebar-collapsed-width)) !important;
+        max-width: calc(100% - var(--shell-sidebar-collapsed-width)) !important;
+    }
+
+    .shell-sidebar-collapsed #appToastContainer {
+        left: var(--shell-sidebar-collapsed-width) !important;
+    }
+}
+
+/* Keep wide console content inside the viewport. Tables and filter rails own scrolling. */
+html:has(body.aws-console),
+body.aws-console,
+.aws-console-root,
+.aws-app-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.shell-main,
+.shell-content-frame,
+.shell-content-frame > *,
+.erp-panel,
+.erp-form-wrap,
+.erp-section,
+.erp-section-muted,
+.erp-table-wrap,
+.app-table-titlebar,
+.aws-filter-toolbar {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.erp-table-wrap {
+    overflow: hidden;
+}
+
+.erp-table-wrap > .erp-table-scroll,
+.erp-table-wrap.erp-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.aws-console .aws-filter-toolbar {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.aws-console .aws-filter-toolbar::after {
+    content: "";
+    flex: 0 0 1px;
+}
+
+/* Consistent EC2 container geometry across pages and overlays. */
+.erp-panel,
+.erp-form-wrap,
+.erp-toolbar,
+.erp-table-wrap,
+.erp-section,
+.erp-section-muted,
+.app-modal-panel,
+[role="dialog"],
+.session-timeout-panel,
+.forgot-password-dialog,
+.guarantor-financial-modal {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 1px rgba(0, 28, 36, .12) !important;
+}
+
+.app-modal-overlay {
+    box-sizing: border-box;
+    padding: 16px !important;
+}
+
+.app-modal-panel,
+[role="dialog"] {
+    width: min(100%, 54rem);
+    max-width: calc(100vw - 32px) !important;
+    max-height: calc(100dvh - 32px) !important;
+    overflow: hidden;
+}
+
+.app-modal-panel--wide {
+    width: min(100%, 68rem);
+}
+
+.app-modal-scroll {
+    max-width: 100%;
+    max-height: calc(100dvh - 34px) !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.app-modal-header,
+.session-timeout-header {
+    border-bottom: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #eaeded !important;
+}
+
+.desktop-sidebar-toggle {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px;
+    min-height: 34px !important;
+}
+
+.desktop-sidebar-toggle svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.shell-sidebar-toggle-row {
+    min-height: 44px;
+}
+
+.shell-sidebar-scroll > a,
+.shell-sidebar-scroll > button,
+.shell-sidebar-scroll > div > a,
+.shell-sidebar-scroll > div > button,
+.shell-sidebar-scroll .shell-review-panel-link {
+    min-height: 35px !important;
+    padding: 7px 9px !important;
+    font-size: 13px !important;
+    line-height: 20px;
+}
+
+.shell-sidebar-group > div a {
+    min-height: 31px;
+    padding: 6px 9px !important;
+    font-size: 12px !important;
+    line-height: 18px;
+}
+
+.session-timeout-overlay {
+    padding: 16px !important;
+    background: rgba(22, 25, 31, .62) !important;
+    backdrop-filter: none !important;
+}
+
+.session-timeout-panel {
+    width: min(100%, 30rem) !important;
+    max-width: calc(100vw - 32px);
+    overflow: hidden;
+    transform: none !important;
+}
+
+.session-timeout-header {
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 8px 10px !important;
+}
+
+.session-timeout-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border: 1px solid var(--aws-line-dark);
+    border-radius: 2px;
+    color: var(--aws-blue);
+}
+
+.session-timeout-body {
+    padding: 14px !important;
+}
+
+.session-timeout-countdown {
+    color: var(--aws-ink);
+    font-size: 40px;
+}
+
+.session-timeout-progress-track,
+.session-timeout-progress-fill {
+    border-radius: 2px !important;
+}
+
+.session-timeout-actions {
+    border-top: 1px solid var(--aws-line) !important;
+    background: #f7f8f8 !important;
+    padding: 8px 10px !important;
+}
+
+@media (max-width: 1023px) {
+    #appToastContainer {
+        left: 0 !important;
+    }
+
+    .shell-sidebar {
+        width: min(188px, calc(100vw - 36px));
+    }
+}
+
+@media (max-width: 767px) {
+    .shell-main {
+        padding: 8px !important;
+    }
+
+    .erp-page-title,
+    .erp-page-heading,
+    .erp-page-header h1 {
+        font-size: 18px !important;
+    }
+
+    .erp-table-toolbar,
+    .erp-filter-form,
+    .erp-filter-row {
+        min-width: 100%;
+        flex-wrap: wrap !important;
+        align-items: stretch;
+    }
+
+    .erp-filter-form > *,
+    .erp-filter-row > * {
+        min-width: min(100%, 150px);
+        flex: 1 1 150px;
+    }
+
+    .app-table-titlebar {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .app-table-heading {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    .app-table-heading h2 {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .app-table-toolbar {
+        width: 100%;
+        max-width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: thin;
+    }
+
+    .app-table-toolbar .app-btn,
+    .loan-flow-navigation .app-btn,
+    .erp-panel-header .app-btn,
+    .erp-toolbar .app-btn {
+        min-width: 0;
+        height: auto;
+        min-height: 36px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: center;
+    }
+
+    .loan-flow-navigation .app-btn {
+        flex: 1 1 11rem;
+    }
+
+    .erp-page-subtitle,
+    .erp-panel-title,
+    .erp-widget-heading,
+    .app-modal-header h2,
+    .session-timeout-header h2,
+    label,
+    legend {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+}
+
+/* Shared AWS status summaries and settings surfaces. */
+.aws-status-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 8px;
+    overflow: hidden;
+    border: 1px solid var(--aws-line);
+    border-radius: 2px;
+    background: var(--aws-panel);
+}
+
+.aws-status-summary-item {
+    min-width: 0;
+    padding: 10px 12px;
+}
+
+.aws-status-summary-item + .aws-status-summary-item {
+    border-left: 1px solid var(--aws-line);
+}
+
+.aws-status-summary-label,
+.aws-settings-kicker,
+.aws-settings-field,
+.platform-settings-field {
+    color: var(--aws-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    line-height: 16px !important;
+    text-transform: uppercase;
+}
+
+.aws-status-summary-value {
+    margin: 3px 0 0;
+    color: var(--aws-ink);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 26px;
+    overflow-wrap: anywhere;
+}
+
+.aws-settings-panel {
+    width: 100%;
+    max-width: 100%;
+}
+
+.aws-settings-header {
+    min-height: 39px;
+    border-bottom: 1px solid var(--aws-line);
+    background: #eaeded;
+    padding: 7px 10px;
+}
+
+.aws-settings-kicker {
+    margin: 0;
+}
+
+.aws-settings-title {
+    margin: 1px 0 0;
+    color: var(--aws-ink);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 20px;
+}
+
+.aws-settings-description,
+.aws-settings-help {
+    margin: 2px 0 0;
+    color: var(--aws-muted);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 18px;
+}
+
+.aws-settings-form,
+.platform-settings-form {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none !important;
+    padding: 10px !important;
+}
+
+.aws-settings-control-row {
+    display: grid;
+    grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
+    align-items: end;
+    gap: 8px 12px;
+    max-width: 58rem;
+}
+
+.aws-settings-grid,
+.platform-settings-grid {
+    display: grid;
+    max-width: 58rem !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start;
+    gap: 10px 12px !important;
+}
+
+.aws-settings-subsection {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+    padding: 0;
+}
+
+.aws-settings-field,
+.platform-settings-field {
+    display: grid;
+    min-width: 0;
+    max-width: none !important;
+    gap: 3px;
+}
+
+.aws-control,
+.aws-settings-field .neo-select-button,
+.aws-settings-field input,
+.aws-settings-field select,
+.platform-settings-field input,
+.platform-settings-field select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 31px !important;
+    height: 31px !important;
+    margin: 0 !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    padding: 4px 8px !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 20px !important;
+    text-transform: none;
+    box-shadow: none !important;
+}
+
+.platform-settings-field textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 76px !important;
+    margin: 0 !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    padding: 6px 8px !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 18px !important;
+    text-transform: none;
+    box-shadow: none !important;
+}
+
+.aws-control:focus,
+.aws-settings-field .neo-select-button:focus-visible,
+.aws-settings-field input:focus,
+.aws-settings-field select:focus,
+.platform-settings-field input:focus,
+.platform-settings-field select:focus,
+.platform-settings-field textarea:focus {
+    border-color: var(--aws-blue) !important;
+    outline: 2px solid #00a1c9 !important;
+    outline-offset: 1px;
+}
+
+.aws-settings-footer,
+.platform-settings-actions {
+    display: flex !important;
+    width: auto;
+    max-width: none !important;
+    flex-flow: row wrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    margin: 10px -10px -10px !important;
+    border-top: 1px solid var(--aws-line) !important;
+    background: #f7f8f8;
+    padding: 7px 10px !important;
+}
+
+.platform-settings-actions > p {
+    margin: 0;
+    color: var(--aws-muted) !important;
+    font-size: 12px !important;
+    line-height: 18px;
+}
+
+.platform-settings-card {
+    max-width: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.platform-settings-subgrid {
+    gap: 8px 10px !important;
+}
+
+.product-builder-form input:not([type="checkbox"]):not([type="radio"]),
+.product-builder-form select,
+.settings-action-bar .neo-select-button,
+.settings-action-bar select,
+.settings-action-button {
+    min-height: 31px !important;
+    height: 31px !important;
+    border-radius: 2px !important;
+    font-size: 12px !important;
+}
+
+.settings-action-bar {
+    border-color: var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #f7f8f8 !important;
+    padding: 7px 10px !important;
+}
+
+.aws-disclosure-button {
+    min-height: 31px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    padding: 5px 8px !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 20px !important;
+    box-shadow: none !important;
+}
+
+.aws-disclosure-button:hover {
+    border-color: var(--aws-blue) !important;
+    background: #f2f3f3 !important;
+    color: var(--aws-blue-dark) !important;
+}
+
+.aws-disclosure-button:focus-visible {
+    border-color: var(--aws-blue) !important;
+    outline: 2px solid #00a1c9 !important;
+    outline-offset: 1px;
+}
+
+.aws-disclosure-button .member-dashboard-dropdown-chevron {
+    width: 14px !important;
+    height: 14px !important;
+    color: var(--aws-muted);
+}
+
+.aws-dashboard-detail-panel {
+    min-width: 0;
+    margin-top: 8px !important;
+    overflow: hidden;
+    border: 1px solid var(--aws-line);
+    border-radius: 2px;
+    background: #ffffff;
+    padding: 0 !important;
+}
+
+.aws-detail-grid,
+.member-dashboard-summary-row.aws-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+}
+
+.aws-detail-grid .member-dashboard-summary-fact {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+    border: 0 !important;
+    border-right: 1px solid var(--aws-line) !important;
+    border-bottom: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 8px 10px;
+}
+
+.aws-detail-grid .member-dashboard-summary-fact:nth-child(2n) {
+    border-right: 0 !important;
+}
+
+.aws-detail-grid .member-dashboard-summary-fact-label {
+    color: var(--aws-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 16px;
+    text-transform: uppercase;
+}
+
+.aws-detail-grid .member-dashboard-summary-fact-value {
+    color: var(--aws-ink);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+}
+
+.aws-detail-updated {
+    border-bottom: 1px solid var(--aws-line);
+    background: #f7f8f8;
+    padding: 6px 10px;
+    color: var(--aws-muted);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 18px;
+}
+
+.aws-inline-notice {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    border-bottom: 1px solid var(--aws-line);
+    border-left: 3px solid var(--aws-blue);
+    background: #f1faff;
+    padding: 6px 8px;
+    color: var(--aws-ink);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.aws-inline-notice--success {
+    border-left-color: var(--aws-success);
+    background: #f2fcf3;
+}
+
+.aws-inline-notice--danger {
+    border-left-color: var(--aws-danger);
+    background: #fff7f5;
+}
+
+.aws-dashboard-detail-panel > .erp-table-wrap {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.aws-table-pagination-footer {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    border-top: 1px solid var(--aws-line);
+    background: #f7f8f8;
+    padding: 6px 8px;
+    color: var(--aws-muted);
+    font-size: 12px;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-shell,
+.aws-dashboard-detail-panel .member-dashboard-mobile-flow {
+    margin: 0 !important;
+    border: 0 !important;
+    border-top: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 8px 10px !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-track {
+    padding: 4px 0 !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-step {
+    width: 7rem;
+    flex-basis: 7rem;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-node,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node {
+    width: 18px !important;
+    height: 18px !important;
+    border-width: 2px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-node::after,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node::after {
+    font-size: 12px !important;
+    line-height: 1 !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-node--completed,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node.member-dashboard-flow-node--completed {
+    border-color: var(--aws-success) !important;
+    color: var(--aws-success) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-node--current,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node.member-dashboard-flow-node--current {
+    border-color: var(--aws-orange) !important;
+    background: #fff7ed !important;
+    color: var(--aws-orange) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-node--pending,
+.aws-dashboard-detail-panel .member-dashboard-flow-node--closed,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node.member-dashboard-flow-node--pending,
+.aws-dashboard-detail-panel .member-dashboard-mobile-node.member-dashboard-flow-node--closed {
+    border-color: var(--aws-line-dark) !important;
+    color: var(--aws-muted) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-connector {
+    width: 24px !important;
+    flex-basis: 24px !important;
+    height: 2px !important;
+    margin-top: 8px !important;
+    border-radius: 0 !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-connector--completed {
+    background: var(--aws-success) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-connector--current {
+    background: var(--aws-orange) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-number {
+    margin-top: 4px !important;
+    color: var(--aws-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 16px !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-label,
+.aws-dashboard-detail-panel .member-dashboard-mobile-title {
+    min-height: 0 !important;
+    margin-top: 2px !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 16px !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-detail,
+.aws-dashboard-detail-panel .member-dashboard-flow-status,
+.aws-dashboard-detail-panel .member-dashboard-flow-meta,
+.aws-dashboard-detail-panel .member-dashboard-flow-date,
+.aws-dashboard-detail-panel .member-dashboard-mobile-detail,
+.aws-dashboard-detail-panel .member-dashboard-mobile-status,
+.aws-dashboard-detail-panel .member-dashboard-mobile-meta,
+.aws-dashboard-detail-panel .member-dashboard-mobile-date {
+    min-height: 0 !important;
+    margin-top: 2px !important;
+    font-size: 11px !important;
+    line-height: 15px !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-legend {
+    margin: 0 !important;
+    border-top: 1px solid var(--aws-line) !important;
+    padding: 6px 10px !important;
+    gap: 6px 14px !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-legend-item {
+    gap: 4px !important;
+    color: var(--aws-muted) !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    line-height: 16px;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-flow-dot {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-mobile-step {
+    grid-template-columns: 26px minmax(0, 1fr) !important;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-mobile-step-number {
+    color: var(--aws-muted) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    line-height: 14px !important;
+    text-transform: uppercase;
+}
+
+.aws-dashboard-detail-panel .member-dashboard-mobile-line {
+    left: 8px !important;
+    width: 2px !important;
+}
+
+@media (max-width: 767px) {
+    .aws-status-summary-grid,
+    .aws-settings-control-row,
+    .aws-settings-grid,
+    .platform-settings-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .aws-status-summary-item + .aws-status-summary-item {
+        border-top: 1px solid var(--aws-line);
+        border-left: 0;
+    }
+
+    .aws-settings-footer .app-btn,
+    .platform-settings-actions .app-btn {
+        flex: 1 1 10rem;
+    }
+
+    .aws-detail-grid,
+    .member-dashboard-summary-row.aws-detail-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .aws-detail-grid .member-dashboard-summary-fact,
+    .aws-detail-grid .member-dashboard-summary-fact:nth-child(2n) {
+        border-right: 0 !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .aws-console *,
+    .aws-console *::before,
+    .aws-console *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+    }
 }

@@ -11,7 +11,7 @@ class MemberApplicationProgressJspLayoutTest {
     @Test
     void progressFragmentSupportsRejectedStageRendering() throws Exception {
         String fragment = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/member-application-progress.jspf"));
-        String styles = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/member-application-progress-styles.jspf"));
+        String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(fragment).contains("${step.metaClasses}");
         assertThat(styles).contains(".member-dashboard-flow-node--rejected");

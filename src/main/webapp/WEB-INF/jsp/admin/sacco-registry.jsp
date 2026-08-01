@@ -3,7 +3,6 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
 
 <spring:message code="admin.saccoRegistry.saccoRegistration" text="SACCO Registration" var="saccoRegistrationLabel" />
 <spring:message code="admin.saccoRegistry.stationRegistry" text="Station Registry" var="stationRegistryLabel" />
@@ -17,7 +16,7 @@
 <spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" var="saveChangesLabel" />
 <spring:message code="admin.saccoRegistry.saveStations" text="Save Stations" var="saveStationsLabel" />
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</p>
     <h1 class="erp-page-title">${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</h1>
     <p class="erp-page-subtitle">${superAdmin ? saccoRegistrationSubtitle : stationRegistrySubtitle}</p>
@@ -31,13 +30,13 @@
             </div>
             <c:if test="${superAdmin}">
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" class="app-btn btn-primary" data-sacco-modal-open="create-sacco"><spring:message code="admin.saccoRegistry.addSacco" text="Add SACCO" /></button>
+                    <button type="button" class="app-btn btn-launch" data-sacco-modal-open="create-sacco"><spring:message code="admin.saccoRegistry.addSacco" text="Add SACCO" /></button>
                 </div>
             </c:if>
         </div>
     </div>
     <div class="erp-panel-body">
-        <div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
             <table class="erp-table min-w-[680px]">
                 <thead>
                 <tr>

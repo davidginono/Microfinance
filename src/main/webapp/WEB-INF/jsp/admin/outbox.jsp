@@ -5,73 +5,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .admin-filter-bar {
-        align-items: flex-end;
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 0.75rem;
-        overflow-x: visible;
-        width: 100%;
-    }
-    .admin-filter-field {
-        flex: 1 1 0;
-        min-width: 0;
-        max-width: none;
-    }
-    .admin-filter-field--date {
-        flex: 0.85 1 0;
-    }
-    .admin-filter-field--loan {
-        flex: 1.05 1 0;
-    }
-    .admin-filter-field--rows {
-        flex: 0 0 9.5rem;
-    }
-    .admin-filter-field select,
-    .admin-filter-field input {
-        min-height: 2.75rem;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .admin-filter-field .neo-select-button {
-        min-height: 2.75rem;
-        padding: 0.62rem 0.75rem;
-    }
-    .admin-filter-field--rows .neo-select-button {
-        padding-left: 0.9rem;
-        padding-right: 0.9rem;
-    }
-    .admin-filter-field--rows .neo-select-button-text {
-        font-size: 0.9rem;
-    }
-    .admin-filter-field--rows-label {
-        white-space: nowrap;
-    }
-    .admin-filter-actions {
-        flex: 0 0 auto;
-        white-space: nowrap;
-    }
-    @media (max-width: 900px) {
-        .admin-filter-bar {
-            flex-wrap: wrap;
-            overflow-x: visible;
-        }
-        .admin-filter-field,
-        .admin-filter-field--date,
-        .admin-filter-field--loan,
-        .admin-filter-field--rows {
-            flex: 1 1 11rem;
-            max-width: none;
-        }
-        .admin-filter-actions {
-            flex: 1 1 auto;
-        }
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.outbox.breadcrumb" text="Admin Tools / Outbox Monitor" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.outbox.subtitle" text="Monitor event delivery and retries." /></p>
@@ -96,7 +31,7 @@
             </span>
         </div>
     </div>
-    <form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar">
+<form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 SACCO
@@ -149,7 +84,7 @@
         </div>
     </form>
 </section>
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor ID</th><th>Name</th></tr>

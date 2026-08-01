@@ -5,13 +5,13 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loanOfficer.reports.breadcrumb" text="Loan Officer Panel / Loan Reports" /></p>
     <h1 class="erp-page-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
     <p class="erp-page-subtitle"><spring:message code="loanOfficer.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then export the report when needed." /></p>
 </div>
 
-<form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4">
+<form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>
     <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.fromDate" text="From Date" /></label>
         <input type="date"
@@ -39,7 +39,7 @@
     </div>
 </form>
 
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>

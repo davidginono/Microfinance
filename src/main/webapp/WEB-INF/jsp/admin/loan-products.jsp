@@ -3,12 +3,12 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Loan Product Controls</p>
     <h1 class="erp-page-title">Loan Product Controls</h1>
     <p class="erp-page-subtitle">Maintain legacy product control values where needed without changing the core workflow implementation.</p>
 </div>
-<div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Loan Type</th><th>Current Guarantors</th><th>Current Ratio</th><th>Active</th><th>Update</th></tr>

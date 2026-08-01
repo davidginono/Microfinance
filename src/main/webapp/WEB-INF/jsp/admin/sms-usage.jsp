@@ -4,18 +4,8 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<style>
-    .sms-unit-control .neo-select-button,
-    .sms-filter-control .neo-select-button {
-        height: 3rem;
-        min-height: 3rem;
-        max-height: 3rem;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-    }
-</style>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SMS Usage</p>
     <h1 class="erp-page-title">SMS Usage</h1>
     <p class="erp-page-subtitle">Track prepaid SMS units by SACCO-station.</p>
@@ -33,7 +23,7 @@
                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                         <label class="sms-unit-control block text-sm font-semibold text-slate-700">
                             SACCO
-                            <select id="smsAllocationSacco" name="saccoId" required class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3" style="height:3rem;min-height:3rem;max-height:3rem;">
+                            <select id="smsAllocationSacco" name="saccoId" required class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3">
                                 <option value="">Select SACCO</option>
                                 <c:forEach items="${registeredSaccos}" var="sacco">
                                     <option value="${sacco.saccoId}" ${selectedSaccoId eq sacco.saccoId ? 'selected' : ''}>${sacco.saccoName}</option>
@@ -42,20 +32,20 @@
                         </label>
                         <label class="sms-unit-control block text-sm font-semibold text-slate-700">
                             Station ID
-                            <select id="smsAllocationStation" name="stationId" data-selected-station="${selectedStationId}" required class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3" style="height:3rem;min-height:3rem;max-height:3rem;">
+                            <select id="smsAllocationStation" name="stationId" data-selected-station="${selectedStationId}" required class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3">
                                 <option value="">Select a SACCO first</option>
                             </select>
                         </label>
                         <label class="block text-sm font-semibold text-slate-700">
                             Units
-                            <input type="number" name="units" min="1" required class="mt-1 w-full rounded-md border border-slate-300 px-3" style="height:3rem;min-height:3rem;max-height:3rem;" />
+                            <input type="number" name="units" min="1" required class="mt-1 w-full rounded-md border border-slate-300 px-3" />
                         </label>
                         <label class="block text-sm font-semibold text-slate-700">
                             Allocation Note
-                            <input name="note" maxlength="500" required class="mt-1 w-full rounded-md border border-slate-300 px-3" style="height:3rem;min-height:3rem;max-height:3rem;" />
+                            <input name="note" maxlength="500" required class="mt-1 w-full rounded-md border border-slate-300 px-3" />
                         </label>
                         <div class="sm:col-span-2 flex justify-end">
-                            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;max-height:3rem;">Add Units</button>
+                            <button type="submit" class="app-btn btn-launch">Add Units</button>
                         </div>
                     </form>
                 </div>
@@ -87,9 +77,9 @@
         <section class="erp-panel mt-5">
             <div class="erp-panel-header"><div><p class="erp-panel-title">Station SMS Balances</p></div></div>
             <div class="erp-panel-body">
-                <form method="get" action="/admin/sms-usage" class="relative mb-4 flex flex-row items-center gap-2 flex-wrap">
+<form method="get" action="/admin/sms-usage" class="relative mb-4 flex flex-row items-center gap-2 flex-wrap aws-filter-toolbar" data-aws-filter-toolbar>
                     <div class="sms-filter-control min-w-[12rem] flex-1">
-                        <select id="smsBalanceSacco" name="saccoId" class="w-full rounded-md border border-slate-300 bg-white px-3" style="height:3rem;min-height:3rem;max-height:3rem;">
+                        <select id="smsBalanceSacco" name="saccoId" class="w-full rounded-md border border-slate-300 bg-white px-3">
                             <option value="">All SACCOs</option>
                             <c:forEach items="${registeredSaccos}" var="sacco">
                                 <option value="${sacco.saccoId}" ${selectedSaccoId eq sacco.saccoId ? 'selected' : ''}>${sacco.saccoName}</option>
@@ -97,21 +87,21 @@
                         </select>
                     </div>
                     <div class="sms-filter-control min-w-[10rem] flex-1">
-                        <select id="smsBalanceStation" name="stationId" data-selected-station="${selectedStationId}" class="w-full rounded-md border border-slate-300 bg-white px-3" style="height:3rem;min-height:3rem;max-height:3rem;">
+                        <select id="smsBalanceStation" name="stationId" data-selected-station="${selectedStationId}" class="w-full rounded-md border border-slate-300 bg-white px-3">
                             <option value="">Select a SACCO first</option>
                         </select>
                     </div>
                     <div class="sms-filter-control min-w-[10rem] flex-1">
-                        <select name="status" class="w-full rounded-md border border-slate-300 bg-white px-3" style="height:3rem;min-height:3rem;max-height:3rem;">
+                        <select name="status" class="w-full rounded-md border border-slate-300 bg-white px-3">
                             <option value="">All statuses</option>
                             <c:forEach items="${smsStatuses}" var="item">
                                 <option value="${item}" ${selectedSmsStatus eq item.toString() ? 'selected' : ''}>${item}</option>
                             </c:forEach>
                         </select>
                     </div>
-                    <button type="submit" class="app-btn btn-neutral min-w-[9rem] justify-center" style="height:3rem;min-height:3rem;max-height:3rem;">Apply Filters</button>
+                    <button type="submit" class="app-btn btn-primary min-w-[9rem] justify-center">Apply Filters</button>
                 </form>
-                <div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr><th class="px-4 py-3">SACCO</th><th class="px-4 py-3">Station</th><th class="px-4 py-3">Available</th><th class="px-4 py-3">Alert Reserve</th><th class="px-4 py-3">Baseline</th><th class="px-4 py-3">Depleted Alerts Sent</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
@@ -183,7 +173,7 @@
         </div>
     </div>
     <div class="erp-panel-body">
-        <div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">First Seen</th><th class="px-4 py-3">Last Seen</th><th class="px-4 py-3">Event</th><th class="px-4 py-3">Outcome</th><th class="px-4 py-3">Count</th><th class="px-4 py-3">Unit Change</th><th class="px-4 py-3">Provider Reference</th><th class="px-4 py-3">Note</th></tr></thead>
             <tbody class="divide-y divide-slate-100 bg-white">

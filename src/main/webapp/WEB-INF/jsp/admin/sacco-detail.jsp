@@ -5,7 +5,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SACCOs / Detail</p>
     <h1 class="erp-page-title">${saccoDetail.summary.saccoName}</h1>
     <p class="erp-page-subtitle">Read-only platform view for ${saccoDetail.summary.saccoId}.</p>
@@ -15,11 +15,11 @@
     <div class="erp-panel-header">
         <p class="erp-panel-title">Station Scope</p>
     </div>
-    <form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end">
+<form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body flex flex-col gap-4 lg:flex-row lg:items-end aws-filter-toolbar" data-aws-filter-toolbar>
         <input type="hidden" name="section" value="${selectedSection}" />
         <label class="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Station
-            <select name="stationId" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;">
+            <select name="stationId" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800">
                 <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}>All stations</option>
                 <c:forEach items="${saccoDetail.stationOptions}" var="station">
                     <option value="${station}" ${saccoDetail.selectedStationId eq station ? 'selected' : ''}>${station}</option>
@@ -27,8 +27,8 @@
             </select>
         </label>
         <div class="flex flex-wrap gap-2 lg:justify-end">
-            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral px-5" style="height:3rem;min-height:3rem;">Reset</a>
-            <button type="submit" class="app-btn btn-primary px-5" style="height:3rem;min-height:3rem;">Apply Filter</button>
+            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral px-5">Reset</a>
+            <button type="submit" class="app-btn btn-primary px-5">Apply Filter</button>
         </div>
     </form>
 </section>
@@ -89,7 +89,7 @@
                             <form action="/admin/saccos/${saccoDetail.saccoId}/access/restore" method="post" class="flex flex-wrap justify-end gap-2">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
-                                <button type="submit" class="app-btn btn-primary justify-center px-5 sm:min-w-[12rem]" style="height:3rem;min-height:3rem;">Restore Access</button>
+                                <button type="submit" class="app-btn btn-primary justify-center px-5 sm:min-w-[12rem]">Restore Access</button>
                             </form>
                         </c:when>
                         <c:otherwise>
@@ -104,14 +104,14 @@
                                 <div class="relative flex flex-row items-center gap-2 flex-wrap">
                                     <label class="block min-w-[12rem] flex-[1_1_16rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                         Reason
-                                        <input name="reason" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" placeholder="Suspension reason" />
+                                        <input name="reason" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" placeholder="Suspension reason" />
                                     </label>
                                     <label class="block min-w-[11rem] flex-[0_1_12rem] text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                         Payment Due
-                                        <input name="paymentDueDate" type="date" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" style="height:3rem;min-height:3rem;" />
+                                        <input name="paymentDueDate" type="date" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 text-sm font-medium normal-case tracking-normal text-slate-800" />
                                     </label>
                                     <div class="flex shrink-0 items-center pt-5">
-                                        <button type="submit" class="app-btn btn-reject min-w-[12rem] justify-center px-5" style="height:3rem;min-height:3rem;">Suspend Access</button>
+                                        <button type="submit" class="app-btn btn-reject min-w-[12rem] justify-center px-5">Suspend Access</button>
                                     </div>
                                 </div>
                             </form>
@@ -177,7 +177,7 @@
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.overdueLoanCount}</p>
                     </div>
                 </div>
-                <div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
                     <table class="erp-table min-w-[760px]">
                         <thead>
                         <tr>
@@ -244,7 +244,7 @@
                             <span>Showing <span class="font-semibold text-slate-800">${memberSliceStart}-${memberSliceEnd}</span> of <span class="font-semibold text-slate-800">${memberTotal}</span> accounts</span>
                         </div>
                     </div>
-                    <form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3">
+<form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar>
                         <input type="hidden" name="section" value="members" />
                         <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
                         <label class="block min-w-[16rem] flex-[1_1_22rem]">
@@ -253,21 +253,20 @@
                                    name="memberQuery"
                                    value="${selectedMemberQuery}"
                                    class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
-                                   style="height:3rem;min-height:3rem;max-height:3rem;"
                                    placeholder="User ID, member number, or name"
                                    title="User ID, member number, or name" />
                         </label>
                         <label class="block min-w-[10rem] flex-[0_1_12rem]">
                             <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Rows Per Page</span>
-                            <select name="memberSize" class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
+                            <select name="memberSize" class="mt-2 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800">
                                 <option value="25" ${selectedMemberPageSize == 25 ? 'selected' : ''}>25 rows</option>
                                 <option value="50" ${selectedMemberPageSize == 50 ? 'selected' : ''}>50 rows</option>
                                 <option value="100" ${selectedMemberPageSize == 100 ? 'selected' : ''}>100 rows</option>
                             </select>
                         </label>
                         <div class="flex shrink-0 flex-wrap items-end gap-2">
-                            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Search</button>
-                            <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="app-btn btn-neutral" style="height:3rem;min-height:3rem;">Reset</a>
+                            <button type="submit" class="app-btn btn-primary">Search</button>
+                            <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="app-btn btn-neutral">Reset</a>
                         </div>
                     </form>
                 </div>

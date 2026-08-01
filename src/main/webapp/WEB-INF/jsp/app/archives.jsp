@@ -6,7 +6,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="archives.breadcrumb" text="Member Workspace / Archives" /></p>
     <h1 class="erp-page-title"><spring:message code="archives.title" text="Archives" /></h1>
 </div>
@@ -22,7 +22,7 @@
                     </div>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(guarantorArchives)} <spring:message code="common.shown" text="shown" /></span>
                 </div>
-                <form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
+<form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto] aws-filter-toolbar" data-aws-filter-toolbar>
                     <input type="hidden" name="section" value="guarantors" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="archives.loanIdSearch" text="Loan ID Search" /></span>
@@ -47,7 +47,7 @@
                     </div>
                 </form>
             </div>
-            <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
+<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -125,7 +125,7 @@
                     </div>
                 </form>
             </div>
-            <div class="erp-table-wrap erp-table-scroll border-0 shadow-none">
+<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
                 <table class="erp-table">
                     <thead>
                     <tr>

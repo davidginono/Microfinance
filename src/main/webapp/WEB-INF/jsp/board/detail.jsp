@@ -5,21 +5,10 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/loan-detail-styles.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/confirm-modal.jspf" %>
-<style>
-    @keyframes otp-pop {
-        0% { transform: translateY(4px) scale(0.82); opacity: 0; }
-        100% { transform: translateY(0) scale(1); opacity: 1; }
-    }
 
-    .otp-checkmark-pop {
-        animation: otp-pop 180ms ease-out;
-    }
-</style>
-
-<div class="erp-page-header flex flex-wrap items-start justify-between gap-3">
+<div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
     <div>
         <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
         <h1 class="erp-page-title">${reviewPanelTitle}</h1>
@@ -226,7 +215,7 @@
                     <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
                 </div>
             </div>
-            <div class="mt-5 erp-table-wrap overflow-x-auto">
+<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -278,7 +267,7 @@
         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewAssessorTitle}</p>
         <p class="mt-2 text-base text-slate-600">${reviewAssessorDescription}</p>
     </div>
-    <div class="mt-5 erp-table-wrap overflow-x-auto">
+<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
         <table class="erp-table">
             <thead>
             <tr>
@@ -316,7 +305,7 @@
                     <td class="px-3 py-2 text-slate-700">
                         <c:choose>
                             <c:when test="${not empty assessor.signatureText}">
-                                <div class="text-xl text-slate-900" style="font-family:'Brush Script MT','Segoe Script','Lucida Handwriting',cursive;">${assessor.signatureText}</div>
+                                <div class="aws-signature-text text-xl text-slate-900">${assessor.signatureText}</div>
                                 <c:if test="${not empty assessor.signatureVerifiedAt}">
                                     <div class="mt-1 text-xs text-slate-500">${fn:replace(fn:substring(assessor.signatureVerifiedAt, 0, 16), 'T', ' ')}</div>
                                 </c:if>

@@ -22,8 +22,278 @@
         if (!shellTopNav) {
             return;
         }
-        const measuredHeight = Math.max(Math.ceil(shellTopNav.getBoundingClientRect().height), 58);
+        const measuredHeight = Math.max(Math.ceil(shellTopNav.getBoundingClientRect().height), 38);
         document.documentElement.style.setProperty('--shell-nav-height', measuredHeight + 'px');
+    };
+    const createConsoleIcon = function (pathData) {
+        const namespace = 'http://www.w3.org/2000/svg';
+        const icon = document.createElementNS(namespace, 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '2');
+        icon.setAttribute('stroke-linecap', 'round');
+        icon.setAttribute('stroke-linejoin', 'round');
+        icon.setAttribute('aria-hidden', 'true');
+        pathData.forEach(function (definition) {
+            const path = document.createElementNS(namespace, 'path');
+            path.setAttribute('d', definition);
+            icon.appendChild(path);
+        });
+        return icon;
+    };
+    const initConsoleNavigationSearch = function () {
+        const search = document.getElementById('consoleNavigationSearch');
+        const sidebar = document.getElementById('appSidebar');
+        if (!search || !sidebar) {
+            return;
+        }
+        search.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+            event.preventDefault();
+            const query = search.value.trim().toLocaleLowerCase();
+            if (!query) {
+                return;
+            }
+            const destination = Array.from(sidebar.querySelectorAll('a[href]')).find(function (link) {
+                return !link.closest('[hidden]') && (link.textContent || '').trim().toLocaleLowerCase().includes(query);
+            });
+            if (destination) {
+                window.location.assign(destination.href);
+                return;
+            }
+            search.setCustomValidity('No matching navigation item was found.');
+            search.reportValidity();
+            window.setTimeout(function () {
+                search.setCustomValidity('');
+            }, 1800);
+        });
+    };
+    const initUppercaseInputs = function () {
+        document.querySelectorAll('[data-uppercase-input]').forEach(function (input) {
+            input.addEventListener('input', function () {
+                const selectionStart = input.selectionStart;
+                const selectionEnd = input.selectionEnd;
+                input.value = input.value.toLocaleUpperCase();
+                if (selectionStart !== null && selectionEnd !== null) {
+                    input.setSelectionRange(selectionStart, selectionEnd);
+                }
+            });
+        });
+    };
+    const enhanceConsolePagination = function () {
+        document.querySelectorAll('a.app-btn, button.app-btn, span.app-btn').forEach(function (control) {
+            const label = (control.textContent || '').trim().toLocaleLowerCase();
+            const isPrevious = label === 'previous';
+            const isNext = label === 'next';
+            if (!isPrevious && !isNext) {
+                return;
+            }
+            control.classList.add('app-icon-button', 'aws-pagination-chevron');
+            control.setAttribute('aria-label', isPrevious ? 'Previous page' : 'Next page');
+            control.textContent = '';
+            control.appendChild(createConsoleIcon([
+                isPrevious ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'
+            ]));
+        });
+    };
+    const resolveConsoleTableTitle = function (region, index) {
+        const table = region.querySelector('table');
+        const explicitLabel = region.getAttribute('aria-label')
+            || table?.getAttribute('aria-label')
+            || table?.querySelector('caption')?.textContent;
+        if (explicitLabel && explicitLabel.trim()) {
+            return explicitLabel.trim();
+        }
+        const panel = region.closest('.erp-panel, section');
+        const nearbyHeading = panel?.querySelector('.erp-panel-title, .erp-widget-heading, h2, h3');
+        if (nearbyHeading && nearbyHeading.textContent.trim()) {
+            return nearbyHeading.textContent.trim();
+        }
+        const pageTitle = document.querySelector('.erp-page-title')?.textContent.trim();
+        return pageTitle ? pageTitle + ' results' : 'Results ' + String(index + 1);
+    };
+    const isConsoleDownloadAction = function (control) {
+        if (!control) {
+            return false;
+        }
+        const label = (control.textContent || '').trim().toLocaleLowerCase();
+        const href = control.getAttribute?.('href') || '';
+        return control.getAttribute?.('data-download-action') === 'true'
+            || control.hasAttribute?.('download')
+            || /\.(pdf|xlsx?|csv|zip)(?:$|[?#])/i.test(href)
+            || /^(export|print|csv|pdf|excel|download)/.test(label);
+    };
+    const enhanceConsoleTables = function () {
+        const regions = Array.from(document.querySelectorAll('.erp-table-wrap')).filter(function (region) {
+            return region.querySelector('table');
+        });
+        regions.forEach(function (region, index) {
+            region.setAttribute('data-aws-table-region', '');
+            region.setAttribute('aria-busy', 'false');
+            let titlebar = region.querySelector(':scope > .app-table-titlebar');
+            if (!titlebar) {
+                titlebar = document.createElement('div');
+                titlebar.className = 'app-table-titlebar';
+                const heading = document.createElement('div');
+                heading.className = 'app-table-heading';
+                const title = document.createElement('h2');
+                title.textContent = resolveConsoleTableTitle(region, index);
+                const info = document.createElement('span');
+                info.textContent = 'Info';
+                heading.append(title, info);
+                const toolbar = document.createElement('div');
+                toolbar.className = 'app-table-toolbar';
+                if (region.getAttribute('data-aws-no-refresh') !== 'true') {
+                    const refresh = document.createElement('button');
+                    refresh.type = 'button';
+                    refresh.className = 'app-icon-button btn-neutral';
+                    refresh.setAttribute('aria-label', 'Refresh table');
+                    refresh.appendChild(createConsoleIcon([
+                        'M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5',
+                        'M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5'
+                    ]));
+                    refresh.addEventListener('click', function () {
+                        showConsoleTableLoading(refresh);
+                        window.location.reload();
+                    });
+                    toolbar.appendChild(refresh);
+                }
+                titlebar.append(heading, toolbar);
+                region.insertBefore(titlebar, region.firstChild);
+            }
+
+            const parentSurface = region.parentElement;
+            const filterCandidates = Array.from(document.querySelectorAll('form.aws-filter-toolbar')).filter(function (form) {
+                if (form.closest('.erp-table-wrap') || form.dataset.awsTableAssigned === 'true' || form.dataset.awsFilterPin === 'true') {
+                    return false;
+                }
+                if (parentSurface && parentSurface.contains(form)) {
+                    return true;
+                }
+                return Boolean(form.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING);
+            });
+            const filterForm = filterCandidates[filterCandidates.length - 1];
+            if (filterForm) {
+                const filterTabs = filterForm.parentElement?.querySelector(':scope > .erp-filter-row');
+                filterForm.dataset.awsTableAssigned = 'true';
+                titlebar.insertAdjacentElement('afterend', filterForm);
+                if (filterTabs && !filterTabs.closest('.erp-table-wrap')) {
+                    titlebar.insertAdjacentElement('afterend', filterTabs);
+                }
+            }
+        });
+
+        document.querySelectorAll('.aws-pagination-chevron').forEach(function (control) {
+            const precedingRegions = regions.filter(function (region) {
+                return Boolean(region.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
+            });
+            const region = precedingRegions[precedingRegions.length - 1];
+            const toolbar = region?.querySelector(':scope > .app-table-titlebar .app-table-toolbar');
+            if (toolbar) {
+                toolbar.appendChild(control);
+            }
+        });
+
+        const tableActions = Array.from(document.querySelectorAll('a.app-btn, button.app-btn')).filter(function (control) {
+            if (control.closest('.app-table-titlebar') || control.closest('.aws-filter-toolbar') || control.closest('[data-aws-action-pin="true"]')) {
+                return false;
+            }
+            return control.classList.contains('btn-launch')
+                || isConsoleDownloadAction(control);
+        });
+        tableActions.forEach(function (control) {
+            const followingRegion = regions.find(function (region) {
+                return Boolean(control.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING);
+            }) || regions[0];
+            const toolbar = followingRegion?.querySelector(':scope > .app-table-titlebar .app-table-toolbar');
+            if (toolbar) {
+                toolbar.appendChild(control);
+            }
+        });
+    };
+    const syncConsoleFiltersFromUrl = function () {
+        const query = new URLSearchParams(window.location.search);
+        document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
+            const actionPath = new URL(form.getAttribute('action') || window.location.href, window.location.href).pathname;
+            if (actionPath !== window.location.pathname) {
+                return;
+            }
+            form.querySelectorAll('[name]').forEach(function (field) {
+                const name = field.getAttribute('name');
+                if (!name || !query.has(name)) {
+                    return;
+                }
+                const values = query.getAll(name);
+                if (field.type === 'checkbox' || field.type === 'radio') {
+                    field.checked = values.includes(field.value);
+                } else if (field.tagName === 'SELECT' && field.multiple) {
+                    Array.from(field.options).forEach(function (option) {
+                        option.selected = values.includes(option.value);
+                    });
+                } else {
+                    field.value = values[values.length - 1] || '';
+                }
+            });
+        });
+    };
+    const clearConsoleTableLoading = function () {
+        document.querySelectorAll('.erp-table-wrap.is-loading').forEach(function (region) {
+            region.classList.remove('is-loading');
+            region.setAttribute('aria-busy', 'false');
+            region.querySelectorAll('.aws-table-loader').forEach(function (loader) {
+                loader.remove();
+            });
+        });
+    };
+    const showConsoleTableLoading = function (formOrControl) {
+        const nearbyRegion = formOrControl.closest('.erp-table-wrap')
+            || formOrControl.parentElement?.querySelector('.erp-table-wrap')
+            || document.querySelector('.erp-table-wrap');
+        if (!nearbyRegion || nearbyRegion.classList.contains('is-loading')) {
+            return;
+        }
+        nearbyRegion.classList.add('is-loading');
+        nearbyRegion.setAttribute('aria-busy', 'true');
+        const loader = document.createElement('div');
+        loader.className = 'aws-table-loader';
+        loader.setAttribute('role', 'status');
+        const spinner = document.createElement('span');
+        spinner.className = 'aws-table-loader__spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        label.textContent = nearbyRegion.getAttribute('data-loading-label') || 'Loading results...';
+        loader.append(spinner, label);
+        nearbyRegion.appendChild(loader);
+    };
+    const initConsoleTableLoading = function () {
+        clearConsoleTableLoading();
+        document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                showConsoleTableLoading(form);
+            });
+        });
+        document.querySelectorAll('.erp-table-wrap a[href], .erp-table-toolbar a[href], .aws-pagination-chevron[href]').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (isConsoleDownloadAction(link)) {
+                    clearConsoleTableLoading();
+                    return;
+                }
+                showConsoleTableLoading(link);
+            });
+        });
+        window.addEventListener('pagehide', clearConsoleTableLoading);
+        window.addEventListener('pageshow', function () {
+            clearConsoleTableLoading();
+            syncConsoleFiltersFromUrl();
+            window.requestAnimationFrame(clearConsoleTableLoading);
+        });
+        window.addEventListener('popstate', function () {
+            clearConsoleTableLoading();
+            syncConsoleFiltersFromUrl();
+        });
     };
     const resolveStickyTitleSource = function () {
         return document.querySelector('[data-sticky-title-source]') || document.querySelector('.erp-page-title');
@@ -267,7 +537,7 @@
         }
         const targetX = Math.max(Number(saved.x) || 0, 0);
         const targetY = Math.max(Number(saved.y) || 0, 0);
-        const behavior = isAdminWorkspace() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+        const behavior = !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
         const restore = function () {
             window.scrollTo({ left: targetX, top: targetY, behavior: behavior });
             restoreScrollablePositions(saved.containers, behavior);
@@ -986,6 +1256,12 @@
 
     window.addEventListener('load', function () {
         syncShellNavHeight();
+        initConsoleNavigationSearch();
+        initUppercaseInputs();
+        enhanceConsolePagination();
+        enhanceConsoleTables();
+        syncConsoleFiltersFromUrl();
+        initConsoleTableLoading();
         schedulePageTitleRailUpdate();
         applyPlaceholderTitles();
         document.querySelectorAll('[data-toast-message]').forEach(function (element) {

@@ -7,71 +7,16 @@
     <title>Sign-In Verification</title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <style>
-        body {
-            font-family: "Manrope", ui-sans-serif, system-ui;
-            background:
-                radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
-                linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
-            min-height: 100vh;
-        }
-
-        .mfa-card {
-            border-radius: 0.75rem;
-            border: 1px solid #d7e3ee;
-            background: #ffffff;
-            padding: 1.5rem;
-            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
-        }
-
-        .mfa-primary-btn {
-            border-radius: 0.85rem;
-            border: 1px solid #14b8c4;
-            background: #14b8c4;
-            color: #ffffff;
-            transition: background-color 160ms ease, transform 160ms ease;
-        }
-
-        .mfa-primary-btn:hover {
-            transform: translateY(-1px);
-            background: #0ea5b7;
-        }
-
-        .mfa-secondary-btn {
-            border-radius: 0.85rem;
-            border: 1px solid #d7e1ef;
-            background: #ffffff;
-            color: #12304d;
-            transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
-        }
-
-        .mfa-secondary-btn:hover {
-            transform: translateY(-1px);
-            border-color: #b8cfdd;
-            background: #f9fcff;
-        }
-
-        .mfa-primary-btn:disabled,
-        .mfa-secondary-btn:disabled {
-            cursor: not-allowed;
-            transform: none;
-            opacity: 0.7;
-        }
-
-        @media (min-width: 640px) {
-            .mfa-card {
-                padding: 2rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
 </head>
-<body class="text-slate-800">
+<body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
     <div class="mfa-card w-full max-w-xl">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sign-In Verification</p>
-            <h1 class="mt-2 text-2xl font-bold text-slate-900" style="font-family:'Sora',ui-sans-serif,system-ui;">Enter your verification code</h1>
+            <h1 class="mt-2 text-2xl font-bold text-slate-900">Enter your verification code</h1>
             <p class="mt-2 text-sm leading-6 text-slate-500">
                 <c:choose>
                     <c:when test="${not empty deliveryMessage}">

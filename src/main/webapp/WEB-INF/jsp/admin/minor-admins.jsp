@@ -4,30 +4,8 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
-<style>
-    [data-minor-admin-form] input,
-    [data-minor-admin-form] select,
-    [data-minor-admin-form] .app-btn {
-        height: 3rem;
-        min-height: 3rem;
-    }
 
-    [data-minor-admin-form] input,
-    [data-minor-admin-form] select {
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-
-    [data-minor-admin-form] .app-btn {
-        align-items: center;
-        justify-content: center;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-</style>
-
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / SACCO Registration / SACCOS Admins Registration" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.minorAdmins.title" text="SACCOS Admins Registration" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.minorAdmins.subtitle" text="Register SACCOS Admin accounts under the correct station." /></p>
@@ -88,7 +66,7 @@
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="member.fullName" text="Full Name" />
-                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -103,7 +81,7 @@
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3">
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="admin.minorAdmins.register" text="Register SACCOS Admin" /></button>
+                    <button type="submit" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.register" text="Register SACCOS Admin" /></button>
                 </div>
             </form>
         </div>
@@ -121,7 +99,7 @@
         </div>
     </div>
 
-    <div class="erp-table-wrap overflow-x-auto">
+<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
         <table class="erp-table min-w-[1120px]">
             <thead>
             <tr>
@@ -288,7 +266,7 @@
 
                     <label class="block text-sm font-semibold text-slate-700">
                         <spring:message code="member.fullName" text="Full Name" />
-                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm uppercase text-slate-800" value="${minorAdmin.fullName}" />
+                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm uppercase text-slate-800" value="${minorAdmin.fullName}" />
                     </label>
 
                     <label class="block text-sm font-semibold text-slate-700">

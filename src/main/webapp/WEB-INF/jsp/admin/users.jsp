@@ -3,39 +3,8 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<%@ include file="../fragments/modal-shell.jspf" %>
-<style>
-    .admin-filter-form input,
-    .admin-filter-form select,
-    .admin-filter-form .app-btn {
-        height: 3rem;
-        min-height: 3rem;
-        max-height: 3rem;
-    }
 
-    .admin-filter-form input,
-    .admin-filter-form select {
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-
-    .admin-filter-form .app-btn {
-        align-items: center;
-        justify-content: center;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-
-    .admin-created-user-id {
-        border: 1px solid #bbf7d0;
-        border-radius: 0.375rem;
-        background: #f0fdf4;
-        color: #166534;
-        padding: 0.75rem 0.9rem;
-    }
-</style>
-
-<div class="erp-page-header">
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage workspace access." /></p>
@@ -43,7 +12,7 @@
 
 <div class="erp-toolbar">
     <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Staff accounts only." /></div>
-    <button type="button" class="app-btn btn-primary" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
+    <button type="button" class="app-btn btn-launch" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
 </div>
 
 <c:if test="${not empty createdStaffUserId}">
@@ -74,10 +43,10 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6">
+<form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6 aws-filter-toolbar" data-aws-filter-toolbar>
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search By</span>
-            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
+            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800">
                 <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}>User ID</option>
                 <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}>Name</option>
             </select>
@@ -89,14 +58,13 @@
                    name="query"
                    value="${selectedUserQuery}"
                    class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
-                   style="height:3rem;min-height:3rem;max-height:3rem;"
                    placeholder="Enter selected User ID or name"
                    title="Enter selected User ID or name" />
         </label>
 
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Rows Per Page</span>
-            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800" style="height:3rem;min-height:3rem;max-height:3rem;">
+            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800">
                 <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
                 <option value="50" ${selectedPageSize == 50 ? 'selected' : ''}>50 rows</option>
                 <option value="100" ${selectedPageSize == 100 ? 'selected' : ''}>100 rows</option>
@@ -104,13 +72,13 @@
         </label>
 
         <div class="flex shrink-0 flex-wrap items-end gap-3">
-            <button type="submit" class="app-btn btn-primary" style="height:3rem;min-height:3rem;">Search</button>
-            <a href="/admin/users" class="app-btn btn-neutral" style="height:3rem;min-height:3rem;">Reset</a>
+            <button type="submit" class="app-btn btn-primary">Search</button>
+            <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
         </div>
     </form>
 </div>
 
-<div class="erp-table-wrap erp-table-scroll">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table min-w-[1420px]">
         <thead>
         <tr>
@@ -235,7 +203,7 @@
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Full Name
-                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.toUpperCase();" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -267,7 +235,7 @@
 
                 <div class="app-modal-actions md:col-span-2">
                     <button type="button" class="app-btn btn-neutral" data-user-modal-close="create-user">Cancel</button>
-                    <button type="submit" class="app-btn btn-primary">Create Staff Member</button>
+                    <button type="submit" class="app-btn btn-launch">Create Staff Member</button>
                 </div>
             </form>
         </div>

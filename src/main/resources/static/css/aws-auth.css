@@ -1,0 +1,409 @@
+:root {
+    --aws-ink: #16191f;
+    --aws-muted: #5f6b7a;
+    --aws-panel: #ffffff;
+    --aws-bg: #eaeded;
+    --aws-line: #d5dbdb;
+    --aws-line-dark: #879596;
+    --aws-blue: #0972d3;
+    --aws-orange: #ec7211;
+    --aws-success: #037f0c;
+    --aws-danger: #d13212;
+}
+
+html,
+body.aws-auth-shell {
+    min-height: 100%;
+    background: var(--aws-bg) !important;
+}
+
+body.aws-auth-shell {
+    margin: 0;
+    color: var(--aws-ink);
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+body.aws-auth-shell::before {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    box-sizing: border-box;
+    height: 38px;
+    border-bottom: 1px solid #414750;
+    background: var(--aws-ink);
+    color: #ffffff;
+    content: "SACCO Loan Management Console";
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 18px;
+}
+
+body.aws-auth-shell main,
+body.aws-auth-shell > .auth-page-shell,
+body.aws-auth-shell > .min-h-screen {
+    padding-top: 62px !important;
+    background: transparent !important;
+}
+
+body.aws-auth-shell .auth-layout,
+body.aws-auth-shell .auth-card,
+body.aws-auth-shell .auth-frame,
+body.aws-auth-shell .registration-card,
+body.aws-auth-shell .error-card,
+body.aws-auth-shell main > div,
+body.aws-auth-shell main > section {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: var(--aws-panel) !important;
+    box-shadow: 0 1px 1px rgba(0, 28, 36, 0.12) !important;
+}
+
+body.aws-auth-shell .auth-brand-panel,
+body.aws-auth-shell .auth-side-panel,
+body.aws-auth-shell [class*="from-"],
+body.aws-auth-shell [class*="gradient"] {
+    background: #f7f8f8 !important;
+    color: var(--aws-ink) !important;
+}
+
+body.aws-auth-shell h1,
+body.aws-auth-shell .auth-heading,
+body.aws-auth-shell .error-title {
+    margin-top: 0;
+    color: var(--aws-ink) !important;
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+}
+
+body.aws-auth-shell h2,
+body.aws-auth-shell h3 {
+    color: var(--aws-ink) !important;
+    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+}
+
+body.aws-auth-shell p,
+body.aws-auth-shell .auth-subtitle,
+body.aws-auth-shell .error-message {
+    color: var(--aws-muted);
+}
+
+body.aws-auth-shell label {
+    color: #414d5c !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    text-transform: uppercase;
+}
+
+body.aws-auth-shell input,
+body.aws-auth-shell select,
+body.aws-auth-shell textarea,
+body.aws-auth-shell .auth-field,
+body.aws-auth-shell .registration-field,
+body.aws-auth-shell .registration-select {
+    min-height: 31px !important;
+    height: 31px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+    box-shadow: none !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+    line-height: 29px !important;
+    padding: 0 8px !important;
+}
+
+body.aws-auth-shell input:focus,
+body.aws-auth-shell select:focus,
+body.aws-auth-shell textarea:focus {
+    border-color: var(--aws-blue) !important;
+    outline: 2px solid var(--aws-blue) !important;
+    outline-offset: 1px;
+    box-shadow: none !important;
+}
+
+body.aws-auth-shell button,
+body.aws-auth-shell a.auth-primary-btn,
+body.aws-auth-shell .registration-action,
+body.aws-auth-shell .mfa-primary-btn,
+body.aws-auth-shell .mfa-secondary-btn,
+body.aws-auth-shell .error-action {
+    min-height: 31px !important;
+    height: 31px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    box-shadow: none !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    padding: 0 10px !important;
+    transform: none !important;
+}
+
+body.aws-auth-shell .auth-primary-btn,
+body.aws-auth-shell .registration-primary,
+body.aws-auth-shell .mfa-primary-btn,
+body.aws-auth-shell button[type="submit"]:not(.auth-secondary-btn):not(.mfa-secondary-btn),
+body.aws-auth-shell .error-action {
+    border-color: #b65b0a !important;
+    background: var(--aws-orange) !important;
+    color: #ffffff !important;
+}
+
+body.aws-auth-shell .auth-primary-btn:hover,
+body.aws-auth-shell .registration-primary:hover,
+body.aws-auth-shell .mfa-primary-btn:hover,
+body.aws-auth-shell button[type="submit"]:not(.auth-secondary-btn):not(.mfa-secondary-btn):hover,
+body.aws-auth-shell .error-action:hover {
+    border-color: #8f4808 !important;
+    background: #eb5f07 !important;
+}
+
+body.aws-auth-shell .auth-secondary-btn,
+body.aws-auth-shell .mfa-secondary-btn,
+body.aws-auth-shell button[type="button"]:not(.auth-primary-btn):not(.registration-primary) {
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+}
+
+body.aws-auth-shell a {
+    color: var(--aws-blue);
+}
+
+body.aws-auth-shell [class*="rounded-"] {
+    border-radius: 2px !important;
+}
+
+body.aws-auth-shell [class*="shadow"] {
+    box-shadow: none !important;
+}
+
+body.aws-auth-shell [class*="bg-rose-"],
+body.aws-auth-shell [class*="bg-red-"] {
+    border-color: var(--aws-danger) !important;
+    background: #fff7f7 !important;
+    color: #7d2105 !important;
+}
+
+body.aws-auth-shell [class*="bg-emerald-"],
+body.aws-auth-shell [class*="bg-green-"] {
+    border-color: var(--aws-success) !important;
+    background: #f2fcf3 !important;
+    color: #033b07 !important;
+}
+
+body.aws-auth-shell .auth-tabs,
+body.aws-auth-shell [role="tablist"] {
+    display: flex;
+    width: 100%;
+    min-height: 34px;
+    border-bottom: 1px solid var(--aws-line);
+    background: #f2f3f3 !important;
+}
+
+body.aws-auth-shell .auth-tab {
+    flex: 1 1 50%;
+    height: 34px !important;
+    border: 0 !important;
+    border-right: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: #f2f3f3 !important;
+    color: #414d5c !important;
+}
+
+body.aws-auth-shell .auth-tab:last-child {
+    border-right: 0 !important;
+}
+
+body.aws-auth-shell .auth-mode-card {
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    padding: 10px !important;
+}
+
+body.aws-auth-shell [role="tab"][aria-selected="true"],
+body.aws-auth-shell .auth-tab.is-active {
+    border-bottom: 2px solid var(--aws-orange) !important;
+    background: #ffffff !important;
+    color: var(--aws-ink) !important;
+}
+
+body.aws-auth-shell [role="tabpanel"][hidden] {
+    display: none !important;
+}
+
+.auth-notification-rail {
+    position: fixed;
+    inset: 38px 0 auto;
+    z-index: 110;
+    display: flex;
+    width: 100%;
+    max-width: 100vw;
+    flex-direction: column;
+    pointer-events: none;
+}
+
+.auth-notification-bar {
+    position: relative;
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 32px;
+    align-items: center;
+    border: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, .2);
+    border-radius: 0 !important;
+    padding: 6px 12px;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    pointer-events: auto;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+.auth-notification-success { background: var(--aws-success) !important; }
+.auth-notification-error { background: var(--aws-danger) !important; }
+.auth-notification-info { background: var(--aws-blue) !important; }
+
+.auth-notification-bar p,
+.auth-notification-bar button,
+.auth-notification-bar svg {
+    color: #ffffff !important;
+}
+
+.auth-notification-bar .app-toast-close {
+    border-color: rgba(255, 255, 255, .45) !important;
+    background: transparent !important;
+}
+
+body.aws-auth-shell .auth-frame,
+body.aws-auth-shell .registration-card,
+body.aws-auth-shell .error-card,
+body.aws-auth-shell .forgot-password-dialog {
+    overflow: hidden;
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 1px rgba(0, 28, 36, .12) !important;
+}
+
+body.aws-auth-shell .forgot-password-dialog {
+    width: min(100%, 32rem);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+}
+
+body.aws-auth-shell .error-shell {
+    width: min(100% - 24px, 52rem);
+    margin: 0 auto;
+    padding: 74px 0 24px;
+}
+
+body.aws-auth-shell .error-card {
+    margin: 0;
+    padding: 0;
+}
+
+body.aws-auth-shell .error-status {
+    display: block;
+    margin: 0;
+    border-bottom: 1px solid var(--aws-line);
+    border-radius: 0 !important;
+    background: #eaeded !important;
+    padding: 9px 12px;
+    color: #414d5c !important;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+body.aws-auth-shell .error-title,
+body.aws-auth-shell .error-summary,
+body.aws-auth-shell .error-message,
+body.aws-auth-shell .error-meta,
+body.aws-auth-shell .error-actions {
+    margin-right: 12px;
+    margin-left: 12px;
+}
+
+body.aws-auth-shell .error-title { margin-top: 16px; }
+body.aws-auth-shell .error-summary { font-size: 14px; }
+body.aws-auth-shell .error-meta {
+    border: 1px solid var(--aws-line);
+    border-radius: 2px !important;
+    background: #f7f8f8;
+    padding: 8px 10px;
+}
+
+body.aws-auth-shell .error-actions {
+    justify-content: flex-end;
+    margin-bottom: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--aws-line);
+}
+
+body.aws-auth-shell .error-btn {
+    display: inline-flex;
+    height: 31px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--aws-line-dark);
+    border-radius: 2px !important;
+    background: #ffffff;
+    padding: 0 10px;
+    color: var(--aws-ink);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+body.aws-auth-shell .error-btn-primary {
+    border-color: #b65b0a;
+    background: var(--aws-orange);
+    color: #ffffff;
+}
+
+@media (max-width: 639px) {
+    body.aws-auth-shell::before {
+        padding-inline: 12px;
+        font-size: 12px;
+    }
+
+    body.aws-auth-shell main,
+    body.aws-auth-shell > .auth-page-shell,
+    body.aws-auth-shell > .min-h-screen {
+        align-items: flex-start !important;
+        padding: 54px 10px 16px !important;
+    }
+
+    body.aws-auth-shell .auth-layout,
+    body.aws-auth-shell .auth-card,
+    body.aws-auth-shell .auth-frame,
+    body.aws-auth-shell .registration-card,
+    body.aws-auth-shell .error-card,
+    body.aws-auth-shell main > div,
+    body.aws-auth-shell main > section {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.aws-auth-shell *,
+    body.aws-auth-shell *::before,
+    body.aws-auth-shell *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+    }
+}
