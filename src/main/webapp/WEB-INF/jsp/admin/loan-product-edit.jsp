@@ -8,8 +8,8 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Settings & Controls / Loan Products</p>
-    <h1 class="erp-page-title">Edit Loan Product</h1>
-    <p class="erp-page-subtitle">Update product rules using the same layout and validation as the Settings modal.</p>
+    <h1 class="erp-page-title">Configure <c:out value="${product.displayName}" /></h1>
+    <p class="erp-page-subtitle">Work through one section at a time. All changes are checked and saved together.</p>
 </div>
 
 <div class="mb-4 flex flex-wrap justify-between gap-3">
@@ -25,9 +25,56 @@
     </form>
 </div>
 
-<form action="/admin/settings-controls/${product.id}"
-                  method="post"
-                  class="product-builder-form"
+<div class="product-config-workspace"
+     data-product-config-workspace
+     data-product-config-storage-key="loan-product-config-${product.id}">
+    <aside class="product-config-workspace-nav" aria-label="Loan product configuration sections">
+        <div class="product-config-workspace-summary">
+            <p class="erp-widget-title">Selected loan product</p>
+            <h2><c:out value="${product.displayName}" /></h2>
+            <div class="product-config-workspace-meta">
+                <span><c:out value="${product.displayCode}" /></span>
+                <span class="product-config-status
+                    ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
+                    ${product.status eq 'DRAFT' ? 'bg-amber-50 text-amber-700' : ''}
+                    ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
+                    ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">${product.status}</span>
+            </div>
+            <p>Use the sections below to keep related decisions together.</p>
+        </div>
+        <div class="product-config-progress" aria-live="polite">
+            <span>Configuration progress</span>
+            <strong data-product-config-progress>Section 1 of 5</strong>
+        </div>
+        <nav class="product-config-step-nav">
+            <button type="button" data-product-config-nav="identity" aria-current="step">
+                <span class="product-config-step-number">1</span>
+                <span><strong>Product identity</strong><small>Name, order and status</small></span>
+            </button>
+            <button type="button" data-product-config-nav="eligibility">
+                <span class="product-config-step-number">2</span>
+                <span><strong>Eligibility</strong><small>Limits, tenure and savings</small></span>
+            </button>
+            <button type="button" data-product-config-nav="pricing">
+                <span class="product-config-step-number">3</span>
+                <span><strong>Repayment & charges</strong><small>Fees and interest method</small></span>
+            </button>
+            <button type="button" data-product-config-nav="workflow">
+                <span class="product-config-step-number">4</span>
+                <span><strong>Approval workflow</strong><small>Stages, reviewers and proof</small></span>
+            </button>
+            <button type="button" data-product-config-nav="preview">
+                <span class="product-config-step-number">5</span>
+                <span><strong>Review flow</strong><small>Confirm the resolved path</small></span>
+            </button>
+        </nav>
+        <p class="product-config-save-note">Nothing is saved until you select <strong>Save product</strong>.</p>
+    </aside>
+
+    <div class="product-config-workspace-main">
+        <form action="/admin/settings-controls/${product.id}"
+                   method="post"
+                   class="product-builder-form"
                   data-inline-validation-form="loan-settings"
                   data-product-workflow-builder="true"
                   data-product-edit-mode="true"
@@ -39,7 +86,8 @@
                   data-active-disbursement-officers="${activeDisbursementOfficerCount}"
                   data-active-disbursement-claim-holders="${activeDisbursementClaimHolderCount}"
                   data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
-                  data-tenant-board-enabled="${settings.boardReviewRequired}">
+                  data-tenant-board-enabled="${settings.boardReviewRequired}"
+                  data-product-config-form>
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <input type="hidden" name="modalKey" value="product-${product.id}" />
                 <input type="hidden" name="productCode" value="${fn:escapeXml(product.displayCode)}" data-product-code-field />
@@ -60,13 +108,20 @@
                     </div>
                 </c:if>
 
-                <section class="product-builder-section">
-                    <div class="product-builder-section-header">
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
-                        <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the member-facing name, display order, and status for this product." /></p>
-                    </div>
-                    <div class="product-builder-section-body product-identity-grid">
+                <section class="product-builder-section product-config-step is-active" data-product-config-step="identity">
+                    <button type="button"
+                            class="product-builder-section-header product-config-step-toggle"
+                            aria-expanded="true"
+                            aria-controls="product-config-identity"
+                            data-product-config-toggle>
+                        <span class="product-config-step-copy">
+                            <span class="erp-widget-title">01 · <spring:message code="admin.settings.loanProducts.basics" text="Basics" /></span>
+                            <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></span>
+                            <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the member-facing name, display order, and status for this product." /></span>
+                        </span>
+                        <span class="product-config-step-action" aria-hidden="true">Current</span>
+                    </button>
+                    <div id="product-config-identity" class="product-builder-section-body product-identity-grid" data-product-config-panel>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" />
                             <input name="displayOrder" type="number" min="1" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.resolvedDisplayOrder}" />
@@ -92,13 +147,20 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section">
-                    <div class="product-builder-section-header">
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></p>
-                        <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityHelp" text="Update loan limits and savings coverage for this product." /></p>
-                    </div>
-                    <div class="product-builder-section-body product-builder-grid two-up">
+                <section class="product-builder-section product-config-step" data-product-config-step="eligibility">
+                    <button type="button"
+                            class="product-builder-section-header product-config-step-toggle"
+                            aria-expanded="false"
+                            aria-controls="product-config-eligibility"
+                            data-product-config-toggle>
+                        <span class="product-config-step-copy">
+                            <span class="erp-widget-title">02 · <spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></span>
+                            <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></span>
+                            <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.eligibilityHelp" text="Update loan limits and savings coverage for this product." /></span>
+                        </span>
+                        <span class="product-config-step-action" aria-hidden="true">Open</span>
+                    </button>
+                    <div id="product-config-eligibility" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
                             <input name="minimumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.minimumAmount}" />
@@ -147,13 +209,20 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section">
-                    <div class="product-builder-section-header">
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></p>
-                        <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.repaymentChargesHelp" text="Update pricing, interest treatment, and repayment duration for this product." /></p>
-                    </div>
-                    <div class="product-builder-section-body product-builder-grid two-up">
+                <section class="product-builder-section product-config-step" data-product-config-step="pricing">
+                    <button type="button"
+                            class="product-builder-section-header product-config-step-toggle"
+                            aria-expanded="false"
+                            aria-controls="product-config-pricing"
+                            data-product-config-toggle>
+                        <span class="product-config-step-copy">
+                            <span class="erp-widget-title">03 · <spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></span>
+                            <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></span>
+                            <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.repaymentChargesHelp" text="Update pricing, interest treatment, and repayment duration for this product." /></span>
+                        </span>
+                        <span class="product-config-step-action" aria-hidden="true">Open</span>
+                    </button>
+                    <div id="product-config-pricing" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
                             <input name="applicationFee" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee}" />
@@ -184,13 +253,20 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section">
-                    <div class="product-builder-section-header">
-                        <p class="erp-widget-title"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
-                        <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.subtitle" text="Configure the approval path for this loan product." /></p>
-                    </div>
-                    <div class="product-builder-section-body">
+                <section class="product-builder-section product-config-step" data-product-config-step="workflow">
+                    <button type="button"
+                            class="product-builder-section-header product-config-step-toggle"
+                            aria-expanded="false"
+                            aria-controls="product-config-workflow"
+                            data-product-config-toggle>
+                        <span class="product-config-step-copy">
+                            <span class="erp-widget-title">04 · <spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></span>
+                            <span class="product-config-step-title"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></span>
+                            <span class="product-config-step-description"><spring:message code="admin.settings.workflow.subtitle" text="Configure the approval path for this loan product." /></span>
+                        </span>
+                        <span class="product-config-step-action" aria-hidden="true">Open</span>
+                    </button>
+                    <div id="product-config-workflow" class="product-builder-section-body" data-product-config-panel hidden>
                         <div class="workflow-subsection">
                             <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></p>
                             <div class="workflow-table">
@@ -473,13 +549,20 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section">
-                    <div class="product-builder-section-header">
-                        <p class="erp-widget-title"><spring:message code="admin.settings.workflow.preview" text="Preview" /></p>
-                        <h3 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.resolvedFlow" text="Resolved Flow" /></h3>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.resolvedFlowHelp" text="The runtime path below reflects what the system would execute with current tenant settings." /></p>
-                    </div>
-                    <div class="product-builder-section-body">
+                <section class="product-builder-section product-config-step" data-product-config-step="preview">
+                    <button type="button"
+                            class="product-builder-section-header product-config-step-toggle"
+                            aria-expanded="false"
+                            aria-controls="product-config-preview"
+                            data-product-config-toggle>
+                        <span class="product-config-step-copy">
+                            <span class="erp-widget-title">05 · <spring:message code="admin.settings.workflow.preview" text="Preview" /></span>
+                            <span class="product-config-step-title"><spring:message code="admin.settings.workflow.resolvedFlow" text="Resolved Flow" /></span>
+                            <span class="product-config-step-description"><spring:message code="admin.settings.workflow.resolvedFlowHelp" text="The runtime path below reflects what the system would execute with current tenant settings." /></span>
+                        </span>
+                        <span class="product-config-step-action" aria-hidden="true">Open</span>
+                    </button>
+                    <div id="product-config-preview" class="product-builder-section-body" data-product-config-panel hidden>
                         <div class="workflow-preview-shell">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
                             <div class="mt-3 workflow-preview-runtime" data-workflow-preview-runtime></div>
@@ -487,11 +570,19 @@
                     </div>
                 </section>
 
-                <div class="flex flex-wrap justify-end gap-3">
-                    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
-                    <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
+                <div class="product-config-actionbar">
+                    <div class="product-config-section-actions" aria-label="Configuration section navigation">
+                        <button type="button" class="app-btn btn-neutral" data-product-config-previous disabled>Previous section</button>
+                        <button type="button" class="app-btn btn-neutral" data-product-config-next>Next section</button>
+                    </div>
+                    <div class="product-config-save-actions">
+                        <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
+                        <button type="submit" class="app-btn btn-primary">Save product</button>
+                    </div>
                 </div>
-</form>
+        </form>
+    </div>
+</div>
 
 <form id="requiredAttachmentCreateForm" action="/admin/settings-controls/loan-products/${product.id}/required-attachments" method="post" class="hidden">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />

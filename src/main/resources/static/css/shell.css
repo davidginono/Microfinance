@@ -2214,6 +2214,24 @@ body.aws-console {
     min-height: 31px !important;
 }
 
+.aws-console .product-config-step-nav button {
+    min-height: 0;
+    padding: 0.7rem 0.75rem !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: normal;
+    white-space: normal;
+}
+
+.aws-console .product-config-step-toggle {
+    min-height: 0;
+    padding: 0.95rem 1rem 0.85rem !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: normal;
+    white-space: normal;
+}
+
 .aws-console input:focus,
 .aws-console select:focus,
 .aws-console textarea:focus,

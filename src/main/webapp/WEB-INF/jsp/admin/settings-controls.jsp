@@ -240,36 +240,44 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
-    <div class="mb-4 flex flex-wrap justify-end gap-3">
-        <c:if test="${not empty loanProductsVersions}">
-            <button type="button"
-                    class="app-btn btn-neutral"
-                    data-product-modal-open="loan-products-versions">
-                <spring:message code="admin.settings.loanProducts.versions" text="Loan Products Versions" />
-            </button>
-        </c:if>
-        <button type="button"
-                class="app-btn btn-primary"
-                data-product-modal-open="create-product">
-            <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
-        </button>
-    </div>
+    <section class="product-catalog" aria-labelledby="loan-product-catalog-title">
+        <div class="product-catalog-toolbar">
+            <div class="product-catalog-heading">
+                <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.single" text="Loan Products" /></p>
+                <h2 id="loan-product-catalog-title">Choose a product to configure</h2>
+                <p>Compare the essential rules, then open one product in its focused configuration workspace.</p>
+            </div>
+            <div class="product-catalog-actions">
+                <c:if test="${not empty loanProductsVersions}">
+                    <button type="button"
+                            class="app-btn btn-neutral"
+                            data-product-modal-open="loan-products-versions">
+                        <spring:message code="admin.settings.loanProducts.versions" text="Loan Products Versions" />
+                    </button>
+                </c:if>
+                <button type="button"
+                        class="app-btn btn-primary"
+                        data-product-modal-open="create-product">
+                    <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
+                </button>
+            </div>
+        </div>
 
-    <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+        <div class="product-catalog-grid">
         <c:forEach items="${products}" var="product">
             <c:set var="productManagerEnabled" value="${product.managerReviewRequired != false}" />
             <c:set var="productLoanOfficerEnabled"
                    value="${product.loanOfficerReviewRequired == true || (product.loanOfficerReviewRequired == null && settings.loanOfficerReviewRequired)}" />
             <c:set var="productWorkflowStartStage"><c:out value="${product.resolvedWorkflowStartStage}" /></c:set>
-            <section class="erp-panel overflow-hidden">
-                <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
+            <article class="erp-panel product-config-card" data-product-config-card>
+                <div class="product-config-card-header">
+                    <div class="product-config-card-heading">
                         <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.single" text="Loan Product" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><c:out value="${product.displayDescription}" /></p>
+                        <h3><c:out value="${product.displayName}" /></h3>
+                        <p class="product-config-card-description"><c:out value="${product.displayDescription}" /></p>
                     </div>
-                    <div class="flex items-center gap-2 sm:pt-1">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                    <div class="product-config-card-actions">
+                        <span class="product-config-status
                             ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
                             ${product.status eq 'DRAFT' ? 'bg-amber-50 text-amber-700' : ''}
                             ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
@@ -283,12 +291,14 @@
                         </button>
                         <a class="app-btn btn-primary"
                            href="/admin/settings-controls/loan-products/${product.id}/edit">
-                            <spring:message code="common.edit" text="Edit" />
+                            Configure
                         </a>
                     </div>
                 </div>
 
-                <div class="divide-y divide-slate-200">
+                <div id="product-card-details-${product.id}"
+                     class="product-config-card-details divide-y divide-slate-200"
+                     data-product-card-details>
                     <div class="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <div>
                             <p class="text-sm font-semibold text-sacco-ink"><spring:message code="admin.settings.loanProducts.displayOrder" text="Display Order" /></p>
@@ -473,9 +483,22 @@
                         </p>
                     </div>
                 </div>
-            </section>
+                <div class="product-config-card-footer">
+                    <button type="button"
+                            class="app-btn btn-link product-config-card-toggle"
+                            aria-expanded="false"
+                            aria-controls="product-card-details-${product.id}"
+                            data-product-card-toggle>
+                        <span data-product-card-toggle-label>See more</span>
+                        <svg aria-hidden="true" viewBox="0 0 20 20" class="product-config-card-toggle-icon">
+                            <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+                        </svg>
+                    </button>
+                </div>
+            </article>
         </c:forEach>
-    </div>
+        </div>
+    </section>
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">

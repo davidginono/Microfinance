@@ -201,6 +201,42 @@ class AwsConsoleViewContractTest {
             .contains("border-radius: 2px");
     }
 
+    @Test
+    void adminLoanProductsUseCatalogSelectionAndProgressiveConfiguration() throws Exception {
+        String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
+        String productEdit = read(JSP_ROOT.resolve("admin/loan-product-edit.jsp"));
+        String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+
+        assertThat(settings)
+            .contains("product-catalog-grid")
+            .contains("data-product-config-card")
+            .contains("data-product-card-toggle")
+            .contains("See more")
+            .contains("/admin/settings-controls/loan-products/${product.id}/edit")
+            .contains("Configure");
+        assertThat(productEdit)
+            .contains("data-product-config-workspace")
+            .contains("data-product-config-nav=\"identity\"")
+            .contains("data-product-config-nav=\"preview\"")
+            .contains("data-product-config-step=\"workflow\"")
+            .contains("data-product-config-panel hidden")
+            .contains("data-product-config-previous")
+            .contains("data-product-config-next")
+            .contains("Save product")
+            .contains("action=\"/admin/settings-controls/${product.id}\"");
+        assertThat(workflowScript)
+            .contains("activateStep")
+            .contains("form.addEventListener('invalid'")
+            .contains("window.sessionStorage.setItem(storageKey")
+            .contains("expanded ? 'Show less' : 'See more'");
+        assertThat(consoleCss)
+            .contains(".product-catalog-grid")
+            .contains(".product-config-workspace")
+            .contains(".product-config-step.is-active")
+            .contains(".product-config-actionbar");
+    }
+
     private static List<Path> routeViews() throws IOException {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             return paths

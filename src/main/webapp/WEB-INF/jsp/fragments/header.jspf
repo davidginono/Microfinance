@@ -11,8 +11,8 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v3' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260801-aws-console-v7' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260803-loan-product-workspace-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260803-loan-product-workspace-v1' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
