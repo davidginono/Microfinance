@@ -81,6 +81,9 @@
             const block = document.createElement('div');
             block.className = 'workflow-warning is-' + tone;
             block.textContent = message;
+            block.hidden = true;
+            block.setAttribute('data-toast-message', message);
+            block.setAttribute('data-toast-type', tone === 'danger' ? 'error' : 'info');
             return block;
         }
 
@@ -399,6 +402,7 @@
             const savingsLimitCheckInput = form.querySelector('[data-savings-limit-check]');
             const savingsMultiplierControl = form.querySelector('.savings-multiplier-control');
             let syncingSavingsRatio = false;
+            const publishedWorkflowWarnings = new Set();
 
             if (!committeeToggle || !warningsRoot || !runtimeRoot) {
                 return;
@@ -731,6 +735,18 @@
 
                 warningsRoot.innerHTML = '';
                 warnings.forEach((warning) => warningsRoot.appendChild(warning));
+                warnings.forEach((warning) => {
+                    const message = warning.textContent.trim();
+                    const toastType = warning.getAttribute('data-toast-type') || 'info';
+                    const warningKey = toastType + ':' + message;
+                    if (!message || publishedWorkflowWarnings.has(warningKey)) {
+                        return;
+                    }
+                    publishedWorkflowWarnings.add(warningKey);
+                    if (typeof window.showToast === 'function') {
+                        window.showToast(toastType, message, { duration: toastType === 'error' ? 9000 : 6500 });
+                    }
+                });
 
                 const runtimeLabels = [productSettingsText.runtimeMember];
                 if (loadedFinancialRequired) {
@@ -970,6 +986,11 @@
                 }
                 event.preventDefault();
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
+                [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('error', message, { duration: 9000 });
+                    }
+                });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];
                 revealFieldErrorTarget(firstTarget);
             });
@@ -997,6 +1018,11 @@
                 }
                 event.preventDefault();
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
+                [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('error', message, { duration: 9000 });
+                    }
+                });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];
                 revealFieldErrorTarget(firstTarget);
             });

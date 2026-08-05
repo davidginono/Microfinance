@@ -11,27 +11,18 @@
     <h1 class="erp-page-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.outbox.subtitle" text="Monitor event delivery and retries." /></p>
 </div>
-<section class="erp-form-wrap mb-4">
-    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <p class="erp-panel-title"><spring:message code="common.filterViewOptions" text="Filter And View Options" /></p>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.outbox.filterHelp" text="Filter the period, then page the results." /></p>
-        </div>
-        <div class="inline-flex flex-wrap items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
-            <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700"><spring:message code="common.currentSlice" text="Current Slice" /></span>
-            <span>
-                <spring:message code="common.showing" text="Showing" />
-                <span class="font-semibold text-slate-800">
-                    <c:choose>
-                        <c:when test="${eventsPage.totalElements eq 0}">0</c:when>
-                        <c:otherwise>${eventsPage.number * eventsPage.size + 1}-${eventsPage.number * eventsPage.size + fn:length(events)}</c:otherwise>
-                    </c:choose>
-                </span>
-                <spring:message code="common.of" text="of" /> <span class="font-semibold text-slate-800">${eventsPage.totalElements}</span> <spring:message code="admin.outbox.eventsLabel" text="outbox events" />
+<section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading"><h2>Outbox Monitor results</h2><span>Info</span></div>
+        <div class="app-table-toolbar">
+            <span class="admin-register-count"><spring:message code="common.showing" text="Showing" />
+                <c:choose><c:when test="${eventsPage.totalElements eq 0}">0</c:when><c:otherwise>${eventsPage.number * eventsPage.size + 1}-${eventsPage.number * eventsPage.size + fn:length(events)}</c:otherwise></c:choose>
+                <spring:message code="common.of" text="of" /> ${eventsPage.totalElements}
             </span>
+            <a href="/admin/outbox" class="app-icon-button" aria-label="Refresh outbox monitor" title="Refresh outbox monitor">&#8635;</a>
         </div>
     </div>
-<form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
+    <form action="/admin/outbox" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 SACCO
@@ -83,8 +74,7 @@
             <a href="/admin/outbox" class="app-btn btn-neutral">Reset</a>
         </div>
     </form>
-</section>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr><th>Event Type</th><th>Aggregate</th><th>Status</th><th>Created</th><th>Actor ID</th><th>Name</th></tr>
@@ -117,7 +107,8 @@
         </c:if>
         </tbody>
     </table>
-</div>
+    </div>
+</section>
 <c:if test="${eventsPage.totalPages gt 1}">
     <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm text-slate-600">Page <span class="font-semibold text-slate-800">${eventsPage.number + 1}</span> of <span class="font-semibold text-slate-800">${eventsPage.totalPages}</span></p>

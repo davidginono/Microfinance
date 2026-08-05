@@ -28,7 +28,7 @@
 <div class="product-config-workspace"
      data-product-config-workspace
      data-product-config-storage-key="loan-product-config-${product.id}">
-    <aside class="product-config-workspace-nav" aria-label="Loan product configuration sections">
+    <section class="product-config-workspace-nav" aria-label="Loan product configuration sections">
         <div class="product-config-workspace-summary">
             <p class="erp-widget-title">Selected product</p>
             <h2><c:out value="${product.displayName}" /></h2>
@@ -40,7 +40,7 @@
                     ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
                     ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">${product.status}</span>
             </div>
-            <p>Select a section below. Only that section will be shown in the workspace.</p>
+            <p>Choose a section, complete its settings, then continue to the next section.</p>
         </div>
         <div class="product-config-progress" aria-live="polite">
             <div>
@@ -72,7 +72,7 @@
             </button>
         </nav>
         <p class="product-config-save-note">Nothing is saved until you select <strong>Save product</strong>.</p>
-    </aside>
+    </section>
 
     <div class="product-config-workspace-main">
         <form action="/admin/settings-controls/${product.id}"
@@ -99,15 +99,16 @@
                 <c:set var="productModalKey" value="product-${product.id}" />
 
                 <c:if test="${openProductModalKey eq productModalKey and not empty message}">
-                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
+                    <span hidden data-toast-message="${fn:escapeXml(message)}" data-toast-type="success"></span>
                 </c:if>
                 <c:if test="${openProductModalKey eq productModalKey and not empty error}">
-                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
+                    <span hidden data-toast-message="${fn:escapeXml(error)}" data-toast-type="error"></span>
                 </c:if>
                 <c:if test="${openProductModalKey eq productModalKey and not empty loanSettingsFieldErrors}">
                     <div hidden data-modal-server-errors>
                         <c:forEach items="${loanSettingsFieldErrors}" var="fieldError">
                             <div data-modal-field-error="${fieldError.key}"><c:out value="${fieldError.value}" /></div>
+                            <span data-toast-message="${fn:escapeXml(fieldError.value)}" data-toast-type="error"></span>
                         </c:forEach>
                     </div>
                 </c:if>
@@ -119,7 +120,7 @@
                             aria-controls="product-config-identity"
                             data-product-config-toggle>
                         <span class="product-config-step-copy">
-                            <span class="erp-widget-title">01 · <spring:message code="admin.settings.loanProducts.basics" text="Basics" /></span>
+                            <span class="erp-widget-title">01 &middot; <spring:message code="admin.settings.loanProducts.basics" text="Basics" /></span>
                             <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></span>
                             <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.identityHelp" text="Update the member-facing name, display order, and status for this product." /></span>
                         </span>
@@ -158,7 +159,7 @@
                             aria-controls="product-config-eligibility"
                             data-product-config-toggle>
                         <span class="product-config-step-copy">
-                            <span class="erp-widget-title">02 · <spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></span>
+                            <span class="erp-widget-title">02 &middot; <spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></span>
                             <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></span>
                             <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.eligibilityHelp" text="Update loan limits and savings coverage for this product." /></span>
                         </span>
@@ -220,7 +221,7 @@
                             aria-controls="product-config-pricing"
                             data-product-config-toggle>
                         <span class="product-config-step-copy">
-                            <span class="erp-widget-title">03 · <spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></span>
+                            <span class="erp-widget-title">03 &middot; <spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></span>
                             <span class="product-config-step-title"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></span>
                             <span class="product-config-step-description"><spring:message code="admin.settings.loanProducts.repaymentChargesHelp" text="Update pricing, interest treatment, and repayment duration for this product." /></span>
                         </span>
@@ -264,7 +265,7 @@
                             aria-controls="product-config-workflow"
                             data-product-config-toggle>
                         <span class="product-config-step-copy">
-                            <span class="erp-widget-title">04 · <spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></span>
+                            <span class="erp-widget-title">04 &middot; <spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></span>
                             <span class="product-config-step-title"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></span>
                             <span class="product-config-step-description"><spring:message code="admin.settings.workflow.subtitle" text="Configure the approval path for this loan product." /></span>
                         </span>
@@ -277,8 +278,8 @@
                             <div class="workflow-table">
                                 <div class="workflow-table-head">
                                     <div><spring:message code="admin.settings.workflow.stage" text="Stage" /></div>
-                                    <div><spring:message code="admin.settings.workflow.required" text="Required" /></div>
-                                    <div><spring:message code="admin.settings.workflow.priority" text="Priority" /></div>
+                                    <div><spring:message code="admin.settings.workflow.required" text="Included" /></div>
+                                    <div><spring:message code="admin.settings.workflow.priority" text="Order" /></div>
                                     <div><spring:message code="admin.settings.workflow.notes" text="Notes" /></div>
                                 </div>
                                 <div class="workflow-table-row">
@@ -561,7 +562,7 @@
                         <details class="workflow-subsection product-config-subsection" open>
                             <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></summary>
                             <div class="product-config-subsection-body">
-                            <div class="workflow-warning-stack mt-4" data-workflow-warnings></div>
+                            <div class="workflow-warning-stack" data-workflow-warnings hidden aria-hidden="true"></div>
                             </div>
                         </details>
                     </div>
@@ -574,7 +575,7 @@
                             aria-controls="product-config-preview"
                             data-product-config-toggle>
                         <span class="product-config-step-copy">
-                            <span class="erp-widget-title">05 · <spring:message code="admin.settings.workflow.preview" text="Preview" /></span>
+                            <span class="erp-widget-title">05 &middot; <spring:message code="admin.settings.workflow.preview" text="Preview" /></span>
                             <span class="product-config-step-title"><spring:message code="admin.settings.workflow.resolvedFlow" text="Resolved Flow" /></span>
                             <span class="product-config-step-description"><spring:message code="admin.settings.workflow.resolvedFlowHelp" text="The runtime path below reflects what the system would execute with current tenant settings." /></span>
                         </span>

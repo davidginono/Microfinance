@@ -1439,6 +1439,113 @@ button:active {
         --shell-content-max: 1760px;
     }
 }
+
+/* SIMS-aligned AWS shell structure, global loader, and register containment. */
+:root {
+    --shell-context-height: 36px;
+}
+
+.app-topbar-inner {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+}
+
+.app-topbar-left {
+    min-width: 0;
+}
+
+.app-topbar-actions {
+    border-left: 1px solid #414750;
+    padding-left: 10px;
+}
+
+.shell-sidebar-toggle-row {
+    min-height: var(--shell-context-height) !important;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    border-radius: 0 !important;
+}
+
+.shell-page-title-rail {
+    pointer-events: none;
+}
+
+.shell-page-title-rail__text {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+    white-space: nowrap !important;
+}
+
+.shell-page-title-rail__text strong {
+    flex: 0 0 auto;
+    color: var(--aws-ink);
+}
+
+.shell-page-title-rail__path {
+    min-width: 0;
+    overflow: hidden;
+    color: #414d5c;
+    font-weight: 400;
+    text-overflow: ellipsis;
+}
+
+.page-submit-preloader__spinner {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+}
+
+.page-submit-preloader__ring {
+    border-color: transparent !important;
+    border-top-color: var(--aws-blue) !important;
+}
+
+.page-submit-preloader__ring:nth-child(2) {
+    display: block !important;
+    inset: .38rem;
+    border-top-color: var(--aws-orange) !important;
+    animation-duration: .9s;
+    animation-direction: reverse;
+}
+
+.page-submit-preloader__ring:nth-child(3) {
+    display: block !important;
+    inset: .76rem;
+    border-top-color: var(--aws-success) !important;
+    animation-duration: .62s;
+}
+
+.erp-table-wrap.erp-table-scroll,
+.erp-table-wrap > .erp-table-scroll {
+    overflow: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable both-edges;
+}
+
+.admin-register-shell {
+    overflow: hidden !important;
+}
+
+.admin-register-shell > .aws-filter-toolbar {
+    margin: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 767px) {
+    .app-topbar-actions {
+        border-left: 0;
+        padding-left: 0;
+    }
+
+    .shell-page-title-rail__path {
+        display: none;
+    }
+}
 @media (min-width: 3840px) {
     :root {
         --shell-sidebar-width: 296px;
@@ -3896,5 +4003,37 @@ body.aws-console,
         scroll-behavior: auto !important;
         transition-duration: .01ms !important;
         animation-duration: .01ms !important;
+    }
+}
+
+/* Final shell geometry intentionally follows the shared header and sidebar markup. */
+.shell-page-title-rail__inner {
+    min-height: var(--shell-context-height) !important;
+    margin-right: 0 !important;
+    border-right: 0 !important;
+    border-left: 0 !important;
+    background: #ffffff !important;
+    padding: 7px 12px !important;
+}
+
+.shell-main {
+    padding-top: calc(var(--shell-context-height) + 10px) !important;
+}
+
+.admin-register-count {
+    color: var(--aws-muted);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+    .shell-main {
+        padding-right: 12px !important;
+        padding-left: calc(var(--shell-sidebar-width) + 12px) !important;
+    }
+
+    .shell-sidebar-collapsed .shell-main {
+        padding-left: calc(var(--shell-sidebar-collapsed-width) + 12px) !important;
     }
 }

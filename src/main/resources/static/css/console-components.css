@@ -5693,15 +5693,18 @@ html.session-timeout-active,
 
 .product-config-workspace {
     display: grid;
-    grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: 1.25rem;
+    gap: 0.75rem;
     min-width: 0;
 }
 
 .product-config-workspace-nav {
     position: sticky;
-    top: calc(var(--shell-nav-height, 52px) + 2.5rem);
+    top: calc(var(--shell-nav-height, 52px) + var(--shell-context-height, 36px));
+    z-index: 12;
+    display: grid;
+    grid-template-columns: minmax(14rem, .8fr) minmax(13rem, .55fr);
     min-width: 0;
     overflow: hidden;
     border: 1px solid #d5dbdb;
@@ -5711,7 +5714,9 @@ html.session-timeout-active,
 }
 
 .product-config-workspace-summary {
-    padding: 1.1rem 1.15rem;
+    min-width: 0;
+    padding: 0.75rem 0.9rem;
+    border-right: 1px solid #d5dbdb;
     border-bottom: 1px solid #d5dbdb;
     background: #ffffff;
 }
@@ -5727,7 +5732,7 @@ html.session-timeout-active,
 
 .product-config-workspace-summary > p:last-child,
 .product-config-save-note {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     color: #5f6b7a;
     font-size: 0.8125rem;
     line-height: 1.5;
@@ -5747,7 +5752,8 @@ html.session-timeout-active,
 .product-config-progress {
     display: grid;
     gap: 0.55rem;
-    padding: 0.8rem 0.9rem;
+    align-content: center;
+    padding: 0.65rem 0.9rem;
     border-bottom: 1px solid #eaeded;
     color: #5f6b7a;
     font-size: 0.8125rem;
@@ -5787,8 +5793,12 @@ html.session-timeout-active,
 
 .product-config-step-nav {
     display: grid;
-    gap: 1px;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(5, minmax(11rem, 1fr));
+    gap: 0;
+    overflow-x: auto;
     background: #eaeded;
+    scrollbar-width: thin;
 }
 
 .product-config-step-nav button {
@@ -5798,10 +5808,11 @@ html.session-timeout-active,
     gap: 0.75rem;
     width: 100%;
     min-width: 0;
-    min-height: 4.25rem;
-    padding: 0.8rem 0.9rem;
+    min-height: 3.75rem;
+    padding: 0.65rem 0.75rem;
     border: 0;
-    border-left: 3px solid transparent;
+    border-top: 3px solid transparent;
+    border-right: 1px solid #d5dbdb;
     background: #ffffff;
     color: #414d5c;
     text-align: left;
@@ -5820,7 +5831,7 @@ html.session-timeout-active,
 }
 
 .product-config-step-nav button[aria-current="step"] {
-    border-left-color: #0972d3;
+    border-top-color: #0972d3;
     background: #eaf3fb;
     color: #16191f;
 }
@@ -5864,9 +5875,11 @@ html.session-timeout-active,
 }
 
 .product-config-save-note {
+    grid-column: 1 / -1;
     margin: 0;
-    padding: 0.85rem 0.9rem;
-    border-top: 1px solid #eaeded;
+    padding: 0.5rem 0.9rem;
+    border-top: 1px solid #d5dbdb;
+    background: #f7f8f8;
 }
 
 .product-config-workspace-main {
@@ -6033,16 +6046,17 @@ html.session-timeout-active,
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .product-config-workspace {
+    .product-config-workspace-nav {
+        position: static;
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .product-config-workspace-nav {
-        position: static;
+    .product-config-step-nav {
+        grid-template-columns: repeat(5, minmax(10.5rem, 1fr));
     }
 
-    .product-config-step-nav {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .product-config-workspace-summary {
+        border-right: 0;
     }
 }
 
@@ -6106,10 +6120,6 @@ html.session-timeout-active,
     .product-config-card-details .items-end {
         align-items: flex-start;
         text-align: left;
-    }
-
-    .product-config-step-nav {
-        grid-template-columns: minmax(0, 1fr);
     }
 
     .product-config-actionbar {

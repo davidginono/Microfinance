@@ -62,7 +62,10 @@ class AwsConsoleViewContractTest {
                         .doesNotContain("style=")
                         .doesNotContain("data-auto-submit")
                         .doesNotContain("onchange=")
-                        .doesNotContain("oninput=");
+                        .doesNotContain("oninput=")
+                        .doesNotContain("Â")
+                        .doesNotContain("Ã")
+                        .doesNotContain("ï¿½");
                 });
         }
     }
@@ -84,8 +87,8 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css")
-            .contains("shell.css?v=20260805-nav-toast-v3")
-            .contains("shell.js?v=20260805-nav-toast-v3")
+            .contains("shell.css?v=20260805-sims-shell-v4")
+            .contains("shell.js?v=20260805-sims-shell-v4")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -93,6 +96,10 @@ class AwsConsoleViewContractTest {
             .contains("profile-avatar-img")
             .contains("aws-console")
             .contains("app-topbar")
+            .contains("app-topbar-left")
+            .contains("app-topbar-actions")
+            .contains("shellPageBreadcrumbRailText")
+            .contains("pageSubmitPreloader")
             .contains("app-global-search");
         assertThat(fontCss)
             .contains("font-family: \"Open Sans\"")
@@ -151,6 +158,8 @@ class AwsConsoleViewContractTest {
             .doesNotContain("&times;")
             .contains("enhanceConsoleTables")
             .contains("showConsoleTableLoading")
+            .contains("showPageSubmitPreloader(null)")
+            .contains("[data-download-action=\"true\"]")
             .contains("syncConsoleFiltersFromUrl")
             .contains("aws-pagination-chevron")
             .contains("maxVisibleToasts = 3")
@@ -294,6 +303,11 @@ class AwsConsoleViewContractTest {
             .contains("data-product-config-step=\"workflow\"")
             .contains("data-product-config-panel hidden")
             .contains("data-product-config-progress-meter")
+            .contains("text=\"Included\"")
+            .contains("text=\"Order\"")
+            .contains("data-toast-message")
+            .contains("&middot;")
+            .doesNotContain(" · ")
             .contains("details class=\"workflow-subsection product-config-subsection\"")
             .contains("data-product-config-previous")
             .contains("data-product-config-next")
@@ -308,11 +322,13 @@ class AwsConsoleViewContractTest {
             .contains("disclosure.open = true")
             .contains("saveState.textContent = 'Unsaved changes'")
             .contains("window.sessionStorage.setItem(storageKey")
+            .contains("window.showToast('error', message")
             .contains("expanded ? 'Show less' : 'See more'");
         assertThat(consoleCss)
             .contains(".product-catalog-grid")
             .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
             .contains(".product-config-workspace")
+            .contains("grid-template-columns: repeat(5, minmax(11rem, 1fr))")
             .contains(".product-config-workspace.is-enhanced .product-config-step:not(.is-active)")
             .contains(".product-config-subsection")
             .contains(".product-config-step.is-active")
@@ -321,6 +337,20 @@ class AwsConsoleViewContractTest {
             .contains(".aws-console .product-config-workspace input:not([type=\"checkbox\"])")
             .contains("min-height: var(--sacco-control-height) !important")
             .contains(".aws-console .product-catalog .app-btn");
+    }
+
+    @Test
+    void adminRegistersKeepAwsFiltersAndScrollableTablesInOneSurface() throws Exception {
+        for (String viewName : List.of("admin/users.jsp", "admin/events.jsp", "admin/outbox.jsp")) {
+            String view = read(JSP_ROOT.resolve(viewName));
+            assertThat(view)
+                .as(viewName)
+                .contains("admin-register-shell")
+                .contains("app-table-titlebar")
+                .contains("data-aws-filter-toolbar")
+                .contains("class=\"erp-table-scroll\"")
+                .contains("data-aws-table-region");
+        }
     }
 
     private static List<Path> routeViews() throws IOException {

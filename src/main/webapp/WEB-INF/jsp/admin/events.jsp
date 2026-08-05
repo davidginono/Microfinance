@@ -10,8 +10,14 @@
     <h1 class="erp-page-title"><spring:message code="admin.events.title" text="Event Log" /></h1>
     <p class="erp-page-subtitle"><spring:message code="admin.events.subtitle" text="Review recorded system activity." /></p>
 </div>
-<section class="erp-form-wrap mb-4">
-<form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
+<section class="erp-table-wrap admin-register-shell" aria-label="Event log results">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading"><h2>Event Log results</h2><span>Info</span></div>
+        <div class="app-table-toolbar">
+            <a href="/admin/events" class="app-icon-button" aria-label="Refresh event log" title="Refresh event log">&#8635;</a>
+        </div>
+    </div>
+    <form action="/admin/events" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <label class="admin-filter-field block min-w-0 text-sm font-semibold text-slate-700">
                 SACCO
@@ -70,8 +76,7 @@
             <a href="/admin/events" class="app-btn btn-neutral">Reset</a>
         </div>
     </form>
-</section>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>
         <tr>
@@ -122,7 +127,8 @@
         </c:if>
         </tbody>
     </table>
-</div>
+    </div>
+</section>
 <c:if test="${entriesPage.totalPages gt 1}">
     <div class="mt-4 flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm text-slate-600">Page <span class="font-semibold text-slate-800">${entriesPage.number + 1}</span> of <span class="font-semibold text-slate-800">${entriesPage.totalPages}</span></p>

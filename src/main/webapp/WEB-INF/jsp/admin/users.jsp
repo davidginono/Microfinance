@@ -10,11 +10,6 @@
     <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage workspace access." /></p>
 </div>
 
-<div class="erp-toolbar">
-    <div class="text-sm text-slate-500"><spring:message code="admin.users.addUserHelp" text="Staff accounts only." /></div>
-    <button type="button" class="app-btn btn-launch" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
-</div>
-
 <c:if test="${not empty createdStaffUserId}">
     <div class="admin-created-user-id mb-4" aria-live="polite">
         <p class="text-xs font-semibold uppercase tracking-wide">Created Staff User ID</p>
@@ -25,25 +20,23 @@
     </div>
 </c:if>
 
-<div class="erp-panel overflow-hidden">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="max-w-2xl">
-                <p class="erp-widget-title"><spring:message code="common.filterViewOptions" text="Filter And View Options" /></p>
-                <p class="mt-2 text-sm leading-6 text-slate-500"><spring:message code="admin.users.filterHelp" text="Search and page users." /></p>
-            </div>
-            <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
-                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-sacco-blue">Current Slice</div>
-                <c:set var="userTotal" value="${usersPage.totalElements}" />
-                <c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
-                <c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
-                <c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
-                <p class="mt-2 text-base font-medium text-slate-700">Showing <span class="font-semibold text-sacco-ink">${userSliceStart}-${userSliceEnd}</span> of <span class="font-semibold text-sacco-ink">${userTotal}</span> users</p>
-            </div>
+<c:set var="userTotal" value="${usersPage.totalElements}" />
+<c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
+<c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
+<c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
+<section class="erp-table-wrap admin-register-shell" aria-label="Users and roles results">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading">
+            <h2>Users &amp; Roles results</h2>
+            <span>Info</span>
+        </div>
+        <div class="app-table-toolbar">
+            <span class="admin-register-count">Showing ${userSliceStart}-${userSliceEnd} of ${userTotal}</span>
+            <button type="button" class="app-btn btn-launch" data-user-modal-open="create-user"><spring:message code="admin.users.addUser" text="Add Staff Member" /></button>
         </div>
     </div>
 
-<form method="get" action="/admin/users" class="admin-filter-form relative flex flex-row flex-wrap items-end gap-3 px-5 py-5 sm:px-6 aws-filter-toolbar" data-aws-filter-toolbar>
+    <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar" data-aws-filter-toolbar>
         <label class="block min-w-[10rem] flex-[0_1_12rem]">
             <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search By</span>
             <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800">
@@ -76,9 +69,7 @@
             <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
         </div>
     </form>
-</div>
-
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table min-w-[1420px]">
         <thead>
         <tr>
@@ -148,7 +139,8 @@
         </c:choose>
         </tbody>
     </table>
-</div>
+    </div>
+</section>
 
 <div class="erp-toolbar">
     <div class="text-sm text-slate-500">

@@ -4,6 +4,7 @@
     const pageSubmitPreloader = document.getElementById('pageSubmitPreloader');
     const pageTitleRail = document.getElementById('shellPageTitleRail');
     const pageTitleRailText = document.getElementById('shellPageTitleRailText');
+    const pageBreadcrumbRailText = document.getElementById('shellPageBreadcrumbRailText');
     const toastQueue = [];
     const visibleToasts = [];
     const maxVisibleToasts = 3;
@@ -306,24 +307,31 @@
             return;
         }
         const source = resolveStickyTitleSource();
+        const breadcrumb = document.querySelector('.erp-page-header .erp-breadcrumb');
         const contentFrame = document.querySelector('.shell-content-frame');
         if (!source || !contentFrame) {
             pageTitleRail.classList.remove('is-active');
             pageTitleRailText.textContent = '';
+            if (pageBreadcrumbRailText) {
+                pageBreadcrumbRailText.textContent = '';
+            }
             return;
         }
-        const navHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--shell-nav-height')) || 58;
         const titleText = (source.getAttribute('data-sticky-title') || source.textContent || '').trim();
-        const sourceRect = source.getBoundingClientRect();
         const frameRect = contentFrame.getBoundingClientRect();
-        const shouldShow = sourceRect.top <= navHeight;
-        if (!titleText || !shouldShow) {
+        if (!titleText) {
             pageTitleRail.classList.remove('is-active');
             pageTitleRailText.textContent = '';
             return;
         }
         document.documentElement.style.setProperty('--shell-page-title-left', Math.round(frameRect.left) + 'px');
         pageTitleRailText.textContent = titleText;
+        if (pageBreadcrumbRailText) {
+            const breadcrumbText = (breadcrumb?.textContent || '').trim();
+            pageBreadcrumbRailText.textContent = breadcrumbText && breadcrumbText !== titleText
+                ? breadcrumbText.replace(/\s*\/\s*/g, '  ›  ')
+                : '';
+        }
         pageTitleRail.classList.add('is-active');
     };
     const schedulePageTitleRailUpdate = function () {
@@ -806,6 +814,32 @@
             if (!event.defaultPrevented) {
                 rememberScrollForReload();
                 showPageSubmitPreloader(form);
+            }
+        }, 0);
+    });
+
+    document.addEventListener('click', function (event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+        const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+        if (!link || link.matches('[download], [target], [data-download-action="true"], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
+            return;
+        }
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
+            return;
+        }
+        const target = new URL(link.href, window.location.href);
+        if (target.origin !== window.location.origin
+            || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)
+            || (target.pathname === window.location.pathname && target.search === window.location.search && target.hash)) {
+            return;
+        }
+        rememberScrollForReload();
+        window.setTimeout(function () {
+            if (!event.defaultPrevented) {
+                showPageSubmitPreloader(null);
             }
         }, 0);
     });
