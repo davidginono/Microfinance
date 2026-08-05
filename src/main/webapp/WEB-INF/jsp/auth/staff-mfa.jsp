@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-cloudscape-type-v2' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-cloudscape-type-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-nav-toast-v3' />" />
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">

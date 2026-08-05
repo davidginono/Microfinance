@@ -382,7 +382,7 @@
                     '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
                 '</div>' +
                 '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
-                    '<span aria-hidden="true">&times;</span>' +
+                    '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
                 '</button>' +
             '</div>';
         toast.querySelector('[data-toast-text]').textContent = String(message);

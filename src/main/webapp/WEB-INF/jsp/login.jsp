@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-cloudscape-type-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-nav-toast-v3' />" />
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
@@ -279,7 +279,7 @@
                         '</div>' +
                     '</div>' +
                     '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
-                        '<span aria-hidden="true">&times;</span>' +
+                        '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
                     '</button>' +
                 '</div>';
             toast.querySelector('[data-toast-text]').textContent = String(message);

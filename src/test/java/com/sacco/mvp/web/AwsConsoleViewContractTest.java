@@ -70,10 +70,13 @@ class AwsConsoleViewContractTest {
     @Test
     void sharedAssetsProvideAwsShellTableAndResponsiveFilterPrimitives() throws Exception {
         String header = read(JSP_ROOT.resolve("fragments/header.jspf"));
+        String login = read(JSP_ROOT.resolve("login.jsp"));
+        String registration = read(JSP_ROOT.resolve("register-member.jsp"));
         String fontCss = read(Path.of("src/main/resources/static/css/open-sans.css"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
         String authCss = read(Path.of("src/main/resources/static/css/aws-auth.css"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+        String securityConfig = read(Path.of("src/main/java/com/sacco/mvp/config/SecurityConfig.java"));
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
 
         assertThat(header)
@@ -81,6 +84,13 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css")
+            .contains("shell.css?v=20260805-nav-toast-v3")
+            .contains("shell.js?v=20260805-nav-toast-v3")
+            .contains("app-global-logo")
+            .contains("app-global-logo-image")
+            .contains("activeSaccoLogoUrl")
+            .contains("/profile/image/me")
+            .contains("profile-avatar-img")
             .contains("aws-console")
             .contains("app-topbar")
             .contains("app-global-search");
@@ -91,6 +101,9 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans-800.woff2")
             .contains("font-display: swap");
+        assertThat(securityConfig)
+            .contains("\"/fonts/**\"")
+            .contains(".permitAll()");
         assertThat(shellCss)
             .contains("--sacco-topbar: #101820")
             .contains("--sacco-font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
@@ -106,11 +119,18 @@ class AwsConsoleViewContractTest {
             .contains("width: calc(100% - var(--shell-sidebar-width)) !important")
             .contains("max-width: calc(100vw - 32px) !important")
             .contains(".app-table-titlebar")
+            .contains("#appToastContainer .app-toast-close")
+            .contains("transform: translateY(-50%) !important")
+            .contains(".app-global-brand .app-global-logo")
+            .contains(".app-topbar .profile-icon-btn .profile-avatar-img")
             .doesNotContain("Amazon Ember")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(authCss)
             .contains("font-family: var(--sacco-font-family) !important")
+            .contains(".auth-notification-bar button[type=\"button\"].app-toast-close")
+            .contains("width: 24px !important")
+            .contains("transform: translateY(-50%) !important")
             .doesNotContain("Amazon Ember")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
@@ -119,7 +139,16 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Amazon Ember")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
+        assertThat(login)
+            .contains("aws-auth.css?v=20260805-nav-toast-v3")
+            .contains("class=\"app-toast-close-icon\"");
+        assertThat(registration)
+            .contains("aws-auth.css?v=20260805-nav-toast-v3")
+            .contains("class=\"app-toast-close-icon\"")
+            .doesNotContain("&times;");
         assertThat(shellJs)
+            .contains("app-toast-close-icon")
+            .doesNotContain("&times;")
             .contains("enhanceConsoleTables")
             .contains("showConsoleTableLoading")
             .contains("syncConsoleFiltersFromUrl")

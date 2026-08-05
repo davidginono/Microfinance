@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260805-cloudscape-type-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260805-nav-toast-v3' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -44,14 +44,14 @@
             <a href="${(currentMember.position eq 'ADMIN' or currentMember.position eq 'MINOR_ADMIN') ? '/admin/dashboard' : (currentMember.position eq 'MANAGER' ? '/manager/loan-applications?status=READY_FOR_MANAGER' : (currentMember.position eq 'LOAN_OFFICER' ? '/loan-officer/queue' : (currentMember.position eq 'CHAIRPERSON' ? '/chairperson/queue' : (currentMember.position eq 'CREDIT_COMMITTEE' ? '/credit-committee/queue' : (currentMember.position eq 'BOARD' ? '/board/queue' : (currentMember.position eq 'ACCOUNTANT' ? '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT' : (currentMember.position eq 'DISBURSEMENT_OFFICER' ? '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT' : '/app/dashboard')))))))}" class="app-global-brand inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
                 <c:choose>
                     <c:when test="${not empty activeSaccoLogoUrl}">
-                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
+                        <span class="app-global-logo inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/35 bg-white/95 shadow-sm sm:h-9 sm:w-9">
                             <img src="${activeSaccoLogoUrl}"
                                  alt="${not empty activeSaccoName ? activeSaccoName : 'SACCO'} logo"
-                                 class="h-full w-full object-contain p-1" />
+                                 class="app-global-logo-image h-full w-full object-contain p-1" />
                         </span>
                     </c:when>
                     <c:otherwise>
-                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/35 bg-white/95 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-800 shadow-sm sm:h-9 sm:w-9 sm:text-[0.68rem]">
+                        <span class="app-global-logo app-global-logo-fallback inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/35 bg-white/95 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-800 shadow-sm sm:h-9 sm:w-9 sm:text-[0.68rem]">
                             ${activeSaccoLogoText}
                         </span>
                     </c:otherwise>
@@ -278,4 +278,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260805-teal-erp-v1' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260805-nav-toast-v3' />" defer></script>
