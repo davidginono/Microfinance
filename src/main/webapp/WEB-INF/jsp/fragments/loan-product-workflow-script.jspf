@@ -292,6 +292,11 @@
             if (!target) {
                 return;
             }
+            let disclosure = target.closest('details');
+            while (disclosure) {
+                disclosure.open = true;
+                disclosure = disclosure.parentElement ? disclosure.parentElement.closest('details') : null;
+            }
             const container = fieldErrorContainer(target) || target;
             const scrollBox = target.closest('.app-modal-scroll');
             if (scrollBox) {
@@ -1140,13 +1145,25 @@
             const previousButton = workspace.querySelector('[data-product-config-previous]');
             const nextButton = workspace.querySelector('[data-product-config-next]');
             const progress = workspace.querySelector('[data-product-config-progress]');
+            const progressMeter = workspace.querySelector('[data-product-config-progress-meter]');
+            const saveState = workspace.querySelector('[data-product-config-save-state]');
             const storageKey = workspace.getAttribute('data-product-config-storage-key');
 
             if (!form || !steps.length) {
                 return;
             }
 
+            workspace.classList.add('is-enhanced');
+
             const stepIndex = (key) => steps.findIndex((step) => step.getAttribute('data-product-config-step') === key);
+            const stepLabel = (index) => {
+                if (index < 0 || index >= steps.length) {
+                    return 'section';
+                }
+                const key = steps[index].getAttribute('data-product-config-step');
+                const nav = navButtons.find((button) => button.getAttribute('data-product-config-nav') === key);
+                return nav?.querySelector('strong')?.textContent.trim() || 'section';
+            };
 
             const activateStep = (key, options = {}) => {
                 let activeIndex = stepIndex(key);
@@ -1180,12 +1197,18 @@
                 if (progress) {
                     progress.textContent = 'Section ' + (activeIndex + 1) + ' of ' + steps.length;
                 }
+                if (progressMeter) {
+                    progressMeter.max = steps.length;
+                    progressMeter.value = activeIndex + 1;
+                    progressMeter.setAttribute('aria-label', 'Configuration progress: section ' + (activeIndex + 1) + ' of ' + steps.length);
+                }
                 if (previousButton) {
                     previousButton.disabled = activeIndex === 0;
+                    previousButton.textContent = activeIndex === 0 ? 'Previous section' : 'Back to ' + stepLabel(activeIndex - 1);
                 }
                 if (nextButton) {
                     nextButton.disabled = activeIndex === steps.length - 1;
-                    nextButton.textContent = activeIndex === steps.length - 1 ? 'All sections reviewed' : 'Next section';
+                    nextButton.textContent = activeIndex === steps.length - 1 ? 'All sections reviewed' : 'Continue to ' + stepLabel(activeIndex + 1);
                 }
 
                 if (storageKey) {
@@ -1224,11 +1247,22 @@
             nextButton?.addEventListener('click', () => moveStep(1));
 
             form.addEventListener('invalid', (event) => {
+                const disclosure = event.target.closest('details.product-config-subsection');
+                if (disclosure) {
+                    disclosure.open = true;
+                }
                 const step = event.target.closest('[data-product-config-step]');
                 if (step) {
                     activateStep(step.getAttribute('data-product-config-step'));
                 }
             }, true);
+
+            form.addEventListener('input', () => {
+                if (saveState) {
+                    saveState.textContent = 'Unsaved changes';
+                    saveState.classList.add('is-dirty');
+                }
+            });
 
             form.addEventListener('submit', (event) => {
                 if (!event.defaultPrevented) {

@@ -11,8 +11,8 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260803-loan-product-workspace-v1' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260803-loan-product-workspace-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-teal-erp-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260805-teal-erp-v1' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -83,17 +83,17 @@
 
         <div class="erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
             <c:if test="${not empty headerStation}">
-                <div class="hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
-                    <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
+                <div class="app-station-selector hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
+                    <span class="app-station-icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
                     </span>
-                    <div class="min-w-0">
+                    <div class="app-station-copy min-w-0">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-50/85"><spring:message code="header.currentStation" text="Current Station" /></p>
                         <p class="truncate text-xs font-semibold text-white">${headerStation.stationId}</p>
                         <p class="truncate text-[10px] font-medium text-cyan-50/85">${headerStation.stationAddressLocation}</p>
                     </div>
                 </div>
-                <div class="flex min-[520px]:hidden items-center rounded-md border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                <div class="app-station-mobile flex min-[520px]:hidden items-center rounded-md border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
                     ${headerStation.stationId}
                 </div>
             </c:if>
@@ -275,4 +275,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260801-aws-console-v5' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260805-teal-erp-v1' />" defer></script>

@@ -4,6 +4,9 @@
     const pageSubmitPreloader = document.getElementById('pageSubmitPreloader');
     const pageTitleRail = document.getElementById('shellPageTitleRail');
     const pageTitleRailText = document.getElementById('shellPageTitleRailText');
+    const toastQueue = [];
+    const visibleToasts = [];
+    const maxVisibleToasts = 3;
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
     const scrollRestoreStorageKey = 'saccos:restore-scroll';
@@ -334,6 +337,24 @@
         });
     };
 
+    const refreshToastLayers = function () {
+        visibleToasts.forEach(function (entry, index) {
+            const depth = Math.max(visibleToasts.length - 1 - index, 0);
+            entry.toast.style.setProperty('--toast-depth', String(depth));
+            entry.toast.style.zIndex = String(100 + index);
+        });
+    };
+
+    const promoteQueuedToast = function () {
+        while (visibleToasts.length < maxVisibleToasts && toastQueue.length > 0) {
+            const entry = toastQueue.shift();
+            visibleToasts.push(entry);
+            toastContainer.appendChild(entry.toast);
+            refreshToastLayers();
+            entry.timer = window.setTimeout(entry.dismiss, entry.duration);
+        }
+    };
+
     window.showToast = function (type, message, options) {
         if (!toastContainer || !message || !String(message).trim()) {
             return null;
@@ -366,21 +387,43 @@
             '</div>';
         toast.querySelector('[data-toast-text]').textContent = String(message);
 
+        const entry = { toast: toast, duration: duration, timer: null, dismiss: null };
         const dismiss = function () {
             if (!toast.isConnected || toast.classList.contains('app-toast-exit')) {
+                const queuedIndex = toastQueue.indexOf(entry);
+                if (queuedIndex >= 0) {
+                    toastQueue.splice(queuedIndex, 1);
+                }
                 return;
+            }
+            if (entry.timer) {
+                window.clearTimeout(entry.timer);
+                entry.timer = null;
             }
             toast.classList.remove('app-toast-enter');
             toast.classList.add('app-toast-exit');
             window.setTimeout(function () {
                 toast.remove();
+                const visibleIndex = visibleToasts.indexOf(entry);
+                if (visibleIndex >= 0) {
+                    visibleToasts.splice(visibleIndex, 1);
+                }
+                refreshToastLayers();
+                promoteQueuedToast();
             }, 190);
         };
+        entry.dismiss = dismiss;
 
         const closeButton = toast.querySelector('button');
         closeButton?.addEventListener('click', dismiss);
-        toastContainer.appendChild(toast);
-        window.setTimeout(dismiss, duration);
+        if (visibleToasts.length < maxVisibleToasts) {
+            visibleToasts.push(entry);
+            toastContainer.appendChild(toast);
+            refreshToastLayers();
+            entry.timer = window.setTimeout(dismiss, duration);
+        } else {
+            toastQueue.push(entry);
+        }
         return { dismiss: dismiss, element: toast };
     };
 

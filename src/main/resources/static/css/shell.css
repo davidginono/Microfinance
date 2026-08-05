@@ -850,9 +850,9 @@ button:active {
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(241, 245, 249, 0.10);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    background: rgba(234, 237, 237, 0.58);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 .page-submit-preloader.is-active {
     display: flex;
@@ -860,51 +860,44 @@ button:active {
 .page-submit-preloader__panel {
     display: grid;
     place-items: center;
-    gap: 0.85rem;
-    color: #334155;
+    gap: 0.6rem;
+    color: #16191f;
 }
 .page-submit-preloader__spinner {
     position: relative;
-    width: 5.5rem;
-    height: 5.5rem;
+    width: 2rem;
+    height: 2rem;
 }
 .page-submit-preloader__ring {
     position: absolute;
     inset: 0;
-    border-radius: 999px;
-    border: 0.18rem solid transparent;
-    animation: page-submit-preloader-spin 1.15s linear infinite;
+    border-radius: 50%;
+    border: 3px solid #d5dbdb;
+    border-top-color: #0972d3;
+    animation: page-submit-preloader-spin .72s linear infinite;
 }
 .page-submit-preloader__ring:nth-child(1) {
-    border-top-color: #2f8fe8;
-    border-left-color: #2f8fe8;
+    border-top-color: #0972d3;
 }
 .page-submit-preloader__ring:nth-child(2) {
-    inset: 0.62rem;
-    border-top-color: #facc15;
-    border-right-color: #facc15;
-    animation-duration: 1.35s;
-    animation-direction: reverse;
+    display: none;
 }
 .page-submit-preloader__ring:nth-child(3) {
-    inset: 1.18rem;
-    border-bottom-color: #f97316;
-    border-left-color: #fbcfe8;
-    animation-duration: 1.55s;
+    display: none;
 }
 .page-submit-preloader__text {
-    font-size: 0.82rem;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
 }
 @media (max-width: 639px) {
     .skeleton-table-row {
         grid-template-columns: minmax(0, 1fr);
     }
     .page-submit-preloader__spinner {
-        width: 4.6rem;
-        height: 4.6rem;
+        width: 2rem;
+        height: 2rem;
     }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1354,10 +1347,10 @@ button:active {
     z-index: 9998;
     max-width: min(16rem, calc(100vw - 2rem));
     padding: 0.45rem 0.62rem;
-    border: 1px solid #d7dde3;
+    border: 1px solid #70838a;
     border-radius: 2px;
-    background: #ffffff;
-    color: #1f2937;
+    background: #142a32;
+    color: #ffffff;
     box-shadow: 0 2px 4px rgba(0, 28, 36, .2);
     font-size: 0.78rem;
     font-weight: 700;
@@ -1378,11 +1371,11 @@ button:active {
     max-height: min(24rem, calc(100vh - 1.25rem));
     overflow-y: auto;
     padding: 0;
-    border: 1px solid #879596;
+    border: 1px solid #70838a;
     border-radius: 2px;
-    background: #ffffff;
+    background: #183038;
     box-shadow: 0 2px 4px rgba(0, 28, 36, .2);
-    color: #1f2937;
+    color: #ffffff;
     opacity: 0;
     pointer-events: none;
     transform: translateX(0.35rem);
@@ -1396,10 +1389,10 @@ button:active {
 .shell-sidebar-flyout-title {
     margin: 0;
     padding: 9px 10px;
-    border-bottom: 1px solid #d5dbdb;
-    background: #eaeded;
-    color: #16191f;
-    font-size: 12px;
+    border-bottom: 1px solid rgba(213, 219, 219, .24);
+    background: #142a32;
+    color: #ffffff;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 20px;
@@ -1417,8 +1410,8 @@ button:active {
     padding: 6px 10px 6px 12px;
     border-left: 3px solid transparent;
     border-radius: 0;
-    color: #16191f;
-    font-size: 13px;
+    color: #e7edef;
+    font-size: 14px;
     font-weight: 400;
     line-height: 20px;
     text-decoration: none;
@@ -1427,26 +1420,23 @@ button:active {
 }
 .shell-sidebar-flyout-link:hover,
 .shell-sidebar-flyout-link:focus-visible {
-    background: #eaeded;
-    color: #0073bb;
+    background: #21414b;
+    color: #ffffff;
     outline: 2px solid #00a1c9;
     outline-offset: -2px;
 }
 .shell-sidebar-flyout-link.is-active {
     border-left-color: #ec7211;
-    background: #f7f8f8;
-    color: #16191f;
+    background: #1f414c;
+    color: #ff9900;
     font-weight: 700;
     box-shadow: none;
 }
 @media (min-width: 2560px) {
     :root {
-        --shell-sidebar-width: 272px;
+        --shell-sidebar-width: 236px;
         --shell-content-gap: 18px;
         --shell-content-max: 1760px;
-    }
-    html {
-        font-size: 17px;
     }
 }
 @media (min-width: 3840px) {
@@ -1518,7 +1508,34 @@ button:active {
 
 /* AWS Management Console-inspired application theme. */
 :root {
+    --sacco-topbar: #101820;
+    --sacco-sidebar: #183038;
+    --sacco-sidebar-hover: #21414b;
+    --sacco-sidebar-active: #1f414c;
+    --sacco-canvas: #eaeded;
+    --sacco-panel: #ffffff;
+    --sacco-panel-muted: #f7f8f8;
+    --sacco-line: #d5dbdb;
+    --sacco-line-strong: #879596;
+    --sacco-ink: #16191f;
+    --sacco-muted: #5f6b7a;
+    --sacco-blue: #0972d3;
+    --sacco-blue-dark: #033160;
+    --sacco-orange: #ec7211;
+    --sacco-success: #037f0c;
+    --sacco-danger: #d13212;
+    --sacco-warning: #ff9900;
+    --sacco-radius: 2px;
+    --sacco-shadow: 0 1px 1px rgba(0, 28, 36, 0.12);
+    --sacco-topbar-height: 52px;
+    --sacco-control-height: 32px;
+    --sacco-sidebar-width: 236px;
+    --sacco-sidebar-collapsed-width: 48px;
     --aws-ink: #16191f;
+    --aws-topbar: #101820;
+    --aws-sidebar: #183038;
+    --aws-sidebar-hover: #21414b;
+    --aws-sidebar-active: #1f414c;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
     --aws-bg: #eaeded;
@@ -1536,12 +1553,12 @@ button:active {
     --panel-shadow: 0 1px 1px rgba(0, 28, 36, 0.12);
     --text-main: var(--aws-ink);
     --text-muted: var(--aws-muted);
-    --shell-sidebar-width: 188px;
-    --shell-sidebar-collapsed-width: 42px;
-    --shell-content-gap: 10px;
+    --shell-sidebar-width: 236px;
+    --shell-sidebar-collapsed-width: 48px;
+    --shell-content-gap: 12px;
     --shell-content-max: none;
-    --shell-nav-height: 38px;
-    --shell-topbar-control-height: 28px;
+    --shell-nav-height: 52px;
+    --shell-topbar-control-height: 32px;
 }
 
 html {
@@ -1555,7 +1572,7 @@ body.aws-console {
     background: var(--aws-bg) !important;
     color: var(--aws-ink);
     font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.4;
 }
 
@@ -1584,17 +1601,17 @@ body.aws-console {
     min-height: var(--shell-nav-height);
     border: 0;
     border-bottom: 1px solid #414750;
-    background: var(--aws-ink) !important;
+    background: var(--aws-topbar) !important;
     box-shadow: none !important;
 }
 
 .app-topbar > div {
-    min-height: 38px;
-    padding: 4px 10px !important;
+    min-height: var(--shell-nav-height);
+    padding: 6px 18px !important;
 }
 
 .app-global-brand {
-    min-width: 160px;
+    min-width: 190px;
     color: #ffffff;
 }
 
@@ -1605,22 +1622,22 @@ body.aws-console {
 .app-global-brand p:first-child {
     color: #ffffff !important;
     font-family: inherit !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
 }
 
 .app-global-brand p:last-child {
     color: #b6bec9 !important;
-    font-size: 9px !important;
+    font-size: 10px !important;
     letter-spacing: .04em !important;
 }
 
 .app-global-search {
     position: relative;
     display: none;
-    width: min(32vw, 420px);
-    height: 28px;
-    margin-left: 8px;
+    width: min(34vw, 480px);
+    height: var(--sacco-control-height);
+    margin-left: 10px;
     align-items: center;
 }
 
@@ -1635,7 +1652,7 @@ body.aws-console {
 
 .app-global-search input {
     width: 100%;
-    height: 28px;
+    height: var(--sacco-control-height);
     border: 1px solid #687078;
     border-radius: 2px;
     background: #242a31;
@@ -1663,11 +1680,11 @@ body.aws-console {
 .app-topbar .erp-icon-btn,
 .app-topbar .erp-topbar-btn,
 .app-topbar button {
-    height: 28px !important;
-    min-height: 28px !important;
+    height: 32px !important;
+    min-height: 32px !important;
     border: 1px solid #687078 !important;
     border-radius: 2px !important;
-    background: #242a31 !important;
+    background: #17232d !important;
     color: #ffffff !important;
     box-shadow: none !important;
     transform: none !important;
@@ -1684,6 +1701,50 @@ body.aws-console {
     border-radius: 50% !important;
 }
 
+.app-station-selector {
+    box-sizing: border-box;
+    height: var(--sacco-control-height);
+    min-height: var(--sacco-control-height);
+    max-width: 220px !important;
+    border: 1px solid #687078 !important;
+    border-radius: 2px !important;
+    background: #17232d !important;
+    padding: 3px 8px !important;
+    box-shadow: none !important;
+}
+
+.app-station-icon {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 2px !important;
+    background: #2a3b46 !important;
+}
+
+.app-station-copy p {
+    margin: 0 !important;
+    line-height: 1.05 !important;
+}
+
+.app-station-copy p:first-child {
+    font-size: 9px !important;
+    letter-spacing: .12em !important;
+}
+
+.app-station-copy p:nth-child(2) {
+    font-size: 13px !important;
+}
+
+.app-station-copy p:last-child {
+    display: none;
+}
+
+.app-station-mobile {
+    height: 32px;
+    border-radius: 2px !important;
+    background: #17232d !important;
+    box-shadow: none !important;
+}
+
 .aws-app-shell {
     overflow-x: clip;
     padding-top: var(--shell-nav-height);
@@ -1692,8 +1753,8 @@ body.aws-console {
 .shell-sidebar {
     top: var(--shell-nav-height) !important;
     width: var(--shell-sidebar-width);
-    border-color: var(--aws-line) !important;
-    background: #f7f8f8 !important;
+    border-color: rgba(213, 219, 219, .26) !important;
+    background: var(--aws-sidebar) !important;
 }
 
 .shell-sidebar::before,
@@ -1702,21 +1763,21 @@ body.aws-console {
 }
 
 .shell-sidebar-panel {
-    border-color: var(--aws-line) !important;
-    background: #f7f8f8 !important;
+    border-color: rgba(213, 219, 219, .18) !important;
+    background: var(--aws-sidebar) !important;
 }
 
 .shell-sidebar-toggle-row {
     min-height: 34px;
-    border-bottom: 1px solid var(--aws-line);
+    border-bottom: 1px solid rgba(213, 219, 219, .25);
     padding: 4px 6px;
-    background: #eaeded;
+    background: #142a32;
 }
 
 .shell-sidebar-toggle-label,
 .shell-sidebar-section-header {
-    color: #414d5c !important;
-    font-size: 10px !important;
+    color: #b6c3c8 !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     letter-spacing: .02em !important;
     text-transform: uppercase;
@@ -1726,16 +1787,16 @@ body.aws-console {
     width: 26px;
     height: 26px;
     min-height: 26px;
-    border: 1px solid var(--aws-line-dark);
+    border: 1px solid #70838a;
     border-radius: 2px;
-    background: #ffffff;
-    color: var(--aws-ink);
+    background: #203b45;
+    color: #ffffff;
 }
 
 .shell-sidebar-scroll {
     padding: 4px 0 12px !important;
-    background: #f7f8f8 !important;
-    scrollbar-color: #879596 #eaeded;
+    background: var(--aws-sidebar) !important;
+    scrollbar-color: #70838a #142a32;
 }
 
 .shell-sidebar-scroll > :not([hidden]) ~ :not([hidden]),
@@ -1749,7 +1810,7 @@ body.aws-console {
 .shell-sidebar-scroll > div > button,
 .shell-sidebar-scroll .shell-review-panel-link {
     position: relative;
-    min-height: 29px !important;
+    min-height: 38px !important;
     width: 100%;
     gap: 6px !important;
     border: 0 !important;
@@ -1757,11 +1818,11 @@ body.aws-console {
     border-radius: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: #414d5c !important;
-    padding: 5px 8px !important;
-    font-size: 12px !important;
+    color: #e7edef !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
-    line-height: 18px;
+    line-height: 20px;
     transform: none !important;
 }
 
@@ -1770,8 +1831,8 @@ body.aws-console {
 .shell-sidebar-scroll > div > a:hover,
 .shell-sidebar-scroll > div > button:hover,
 .shell-sidebar-scroll .shell-review-panel-link:hover {
-    background: #eaeded !important;
-    color: var(--aws-ink) !important;
+    background: var(--aws-sidebar-hover) !important;
+    color: #ffffff !important;
     text-shadow: none !important;
 }
 
@@ -1785,8 +1846,8 @@ body.aws-console {
 .shell-sidebar-scroll button[class*="bg-amber-50"],
 .shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"] {
     border-left-color: var(--aws-orange) !important;
-    background: #ffffff !important;
-    color: #8f4808 !important;
+    background: var(--aws-sidebar-active) !important;
+    color: #ff9900 !important;
     font-weight: 700 !important;
 }
 
@@ -1800,7 +1861,7 @@ body.aws-console {
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    color: #5f6b7a !important;
+    color: #b6c3c8 !important;
 }
 
 .shell-sidebar-scroll > a > span svg,
@@ -1814,39 +1875,57 @@ body.aws-console {
     margin: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
-    background: #ffffff !important;
-    box-shadow: inset 3px 0 0 #d5dbdb !important;
-    padding: 2px 0 2px 20px !important;
+    background: #142a32 !important;
+    box-shadow: inset 3px 0 0 rgba(213, 219, 219, .18) !important;
+    padding: 2px 0 2px 22px !important;
 }
 
 .shell-sidebar-group > div a {
-    min-height: 26px;
+    min-height: 34px;
     border-radius: 0 !important;
     padding: 4px 8px !important;
-    color: #414d5c !important;
-    font-size: 11px !important;
+    color: #d5dfe2 !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
 }
 
 .shell-sidebar-group > div a[class*="bg-white"] {
-    color: #8f4808 !important;
+    color: #ff9900 !important;
     font-weight: 700 !important;
 }
 
 .shell-powered-by {
-    border-color: var(--aws-line) !important;
-    background: #eaeded !important;
+    border-color: rgba(213, 219, 219, .22) !important;
+    background: #142a32 !important;
+    color: #b6c3c8 !important;
+}
+
+.shell-powered-by p,
+.shell-powered-by span {
+    color: #b6c3c8 !important;
+}
+
+.shell-powered-by a {
+    color: #66b7f1 !important;
 }
 
 .shell-main {
     min-height: calc(100vh - var(--shell-nav-height));
-    padding: 10px !important;
+    padding: 12px !important;
 }
 
 .shell-content-frame {
     width: 100%;
     max-width: none !important;
     margin: 0 !important;
+}
+
+.shell-main .truncate,
+.shell-sidebar-scroll .truncate {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
 }
 
 .erp-page-header,
@@ -1861,7 +1940,7 @@ body.aws-console {
 .erp-page-kicker {
     margin: 0 0 2px !important;
     color: var(--aws-muted) !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     letter-spacing: .02em !important;
     text-transform: uppercase;
@@ -1873,7 +1952,7 @@ body.aws-console {
     margin: 0 !important;
     color: var(--aws-ink) !important;
     font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
-    font-size: 20px !important;
+    font-size: 22px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
     letter-spacing: 0 !important;
@@ -1884,7 +1963,7 @@ body.aws-console {
     max-width: 760px;
     margin: 2px 0 0 !important;
     color: var(--aws-muted) !important;
-    font-size: 12px !important;
+    font-size: 14px !important;
     line-height: 1.4 !important;
 }
 
@@ -1932,10 +2011,11 @@ body.aws-console {
 }
 
 .app-table-heading h2 {
-    overflow: hidden;
+    overflow: visible;
     margin: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .app-table-heading > span {
@@ -1991,9 +2071,9 @@ body.aws-console {
 .aws-console .aws-filter-toolbar input,
 .aws-console .aws-filter-toolbar select,
 .aws-console .aws-filter-toolbar .app-btn {
-    height: 31px !important;
-    min-height: 31px !important;
-    max-height: 31px !important;
+    height: var(--sacco-control-height) !important;
+    min-height: var(--sacco-control-height) !important;
+    max-height: var(--sacco-control-height) !important;
 }
 
 .aws-console .erp-table-wrap > .aws-filter-toolbar {
@@ -2011,9 +2091,9 @@ body.aws-console {
 
 .app-icon-button {
     display: inline-flex;
-    width: 31px;
-    height: 31px;
-    min-height: 31px;
+    width: var(--sacco-control-height);
+    height: var(--sacco-control-height);
+    min-height: var(--sacco-control-height);
     align-items: center;
     justify-content: center;
     border: 1px solid var(--aws-line-dark);
@@ -2031,7 +2111,7 @@ body.aws-console {
 .erp-widget-heading {
     color: var(--aws-ink) !important;
     font-family: inherit !important;
-    font-size: 14px !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
 }
@@ -2044,7 +2124,7 @@ body.aws-console {
 .erp-stat-label,
 .fcms-label {
     color: #414d5c !important;
-    font-size: 10px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     letter-spacing: .02em !important;
     text-transform: uppercase;
@@ -2118,12 +2198,12 @@ body.aws-console {
 .app-btn,
 .aws-console button:not(.neo-select-button),
 .app-icon-button {
-    min-height: 31px;
+    min-height: 32px;
     border-radius: 2px !important;
     padding: 0 10px;
     box-shadow: none !important;
     font-family: inherit;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
     line-height: 1;
     transform: none !important;
@@ -2187,18 +2267,23 @@ body.aws-console {
 .aws-console select,
 .aws-console .fcms-control,
 .aws-console .neo-select-button {
-    min-height: 31px !important;
-    height: 31px !important;
+    box-sizing: border-box;
+    max-width: 100%;
+    min-height: 32px !important;
+    height: 32px !important;
     border: 1px solid var(--aws-line-dark) !important;
     border-radius: 2px !important;
     background: #ffffff !important;
     color: var(--aws-ink) !important;
     box-shadow: none !important;
     font-family: inherit !important;
-    font-size: 12px !important;
+    font-size: 14px !important;
 }
 
 .aws-console textarea {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
     min-height: 84px !important;
     border: 1px solid var(--aws-line-dark) !important;
     border-radius: 2px !important;
@@ -2206,17 +2291,17 @@ body.aws-console {
     color: var(--aws-ink) !important;
     box-shadow: none !important;
     font-family: inherit !important;
-    font-size: 12px !important;
+    font-size: 14px !important;
 }
 
 .aws-console .app-btn {
-    height: 31px !important;
-    min-height: 31px !important;
+    height: 32px !important;
+    min-height: 32px !important;
 }
 
 .aws-console .product-config-step-nav button {
-    min-height: 0;
-    padding: 0.7rem 0.75rem !important;
+    min-height: 4.25rem;
+    padding: 0.8rem 0.9rem !important;
     font-size: inherit !important;
     font-weight: inherit !important;
     line-height: normal;
@@ -2224,12 +2309,44 @@ body.aws-console {
 }
 
 .aws-console .product-config-step-toggle {
-    min-height: 0;
-    padding: 0.95rem 1rem 0.85rem !important;
+    min-height: 4.75rem;
+    padding: 1rem 1.15rem !important;
     font-size: inherit !important;
     font-weight: inherit !important;
     line-height: normal;
     white-space: normal;
+}
+
+.aws-console .product-catalog .app-btn,
+.aws-console .product-config-page-actions .app-btn,
+.aws-console .product-config-workspace .app-btn {
+    min-height: var(--sacco-control-height) !important;
+    height: auto !important;
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+    line-height: 18px !important;
+    white-space: normal;
+}
+
+.aws-console .product-config-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.aws-console .product-config-workspace select,
+.aws-console .product-config-workspace .fcms-control,
+.aws-console .product-config-workspace .neo-select-button {
+    min-height: var(--sacco-control-height) !important;
+    height: var(--sacco-control-height) !important;
+    font-size: 14px !important;
+}
+
+.aws-console .product-config-workspace textarea {
+    min-height: 7rem !important;
+    font-size: 0.875rem !important;
+}
+
+.aws-console .product-config-workspace input[type="checkbox"],
+.aws-console .product-config-workspace input[type="radio"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex: 0 0 auto;
 }
 
 .aws-console input:focus,
@@ -2283,8 +2400,8 @@ body.aws-console {
 }
 
 .aws-pagination-chevron {
-    width: 31px !important;
-    min-width: 31px;
+    width: var(--sacco-control-height) !important;
+    min-width: var(--sacco-control-height);
     padding: 0 !important;
 }
 
@@ -2424,10 +2541,21 @@ body.aws-console {
     right: 0 !important;
     top: var(--shell-nav-height) !important;
     width: auto !important;
+    min-height: 38px;
     gap: 0 !important;
+    overflow: visible;
+}
+
+.profile-panel .truncate {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
 }
 
 #appToastContainer > * {
+    position: absolute !important;
+    inset: calc(var(--toast-depth, 0) * 4px) 0 auto !important;
     width: 100%;
     min-height: 30px;
     border: 0 !important;
@@ -2489,7 +2617,7 @@ body.aws-console {
 }
 
 .shell-page-title-rail__text {
-    overflow: hidden;
+    overflow: visible;
     margin: 0 !important;
     color: var(--aws-ink) !important;
     font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
@@ -2497,8 +2625,8 @@ body.aws-console {
     font-weight: 700 !important;
     letter-spacing: 0 !important;
     line-height: 20px !important;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-overflow: clip;
+    white-space: normal;
 }
 
 /* Page-local components are normalized here so every workspace keeps one console language. */
@@ -2695,6 +2823,18 @@ body.aws-console {
     padding: 7px 10px !important;
 }
 
+.aws-console .product-config-workspace .product-builder-section-body {
+    padding: 1.25rem !important;
+}
+
+.aws-console .product-config-workspace .product-config-subsection {
+    padding: 0 !important;
+}
+
+.aws-console .product-config-workspace .product-config-subsection-body {
+    padding: 1rem !important;
+}
+
 @media (max-width: 767px) {
     .aws-console .aws-filter-toolbar {
         min-width: 0;
@@ -2762,7 +2902,19 @@ body.aws-console {
 }
 
 .aws-console .aws-sidebar-footer {
-    border-color: rgba(213, 219, 219, 0.9);
+    border-color: rgba(213, 219, 219, .22) !important;
+    background: #142a32 !important;
+    color: #b6c3c8 !important;
+}
+
+.aws-console .aws-sidebar-footer > div:first-child {
+    color: #d5dfe2 !important;
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.aws-console .aws-sidebar-footer .shell-powered-by {
+    background: transparent !important;
 }
 
 .aws-console .aws-usage-range-picker {
@@ -2959,16 +3111,16 @@ body.aws-console,
 .shell-sidebar-scroll > div > a,
 .shell-sidebar-scroll > div > button,
 .shell-sidebar-scroll .shell-review-panel-link {
-    min-height: 35px !important;
-    padding: 7px 9px !important;
-    font-size: 13px !important;
+    min-height: 38px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
     line-height: 20px;
 }
 
 .shell-sidebar-group > div a {
-    min-height: 31px;
-    padding: 6px 9px !important;
-    font-size: 12px !important;
+    min-height: 34px;
+    padding: 7px 10px !important;
+    font-size: 13px !important;
     line-height: 18px;
 }
 
@@ -3027,11 +3179,47 @@ body.aws-console,
     }
 
     .shell-sidebar {
-        width: min(188px, calc(100vw - 36px));
+        width: min(236px, calc(100vw - 36px));
     }
 }
 
 @media (max-width: 767px) {
+    .app-topbar > div {
+        min-height: var(--shell-nav-height);
+        gap: 6px !important;
+        padding: 6px 8px !important;
+    }
+
+    .app-global-brand {
+        min-width: 0;
+    }
+
+    .app-global-brand p:first-child {
+        max-width: 8rem;
+        font-size: 13px !important;
+    }
+
+    .aws-mobile-menu-button {
+        width: 34px !important;
+        min-width: 34px;
+        height: 34px !important;
+        min-height: 34px !important;
+        padding: 0 !important;
+    }
+
+    .app-station-mobile {
+        max-width: 4.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .aws-console div[class*="min-w-["],
+    .aws-console label[class*="min-w-["],
+    .aws-console section[class*="min-w-["] {
+        min-width: 0 !important;
+    }
+
     .shell-main {
         padding: 8px !important;
     }
@@ -3235,8 +3423,8 @@ body.aws-console,
 .platform-settings-field select {
     box-sizing: border-box;
     width: 100%;
-    min-height: 31px !important;
-    height: 31px !important;
+    min-height: var(--sacco-control-height) !important;
+    height: var(--sacco-control-height) !important;
     margin: 0 !important;
     border: 1px solid var(--aws-line-dark) !important;
     border-radius: 2px !important;
@@ -3318,8 +3506,8 @@ body.aws-console,
 .settings-action-bar .neo-select-button,
 .settings-action-bar select,
 .settings-action-button {
-    min-height: 31px !important;
-    height: 31px !important;
+    min-height: var(--sacco-control-height) !important;
+    height: var(--sacco-control-height) !important;
     border-radius: 2px !important;
     font-size: 12px !important;
 }
@@ -3332,7 +3520,7 @@ body.aws-console,
 }
 
 .aws-disclosure-button {
-    min-height: 31px !important;
+    min-height: var(--sacco-control-height) !important;
     border: 1px solid var(--aws-line-dark) !important;
     border-radius: 2px !important;
     background: #ffffff !important;

@@ -79,7 +79,14 @@ class AwsConsoleViewContractTest {
             .contains("app-topbar")
             .contains("app-global-search");
         assertThat(shellCss)
+            .contains("--sacco-topbar: #101820")
+            .contains("--sacco-sidebar: #183038")
+            .contains("--sacco-canvas: #eaeded")
+            .contains("--sacco-control-height: 32px")
             .contains("--aws-orange")
+            .contains("--aws-sidebar: #183038")
+            .contains("--shell-sidebar-width: 236px")
+            .contains("--shell-nav-height: 52px")
             .contains(".aws-filter-toolbar")
             .contains("flex-wrap: wrap !important")
             .contains("width: calc(100% - var(--shell-sidebar-width)) !important")
@@ -89,7 +96,9 @@ class AwsConsoleViewContractTest {
             .contains("enhanceConsoleTables")
             .contains("showConsoleTableLoading")
             .contains("syncConsoleFiltersFromUrl")
-            .contains("aws-pagination-chevron");
+            .contains("aws-pagination-chevron")
+            .contains("maxVisibleToasts = 3")
+            .contains("promoteQueuedToast");
     }
 
     @Test
@@ -106,7 +115,10 @@ class AwsConsoleViewContractTest {
             .contains("auth-notification-rail");
         assertThat(authCss)
             .contains(".auth-notification-bar")
-            .contains("inset: 38px 0 auto")
+            .contains("inset: 52px 0 auto")
+            .contains("--sacco-topbar-height: 52px")
+            .contains("--sacco-control-height: 32px")
+            .contains("--aws-topbar: #101820")
             .contains("transform: none !important");
         assertThat(loanProducts)
             .contains("loan-calculator-steps")
@@ -196,7 +208,7 @@ class AwsConsoleViewContractTest {
             .contains(".aws-disclosure-button")
             .contains(".shell-page-title-rail__inner")
             .contains("backdrop-filter: none !important")
-            .contains("height: 31px !important")
+            .contains("height: 32px !important")
             .contains("font-size: 14px")
             .contains("border-radius: 2px");
     }
@@ -207,34 +219,52 @@ class AwsConsoleViewContractTest {
         String productEdit = read(JSP_ROOT.resolve("admin/loan-product-edit.jsp"));
         String workflowScript = read(JSP_ROOT.resolve("fragments/loan-product-workflow-script.jspf"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(settings)
+            .contains("Step 1 of 2")
+            .contains("Select a loan product")
             .contains("product-catalog-grid")
             .contains("data-product-config-card")
             .contains("data-product-card-toggle")
             .contains("See more")
             .contains("/admin/settings-controls/loan-products/${product.id}/edit")
-            .contains("Configure");
+            .contains("Configure product");
         assertThat(productEdit)
+            .contains("Step 2 of 2")
             .contains("data-product-config-workspace")
             .contains("data-product-config-nav=\"identity\"")
             .contains("data-product-config-nav=\"preview\"")
             .contains("data-product-config-step=\"workflow\"")
             .contains("data-product-config-panel hidden")
+            .contains("data-product-config-progress-meter")
+            .contains("details class=\"workflow-subsection product-config-subsection\"")
             .contains("data-product-config-previous")
             .contains("data-product-config-next")
+            .contains("data-product-config-save-state")
             .contains("Save product")
             .contains("action=\"/admin/settings-controls/${product.id}\"");
         assertThat(workflowScript)
             .contains("activateStep")
+            .contains("workspace.classList.add('is-enhanced')")
+            .contains("'Continue to ' + stepLabel")
             .contains("form.addEventListener('invalid'")
+            .contains("disclosure.open = true")
+            .contains("saveState.textContent = 'Unsaved changes'")
             .contains("window.sessionStorage.setItem(storageKey")
             .contains("expanded ? 'Show less' : 'See more'");
         assertThat(consoleCss)
             .contains(".product-catalog-grid")
+            .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
             .contains(".product-config-workspace")
+            .contains(".product-config-workspace.is-enhanced .product-config-step:not(.is-active)")
+            .contains(".product-config-subsection")
             .contains(".product-config-step.is-active")
             .contains(".product-config-actionbar");
+        assertThat(shellCss)
+            .contains(".aws-console .product-config-workspace input:not([type=\"checkbox\"])")
+            .contains("min-height: var(--sacco-control-height) !important")
+            .contains(".aws-console .product-catalog .app-btn");
     }
 
     private static List<Path> routeViews() throws IOException {

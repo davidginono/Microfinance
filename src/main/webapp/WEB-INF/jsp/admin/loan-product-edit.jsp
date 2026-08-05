@@ -9,10 +9,10 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Settings & Controls / Loan Products</p>
     <h1 class="erp-page-title">Configure <c:out value="${product.displayName}" /></h1>
-    <p class="erp-page-subtitle">Work through one section at a time. All changes are checked and saved together.</p>
+    <p class="erp-page-subtitle">Step 2 of 2. Complete one section at a time, then review and save the product.</p>
 </div>
 
-<div class="mb-4 flex flex-wrap justify-between gap-3">
+<div class="product-config-page-actions">
     <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Back to loan products</a>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
@@ -30,7 +30,7 @@
      data-product-config-storage-key="loan-product-config-${product.id}">
     <aside class="product-config-workspace-nav" aria-label="Loan product configuration sections">
         <div class="product-config-workspace-summary">
-            <p class="erp-widget-title">Selected loan product</p>
+            <p class="erp-widget-title">Selected product</p>
             <h2><c:out value="${product.displayName}" /></h2>
             <div class="product-config-workspace-meta">
                 <span><c:out value="${product.displayCode}" /></span>
@@ -40,11 +40,14 @@
                     ${product.status eq 'SUSPENDED' ? 'bg-slate-100 text-slate-600' : ''}
                     ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">${product.status}</span>
             </div>
-            <p>Use the sections below to keep related decisions together.</p>
+            <p>Select a section below. Only that section will be shown in the workspace.</p>
         </div>
         <div class="product-config-progress" aria-live="polite">
-            <span>Configuration progress</span>
-            <strong data-product-config-progress>Section 1 of 5</strong>
+            <div>
+                <span>Configuration progress</span>
+                <strong data-product-config-progress>Section 1 of 5</strong>
+            </div>
+            <progress value="1" max="5" data-product-config-progress-meter aria-label="Configuration progress: section 1 of 5"></progress>
         </div>
         <nav class="product-config-step-nav">
             <button type="button" data-product-config-nav="identity" aria-current="step">
@@ -87,6 +90,7 @@
                   data-active-disbursement-claim-holders="${activeDisbursementClaimHolderCount}"
                   data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
                   data-tenant-board-enabled="${settings.boardReviewRequired}"
+                  aria-label="Configure ${fn:escapeXml(product.displayName)}"
                   data-product-config-form>
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <input type="hidden" name="modalKey" value="product-${product.id}" />
@@ -267,8 +271,9 @@
                         <span class="product-config-step-action" aria-hidden="true">Open</span>
                     </button>
                     <div id="product-config-workflow" class="product-builder-section-body" data-product-config-panel hidden>
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></p>
+                        <details class="workflow-subsection product-config-subsection" open>
+                            <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="workflow-table">
                                 <div class="workflow-table-head">
                                     <div><spring:message code="admin.settings.workflow.stage" text="Stage" /></div>
@@ -392,10 +397,12 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></p>
+                        <details class="workflow-subsection product-config-subsection">
+                            <summary class="workflow-subsection-title"><spring:message code="role.boardMember" text="Board Member" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="grid gap-3">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Board Members Assigned
@@ -419,10 +426,12 @@
                                 </div>
                                 <p class="text-xs text-slate-500">Every selected board member will be assigned and notified for this product.</p>
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="role.committee" text="Credit Committee" /></p>
+                        <details class="workflow-subsection product-config-subsection">
+                            <summary class="workflow-subsection-title"><spring:message code="role.committee" text="Credit Committee" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="grid gap-3">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Credit Committee Assigned
@@ -446,10 +455,12 @@
                                 </div>
                                 <p class="text-xs text-slate-500">Every selected credit committee member will be assigned and notified for this product.</p>
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title">Applicant</p>
+                        <details class="workflow-subsection product-config-subsection">
+                            <summary class="workflow-subsection-title">Applicant documents</summary>
+                            <div class="product-config-subsection-body">
                             <div class="workflow-support-grid">
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="applicantAttachmentRequired" type="checkbox" value="true" ${product.applicantAttachmentRequired ? 'checked' : ''} data-required-attachments-toggle />
@@ -511,10 +522,12 @@
                                     </table>
                                 </div>
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></p>
+                        <details class="workflow-subsection product-config-subsection">
+                            <summary class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="workflow-support-grid">
                                 <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                                     <input name="disbursementProofRequired" type="checkbox" value="true" ${product.disbursementProofRequired != false ? 'checked' : ''} />
@@ -522,10 +535,12 @@
                                 </label>
                                 <input type="hidden" name="disbursementProofRequired" value="false" />
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
+                        <details class="workflow-subsection product-config-subsection">
+                            <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="workflow-support-grid">
                                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <spring:message code="admin.settings.workflow.guarantorsRequired" text="Guarantors Required" />
@@ -540,12 +555,15 @@
                                     <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum savings before selection" /></span>
                                 </label>
                             </div>
-                        </div>
+                            </div>
+                        </details>
 
-                        <div class="workflow-subsection">
-                            <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></p>
+                        <details class="workflow-subsection product-config-subsection" open>
+                            <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></summary>
+                            <div class="product-config-subsection-body">
                             <div class="workflow-warning-stack mt-4" data-workflow-warnings></div>
-                        </div>
+                            </div>
+                        </details>
                     </div>
                 </section>
 
@@ -576,6 +594,7 @@
                         <button type="button" class="app-btn btn-neutral" data-product-config-next>Next section</button>
                     </div>
                     <div class="product-config-save-actions">
+                        <span class="product-config-save-state" data-product-config-save-state>Changes save only when you select Save product.</span>
                         <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
                         <button type="submit" class="app-btn btn-primary">Save product</button>
                     </div>

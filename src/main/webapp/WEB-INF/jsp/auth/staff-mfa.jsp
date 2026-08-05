@@ -7,9 +7,9 @@
     <title>Sign-In Verification</title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-teal-erp-v1' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-teal-erp-v1' />" />
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">

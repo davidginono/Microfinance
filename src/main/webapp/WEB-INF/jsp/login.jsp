@@ -9,8 +9,8 @@
     <title><spring:message code="app.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-teal-erp-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-teal-erp-v1' />" />
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />

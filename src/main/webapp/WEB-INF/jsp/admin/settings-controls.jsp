@@ -243,9 +243,9 @@
     <section class="product-catalog" aria-labelledby="loan-product-catalog-title">
         <div class="product-catalog-toolbar">
             <div class="product-catalog-heading">
-                <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.single" text="Loan Products" /></p>
-                <h2 id="loan-product-catalog-title">Choose a product to configure</h2>
-                <p>Compare the essential rules, then open one product in its focused configuration workspace.</p>
+                <p class="erp-widget-title">Step 1 of 2 &middot; <spring:message code="admin.settings.loanProducts.single" text="Loan Products" /></p>
+                <h2 id="loan-product-catalog-title">Select a loan product</h2>
+                <p>Compare the amount, interest, savings limit, and display order. Select <strong>Configure product</strong> to continue.</p>
             </div>
             <div class="product-catalog-actions">
                 <c:if test="${not empty loanProductsVersions}">
@@ -256,7 +256,7 @@
                     </button>
                 </c:if>
                 <button type="button"
-                        class="app-btn btn-primary"
+                        class="app-btn btn-launch"
                         data-product-modal-open="create-product">
                     <spring:message code="admin.settings.loanProducts.add" text="Add loan product" />
                 </button>
@@ -284,15 +284,6 @@
                             ${product.status eq 'RETIRED' ? 'bg-rose-50 text-rose-700' : ''}">
                             ${product.status}
                         </span>
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-open="versions-${product.id}">
-                            <spring:message code="admin.settings.loanProducts.versionsShort" text="Versions" />
-                        </button>
-                        <a class="app-btn btn-primary"
-                           href="/admin/settings-controls/loan-products/${product.id}/edit">
-                            Configure
-                        </a>
                     </div>
                 </div>
 
@@ -494,6 +485,17 @@
                             <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
                         </svg>
                     </button>
+                    <div class="product-config-card-footer-actions">
+                        <button type="button"
+                                class="app-btn btn-neutral"
+                                data-product-modal-open="versions-${product.id}">
+                            <spring:message code="admin.settings.loanProducts.versionsShort" text="Versions" />
+                        </button>
+                        <a class="app-btn btn-primary"
+                           href="/admin/settings-controls/loan-products/${product.id}/edit">
+                            Configure product
+                        </a>
+                    </div>
                 </div>
             </article>
         </c:forEach>

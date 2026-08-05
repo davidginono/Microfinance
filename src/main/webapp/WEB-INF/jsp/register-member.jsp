@@ -10,13 +10,13 @@
     <title><spring:message code="register.member.title" /></title>
     <link rel="icon" type="image/png" href="<c:url value='/images/computer-resources-logo.png' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260801-aws-console-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260801-aws-console-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-teal-erp-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260805-teal-erp-v1' />" />
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
-<div id="authToastContainer" class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(100vw-1rem,24rem)] max-w-full flex-col gap-3 sm:right-5 sm:top-5"></div>
+<div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
 <div class="relative flex min-h-screen items-center justify-center px-4 py-10">
     <div class="auth-frame relative w-full max-w-[28rem] overflow-hidden px-5 py-7 sm:px-8 sm:py-8">
         <div class="mb-6 sm:mb-7">
@@ -188,18 +188,13 @@
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const requestedDuration = Number(settings.duration);
             const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (variant === 'error' ? 5200 : 3600);
-            const palette = variant === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : variant === 'error'
-                    ? 'border-rose-200 bg-rose-50 text-rose-700'
-                    : 'border-blue-200 bg-blue-50 text-blue-700';
             const icon = variant === 'success'
                 ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
                 : variant === 'error'
                     ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.5a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V6.5zm0 7a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z" clip-rule="evenodd"/></svg>'
                     : '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7.25-3.75a.75.75 0 10-1.5 0v.25a.75.75 0 001.5 0V6.25zm0 2.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z" clip-rule="evenodd"/></svg>';
             const toast = document.createElement('div');
-            toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg ' + palette;
+            toast.className = 'app-toast-enter auth-notification-bar auth-notification-' + variant;
             toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
             toast.innerHTML =
                 '<div class="flex items-start gap-3">' +
