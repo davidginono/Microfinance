@@ -13,6 +13,7 @@
     --sacco-radius: 2px;
     --sacco-topbar-height: 52px;
     --sacco-control-height: 32px;
+    --sacco-font-family: "Open Sans", Helvetica, Arial, sans-serif;
     --aws-ink: #16191f;
     --aws-topbar: #101820;
     --aws-muted: #5f6b7a;
@@ -35,9 +36,9 @@ body.aws-auth-shell {
 body.aws-auth-shell {
     margin: 0;
     color: var(--aws-ink);
-    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-family: var(--sacco-font-family) !important;
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 20px;
 }
 
 body.aws-auth-shell::before {
@@ -89,7 +90,7 @@ body.aws-auth-shell .auth-heading,
 body.aws-auth-shell .error-title {
     margin-top: 0;
     color: var(--aws-ink) !important;
-    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-family: var(--sacco-font-family) !important;
     font-size: 22px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
@@ -98,7 +99,7 @@ body.aws-auth-shell .error-title {
 body.aws-auth-shell h2,
 body.aws-auth-shell h3 {
     color: var(--aws-ink) !important;
-    font-family: "Amazon Ember", Arial, Helvetica, sans-serif !important;
+    font-family: var(--sacco-font-family) !important;
 }
 
 body.aws-auth-shell p,

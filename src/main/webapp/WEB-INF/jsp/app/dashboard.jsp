@@ -99,7 +99,7 @@ for (int i = 0; i <= statusTicks; i++) {
         .append("' x2='").append(statusChartWidth - statusRightPad).append("' y2='").append(y)
         .append("' stroke='#E2E8F0' stroke-width='1' />");
     statusYLabels.append("<text x='").append(statusLeftPad - 10).append("' y='").append(y + 4)
-        .append("' text-anchor='end' fill='#64748B' font-size='11' font-family='Manrope'>")
+        .append("' text-anchor='end' fill='#64748B' font-size='11' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
         .append(tickValue).append("</text>");
 }
 
@@ -130,13 +130,13 @@ if (!statusRows.isEmpty()) {
 
         statusValues.append("<text x='").append((int) Math.round(centerX)).append("' y='")
             .append((int) Math.round((count <= 0L ? statusTopPad + statusPlotHeight + 2 : y) - 10))
-            .append("' text-anchor='middle' fill='#172033' font-size='12' font-weight='700' font-family='Manrope'>")
+            .append("' text-anchor='middle' fill='#172033' font-size='12' font-weight='700' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
             .append(count).append("</text>");
 
         String[] pieces = splitLabel(label);
         statusLabels.append("<text x='").append((int) Math.round(centerX)).append("' y='")
             .append(statusChartHeight - 38)
-            .append("' text-anchor='middle' fill='#475569' font-size='11' font-weight='600' font-family='Manrope'>");
+            .append("' text-anchor='middle' fill='#475569' font-size='11' font-weight='600' font-family='Open Sans, Helvetica, Arial, sans-serif'>");
         for (int j = 0; j < pieces.length; j++) {
             statusLabels.append("<tspan x='").append((int) Math.round(centerX)).append("' dy='")
                 .append(j == 0 ? 0 : 14).append("'>").append(esc(pieces[j])).append("</tspan>");
@@ -180,7 +180,7 @@ for (int i = 0; i < 5; i++) {
         .append("' x2='").append(x).append("' y2='").append(loanChartHeight - loanBottomPad)
         .append("' stroke='#E2E8F0' stroke-width='1' />");
     loanTickLabels.append("<text x='").append(x).append("' y='").append(loanChartHeight - 8)
-        .append("' text-anchor='middle' fill='#64748B' font-size='11' font-family='Manrope'>")
+        .append("' text-anchor='middle' fill='#64748B' font-size='11' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
         .append(tickValue).append("d</text>");
 }
 
@@ -210,14 +210,14 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         .append(" data-due='").append(esc(dueDate)).append("'")
         .append(" data-countdown='").append(esc(countdown)).append("'></rect>");
     loanBars.append("<text x='").append(loanLeftPad + barWidth + 8).append("' y='").append(barY + 12)
-        .append("' fill='#172033' font-size='12' font-weight='700' font-family='Manrope'>")
+        .append("' fill='#172033' font-size='12' font-weight='700' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
         .append(daysLeft).append(" d</text>");
 
     loanRowLabels.append("<text x='").append(loanLeftPad - 12).append("' y='").append(y + 18)
-        .append("' text-anchor='end' fill='#172033' font-size='12' font-weight='700' font-family='Manrope'>")
+        .append("' text-anchor='end' fill='#172033' font-size='12' font-weight='700' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
         .append(esc(loanId)).append("</text>");
     loanRowLabels.append("<text x='").append(loanLeftPad - 12).append("' y='").append(y + 34)
-        .append("' text-anchor='end' fill='#64748B' font-size='11' font-family='Manrope'>")
+        .append("' text-anchor='end' fill='#64748B' font-size='11' font-family='Open Sans, Helvetica, Arial, sans-serif'>")
         .append(esc(amountLabel)).append("</text>");
 }
 %>

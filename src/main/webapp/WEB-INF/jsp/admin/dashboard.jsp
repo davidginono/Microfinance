@@ -218,7 +218,7 @@
 
             if (!history.length) {
                 ctx.fillStyle = '#64748b';
-                ctx.font = '14px Manrope, sans-serif';
+                ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
                 ctx.fillText('No database utilization samples yet.', 18, 32);
                 return;
             }
@@ -278,7 +278,7 @@
             ctx.stroke();
 
             ctx.fillStyle = '#64748b';
-            ctx.font = '12px Manrope, sans-serif';
+            ctx.font = '12px "Open Sans", Helvetica, Arial, sans-serif';
             ctx.textAlign = 'right';
             for (let i = 0; i <= 4; i++) {
                 const ratio = 1 - (i / 4);
@@ -327,7 +327,7 @@
 
             ctx.textAlign = 'center';
             ctx.fillStyle = '#64748b';
-            ctx.font = '11px Manrope, sans-serif';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
             const labelStep = Math.max(1, Math.ceil(history.length / 6));
             history.forEach(function (item, index) {
                 if (index % labelStep !== 0 && index !== history.length - 1) {
@@ -337,7 +337,7 @@
             });
 
             ctx.textAlign = 'left';
-            ctx.font = '12px Manrope, sans-serif';
+            ctx.font = '12px "Open Sans", Helvetica, Arial, sans-serif';
             ctx.fillStyle = '#0f766e';
             ctx.fillRect(padding.left, 10, 12, 12);
             ctx.fillStyle = '#334155';
@@ -368,7 +368,7 @@
                 .catch(function () {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = '#64748b';
-                    ctx.font = '14px Manrope, sans-serif';
+                    ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
                     ctx.fillText('${unableLoadDatabaseMetricsLabel}', 18, 32);
                 });
         }

@@ -7,8 +7,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Manrope", "Segoe UI", "Tahoma", "Geneva", "Verdana", "sans-serif"],
-        display: ["Sora", "Segoe UI", "Tahoma", "Geneva", "Verdana", "sans-serif"]
+        sans: ["Open Sans", "Helvetica", "Arial", "sans-serif"],
+        display: ["Open Sans", "Helvetica", "Arial", "sans-serif"]
       },
       colors: {
         sacco: {

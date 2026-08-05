@@ -70,16 +70,30 @@ class AwsConsoleViewContractTest {
     @Test
     void sharedAssetsProvideAwsShellTableAndResponsiveFilterPrimitives() throws Exception {
         String header = read(JSP_ROOT.resolve("fragments/header.jspf"));
+        String fontCss = read(Path.of("src/main/resources/static/css/open-sans.css"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+        String authCss = read(Path.of("src/main/resources/static/css/aws-auth.css"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
 
         assertThat(header)
+            .contains("open-sans-400.woff2")
+            .contains("open-sans-700.woff2")
+            .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css")
             .contains("aws-console")
             .contains("app-topbar")
             .contains("app-global-search");
+        assertThat(fontCss)
+            .contains("font-family: \"Open Sans\"")
+            .contains("open-sans-300.woff2")
+            .contains("open-sans-400.woff2")
+            .contains("open-sans-700.woff2")
+            .contains("open-sans-800.woff2")
+            .contains("font-display: swap");
         assertThat(shellCss)
             .contains("--sacco-topbar: #101820")
+            .contains("--sacco-font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
             .contains("--sacco-sidebar: #183038")
             .contains("--sacco-canvas: #eaeded")
             .contains("--sacco-control-height: 32px")
@@ -91,7 +105,20 @@ class AwsConsoleViewContractTest {
             .contains("flex-wrap: wrap !important")
             .contains("width: calc(100% - var(--shell-sidebar-width)) !important")
             .contains("max-width: calc(100vw - 32px) !important")
-            .contains(".app-table-titlebar");
+            .contains(".app-table-titlebar")
+            .doesNotContain("Amazon Ember")
+            .doesNotContain("Manrope")
+            .doesNotContain("Sora");
+        assertThat(authCss)
+            .contains("font-family: var(--sacco-font-family) !important")
+            .doesNotContain("Amazon Ember")
+            .doesNotContain("Manrope")
+            .doesNotContain("Sora");
+        assertThat(consoleCss)
+            .contains("font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
+            .doesNotContain("Amazon Ember")
+            .doesNotContain("Manrope")
+            .doesNotContain("Sora");
         assertThat(shellJs)
             .contains("enhanceConsoleTables")
             .contains("showConsoleTableLoading")

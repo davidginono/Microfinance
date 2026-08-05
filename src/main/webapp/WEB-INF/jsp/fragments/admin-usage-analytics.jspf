@@ -229,7 +229,7 @@
             const data = rows || [];
             if (!data.length) {
                 ctx.fillStyle = '#64748b';
-                ctx.font = '14px Manrope, sans-serif';
+                ctx.font = '14px "Open Sans", Helvetica, Arial, sans-serif';
                 ctx.fillText('No logins in this period yet.', 16, 28);
                 return;
             }
@@ -238,7 +238,7 @@
             const maxValue = Math.max(1, ...data.map(function (row) { return Number(row.total || 0); }));
             const axis = buildYAxis(maxValue);
             let padding = { top: 20, right: compact ? 10 : 20, bottom: compact ? 54 : 42, left: compact ? 34 : 44 };
-            ctx.font = '11px Manrope, sans-serif';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
             padding.left = Math.max(padding.left, Math.ceil(ctx.measureText(formatNumber(axis.max)).width) + 14);
             const width = cssWidth - padding.left - padding.right;
             const height = cssHeight - padding.top - padding.bottom;
@@ -254,7 +254,7 @@
             ctx.strokeStyle = '#e2e8f0';
             ctx.lineWidth = 1;
             ctx.fillStyle = '#64748b';
-            ctx.font = '11px Manrope, sans-serif';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
             ctx.textAlign = 'right';
             axis.ticks.forEach(function (tick) {
                 const gridY = y(tick);
@@ -286,7 +286,7 @@
             ctx.fill();
 
             ctx.fillStyle = '#64748b';
-            ctx.font = '11px Manrope, sans-serif';
+            ctx.font = '11px "Open Sans", Helvetica, Arial, sans-serif';
             ctx.textAlign = 'center';
             const targetLabels = compact ? 5 : 9;
             const step = Math.max(1, Math.ceil(data.length / targetLabels));

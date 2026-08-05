@@ -31,7 +31,7 @@
 
 /* Source: src/main/webapp/WEB-INF/jsp/auth/staff-mfa.jsp */
 body {
-            font-family: "Manrope", ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             background:
                 radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 34%),
                 linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
@@ -114,7 +114,7 @@ body {
 
 /* Source: src/main/webapp/WEB-INF/jsp/auth/claim.jsp */
 body {
-            font-family: 'Manrope', ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             background:
                 radial-gradient(circle at top, rgba(47, 52, 141, 0.08), transparent 34%),
                 linear-gradient(180deg, #f8fbfd 0%, #edf3f8 100%);
@@ -165,7 +165,7 @@ body {
             min-height: 100vh;
             background: linear-gradient(180deg, #eef7fa 0%, var(--page-bg) 28%, var(--page-bg) 100%);
             color: var(--text-main);
-            font-family: Manrope, ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
         }
         .error-shell {
             width: min(100%, 64rem);
@@ -184,7 +184,7 @@ body {
         }
         .error-brand-title {
             margin: 0;
-            font-family: Sora, ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             font-size: 1.2rem;
             font-weight: 700;
         }
@@ -219,7 +219,7 @@ body {
         }
         .error-title {
             margin: 0.9rem 0 0;
-            font-family: Sora, ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             font-size: clamp(1.8rem, 3.5vw, 2.45rem);
             line-height: 1.1;
         }
@@ -2560,7 +2560,7 @@ body {
             gap: 0;
         }
         .auth-heading {
-            font-family: "Sora", ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             font-size: 2.2rem;
             line-height: 0.98;
             letter-spacing: -0.05em;
@@ -2914,7 +2914,7 @@ body {
             gap: 0;
         }
         .auth-heading {
-            font-family: "Sora", ui-sans-serif, system-ui;
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
             font-size: 2.2rem;
             line-height: 0.98;
             letter-spacing: -0.05em;
@@ -5339,13 +5339,13 @@ html.session-timeout-active,
     }
     .manager-pie-label {
         fill: #475569;
-        font-family: Manrope, ui-sans-serif, system-ui;
+        font-family: "Open Sans", Helvetica, Arial, sans-serif;
         font-size: 13px;
         font-weight: 700;
     }
     .manager-pie-subtext {
         fill: #64748b;
-        font-family: Manrope, ui-sans-serif, system-ui;
+        font-family: "Open Sans", Helvetica, Arial, sans-serif;
         font-size: 11px;
         font-weight: 600;
     }
@@ -5371,7 +5371,7 @@ html.session-timeout-active,
     }
     .manager-pie-tooltip-title {
         color: #172033;
-        font-family: Manrope, ui-sans-serif, system-ui;
+        font-family: "Open Sans", Helvetica, Arial, sans-serif;
         font-size: 0.95rem;
         font-weight: 800;
         line-height: 1.2;
@@ -5379,7 +5379,7 @@ html.session-timeout-active,
     .manager-pie-tooltip-meta {
         margin-top: 0.25rem;
         color: #475569;
-        font-family: Manrope, ui-sans-serif, system-ui;
+        font-family: "Open Sans", Helvetica, Arial, sans-serif;
         font-size: 0.82rem;
         font-weight: 700;
         line-height: 1.25;
