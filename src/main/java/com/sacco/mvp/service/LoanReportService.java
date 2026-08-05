@@ -69,6 +69,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.DateTimeException;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.Year;
@@ -3723,8 +3724,18 @@ public class LoanReportService {
                     max = Math.max(max, numberValue(point.get("y")));
                 }
             }
-            write("0", chartX - 12, chartY - 2, regular, SMALL);
-            write(String.valueOf(max), chartX - 12, chartY + chartHeight - 2, regular, SMALL);
+            int tickIntervals = (int) Math.min(4L, max);
+            for (int tick = 0; tick <= tickIntervals; tick++) {
+                float tickY = chartY + (chartHeight * tick / tickIntervals);
+                long tickValue = Math.round(max * tick / (double) tickIntervals);
+                if (tick > 0 && tick < tickIntervals) {
+                    stream.setStrokingColor(new Color(220, 224, 230));
+                    stream.setLineWidth(0.25f);
+                    line(chartX, tickY, chartX + chartWidth, tickY);
+                    stream.setStrokingColor(Color.BLACK);
+                }
+                write(String.valueOf(tickValue), chartX - 18, tickY - 2, regular, SMALL);
+            }
             List<Map<String, Object>> labelPoints = report.trendSeries().stream()
                 .filter(series -> !series.dataPoints().isEmpty())
                 .findFirst()
@@ -3781,7 +3792,15 @@ public class LoanReportService {
 
         private String shortTrendLabel(Object value) {
             String label = trendPeriodLabel(value);
-            return label != null && label.length() >= 4 ? label.substring(label.length() - 4) : valueOrDash(label);
+            if (label == null || label.isBlank()) {
+                return "-";
+            }
+            try {
+                YearMonth period = YearMonth.parse(label, DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH));
+                return period.format(DateTimeFormatter.ofPattern("MMM yy", Locale.ENGLISH));
+            } catch (DateTimeException ignored) {
+                return label;
+            }
         }
 
         private void signOff(float x, float top, float width) throws IOException {

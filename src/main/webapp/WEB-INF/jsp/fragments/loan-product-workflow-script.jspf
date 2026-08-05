@@ -81,10 +81,14 @@
             const block = document.createElement('div');
             block.className = 'workflow-warning is-' + tone;
             block.textContent = message;
-            block.hidden = true;
             block.setAttribute('data-toast-message', message);
             block.setAttribute('data-toast-type', tone === 'danger' ? 'error' : 'info');
             return block;
+        }
+
+        function workflowFormIsActive(form) {
+            const modal = form.closest('[data-product-modal]');
+            return !modal || (modal.classList.contains('is-open') && !modal.classList.contains('hidden'));
         }
 
         function numberOrNull(input) {
@@ -735,11 +739,13 @@
 
                 warningsRoot.innerHTML = '';
                 warnings.forEach((warning) => warningsRoot.appendChild(warning));
+                warningsRoot.hidden = warnings.length === 0;
+                warningsRoot.setAttribute('aria-hidden', warnings.length === 0 ? 'true' : 'false');
                 warnings.forEach((warning) => {
                     const message = warning.textContent.trim();
                     const toastType = warning.getAttribute('data-toast-type') || 'info';
                     const warningKey = toastType + ':' + message;
-                    if (!message || publishedWorkflowWarnings.has(warningKey)) {
+                    if (!workflowFormIsActive(form) || !message || publishedWorkflowWarnings.has(warningKey)) {
                         return;
                     }
                     publishedWorkflowWarnings.add(warningKey);
@@ -977,6 +983,7 @@
                 syncProductCode();
             }
 
+            form.addEventListener('workflow:refresh', applyRules);
             form.addEventListener('submit', (event) => {
                 clearFieldErrors(form);
                 applyRules();
@@ -1121,6 +1128,9 @@
                     modal.classList.remove('hidden');
                     modal.classList.add('is-open');
                     body.classList.add('overflow-hidden');
+                    modal.querySelectorAll('[data-product-workflow-builder="true"]').forEach((form) => {
+                        form.dispatchEvent(new Event('workflow:refresh'));
+                    });
                 }
             });
         });

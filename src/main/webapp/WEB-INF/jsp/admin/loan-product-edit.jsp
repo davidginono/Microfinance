@@ -562,7 +562,7 @@
                         <details class="workflow-subsection product-config-subsection" open>
                             <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></summary>
                             <div class="product-config-subsection-body">
-                            <div class="workflow-warning-stack" data-workflow-warnings hidden aria-hidden="true"></div>
+                            <div class="workflow-warning-stack" data-workflow-warnings></div>
                             </div>
                         </details>
                     </div>

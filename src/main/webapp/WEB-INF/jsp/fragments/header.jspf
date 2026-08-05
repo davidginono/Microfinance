@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-sims-shell-v4' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260805-sims-shell-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260806-sims-shell-v9' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -100,7 +100,7 @@
                     ${headerStation.stationId}
                 </div>
             </c:if>
-            <div class="relative">
+            <div class="app-notification-control relative">
                 <button id="notificationToggle" type="button" class="erp-icon-btn" aria-label="<spring:message code='notifications.title' text='Notifications' />">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10 2a4 4 0 00-4 4v1.172c0 .53-.211 1.039-.586 1.414L4.293 9.707A1 1 0 004 10.414V12a2 2 0 002 2h8a2 2 0 002-2v-1.586a1 1 0 00-.293-.707l-1.121-1.121A2 2 0 0114 7.172V6a4 4 0 00-4-4zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z"/>
@@ -120,7 +120,7 @@
                     </div>
                 </div>
             </div>
-            <div class="hidden lg:flex items-center px-2 py-0 text-right">
+            <div class="app-account-copy hidden lg:flex items-center px-2 py-0 text-right">
                 <div class="min-w-0">
                     <p class="truncate text-sm font-semibold text-white">
                         <c:choose>
@@ -148,7 +148,7 @@
                     </p>
                 </div>
             </div>
-            <div class="relative">
+            <div class="app-profile-control relative">
                 <button id="profileToggle" type="button" class="erp-icon-btn profile-icon-btn" aria-label="<spring:message code='profile.openDetails' text='Open profile details' />">
                     <img src="<c:url value='/profile/image/me' />"
                          alt=""
@@ -250,7 +250,7 @@
                     </div>
                 </div>
             </div>
-            <form action="/logout" method="post" class="m-0 shrink-0">
+            <form action="/logout" method="post" class="app-logout-control m-0 shrink-0">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <button type="submit" class="app-btn erp-topbar-btn btn-primary px-3 text-[0.78rem] sm:px-4 max-[374px]:px-2.5 max-[374px]:text-[0.72rem]"><spring:message code="nav.logout" /></button>
             </form>
@@ -281,4 +281,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260805-sims-shell-v4' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260806-sims-shell-v9' />" defer></script>

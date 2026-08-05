@@ -87,8 +87,8 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css")
-            .contains("shell.css?v=20260805-sims-shell-v4")
-            .contains("shell.js?v=20260805-sims-shell-v4")
+            .contains("shell.css?v=20260806-sims-shell-v9")
+            .contains("shell.js?v=20260806-sims-shell-v9")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -98,6 +98,9 @@ class AwsConsoleViewContractTest {
             .contains("app-topbar")
             .contains("app-topbar-left")
             .contains("app-topbar-actions")
+            .contains("app-notification-control")
+            .contains("app-account-copy")
+            .contains("app-profile-control")
             .contains("shellPageBreadcrumbRailText")
             .contains("pageSubmitPreloader")
             .contains("app-global-search");
@@ -124,18 +127,34 @@ class AwsConsoleViewContractTest {
             .contains(".aws-filter-toolbar")
             .contains("flex-wrap: wrap !important")
             .contains("width: calc(100% - var(--shell-sidebar-width)) !important")
+            .doesNotContain("padding-left: calc(var(--shell-sidebar-width) + 12px) !important")
+            .doesNotContain("padding-left: calc(var(--shell-sidebar-collapsed-width) + 12px) !important")
             .contains("max-width: calc(100vw - 32px) !important")
             .contains(".app-table-titlebar")
             .contains("#appToastContainer .app-toast-close")
+            .contains("background: transparent !important")
+            .contains(".aws-console .workflow-table-head")
+            .contains(".aws-console .admin-register-shell .erp-table thead th")
+            .contains(".aws-console .member-dashboard-flow-track")
             .contains("transform: translateY(-50%) !important")
             .contains(".app-global-brand .app-global-logo")
             .contains(".app-topbar .profile-icon-btn .profile-avatar-img")
+            .contains("SIMS reference shell")
+            .contains(".shell-sidebar-nav-heading")
+            .contains("--shell-sidebar-width: 330px")
+            .contains("--shell-nav-fixed-height: 52px")
+            .contains("--shell-topbar-control-height: 32px")
+            .contains("@media (max-width: 420px)")
+            .contains(".app-global-brand > div")
+            .contains(".shell-nav-active")
+            .contains("border-left: 3px solid var(--aws-orange) !important")
             .doesNotContain("Amazon Ember")
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(authCss)
             .contains("font-family: var(--sacco-font-family) !important")
             .contains(".auth-notification-bar button[type=\"button\"].app-toast-close")
+            .contains("background: transparent !important")
             .contains("width: 24px !important")
             .contains("transform: translateY(-50%) !important")
             .doesNotContain("Amazon Ember")
@@ -147,13 +166,14 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)
-            .contains("aws-auth.css?v=20260805-nav-toast-v3")
+            .contains("aws-auth.css?v=20260806-clean-toast-v4")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
-            .contains("aws-auth.css?v=20260805-nav-toast-v3")
+            .contains("aws-auth.css?v=20260806-clean-toast-v4")
             .contains("class=\"app-toast-close-icon\"")
             .doesNotContain("&times;");
         assertThat(shellJs)
+            .contains("syncActiveSidebarLink")
             .contains("app-toast-close-icon")
             .doesNotContain("&times;")
             .contains("enhanceConsoleTables")
@@ -323,6 +343,9 @@ class AwsConsoleViewContractTest {
             .contains("saveState.textContent = 'Unsaved changes'")
             .contains("window.sessionStorage.setItem(storageKey")
             .contains("window.showToast('error', message")
+            .contains("workflowFormIsActive")
+            .contains("warningsRoot.hidden = warnings.length === 0")
+            .contains("form.addEventListener('workflow:refresh', applyRules)")
             .contains("expanded ? 'Show less' : 'See more'");
         assertThat(consoleCss)
             .contains(".product-catalog-grid")
@@ -337,6 +360,17 @@ class AwsConsoleViewContractTest {
             .contains(".aws-console .product-config-workspace input:not([type=\"checkbox\"])")
             .contains("min-height: var(--sacco-control-height) !important")
             .contains(".aws-console .product-catalog .app-btn");
+    }
+
+    @Test
+    void regionalLoadingDoesNotCompeteWithThePagePreloader() throws Exception {
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+
+        assertThat(shellJs)
+            .contains("hidePageSubmitPreloader();")
+            .contains("const regionalLoaderActive")
+            .contains("if (regionalLoaderActive || regionalForm)")
+            .contains("[data-aws-table-region][aria-busy=\"true\"]");
     }
 
     @Test

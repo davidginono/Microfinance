@@ -19,6 +19,48 @@
     const isAdminWorkspace = function () {
         return isAdminWorkspacePath(window.location.pathname || '');
     };
+    const syncActiveSidebarLink = function () {
+        const navigation = document.querySelector('.shell-sidebar-scroll');
+        if (!navigation) {
+            return;
+        }
+        const currentPath = window.location.pathname || '/';
+        const currentSearch = window.location.search || '';
+        const links = Array.from(navigation.querySelectorAll('a[href]'));
+        let bestMatch = null;
+        let bestScore = -1;
+        links.forEach(function (link) {
+            let target;
+            try {
+                target = new URL(link.getAttribute('href'), window.location.origin);
+            } catch (ignored) {
+                return;
+            }
+            const exactPath = target.pathname === currentPath;
+            const parentPath = currentPath.indexOf(target.pathname + '/') === 0;
+            if (!exactPath && !parentPath) {
+                return;
+            }
+            let score = target.pathname.length;
+            if (exactPath) {
+                score += 10000;
+            }
+            if (target.search && target.search === currentSearch) {
+                score += 20000;
+            } else if (target.search) {
+                score -= 1000;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = link;
+            }
+        });
+        if (bestMatch) {
+            bestMatch.classList.add('shell-nav-active');
+            bestMatch.setAttribute('aria-current', 'page');
+        }
+    };
+    syncActiveSidebarLink();
     if (toastContainer && toastContainer.parentElement !== document.body) {
         document.body.appendChild(toastContainer);
     }
@@ -253,6 +295,9 @@
         });
     };
     const showConsoleTableLoading = function (formOrControl) {
+        if (!formOrControl) {
+            return;
+        }
         const nearbyRegion = formOrControl.closest('.erp-table-wrap')
             || formOrControl.parentElement?.querySelector('.erp-table-wrap')
             || document.querySelector('.erp-table-wrap');
@@ -261,6 +306,7 @@
         }
         nearbyRegion.classList.add('is-loading');
         nearbyRegion.setAttribute('aria-busy', 'true');
+        hidePageSubmitPreloader();
         const loader = document.createElement('div');
         loader.className = 'aws-table-loader';
         loader.setAttribute('role', 'status');
@@ -447,6 +493,15 @@
 
     const showPageSubmitPreloader = function (form) {
         if (!pageSubmitPreloader || pageSubmitPreloaderActive) {
+            return;
+        }
+        const regionalLoaderActive = document.querySelector('.erp-table-wrap.is-loading, [data-aws-table-region][aria-busy="true"]');
+        const regionalForm = form && (
+            form.matches('form[method="get"], form:not([method]), [data-aws-filter-toolbar], .aws-filter-toolbar, .admin-filter-form, .loan-analytics-filter, .staff-analytics-filter')
+            || form.closest('[data-aws-table-region], .erp-table-wrap')
+            || form.parentElement?.querySelector('[data-aws-table-region], .erp-table-wrap')
+        );
+        if (regionalLoaderActive || regionalForm) {
             return;
         }
         pageSubmitPreloaderActive = true;

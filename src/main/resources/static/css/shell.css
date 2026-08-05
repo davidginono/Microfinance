@@ -2715,13 +2715,22 @@ body.aws-console {
     min-width: 24px !important;
     height: 24px !important;
     min-height: 24px !important;
-    border: 1px solid rgba(255, 255, 255, .55) !important;
-    border-radius: 2px !important;
-    background: rgba(255, 255, 255, .12) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
     color: #ffffff !important;
     padding: 0 !important;
     font-size: 0 !important;
     transform: translateY(-50%) !important;
+}
+
+#appToastContainer .app-toast-close:hover,
+#appToastContainer .app-toast-close:focus-visible {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    opacity: .72;
 }
 
 .app-toast-close-icon {
@@ -4027,13 +4036,537 @@ body.aws-console,
     white-space: nowrap;
 }
 
-@media (min-width: 1024px) {
-    .shell-main {
-        padding-right: 12px !important;
-        padding-left: calc(var(--shell-sidebar-width) + 12px) !important;
+/* SIMS reference shell: compact utility bar, grouped dark rail, and breadcrumb strip. */
+:root {
+    --shell-sidebar-width: 330px;
+    --shell-sidebar-collapsed-width: 64px;
+    --shell-nav-height: 52px;
+    --shell-context-height: 52px;
+    --shell-content-gap: 0px;
+    --shell-nav-fixed-height: 52px;
+    --shell-topbar-control-height: 32px;
+}
+
+.app-topbar {
+    height: var(--shell-nav-fixed-height) !important;
+    min-height: var(--shell-nav-fixed-height) !important;
+    box-sizing: border-box;
+}
+
+.app-topbar > .app-topbar-inner {
+    height: 100%;
+    min-height: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 !important;
+    padding: 0 14px !important;
+}
+
+.app-topbar-left {
+    height: 100%;
+    gap: 0 !important;
+}
+
+.app-global-brand {
+    align-self: stretch;
+    flex: 0 0 256px;
+    min-width: 256px;
+    gap: 12px !important;
+    border-right: 1px solid #414750;
+    padding-right: 14px;
+}
+
+.app-global-brand .app-global-logo {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px;
+    border-radius: 0 !important;
+}
+
+.app-global-brand p:first-child {
+    max-width: 180px;
+    font-size: 16px !important;
+    line-height: 20px !important;
+    white-space: nowrap !important;
+}
+
+.app-global-brand p:last-child {
+    display: none !important;
+}
+
+.app-global-search {
+    flex: 1 1 38rem;
+    width: min(36vw, 604px);
+    max-width: 604px;
+    margin: 0 14px !important;
+}
+
+.aws-console .app-topbar .app-global-search,
+.aws-console .app-topbar .app-global-search input {
+    height: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    max-height: var(--shell-topbar-control-height) !important;
+}
+
+.aws-console .app-topbar .app-global-search input {
+    background: #111820 !important;
+    border-color: #687078 !important;
+    border-radius: 2px !important;
+    color: #f2f3f3 !important;
+    font-size: 14px !important;
+}
+
+.app-topbar-actions {
+    height: 100%;
+    gap: 0 !important;
+    border-left: 1px solid #414750;
+    padding-left: 6px;
+}
+
+.app-topbar-actions > * {
+    flex-shrink: 0;
+}
+
+.app-station-selector,
+.app-notification-control,
+.app-profile-control,
+.app-logout-control {
+    margin-left: 6px;
+}
+
+.app-account-copy {
+    order: 4;
+    min-width: 168px;
+    height: 100%;
+    border-left: 1px solid #414750;
+    margin-left: 8px;
+    padding: 0 10px !important;
+}
+
+.app-profile-control {
+    order: 3;
+}
+
+.app-logout-control {
+    order: 5;
+}
+
+.app-station-selector {
+    order: 1;
+}
+
+.app-notification-control {
+    order: 2;
+}
+
+.app-topbar .erp-icon-btn,
+.app-topbar .erp-topbar-btn,
+.app-topbar button {
+    height: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    max-height: var(--shell-topbar-control-height) !important;
+    border-radius: 2px !important;
+}
+
+.app-station-selector {
+    height: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    max-height: var(--shell-topbar-control-height) !important;
+    border-radius: 2px !important;
+    background: transparent !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.app-station-icon {
+    width: 24px !important;
+    height: 24px !important;
+}
+
+.app-station-copy p:first-child {
+    font-size: 9px !important;
+    line-height: 11px !important;
+}
+
+.app-station-copy p:nth-child(2) {
+    font-size: 12px !important;
+    line-height: 14px !important;
+}
+
+.app-station-copy p:nth-child(3) {
+    display: none !important;
+}
+
+.app-account-copy p:first-child {
+    font-size: 13px !important;
+    line-height: 16px !important;
+}
+
+.app-account-copy p:last-child {
+    margin-top: 0 !important;
+    font-size: 12px !important;
+    line-height: 14px !important;
+}
+
+.shell-sidebar-toggle-row {
+    min-height: var(--shell-context-height) !important;
+    height: var(--shell-context-height);
+    justify-content: space-between !important;
+    border-bottom: 1px solid #52606b !important;
+    background: #1d2a30 !important;
+    padding: 0 12px !important;
+}
+
+.shell-sidebar-toggle-label {
+    font-size: 16px !important;
+    letter-spacing: .02em !important;
+}
+
+.desktop-sidebar-toggle {
+    width: 48px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    border-color: #52606b !important;
+    background: #263640 !important;
+}
+
+.shell-sidebar-scroll {
+    padding: 0 0 12px !important;
+    background: #1d2a30 !important;
+}
+
+.shell-sidebar-nav-heading,
+.shell-sidebar-scroll > .px-3.pb-1.pt-3 {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 !important;
+    border-top: 1px solid rgba(182, 195, 200, .2);
+    padding: 18px 24px 10px !important;
+    color: #aab7bb;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 18px;
+    text-transform: uppercase;
+}
+
+.shell-sidebar-nav-heading:first-child {
+    border-top: 0;
+}
+
+.shell-sidebar-scroll > .px-3.pb-1.pt-3 p {
+    color: inherit !important;
+    font-size: inherit !important;
+    letter-spacing: .02em !important;
+}
+
+.shell-sidebar-scroll > a,
+.shell-sidebar-scroll > button,
+.shell-sidebar-scroll > div > a,
+.shell-sidebar-scroll > div > button,
+.shell-sidebar-scroll .shell-review-panel-link {
+    width: calc(100% - 24px) !important;
+    min-height: 54px !important;
+    margin-right: 12px !important;
+    margin-left: 12px !important;
+    gap: 12px !important;
+    padding: 12px !important;
+    color: #d5dfe2 !important;
+    font-size: 18px !important;
+    line-height: 24px !important;
+}
+
+.shell-sidebar-scroll a > span:first-child,
+.shell-sidebar-scroll button > span:first-child {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+.shell-sidebar-scroll a > span:first-child svg,
+.shell-sidebar-scroll button > span:first-child svg {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.shell-sidebar-scroll a[class*="bg-cyan-50"],
+.shell-sidebar-scroll button[class*="bg-cyan-50"],
+.shell-sidebar-scroll a[class*="bg-blue-50"],
+.shell-sidebar-scroll button[class*="bg-blue-50"],
+.shell-sidebar-scroll a[class*="bg-green-50"],
+.shell-sidebar-scroll button[class*="bg-green-50"],
+.shell-sidebar-scroll a[class*="bg-amber-50"],
+.shell-sidebar-scroll button[class*="bg-amber-50"],
+.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"],
+.shell-sidebar-scroll .shell-nav-active {
+    border: 1px solid #52606b !important;
+    border-left: 3px solid var(--aws-orange) !important;
+    background: #263640 !important;
+    color: #ffffff !important;
+}
+
+.shell-sidebar-scroll a[class*="bg-cyan-50"] > span:first-child,
+.shell-sidebar-scroll button[class*="bg-cyan-50"] > span:first-child,
+.shell-sidebar-scroll a[class*="bg-blue-50"] > span:first-child,
+.shell-sidebar-scroll button[class*="bg-blue-50"] > span:first-child,
+.shell-sidebar-scroll a[class*="bg-green-50"] > span:first-child,
+.shell-sidebar-scroll button[class*="bg-green-50"] > span:first-child,
+.shell-sidebar-scroll a[class*="bg-amber-50"] > span:first-child,
+.shell-sidebar-scroll button[class*="bg-amber-50"] > span:first-child,
+.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"] > span:first-child {
+    color: var(--aws-orange) !important;
+}
+
+.shell-sidebar-scroll .shell-nav-active > span:first-child {
+    color: var(--aws-orange) !important;
+}
+
+.shell-sidebar-group > div {
+    margin: 0 12px !important;
+    background: #17242a !important;
+    box-shadow: inset 3px 0 0 #52606b !important;
+    padding: 4px 0 4px 26px !important;
+}
+
+.shell-sidebar-group > div a {
+    width: 100% !important;
+    margin: 0 !important;
+    min-height: 42px !important;
+    padding: 8px 10px !important;
+    font-size: 15px !important;
+}
+
+.shell-powered-by {
+    border-top: 1px solid #52606b !important;
+    background: #1d2a30 !important;
+}
+
+.shell-page-title-rail__inner {
+    display: flex;
+    min-height: var(--shell-context-height) !important;
+    align-items: center;
+    border-bottom: 1px solid var(--aws-line) !important;
+    background: #ffffff !important;
+    padding: 0 18px !important;
+}
+
+.shell-page-title-rail__text {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    font-size: 18px !important;
+    line-height: 24px !important;
+}
+
+.shell-page-title-rail__path {
+    color: #465568 !important;
+}
+
+@media (max-width: 1279px) {
+    :root {
+        --shell-sidebar-width: 280px;
     }
 
-    .shell-sidebar-collapsed .shell-main {
-        padding-left: calc(var(--shell-sidebar-collapsed-width) + 12px) !important;
+    .app-global-brand {
+        flex-basis: 220px;
+        min-width: 220px;
+    }
+
+    .app-global-search {
+        width: min(34vw, 440px);
+        margin-right: 8px !important;
+        margin-left: 8px !important;
+    }
+
+    .app-account-copy {
+        min-width: 132px;
+    }
+}
+
+@media (max-width: 1023px) {
+    :root {
+        --shell-sidebar-width: 296px;
+        --shell-nav-height: 52px;
+        --shell-nav-fixed-height: 52px;
+        --shell-context-height: 0px;
+    }
+
+    .app-topbar > .app-topbar-inner {
+        display: flex !important;
+        padding: 0 8px !important;
+    }
+
+    .app-global-brand {
+        flex: 0 1 auto;
+        min-width: 0;
+        border-right: 0;
+        padding-right: 0;
+    }
+
+    .app-global-brand .app-global-logo {
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 30px;
+    }
+
+    .app-global-brand p:first-child {
+        font-size: 14px !important;
+    }
+
+    .aws-mobile-menu-button {
+        width: var(--shell-topbar-control-height) !important;
+        min-width: var(--shell-topbar-control-height) !important;
+    }
+
+    .shell-sidebar-nav-heading {
+        padding-right: 14px !important;
+        padding-left: 14px !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-global-brand {
+        flex: 0 0 30px;
+        width: 30px;
+    }
+
+    .app-global-brand > div {
+        display: none !important;
+    }
+}
+
+/* Shared old-AWS content surfaces for workflows, registers, queues and progress. */
+.aws-console .workflow-table,
+.aws-console [data-board-reviewer-list],
+.aws-console [data-credit-committee-reviewer-list],
+.aws-console .admin-register-shell,
+.aws-console .member-dashboard-flow-shell,
+.aws-console .member-dashboard-mobile-flow {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--aws-line) !important;
+    border-radius: 2px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 1px rgba(0, 28, 36, .08) !important;
+}
+
+.aws-console .workflow-table { overflow-x: auto; }
+.aws-console .workflow-table-head,
+.aws-console .workflow-table-row {
+    min-width: 720px;
+    gap: 0;
+    padding: 0;
+}
+.aws-console .workflow-table-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--aws-line) !important;
+    background: #eaeded !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    letter-spacing: .02em !important;
+    text-transform: none !important;
+}
+.aws-console .workflow-table-head > div,
+.aws-console .workflow-table-cell {
+    min-height: 42px;
+    padding: 8px 10px !important;
+    border-right: 1px solid #eaeded;
+    color: var(--aws-ink) !important;
+    font-size: 13px !important;
+    line-height: 20px;
+}
+.aws-console .workflow-table-head > div:last-child,
+.aws-console .workflow-table-cell:last-child { border-right: 0; }
+.aws-console .workflow-table-row + .workflow-table-row { border-top: 1px solid #eaeded !important; }
+.aws-console .workflow-table-row:hover { background: #f2f8fd; }
+.aws-console .workflow-priority-select {
+    width: 100%;
+    max-width: 92px;
+    min-height: 32px !important;
+    height: 32px !important;
+    border: 1px solid var(--aws-line-dark) !important;
+    border-radius: 2px !important;
+    background: #fff !important;
+    padding: 4px 26px 4px 8px !important;
+    font-size: 13px !important;
+}
+.aws-console [data-board-reviewer-list],
+.aws-console [data-credit-committee-reviewer-list] {
+    display: grid;
+    gap: 0 !important;
+    max-height: 260px;
+    overflow: auto;
+}
+.aws-console [data-board-reviewer-option],
+.aws-console [data-credit-committee-reviewer-option] {
+    min-height: 40px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #eaeded !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    padding: 8px 10px !important;
+}
+.aws-console [data-board-reviewer-option]:last-child,
+.aws-console [data-credit-committee-reviewer-option]:last-child { border-bottom: 0 !important; }
+.aws-console [data-board-reviewer-option]:hover,
+.aws-console [data-credit-committee-reviewer-option]:hover { background: #f2f8fd !important; }
+
+.aws-console .workflow-warning-stack[hidden] { display: none !important; }
+.aws-console .workflow-warning-stack { gap: 6px !important; }
+.aws-console .workflow-warning {
+    border-width: 0 0 0 3px !important;
+    border-radius: 0 !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    line-height: 20px !important;
+}
+.aws-console .workflow-warning.is-info {
+    border-left-color: var(--aws-blue) !important;
+    background: #f1faff !important;
+    color: #033160 !important;
+}
+.aws-console .workflow-warning.is-danger {
+    border-left-color: var(--aws-danger) !important;
+    background: #fff5f5 !important;
+    color: #7d2105 !important;
+}
+
+.aws-console .admin-register-shell > .erp-table-scroll,
+.aws-console .admin-register-shell [data-aws-table-region] {
+    max-width: 100%;
+    max-height: min(60vh, 620px);
+    overflow: auto !important;
+    overscroll-behavior: contain;
+}
+.aws-console .admin-register-shell .erp-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #eaeded !important;
+}
+.aws-console .member-dashboard-flow-shell,
+.aws-console .member-dashboard-mobile-flow { padding: 12px !important; }
+.aws-console .member-dashboard-flow-track {
+    overflow-x: auto;
+    scrollbar-gutter: stable;
+}
+.aws-console .member-dashboard-flow-list { min-width: max-content; }
+.aws-console .member-dashboard-flow-step {
+    min-width: 160px;
+    border-radius: 2px !important;
+}
+
+@media (max-width: 640px) {
+    .aws-console .workflow-table-head,
+    .aws-console .workflow-table-row { min-width: 0; }
+    .aws-console .workflow-table-cell {
+        min-height: 0;
+        border-right: 0;
+        padding: 7px 10px !important;
     }
 }

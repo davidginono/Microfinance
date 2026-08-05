@@ -447,6 +447,8 @@ class LoanReportServiceTest {
 
         try (PDDocument document = Loader.loadPDF(pdf)) {
             assertThat(document.getNumberOfPages()).isEqualTo(2);
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Jun 25").contains("Jun 26");
         }
     }
 
