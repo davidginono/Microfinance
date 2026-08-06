@@ -330,37 +330,6 @@ CREATE TABLE public.loan_product_settings (
 
 
 --
--- Name: loan_product_versions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.loan_product_versions (
-    id uuid NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL,
-    created_by_member_id uuid,
-    loan_product_setting_id uuid NOT NULL,
-    sacco_id character varying(255) NOT NULL,
-    snapshot_json jsonb NOT NULL,
-    snapshot_type character varying(40) NOT NULL,
-    version_number integer NOT NULL
-);
-
-
---
--- Name: loan_products_versions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.loan_products_versions (
-    id uuid NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL,
-    created_by_member_id uuid,
-    sacco_id character varying(255) NOT NULL,
-    snapshot_json jsonb NOT NULL,
-    snapshot_type character varying(40) NOT NULL,
-    version_number integer NOT NULL
-);
-
-
---
 -- Name: manager_reviews; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -871,22 +840,6 @@ ALTER TABLE ONLY public.loan_product_settings
 
 
 --
--- Name: loan_product_versions loan_product_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.loan_product_versions
-    ADD CONSTRAINT loan_product_versions_pkey PRIMARY KEY (id);
-
-
---
--- Name: loan_products_versions loan_products_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.loan_products_versions
-    ADD CONSTRAINT loan_products_versions_pkey PRIMARY KEY (id);
-
-
---
 -- Name: manager_reviews manager_reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1039,14 +992,6 @@ ALTER TABLE ONLY public.stored_uploads
 
 
 --
--- Name: loan_products_versions uk1otio0vbbt215pfi3ymxur0bo; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.loan_products_versions
-    ADD CONSTRAINT uk1otio0vbbt215pfi3ymxur0bo UNIQUE (sacco_id, version_number);
-
-
---
 -- Name: guarantor_requests uk695pu1ejdrmydcxnx9vjjjkfv; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1108,14 +1053,6 @@ ALTER TABLE ONLY public.station_sms_accounts
 
 ALTER TABLE ONLY public.members
     ADD CONSTRAINT ukfhh3rprrwq7dq8ol3ds43em3y UNIQUE (member_no);
-
-
---
--- Name: loan_product_versions ukftwupwskdw1k4pj1htke3o1so; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.loan_product_versions
-    ADD CONSTRAINT ukftwupwskdw1k4pj1htke3o1so UNIQUE (loan_product_setting_id, version_number);
 
 
 --

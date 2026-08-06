@@ -54,8 +54,9 @@
     </div>
 </div>
 
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
-    <table class="erp-table">
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
+    <div class="erp-table-scroll" data-view-position-key="accountant-archive-table">
+        <table class="erp-table">
         <thead>
         <tr>
             <th>${archivePrimaryColumnLabel}</th>
@@ -109,8 +110,9 @@
             </tr>
         </c:if>
         </tbody>
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
 <c:if test="${archivePage.totalPages gt 1}">
     <div class="mt-4 flex items-center justify-between gap-3">

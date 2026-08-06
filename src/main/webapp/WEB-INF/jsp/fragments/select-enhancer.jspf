@@ -15,7 +15,7 @@
             }
             state.wrapper.classList.remove('neo-select--open');
             state.button.setAttribute('aria-expanded', 'false');
-            state.menu.classList.remove('is-open', 'is-open-upward');
+            state.menu.classList.remove('is-open');
         }
 
         function closeAllEnhancedSelects(exceptState) {
@@ -161,27 +161,24 @@
                 Math.max(rect.left, viewportPadding),
                 Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
             );
-            const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
-            const availableAbove = rect.top - viewportPadding;
+            const availableBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
             const desiredHeight = Math.min(state.menu.scrollHeight || 0, 272);
-            const forcedDirection = state.select.dataset.neoDirection;
-            const forceDown = forcedDirection === 'down';
-            const openUpward = forceDown
-                ? false
-                : availableBelow < Math.min(desiredHeight, 180) && availableAbove > availableBelow;
-            const maxHeight = Math.max(120, openUpward ? availableAbove : availableBelow);
-            const menuHeight = Math.min(desiredHeight || 272, maxHeight);
-            const top = forceDown
-                ? rect.bottom - 1
-                : openUpward
-                ? Math.max(viewportPadding, rect.top - menuHeight + 1)
-                : Math.min(window.innerHeight - menuHeight - viewportPadding, rect.bottom - 1);
+            const menuHeight = Math.min(desiredHeight || 272, Math.max(48, availableBelow));
+            const top = rect.bottom - 1;
 
             state.menu.style.left = left + 'px';
             state.menu.style.top = top + 'px';
             state.menu.style.setProperty('--neo-select-menu-width', menuWidth + 'px');
             state.menu.style.maxHeight = menuHeight + 'px';
-            state.menu.classList.toggle('is-open-upward', openUpward);
+        }
+
+        function makeRoomBelow(state) {
+            const rect = state.button.getBoundingClientRect();
+            const availableBelow = window.innerHeight - rect.bottom - 8;
+            const desiredHeight = Math.min(state.menu.scrollHeight || 272, 272);
+            if (availableBelow < Math.min(desiredHeight, 160)) {
+                state.button.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+            }
         }
 
         function positionAllOpenMenus() {
@@ -205,7 +202,7 @@
             state.wrapper.classList.add('neo-select--open');
             state.button.setAttribute('aria-expanded', 'true');
             state.menu.classList.add('is-open');
-            positionMenu(state);
+            makeRoomBelow(state);
             window.requestAnimationFrame(function () {
                 positionMenu(state);
                 focusOption(state, 'selected');

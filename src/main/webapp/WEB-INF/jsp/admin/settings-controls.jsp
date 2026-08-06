@@ -242,17 +242,9 @@
     <section class="product-catalog" aria-labelledby="loan-product-catalog-title">
         <div class="product-catalog-toolbar">
             <div class="product-catalog-heading">
-                <p class="erp-widget-title">Step 1 of 2 &middot; <spring:message code="admin.settings.loanProducts.single" text="Loan Products" /></p>
                 <h2 id="loan-product-catalog-title">Select a loan product</h2>
             </div>
             <div class="product-catalog-actions">
-                <c:if test="${not empty loanProductsVersions}">
-                    <button type="button"
-                            class="app-btn btn-neutral"
-                            data-product-modal-open="loan-products-versions">
-                        <spring:message code="admin.settings.loanProducts.versions" text="Loan Products Versions" />
-                    </button>
-                </c:if>
                 <button type="button"
                         class="app-btn btn-launch"
                         data-product-modal-open="create-product">
@@ -484,11 +476,6 @@
                         </svg>
                     </button>
                     <div class="product-config-card-footer-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-open="versions-${product.id}">
-                            <spring:message code="admin.settings.loanProducts.versionsShort" text="Versions" />
-                        </button>
                         <a class="app-btn btn-primary"
                            href="/admin/settings-controls/loan-products/${product.id}/edit">
                             Configure product
@@ -559,68 +546,6 @@
                         <button type="submit" class="app-btn btn-primary"><spring:message code="common.save" text="Save" /></button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-</c:if>
-
-<c:if test="${settingsSection eq 'loan' and not empty loanProductsVersions}">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="loan-products-versions">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanProductVersions" text="Loan Products Versions" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.portfolioSnapshots" text="Portfolio Snapshots" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.portfolioSnapshotsHelp" text="Each entry stores the full loan products configuration set for this SACCO at that moment." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="loan-products-versions" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="app-modal-body">
-                    <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading versions...">
-                        <table class="erp-table">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <tr>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.applicationFee" text="Application Fee" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.products" text="Products" /></th>
-                                <th class="px-4 py-3"><spring:message code="admin.settings.productNames" text="Product Names" /></th>
-                            </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
-                            <c:forEach items="${loanProductsVersions}" var="version">
-                                <tr>
-                                    <td class="px-4 py-3 align-top">
-                                        <p class="font-semibold text-sacco-ink">V${version.versionNumber}</p>
-                                        <p class="mt-1 text-xs text-slate-500">${version.snapshotType}</p>
-                                    </td>
-                                    <td class="px-4 py-3 align-top">${version.savedAtLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.savedByLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.applicationFeeLabel}</td>
-                                    <td class="px-4 py-3 align-top">${version.productCount}</td>
-                                    <td class="px-4 py-3 align-top">${version.productsLabel}</td>
-                                </tr>
-                            </c:forEach>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="loan-products-versions">
-                            <spring:message code="common.close" text="Close" />
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1067,91 +992,6 @@
 </c:if>
 
 <c:forEach items="${products}" var="product">
-    <div class="app-modal-overlay hidden"
-         data-product-modal="versions-${product.id}">
-        <div class="app-modal-panel max-w-6xl">
-            <div class="app-modal-scroll">
-                <div class="app-modal-header">
-                    <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.productVersions" text="Product Versions" /></p>
-                        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><c:out value="${product.displayName}" /></h2>
-                        <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.productVersionsHelp" text="Preserved configuration snapshots for this product. The most recent three versions are shown." /></p>
-                    </div>
-                    <button type="button" class="app-modal-close" data-product-modal-close="versions-${product.id}" aria-label="Close modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="app-modal-body">
-                    <c:set var="productVersions" value="${productVersionsByProductId[product.id]}" />
-                    <c:choose>
-                        <c:when test="${empty productVersions}">
-                            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-600">
-                                No saved versions are available yet. A snapshot is preserved automatically the next time this product is changed.
-                            </div>
-                        </c:when>
-                        <c:otherwise>
-                            <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading versions...">
-                                <table class="erp-table">
-                                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <tr>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.version" text="Version" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.saved" text="Saved" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.savedBy" text="Saved By" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.amountRange" text="Amount Range" /></th>
-                                            <th class="px-4 py-3"><spring:message code="products.table.tenure" text="Tenure" /></th>
-                                            <th class="px-4 py-3"><spring:message code="repayment.interest" text="Interest" /></th>
-                                            <th class="px-4 py-3"><spring:message code="admin.settings.workflow" text="Workflow" /></th>
-                                            <th class="px-4 py-3"><spring:message code="common.status" text="Status" /></th>
-                                            <th class="px-4 py-3 text-right"><spring:message code="common.action" text="Action" /></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-200 bg-white text-slate-700">
-                                        <c:forEach items="${productVersions}" var="version">
-                                            <tr>
-                                                <td class="px-4 py-3 align-top">
-                                                    <p class="font-semibold text-sacco-ink">V${version.versionNumber}</p>
-                                                    <p class="mt-1 text-xs text-slate-500">${version.snapshotType}</p>
-                                                </td>
-                                                <td class="px-4 py-3 align-top">${version.savedAtLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.savedByLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.amountRangeLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.tenureLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.interestLabel}</td>
-                                                <td class="px-4 py-3 align-top">${version.workflowLabel}</td>
-                                                <td class="px-4 py-3 align-top">
-                                                    <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                                        ${version.statusLabel}
-                                                    </span>
-                                                </td>
-                                                <td class="px-4 py-3 align-top text-right">
-                                                    <form action="/admin/settings-controls/${product.id}/versions/${version.id}/rollback" method="post" class="inline">
-                                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                                        <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.rollback" text="Rollback" /></button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        </c:forEach>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </c:otherwise>
-                    </c:choose>
-
-                    <div class="app-modal-actions">
-                        <button type="button"
-                                class="app-btn btn-neutral"
-                                data-product-modal-close="versions-${product.id}">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="app-modal-overlay hidden"
          data-product-modal="product-${product.id}">
         <div class="app-modal-panel max-w-6xl">

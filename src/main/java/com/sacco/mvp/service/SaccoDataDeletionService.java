@@ -143,8 +143,6 @@ public class SaccoDataDeletionService {
 
         update("delete from loan_product_required_attachments where loan_product_setting_id in (select id from loan_product_settings where sacco_id = ?)", saccoId);
         update("delete from loan_product_board_reviewers where sacco_id = ? or loan_product_setting_id in (select id from loan_product_settings where sacco_id = ?) or board_member_id in (select id from members where sacco_id = ?)", saccoId, saccoId, saccoId);
-        update("delete from loan_product_versions where sacco_id = ? or loan_product_setting_id in (select id from loan_product_settings where sacco_id = ?)", saccoId, saccoId);
-        update("delete from loan_products_versions where sacco_id = ?", saccoId);
         update("delete from loan_product_settings where sacco_id = ?", saccoId);
 
         update("delete from accounts_savings where member_id in (select id from members where sacco_id = ?)", saccoId);

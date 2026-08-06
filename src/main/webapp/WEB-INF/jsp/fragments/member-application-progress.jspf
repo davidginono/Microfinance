@@ -35,7 +35,7 @@
                         <div class="member-dashboard-flow-node-wrap">
                             <div class="member-dashboard-flow-node ${step.nodeClasses}" aria-hidden="true"></div>
                         </div>
-                        <p class="member-dashboard-flow-number ${step.numberClasses}">${step.stepNumber}</p>
+                        <p class="member-dashboard-flow-number ${step.numberClasses}">Step ${step.stepNumber}</p>
                         <p class="member-dashboard-flow-label">${step.label}</p>
                         <c:if test="${not empty step.detailLabel}">
                             <p class="member-dashboard-flow-detail">${step.detailLabel}</p>

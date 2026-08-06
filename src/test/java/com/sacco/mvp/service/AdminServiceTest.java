@@ -11,7 +11,6 @@ import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
-import com.sacco.mvp.domain.LoanProductVersion;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.MemberAccessClaim;
 import com.sacco.mvp.domain.Position;
@@ -29,9 +28,7 @@ import com.sacco.mvp.repository.AuditLogRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanProductBoardReviewerRepository;
-import com.sacco.mvp.repository.LoanProductsVersionRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
-import com.sacco.mvp.repository.LoanProductVersionRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberAccessClaimRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -85,8 +82,6 @@ class AdminServiceTest {
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private LoanProductBoardReviewerRepository loanProductBoardReviewerRepository;
-    @Mock private LoanProductVersionRepository loanProductVersionRepository;
-    @Mock private LoanProductsVersionRepository loanProductsVersionRepository;
     @Mock private RegisteredSaccoRepository registeredSaccoRepository;
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Mock private SaccoStationRepository saccoStationRepository;
@@ -179,8 +174,6 @@ class AdminServiceTest {
             loanApplicationRepository,
             loanProductSettingRepository,
             loanProductBoardReviewerRepository,
-            loanProductVersionRepository,
-            loanProductsVersionRepository,
             saccoSettingsRepository,
             saccoStationRepository,
             saccoStationPolicyRepository,
@@ -1643,7 +1636,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void updateLoanProductPreservesPreviousVersionSnapshot() {
+    void updateLoanProductPersistsCurrentConfiguration() {
         UUID productId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
         LoanProductSetting product = LoanProductSetting.builder()
@@ -1673,26 +1666,9 @@ class AdminServiceTest {
             .createdAt(OffsetDateTime.now().minusDays(2))
             .updatedAt(OffsetDateTime.now().minusDays(1))
             .build();
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .applicationFee(new BigDecimal("15000.00"))
-            .requiredGuarantors(3)
-            .boardSize(3)
-            .boardQuorum(2)
-            .defaultLanguage("en")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
         when(loanProductSettingRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc("SACCO-01")).thenReturn(List.of(product));
-        when(loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(productId)).thenReturn(Optional.empty());
-        when(loanProductVersionRepository.save(any(LoanProductVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
-        when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_GROWTH", productId)).thenReturn(false);
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
         stubActiveRoleDirectory("SACCO-01", List.of(
             Member.builder()
                 .id(UUID.randomUUID())
@@ -1736,9 +1712,9 @@ class AdminServiceTest {
             LoanProductStatus.ACTIVE
         );
 
-        verify(loanProductVersionRepository).save(any(LoanProductVersion.class));
-        verify(loanProductsVersionRepository).save(any(com.sacco.mvp.domain.LoanProductsVersion.class));
         verify(loanProductSettingRepository).save(product);
+        assertThat(product.getProductCode()).isEqualTo("DEV_GROWTH");
+        assertThat(product.getProductName()).isEqualTo("Growth Loan");
     }
 
     @Test
@@ -1780,27 +1756,9 @@ class AdminServiceTest {
             .createdAt(OffsetDateTime.now().minusDays(2))
             .updatedAt(OffsetDateTime.now().minusDays(1))
             .build();
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .applicationFee(new BigDecimal("15000.00"))
-            .requiredGuarantors(3)
-            .boardSize(3)
-            .boardQuorum(1)
-            .defaultLanguage("en")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
         when(loanProductSettingRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc("SACCO-01")).thenReturn(List.of(product));
-        when(loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(productId)).thenReturn(Optional.empty());
-        when(loanProductVersionRepository.save(any(LoanProductVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
-        when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_LOAN", productId)).thenReturn(false);
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
         UUID boardReviewerId = UUID.randomUUID();
         UUID creditCommitteeReviewerId = UUID.randomUUID();
         stubActiveRoleDirectory("SACCO-01", List.of(
@@ -1938,21 +1896,6 @@ class AdminServiceTest {
                 .build()
         ));
 
-        SaccoSettings settings = SaccoSettings.builder()
-            .saccoId("SACCO-01")
-            .applicationFee(new BigDecimal("15000.00"))
-            .requiredGuarantors(1)
-            .boardSize(3)
-            .boardQuorum(2)
-            .defaultLanguage("en")
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-
-        when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
-        when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
         AtomicReference<LoanProductSetting> savedProduct = new AtomicReference<>();
         when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> {
             LoanProductSetting product = invocation.getArgument(0);
@@ -2002,7 +1945,6 @@ class AdminServiceTest {
         assertThat(product.getManagerPriority()).isEqualTo(1);
         assertThat(product.getLoanOfficerPriority()).isEqualTo(2);
         assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.MANAGER);
-        verify(loanProductsVersionRepository).save(any(com.sacco.mvp.domain.LoanProductsVersion.class));
         verify(loanProductSettingRepository).save(any(LoanProductSetting.class));
     }
 
@@ -2021,14 +1963,10 @@ class AdminServiceTest {
             .build();
 
         when(saccoSettingsRepository.findById("SACCO-01")).thenReturn(Optional.of(settings));
-        when(loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc("SACCO-01")).thenReturn(Optional.empty());
-        when(loanProductsVersionRepository.save(any(com.sacco.mvp.domain.LoanProductsVersion.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
         when(saccoSettingsRepository.save(any(SaccoSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         adminService.updateLoanApplicationFee("SACCO-01", adminId, new BigDecimal("22000.00"));
 
-        verify(loanProductsVersionRepository).save(any(com.sacco.mvp.domain.LoanProductsVersion.class));
         verify(saccoSettingsRepository).save(settings);
         assertThat(settings.getApplicationFee()).isEqualByComparingTo("22000.00");
     }

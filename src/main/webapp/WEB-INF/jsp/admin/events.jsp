@@ -12,7 +12,7 @@
 </div>
 <section class="erp-table-wrap admin-register-shell" aria-label="Event log results">
     <div class="app-table-titlebar">
-        <div class="app-table-heading"><h2>Event Log results</h2><span>Info</span></div>
+        <div class="app-table-heading"><h2>Event Log results</h2></div>
         <div class="app-table-toolbar">
             <a href="/admin/events" class="app-icon-button" aria-label="Refresh event log" title="Refresh event log">&#8635;</a>
         </div>

@@ -13,7 +13,7 @@
 </div>
 <section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results">
     <div class="app-table-titlebar">
-        <div class="app-table-heading"><h2>Outbox Monitor results</h2><span>Info</span></div>
+        <div class="app-table-heading"><h2>Outbox Monitor results</h2></div>
         <div class="app-table-toolbar">
             <span class="admin-register-count"><spring:message code="common.showing" text="Showing" />
                 <c:choose><c:when test="${eventsPage.totalElements eq 0}">0</c:when><c:otherwise>${eventsPage.number * eventsPage.size + 1}-${eventsPage.number * eventsPage.size + fn:length(events)}</c:otherwise></c:choose>

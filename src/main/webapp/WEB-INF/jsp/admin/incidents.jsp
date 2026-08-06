@@ -18,7 +18,6 @@
     </form>
 </div>
 
-<section class="erp-form-wrap">
 <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <div class="admin-filter-field min-w-0">
@@ -61,7 +60,6 @@
             <a href="/admin/incidents" class="app-btn btn-neutral">Clear</a>
         </div>
     </form>
-</section>
 
 <section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">

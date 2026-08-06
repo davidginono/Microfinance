@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260806-clean-toast-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260806-forgot-link-v5' />" />
 </head>
 <body class="auth-shell aws-auth-shell min-h-screen font-sans text-slate-900 antialiased">
 <c:set var="activeLoginTab" value="${param.tab eq 'staff' ? 'staff' : 'member'}" />
@@ -87,7 +87,7 @@
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
-                                    <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="member">Forgot password?</button>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="member">Forgot password?</a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
                                     <span data-login-submit-label>Log in</span>
@@ -139,7 +139,7 @@
                                 </div>
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <span class="text-slate-500">Having trouble with your password?</span>
-                                    <button type="button" class="text-xs font-semibold text-[#2F348D] hover:underline" data-forgot-password-open="staff">Forgot password?</button>
+                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="staff">Forgot password?</a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
                                     <span data-login-submit-label>Log in as Staff</span>
@@ -934,8 +934,11 @@
                 return payload;
             };
 
-            document.querySelectorAll('[data-forgot-password-open]').forEach((button) => {
-                button.addEventListener('click', () => open(button.getAttribute('data-forgot-password-open')));
+            document.querySelectorAll('[data-forgot-password-open]').forEach((link) => {
+                link.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    open(link.getAttribute('data-forgot-password-open'));
+                });
             });
             document.querySelectorAll('[data-forgot-password-close]').forEach((button) => {
                 button.addEventListener('click', close);

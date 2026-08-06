@@ -60,6 +60,7 @@ class AwsConsoleViewContractTest {
                         .as(path.toString())
                         .doesNotContain("<style")
                         .doesNotContain("style=")
+                        .doesNotContainPattern("(?i)>\\s*info\\s*<")
                         .doesNotContain("data-auto-submit")
                         .doesNotContain("onchange=")
                         .doesNotContain("oninput=")
@@ -73,6 +74,7 @@ class AwsConsoleViewContractTest {
     @Test
     void sharedAssetsProvideAwsShellTableAndResponsiveFilterPrimitives() throws Exception {
         String header = read(JSP_ROOT.resolve("fragments/header.jspf"));
+        String footer = read(JSP_ROOT.resolve("fragments/footer.jspf"));
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String registration = read(JSP_ROOT.resolve("register-member.jsp"));
         String fontCss = read(Path.of("src/main/resources/static/css/open-sans.css"));
@@ -86,9 +88,9 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css")
-            .contains("shell.css?v=20260806-config-notices-v1")
-            .contains("shell.js?v=20260806-config-notices-v1")
+            .contains("console-components.css?v=20260806-staff-analytics-v9")
+            .contains("shell.css?v=20260806-sidebar-toggle-v10")
+            .contains("shell.js?v=20260806-no-info-v9")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -104,6 +106,9 @@ class AwsConsoleViewContractTest {
             .contains("shellPageBreadcrumbRailText")
             .contains("pageSubmitPreloader")
             .contains("app-global-search");
+        assertThat(footer)
+            .contains("item.dataset.sidebarLabel = label")
+            .doesNotContain("item.setAttribute(\"title\", label)");
         assertThat(fontCss)
             .contains("font-family: \"Open Sans\"")
             .contains("open-sans-300.woff2")
@@ -133,17 +138,29 @@ class AwsConsoleViewContractTest {
             .contains(".app-table-titlebar")
             .contains("#appToastContainer .app-toast-close")
             .contains("background: transparent !important")
+            .contains(".erp-page-header[data-aws-page-header] .erp-page-title")
+            .contains("font-size: 20px !important")
+            .contains(".aws-console .loan-applicant-photo-frame img")
+            .contains("border-radius: 50% !important")
             .contains(".aws-console .workflow-table-head")
             .contains(".aws-console .admin-register-shell .erp-table thead th")
             .contains(".aws-console .member-dashboard-flow-track")
             .contains("transform: translateY(-50%) !important")
+            .contains(".shell-sidebar-group > div > a:hover")
+            .contains("background: #232e36 !important")
+            .contains(".shell-sidebar-group > div > a.shell-nav-active")
+            .contains("background: #25313a !important")
+            .contains("color: #ffffff !important")
             .contains(".app-global-brand .app-global-logo")
+            .contains(".app-topbar-actions .app-profile-control")
             .contains(".app-topbar .profile-icon-btn .profile-avatar-img")
             .contains("SIMS reference shell")
             .contains(".shell-sidebar-nav-heading")
-            .contains("--shell-sidebar-width: 330px")
-            .contains("--shell-nav-fixed-height: 52px")
+            .contains("--shell-sidebar-width: 220px")
+            .contains("--shell-nav-fixed-height: 38px")
             .contains("--shell-topbar-control-height: 32px")
+            .contains("--shell-sims-topbar: #16191f")
+            .contains("--shell-sims-sidebar: #1e272e")
             .contains("@media (max-width: 420px)")
             .contains(".app-global-brand > div")
             .contains(".shell-nav-active")
@@ -166,7 +183,10 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)
-            .contains("aws-auth.css?v=20260806-clean-toast-v4")
+            .contains("aws-auth.css?v=20260806-forgot-link-v5")
+            .contains("href=\"#forgotPasswordModal\" class=\"auth-text-link\"")
+            .contains("event.preventDefault()")
+            .doesNotContain("data-forgot-password-open=\"member\">Forgot password?</button>")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
             .contains("aws-auth.css?v=20260806-clean-toast-v4")
@@ -183,7 +203,9 @@ class AwsConsoleViewContractTest {
             .contains("syncConsoleFiltersFromUrl")
             .contains("aws-pagination-chevron")
             .contains("maxVisibleToasts = 3")
-            .contains("promoteQueuedToast");
+            .contains("promoteQueuedToast")
+            .doesNotContain("info.textContent = 'Info'")
+            .doesNotContain("heading.append(title, info)");
     }
 
     @Test
@@ -191,6 +213,12 @@ class AwsConsoleViewContractTest {
         String login = read(JSP_ROOT.resolve("login.jsp"));
         String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
         String loanApplication = read(JSP_ROOT.resolve("app/loan-new.jsp"));
+        String guarantorSelection = read(JSP_ROOT.resolve("app/guarantor-selection.jsp"));
+        String loanDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
+        String staffLoanDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
         String authCss = read(Path.of("src/main/resources/static/css/aws-auth.css"));
 
         assertThat(login)
@@ -200,6 +228,8 @@ class AwsConsoleViewContractTest {
             .contains("auth-notification-rail");
         assertThat(authCss)
             .contains(".auth-notification-bar")
+            .contains(".auth-text-link")
+            .contains("color: var(--aws-blue) !important")
             .contains("inset: 52px 0 auto")
             .contains("--sacco-topbar-height: 52px")
             .contains("--sacco-control-height: 32px")
@@ -212,19 +242,61 @@ class AwsConsoleViewContractTest {
             .contains("setCalculatorStage");
         assertThat(loanApplication)
             .contains("data-loan-flow-step=\"1\"")
-            .contains("data-loan-flow-step=\"4\"")
+            .contains("data-loan-flow-step=\"5\"")
             .contains("data-loan-step-next")
+            .contains("<span>Loan Calculations</span>")
+            .contains("<span>Select Guarantor</span>")
+            .contains("<span>Attachments</span>")
+            .contains("<span>Submit</span>")
             .contains("data-aws-no-refresh=\"true\"")
-            .contains("Continue to Guarantees")
-            .contains("Continue to Save&amp;Send")
-            .doesNotContain("Continue to Documents")
-            .doesNotContain("Continue to Review")
+            .contains("data-aws-no-titlebar=\"true\"")
+            .contains("loan-summary-table")
+            .contains("Continue to Loan Calculations")
+            .contains("Continue to Select Guarantor")
+            .contains("Continue to Attachments")
+            .contains("Continue to Submit")
+            .doesNotContain("Check affordability")
+            .doesNotContain("Add guarantors and documents")
             .contains("validateCurrentStep");
+        assertThat(guarantorSelection)
+            .contains("guarantor-selection-page")
+            .contains("loan-guarantor-search-row")
+            .contains("loan-selected-guarantors")
+            .contains("selected-guarantor-chip")
+            .doesNotContain("rounded-full");
+        assertThat(loanDetail)
+            .contains("loan-application-detail-page")
+            .contains("data-aws-action-pin=\"true\"")
+            .contains("app-table-titlebar")
+            .contains("erp-table-wrap erp-table-scroll")
+            .contains("loan-summary-table")
+            .contains("loan-detail-disclosure")
+            .doesNotContain("loan-staff-kpi-icon");
+        assertThat(staffLoanDetail)
+            .contains("loan-applicant-photo-card")
+            .contains("loan-applicant-photo-frame")
+            .contains("/profile/image/members/${applicant.id}");
+        assertThat(shellCss)
+            .contains("position: sticky !important")
+            .contains("top: var(--shell-nav-height) !important")
+            .contains(".shell-content-frame")
+            .contains("overflow-y: visible !important");
+        assertThat(consoleCss)
+            .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
+            .contains(".loan-guarantor-search-row")
+            .contains(".loan-summary-table .erp-table")
+            .contains(".loan-application-detail-page")
+            .contains("border-radius: 2px !important");
+        assertThat(shellJs)
+            .contains("data-aws-no-titlebar")
+            .contains("!suppressTitlebar")
+            .contains("control.closest('table')");
     }
 
     @Test
     void memberMobileAnalyticsAndShellStateUsePinnedResponsiveContracts() throws Exception {
         String reports = read(JSP_ROOT.resolve("app/reports.jsp"));
+        String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
         String sidebar = read(JSP_ROOT.resolve("fragments/sidebar.jspf"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
@@ -233,19 +305,47 @@ class AwsConsoleViewContractTest {
         assertThat(reports)
             .contains("data-aws-filter-pin=\"true\"")
             .contains("data-aws-action-pin=\"true\"")
-            .contains("data-download-action=\"true\"");
-        assertThat(sidebar).contains("data-view-position-key=\"sidebar-navigation\"");
+            .contains("data-download-action=\"true\"")
+            .contains("loan-spark-row")
+            .contains("renderMetricSparklines")
+            .doesNotContain("loan-analytics-command-header")
+            .doesNotContain("reports.controls");
+        assertThat(staffAnalytics)
+            .contains("class=\"staff-analytics-actions md:justify-end\" data-aws-action-pin=\"true\"")
+            .contains("data-download-action=\"true\"")
+            .contains("class=\"erp-table-scroll\" data-view-position-key=\"staff-analytics-financial-breakdown\"")
+            .contains("staff-metric-meta-value")
+            .doesNotContain("staff-card-info");
+        assertThat(sidebar)
+            .contains("data-view-position-key=\"sidebar-navigation\"")
+            .contains("<sec:authorize access=\"@authz.staffAnalyticsAccess(principal)\">")
+            .contains("<c:set var=\"showStaffAnalyticsPanel\" value=\"true\" />");
         assertThat(consoleCss)
             .contains(".loan-analytics-command-panel .loan-analytics-actions")
-            .contains("grid-template-columns: repeat(2, minmax(0, 1fr))");
+            .contains("height: var(--sacco-control-height)")
+            .contains(".staff-analytics-filter")
+            .contains("grid-auto-rows: auto")
+            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
+            .contains(".staff-metric-meta-value")
+            .doesNotContain(".staff-card-info")
+            .doesNotContain(".staff-metric-grid.is-station")
+            .doesNotContain(".loan-analytics-page-header .erp-breadcrumb");
         assertThat(shellCss)
             .contains(".app-table-heading h2")
             .contains("overflow-wrap: anywhere")
             .contains(".shell-sidebar-flyout-link.is-active")
             .contains("background: transparent !important")
-            .contains("box-shadow: none !important");
+            .contains("box-shadow: none !important")
+            .contains(".shell-sidebar-collapsed .shell-sidebar-nav-heading")
+            .contains("overflow-x: hidden !important")
+            .contains("font-size: 0 !important")
+            .contains("width: 24px !important")
+            .contains("padding-left: 12px !important");
         assertThat(shellJs)
             .contains("isConsoleDownloadAction")
+            .contains("header.querySelector('.erp-breadcrumb')")
+            .contains("promotePageHeadersToShell")
+            .contains("shellMain.insertBefore(header, contentFrame)")
             .contains("data-aws-no-refresh")
             .contains("dataset.awsFilterPin")
             .contains("data-aws-action-pin")
@@ -307,14 +407,17 @@ class AwsConsoleViewContractTest {
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(settings)
-            .contains("Step 1 of 2")
             .contains("Select a loan product")
             .contains("product-catalog-grid")
             .contains("data-product-config-card")
             .contains("data-product-card-toggle")
             .contains("See more")
             .contains("/admin/settings-controls/loan-products/${product.id}/edit")
-            .contains("Configure product");
+            .contains("Configure product")
+            .doesNotContain("Step 1 of 2")
+            .doesNotContain("loan-products-versions")
+            .doesNotContain("data-product-modal-open=\"versions-${product.id}\"")
+            .doesNotContain("/versions/${version.id}/rollback");
         assertThat(productEdit)
             .contains("Step 2 of 2")
             .contains("data-product-config-workspace")
@@ -322,7 +425,7 @@ class AwsConsoleViewContractTest {
             .contains("data-product-config-nav=\"preview\"")
             .contains("data-product-config-step=\"workflow\"")
             .contains("data-product-config-panel hidden")
-            .contains("data-product-config-progress-meter")
+            .doesNotContain("data-product-config-progress")
             .contains("text=\"Included\"")
             .contains("text=\"Order\"")
             .contains("data-toast-message")
@@ -355,7 +458,10 @@ class AwsConsoleViewContractTest {
             .contains(".product-config-workspace.is-enhanced .product-config-step:not(.is-active)")
             .contains(".product-config-subsection")
             .contains(".product-config-step.is-active")
-            .contains(".product-config-actionbar");
+            .contains(".product-config-actionbar")
+            .contains("grid-template-columns: 1.55rem minmax(0, 1fr)")
+            .contains("min-height: 3rem")
+            .doesNotContain(".product-config-progress");
         assertThat(shellCss)
             .contains(".aws-console .product-config-workspace input:not([type=\"checkbox\"])")
             .contains("min-height: var(--sacco-control-height) !important")

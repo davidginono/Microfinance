@@ -28,7 +28,6 @@
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2>Users &amp; Roles results</h2>
-            <span>Info</span>
         </div>
         <div class="app-table-toolbar">
             <span class="admin-register-count">Showing ${userSliceStart}-${userSliceEnd} of ${userTotal}</span>

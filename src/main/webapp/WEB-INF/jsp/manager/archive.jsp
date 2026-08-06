@@ -13,30 +13,24 @@
     <p class="erp-page-subtitle"><spring:message code="manager.archive.subtitle" text="Open the loans you already reviewed and track what happened after your decision." /></p>
 </div>
 
-<div class="erp-toolbar">
-    <div class="space-y-3">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
-        </div>
-        <div class="erp-filter-row">
-            <a href="/manager/archive?filter=ALL"
-               class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
-                <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
-            </a>
-            <a href="/manager/archive?filter=APPROVED"
-               class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
-                <spring:message code="archive.approvedLoans" text="Approved Loans" />
-            </a>
-            <a href="/manager/archive?filter=REJECTED"
-               class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
-                <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
-            </a>
-            <a href="/manager/archive?filter=DISBURSED"
-               class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
-                <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
-            </a>
-        </div>
+<div class="erp-filter-row">
+    <a href="/manager/archive?filter=ALL"
+       class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
+        <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
+    </a>
+    <a href="/manager/archive?filter=APPROVED"
+       class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
+        <spring:message code="archive.approvedLoans" text="Approved Loans" />
+    </a>
+    <a href="/manager/archive?filter=REJECTED"
+       class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
+        <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
+    </a>
+    <a href="/manager/archive?filter=DISBURSED"
+       class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
+        <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
+    </a>
+</div>
 <form action="/manager/archive" method="get" class="erp-filter-form manager-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -55,11 +49,10 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
 
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
-    <table class="erp-table">
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Manager Archive results">
+    <div class="erp-table-scroll" data-view-position-key="manager-archive-table">
+        <table class="erp-table">
         <thead>
         <tr>
             <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
@@ -97,8 +90,9 @@
             </tr>
         </c:if>
         </tbody>
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
 <c:if test="${archivePage.totalPages gt 1}">
     <div class="mt-4 flex items-center justify-between gap-3">

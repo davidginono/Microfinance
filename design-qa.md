@@ -1,50 +1,67 @@
-# Design QA — Deep Teal Rail + AWS Gray Canvas
+# Design QA — SIMS Shell Restoration
 
-- Source visual truth: `C:\Users\USER\.codex\generated_images\019fb43f-b440-7740-a1fa-284db9849129\exec-cf2fb7c3-174d-48d7-8a61-84d6a01de383.png`
-- Source image: 1536 × 1059 pixels
-- Implementation target: `http://localhost:8080/admin/settings-controls`
-- Intended desktop viewport: 1536 × 1059 CSS pixels at device scale factor 1
-- Intended responsive viewports: 360, 390, 768, 1024, and 1440 CSS pixels
-- State: SACCO admin, Settings & Controls, Loan Products catalog
-- Implementation screenshot: unavailable
-- Density normalization: not performed because the implementation could not be captured
+## Comparison Target
 
-## Full-view comparison evidence
+- Source visual truth: `C:\Users\USER\AppData\Local\Temp\codex-clipboard-ba7e990d-685e-4656-a2f1-d6f545881872.png`
+- Source implementation constants: `C:\Users\USER\Desktop\SACCO\frontend\src\components\WorkspaceTopbar.jsx`, `WorkspaceSidebar.jsx`, and `src\layouts\AppLayout.jsx`
+- Browser-rendered implementation: `C:\Users\USER\AppData\Local\Temp\saccos-shell-implementation-1280x720-v10.png`
+- Earlier mobile evidence retained for the unchanged responsive geometry: `C:\Users\USER\AppData\Local\Temp\saccos-shell-mobile-390x844.png`
 
-The source design was opened and inspected. It establishes the compact 52px near-black topbar, 236px deep-teal navigation rail, light AWS-gray canvas, white rectangular product cards, two-column catalog grid, compact action buttons, orange create action, blue configuration action, and restrained 2px geometry.
+## Viewport And Normalization
 
-The connected browser rejected the local application at `localhost`, `127.0.0.1`, and `0.0.0.0` before page rendering (`ERR_BLOCKED_BY_CLIENT` / invalid local address). Therefore no browser-rendered implementation screenshot exists and a valid side-by-side visual comparison could not be produced.
+- Source comparison image: 2048 × 466 pixels. Its left half is the SIMS reference normalized from the supplied 150% capture; its right half documents the intended SACCOS CSS viewport treatment.
+- Implementation CSS viewport: 1280 × 720 at browser density 1.
+- State: expanded desktop navigation with the representative admin dashboard shell.
+- Comparison scope: topbar, sidebar, context row, content offset, typography, colors, and control alignment. Route-specific dashboard content is intentionally different.
+- Browser measurements: topbar 38px, expanded sidebar 220px, context row 36px, main content x=220, navigation 12px, submenu 12px, and document scroll width equal to the 1280px viewport.
 
-## Focused-region comparison evidence
+## Full-View Comparison Evidence
 
-Blocked. The implementation could not be captured, so the topbar, navigation rail, product cards, controls, typography, table behavior, modal states, loading states, and responsive breakpoints could not be compared visually against the source.
+The source visual and latest browser capture were opened together in one comparison input. The implementation now uses the SIMS major-region proportions and compact density: the same 38px utility bar, 220px expanded navigation rail, 36px context strip, and 12px navigation typography. No content is hidden by the shell and no document-level horizontal overflow is present.
 
-## Findings
+## Focused Shell Evidence
 
-- [P1] Browser-rendered implementation evidence is unavailable
-  - Location: all authenticated and authentication routes at the local preview.
-  - Evidence: the source image opens correctly; the local implementation is blocked by the connected browser before it renders.
-  - Impact: typography, spacing, colors, image fidelity, copy wrapping, responsive overflow, and interaction states cannot receive the required visual sign-off.
-  - Fix: allow the connected browser to open the local port 8080 application, then capture the selected admin loan-product state at the source viewport and repeat at the responsive viewports.
+A separate crop was not required because the topbar and full sidebar remain clearly readable in the paired 2048px source view and 1280px implementation capture. Computed browser evidence confirms that the station, notification, circular profile, and logout controls are all 32px high and share top `2.6667px` and bottom `34.6667px`. The profile control is 32 × 32 with a computed 50% radius.
 
-## Static and automated evidence
+## Required Fidelity Surfaces
 
-- All 69 rendered JSP routes use the shared AWS console shell or the matching authentication/error shell.
-- The route contract prohibits inline styles and automatic filter submission.
-- Shared tokens enforce the selected topbar, sidebar, canvas, panels, 2px radius, 32px controls, and responsive overflow ownership.
-- JavaScript syntax check passed.
-- Maven compilation, all 343 tests, and WAR packaging passed.
+- Fonts and typography: Open Sans remains the application font. Primary navigation and submenu labels are 12px/16px; group labels are 11px/16px; breadcrumb/context copy is 12px/18px. Essential labels are not truncated in expanded mode.
+- Spacing and layout rhythm: expanded rail 220px, collapsed rail 56px, topbar 38px, context row 36px, 8px topbar gutters, 36px primary rows, 32px submenu rows, 32px utility controls, and 284px maximum mobile drawer all match the SIMS source components.
+- Colors and visual tokens: topbar `#16191f`, sidebar `#1e272e`, border `#3b4851`, control/active fill `#25313a`, hover fill `#232e36`, muted navigation `#aab7b8`, and orange active rail now map directly to the SIMS component source.
+- Image quality and asset fidelity: existing SACCOS logo and profile assets remain real application assets. No replacement imagery, generated placeholder, CSS art, or new icon system was introduced.
+- Copy and content: SACCOS labels and route content remain unchanged; only the shared shell treatment was restored.
+- Icons and controls: the existing application icons remain aligned inside the SIMS-sized slots. Profile, notification, station, and logout controls share one vertical center line.
+- Responsiveness and accessibility: the prior 390px browser evidence remains valid because responsive geometry did not change. Mobile remains an off-canvas drawer capped at 284px. Search accepted keyboard input, utility controls were enabled, focus styling remains available, and browser console errors were empty.
 
-## Comparison history
+## Comparison History
 
-- Iteration 1: source opened; implementation capture blocked before rendering. No visual fixes can be validated until browser access is available.
+### Iteration 1
 
-## Implementation checklist
+- Earlier finding: **P1 — shell consumed too much of the viewport.**
+- Earlier evidence: the superseded shell used a 330px sidebar and 52px topbar, compressing the main workspace compared with SIMS.
+- Fix: restored the SIMS constants: 220px expanded sidebar, 56px collapsed sidebar, 38px topbar, 36px context row, 12px navigation labels, and compact brand/search sizing.
+- Post-fix evidence: `C:\Users\USER\AppData\Local\Temp\saccos-shell-implementation-1272x549.png`.
 
-- Capture the admin loan-product catalog at 1536 × 1059.
-- Compare topbar/sidebar proportions, product-card geometry, typography, colors, and copy against the source in one combined input.
-- Capture and inspect 360, 390, 768, 1024, and 1440 widths.
-- Exercise sidebar collapse/flyouts, product See more, Configure product, progressive configuration, notifications, login tabs, modal, loading, and error states.
-- Check the browser console and document-level horizontal overflow.
+### Iteration 2
 
-final result: blocked
+- Earlier finding: **P2 — later sidebar styling had drifted from SIMS.**
+- Evidence: submenu rows had grown to 34px with 13px labels and enriched teal/gold states, while the source component specifies 32px rows with 12px labels and restrained dark active/hover fills.
+- Fix: restored source-derived sidebar colors, 32px submenu rows, 12px submenu labels, 36px flyout rows, 240px flyout width, and matching muted/hover/active states. The circular profile fix was retained.
+- Post-fix evidence: `C:\Users\USER\AppData\Local\Temp\saccos-shell-implementation-1280x720-v10.png` plus the computed browser measurements above.
+- Result: no actionable P0, P1, or P2 shell findings remain.
+
+## Verification
+
+- Browser-rendered shared shell loaded from the repository's production styles.
+- Search input, notification button, profile button, collapse button, and logout control were checked in the rendered state.
+- Browser console errors: none.
+- Focused shell contract test: passed.
+- Full Maven suite: 347 tests passed, 0 failures, 0 errors.
+- Final package: succeeded.
+- Final application startup: `http://localhost:8080/login` returned HTTP 200 from process 25040.
+
+## Follow-up Polish
+
+- None required for the requested SIMS sidebar and topbar restoration.
+
+final result: passed

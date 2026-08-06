@@ -1976,7 +1976,7 @@ body.aws-console {
 .shell-sidebar-scroll button[class*="bg-green-50"],
 .shell-sidebar-scroll a[class*="bg-amber-50"],
 .shell-sidebar-scroll button[class*="bg-amber-50"],
-.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"] {
+.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active {
     border-left-color: var(--aws-orange) !important;
     background: var(--aws-sidebar-active) !important;
     color: #ff9900 !important;
@@ -2012,18 +2012,13 @@ body.aws-console {
     padding: 2px 0 2px 22px !important;
 }
 
-.shell-sidebar-group > div a {
+.shell-sidebar-group > div > a {
     min-height: 34px;
     border-radius: 0 !important;
     padding: 4px 8px !important;
     color: #d5dfe2 !important;
     font-size: 13px !important;
     font-weight: 500 !important;
-}
-
-.shell-sidebar-group > div a[class*="bg-white"] {
-    color: #ff9900 !important;
-    font-weight: 700 !important;
 }
 
 .shell-powered-by {
@@ -2432,8 +2427,8 @@ body.aws-console {
 }
 
 .aws-console .product-config-step-nav button {
-    min-height: 4.25rem;
-    padding: 0.8rem 0.9rem !important;
+    min-height: 3rem;
+    padding: 0.4rem 0.65rem !important;
     font-size: inherit !important;
     font-weight: inherit !important;
     line-height: normal;
@@ -4038,19 +4033,27 @@ body.aws-console,
 
 /* SIMS reference shell: compact utility bar, grouped dark rail, and breadcrumb strip. */
 :root {
-    --shell-sidebar-width: 330px;
-    --shell-sidebar-collapsed-width: 64px;
-    --shell-nav-height: 52px;
-    --shell-context-height: 52px;
+    --shell-sidebar-width: 220px;
+    --shell-sidebar-collapsed-width: 56px;
+    --shell-nav-height: 38px;
+    --shell-context-height: 36px;
     --shell-content-gap: 0px;
-    --shell-nav-fixed-height: 52px;
+    --shell-nav-fixed-height: 38px;
     --shell-topbar-control-height: 32px;
+    --shell-sims-topbar: #16191f;
+    --shell-sims-sidebar: #1e272e;
+    --shell-sims-sidebar-border: #3b4851;
+    --shell-sims-sidebar-control: #25313a;
+    --shell-sims-sidebar-hover: #232e36;
+    --shell-sims-sidebar-active: #25313a;
+    --shell-sims-sidebar-muted: #aab7b8;
 }
 
 .app-topbar {
     height: var(--shell-nav-fixed-height) !important;
     min-height: var(--shell-nav-fixed-height) !important;
     box-sizing: border-box;
+    background: var(--shell-sims-topbar) !important;
 }
 
 .app-topbar > .app-topbar-inner {
@@ -4058,7 +4061,8 @@ body.aws-console,
     min-height: 100%;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0 !important;
-    padding: 0 14px !important;
+    padding: 0 8px !important;
+    font-size: 12px;
 }
 
 .app-topbar-left {
@@ -4066,26 +4070,36 @@ body.aws-console,
     gap: 0 !important;
 }
 
+.shell-sidebar,
+.shell-sidebar-panel {
+    border-color: var(--shell-sims-sidebar-border) !important;
+    background: var(--shell-sims-sidebar) !important;
+}
+
+.shell-sidebar {
+    box-shadow: 1px 0 2px rgba(0, 0, 0, .28) !important;
+}
+
 .app-global-brand {
     align-self: stretch;
-    flex: 0 0 256px;
-    min-width: 256px;
-    gap: 12px !important;
+    flex: 0 0 174px;
+    min-width: 174px;
+    gap: 8px !important;
     border-right: 1px solid #414750;
-    padding-right: 14px;
+    padding-right: 8px;
 }
 
 .app-global-brand .app-global-logo {
     width: 32px !important;
-    height: 32px !important;
+    height: 28px !important;
     min-width: 32px;
     border-radius: 0 !important;
 }
 
 .app-global-brand p:first-child {
-    max-width: 180px;
-    font-size: 16px !important;
-    line-height: 20px !important;
+    max-width: 126px;
+    font-size: 13px !important;
+    line-height: 18px !important;
     white-space: nowrap !important;
 }
 
@@ -4094,31 +4108,35 @@ body.aws-console,
 }
 
 .app-global-search {
-    flex: 1 1 38rem;
-    width: min(36vw, 604px);
-    max-width: 604px;
-    margin: 0 14px !important;
+    flex: 1 1 auto;
+    width: min(42vw, 720px);
+    max-width: 720px;
+    margin: 0 8px !important;
 }
 
 .aws-console .app-topbar .app-global-search,
 .aws-console .app-topbar .app-global-search input {
-    height: var(--shell-topbar-control-height) !important;
-    min-height: var(--shell-topbar-control-height) !important;
-    max-height: var(--shell-topbar-control-height) !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
 }
 
 .aws-console .app-topbar .app-global-search input {
-    background: #111820 !important;
-    border-color: #687078 !important;
+    background: #0f1115 !important;
+    border-color: #545b64 !important;
     border-radius: 2px !important;
     color: #f2f3f3 !important;
-    font-size: 14px !important;
+    font-size: 12px !important;
+}
+
+.aws-console .app-topbar .app-global-search input::placeholder {
+    color: #aab7b8 !important;
 }
 
 .app-topbar-actions {
     height: 100%;
     gap: 0 !important;
-    border-left: 1px solid #414750;
+    border-left: 1px solid #545b64;
     padding-left: 6px;
 }
 
@@ -4135,7 +4153,7 @@ body.aws-console,
 
 .app-account-copy {
     order: 4;
-    min-width: 168px;
+    min-width: 132px;
     height: 100%;
     border-left: 1px solid #414750;
     margin-left: 8px;
@@ -4241,47 +4259,65 @@ body.aws-console,
     min-height: var(--shell-context-height) !important;
     height: var(--shell-context-height);
     justify-content: space-between !important;
-    border-bottom: 1px solid #52606b !important;
-    background: #1d2a30 !important;
-    padding: 0 12px !important;
+    border-bottom: 1px solid var(--shell-sims-sidebar-border) !important;
+    background: var(--shell-sims-sidebar) !important;
+    padding: 0 !important;
 }
 
 .shell-sidebar-toggle-label {
-    font-size: 16px !important;
+    padding-left: 12px !important;
+    color: var(--shell-sims-sidebar-muted) !important;
+    font-size: 11px !important;
     letter-spacing: .02em !important;
 }
 
 .desktop-sidebar-toggle {
-    width: 48px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    border-color: #52606b !important;
-    background: #263640 !important;
+    width: 42px !important;
+    height: 36px !important;
+    min-width: 42px !important;
+    min-height: 36px !important;
+    border-color: #70838a !important;
+    border-radius: 3px !important;
+    background: var(--shell-sims-sidebar-control) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .25) !important;
+}
+
+.desktop-sidebar-toggle svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+.desktop-sidebar-toggle:hover,
+.desktop-sidebar-toggle:focus-visible {
+    border-color: #aab7b8 !important;
+    background: #34434d !important;
+    color: #ffffff !important;
 }
 
 .shell-sidebar-scroll {
-    padding: 0 0 12px !important;
-    background: #1d2a30 !important;
+    padding: 12px 0 !important;
+    background: var(--shell-sims-sidebar) !important;
 }
 
 .shell-sidebar-nav-heading,
 .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
     display: flex;
-    min-height: 58px;
+    min-height: 28px;
     align-items: center;
     justify-content: space-between;
-    margin: 0 !important;
+    margin: 12px 8px 4px !important;
     border-top: 1px solid rgba(182, 195, 200, .2);
-    padding: 18px 24px 10px !important;
-    color: #aab7bb;
-    font-size: 16px;
+    padding: 0 8px !important;
+    color: var(--shell-sims-sidebar-muted);
+    font-size: 11px;
     font-weight: 700;
-    line-height: 18px;
+    line-height: 16px;
     text-transform: uppercase;
 }
 
 .shell-sidebar-nav-heading:first-child {
     border-top: 0;
+    margin-top: 0 !important;
 }
 
 .shell-sidebar-scroll > .px-3.pb-1.pt-3 p {
@@ -4295,30 +4331,40 @@ body.aws-console,
 .shell-sidebar-scroll > div > a,
 .shell-sidebar-scroll > div > button,
 .shell-sidebar-scroll .shell-review-panel-link {
-    width: calc(100% - 24px) !important;
-    min-height: 54px !important;
-    margin-right: 12px !important;
-    margin-left: 12px !important;
-    gap: 12px !important;
-    padding: 12px !important;
+    width: calc(100% - 16px) !important;
+    min-height: 36px !important;
+    margin-right: 8px !important;
+    margin-left: 8px !important;
+    gap: 8px !important;
+    padding: 8px !important;
     color: #d5dfe2 !important;
-    font-size: 18px !important;
-    line-height: 24px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 16px !important;
+}
+
+.shell-sidebar-scroll > a:hover,
+.shell-sidebar-scroll > button:hover,
+.shell-sidebar-scroll > div > a:hover,
+.shell-sidebar-scroll > div > button:hover,
+.shell-sidebar-scroll .shell-review-panel-link:hover {
+    background: var(--shell-sims-sidebar-hover) !important;
+    color: #ffffff !important;
 }
 
 .shell-sidebar-scroll a > span:first-child,
 .shell-sidebar-scroll button > span:first-child {
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
     border: 0 !important;
     background: transparent !important;
 }
 
 .shell-sidebar-scroll a > span:first-child svg,
 .shell-sidebar-scroll button > span:first-child svg {
-    width: 20px !important;
-    height: 20px !important;
+    width: 16px !important;
+    height: 16px !important;
 }
 
 .shell-sidebar-scroll a[class*="bg-cyan-50"],
@@ -4329,11 +4375,11 @@ body.aws-console,
 .shell-sidebar-scroll button[class*="bg-green-50"],
 .shell-sidebar-scroll a[class*="bg-amber-50"],
 .shell-sidebar-scroll button[class*="bg-amber-50"],
-.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"],
+.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active,
 .shell-sidebar-scroll .shell-nav-active {
-    border: 1px solid #52606b !important;
+    border: 1px solid #50616d !important;
     border-left: 3px solid var(--aws-orange) !important;
-    background: #263640 !important;
+    background: var(--shell-sims-sidebar-active) !important;
     color: #ffffff !important;
 }
 
@@ -4345,7 +4391,7 @@ body.aws-console,
 .shell-sidebar-scroll button[class*="bg-green-50"] > span:first-child,
 .shell-sidebar-scroll a[class*="bg-amber-50"] > span:first-child,
 .shell-sidebar-scroll button[class*="bg-amber-50"] > span:first-child,
-.shell-sidebar-scroll .shell-review-panel-link[class*="bg-white"] > span:first-child {
+.shell-sidebar-scroll .shell-review-panel-link.shell-nav-active > span:first-child {
     color: var(--aws-orange) !important;
 }
 
@@ -4354,23 +4400,32 @@ body.aws-console,
 }
 
 .shell-sidebar-group > div {
-    margin: 0 12px !important;
+    margin: 0 8px !important;
     background: #17242a !important;
     box-shadow: inset 3px 0 0 #52606b !important;
-    padding: 4px 0 4px 26px !important;
+    padding: 4px 0 4px 24px !important;
 }
 
-.shell-sidebar-group > div a {
+.shell-sidebar-group > div > a {
     width: 100% !important;
     margin: 0 !important;
-    min-height: 42px !important;
-    padding: 8px 10px !important;
-    font-size: 15px !important;
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
 }
 
 .shell-powered-by {
-    border-top: 1px solid #52606b !important;
-    background: #1d2a30 !important;
+    border-top: 1px solid var(--shell-sims-sidebar-border) !important;
+    background: var(--shell-sims-sidebar) !important;
+}
+
+.aws-sidebar-footer {
+    border-color: var(--shell-sims-sidebar-border) !important;
+    background: var(--shell-sims-sidebar) !important;
+    color: #c4ced4 !important;
+    font-size: 10px !important;
+    line-height: 16px !important;
 }
 
 .shell-page-title-rail__inner {
@@ -4379,15 +4434,15 @@ body.aws-console,
     align-items: center;
     border-bottom: 1px solid var(--aws-line) !important;
     background: #ffffff !important;
-    padding: 0 18px !important;
+    padding: 0 12px !important;
 }
 
 .shell-page-title-rail__text {
     display: flex;
     align-items: center;
-    gap: 22px;
-    font-size: 18px !important;
-    line-height: 24px !important;
+    gap: 8px;
+    font-size: 12px !important;
+    line-height: 18px !important;
 }
 
 .shell-page-title-rail__path {
@@ -4396,12 +4451,12 @@ body.aws-console,
 
 @media (max-width: 1279px) {
     :root {
-        --shell-sidebar-width: 280px;
+        --shell-sidebar-width: 220px;
     }
 
     .app-global-brand {
-        flex-basis: 220px;
-        min-width: 220px;
+        flex-basis: 174px;
+        min-width: 174px;
     }
 
     .app-global-search {
@@ -4417,10 +4472,14 @@ body.aws-console,
 
 @media (max-width: 1023px) {
     :root {
-        --shell-sidebar-width: 296px;
-        --shell-nav-height: 52px;
-        --shell-nav-fixed-height: 52px;
+        --shell-sidebar-width: 284px;
+        --shell-nav-height: 38px;
+        --shell-nav-fixed-height: 38px;
         --shell-context-height: 0px;
+    }
+
+    .shell-sidebar {
+        width: min(86vw, 284px) !important;
     }
 
     .app-topbar > .app-topbar-inner {
@@ -4579,16 +4638,248 @@ body.aws-console,
     z-index: 2;
     background: #eaeded !important;
 }
-.aws-console .member-dashboard-flow-shell,
-.aws-console .member-dashboard-mobile-flow { padding: 12px !important; }
-.aws-console .member-dashboard-flow-track {
-    overflow-x: auto;
-    scrollbar-gutter: stable;
+.aws-console .member-dashboard-flow-shell {
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 0 !important;
+    overscroll-behavior-x: contain;
+    scrollbar-gutter: auto;
 }
-.aws-console .member-dashboard-flow-list { min-width: max-content; }
+.aws-console .member-dashboard-flow-track {
+    width: 100%;
+    min-width: 720px;
+    overflow: visible;
+    padding: 14px 10px 10px !important;
+}
+.aws-console .member-dashboard-flow-list {
+    display: flex;
+    width: 100%;
+    min-width: 720px !important;
+    align-items: flex-start;
+}
+.aws-console .member-dashboard-flow-step-wrap {
+    position: relative;
+    display: block;
+    min-width: 120px;
+    flex: 1 0 120px;
+}
 .aws-console .member-dashboard-flow-step {
-    min-width: 160px;
-    border-radius: 2px !important;
+    position: relative;
+    z-index: 1;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 8px;
+    text-align: center;
+}
+.aws-console .member-dashboard-flow-node-wrap {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+}
+.aws-console .member-dashboard-flow-node,
+.aws-console .member-dashboard-mobile-node {
+    position: relative;
+    display: flex;
+    width: 24px !important;
+    height: 24px !important;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--aws-line-dark) !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    color: var(--aws-muted);
+}
+.aws-console .member-dashboard-flow-node::after,
+.aws-console .member-dashboard-mobile-node::after {
+    content: "";
+    font-size: 14px !important;
+    font-weight: 700;
+    line-height: 1 !important;
+}
+.aws-console .member-dashboard-flow-node--completed,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--completed {
+    border-color: var(--aws-success) !important;
+    color: var(--aws-success) !important;
+}
+.aws-console .member-dashboard-flow-node--completed::after,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--completed::after {
+    content: "\2713";
+}
+.aws-console .member-dashboard-flow-node--current,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--current {
+    border-color: var(--aws-blue) !important;
+    background: #f1faff !important;
+    color: var(--aws-blue) !important;
+}
+.aws-console .member-dashboard-flow-node--current::after,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--current::after {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.aws-console .member-dashboard-flow-node--rejected,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--rejected {
+    border-color: var(--aws-danger) !important;
+    background: #fff7f5 !important;
+    color: var(--aws-danger) !important;
+}
+.aws-console .member-dashboard-flow-node--rejected::after,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--rejected::after,
+.aws-console .member-dashboard-flow-node--closed::after,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--closed::after {
+    content: "\00d7";
+    font-size: 17px !important;
+}
+.aws-console .member-dashboard-flow-node--pending,
+.aws-console .member-dashboard-flow-node--closed,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--pending,
+.aws-console .member-dashboard-mobile-node.member-dashboard-flow-node--closed {
+    border-color: var(--aws-line-dark) !important;
+    background: #f7f8f8 !important;
+    color: var(--aws-muted) !important;
+}
+.aws-console .member-dashboard-flow-connector {
+    position: absolute;
+    z-index: 0;
+    top: 11px;
+    left: 50%;
+    width: 100% !important;
+    height: 2px !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: var(--aws-line-dark);
+}
+.aws-console .member-dashboard-flow-connector--completed { background: var(--aws-success); }
+.aws-console .member-dashboard-flow-connector--current { background: var(--aws-blue); }
+.aws-console .member-dashboard-flow-connector--pending { background: var(--aws-line-dark); }
+.aws-console .member-dashboard-flow-number {
+    min-height: 0;
+    margin: 5px 0 0 !important;
+    color: var(--aws-muted) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .04em;
+    line-height: 14px !important;
+    text-transform: uppercase;
+}
+.aws-console .member-dashboard-flow-label {
+    min-height: 32px !important;
+    margin: 2px 0 0 !important;
+    color: var(--aws-ink) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 16px !important;
+    overflow-wrap: anywhere;
+}
+.aws-console .member-dashboard-flow-detail,
+.aws-console .member-dashboard-flow-status,
+.aws-console .member-dashboard-flow-meta,
+.aws-console .member-dashboard-flow-date {
+    min-height: 0 !important;
+    margin: 2px 0 0 !important;
+    font-size: 11px !important;
+    line-height: 15px !important;
+    overflow-wrap: anywhere;
+}
+.aws-console .member-dashboard-flow-status { font-weight: 700; }
+.aws-console .member-dashboard-flow-date { color: var(--aws-muted); }
+.aws-console .member-dashboard-flow-text--completed { color: var(--aws-success); }
+.aws-console .member-dashboard-flow-text--current,
+.aws-console .member-dashboard-flow-meta--current { color: var(--aws-blue); }
+.aws-console .member-dashboard-flow-text--pending { color: #b35c00; }
+.aws-console .member-dashboard-flow-text--rejected,
+.aws-console .member-dashboard-flow-meta--rejected { color: var(--aws-danger); }
+.aws-console .member-dashboard-flow-text--closed,
+.aws-console .member-dashboard-flow-text--not-started { color: var(--aws-muted); }
+.aws-console .member-dashboard-flow-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px !important;
+    margin: 10px 0 0 !important;
+    border-top: 1px solid var(--aws-line) !important;
+    padding: 8px 0 0 !important;
+}
+.aws-console .member-dashboard-flow-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px !important;
+    color: var(--aws-muted) !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    line-height: 16px;
+}
+.aws-console .member-dashboard-flow-dot {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+}
+.aws-console .member-dashboard-flow-dot--completed { background: var(--aws-success); }
+.aws-console .member-dashboard-flow-dot--current { background: var(--aws-blue); }
+.aws-console .member-dashboard-flow-dot--pending { background: var(--aws-orange); }
+.aws-console .member-dashboard-flow-dot--not-started { background: var(--aws-line-dark); }
+.aws-console .member-dashboard-flow-dot--closed {
+    border: 1px solid var(--aws-line-dark);
+    background: #ffffff;
+}
+.aws-console .member-dashboard-flow-dot--closed::after { display: none; }
+
+@media (max-width: 768px) {
+    .aws-console .member-dashboard-mobile-flow {
+        display: block;
+        margin-top: 8px !important;
+        padding: 10px !important;
+    }
+    .aws-console .member-dashboard-mobile-step {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) !important;
+        gap: 8px;
+    }
+    .aws-console .member-dashboard-mobile-rail {
+        display: flex;
+        align-items: center;
+    }
+    .aws-console .member-dashboard-mobile-node {
+        width: 20px !important;
+        height: 20px !important;
+    }
+    .aws-console .member-dashboard-mobile-line {
+        position: static;
+        width: 2px !important;
+        min-height: 30px;
+        margin: 4px 0 0 !important;
+        border-radius: 0 !important;
+        background: var(--aws-line-dark);
+    }
+    .aws-console .member-dashboard-mobile-line--completed { background: var(--aws-success); }
+    .aws-console .member-dashboard-mobile-line--current { background: var(--aws-blue); }
+    .aws-console .member-dashboard-mobile-body { padding-top: 0; }
+    .aws-console .member-dashboard-mobile-step-number {
+        margin: 0;
+        color: var(--aws-muted) !important;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        letter-spacing: .04em !important;
+        line-height: 14px !important;
+    }
+    .aws-console .member-dashboard-mobile-title {
+        margin: 1px 0 0 !important;
+        color: var(--aws-ink) !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        line-height: 16px !important;
+    }
+    .aws-console .member-dashboard-mobile-detail,
+    .aws-console .member-dashboard-mobile-status,
+    .aws-console .member-dashboard-mobile-meta,
+    .aws-console .member-dashboard-mobile-date {
+        margin: 2px 0 0 !important;
+        font-size: 11px !important;
+        line-height: 15px !important;
+    }
 }
 
 @media (max-width: 640px) {
@@ -4601,9 +4892,322 @@ body.aws-console,
     }
 }
 
+/* Collapsed desktop navigation owns a single layout offset. */
+@media (min-width: 1024px) {
+    .shell-main {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .shell-sidebar-collapsed .shell-main {
+        padding-left: 12px !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-nav-heading,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > .px-3.pb-1.pt-3 {
+        display: none !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-scroll {
+        padding: 8px 0 !important;
+        overflow-x: hidden !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
+        width: 40px !important;
+        margin-right: 8px !important;
+        margin-left: 8px !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        padding: 8px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        white-space: nowrap !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:first-child,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:first-child {
+        display: inline-flex !important;
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+        flex: 0 0 24px !important;
+        margin: 0 !important;
+        font-size: 16px !important;
+        line-height: 1 !important;
+        visibility: visible !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > span:not(:first-child),
+    .shell-sidebar-collapsed .shell-sidebar-scroll > a > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > button > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > a > svg,
+    .shell-sidebar-collapsed .shell-sidebar-scroll > div > button > svg {
+        display: none !important;
+    }
+
+    .shell-sidebar-collapsed .shell-sidebar-group > div {
+        display: none !important;
+    }
+}
+
+/* Sidebar submenu hierarchy: calm teal surface, clear hover, and warm active state. */
+.shell-sidebar-group > div {
+    border: 0 !important;
+    border-radius: 2px !important;
+    background: #182229 !important;
+    box-shadow: none !important;
+    padding: 4px 0 4px 28px !important;
+}
+
+.shell-sidebar-group > div > a {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    width: 100% !important;
+    min-height: 32px !important;
+    margin: 0 !important;
+    border: 1px solid transparent !important;
+    border-left: 3px solid transparent !important;
+    border-radius: 2px !important;
+    padding: 6px 8px !important;
+    color: #c4ced4 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 16px !important;
+    text-decoration: none !important;
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.shell-sidebar-group > div > a:hover {
+    border-color: transparent !important;
+    border-left-color: #ec7211 !important;
+    background: #232e36 !important;
+    color: #ffffff !important;
+}
+
+.shell-sidebar-group > div > a:focus-visible {
+    border-left-color: #ec7211 !important;
+    background: #232e36 !important;
+    color: #ffffff !important;
+    outline: 2px solid #0972d3 !important;
+    outline-offset: -2px !important;
+}
+
+.shell-sidebar-group > div > a.shell-nav-active {
+    border-color: #50616d !important;
+    border-left-color: transparent !important;
+    background: #25313a !important;
+    color: #c4ced4 !important;
+    font-weight: 700 !important;
+    box-shadow: none !important;
+}
+
+.shell-sidebar-group > div > a.shell-nav-active:hover,
+.shell-sidebar-group > div > a.shell-nav-active:focus-visible {
+    border-color: #50616d !important;
+    border-left-color: #ec7211 !important;
+    background: #34434d !important;
+    color: #ffffff !important;
+}
+
+.shell-support-contact {
+    overflow: hidden;
+    margin: 8px 0 0 !important;
+    border: 0 !important;
+    border-top: 1px solid #50616d !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 9px 8px 4px !important;
+    color: #c4ced4 !important;
+    box-shadow: none !important;
+}
+
+.shell-support-contact__eyebrow {
+    margin: 0;
+    color: #aab7b8 !important;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    line-height: 14px;
+    text-transform: uppercase;
+}
+
+.shell-support-contact__name {
+    margin: 4px 0 0;
+    color: #ffffff !important;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 17px;
+}
+
+.shell-support-contact__role {
+    margin: 1px 0 0;
+    color: #aab7b8 !important;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 15px;
+}
+
+.shell-support-contact__channels {
+    display: grid;
+    gap: 3px;
+    margin-top: 7px;
+}
+
+.shell-sidebar-group > div .shell-support-contact__link {
+    display: grid !important;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 3px 0 !important;
+    color: #d5e1e4 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 15px !important;
+    text-decoration: none !important;
+}
+
+.shell-sidebar-group > div .shell-support-contact__link:hover,
+.shell-sidebar-group > div .shell-support-contact__link:focus-visible {
+    border: 0 !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    outline-offset: 2px !important;
+    text-decoration: underline !important;
+}
+
+.shell-support-contact__label {
+    color: #aab7b8 !important;
+    font-weight: 700;
+}
+
+.shell-support-contact__value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.shell-support-contact__meta {
+    margin: 7px 0 0;
+    color: #aab7b8 !important;
+    font-size: 11px;
+    line-height: 15px;
+    overflow-wrap: anywhere;
+}
+
+.shell-sidebar-flyout {
+    width: min(240px, calc(100vw - 64px));
+    border-color: #50616d;
+    background: #25313a;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .32);
+}
+
+.shell-sidebar-flyout-title {
+    border-bottom-color: #50616d;
+    background: #25313a;
+    padding: 8px 12px;
+    color: #aab7b8;
+    font-size: 11px;
+    line-height: 16px;
+    text-transform: uppercase;
+}
+
+.shell-sidebar-flyout-link {
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: 2px;
+    color: #d5dbdb;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+}
+
+.shell-sidebar-flyout-link {
+    color: #d5e1e4;
+}
+
+.shell-sidebar-flyout-link:hover,
+.shell-sidebar-flyout-link:focus-visible {
+    border-left-color: transparent;
+    background: #34434d;
+    color: #ffffff;
+}
+
+.shell-sidebar-flyout-link.is-active,
+.shell-sidebar-flyout-link.is-active:hover,
+.shell-sidebar-flyout-link.is-active:focus-visible {
+    border-left-color: #ec7211;
+    background: #34434d;
+    color: #ffffff;
+}
+
 /* Keep the real page heading in view and remove the duplicated shell title strip. */
 .shell-page-title-rail {
     display: none !important;
+}
+
+.shell-main {
+    padding-top: 0 !important;
+}
+
+.erp-page-path {
+    position: static !important;
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 28px;
+    align-items: center;
+    gap: 3px 6px;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--aws-line);
+    background: #ffffff;
+    padding: 4px 12px;
+    color: var(--aws-muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 18px;
+    text-transform: uppercase;
+}
+
+.erp-page-path__separator {
+    color: #687078;
+    font-weight: 400;
+}
+
+.erp-page-path__item[aria-current="page"] {
+    color: var(--aws-ink);
+}
+
+.shell-content-frame > .erp-page-path + .erp-page-header[data-aws-page-header],
+.shell-main > .erp-page-path + .erp-page-header[data-aws-page-header] {
+    margin-top: 0 !important;
+}
+
+/* Horizontal clipping must not turn shell ancestors into sticky scroll containers. */
+html:has(body.aws-console),
+body.aws-console,
+.aws-console-root,
+.aws-app-shell {
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+}
+
+.shell-main,
+.shell-content-frame {
+    overflow-y: visible !important;
 }
 
 .erp-page-subtitle,
@@ -4612,18 +5216,26 @@ body.aws-console,
 }
 
 .erp-page-header[data-aws-page-header] {
-    position: sticky;
-    top: var(--shell-nav-height);
+    position: sticky !important;
+    top: var(--shell-nav-height) !important;
     z-index: 37;
     display: flex;
     flex-wrap: wrap;
+    width: 100%;
     min-height: var(--shell-context-height);
+    align-self: flex-start;
     align-items: baseline;
     gap: 4px 10px;
     margin: 0 0 10px !important;
     border-bottom: 1px solid var(--aws-line) !important;
     background: #ffffff !important;
     padding: 6px 12px !important;
+}
+
+.erp-page-header[data-aws-page-header] .erp-page-title,
+.erp-page-header[data-aws-page-header] h1 {
+    font-size: 20px !important;
+    line-height: 24px !important;
 }
 
 .erp-page-header[data-aws-page-header] > .erp-page-title {
@@ -4641,8 +5253,111 @@ body.aws-console,
 }
 
 @media (max-width: 640px) {
+    .erp-page-path {
+        padding-inline: 8px;
+    }
+
     .erp-page-header[data-aws-page-header] {
         align-items: flex-start;
         padding: 6px 8px !important;
     }
+
+    .erp-page-header[data-aws-page-header] .erp-page-title,
+    .erp-page-header[data-aws-page-header] h1 {
+        font-size: 18px !important;
+        line-height: 22px !important;
+    }
+}
+
+/* Applicant photos remain circular without inheriting the generic console-card frame. */
+.aws-console .loan-applicant-photo-card {
+    border: 0 !important;
+    border-left: 1px solid var(--aws-line) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.aws-console .loan-applicant-photo-frame,
+.aws-console .loan-applicant-photo-frame img {
+    border-radius: 50% !important;
+}
+
+@media (max-width: 767px) {
+    .aws-console .loan-applicant-photo-card {
+        border-left: 0 !important;
+    }
+}
+
+/* Toasts keep the existing appearance while exposing reliable click targets. */
+#appToastContainer {
+    pointer-events: none !important;
+}
+
+#appToastContainer > [data-app-toast],
+#appToastContainer .app-toast-close {
+    pointer-events: auto !important;
+}
+
+#appToastContainer .app-toast-close {
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* Keep the supplier wordmark and replace only its emblem with the supplied orange mark. */
+.aws-console .aws-sidebar-footer,
+.aws-console .aws-sidebar-footer .shell-powered-by {
+    background: #111d2c !important;
+}
+
+.shell-powered-by {
+    align-items: flex-start;
+    gap: 0;
+}
+
+.shell-powered-by-label {
+    color: #c4ced4 !important;
+}
+
+.shell-powered-by-brand {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 6px;
+    color: #18bfd0;
+}
+
+.shell-powered-by-copy {
+    display: inline-flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+}
+
+.shell-powered-by-logo {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    object-fit: contain;
+}
+
+.shell-powered-by-wordmark {
+    display: inline-flex;
+    min-width: 0;
+    flex-direction: column;
+    color: #18bfd0 !important;
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 800;
+    line-height: 12px;
+    white-space: nowrap;
+}
+
+.shell-powered-by-wordmark > span {
+    color: inherit !important;
+}
+
+.shell-powered-by-wordmark > span:last-child {
+    font-size: 9px;
 }

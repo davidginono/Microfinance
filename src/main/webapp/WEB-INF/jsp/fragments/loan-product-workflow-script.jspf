@@ -1190,8 +1190,6 @@
             const navButtons = Array.from(workspace.querySelectorAll('[data-product-config-nav]'));
             const previousButton = workspace.querySelector('[data-product-config-previous]');
             const nextButton = workspace.querySelector('[data-product-config-next]');
-            const progress = workspace.querySelector('[data-product-config-progress]');
-            const progressMeter = workspace.querySelector('[data-product-config-progress-meter]');
             const saveState = workspace.querySelector('[data-product-config-save-state]');
             const storageKey = workspace.getAttribute('data-product-config-storage-key');
 
@@ -1219,16 +1217,10 @@
 
                 steps.forEach((step, index) => {
                     const active = index === activeIndex;
-                    const toggle = step.querySelector('[data-product-config-toggle]');
                     const panel = step.querySelector('[data-product-config-panel]');
-                    const action = step.querySelector('.product-config-step-action');
                     step.classList.toggle('is-active', active);
-                    toggle?.setAttribute('aria-expanded', String(active));
                     if (panel) {
                         panel.hidden = !active;
-                    }
-                    if (action) {
-                        action.textContent = active ? 'Current' : 'Open';
                     }
                 });
 
@@ -1240,14 +1232,6 @@
                     }
                 });
 
-                if (progress) {
-                    progress.textContent = 'Section ' + (activeIndex + 1) + ' of ' + steps.length;
-                }
-                if (progressMeter) {
-                    progressMeter.max = steps.length;
-                    progressMeter.value = activeIndex + 1;
-                    progressMeter.setAttribute('aria-label', 'Configuration progress: section ' + (activeIndex + 1) + ' of ' + steps.length);
-                }
                 if (previousButton) {
                     previousButton.disabled = activeIndex === 0;
                     previousButton.textContent = activeIndex === 0 ? 'Previous section' : 'Back to ' + stepLabel(activeIndex - 1);
@@ -1269,7 +1253,7 @@
                     steps[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 if (options.focus) {
-                    steps[activeIndex].querySelector('[data-product-config-toggle]')?.focus({ preventScroll: true });
+                    navButtons.find((button) => button.getAttribute('aria-current') === 'step')?.focus({ preventScroll: true });
                 }
             };
 
@@ -1282,11 +1266,6 @@
             navButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     activateStep(button.getAttribute('data-product-config-nav'), { scroll: true, focus: true });
-                });
-            });
-            steps.forEach((step) => {
-                step.querySelector('[data-product-config-toggle]')?.addEventListener('click', () => {
-                    activateStep(step.getAttribute('data-product-config-step'));
                 });
             });
             previousButton?.addEventListener('click', () => moveStep(-1));

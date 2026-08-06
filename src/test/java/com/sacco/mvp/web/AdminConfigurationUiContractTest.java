@@ -24,14 +24,60 @@ class AdminConfigurationUiContractTest {
             .contains("data-credit-committee-reviewer-option")
             .contains("<c:if test=\"${not empty error}\">")
             .doesNotContain("openProductModalKey eq productModalKey")
-            .doesNotContain("product-config-step-description");
+            .doesNotContain("product-config-step-description")
+            .doesNotContain("data-product-config-toggle")
+            .doesNotContain("product-config-step-action")
+            .doesNotContain("product-config-progress");
         assertThat(settings).doesNotContain("data-workflow-notifications=\"focused\"");
         assertThat(workflowScript)
             .contains("applyRules({ notify: true })")
             .contains("previousWorkflowWarningKeys")
             .contains("workflowWarningsInitialized")
             .contains("block.dataset.workflowWarningTone")
-            .doesNotContain("block.setAttribute('data-toast-message'");
+            .doesNotContain("block.setAttribute('data-toast-message'")
+            .doesNotContain("progressMeter")
+            .doesNotContain("data-product-config-progress");
+    }
+
+    @Test
+    void loanProductDeletionRequiresTypedConfirmation() throws Exception {
+        String productEdit = read(JSP_ROOT.resolve("admin/loan-product-edit.jsp"));
+        String confirmModal = read(JSP_ROOT.resolve("fragments/confirm-modal.jspf"));
+
+        assertThat(productEdit)
+            .contains("data-confirm-text=\"Delete product\"")
+            .contains("data-confirm-proceed=\"Delete Product\"");
+        assertThat(confirmModal)
+            .contains("id=\"appConfirmTextInput\"")
+            .contains("Type <strong id=\"appConfirmRequiredText\"></strong> to confirm.")
+            .contains("textInput.value.trim() === requiredText")
+            .contains("proceed.disabled = !confirmed")
+            .contains("(requiredText ? textInput : proceed).focus");
+    }
+
+    @Test
+    void loanProductVersionHistoryIsRemovedAcrossUiApplicationAndSchema() throws Exception {
+        String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
+        String controller = read(Path.of("src/main/java/com/sacco/mvp/web/AdminController.java"));
+        String service = read(Path.of("src/main/java/com/sacco/mvp/service/AdminService.java"));
+        String migration = read(Path.of("src/main/resources/db/migration/V23__remove_loan_product_versions.sql"));
+
+        assertThat(settings)
+            .doesNotContain("Step 1 of 2")
+            .doesNotContain("Loan Products Versions")
+            .doesNotContain("Product Versions")
+            .doesNotContain("/versions/");
+        assertThat(controller)
+            .doesNotContain("rollbackLoanProductVersion")
+            .doesNotContain("loanProductsVersionHistory")
+            .doesNotContain("productVersionsByProductId");
+        assertThat(service)
+            .doesNotContain("LoanProductVersion")
+            .doesNotContain("LoanProductsVersion")
+            .doesNotContain("saveLoanProductSnapshot");
+        assertThat(migration)
+            .contains("DROP TABLE IF EXISTS public.loan_product_versions")
+            .contains("DROP TABLE IF EXISTS public.loan_products_versions");
     }
 
     @Test
@@ -41,7 +87,9 @@ class AdminConfigurationUiContractTest {
         String registration = read(JSP_ROOT.resolve("register-member.jsp"));
 
         assertThat(shellScript)
-            .contains("closeButton?.addEventListener('click', dismiss)")
+            .contains("closeButton?.addEventListener('click', function (event)")
+            .contains("event.preventDefault()")
+            .contains("event.stopPropagation()")
             .doesNotContain("window.setTimeout(entry.dismiss")
             .doesNotContain("window.setTimeout(dismiss, duration)");
         assertThat(login).doesNotContain("window.setTimeout(dismiss, duration)");
@@ -52,6 +100,7 @@ class AdminConfigurationUiContractTest {
     void smsTablesAndSharedPageHeaderUseAwsConsoleStructure() throws Exception {
         String smsUsage = read(JSP_ROOT.resolve("admin/sms-usage.jsp"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+        String shellScript = read(Path.of("src/main/resources/static/js/shell.js"));
 
         assertThat(smsUsage)
             .contains("Station SMS Balances")
@@ -67,7 +116,100 @@ class AdminConfigurationUiContractTest {
             .contains("position: sticky")
             .contains(".shell-page-title-rail")
             .contains("display: none !important")
+            .contains(".erp-page-path")
+            .contains("padding-top: 0 !important")
+            .contains("overflow-x: clip !important")
+            .contains("overflow-y: visible !important")
             .contains(".erp-page-subtitle");
+        assertThat(shellScript)
+            .contains("enhancePageBreadcrumbs")
+            .contains("separator.textContent = '>'")
+            .contains("breadcrumb.remove()");
+    }
+
+    @Test
+    void sidebarShowsOneActiveStaffRailAndUsesOrangeEmblemWithExistingWordmark() throws Exception {
+        String sidebar = read(JSP_ROOT.resolve("fragments/sidebar.jspf"));
+        String supportContact = read(JSP_ROOT.resolve("fragments/platform-support-contact-sidebar.jspf"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+
+        assertThat(sidebar)
+            .contains("staffDashboardActive ? 'shell-nav-active")
+            .contains("staffReportsActive ? 'shell-nav-active")
+            .contains("/images/computer-resources-mark-orange.png")
+            .contains("Computer Resources")
+            .contains("(T) Limited")
+            .contains("shell-powered-by-copy")
+            .contains("shell-powered-by-wordmark");
+        assertThat(supportContact)
+            .contains("shell-support-contact")
+            .contains("shell-support-contact__link")
+            .contains("platformSupportContact.officeHours ne '-'")
+            .contains("platformSupportContact.supportNote ne '-'");
+        assertThat(shellCss)
+            .contains(".shell-review-panel-link.shell-nav-active")
+            .contains(".shell-sidebar-group > div > a.shell-nav-active")
+            .contains(".shell-sidebar-group > div > a:hover")
+            .contains("border-left-color: #ec7211 !important")
+            .contains("color: #c4ced4 !important")
+            .contains(".shell-support-contact__link")
+            .contains("grid-template-columns: 36px minmax(0, 1fr)")
+            .contains("width: 42px !important")
+            .contains("width: 22px !important")
+            .containsPattern("(?s)\\.shell-sidebar-toggle-row\\s*\\{[^}]*padding:\\s*0 !important;")
+            .containsPattern("(?s)\\.shell-sidebar-toggle-label\\s*\\{[^}]*padding-left:\\s*12px !important;")
+            .contains(".shell-powered-by-copy")
+            .doesNotContain(".shell-sidebar-group > div a[class*=\"bg-white\"]")
+            .doesNotContain(".shell-sidebar-scroll .shell-review-panel-link[class*=\"bg-white\"]")
+            .contains("background: #111d2c !important");
+    }
+
+    @Test
+    void incidentAndManagerArchiveFiltersLeaveNoEmptyToolbarBars() throws Exception {
+        String incidents = read(JSP_ROOT.resolve("admin/incidents.jsp"));
+        String managerArchive = read(JSP_ROOT.resolve("manager/archive.jsp"));
+
+        assertThat(incidents)
+            .contains("class=\"admin-filter-form admin-filter-bar aws-filter-toolbar\"")
+            .doesNotContain("<section class=\"erp-form-wrap\">\n<form action=\"/admin/incidents\"");
+        assertThat(managerArchive)
+            .contains("<div class=\"erp-filter-row\">")
+            .contains("class=\"erp-filter-form manager-archive-search-form aws-filter-toolbar\"")
+            .doesNotContain("common.currentFilter")
+            .doesNotContain("<div class=\"erp-toolbar\">");
+    }
+
+    @Test
+    void staffArchiveChromeStaysOutsideTheTableScrollViewport() throws Exception {
+        for (String relativePath : new String[] {
+            "manager/archive.jsp",
+            "accountant/archive.jsp",
+            "disbursement/archive.jsp"
+        }) {
+            String archive = read(JSP_ROOT.resolve(relativePath));
+
+            assertThat(archive)
+                .contains("class=\"erp-table-wrap\"")
+                .contains("class=\"erp-table-scroll\" data-view-position-key=")
+                .contains("class=\"erp-table\"")
+                .doesNotContain("erp-table-wrap erp-table-scroll");
+        }
+    }
+
+    @Test
+    void shellRestoresEveryWorkspaceAndRepairsLegacyTableScrollRegions() throws Exception {
+        String shellScript = read(Path.of("src/main/resources/static/js/shell.js"));
+
+        assertThat(shellScript)
+            .contains("window.history.scrollRestoration = 'manual'")
+            .contains("scrollRestoreStorageKeyPrefix")
+            .contains("currentScrollRestoreStorageKey()")
+            .contains(".shell-sidebar-scroll, .shell-main")
+            .contains("window.addEventListener('scroll', scheduleScrollStateSave")
+            .contains("ensureConsoleTableScroller")
+            .contains("scroller.classList.add(modifier)")
+            .contains("region.classList.remove('erp-table-scroll')")
+            .doesNotContain("isAdminWorkspace");
     }
 
     @Test

@@ -164,9 +164,6 @@
                 if (!label) {
                     return;
                 }
-                if (!item.getAttribute("title")) {
-                    item.setAttribute("title", label);
-                }
                 if (!item.getAttribute("aria-label")) {
                     item.setAttribute("aria-label", label);
                 }

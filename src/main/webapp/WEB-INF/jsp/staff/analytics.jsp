@@ -28,14 +28,14 @@
             <h1 class="erp-page-title">${staffAnalyticsTitle}</h1>
             <p class="erp-page-subtitle">${staffAnalyticsSubtitle}</p>
         </div>
-        <div class="staff-analytics-actions md:justify-end">
-            <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action">
+        <div class="staff-analytics-actions md:justify-end" data-aws-action-pin="true">
+            <a href="${staffPdfExportUrl}" class="app-btn btn-neutral staff-filter-action" data-download-action="true">
                 <span class="text-red-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
                 </span>
                 <spring:message code="reports.exportPdf" text="Export PDF" />
             </a>
-            <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action">
+            <a href="${staffExcelExportUrl}" class="app-btn btn-neutral staff-filter-action" data-download-action="true">
                 <span class="text-emerald-600" aria-hidden="true">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h8"/><path d="M8 18h8"/></svg>
                 </span>
@@ -114,7 +114,6 @@
             </div>
             <div class="staff-spark-row">
                 <div class="staff-sparkline" aria-hidden="true"></div>
-                <span class="staff-card-info" title="${card.label} trend">i</span>
             </div>
         </div>
     </c:forEach>
@@ -137,7 +136,6 @@
                 <p class="text-xs font-semibold text-slate-600">
                     <spring:message code="staff.analytics.stationScope" text="Current station scope" />
                 </p>
-                <span class="staff-card-info" title="<spring:message code='staff.analytics.totalMembers' text='Total Members' />">i</span>
             </div>
         </div>
         <div class="erp-panel staff-metric-card" title="<spring:message code='staff.analytics.totalApplicants' text='Total Applicants' />">
@@ -159,7 +157,7 @@
                     <spring:message code="staff.analytics.repeatApplicants" text="Repeat Applicants" />:
                     <fmt:formatNumber value="${stationParticipation.repeatApplicants}" />
                 </p>
-                <span class="staff-card-info" title="<spring:message code='staff.analytics.applicationsPerApplicant' text='Applications per Applicant' />">${stationParticipation.applicationsPerApplicantLabel}</span>
+                <span class="staff-metric-meta-value" aria-label="<spring:message code='staff.analytics.applicationsPerApplicant' text='Applications per Applicant' />: ${stationParticipation.applicationsPerApplicantLabel}">${stationParticipation.applicationsPerApplicantLabel}</span>
             </div>
         </div>
     </c:if>
@@ -227,7 +225,8 @@
                         </div>
                     </div>
                     <c:if test="${empty loanType}">
-<div class="erp-table-wrap erp-table-scroll staff-financial-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                        <div class="erp-table-wrap staff-financial-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Loan product financial breakdown">
+                            <div class="erp-table-scroll" data-view-position-key="staff-analytics-financial-breakdown">
                             <table class="erp-table staff-financial-table">
                                 <thead>
                                     <tr>
@@ -255,6 +254,7 @@
                                     </c:if>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </c:if>
                 </c:if>

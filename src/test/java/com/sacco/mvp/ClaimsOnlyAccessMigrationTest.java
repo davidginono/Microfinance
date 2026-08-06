@@ -49,6 +49,27 @@ class ClaimsOnlyAccessMigrationTest {
         );
     }
 
+    @Test
+    void analyticsRepairRestoresOnlyTheDefaultClaimsForReviewRoles() throws IOException {
+        String migration = Files.readString(Path.of(
+            "src/main/resources/db/migration/V22__repair_staff_analytics_default_claims.sql"
+        ));
+
+        assertThat(migration).contains(
+            "('MANAGER', 'STAFF_ANALYTICS_VIEW')",
+            "('MANAGER', 'STAFF_ANALYTICS_EXPORT')",
+            "('LOAN_OFFICER', 'STAFF_ANALYTICS_VIEW')",
+            "('ACCOUNTANT', 'STAFF_ANALYTICS_VIEW')",
+            "('DISBURSEMENT_OFFICER', 'STAFF_ANALYTICS_VIEW')",
+            "('CHAIRPERSON', 'STAFF_ANALYTICS_VIEW')",
+            "('BOARD', 'STAFF_ANALYTICS_VIEW')",
+            "('CREDIT_COMMITTEE', 'STAFF_ANALYTICS_VIEW')",
+            "ON CONFLICT DO NOTHING"
+        );
+        assertThat(migration)
+            .doesNotContain("('DISBURSEMENT_OFFICER', 'STAFF_ANALYTICS_EXPORT')");
+    }
+
     private int flywayChecksum(Path migration) throws IOException {
         CRC32 crc32 = new CRC32();
         for (String line : Files.readAllLines(migration, StandardCharsets.UTF_8)) {

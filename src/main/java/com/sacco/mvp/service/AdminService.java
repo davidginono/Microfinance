@@ -1,6 +1,5 @@
 package com.sacco.mvp.service;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -17,7 +16,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -46,21 +44,15 @@ public class AdminService {
     private static final int FIRST_GENERATED_USER_ID = 10000;
     private static final int LAST_GENERATED_USER_ID = 99999;
     private static final String INVITED_ACCOUNT_PASSWORD_PLACEHOLDER = "OTP_ONLY_LOGIN";
-    private static final int MAX_PRODUCT_VERSION_HISTORY = 3;
-    private static final int MAX_LOAN_PRODUCTS_VERSION_HISTORY = 3;
     private static final int MAX_WORKFLOW_COUNT = 15;
     private static final BigDecimal MAX_LOAN_SAVINGS_RATIO = new BigDecimal("10.0000");
     private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");
-    private static final DateTimeFormatter PRODUCT_VERSION_TIME_FORMATTER =
-        DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private final MemberRepository memberRepository;
     private final SavingsAccountRepository savingsAccountRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanProductBoardReviewerRepository loanProductBoardReviewerRepository;
-    private final LoanProductVersionRepository loanProductVersionRepository;
-    private final LoanProductsVersionRepository loanProductsVersionRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoStationRepository saccoStationRepository;
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
@@ -555,71 +547,10 @@ public class AdminService {
             return;
         }
         Map<String, Object> before = snapshotProduct(product);
-        saveLoanProductSnapshot(product, adminId, "BEFORE_ATTACHMENT_REQUIREMENT_UPDATE");
         product.setApplicantAttachmentRequired(required);
         product.setUpdatedAt(OffsetDateTime.now());
         loanProductSettingRepository.save(product);
         auditService.log("LOAN_PRODUCT", productId, "ADMIN_UPDATE_ATTACHMENT_REQUIREMENT", adminId, before, snapshotProduct(product));
-    }
-
-    public Map<UUID, List<LoanProductVersionView>> loanProductVersions(String saccoId) {
-        List<LoanProductSetting> products = loanProducts(saccoId);
-        if (products.isEmpty()) {
-            return Map.of();
-        }
-        List<UUID> productIds = products.stream()
-            .map(LoanProductSetting::getId)
-            .toList();
-        List<LoanProductVersion> versions = loanProductVersionRepository.findByLoanProductSettingIdInOrderByCreatedAtDesc(productIds);
-        Map<UUID, String> actorNames = memberRepository.findAllById(
-                versions.stream()
-                    .map(LoanProductVersion::getCreatedByMemberId)
-                    .filter(java.util.Objects::nonNull)
-                    .collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
-
-        Map<UUID, List<LoanProductVersionView>> versionsByProduct = new LinkedHashMap<>();
-        versions.forEach(version -> {
-            if (!saccoId.equals(version.getSaccoId())) {
-                return;
-            }
-            List<LoanProductVersionView> views = versionsByProduct.computeIfAbsent(
-                version.getLoanProductSettingId(),
-                ignored -> new java.util.ArrayList<>()
-            );
-            if (views.size() >= MAX_PRODUCT_VERSION_HISTORY) {
-                return;
-            }
-            LoanProductSnapshot snapshot = parseLoanProductSnapshot(version.getSnapshotJson());
-            views.add(toLoanProductVersionView(version, snapshot, actorNames.get(version.getCreatedByMemberId())));
-        });
-
-        products.forEach(product -> versionsByProduct.computeIfAbsent(product.getId(), ignored -> List.of()));
-        return versionsByProduct;
-    }
-
-    public List<LoanProductsVersionView> loanProductsVersionHistory(String saccoId) {
-        List<LoanProductsVersion> versions = loanProductsVersionRepository.findBySaccoIdOrderByCreatedAtDesc(saccoId);
-        if (versions.isEmpty()) {
-            return List.of();
-        }
-        Map<UUID, String> actorNames = memberRepository.findAllById(
-                versions.stream()
-                    .map(LoanProductsVersion::getCreatedByMemberId)
-                    .filter(java.util.Objects::nonNull)
-                    .collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
-
-        return versions.stream()
-            .limit(MAX_LOAN_PRODUCTS_VERSION_HISTORY)
-            .map(version -> toLoanProductsVersionView(
-                version,
-                parseLoanProductsSnapshot(version.getSnapshotJson()),
-                actorNames.get(version.getCreatedByMemberId())
-            ))
-            .toList();
     }
 
     public boolean customizedLoanProductExists(String saccoId) {
@@ -1063,8 +994,6 @@ public class AdminService {
         }
 
         Map<String, Object> before = snapshotProduct(product);
-        saveLoanProductSnapshot(product, adminId, "BEFORE_UPDATE");
-        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_UPDATE");
         product.setProductCode(normalizeProductCode(saccoId, product.getLoanType(), productCode, product.getId(), productName));
         product.setProductName(normalizeProductName(product.getLoanType(), productName));
         product.setProductDescription(normalizeRequiredProductDescription(productDescription));
@@ -1164,43 +1093,11 @@ public class AdminService {
             throw new IllegalArgumentException("Loan product not found in this SACCO");
         }
         Map<String, Object> before = snapshotProduct(product);
-        saveLoanProductSnapshot(product, adminId, "BEFORE_ARCHIVE");
-        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_ARCHIVE");
         product.setProductStatus(LoanProductStatus.RETIRED);
         product.setActive(false);
         product.setUpdatedAt(OffsetDateTime.now());
         loanProductSettingRepository.save(product);
         auditService.log("LOAN_PRODUCT", productId, "ADMIN_ARCHIVE_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
-    }
-
-    @Transactional
-    public void rollbackLoanProductVersion(String saccoId, UUID adminId, UUID productId, UUID versionId) {
-        LoanProductSetting product = loanProductSettingRepository.findById(productId)
-            .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
-        if (!saccoId.equals(product.getSaccoId())) {
-            throw new IllegalArgumentException("Loan product not found in this SACCO");
-        }
-
-        LoanProductVersion version = loanProductVersionRepository.findById(versionId)
-            .orElseThrow(() -> new IllegalArgumentException("Loan product version not found."));
-        if (!productId.equals(version.getLoanProductSettingId()) || !saccoId.equals(version.getSaccoId())) {
-            throw new IllegalArgumentException("Loan product version not found in this SACCO.");
-        }
-
-        Map<String, Object> before = snapshotProduct(product);
-        saveLoanProductSnapshot(product, adminId, "BEFORE_ROLLBACK");
-        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_ROLLBACK");
-        LoanProductSnapshot snapshot = parseLoanProductSnapshot(version.getSnapshotJson());
-        applyLoanProductSnapshot(product, snapshot);
-        product.setUpdatedAt(OffsetDateTime.now());
-        loanProductSettingRepository.save(product);
-        replaceLoanProductReviewers(product, ApprovalWorkflowStage.CHAIRPERSON,
-            snapshotChairpersonReviewerIds(snapshot));
-        replaceLoanProductReviewers(product, ApprovalWorkflowStage.BOARD,
-            snapshotBoardReviewerIds(snapshot));
-        replaceLoanProductReviewers(product, ApprovalWorkflowStage.CREDIT_COMMITTEE,
-            snapshotCreditCommitteeReviewerIds(snapshot));
-        auditService.log("LOAN_PRODUCT", productId, "ADMIN_ROLLBACK_LOAN_PRODUCT", adminId, before, snapshotProduct(product));
     }
 
     @Transactional
@@ -1467,7 +1364,6 @@ public class AdminService {
         validateStageReviewerConfiguration(saccoId, Position.CHAIRPERSON, normalizedChairpersonReviewerIds.size(), chairpersonReviewRequired, "chairperson");
         validateStageReviewerConfiguration(saccoId, Position.BOARD, normalizedBoardReviewerIds.size(), boardReviewRequired, "board member");
         validateStageReviewerConfiguration(saccoId, Position.CREDIT_COMMITTEE, normalizedCreditCommitteeReviewerIds.size(), committeeReviewRequired, "credit committee member");
-        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_PRODUCT_CREATE");
         LoanProductSetting product = saccoConfigurationService.createLoanProduct(
             saccoId,
             LoanType.CUSTOMIZED_LOAN,
@@ -1523,7 +1419,6 @@ public class AdminService {
     public void updateLoanApplicationFee(String saccoId, UUID adminId, BigDecimal applicationFee) {
         SaccoSettings settings = settings(saccoId);
         Map<String, Object> before = snapshotSettings(settings);
-        saveLoanProductsSnapshot(saccoId, adminId, "BEFORE_GLOBAL_LOAN_SETTINGS_UPDATE");
         settings.setApplicationFee(normalizeApplicationFee(applicationFee));
         settings.setUpdatedAt(OffsetDateTime.now());
         saccoSettingsRepository.save(settings);
@@ -3502,381 +3397,57 @@ public class AdminService {
             .build());
     }
 
-    private void saveLoanProductSnapshot(LoanProductSetting product, UUID actorMemberId, String snapshotType) {
-        LoanProductSnapshot snapshot = snapshotFromProduct(product);
-        int nextVersionNumber = loanProductVersionRepository.findTopByLoanProductSettingIdOrderByVersionNumberDesc(product.getId())
-            .map(existing -> existing.getVersionNumber() + 1)
-            .orElse(1);
-        loanProductVersionRepository.save(LoanProductVersion.builder()
-            .id(UUID.randomUUID())
-            .loanProductSettingId(product.getId())
-            .saccoId(product.getSaccoId())
-            .versionNumber(nextVersionNumber)
-            .snapshotType(snapshotType)
-            .snapshotJson(writeLoanProductSnapshot(snapshot))
-            .createdByMemberId(actorMemberId)
-            .createdAt(OffsetDateTime.now())
-            .build());
-    }
-
-    private void saveLoanProductsSnapshot(String saccoId, UUID actorMemberId, String snapshotType) {
-        LoanProductsSnapshot snapshot = buildLoanProductsSnapshot(saccoId);
-        int nextVersionNumber = loanProductsVersionRepository.findTopBySaccoIdOrderByVersionNumberDesc(saccoId)
-            .map(existing -> existing.getVersionNumber() + 1)
-            .orElse(1);
-        loanProductsVersionRepository.save(LoanProductsVersion.builder()
-            .id(UUID.randomUUID())
-            .saccoId(saccoId)
-            .versionNumber(nextVersionNumber)
-            .snapshotType(snapshotType)
-            .snapshotJson(writeLoanProductsSnapshot(snapshot))
-            .createdByMemberId(actorMemberId)
-            .createdAt(OffsetDateTime.now())
-            .build());
-    }
-
-    private String writeLoanProductSnapshot(LoanProductSnapshot snapshot) {
-        try {
-            return objectMapper.writeValueAsString(snapshot);
-        } catch (JacksonException ex) {
-            throw new IllegalStateException("Unable to save loan product version snapshot.", ex);
-        }
-    }
-
-    private String writeLoanProductsSnapshot(LoanProductsSnapshot snapshot) {
-        try {
-            return objectMapper.writeValueAsString(snapshot);
-        } catch (JacksonException ex) {
-            throw new IllegalStateException("Unable to save loan products version snapshot.", ex);
-        }
-    }
-
-    private LoanProductSnapshot parseLoanProductSnapshot(String snapshotJson) {
-        try {
-            return objectMapper.readValue(snapshotJson, LoanProductSnapshot.class);
-        } catch (JacksonException ex) {
-            throw new IllegalStateException("Unable to read loan product version snapshot.", ex);
-        }
-    }
-
-    private LoanProductsSnapshot parseLoanProductsSnapshot(String snapshotJson) {
-        try {
-            return objectMapper.readValue(snapshotJson, LoanProductsSnapshot.class);
-        } catch (JacksonException ex) {
-            throw new IllegalStateException("Unable to read loan products version snapshot.", ex);
-        }
-    }
-
-    private LoanProductsSnapshot buildLoanProductsSnapshot(String saccoId) {
-        List<LoanProductSnapshot> products = loanProducts(saccoId).stream()
-            .map(this::snapshotFromProduct)
-            .toList();
-        return new LoanProductsSnapshot(settings(saccoId).getResolvedApplicationFee(), products);
-    }
-
-    private LoanProductSnapshot snapshotFromProduct(LoanProductSetting product) {
-        return LoanProductSnapshot.fromProduct(
-            product,
-            reviewerIds(product.getId(), ApprovalWorkflowStage.CHAIRPERSON),
-            reviewerIds(product.getId(), ApprovalWorkflowStage.BOARD),
-            reviewerIds(product.getId(), ApprovalWorkflowStage.CREDIT_COMMITTEE)
-        );
-    }
-
-    private List<UUID> snapshotChairpersonReviewerIds(LoanProductSnapshot snapshot) {
-        return snapshot.chairpersonReviewerIds() == null ? List.of() : snapshot.chairpersonReviewerIds();
-    }
-
-    private List<UUID> snapshotBoardReviewerIds(LoanProductSnapshot snapshot) {
-        return snapshot.boardReviewerIds() == null ? List.of() : snapshot.boardReviewerIds();
-    }
-
-    private List<UUID> snapshotCreditCommitteeReviewerIds(LoanProductSnapshot snapshot) {
-        if (snapshot.creditCommitteeReviewerIds() != null) {
-            return snapshot.creditCommitteeReviewerIds();
-        }
-        return snapshot.boardReviewRequired() == null && snapshot.boardReviewerIds() != null
-            ? snapshot.boardReviewerIds()
-            : List.of();
-    }
-
-    private void applyLoanProductSnapshot(LoanProductSetting product, LoanProductSnapshot snapshot) {
-        product.setProductCode(normalizeProductCode(product.getSaccoId(), product.getLoanType(), snapshot.productCode(), product.getId()));
-        product.setProductName(normalizeProductName(product.getLoanType(), snapshot.productName()));
-        product.setProductDescription(normalizeProductDescription(snapshot.productDescription()));
-        product.setDisplayOrder(normalizeDisplayOrder(snapshot.displayOrder()));
-        BigDecimal normalizedMinimumAmount = normalizeMinimumAmount(snapshot.minimumAmount());
-        product.setMinimumAmount(normalizedMinimumAmount);
-        product.setMaximumAmount(normalizeMaximumAmount(normalizedMinimumAmount, snapshot.maximumAmount()));
-        product.setGuarantorsRequired(normalizeGuarantorCount(snapshot.guarantorsRequired()));
-        product.setMaxLoanSavingsRatio(normalizeRatio(snapshot.maxLoanSavingsRatio()));
-        product.setSavingsLimitCheckRequired(!Boolean.FALSE.equals(snapshot.savingsLimitCheckRequired()));
-        product.setApplicationFee(normalizeApplicationFee(snapshot.applicationFee()));
-        product.setInsuranceRate(normalizeInsuranceRate(snapshot.insuranceRate()));
-        product.setProcessingFeeRate(normalizePercentageRate(snapshot.processingFeeRate(), "Loan processing fee percentage cannot be negative."));
-        product.setInterestRate(normalizeAnnualRate(snapshot.interestRate()));
-        product.setInterestMethod(normalizeInterestMethod(snapshot.interestMethod()));
-        int minRepaymentMonths = normalizeMinimumRepaymentMonths(snapshot.minRepaymentMonths());
-        product.setMinRepaymentMonths(minRepaymentMonths);
-        product.setMaxRepaymentMonths(normalizeMaximumRepaymentMonths(minRepaymentMonths, snapshot.maxRepaymentMonths()));
-        product.setAllowApplicationWithActiveLoan(Boolean.TRUE.equals(snapshot.allowApplicationWithActiveLoan()));
-        product.setFreshFinancialDataRequired(Boolean.TRUE.equals(snapshot.freshFinancialDataRequired()));
-        validateWorkflowConfiguration(
-            product.getSaccoId(),
-            Boolean.TRUE.equals(snapshot.managerReviewRequired()),
-            Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()),
-            snapshot.workflowStartStage(),
-            snapshot.managerPriority(),
-            snapshot.loanOfficerPriority(),
-            Boolean.TRUE.equals(snapshot.chairpersonReviewRequired()),
-            snapshot.chairpersonPriority(),
-            Boolean.TRUE.equals(snapshot.boardReviewRequired()),
-            snapshot.boardPriority(),
-            Boolean.TRUE.equals(snapshot.committeeReviewRequired()),
-            snapshot.committeePriority(),
-            snapshot.committeeMinimumVotes(),
-            snapshot.committeeApprovalThreshold(),
-            !Boolean.FALSE.equals(snapshot.accountantReviewRequired()),
-            snapshot.accountantPriority(),
-            !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired())
-        );
-        boolean managerReviewRequired = normalizeManagerReviewRequired(Boolean.TRUE.equals(snapshot.managerReviewRequired()));
-        boolean chairpersonReviewRequired = Boolean.TRUE.equals(snapshot.chairpersonReviewRequired());
-        boolean boardReviewRequired = Boolean.TRUE.equals(snapshot.boardReviewRequired());
-        boolean committeeReviewRequired = Boolean.TRUE.equals(snapshot.committeeReviewRequired());
-        product.setManagerReviewRequired(managerReviewRequired);
-        product.setManagerPriority(normalizeReviewPriority(managerReviewRequired, snapshot.managerPriority(), 1));
-        product.setLoanOfficerReviewRequired(Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
-        product.setLoanOfficerPriority(normalizeReviewPriority(Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()), snapshot.loanOfficerPriority(), 2));
-        product.setWorkflowStartStage(normalizeWorkflowStartStage(
-            snapshot.workflowStartStage(),
-            managerReviewRequired,
-            Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired())
-        ));
-        product.setChairpersonReviewRequired(chairpersonReviewRequired);
-        product.setChairpersonPriority(normalizeStagePriority(chairpersonReviewRequired, snapshot.chairpersonPriority(), 3));
-        product.setBoardReviewRequired(boardReviewRequired);
-        product.setBoardPriority(normalizeStagePriority(boardReviewRequired, snapshot.boardPriority(), 3));
-        product.setCommitteeReviewRequired(committeeReviewRequired);
-        product.setCommitteePriority(normalizeStagePriority(committeeReviewRequired, snapshot.committeePriority(), 4));
-        Integer committeeMinimumVotes = normalizeCommitteeMinimumVotes(committeeReviewRequired, snapshot.committeeMinimumVotes());
-        Integer committeeApprovalThreshold = normalizeCommitteeApprovalThreshold(
-            committeeReviewRequired,
-            committeeMinimumVotes,
-            snapshot.committeeApprovalThreshold()
-        );
-        validateStageReviewerConfiguration(product.getSaccoId(), Position.CHAIRPERSON,
-            snapshotChairpersonReviewerIds(snapshot).size(),
-            chairpersonReviewRequired,
-            "chairperson");
-        validateStageReviewerConfiguration(product.getSaccoId(), Position.BOARD,
-            snapshotBoardReviewerIds(snapshot).size(),
-            boardReviewRequired,
-            "board member");
-        validateStageReviewerConfiguration(product.getSaccoId(), Position.CREDIT_COMMITTEE,
-            snapshotCreditCommitteeReviewerIds(snapshot).size(),
-            committeeReviewRequired,
-            "credit committee member");
-        product.setCommitteeMinimumVotes(committeeMinimumVotes);
-        product.setCommitteeApprovalThreshold(committeeApprovalThreshold);
-        boolean accountantReviewRequired = !Boolean.FALSE.equals(snapshot.accountantReviewRequired());
-        product.setAccountantReviewRequired(accountantReviewRequired);
-        product.setAccountantPriority(normalizeStagePriority(accountantReviewRequired, snapshot.accountantPriority(), 5));
-        product.setDisbursementOfficerRequired(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
-        product.setDisbursementProofRequired(!Boolean.FALSE.equals(snapshot.disbursementProofRequired()));
-        product.setApplicantAttachmentRequired(Boolean.TRUE.equals(snapshot.applicantAttachmentRequired()));
-        product.setGuarantorMinSavingsCheckRequired(Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
-        product.setGuarantorMinimumSavings(nonNegativeAmount(snapshot.guarantorMinimumSavings(), "Minimum guarantor savings cannot be negative."));
-        LoanProductStatus normalizedStatus = normalizeProductStatus(snapshot.productStatus());
-        product.setProductStatus(normalizedStatus);
-        product.setActive(normalizedStatus == LoanProductStatus.ACTIVE);
-    }
-
     private Map<String, Object> snapshotProduct(LoanProductSetting product) {
-        LoanProductSnapshot snapshot = snapshotFromProduct(product);
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("loanType", snapshot.loanType());
-        data.put("productCode", resolveProductCode(snapshot));
-        data.put("productName", snapshot.productName());
-        data.put("productDescription", snapshot.productDescription());
-        data.put("displayOrder", snapshot.displayOrder());
-        data.put("minimumAmount", snapshot.minimumAmount());
-        data.put("maximumAmount", snapshot.maximumAmount());
-        data.put("guarantorsRequired", snapshot.guarantorsRequired());
-        data.put("ratio", snapshot.maxLoanSavingsRatio());
-        data.put("savingsLimitCheckRequired", !Boolean.FALSE.equals(snapshot.savingsLimitCheckRequired()));
-        data.put("applicationFee", snapshot.applicationFee());
-        data.put("insuranceRate", snapshot.insuranceRate());
-        data.put("processingFeeRate", snapshot.processingFeeRate());
-        data.put("interestRate", snapshot.interestRate());
-        data.put("interestMethod", snapshot.interestMethod());
-        data.put("minRepaymentMonths", snapshot.minRepaymentMonths());
-        data.put("maxRepaymentMonths", snapshot.maxRepaymentMonths());
-        data.put("allowApplicationWithActiveLoan", Boolean.TRUE.equals(snapshot.allowApplicationWithActiveLoan()));
-        data.put("freshFinancialDataRequired", Boolean.TRUE.equals(snapshot.freshFinancialDataRequired()));
-        data.put("managerReviewRequired", Boolean.TRUE.equals(snapshot.managerReviewRequired()));
-        data.put("managerPriority", snapshot.managerPriority());
-        data.put("loanOfficerReviewRequired", Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired()));
-        data.put("loanOfficerPriority", snapshot.loanOfficerPriority());
-        data.put("workflowStartStage", snapshot.workflowStartStage());
-        data.put("chairpersonReviewRequired", Boolean.TRUE.equals(snapshot.chairpersonReviewRequired()));
-        data.put("chairpersonPriority", snapshot.chairpersonPriority());
-        data.put("chairpersonReviewerIds", snapshotChairpersonReviewerIds(snapshot));
-        data.put("boardReviewRequired", Boolean.TRUE.equals(snapshot.boardReviewRequired()));
-        data.put("boardPriority", snapshot.boardPriority());
-        data.put("boardReviewerIds", snapshotBoardReviewerIds(snapshot));
-        data.put("committeeReviewRequired", Boolean.TRUE.equals(snapshot.committeeReviewRequired()));
-        data.put("committeePriority", snapshot.committeePriority());
-        data.put("committeeMinimumVotes", snapshot.committeeMinimumVotes());
-        data.put("committeeApprovalThreshold", snapshot.committeeApprovalThreshold());
-        data.put("creditCommitteeReviewerIds", snapshotCreditCommitteeReviewerIds(snapshot));
-        data.put("accountantReviewRequired", !Boolean.FALSE.equals(snapshot.accountantReviewRequired()));
-        data.put("accountantPriority", snapshot.accountantPriority());
-        data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(snapshot.disbursementOfficerRequired()));
-        data.put("disbursementProofRequired", !Boolean.FALSE.equals(snapshot.disbursementProofRequired()));
-        data.put("applicantAttachmentRequired", Boolean.TRUE.equals(snapshot.applicantAttachmentRequired()));
-        data.put("guarantorMinSavingsCheckRequired", Boolean.TRUE.equals(snapshot.guarantorMinSavingsCheckRequired()));
-        data.put("guarantorMinimumSavings", snapshot.guarantorMinimumSavings());
-        data.put("productStatus", snapshot.productStatus());
+        data.put("loanType", product.getLoanType());
+        String productCode = product.getProductCode();
+        if (productCode == null || productCode.isBlank()) {
+            productCode = product.getLoanType() == null ? "" : product.getLoanType().defaultProductCode();
+        }
+        data.put("productCode", productCode);
+        data.put("productName", product.getProductName());
+        data.put("productDescription", product.getProductDescription());
+        data.put("displayOrder", product.getResolvedDisplayOrder());
+        data.put("minimumAmount", product.getMinimumAmount());
+        data.put("maximumAmount", product.getMaximumAmount());
+        data.put("guarantorsRequired", product.getGuarantorsRequired());
+        data.put("ratio", product.getMaxLoanSavingsRatio());
+        data.put("savingsLimitCheckRequired", product.isSavingsLimitCheckRequired());
+        data.put("applicationFee", product.getApplicationFee());
+        data.put("insuranceRate", product.getInsuranceRate());
+        data.put("processingFeeRate", product.getProcessingFeeRate());
+        data.put("interestRate", product.getInterestRate());
+        data.put("interestMethod", product.getInterestMethod());
+        data.put("minRepaymentMonths", product.getMinimumRepaymentMonths());
+        data.put("maxRepaymentMonths", product.getMaxRepaymentMonths());
+        data.put("allowApplicationWithActiveLoan", Boolean.TRUE.equals(product.getAllowApplicationWithActiveLoan()));
+        data.put("freshFinancialDataRequired", Boolean.TRUE.equals(product.getFreshFinancialDataRequired()));
+        data.put("managerReviewRequired", Boolean.TRUE.equals(product.getManagerReviewRequired()));
+        data.put("managerPriority", product.getResolvedManagerPriority());
+        data.put("loanOfficerReviewRequired", Boolean.TRUE.equals(product.getLoanOfficerReviewRequired()));
+        data.put("loanOfficerPriority", product.getResolvedLoanOfficerPriority());
+        data.put("workflowStartStage", product.getWorkflowStartStage());
+        data.put("chairpersonReviewRequired", Boolean.TRUE.equals(product.getChairpersonReviewRequired()));
+        data.put("chairpersonPriority", product.getResolvedChairpersonPriority());
+        data.put("chairpersonReviewerIds", reviewerIds(product.getId(), ApprovalWorkflowStage.CHAIRPERSON));
+        data.put("boardReviewRequired", Boolean.TRUE.equals(product.getBoardReviewRequired()));
+        data.put("boardPriority", product.getBoardPriority());
+        data.put("boardReviewerIds", reviewerIds(product.getId(), ApprovalWorkflowStage.BOARD));
+        data.put("committeeReviewRequired", Boolean.TRUE.equals(product.getCommitteeReviewRequired()));
+        data.put("committeePriority", product.getCommitteePriority());
+        data.put("committeeMinimumVotes", product.getCommitteeMinimumVotes());
+        data.put("committeeApprovalThreshold", product.getCommitteeApprovalThreshold());
+        data.put("creditCommitteeReviewerIds", reviewerIds(product.getId(), ApprovalWorkflowStage.CREDIT_COMMITTEE));
+        data.put("accountantReviewRequired", !Boolean.FALSE.equals(product.getAccountantReviewRequired()));
+        data.put("accountantPriority", product.getAccountantPriority());
+        data.put("disbursementOfficerRequired", !Boolean.FALSE.equals(product.getDisbursementOfficerRequired()));
+        data.put("disbursementProofRequired", !Boolean.FALSE.equals(product.getDisbursementProofRequired()));
+        data.put("applicantAttachmentRequired", Boolean.TRUE.equals(product.getApplicantAttachmentRequired()));
+        data.put("guarantorMinSavingsCheckRequired", Boolean.TRUE.equals(product.getGuarantorMinSavingsCheckRequired()));
+        data.put("guarantorMinimumSavings", product.getGuarantorMinimumSavings());
+        data.put("productStatus", product.getStatus());
         data.put("active", product.getActive());
         return data;
-    }
-
-    private LoanProductVersionView toLoanProductVersionView(LoanProductVersion version,
-                                                            LoanProductSnapshot snapshot,
-                                                            String actorName) {
-        return new LoanProductVersionView(
-            version.getId(),
-            version.getVersionNumber(),
-            formatSnapshotTypeLabel(version.getSnapshotType()),
-            version.getCreatedAt() == null ? "" : version.getCreatedAt().format(PRODUCT_VERSION_TIME_FORMATTER),
-            actorName == null || actorName.isBlank() ? "System" : actorName,
-            resolveProductCode(snapshot),
-            resolveProductName(snapshot),
-            formatAmountRange(snapshot.minimumAmount(), snapshot.maximumAmount()),
-            snapshot.minRepaymentMonths() + " - " + snapshot.maxRepaymentMonths() + " month(s)",
-            formatInterestSummary(snapshot.interestMethod(), snapshot.interestRate()),
-            formatWorkflowSummary(snapshot),
-            snapshot.productStatus() == null ? LoanProductStatus.ACTIVE.name() : snapshot.productStatus().name()
-        );
-    }
-
-    private LoanProductsVersionView toLoanProductsVersionView(LoanProductsVersion version,
-                                                              LoanProductsSnapshot snapshot,
-                                                              String actorName) {
-        List<LoanProductSnapshot> products = snapshot.products() == null ? List.of() : snapshot.products();
-        String productsLabel = products.stream()
-            .map(this::resolveProductName)
-            .filter(name -> name != null && !name.isBlank())
-            .limit(4)
-            .collect(Collectors.joining(", "));
-        if (products.size() > 4) {
-            productsLabel = productsLabel + " +" + (products.size() - 4) + " more";
-        }
-        return new LoanProductsVersionView(
-            version.getId(),
-            version.getVersionNumber(),
-            formatSnapshotTypeLabel(version.getSnapshotType()),
-            version.getCreatedAt() == null ? "" : version.getCreatedAt().format(PRODUCT_VERSION_TIME_FORMATTER),
-            actorName == null || actorName.isBlank() ? "System" : actorName,
-            formatMoney(snapshot.applicationFee()),
-            products.size(),
-            productsLabel.isBlank() ? "No products" : productsLabel
-        );
-    }
-
-    private String resolveProductCode(LoanProductSnapshot snapshot) {
-        if (snapshot.productCode() != null && !snapshot.productCode().isBlank()) {
-            return snapshot.productCode();
-        }
-        return snapshot.loanType() == null ? "" : snapshot.loanType().defaultProductCode();
-    }
-
-    private String resolveProductName(LoanProductSnapshot snapshot) {
-        if (snapshot.productName() != null && !snapshot.productName().isBlank()) {
-            return snapshot.productName();
-        }
-        return snapshot.loanType() == null ? "" : snapshot.loanType().getDisplayLabel();
-    }
-
-    private String formatAmountRange(BigDecimal minimumAmount, BigDecimal maximumAmount) {
-        return formatMoney(minimumAmount) + " to " + (maximumAmount == null ? "Not set" : formatMoney(maximumAmount));
-    }
-
-    private String formatInterestSummary(InterestMethod interestMethod, BigDecimal interestRate) {
-        return formatInterestMethodLabel(interestMethod) + " / " + formatPercent(interestRate);
-    }
-
-    private String formatWorkflowSummary(LoanProductSnapshot snapshot) {
-        List<String> stages = new ArrayList<>();
-        boolean managerEnabled = Boolean.TRUE.equals(snapshot.managerReviewRequired());
-        boolean loanOfficerEnabled = Boolean.TRUE.equals(snapshot.loanOfficerReviewRequired());
-        ApprovalWorkflowStage startStage = snapshot.workflowStartStage() == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerEnabled
-            ? ApprovalWorkflowStage.LOAN_OFFICER
-            : ApprovalWorkflowStage.MANAGER;
-        if (startStage == ApprovalWorkflowStage.LOAN_OFFICER && loanOfficerEnabled) {
-            stages.add("Loan Officer");
-            if (managerEnabled) {
-                stages.add("Manager");
-            }
-        } else if (managerEnabled) {
-            stages.add("Manager");
-            if (loanOfficerEnabled) {
-                stages.add("Loan Officer");
-            }
-        } else if (loanOfficerEnabled) {
-            stages.add("Loan Officer");
-        }
-        if (Boolean.TRUE.equals(snapshot.boardReviewRequired())) {
-            stages.add("Board Member");
-        }
-        if (Boolean.TRUE.equals(snapshot.chairpersonReviewRequired())) {
-            stages.add("Chairperson");
-        }
-        if (Boolean.TRUE.equals(snapshot.committeeReviewRequired())) {
-            stages.add("Credit Committee");
-        }
-        if (!Boolean.FALSE.equals(snapshot.accountantReviewRequired())) {
-            stages.add("Accountant");
-        }
-        stages.add(!Boolean.FALSE.equals(snapshot.disbursementOfficerRequired())
-            ? "Disbursement/Teller Officer"
-            : "Disbursement Release");
-        return String.join(" -> ", stages);
-    }
-
-    private String formatSnapshotTypeLabel(String snapshotType) {
-        if ("BEFORE_ROLLBACK".equalsIgnoreCase(snapshotType)) {
-            return "Before rollback";
-        }
-        if ("BEFORE_UPDATE".equalsIgnoreCase(snapshotType)) {
-            return "Before update";
-        }
-        return "Saved snapshot";
-    }
-
-    private String formatInterestMethodLabel(InterestMethod interestMethod) {
-        return switch (interestMethod == null ? InterestMethod.FLAT_RATE : interestMethod) {
-            case FLAT_RATE -> "Flat Rate";
-            case REDUCING_BALANCE -> "Reducing Balance";
-        };
-    }
-
-    private String formatMoney(BigDecimal amount) {
-        if (amount == null) {
-            return "0";
-        }
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(java.util.Locale.US));
-        return format.format(amount.setScale(2, java.math.RoundingMode.HALF_UP));
-    }
-
-    private String formatPercent(BigDecimal ratio) {
-        if (ratio == null) {
-            return "0.00%";
-        }
-        return ratio.multiply(BigDecimal.valueOf(100))
-            .setScale(2, java.math.RoundingMode.HALF_UP)
-            .toPlainString() + "%";
     }
 
     private String normalizeDefaultLanguage(String defaultLanguage) {
@@ -4207,112 +3778,6 @@ public class AdminService {
         }
     }
 
-    public record LoanProductVersionView(
-        UUID id,
-        int versionNumber,
-        String snapshotType,
-        String savedAtLabel,
-        String savedByLabel,
-        String productCode,
-        String productName,
-        String amountRangeLabel,
-        String tenureLabel,
-        String interestLabel,
-        String workflowLabel,
-        String statusLabel
-    ) {
-        public UUID getId() {
-            return id;
-        }
-
-        public int getVersionNumber() {
-            return versionNumber;
-        }
-
-        public String getSnapshotType() {
-            return snapshotType;
-        }
-
-        public String getSavedAtLabel() {
-            return savedAtLabel;
-        }
-
-        public String getSavedByLabel() {
-            return savedByLabel;
-        }
-
-        public String getProductCode() {
-            return productCode;
-        }
-
-        public String getProductName() {
-            return productName;
-        }
-
-        public String getAmountRangeLabel() {
-            return amountRangeLabel;
-        }
-
-        public String getTenureLabel() {
-            return tenureLabel;
-        }
-
-        public String getInterestLabel() {
-            return interestLabel;
-        }
-
-        public String getWorkflowLabel() {
-            return workflowLabel;
-        }
-
-        public String getStatusLabel() {
-            return statusLabel;
-        }
-    }
-
-    public record LoanProductsVersionView(
-        UUID id,
-        int versionNumber,
-        String snapshotType,
-        String savedAtLabel,
-        String savedByLabel,
-        String applicationFeeLabel,
-        int productCount,
-        String productsLabel
-    ) {
-        public UUID getId() {
-            return id;
-        }
-
-        public int getVersionNumber() {
-            return versionNumber;
-        }
-
-        public String getSnapshotType() {
-            return snapshotType;
-        }
-
-        public String getSavedAtLabel() {
-            return savedAtLabel;
-        }
-
-        public String getSavedByLabel() {
-            return savedByLabel;
-        }
-
-        public String getApplicationFeeLabel() {
-            return applicationFeeLabel;
-        }
-
-        public int getProductCount() {
-            return productCount;
-        }
-
-        public String getProductsLabel() {
-            return productsLabel;
-        }
-    }
-
     public static final class BoardReviewerOption {
         private final UUID id;
         private final String fullName;
@@ -4340,115 +3805,6 @@ public class AdminService {
 
         public String getStationId() {
             return stationId;
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record LoanProductsSnapshot(
-        BigDecimal applicationFee,
-        List<LoanProductSnapshot> products
-    ) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record LoanProductSnapshot(
-        LoanType loanType,
-        String productCode,
-        String productName,
-        String productDescription,
-        Integer displayOrder,
-        BigDecimal minimumAmount,
-        BigDecimal maximumAmount,
-        Integer guarantorsRequired,
-        BigDecimal maxLoanSavingsRatio,
-        Boolean savingsLimitCheckRequired,
-        BigDecimal applicationFee,
-        BigDecimal insuranceRate,
-        BigDecimal processingFeeRate,
-        BigDecimal interestRate,
-        InterestMethod interestMethod,
-        Integer minRepaymentMonths,
-        Integer maxRepaymentMonths,
-        Boolean allowApplicationWithActiveLoan,
-        Boolean freshFinancialDataRequired,
-        Boolean managerReviewRequired,
-        Integer managerPriority,
-        Boolean loanOfficerReviewRequired,
-        Integer loanOfficerPriority,
-        ApprovalWorkflowStage workflowStartStage,
-        Boolean chairpersonReviewRequired,
-        Integer chairpersonPriority,
-        List<UUID> chairpersonReviewerIds,
-        Boolean boardReviewRequired,
-        Integer boardPriority,
-        List<UUID> boardReviewerIds,
-        Boolean committeeReviewRequired,
-        Integer committeePriority,
-        Integer committeeMinimumVotes,
-        Integer committeeApprovalThreshold,
-        List<UUID> creditCommitteeReviewerIds,
-        Boolean accountantReviewRequired,
-        Integer accountantPriority,
-        Boolean disbursementOfficerRequired,
-        Boolean disbursementProofRequired,
-        Boolean applicantAttachmentRequired,
-        Boolean guarantorMinSavingsCheckRequired,
-        BigDecimal guarantorMinimumSavings,
-        LoanProductStatus productStatus
-    ) {
-        public static LoanProductSnapshot fromProduct(LoanProductSetting product) {
-            return fromProduct(product, List.of(), List.of(), List.of());
-        }
-
-        public static LoanProductSnapshot fromProduct(LoanProductSetting product,
-                                                      List<UUID> chairpersonReviewerIds,
-                                                      List<UUID> boardReviewerIds,
-                                                      List<UUID> creditCommitteeReviewerIds) {
-            return new LoanProductSnapshot(
-                product.getLoanType(),
-                product.getProductCode(),
-                product.getProductName(),
-                product.getProductDescription(),
-                product.getResolvedDisplayOrder(),
-                product.getMinimumAmount(),
-                product.getMaximumAmount(),
-                product.getGuarantorsRequired(),
-                product.getMaxLoanSavingsRatio(),
-                product.isSavingsLimitCheckRequired(),
-                product.getApplicationFee(),
-                product.getInsuranceRate(),
-                product.getProcessingFeeRate(),
-                product.getInterestRate(),
-                product.getInterestMethod(),
-                product.getMinimumRepaymentMonths(),
-                product.getMaxRepaymentMonths(),
-                product.getAllowApplicationWithActiveLoan(),
-                product.getFreshFinancialDataRequired(),
-                product.getManagerReviewRequired(),
-                product.getResolvedManagerPriority(),
-                product.getLoanOfficerReviewRequired(),
-                product.getResolvedLoanOfficerPriority(),
-                product.getWorkflowStartStage(),
-                product.getChairpersonReviewRequired(),
-                product.getResolvedChairpersonPriority(),
-                chairpersonReviewerIds == null ? List.of() : List.copyOf(chairpersonReviewerIds),
-                product.getBoardReviewRequired(),
-                product.getBoardPriority(),
-                boardReviewerIds == null ? List.of() : List.copyOf(boardReviewerIds),
-                product.getCommitteeReviewRequired(),
-                product.getCommitteePriority(),
-                product.getCommitteeMinimumVotes(),
-                product.getCommitteeApprovalThreshold(),
-                creditCommitteeReviewerIds == null ? List.of() : List.copyOf(creditCommitteeReviewerIds),
-                product.getAccountantReviewRequired(),
-                product.getAccountantPriority(),
-                product.getDisbursementOfficerRequired(),
-                product.getDisbursementProofRequired(),
-                product.getApplicantAttachmentRequired(),
-                product.getGuarantorMinSavingsCheckRequired(),
-                product.getGuarantorMinimumSavings(),
-                product.getStatus()
-            );
         }
     }
 

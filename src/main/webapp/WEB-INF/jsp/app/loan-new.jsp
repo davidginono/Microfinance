@@ -29,7 +29,7 @@
     </ul>
 </div>
 
-<form id="loanApplicationForm" method="post" action="/app/loan-applications" enctype="multipart/form-data" class="erp-form-wrap space-y-5">
+<form id="loanApplicationForm" method="post" action="/app/loan-applications" enctype="multipart/form-data" class="erp-form-wrap loan-application-create-page space-y-5">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
     <input type="hidden" name="loanProductId" value="${loanProductId}" />
     <input type="hidden" name="loanType" value="${loanType}" />
@@ -42,9 +42,10 @@
 
     <nav class="loan-application-steps" aria-label="Loan application steps">
         <button type="button" class="is-current" data-loan-step-button="1" aria-current="step"><span>1</span><span>Request</span></button>
-        <button type="button" data-loan-step-button="2"><span>2</span><span>Affordability</span></button>
-        <button type="button" data-loan-step-button="3"><span>3</span><span>Documents</span></button>
-        <button type="button" data-loan-step-button="4"><span>4</span><span>Review</span></button>
+        <button type="button" data-loan-step-button="2"><span>2</span><span>Loan Calculations</span></button>
+        <button type="button" data-loan-step-button="3"><span>3</span><span>Select Guarantor</span></button>
+        <button type="button" data-loan-step-button="4"><span>4</span><span>Attachments</span></button>
+        <button type="button" data-loan-step-button="5"><span>5</span><span>Submit</span></button>
     </nav>
 
     <section class="loan-flow-panel" data-loan-flow-step="1" aria-labelledby="loanFlowStep1Title">
@@ -152,7 +153,7 @@
 
         </div>
         <div class="loan-flow-navigation">
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to affordability</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Loan Calculations</button>
         </div>
     </section>
 
@@ -160,16 +161,13 @@
         <div class="loan-flow-panel-heading">
             <span class="loan-flow-step-number">2</span>
             <div>
-                <h2 id="loanFlowStep2Title">Check affordability</h2>
-                <p>Load the same financial snapshot and repayment estimate used by the existing application checks.</p>
+                <h2 id="loanFlowStep2Title">Loan Calculations</h2>
+                <p>Review the repayment estimate, fees, and schedule for this application.</p>
             </div>
         </div>
         <div class="loan-flow-panel-body">
-    <div class="erp-section-muted">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h5 class="erp-panel-title"><spring:message code="newloan.loanDetails.title" /></h5>
-                </div>
+    <div class="loan-workflow-section loan-calculations-section">
+        <div class="loan-workflow-toolbar">
             <button id="loadFinancialDetailsButton" type="button" class="app-btn btn-primary">
                 <spring:message code="newloan.loanDetails.button" />
             </button>
@@ -195,7 +193,7 @@
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotSections}'>hidden </c:if>mt-4 grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialSnapshotSections}" var="section">
-<div class="erp-table-wrap overflow-hidden" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
+<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -226,7 +224,7 @@
                 <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
             </div>
         </div>
-<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
+<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
             <table class="erp-table">
                 <thead>
                 <tr>
@@ -259,7 +257,7 @@
         </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Guarantees</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Select Guarantor</button>
         </div>
     </section>
 
@@ -267,14 +265,14 @@
         <div class="loan-flow-panel-heading">
             <span class="loan-flow-step-number">3</span>
             <div>
-                <h2 id="loanFlowStep3Title">Add guarantors and documents</h2>
-                <p>Complete only the supporting items required for this loan product.</p>
+                <h2 id="loanFlowStep3Title">Select Guarantor</h2>
+                <p>Choose the required guarantor and approval method for this application.</p>
             </div>
         </div>
         <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors gt 0}">
-        <div class="erp-section-muted">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="loan-workflow-section loan-guarantor-section">
+            <div class="loan-selection-header">
                 <div>
                     <h5 class="erp-panel-title">
                         <c:choose>
@@ -283,30 +281,30 @@
                         </c:choose>
                     </h5>
                 </div>
-                <span id="guarantorSelectedCount" class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">
+                <span id="guarantorSelectedCount" class="app-badge loan-selection-counter">
                     <spring:message code="newloan.guarantors.counter" arguments="${requiredGuarantors}" />
                 </span>
             </div>
 
-            <div class="mb-3 rounded-md border border-slate-200 bg-white p-3">
-                <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div class="loan-guarantor-mode">
+                <div class="loan-control-label">
                     <spring:message code="newloan.guarantors.approvalMode" text="Guarantor approval mode" />
                 </div>
                 <input type="hidden"
                        id="guarantorApprovalMode"
                        name="guarantorApprovalMode"
                        value="${guarantorApprovalMode eq 'DIRECT_OTP' ? 'DIRECT_OTP' : 'LOGIN'}" />
-                <div class="inline-flex max-w-full rounded-md border border-slate-200 bg-slate-50 p-1"
+                <div class="loan-segmented-control"
                      role="group"
                      aria-label="Guarantor approval mode">
                     <button type="button"
-                            class="guarantor-approval-mode-option rounded px-3 py-2 text-sm font-semibold transition ${guarantorApprovalMode ne 'DIRECT_OTP' ? 'bg-white text-sacco-blue shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                            class="guarantor-approval-mode-option loan-segmented-control__button ${guarantorApprovalMode ne 'DIRECT_OTP' ? 'is-active' : ''}"
                             data-guarantor-approval-mode-option="LOGIN"
                             aria-pressed="${guarantorApprovalMode ne 'DIRECT_OTP'}">
                         <spring:message code="newloan.guarantors.loginApproval" text="Login approval" />
                     </button>
                     <button type="button"
-                            class="guarantor-approval-mode-option rounded px-3 py-2 text-sm font-semibold transition ${guarantorApprovalMode eq 'DIRECT_OTP' ? 'bg-white text-sacco-blue shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                            class="guarantor-approval-mode-option loan-segmented-control__button ${guarantorApprovalMode eq 'DIRECT_OTP' ? 'is-active' : ''}"
                             data-guarantor-approval-mode-option="DIRECT_OTP"
                             aria-pressed="${guarantorApprovalMode eq 'DIRECT_OTP'}">
                         <spring:message code="newloan.guarantors.directOtp" text="Direct OTP" />
@@ -314,30 +312,33 @@
                 </div>
             </div>
 
-            <div class="relative flex flex-col gap-2 sm:flex-row sm:items-center ">
+            <div class="loan-guarantor-search-row">
                 <select id="guarantorSearchMode"
-                        class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none">
+                        data-native-select="true"
+                        class="fcms-control loan-guarantor-search-mode"
+                        aria-label="Guarantor search field">
                     <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
                     <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
                 </select>
                 <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.namePlaceholder' />"
-                       class="w-full sm:flex-1 rounded-lg border border-slate-300 bg-white px-3 py-3.5 text-sm focus:border-sacco-blue focus:outline-none" />
-                <button id="guarantorSearchButton" type="button" class="shrink-0 rounded-md bg-white border-slate-300 px-5 py-3.5 text-sm font-semibold text-gray hover:bg-sacco-blue/90"><spring:message code="common.search" /></button>
-                <div id="guarantorDropdown" class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
+                       class="fcms-control loan-guarantor-search-input" />
+                <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action"><spring:message code="common.search" /></button>
+                <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
             </div>
 
            
             <p id="guarantorHint" class="mt-2 text-sm text-slate-500"></p>
 
-            <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
+            <div id="selectedGuarantors" class="loan-selected-guarantors" aria-live="polite">
                 <c:forEach items="${selectedGuarantorItems}" var="item">
                     <button type="button"
-                            class="selected-guarantor-chip inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+                            class="selected-guarantor-chip"
                             data-id="${item.id}"
                             data-member-no="${item.memberNo}"
-                            data-full-name="${item.fullName}">
+                            data-full-name="${item.fullName}"
+                            aria-label="Remove ${item.fullName}">
                         <span>${item.memberNo} - ${item.fullName}</span>
-                        <span class="text-slate-400">x</span>
+                        <span class="selected-guarantor-remove" aria-hidden="true">&times;</span>
                     </button>
                 </c:forEach>
             </div>
@@ -351,12 +352,34 @@
         </div>
     </c:if>
 
-    <div class="erp-section-muted">
+    <c:if test="${requiredGuarantors le 0}">
+        <div class="loan-empty-state" role="status">
+            This loan product does not require a guarantor. Continue to attachments.
+        </div>
+    </c:if>
+
+        </div>
+        <div class="loan-flow-navigation">
+            <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Attachments</button>
+        </div>
+    </section>
+
+    <section class="loan-flow-panel" data-loan-flow-step="4" aria-labelledby="loanFlowStep4Title" hidden>
+        <div class="loan-flow-panel-heading">
+            <span class="loan-flow-step-number">4</span>
+            <div>
+                <h2 id="loanFlowStep4Title">Attachments</h2>
+                <p>Add the documents required for this loan product.</p>
+            </div>
+        </div>
+        <div class="loan-flow-panel-body">
+    <div class="loan-workflow-section loan-attachments-section">
         <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
             </div>
-            <span class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${product.applicantAttachmentRequired ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
+            <span class="app-badge loan-requirement-badge ${product.applicantAttachmentRequired ? 'is-required' : ''}">
                 <c:choose>
                     <c:when test="${product.applicantAttachmentRequired}">
                         <spring:message code="common.required" text="Required" />
@@ -372,14 +395,14 @@
                 <div class="grid gap-3">
                     <c:forEach items="${requiredAttachmentDefinitions}" var="requirement">
                         <c:set var="existingAttachmentNames" value="${existingRequiredAttachmentNames[requirement.id]}" />
-                        <div class="rounded-md border border-slate-200 bg-white p-3">
+                        <div class="loan-attachment-requirement">
                             <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900"><c:out value="${requirement.attachmentName}" /></p>
                                     <p class="text-xs text-slate-500">Maximum file size: ${requirement.maxSizeMb} MB</p>
                                 </div>
                                 <c:if test="${existingRequiredAttachmentIds.contains(requirement.id.toString())}">
-                                    <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Already uploaded</span>
+                                    <span class="app-badge loan-uploaded-badge">Already uploaded</span>
                                 </c:if>
                             </div>
                             <label class="attachment-dropzone" data-attachment-dropzone>
@@ -424,23 +447,23 @@
         </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Save&amp;Send</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Submit</button>
         </div>
     </section>
 
-    <section class="loan-flow-panel" data-loan-flow-step="4" aria-labelledby="loanFlowStep4Title" hidden>
+    <section class="loan-flow-panel" data-loan-flow-step="5" aria-labelledby="loanFlowStep5Title" hidden>
         <div class="loan-flow-panel-heading">
-            <span class="loan-flow-step-number">4</span>
+            <span class="loan-flow-step-number">5</span>
             <div>
-                <h2 id="loanFlowStep4Title">Review and save</h2>
-                <p>Accept the declaration where required, then save a draft or submit using the existing workflow.</p>
+                <h2 id="loanFlowStep5Title">Submit</h2>
+                <p>Review the declaration, save the draft, or submit the application.</p>
             </div>
         </div>
         <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors le 0}">
-    <div class="erp-section-muted">
+    <div class="loan-workflow-section loan-submit-section">
         <h5 class="erp-panel-title"><spring:message code="newloan.declaration.title" /></h5>
-        <div class="mt-3 space-y-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700">
+        <div class="loan-declaration-panel">
             <p><spring:message code="newloan.declaration.text" />
                 <strong>
                     <c:choose>
@@ -449,11 +472,11 @@
                     </c:choose>
                 </strong><spring:message code="newloan.declaration.textTail" arguments="${declarationSaccoName}" />
             </p>
-            <label class="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+            <label class="loan-confirmation-check">
                 <input id="loanTermsAccepted" type="checkbox" name="termsAccepted" value="true" class="mt-1 h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
                 <span><spring:message code="loan.terms.accept" text="I accept the terms and conditions for this loan application." /></span>
             </label>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div class="loan-otp-panel">
                 <c:choose>
                     <c:when test="${empty formValues['applicationId']}">
                         <div>
@@ -481,7 +504,7 @@
                             <input type="text" name="applicantSignatureOtpCode" id="applicantSignatureOtpCode"
                                    inputmode="numeric" maxlength="6" autocomplete="one-time-code"
                                    data-otp-hidden="true" data-otp-label="Applicant OTP code"
-                                   class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                   class="fcms-control loan-otp-input"
                                    placeholder="123456" />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.otp.codeHelp" /></p>
                             <div id="applicantSignatureOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
@@ -538,6 +561,9 @@
             return;
         }
 
+        const maxStep = Math.max.apply(null, panels.map(function (panel) {
+            return Number(panel.dataset.loanFlowStep);
+        }));
         let currentStep = document.getElementById("guarantorValidationErrorMarker") ? 3 : 1;
 
         function panelFor(step) {
@@ -601,7 +627,7 @@
         form.querySelectorAll("[data-loan-step-next]").forEach(function (button) {
             button.addEventListener("click", function () {
                 if (validateCurrentStep()) {
-                    activateStep(Math.min(4, currentStep + 1), true);
+                    activateStep(Math.min(maxStep, currentStep + 1), true);
                 }
             });
         });
@@ -955,7 +981,10 @@
             financialCard.innerHTML = "";
             Object.entries(sections || {}).forEach(function (section) {
                 const wrapper = document.createElement("div");
-                wrapper.className = "erp-table-wrap overflow-hidden";
+                wrapper.className = "erp-table-wrap erp-table-scroll erp-table-scroll-sm loan-summary-table";
+                wrapper.setAttribute("data-aws-table-region", "");
+                wrapper.setAttribute("data-aws-no-titlebar", "true");
+                wrapper.setAttribute("data-aws-no-refresh", "true");
                 wrapper.innerHTML = ""
                     + "<div class='border-b border-slate-200 bg-slate-50 px-3 py-2'>"
                     + "<p class='text-xs font-bold uppercase tracking-[0.16em] text-slate-600'></p>"
@@ -1462,11 +1491,7 @@
                 approvalModeButtons.forEach(function (button) {
                     const selectedMode = button.dataset.guarantorApprovalModeOption === normalized;
                     button.setAttribute("aria-pressed", selectedMode ? "true" : "false");
-                    button.classList.toggle("bg-white", selectedMode);
-                    button.classList.toggle("text-sacco-blue", selectedMode);
-                    button.classList.toggle("shadow-sm", selectedMode);
-                    button.classList.toggle("text-slate-600", !selectedMode);
-                    button.classList.toggle("hover:text-slate-900", !selectedMode);
+                    button.classList.toggle("is-active", selectedMode);
                 });
             }
 
@@ -1498,10 +1523,10 @@
                     const chip = document.createElement("button");
                     chip.type = "button";
                     const hasServerError = serverGuarantorErrorId && item.id === serverGuarantorErrorId;
-                    chip.className = "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium "
-                        + (hasServerError ? "border-rose-300 bg-rose-50 text-rose-800 ring-2 ring-rose-100" : "border-slate-300 bg-white text-slate-700");
+                    chip.className = "selected-guarantor-chip" + (hasServerError ? " has-error" : "");
                     chip.dataset.guarantorId = item.id;
-                    chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='text-slate-400'>x</span>";
+                    chip.setAttribute("aria-label", "Remove " + item.fullName);
+                    chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
                     chip.addEventListener("click", function () {
                         selected.delete(item.id);
                         renderSelected();

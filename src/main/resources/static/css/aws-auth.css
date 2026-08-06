@@ -203,6 +203,25 @@ body.aws-auth-shell a {
     color: var(--aws-blue);
 }
 
+body.aws-auth-shell .auth-text-link {
+    color: var(--aws-blue) !important;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none;
+}
+
+body.aws-auth-shell .auth-text-link:hover {
+    color: #033160 !important;
+    text-decoration: underline;
+}
+
+body.aws-auth-shell .auth-text-link:focus-visible {
+    border-radius: 2px;
+    outline: 2px solid var(--aws-blue);
+    outline-offset: 2px;
+}
+
 body.aws-auth-shell [class*="rounded-"] {
     border-radius: 2px !important;
 }

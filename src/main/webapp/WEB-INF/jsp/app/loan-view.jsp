@@ -7,6 +7,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
+<div class="loan-application-detail-page">
 <div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
     <div>
         <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
@@ -14,12 +15,12 @@
         <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
     </div>
     <c:if test="${canPrint}">
-        <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
+        <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral"><spring:message code="common.export" text="Export" /></button>
     </c:if>
 </div>
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
 <c:if test="${app.status eq 'AWAITING_GUARANTORS'}">
-    <div class="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+    <div class="aws-inline-notice loan-detail-notice" role="status">
         <spring:message code="loan.view.awaitingGuarantors" text="Waiting for guarantor approval. This page auto-refreshes every 1 hour." />
     </div>
     <script>
@@ -27,12 +28,12 @@
     </script>
 </c:if>
 <c:if test="${app.status eq 'ALL_GUARANTORS_APPROVED'}">
-    <div class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+    <div class="aws-inline-notice aws-inline-notice--success loan-detail-notice" role="status">
         <spring:message code="loan.view.guarantorsApproved" text="All guarantors have approved this application. You can now submit it for review." />
     </div>
 </c:if>
 <c:if test="${app.status eq 'DISBURSED' and empty app.applicantDisbursementAcknowledgedAt}">
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+    <div class="aws-inline-notice aws-inline-notice--success loan-detail-notice" role="status">
         <span><spring:message code="loan.disbursement.memberReadyAck" text="Your loan has been disbursed." /></span>
         <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-disbursement" class="m-0">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -42,7 +43,7 @@
     </div>
 </c:if>
 <c:if test="${rejectionAcknowledgementRequired}">
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+    <div class="aws-inline-notice aws-inline-notice--danger loan-detail-notice" role="alert">
         <span><spring:message code="loan.rejection.memberReadyAck" text="This loan application was rejected. Review the decision and acknowledge it to clear it from your progress view." /></span>
         <form method="post" action="${pageContext.request.contextPath}/app/loan-applications/${app.id}/acknowledge-rejection" class="m-0">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -68,7 +69,7 @@
                 <div class="loan-hero-inline-fact">
                     <div class="loan-hero-inline-label"><spring:message code="loan.status" text="Status" /></div>
                     <div class="loan-hero-inline-value">
-                        <span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${loanStatusBadgeClass}">
+                        <span class="app-badge loan-status-badge ${loanStatusBadgeClass}">
                             <spring:message code="loan.status.${app.status}" text="${app.status}" />
                         </span>
                     </div>
@@ -94,54 +95,23 @@
              data-live-account-status-url="${pageContext.request.contextPath}/app/loan-applications/${app.id}/applicant-financial-status">
             <div class="loan-staff-kpi-grid">
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <span class="loan-staff-kpi-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 7h15a3 3 0 0 1 3 3v8H6a3 3 0 0 1-3-3V7Z"/>
-                            <path d="M3 7a3 3 0 0 1 3-3h11v3"/>
-                            <path d="M16 13h2"/>
-                        </svg>
-                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></div>
                     <div class="loan-stat-value">TSh <fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <span class="loan-staff-kpi-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 2v4"/>
-                            <path d="M16 2v4"/>
-                            <rect x="3" y="4" width="18" height="18" rx="2"/>
-                            <path d="M3 10h18"/>
-                            <path d="M8 14h.01"/>
-                            <path d="M12 14h.01"/>
-                            <path d="M16 14h.01"/>
-                        </svg>
-                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></div>
                     <div class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <span class="loan-staff-kpi-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/>
-                            <path d="M9 9V6a3 3 0 0 1 5.5-1.7"/>
-                            <path d="M18 12h.01"/>
-                        </svg>
-                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></div>
                     <div class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</div>
                 </div>
                 <div class="loan-view-summary-card loan-staff-kpi-card">
-                    <span class="loan-staff-kpi-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 12a9 9 0 1 1-9-9v9h9Z"/>
-                            <path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"/>
-                        </svg>
-                    </span>
                     <div class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></div>
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
-            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}aws-inline-notice loan-detail-notice"
                  data-live-account-status-box>
                 ${applicantExternalAccountStatus.statusMessage}
             </div>
@@ -162,9 +132,6 @@
                                     <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
                                 </c:choose>
                             </span>
-                            <c:if test="${item.current}">
-                                <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
-                            </c:if>
                         </span>
                     </div>
                 </c:forEach>
@@ -176,7 +143,7 @@
 
 <div class="mt-4 space-y-4">
     <c:if test="${not empty decisionFeedback}">
-        <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
+        <div class="aws-inline-notice loan-detail-notice">
             <p class="font-semibold"><spring:message code="review.decisionFeedback" text="Decision Feedback" /></p>
             <div class="mt-2 space-y-2">
                 <c:forEach items="${decisionFeedback}" var="feedback">
@@ -191,7 +158,7 @@
 </div>
 
 <c:if test="${app.status eq 'READY_FOR_MANAGER' and not empty pendingManagerStageWithdrawal}">
-    <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <div class="aws-inline-notice aws-inline-notice--warning loan-detail-notice" role="status">
         <spring:message code="loan.view.removalPending" text="Your application removal request is already waiting for the manager's decision." />
     </div>
 </c:if>
@@ -200,7 +167,7 @@
     <c:when test="${not empty financialFieldSections}">
         <div class="grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialFieldSections}" var="section">
-<div class="erp-table-wrap overflow-hidden" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-loading-label="Loading results...">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
@@ -225,9 +192,11 @@
         </div>
     </c:when>
     <c:otherwise>
-        <div class="erp-table-wrap overflow-x-auto">
-            <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.details" text="Loan Details" /></h5>
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+            <div class="app-table-titlebar">
+                <div class="app-table-heading"><h2><spring:message code="loan.details" text="Loan Details" /></h2></div>
+            </div>
+            <table class="erp-table">
                 <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="newloan.table.section" text="Section" /></th>
@@ -254,8 +223,8 @@
 
 <c:if test="${not empty calculatedRepaymentRows}">
 <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
-        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="text-sm font-semibold text-slate-900"><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></div>
+        <div class="app-table-titlebar">
+            <div class="app-table-heading"><h2><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></h2></div>
         </div>
         <table class="erp-table">
             <thead>
@@ -429,12 +398,12 @@
             </div>
         </div>
         <c:if test="${not empty repaymentRows}">
-            <details class="mt-5 rounded-md border border-slate-200 bg-white" open>
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
+            <details class="loan-detail-disclosure" open>
+                <summary class="loan-detail-disclosure__summary">
                     <span><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></span>
-                    <span class="text-slate-400">v</span>
+                    <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
                 </summary>
-                <div class="erp-table-wrap overflow-x-auto rounded-none border-0">
+                <div class="erp-table-wrap erp-table-scroll rounded-none border-0" data-aws-no-titlebar="true">
                     <table class="erp-table">
                         <thead>
                             <tr>
@@ -468,9 +437,11 @@
 </c:if>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap overflow-x-auto">
-        <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h5>
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+        <div class="app-table-titlebar">
+            <div class="app-table-heading"><h2><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></h2></div>
+        </div>
+        <table class="erp-table">
             <thead class="bg-slate-50">
                 <tr>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
@@ -503,9 +474,11 @@
     </div>
 </c:if>
 
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading"><h2><spring:message code="loan.attachments.applicationAttachments" text="Application Attachments" /></h2></div>
+    </div>
+    <table class="erp-table">
         <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
@@ -533,11 +506,11 @@
     </table>
 </div>
 
-<div class="erp-table-wrap overflow-x-auto">
-    <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        <spring:message code="loan.guarantors" />
-    </h5>
-    <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
+<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading"><h2><spring:message code="loan.guarantors" /></h2></div>
+    </div>
+    <table class="erp-table">
         <thead class="bg-slate-50">
             <tr>
                 <th class="w-[18%] px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
@@ -621,8 +594,8 @@
 </div>
 
 <c:if test="${directOtpGuarantorPanelVisible}">
-    <details class="erp-section-muted" open>
-        <summary class="cursor-pointer list-none">
+    <details class="loan-detail-disclosure" open>
+        <summary class="loan-detail-disclosure__summary">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <h5 class="erp-panel-title">
@@ -632,7 +605,7 @@
                         <spring:message code="loan.guarantorOtp.directHelp" text="Enter each guarantor code after they receive it and agree to guarantee this loan." />
                     </p>
                 </div>
-                <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sacco-blue">
+                <span class="app-badge loan-selection-counter">
                     <spring:message code="loan.guarantorOtp.pending" text="Pending OTPs" />
                 </span>
             </div>
@@ -856,7 +829,7 @@
                                autocomplete="one-time-code"
                                data-otp-hidden="true"
                                data-otp-label="Applicant OTP code"
-                               class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                               class="fcms-control loan-otp-input"
                                placeholder="123456" />
                         <div id="applicantSubmitOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                             <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
@@ -877,6 +850,8 @@
         </form>
     </div>
 </c:if>
+
+</div>
 
 <%@ include file="../fragments/confirm-modal.jspf" %>
 

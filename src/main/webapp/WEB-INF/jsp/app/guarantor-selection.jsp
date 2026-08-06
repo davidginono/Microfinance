@@ -6,46 +6,48 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Member Workspace / Guarantor Selection" /></p>
-    <h1 class="erp-page-title"><spring:message code="guarantor.select" /> (${app.requiredGuarantors})</h1>
-    <p class="erp-page-subtitle"><spring:message code="guarantor.selection.subtitle" text="Search privately and store the exact guarantor selection required for this application." /></p>
+    <h1 class="erp-page-title"><spring:message code="guarantor.select" text="Select Guarantor" /></h1>
+    <p class="erp-page-subtitle"><spring:message code="guarantor.selection.subtitle" text="Search and select the exact number of guarantors required." /></p>
 </div>
-<form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap space-y-4">
+<form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap guarantor-selection-page">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-    <div class="erp-section-muted">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section class="loan-workflow-section loan-guarantor-section" aria-labelledby="guarantorSelectionTitle">
+        <div class="loan-selection-header">
             <div>
-                <p class="erp-panel-title"><spring:message code="guarantor.selection.privateSearch" text="Private Guarantor Search" /></p>
-                <p class="text-sm text-slate-500"><spring:message code="guarantor.selection.searchHelp" text="Type to search. Only a small suggestion list is shown." /></p>
+                <h2 id="guarantorSelectionTitle" class="erp-panel-title"><spring:message code="guarantor.selection.privateSearch" text="Guarantor Search" /></h2>
             </div>
-            <span id="guarantorSelectedCount" class="rounded-full bg-sacco-blue/10 px-3 py-1 text-sm font-semibold text-sacco-blue">
+            <span id="guarantorSelectedCount" class="app-badge loan-selection-counter">
                 0 <spring:message code="newloan.js.selectedSuffix" text="selected" /> / ${app.requiredGuarantors}
             </span>
         </div>
 
-        <div class="relative">
+        <div class="loan-guarantor-search-row">
             <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='guarantor.selection.searchPlaceholder' text='Search by member number or name' />"
-                   class="w-full border border-slate-300 bg-white px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none" />
-            <div id="guarantorDropdown" class="absolute left-0 right-0 z-20 mt-2 hidden max-h-52 overflow-y-auto rounded border border-slate-200 bg-white shadow-lg"></div>
+                   class="fcms-control loan-guarantor-search-input" />
+            <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
         </div>
         <p id="guarantorHint" class="mt-2 text-sm text-slate-500"><spring:message code="guarantor.selection.typeTwo" text="Type at least 2 characters to search." /></p>
 
-        <div id="selectedGuarantors" class="mt-3 flex flex-wrap gap-2">
+        <div id="selectedGuarantors" class="loan-selected-guarantors" aria-live="polite">
             <c:forEach items="${selectedGuarantorItems}" var="item">
                 <button type="button"
-                        class="selected-guarantor-chip inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+                        class="selected-guarantor-chip"
                         data-id="${item.id}"
                         data-member-no="${item.memberNo}"
-                        data-full-name="${item.fullName}">
+                        data-full-name="${item.fullName}"
+                        aria-label="Remove ${item.fullName}">
                     <span>${item.memberNo} - ${item.fullName}</span>
-                    <span class="text-slate-400">x</span>
+                    <span class="selected-guarantor-remove" aria-hidden="true">&times;</span>
                 </button>
             </c:forEach>
         </div>
         <div id="selectedGuarantorInputs"></div>
-    </div>
+    </section>
 
-    <button type="submit" class="app-btn btn-primary"><spring:message code="guarantor.selection.save" text="Save Guarantors" /></button>
+    <div class="loan-flow-navigation">
+        <button type="submit" class="app-btn btn-primary"><spring:message code="guarantor.selection.save" text="Save Guarantors" /></button>
+    </div>
 </form>
 
 <script>
@@ -86,8 +88,9 @@
             Array.from(selected.values()).forEach(function (item) {
                 const chip = document.createElement("button");
                 chip.type = "button";
-                chip.className = "inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700";
-                chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='text-slate-400'>x</span>";
+                chip.className = "selected-guarantor-chip";
+                chip.setAttribute("aria-label", "Remove " + item.fullName);
+                chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
                 chip.addEventListener("click", function () {
                     selected.delete(item.id);
                     renderSelected();
@@ -123,7 +126,7 @@
                 items.forEach(function (item) {
                     const row = document.createElement("button");
                     row.type = "button";
-                    row.className = "block w-full border-b border-slate-100 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50";
+                    row.className = "block w-full text-left";
                     row.textContent = item.memberNo + " - " + item.fullName;
                     row.addEventListener("click", function () {
                         if (selected.size >= required) {

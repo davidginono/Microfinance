@@ -101,8 +101,6 @@ DELETE FROM public.stored_uploads;
 
 DELETE FROM public.loan_product_required_attachments;
 DELETE FROM public.loan_product_board_reviewers;
-DELETE FROM public.loan_product_versions;
-DELETE FROM public.loan_products_versions;
 DELETE FROM public.loan_product_settings;
 
 DELETE FROM public.accounts_savings;

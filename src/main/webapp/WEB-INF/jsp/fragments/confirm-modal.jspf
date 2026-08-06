@@ -15,6 +15,18 @@
         </div>
         <div class="app-modal-body">
             <p id="appConfirmMessage" class="text-base leading-7 text-slate-700"></p>
+            <div id="appConfirmTextBlock" class="mt-4 hidden">
+                <label for="appConfirmTextInput" class="fcms-label block">
+                    Type <strong id="appConfirmRequiredText"></strong> to confirm.
+                </label>
+                <input id="appConfirmTextInput"
+                       type="text"
+                       class="fcms-control mt-2 w-full"
+                       autocomplete="off"
+                       spellcheck="false"
+                       aria-describedby="appConfirmTextHelp" />
+                <p id="appConfirmTextHelp" class="mt-1 text-xs text-slate-500">The confirmation text must match exactly.</p>
+            </div>
         </div>
         <div class="app-modal-body pt-0">
         <div class="app-modal-actions">
@@ -47,13 +59,28 @@
             const proceed = document.getElementById("appConfirmProceed");
             const cancel = document.getElementById("appConfirmCancel");
             const close = document.getElementById("appConfirmClose");
+            const textBlock = document.getElementById("appConfirmTextBlock");
+            const requiredTextLabel = document.getElementById("appConfirmRequiredText");
+            const textInput = document.getElementById("appConfirmTextInput");
             let pendingForm = null;
             let pendingSubmitter = null;
+            let requiredText = "";
+
+            function syncTypedConfirmation() {
+                const confirmed = !requiredText || textInput.value.trim() === requiredText;
+                proceed.disabled = !confirmed;
+                proceed.setAttribute("aria-disabled", String(!confirmed));
+            }
 
             function closeModal() {
                 modal.classList.remove("is-open");
                 modal.setAttribute("aria-hidden", "true");
                 body.classList.remove("overflow-hidden");
+                requiredText = "";
+                textInput.value = "";
+                textBlock.classList.add("hidden");
+                proceed.disabled = false;
+                proceed.removeAttribute("aria-disabled");
                 pendingForm = null;
                 pendingSubmitter = null;
             }
@@ -65,10 +92,15 @@
                 eyebrow.textContent = form.dataset.confirmEyebrow || "<spring:message code='confirm.eyebrow' text='Please Confirm' />";
                 message.textContent = form.dataset.confirmMessage || "<spring:message code='confirm.message' text='Do you want to continue?' />";
                 proceed.textContent = form.dataset.confirmProceed || "<spring:message code='common.continue' text='Continue' />";
+                requiredText = form.dataset.confirmText || "";
+                textInput.value = "";
+                requiredTextLabel.textContent = requiredText;
+                textBlock.classList.toggle("hidden", !requiredText);
+                syncTypedConfirmation();
                 modal.classList.add("is-open");
                 modal.setAttribute("aria-hidden", "false");
                 body.classList.add("overflow-hidden");
-                proceed.focus({ preventScroll: true });
+                (requiredText ? textInput : proceed).focus({ preventScroll: true });
             }
 
             document.addEventListener("submit", (event) => {
@@ -89,6 +121,10 @@
                     closeModal();
                     return;
                 }
+                if (proceed.disabled) {
+                    textInput.focus({ preventScroll: true });
+                    return;
+                }
                 pendingForm.dataset.confirmBypass = "true";
                 const form = pendingForm;
                 const submitter = pendingSubmitter;
@@ -107,6 +143,8 @@
             [cancel, close].forEach((button) => {
                 button.addEventListener("click", closeModal);
             });
+
+            textInput.addEventListener("input", syncTypedConfirmation);
 
             document.addEventListener("keydown", (event) => {
                 if (event.key === "Escape" && modal.classList.contains("is-open")) {

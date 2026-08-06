@@ -10,15 +10,14 @@
     const maxVisibleToasts = 3;
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
-    const scrollRestoreStorageKey = 'saccos:restore-scroll';
+    const legacyScrollRestoreStorageKey = 'saccos:restore-scroll';
+    const scrollRestoreStorageKeyPrefix = 'saccos:restore-scroll:';
     const modalRestoreStorageKey = 'saccos:open-modal';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
-    const isAdminWorkspacePath = function (path) {
-        return path === '/admin' || path.indexOf('/admin/') === 0;
-    };
-    const isAdminWorkspace = function () {
-        return isAdminWorkspacePath(window.location.pathname || '');
-    };
+    let scrollStateSaveTimer = null;
+    if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+    }
     const syncActiveSidebarLink = function () {
         const navigation = document.querySelector('.shell-sidebar-scroll');
         if (!navigation) {
@@ -172,11 +171,36 @@
             || /\.(pdf|xlsx?|csv|zip)(?:$|[?#])/i.test(href)
             || /^(export|print|csv|pdf|excel|download)/.test(label);
     };
+    const ensureConsoleTableScroller = function (region, index) {
+        const existingScroller = region.querySelector(':scope > .erp-table-scroll');
+        if (existingScroller || !region.classList.contains('erp-table-scroll')) {
+            return existingScroller;
+        }
+        const table = region.querySelector(':scope > table');
+        if (!table) {
+            return null;
+        }
+        const scroller = document.createElement('div');
+        scroller.className = 'erp-table-scroll';
+        ['erp-table-scroll-sm', 'erp-table-scroll-lg'].forEach(function (modifier) {
+            if (region.classList.contains(modifier)) {
+                region.classList.remove(modifier);
+                scroller.classList.add(modifier);
+            }
+        });
+        scroller.setAttribute('data-view-position-key', region.getAttribute('data-view-position-key') || 'table-region-' + String(index + 1));
+        region.removeAttribute('data-view-position-key');
+        region.classList.remove('erp-table-scroll');
+        table.insertAdjacentElement('beforebegin', scroller);
+        scroller.appendChild(table);
+        return scroller;
+    };
     const enhanceConsoleTables = function () {
         const regions = Array.from(document.querySelectorAll('.erp-table-wrap')).filter(function (region) {
             return region.querySelector('table');
         });
         regions.forEach(function (region, index) {
+            ensureConsoleTableScroller(region, index);
             region.setAttribute('data-aws-table-region', '');
             region.setAttribute('aria-busy', 'false');
             let titlebar = region.querySelector(':scope > .app-table-titlebar');
@@ -188,9 +212,7 @@
                 heading.className = 'app-table-heading';
                 const title = document.createElement('h2');
                 title.textContent = resolveConsoleTableTitle(region, index);
-                const info = document.createElement('span');
-                info.textContent = 'Info';
-                heading.append(title, info);
+                heading.appendChild(title);
                 const toolbar = document.createElement('div');
                 toolbar.className = 'app-table-toolbar';
                 if (region.getAttribute('data-aws-no-refresh') !== 'true') {
@@ -350,6 +372,61 @@
             syncConsoleFiltersFromUrl();
         });
     };
+    const enhancePageBreadcrumbs = function () {
+        document.querySelectorAll('.erp-page-header[data-aws-page-header]').forEach(function (header) {
+            const breadcrumb = header.querySelector('.erp-breadcrumb');
+            if (!breadcrumb || header.previousElementSibling?.classList.contains('erp-page-path')) {
+                return;
+            }
+            const segments = (breadcrumb.textContent || '')
+                .split(/\s*(?:\/|>|›)\s*/u)
+                .map(function (segment) { return segment.trim(); })
+                .filter(Boolean);
+            if (segments.length === 0) {
+                breadcrumb.remove();
+                return;
+            }
+            const path = document.createElement('nav');
+            path.className = 'erp-page-path';
+            path.setAttribute('aria-label', 'Breadcrumb');
+            segments.forEach(function (segment, index) {
+                if (index > 0) {
+                    const separator = document.createElement('span');
+                    separator.className = 'erp-page-path__separator';
+                    separator.setAttribute('aria-hidden', 'true');
+                    separator.textContent = '>';
+                    path.appendChild(separator);
+                }
+                const item = document.createElement('span');
+                item.className = 'erp-page-path__item';
+                item.textContent = segment;
+                if (index === segments.length - 1) {
+                    item.setAttribute('aria-current', 'page');
+                }
+                path.appendChild(item);
+            });
+            header.parentElement?.insertBefore(path, header);
+            breadcrumb.remove();
+        });
+    };
+    enhancePageBreadcrumbs();
+    const promotePageHeadersToShell = function () {
+        document.querySelectorAll('.erp-page-header[data-aws-page-header]').forEach(function (header) {
+            const contentFrame = header.closest('.shell-content-frame');
+            const shellMain = contentFrame?.parentElement;
+            if (!shellMain?.classList.contains('shell-main')) {
+                return;
+            }
+            const path = header.previousElementSibling?.classList.contains('erp-page-path')
+                ? header.previousElementSibling
+                : null;
+            if (path && path.parentElement === contentFrame) {
+                shellMain.insertBefore(path, contentFrame);
+            }
+            shellMain.insertBefore(header, contentFrame);
+        });
+    };
+    promotePageHeadersToShell();
     const resolveStickyTitleSource = function () {
         return document.querySelector('[data-sticky-title-source]') || document.querySelector('.erp-page-title');
     };
@@ -421,6 +498,7 @@
         const toast = document.createElement('div');
         toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm ' +
             (variant === 'success' ? 'app-toast-success' : variant === 'error' ? 'app-toast-error' : 'app-toast-info');
+        toast.setAttribute('data-app-toast', 'true');
         toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
         toast.innerHTML =
             '<div class="flex items-start gap-3">' +
@@ -464,7 +542,11 @@
         entry.dismiss = dismiss;
 
         const closeButton = toast.querySelector('button');
-        closeButton?.addEventListener('click', dismiss);
+        closeButton?.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            dismiss();
+        });
         if (visibleToasts.length < maxVisibleToasts) {
             visibleToasts.push(entry);
             toastContainer.appendChild(toast);
@@ -514,6 +596,9 @@
     const currentScrollRestorePath = function () {
         return window.location.pathname + window.location.search;
     };
+    const currentScrollRestoreStorageKey = function () {
+        return scrollRestoreStorageKeyPrefix + encodeURIComponent(window.location.pathname || '/');
+    };
     const scrollRestorePathname = function (path) {
         try {
             return new URL(path || '/', window.location.origin).pathname;
@@ -549,7 +634,7 @@
     };
 
     const scrollableElements = function () {
-        return Array.from(document.querySelectorAll('[data-view-position-key], .erp-table-scroll, .app-modal-scroll, .shell-sidebar-scroll'))
+        return Array.from(document.querySelectorAll('[data-view-position-key], [data-aws-persist-scroll], [data-fcms-persist-scroll], .erp-table-scroll, .app-modal-scroll, .shell-sidebar-scroll, .shell-main, .aws-filter-toolbar'))
             .filter(function (element) {
                 return element instanceof HTMLElement;
             });
@@ -598,7 +683,7 @@
 
     const rememberScrollForReload = function () {
         try {
-            window.sessionStorage.setItem(scrollRestoreStorageKey, JSON.stringify({
+            window.sessionStorage.setItem(currentScrollRestoreStorageKey(), JSON.stringify({
                 path: currentScrollRestorePath(),
                 pathname: window.location.pathname,
                 x: window.scrollX || window.pageXOffset || 0,
@@ -619,16 +704,18 @@
             return true;
         }
         const savedPathname = saved.pathname || scrollRestorePathname(saved.path);
-        return isAdminWorkspace()
-            && isAdminWorkspacePath(savedPathname)
-            && savedPathname === window.location.pathname;
+        return savedPathname === window.location.pathname;
     };
 
     const restoreScrollAfterReload = function () {
         let saved;
         try {
-            saved = JSON.parse(window.sessionStorage.getItem(scrollRestoreStorageKey) || 'null');
-            window.sessionStorage.removeItem(scrollRestoreStorageKey);
+            saved = JSON.parse(
+                window.sessionStorage.getItem(currentScrollRestoreStorageKey())
+                || window.sessionStorage.getItem(legacyScrollRestoreStorageKey)
+                || 'null'
+            );
+            window.sessionStorage.removeItem(legacyScrollRestoreStorageKey);
         } catch (ignored) {
             return;
         }
@@ -647,6 +734,16 @@
             restore();
             window.setTimeout(restore, 120);
         });
+    };
+
+    const scheduleScrollStateSave = function () {
+        if (scrollStateSaveTimer) {
+            window.clearTimeout(scrollStateSaveTimer);
+        }
+        scrollStateSaveTimer = window.setTimeout(function () {
+            scrollStateSaveTimer = null;
+            rememberScrollForReload();
+        }, 120);
     };
 
     function identifyModal(modal) {
@@ -893,21 +990,21 @@
         }, 0);
     });
 
-    document.addEventListener('click', function () {
-        if (isAdminWorkspace()) {
-            rememberScrollForReload();
-        }
-    }, { capture: true, passive: true });
+    document.addEventListener('click', rememberScrollForReload, { capture: true, passive: true });
 
     document.addEventListener('change', function (event) {
-        if (!isAdminWorkspace()) {
-            return;
-        }
         const target = event.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
             rememberScrollForReload();
         }
     }, { capture: true });
+
+    window.addEventListener('scroll', scheduleScrollStateSave, { passive: true });
+    document.addEventListener('scroll', function (event) {
+        if (event.target instanceof HTMLElement && scrollableElements().includes(event.target)) {
+            scheduleScrollStateSave();
+        }
+    }, { capture: true, passive: true });
 
     window.addEventListener('pagehide', function () {
         rememberScrollForReload();

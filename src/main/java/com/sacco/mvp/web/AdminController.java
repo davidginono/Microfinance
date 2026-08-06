@@ -803,8 +803,6 @@ public class AdminController {
         model.addAttribute("products", products);
         model.addAttribute("requiredAttachmentsByProductId", requiredAttachmentService.activeByProduct(
             products.stream().map(LoanProductSetting::getId).toList()));
-        model.addAttribute("productVersionsByProductId", adminService.loanProductVersions(saccoId));
-        model.addAttribute("loanProductsVersions", adminService.loanProductsVersionHistory(saccoId));
         model.addAttribute("customizedProductExists", false);
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
@@ -1455,22 +1453,6 @@ public class AdminController {
             }
         }
         return fieldErrors;
-    }
-
-    @PostMapping("/settings-controls/{id}/versions/{versionId}/rollback")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_UPDATE')")
-    public String rollbackLoanProductVersion(@PathVariable UUID id,
-                                             @PathVariable UUID versionId,
-                                             @AuthenticationPrincipal AppUserPrincipal principal,
-                                             RedirectAttributes ra) {
-        adminService.rollbackLoanProductVersion(
-            adminScopeService.currentSaccoId(principal),
-            principal.getMemberId(),
-            id,
-            versionId
-        );
-        ra.addFlashAttribute("message", "Loan product rolled back to the selected saved version.");
-        return "redirect:/admin/settings-controls?section=loan";
     }
 
     @GetMapping("/reports")

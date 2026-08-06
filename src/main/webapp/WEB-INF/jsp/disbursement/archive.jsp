@@ -57,8 +57,9 @@
     </div>
 </div>
 
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
-    <table class="erp-table">
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Disbursement Archive results">
+    <div class="erp-table-scroll" data-view-position-key="disbursement-archive-table">
+        <table class="erp-table">
         <thead>
         <tr>
             <th><spring:message code="loan.loanId" text="Loan ID" /></th>
@@ -92,8 +93,9 @@
             </tr>
         </c:if>
         </tbody>
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
 <c:if test="${archivePage.totalPages gt 1}">
     <div class="mt-4 flex items-center justify-between gap-3">
