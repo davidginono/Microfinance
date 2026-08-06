@@ -1820,12 +1820,12 @@ body.aws-console {
     background: #343b44 !important;
 }
 
-.app-topbar .profile-icon-btn {
+.aws-console .app-topbar .profile-icon-btn {
     border-radius: 50% !important;
     overflow: hidden;
 }
 
-.app-topbar .profile-icon-btn .profile-avatar-img {
+.aws-console .app-topbar .profile-icon-btn .profile-avatar-img {
     display: block;
     width: 100%;
     height: 100%;
@@ -4167,6 +4167,36 @@ body.aws-console,
     border-radius: 2px !important;
 }
 
+.app-topbar-actions .app-profile-control {
+    display: flex;
+    width: var(--shell-topbar-control-height);
+    height: var(--shell-topbar-control-height);
+    min-width: var(--shell-topbar-control-height);
+    min-height: var(--shell-topbar-control-height);
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.aws-console .app-topbar .profile-icon-btn {
+    width: var(--shell-topbar-control-height) !important;
+    min-width: var(--shell-topbar-control-height) !important;
+    max-width: var(--shell-topbar-control-height) !important;
+    flex: 0 0 var(--shell-topbar-control-height);
+    align-self: center;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    overflow: hidden;
+    vertical-align: middle;
+}
+
+.aws-console .app-topbar .profile-icon-btn .profile-avatar-img {
+    inset: 0;
+    border-radius: 50% !important;
+}
+
 .app-station-selector {
     height: var(--shell-topbar-control-height) !important;
     min-height: var(--shell-topbar-control-height) !important;
@@ -4568,5 +4598,51 @@ body.aws-console,
         min-height: 0;
         border-right: 0;
         padding: 7px 10px !important;
+    }
+}
+
+/* Keep the real page heading in view and remove the duplicated shell title strip. */
+.shell-page-title-rail {
+    display: none !important;
+}
+
+.erp-page-subtitle,
+.erp-page-header[data-aws-page-header] > p:not(.erp-breadcrumb):not(.erp-page-kicker) {
+    display: none !important;
+}
+
+.erp-page-header[data-aws-page-header] {
+    position: sticky;
+    top: var(--shell-nav-height);
+    z-index: 37;
+    display: flex;
+    flex-wrap: wrap;
+    min-height: var(--shell-context-height);
+    align-items: baseline;
+    gap: 4px 10px;
+    margin: 0 0 10px !important;
+    border-bottom: 1px solid var(--aws-line) !important;
+    background: #ffffff !important;
+    padding: 6px 12px !important;
+}
+
+.erp-page-header[data-aws-page-header] > .erp-page-title {
+    order: 1;
+}
+
+.erp-page-header[data-aws-page-header] > .erp-breadcrumb,
+.erp-page-header[data-aws-page-header] > .erp-page-kicker {
+    order: 2;
+    margin: 0 !important;
+}
+
+.erp-page-header[data-aws-page-header] > :not(.erp-page-title):not(.erp-breadcrumb):not(.erp-page-kicker):not(.erp-page-subtitle) {
+    order: 3;
+}
+
+@media (max-width: 640px) {
+    .erp-page-header[data-aws-page-header] {
+        align-items: flex-start;
+        padding: 6px 8px !important;
     }
 }

@@ -148,7 +148,7 @@ public class AdminController {
                 : stationOtpSettingsService.channel(selectedAccount.getSaccoId(), selectedAccount.getStationId()));
             model.addAttribute("usageHistory", selectedAccount == null
                 ? Page.empty(PageRequest.of(safeHistoryPage, 25))
-                : smsUsageManagementService.history(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
+                : smsUsageManagementService.historyRows(selectedAccount.getId(), PageRequest.of(safeHistoryPage, 25)));
             model.addAttribute("registeredSaccos", registeredSaccos);
             model.addAttribute("selectedSaccoId", selectedSaccoId);
             model.addAttribute("selectedStationId", selectedStationId);
@@ -159,7 +159,7 @@ public class AdminController {
             var selectedAccount = smsUsageManagementService.account(scopedSaccoId, scopedStationId);
             model.addAttribute("selectedAccount", selectedAccount);
             model.addAttribute("selectedOtpDeliveryChannel", stationOtpSettingsService.channel(scopedSaccoId, scopedStationId));
-            model.addAttribute("usageHistory", smsUsageManagementService.history(
+            model.addAttribute("usageHistory", smsUsageManagementService.historyRows(
                 scopedSaccoId,
                 scopedStationId,
                 PageRequest.of(safeHistoryPage, 25)
@@ -946,6 +946,7 @@ public class AdminController {
         model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
         model.addAttribute("activeDisbursementOfficerCount", adminService.activeDisbursementOfficerCount(saccoId));
         model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
+        model.addAttribute("suppressToastMessages", true);
         return "admin/loan-product-edit";
     }
 

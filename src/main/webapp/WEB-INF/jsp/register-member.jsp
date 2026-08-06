@@ -187,10 +187,7 @@
             if (!toastContainer || !message || !String(message).trim()) {
                 return null;
             }
-            const settings = options || {};
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
-            const requestedDuration = Number(settings.duration);
-            const duration = Number.isFinite(requestedDuration) && requestedDuration > 0 ? Math.min(requestedDuration, 10000) : (variant === 'error' ? 5200 : 3600);
             const icon = variant === 'success'
                 ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
                 : variant === 'error'
@@ -218,7 +215,6 @@
             };
             toast.querySelector('button')?.addEventListener('click', dismiss);
             toastContainer.appendChild(toast);
-            window.setTimeout(dismiss, duration);
             return { dismiss, element: toast };
         };
 

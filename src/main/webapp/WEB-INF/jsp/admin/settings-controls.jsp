@@ -9,7 +9,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.settings.breadcrumb" text="Admin Tools / Settings & Controls" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.settings.title" text="Settings & Controls" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.settings.subtitle" text="Manage loan, guarantor, and board controls." /></p>
 </div>
 
 <c:if test="${not empty openProductModalKey}">
@@ -245,7 +244,6 @@
             <div class="product-catalog-heading">
                 <p class="erp-widget-title">Step 1 of 2 &middot; <spring:message code="admin.settings.loanProducts.single" text="Loan Products" /></p>
                 <h2 id="loan-product-catalog-title">Select a loan product</h2>
-                <p>Compare the amount, interest, savings limit, and display order. Select <strong>Configure product</strong> to continue.</p>
             </div>
             <div class="product-catalog-actions">
                 <c:if test="${not empty loanProductsVersions}">

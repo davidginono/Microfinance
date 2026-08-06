@@ -81,14 +81,13 @@
             const block = document.createElement('div');
             block.className = 'workflow-warning is-' + tone;
             block.textContent = message;
-            block.setAttribute('data-toast-message', message);
-            block.setAttribute('data-toast-type', tone === 'danger' ? 'error' : 'info');
+            block.dataset.workflowWarningTone = tone === 'danger' ? 'error' : 'info';
             return block;
         }
 
         function workflowFormIsActive(form) {
-            const modal = form.closest('[data-product-modal]');
-            return !modal || (modal.classList.contains('is-open') && !modal.classList.contains('hidden'));
+            return form.getAttribute('data-workflow-notifications') === 'focused'
+                && Boolean(form.closest('[data-product-config-workspace]'));
         }
 
         function numberOrNull(input) {
@@ -406,7 +405,8 @@
             const savingsLimitCheckInput = form.querySelector('[data-savings-limit-check]');
             const savingsMultiplierControl = form.querySelector('.savings-multiplier-control');
             let syncingSavingsRatio = false;
-            const publishedWorkflowWarnings = new Set();
+            let workflowWarningsInitialized = false;
+            let previousWorkflowWarningKeys = new Set();
 
             if (!committeeToggle || !warningsRoot || !runtimeRoot) {
                 return;
@@ -647,7 +647,8 @@
                 }
             }
 
-            function applyRules() {
+            function applyRules(options = {}) {
+                const publishChanges = options.notify === true;
                 const managerEnabled = !managerToggle || managerToggle.checked;
                 const loanOfficerEnabled = loanOfficerToggle && loanOfficerToggle.checked;
                 const chairpersonEnabled = chairpersonToggle && chairpersonToggle.checked;
@@ -741,18 +742,27 @@
                 warnings.forEach((warning) => warningsRoot.appendChild(warning));
                 warningsRoot.hidden = warnings.length === 0;
                 warningsRoot.setAttribute('aria-hidden', warnings.length === 0 ? 'true' : 'false');
+                const currentWarningKeys = new Set();
                 warnings.forEach((warning) => {
                     const message = warning.textContent.trim();
-                    const toastType = warning.getAttribute('data-toast-type') || 'info';
+                    const toastType = warning.dataset.workflowWarningTone || 'info';
                     const warningKey = toastType + ':' + message;
-                    if (!workflowFormIsActive(form) || !message || publishedWorkflowWarnings.has(warningKey)) {
+                    if (!message) {
                         return;
                     }
-                    publishedWorkflowWarnings.add(warningKey);
-                    if (typeof window.showToast === 'function') {
-                        window.showToast(toastType, message, { duration: toastType === 'error' ? 9000 : 6500 });
+                    currentWarningKeys.add(warningKey);
+                    if (workflowWarningsInitialized
+                        && publishChanges
+                        && workflowFormIsActive(form)
+                        && !previousWorkflowWarningKeys.has(warningKey)
+                        && typeof window.showToast === 'function') {
+                        window.showToast(toastType, message);
                     }
                 });
+                if (!workflowWarningsInitialized || publishChanges) {
+                    previousWorkflowWarningKeys = currentWarningKeys;
+                    workflowWarningsInitialized = true;
+                }
 
                 const runtimeLabels = [productSettingsText.runtimeMember];
                 if (loadedFinancialRequired) {
@@ -931,14 +941,14 @@
             [managerToggle, loanOfficerToggle, chairpersonToggle, chairpersonPriority, boardToggle, boardPriority, committeeToggle, committeePriority, accountantToggle, accountantPriority, disbursementOfficerToggle, guarantorsInput, loadedFinancialInput, savingsPercentInput, savingsLimitCheckInput, boardReviewerSearch, creditCommitteeReviewerSearch]
                 .filter(Boolean)
                 .forEach((field) => {
-                    field.addEventListener('change', applyRules);
+                    field.addEventListener('change', () => applyRules({ notify: true }));
                     field.addEventListener('input', applyRules);
                 });
             boardReviewerInputs.forEach((field) => {
-                field.addEventListener('change', applyRules);
+                field.addEventListener('change', () => applyRules({ notify: true }));
             });
             creditCommitteeReviewerInputs.forEach((field) => {
-                field.addEventListener('change', applyRules);
+                field.addEventListener('change', () => applyRules({ notify: true }));
             });
             if (boardReviewerSearch) {
                 boardReviewerSearch.addEventListener('input', filterBoardReviewers);
@@ -951,7 +961,7 @@
                 .forEach((field) => {
                     field.addEventListener('change', () => {
                         syncSavingsPercentFromMultiplier();
-                        applyRules();
+                        applyRules({ notify: true });
                     });
                     field.addEventListener('input', () => {
                         syncSavingsPercentFromMultiplier();
@@ -966,14 +976,14 @@
             [managerStartRadio, loanOfficerStartRadio].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {
                     syncReviewPriorities(field.dataset.workflowStartRadio === 'loanOfficer' ? 'loan-officer-radio' : 'manager-radio');
-                    applyRules();
+                    applyRules({ notify: true });
                 });
             });
 
             [managerPriority, loanOfficerPriority].filter(Boolean).forEach((field) => {
                 field.addEventListener('change', () => {
                     syncReviewPriorities(field.hasAttribute('data-workflow-loan-officer-priority') ? 'loan-officer-select' : 'manager-select');
-                    applyRules();
+                    applyRules({ notify: true });
                 });
             });
 
@@ -995,7 +1005,7 @@
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
                 [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
                     if (typeof window.showToast === 'function') {
-                        window.showToast('error', message, { duration: 9000 });
+                        window.showToast('error', message);
                     }
                 });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];
@@ -1027,7 +1037,7 @@
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
                 [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
                     if (typeof window.showToast === 'function') {
-                        window.showToast('error', message, { duration: 9000 });
+                        window.showToast('error', message);
                     }
                 });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];

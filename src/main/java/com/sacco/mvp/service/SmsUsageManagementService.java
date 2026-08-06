@@ -14,11 +14,17 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class SmsUsageManagementService {
+    private static final DateTimeFormatter USAGE_TIMESTAMP =
+        DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH);
+
     private final SmsUnitTransactionService transactionService;
     private final SmsUsageAlertService alertService;
     private final StationSmsAccountRepository accountRepository;
@@ -62,6 +68,14 @@ public class SmsUsageManagementService {
         return ledgerRepository.findByAccountIdOrderByCreatedAtDesc(accountId, pageable);
     }
 
+    public Page<SmsUsageRow> historyRows(String saccoId, String stationId, Pageable pageable) {
+        return history(saccoId, stationId, pageable).map(this::toUsageRow);
+    }
+
+    public Page<SmsUsageRow> historyRows(UUID accountId, Pageable pageable) {
+        return history(accountId, pageable).map(this::toUsageRow);
+    }
+
     public PlatformSmsSettings settings() {
         return transactionService.settings();
     }
@@ -77,5 +91,34 @@ public class SmsUsageManagementService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private SmsUsageRow toUsageRow(SmsUsageLedger entry) {
+        return new SmsUsageRow(
+            formatTimestamp(entry.getCreatedAt()),
+            formatTimestamp(entry.getLastOccurredAt() == null ? entry.getCreatedAt() : entry.getLastOccurredAt()),
+            entry.getEventType(),
+            entry.getOutcome(),
+            entry.getEventCount(),
+            entry.getUnitChange(),
+            entry.getProviderReference(),
+            entry.getNote()
+        );
+    }
+
+    private String formatTimestamp(OffsetDateTime timestamp) {
+        return timestamp == null ? "-" : timestamp.format(USAGE_TIMESTAMP);
+    }
+
+    public record SmsUsageRow(
+        String createdAtLabel,
+        String lastOccurredAtLabel,
+        String eventType,
+        com.sacco.mvp.domain.SmsUsageOutcome outcome,
+        long eventCount,
+        long unitChange,
+        String providerReference,
+        String note
+    ) {
     }
 }

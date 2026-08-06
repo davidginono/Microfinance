@@ -180,7 +180,8 @@
             region.setAttribute('data-aws-table-region', '');
             region.setAttribute('aria-busy', 'false');
             let titlebar = region.querySelector(':scope > .app-table-titlebar');
-            if (!titlebar) {
+            const suppressTitlebar = region.getAttribute('data-aws-no-titlebar') === 'true';
+            if (!titlebar && !suppressTitlebar) {
                 titlebar = document.createElement('div');
                 titlebar.className = 'app-table-titlebar';
                 const heading = document.createElement('div');
@@ -222,7 +223,7 @@
                 return Boolean(form.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING);
             });
             const filterForm = filterCandidates[filterCandidates.length - 1];
-            if (filterForm) {
+            if (filterForm && titlebar) {
                 const filterTabs = filterForm.parentElement?.querySelector(':scope > .erp-filter-row');
                 filterForm.dataset.awsTableAssigned = 'true';
                 titlebar.insertAdjacentElement('afterend', filterForm);
@@ -244,7 +245,11 @@
         });
 
         const tableActions = Array.from(document.querySelectorAll('a.app-btn, button.app-btn')).filter(function (control) {
-            if (control.closest('.app-table-titlebar') || control.closest('.aws-filter-toolbar') || control.closest('[data-aws-action-pin="true"]')) {
+            if (control.closest('table')
+                || control.closest('.app-table-titlebar')
+                || control.closest('.aws-filter-toolbar')
+                || control.closest('.app-modal-overlay')
+                || control.closest('[data-aws-action-pin="true"]')) {
                 return false;
             }
             return control.classList.contains('btn-launch')
@@ -405,7 +410,6 @@
             visibleToasts.push(entry);
             toastContainer.appendChild(entry.toast);
             refreshToastLayers();
-            entry.timer = window.setTimeout(entry.dismiss, entry.duration);
         }
     };
 
@@ -413,12 +417,7 @@
         if (!toastContainer || !message || !String(message).trim()) {
             return null;
         }
-        const settings = options || {};
         const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
-        const requestedDuration = Number(settings.duration);
-        const duration = Number.isFinite(requestedDuration) && requestedDuration > 0
-            ? Math.min(requestedDuration, 10000)
-            : (variant === 'error' ? 5200 : 3600);
         const toast = document.createElement('div');
         toast.className = 'app-toast-enter pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm ' +
             (variant === 'success' ? 'app-toast-success' : variant === 'error' ? 'app-toast-error' : 'app-toast-info');
@@ -441,7 +440,7 @@
             '</div>';
         toast.querySelector('[data-toast-text]').textContent = String(message);
 
-        const entry = { toast: toast, duration: duration, timer: null, dismiss: null };
+        const entry = { toast: toast, dismiss: null };
         const dismiss = function () {
             if (!toast.isConnected || toast.classList.contains('app-toast-exit')) {
                 const queuedIndex = toastQueue.indexOf(entry);
@@ -449,10 +448,6 @@
                     toastQueue.splice(queuedIndex, 1);
                 }
                 return;
-            }
-            if (entry.timer) {
-                window.clearTimeout(entry.timer);
-                entry.timer = null;
             }
             toast.classList.remove('app-toast-enter');
             toast.classList.add('app-toast-exit');
@@ -474,7 +469,6 @@
             visibleToasts.push(entry);
             toastContainer.appendChild(toast);
             refreshToastLayers();
-            entry.timer = window.setTimeout(dismiss, duration);
         } else {
             toastQueue.push(entry);
         }
