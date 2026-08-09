@@ -24,7 +24,7 @@
 <c:set var="userSliceStart" value="${userTotal == 0 ? 0 : (usersPage.number * usersPage.size) + 1}" />
 <c:set var="userSliceEndRaw" value="${(usersPage.number * usersPage.size) + users.size()}" />
 <c:set var="userSliceEnd" value="${userTotal == 0 ? 0 : userSliceEndRaw}" />
-<section class="erp-table-wrap admin-register-shell" aria-label="Users and roles results">
+<section class="erp-table-wrap admin-register-shell admin-users-register" aria-label="Users and roles results">
     <div class="app-table-titlebar">
         <div class="app-table-heading">
             <h2>Users &amp; Roles results</h2>
@@ -35,35 +35,35 @@
         </div>
     </div>
 
-    <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar" data-aws-filter-toolbar>
-        <label class="block min-w-[10rem] flex-[0_1_12rem]">
-            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search By</span>
-            <select name="searchBy" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800">
+    <form method="get" action="/admin/users" class="admin-filter-form aws-filter-toolbar admin-users-filter-form" data-aws-filter-toolbar>
+        <label class="admin-users-filter-field admin-users-filter-field--type">
+            <span class="sr-only">Search By</span>
+            <select name="searchBy" class="fcms-control w-full" aria-label="Search by">
                 <option value="userId" ${selectedUserSearchBy eq 'userId' ? 'selected' : ''}>User ID</option>
                 <option value="name" ${selectedUserSearchBy eq 'name' ? 'selected' : ''}>Name</option>
             </select>
         </label>
 
-        <label class="block min-w-[16rem] flex-[1_1_20rem]">
-            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Search User</span>
-            <input type="text"
+        <label class="admin-users-filter-field admin-users-filter-field--query">
+            <span class="sr-only">Search User</span>
+            <input type="search"
                    name="query"
                    value="${selectedUserQuery}"
-                   class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800"
+                   class="fcms-control w-full"
                    placeholder="Enter selected User ID or name"
                    title="Enter selected User ID or name" />
         </label>
 
-        <label class="block min-w-[10rem] flex-[0_1_12rem]">
-            <span class="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Rows Per Page</span>
-            <select name="size" class="mt-2 w-full rounded border border-slate-300 px-3 text-sm text-slate-800">
+        <label class="admin-users-filter-field admin-users-filter-field--rows">
+            <span class="sr-only">Rows Per Page</span>
+            <select name="size" class="fcms-control w-full" aria-label="Rows per page">
                 <option value="25" ${selectedPageSize == 25 ? 'selected' : ''}>25 rows</option>
                 <option value="50" ${selectedPageSize == 50 ? 'selected' : ''}>50 rows</option>
                 <option value="100" ${selectedPageSize == 100 ? 'selected' : ''}>100 rows</option>
             </select>
         </label>
 
-        <div class="flex shrink-0 flex-wrap items-end gap-3">
+        <div class="admin-users-filter-actions">
             <button type="submit" class="app-btn btn-primary">Search</button>
             <a href="/admin/users" class="app-btn btn-neutral">Reset</a>
         </div>

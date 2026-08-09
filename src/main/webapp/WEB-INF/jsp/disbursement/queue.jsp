@@ -11,13 +11,14 @@
     <p class="erp-breadcrumb"><spring:message code="disbursement.queue.breadcrumb" text="Disbursement Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
 </div>
-<div class="erp-toolbar">
-    <div class="space-y-3">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+<section class="aws-current-filter-toolbar" aria-labelledby="disbursementQueueCurrentFilterLabel">
+    <div class="aws-current-filter-summary">
+        <div class="aws-current-filter-copy">
+            <p id="disbursementQueueCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+            <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
         </div>
-<form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+    </div>
+    <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
@@ -35,8 +36,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
+</section>
 <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>

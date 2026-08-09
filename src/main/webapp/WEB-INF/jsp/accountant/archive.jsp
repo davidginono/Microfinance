@@ -13,13 +13,14 @@
     <p class="erp-page-subtitle"><spring:message code="accountant.archive.subtitle" text="Open the loan applications you have already reviewed and track where they are now." /></p>
 </div>
 
-<div class="erp-toolbar">
-    <div class="space-y-3">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+<section class="aws-current-filter-toolbar" aria-labelledby="accountantArchiveCurrentFilterLabel">
+        <div class="aws-current-filter-summary">
+            <div class="aws-current-filter-copy">
+                <p id="accountantArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
+            </div>
         </div>
-        <div class="erp-filter-row">
+        <div class="erp-filter-row aws-current-filter-tabs">
             <a href="/accountant/archive?filter=ALL"
                class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
                 <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
@@ -33,7 +34,7 @@
                 <spring:message code="review.rejected" text="Rejected" />
             </a>
         </div>
-<form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+        <form action="/accountant/archive" method="get" class="erp-filter-form accountant-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${archiveSearchLabel}
@@ -51,8 +52,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
+</section>
 
 <section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Accountant Archive results">
     <div class="erp-table-scroll" data-view-position-key="accountant-archive-table">

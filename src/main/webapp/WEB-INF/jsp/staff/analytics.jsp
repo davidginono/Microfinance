@@ -279,20 +279,6 @@
             </div>
         </section>
 
-    <section class="erp-panel staff-product-panel">
-            <div class="erp-panel-header">
-                <h2 class="erp-panel-title">
-                    <c:choose>
-                        <c:when test="${staffReviewView}"><spring:message code="staff.analytics.loanProductReviewBreakdown" text="Loan Product Review Breakdown" /></c:when>
-                        <c:otherwise><spring:message code="staff.analytics.loanProductPerformance" text="Loan Product Performance" /></c:otherwise>
-                    </c:choose>
-                </h2>
-            </div>
-            <div class="erp-panel-body">
-                <div id="staffProductChart" class="staff-chart-box" role="img" aria-label="<spring:message code='staff.analytics.productChartLabel' text='Loan product performance chart' />" data-empty-message="<spring:message code='staff.analytics.chartEmpty' text='No results match the selected filters.' />"></div>
-            </div>
-    </section>
-
     <section class="erp-panel staff-trend-panel">
         <div class="erp-panel-header staff-trend-header">
             <h2 class="erp-panel-title">
@@ -316,6 +302,20 @@
         <div class="erp-panel-body">
             <div id="staffTrendChart" class="staff-chart-box" role="img" aria-label="<spring:message code='staff.analytics.trendChartLabel' text='Loan status trend chart' />" data-empty-message="<spring:message code='staff.analytics.chartEmpty' text='No results match the selected filters.' />"></div>
         </div>
+    </section>
+
+    <section class="erp-panel staff-product-panel">
+            <div class="erp-panel-header">
+                <h2 class="erp-panel-title">
+                    <c:choose>
+                        <c:when test="${staffReviewView}"><spring:message code="staff.analytics.loanProductReviewBreakdown" text="Loan Product Review Breakdown" /></c:when>
+                        <c:otherwise><spring:message code="staff.analytics.loanProductPerformance" text="Loan Product Performance" /></c:otherwise>
+                    </c:choose>
+                </h2>
+            </div>
+            <div class="erp-panel-body">
+                <div id="staffProductChart" class="staff-chart-box" role="img" aria-label="<spring:message code='staff.analytics.productChartLabel' text='Loan product performance chart' />" data-empty-message="<spring:message code='staff.analytics.chartEmpty' text='No results match the selected filters.' />"></div>
+            </div>
     </section>
 </section>
 

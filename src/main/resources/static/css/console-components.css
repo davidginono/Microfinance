@@ -488,6 +488,90 @@ body {
         line-height: 20px;
     }
 
+    .admin-users-filter-form {
+        align-items: center !important;
+        gap: 6px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        padding: 7px 10px !important;
+        scrollbar-gutter: auto;
+    }
+
+    .admin-users-filter-form .neo-select--open {
+        z-index: 65;
+    }
+
+    .admin-users-filter-field {
+        display: block;
+        min-width: 0 !important;
+        margin: 0 !important;
+    }
+
+    .admin-users-filter-field--type {
+        flex: 0 0 12rem !important;
+    }
+
+    .admin-users-filter-field--query {
+        flex: 1 1 25rem !important;
+        min-width: 18rem !important;
+    }
+
+    .admin-users-filter-field--rows {
+        flex: 0 0 10.5rem !important;
+    }
+
+    .admin-users-filter-actions {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 6px;
+        min-width: max-content;
+        margin: 0 !important;
+    }
+
+    .admin-users-filter-form input,
+    .admin-users-filter-form select,
+    .admin-users-filter-form .neo-select-button,
+    .admin-users-filter-form .app-btn {
+        height: var(--sacco-control-height, 32px) !important;
+        min-height: var(--sacco-control-height, 32px) !important;
+        max-height: var(--sacco-control-height, 32px) !important;
+        margin: 0 !important;
+        border-radius: 2px !important;
+    }
+
+    .admin-users-filter-form input {
+        padding: 4px 10px !important;
+    }
+
+    .aws-console .admin-users-register.admin-register-shell > .erp-table-scroll,
+    .aws-console .admin-users-register.admin-register-shell [data-aws-table-region] {
+        max-height: none !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        scrollbar-gutter: auto;
+    }
+
+    @media (max-width: 767px) {
+        .admin-users-filter-form {
+            overflow-x: visible !important;
+            overflow-y: visible !important;
+        }
+
+        .admin-users-filter-field--type,
+        .admin-users-filter-field--query,
+        .admin-users-filter-field--rows,
+        .admin-users-filter-actions {
+            flex: 1 1 100% !important;
+            min-width: 0 !important;
+        }
+
+        .admin-users-filter-actions .app-btn {
+            flex: 1 1 10rem;
+            justify-content: center;
+        }
+    }
+
     .admin-user-badge-row {
         display: flex;
         flex-wrap: wrap;
@@ -939,6 +1023,142 @@ body {
         }
         .settings-action-bar--split .settings-action-button {
             justify-self: start;
+        }
+    }
+    .aws-qualification-settings {
+        overflow: hidden;
+    }
+    .aws-qualification-form {
+        display: grid;
+        gap: 10px;
+    }
+    .aws-qualification-settings .aws-settings-commandbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--aws-line, #d5dbdb);
+        border-radius: 2px;
+        background: #f7f8f8;
+        padding: 7px 10px;
+    }
+    .aws-qualification-settings .aws-settings-description {
+        max-width: none;
+        margin: 0;
+    }
+    .aws-qualification-settings .aws-settings-save-action {
+        justify-self: end;
+        min-width: 11rem;
+        white-space: nowrap;
+    }
+    .aws-qualification-settings .aws-qualification-grid {
+        max-width: none !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+    .aws-settings-group {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--aws-line, #d5dbdb);
+        border-radius: 2px;
+        background: #ffffff;
+    }
+    .aws-settings-group-header {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        border-bottom: 1px solid var(--aws-line, #d5dbdb);
+        background: #f7f8f8;
+        padding: 7px 10px;
+    }
+    .aws-settings-group-header h3 {
+        margin: 0;
+        color: var(--aws-ink, #16191f);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 18px;
+    }
+    .aws-settings-group-body {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+    }
+    .aws-settings-policy-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
+        align-items: start;
+    }
+    .aws-settings-checkbox-row {
+        display: grid;
+        grid-template-columns: 16px minmax(0, 1fr);
+        align-items: start;
+        gap: 8px;
+        min-height: 32px;
+        border: 1px solid var(--aws-line, #d5dbdb);
+        border-radius: 2px;
+        background: #ffffff;
+        padding: 7px 8px;
+        color: var(--aws-ink, #16191f);
+        cursor: pointer;
+    }
+    .aws-settings-checkbox-row:hover {
+        background: #f2f8fd;
+    }
+    .aws-settings-checkbox-row:focus-within {
+        outline: none;
+    }
+    .aws-settings-checkbox-row:has(.aws-settings-checkbox:focus-visible) {
+        outline: 2px solid var(--aws-blue, #0972d3);
+        outline-offset: 1px;
+    }
+    .aws-settings-checkbox {
+        width: 14px;
+        height: 14px;
+        margin: 2px 0 0;
+        accent-color: var(--aws-blue, #0972d3);
+    }
+    .aws-settings-checkbox:focus {
+        outline: none;
+        box-shadow: none;
+    }
+    .aws-settings-checkbox:focus-visible {
+        outline: 2px solid var(--aws-blue, #0972d3);
+        outline-offset: 1px;
+    }
+    .aws-settings-checkbox-copy {
+        min-width: 0;
+    }
+    .aws-settings-checkbox-title {
+        display: block;
+        color: var(--aws-ink, #16191f);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 18px;
+    }
+    .aws-qualification-settings .aws-settings-help {
+        display: block;
+        margin-top: 1px;
+    }
+    .aws-settings-field--compact {
+        align-self: stretch;
+        gap: 4px;
+        min-width: 0;
+    }
+    .aws-settings-field--compact input {
+        max-width: 100%;
+    }
+    @media (max-width: 900px) {
+        .aws-qualification-settings .aws-qualification-grid,
+        .aws-settings-policy-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+    }
+    @media (max-width: 639px) {
+        .aws-qualification-settings .aws-settings-commandbar {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .aws-qualification-settings .aws-settings-save-action {
+            justify-self: stretch;
+            width: 100%;
         }
     }
     .workflow-stage-list {
@@ -2919,16 +3139,16 @@ body {
             grid-template-columns: repeat(12, minmax(0, 1fr));
         }
         .staff-portfolio-panel {
-            grid-column: 1 / span 6;
+            grid-column: 1 / -1;
             grid-row: 1;
         }
         .staff-trend-panel {
-            grid-column: 7 / -1;
-            grid-row: 1;
+            grid-column: 1 / -1;
+            grid-row: 2;
         }
         .staff-product-panel {
             grid-column: 1 / -1;
-            grid-row: 2;
+            grid-row: 3;
         }
         .staff-financial-breakdown-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5245,23 +5465,24 @@ html.session-timeout-active,
         transform: none;
         filter: none;
         outline: none;
-        background: #f1faff;
+        background: #f2f3f3;
         color: var(--aws-ink, #16191f);
     }
     .neo-select-option:active {
         transform: none;
-        background: #e7f4ff;
+        background: #eaeded;
+        color: var(--aws-ink, #16191f);
     }
     .neo-select-option.is-selected {
-        background: #e7f4ff;
-        color: var(--aws-blue-dark, #033160);
-        box-shadow: inset 3px 0 0 var(--aws-blue, #0972d3);
+        background: #eaeded;
+        color: var(--aws-ink, #16191f);
+        box-shadow: inset 3px 0 0 var(--aws-line-dark, #879596);
         font-weight: 700;
     }
     .neo-select-option.is-selected:hover,
     .neo-select-option.is-selected:focus-visible {
-        background: #d1ebff;
-        color: var(--aws-blue-dark, #033160);
+        background: #eaeded;
+        color: var(--aws-ink, #16191f);
     }
     .neo-select-option.is-disabled {
         cursor: not-allowed;
@@ -5807,6 +6028,18 @@ html.session-timeout-active,
 
     .loan-application-detail-page > * {
         min-width: 0;
+    }
+
+    .loan-detail-action-row {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        margin: 0 0 10px;
+    }
+
+    .loan-application-detail-page .loan-detail-action-row {
+        margin: 0;
     }
 
     .loan-application-detail-page .erp-page-header,
@@ -6959,46 +7192,84 @@ html.session-timeout-active,
         display: none !important;
     }
 
-/* Source: src/main/webapp/WEB-INF/jsp/manager/queue.jsp */
+/* Shared AWS current-filter bar for role queues and archives. */
+.aws-current-filter-toolbar,
 .manager-queue-filter-toolbar {
     display: flex;
+    min-width: 0;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     margin: 0 0 10px;
-}
-
-.manager-queue-filter-summary {
-    display: flex;
-    min-height: 46px;
-    align-items: center;
-    border: 1px solid var(--aws-line);
-    border-left: 3px solid var(--aws-orange);
+    overflow: hidden;
+    border: 1px solid var(--aws-line, #d5dbdb);
     border-radius: 2px;
     background: #ffffff;
     box-shadow: 0 1px 1px rgba(0, 28, 36, .12);
-    padding: 7px 12px 7px 10px;
 }
 
+.aws-current-filter-summary,
+.manager-queue-filter-summary {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    border-left: 3px solid var(--aws-orange, #ec7211);
+    background: #f7f8f8;
+    padding: 6px 10px 6px 8px;
+}
+
+.aws-current-filter-copy,
 .manager-queue-filter-copy {
+    display: flex;
     min-width: 0;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 8px;
 }
 
+.aws-current-filter-kicker,
 .manager-queue-filter-kicker {
-    margin: 0 0 2px;
-    color: #354150;
+    margin: 0;
+    color: #414d5c;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0;
-    line-height: 1.15;
+    line-height: 16px;
     text-transform: uppercase;
 }
 
+.aws-current-filter-value,
 .manager-queue-filter-value {
     margin: 0;
     color: #000716;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+}
+
+.aws-current-filter-toolbar > .aws-filter-toolbar,
+.manager-queue-filter-toolbar > .aws-filter-toolbar {
+    margin: 0;
+    border: 0 !important;
+    border-top: 1px solid var(--aws-line, #d5dbdb) !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    padding: 8px 10px !important;
+}
+
+.aws-current-filter-toolbar > .aws-current-filter-tabs {
+    margin: 0;
+    border-top: 1px solid var(--aws-line, #d5dbdb);
+    background: #ffffff;
+    padding: 7px 10px;
+}
+
+.aws-current-filter-toolbar .erp-filter-tab {
+    min-height: 30px;
+    border-radius: 2px;
+    font-size: 12px;
+    line-height: 16px;
 }
 
 /* Source: admin loan product catalog and focused configuration workspace */
@@ -7632,12 +7903,27 @@ html.session-timeout-active,
         }
     }
     @media (max-width: 640px) {
+        .loan-detail-action-row {
+            justify-content: stretch;
+        }
+
+        .loan-detail-action-row .app-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .aws-current-filter-summary,
         .manager-queue-filter-summary {
-            min-height: 42px;
+            min-height: 36px;
             padding: 6px 10px;
         }
+        .aws-current-filter-value,
         .manager-queue-filter-value {
-            font-size: 16px;
+            font-size: 15px;
+        }
+        .aws-current-filter-toolbar > .aws-filter-toolbar,
+        .manager-queue-filter-toolbar > .aws-filter-toolbar {
+            padding: 8px !important;
         }
         .manager-queue-search-actions > * {
             flex: 1 1 auto;

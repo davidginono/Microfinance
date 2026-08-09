@@ -11,18 +11,18 @@
 <c:set var="isDisbursementReview" value="${reviewBasePath eq '/disbursement'}" />
 <c:set var="hideDisbursementSupportSections" value="${isDisbursementReview and app.status eq 'READY_FOR_DISBURSEMENT'}" />
 
-<div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
-    <div>
-        <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-        <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-    </div>
-    <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
+<div class="erp-page-header" data-aws-page-header>
+    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
 </div>
 <c:if test="${app.status eq 'AWAITING_BOARD'}">
     <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
     </div>
 </c:if>
+<div class="loan-detail-action-row">
+    <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
+</div>
 <div class="loan-view-hero-summary loan-staff-review-template">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="loan-hero-with-photo">

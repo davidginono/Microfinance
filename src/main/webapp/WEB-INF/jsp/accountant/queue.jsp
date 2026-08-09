@@ -12,19 +12,20 @@
     <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
     <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement/teller officer." /></p>
 </div>
-<div class="erp-toolbar">
-    <div class="space-y-3">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+<section class="aws-current-filter-toolbar" aria-labelledby="accountantQueueCurrentFilterLabel">
+        <div class="aws-current-filter-summary">
+            <div class="aws-current-filter-copy">
+                <p id="accountantQueueCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
+            </div>
         </div>
-        <div class="erp-filter-row">
+        <div class="erp-filter-row aws-current-filter-tabs">
             <a href="/accountant/loan-applications?filter=AWAITING_ACCOUNTANT"
                class="erp-filter-tab ${currentFilterKey eq 'AWAITING_ACCOUNTANT' ? 'is-active' : ''}">
                 <spring:message code="loan.status.AWAITING_ACCOUNTANT" text="On Review By Accountant" />
             </a>
         </div>
-<form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+        <form action="/accountant/loan-applications" method="get" class="erp-filter-form accountant-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.applicationId" text="Loan Application ID" />
@@ -42,8 +43,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
+</section>
 <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
     <table class="erp-table">
         <thead>

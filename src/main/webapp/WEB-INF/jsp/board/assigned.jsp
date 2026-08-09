@@ -13,13 +13,14 @@
 </div>
 
 <c:if test="${archiveView}">
-    <div class="erp-toolbar">
-        <div class="space-y-3">
-            <div>
-                <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-                <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+    <section class="aws-current-filter-toolbar" aria-labelledby="boardArchiveCurrentFilterLabel">
+            <div class="aws-current-filter-summary">
+                <div class="aws-current-filter-copy">
+                    <p id="boardArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+                    <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
+                </div>
             </div>
-            <div class="erp-filter-row">
+            <div class="erp-filter-row aws-current-filter-tabs">
                 <a href="${boardListRoute}?filter=ALL" class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
                     <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
                 </a>
@@ -33,8 +34,7 @@
                     <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
                 </a>
             </div>
-        </div>
-    </div>
+    </section>
 </c:if>
 
 <div class="erp-panel overflow-hidden">

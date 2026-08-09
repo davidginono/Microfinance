@@ -12,13 +12,14 @@
     <h1 class="erp-page-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h1>
 </div>
 
-<div class="erp-toolbar">
-    <div class="space-y-3">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+<section class="aws-current-filter-toolbar" aria-labelledby="disbursementArchiveCurrentFilterLabel">
+        <div class="aws-current-filter-summary">
+            <div class="aws-current-filter-copy">
+                <p id="disbursementArchiveCurrentFilterLabel" class="aws-current-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+                <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
+            </div>
         </div>
-        <div class="erp-filter-row">
+        <div class="erp-filter-row aws-current-filter-tabs">
             <a href="/disbursement/archive?filter=ALL"
                class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
                 <spring:message code="archive.allDisbursedLoans" text="All Disbursed Loans" />
@@ -36,7 +37,7 @@
                 <spring:message code="archive.defaultedLoans" text="Defaulted Loans" />
             </a>
         </div>
-<form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+        <form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="loan.loanId" text="Loan ID" />
@@ -53,8 +54,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
+</section>
 
 <section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Disbursement Archive results">
     <div class="erp-table-scroll" data-view-position-key="disbursement-archive-table">

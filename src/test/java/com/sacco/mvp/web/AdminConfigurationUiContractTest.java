@@ -81,6 +81,46 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void applicantAndGuarantorSettingsUseCloudscapeSettingsSurface() throws Exception {
+        String settings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+
+        assertThat(settings)
+            .contains("class=\"erp-panel aws-settings-panel aws-qualification-settings mb-4\"")
+            .contains("aria-labelledby=\"qualification-settings-title\"")
+            .contains("id=\"qualification-settings-title\" class=\"aws-settings-title\"")
+            .contains("class=\"aws-settings-form aws-qualification-form\"")
+            .contains("class=\"aws-settings-commandbar\"")
+            .contains("class=\"app-btn btn-primary aws-settings-save-action\"")
+            .contains("class=\"aws-settings-grid aws-qualification-grid\"")
+            .contains("class=\"aws-settings-group\"")
+            .contains("class=\"aws-settings-group-header\"")
+            .contains("class=\"aws-settings-checkbox-row\"")
+            .contains("class=\"aws-settings-field aws-settings-field--compact\"")
+            .contains("class=\"aws-control\"")
+            .contains("name=\"applicantMaxDefaultedLoans\"")
+            .contains("name=\"guarantorWithActiveLoanAllowed\"")
+            .contains("name=\"guarantorMaxGuaranteedLoanAmount\"")
+            .contains("name=\"guarantorMaxDefaultedLoans\"")
+            .doesNotContain("settings-action-bar settings-action-bar--split");
+        assertThat(consoleCss)
+            .contains(".aws-qualification-settings .aws-settings-commandbar")
+            .contains("grid-template-columns: minmax(0, 1fr) auto")
+            .contains(".aws-qualification-settings .aws-qualification-grid")
+            .contains("max-width: none !important")
+            .contains(".aws-settings-checkbox-row")
+            .contains("grid-template-columns: 16px minmax(0, 1fr)")
+            .contains(".aws-settings-policy-grid")
+            .contains(".aws-settings-checkbox-row:focus-within")
+            .contains("outline: none")
+            .contains(".aws-settings-checkbox-row:has(.aws-settings-checkbox:focus-visible)")
+            .contains(".aws-settings-checkbox:focus-visible")
+            .contains("accent-color: var(--aws-blue, #0972d3)")
+            .contains("@media (max-width: 900px)")
+            .contains("@media (max-width: 639px)");
+    }
+
+    @Test
     void applicationNoticesExpireOnlyWhenDismissed() throws Exception {
         String shellScript = read(Path.of("src/main/resources/static/js/shell.js"));
         String login = read(JSP_ROOT.resolve("login.jsp"));

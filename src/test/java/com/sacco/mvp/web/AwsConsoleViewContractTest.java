@@ -63,24 +63,45 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void managerQueueCurrentFilterUsesCompactAwsSummaryStrip() throws Exception {
+    void roleQueueCurrentFiltersUseCompactAwsSummaryStrips() throws Exception {
         String managerQueue = read(JSP_ROOT.resolve("manager/queue.jsp"));
+        List<String> currentFilterViews = List.of(
+            managerQueue,
+            read(JSP_ROOT.resolve("disbursement/queue.jsp")),
+            read(JSP_ROOT.resolve("disbursement/archive.jsp")),
+            read(JSP_ROOT.resolve("board/assigned.jsp")),
+            read(JSP_ROOT.resolve("accountant/queue.jsp")),
+            read(JSP_ROOT.resolve("accountant/archive.jsp"))
+        );
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(managerQueue)
-            .contains("<section class=\"manager-queue-filter-toolbar\" aria-labelledby=\"managerQueueCurrentFilterLabel\">")
-            .contains("class=\"manager-queue-filter-summary\"")
+            .contains("<section class=\"aws-current-filter-toolbar manager-queue-filter-toolbar\" aria-labelledby=\"managerQueueCurrentFilterLabel\">")
             .contains("id=\"managerQueueCurrentFilterLabel\"")
-            .contains("class=\"manager-queue-filter-value\"><c:out value=\"${currentFilterLabel}\" /></p>")
-            .contains("class=\"erp-filter-form manager-queue-search-form aws-filter-toolbar\"")
-            .doesNotContain("erp-toolbar manager-queue-filter-toolbar")
-            .doesNotContain("manager-queue-filter-stack");
+            .contains("manager-queue-filter-summary")
+            .contains("class=\"erp-filter-form manager-queue-search-form aws-filter-toolbar\"");
+        for (String view : currentFilterViews) {
+            assertThat(view)
+                .contains("class=\"aws-current-filter-summary")
+                .contains("class=\"aws-current-filter-copy")
+                .contains("class=\"aws-current-filter-kicker")
+                .contains("aws-current-filter-value")
+                .contains("<c:out value=\"${currentFilterLabel}\" />")
+                .doesNotContain("<div class=\"erp-toolbar\">")
+                .doesNotContain("class=\"erp-widget-title\"><spring:message code=\"common.currentFilter\"")
+                .doesNotContain("class=\"erp-widget-heading\">${currentFilterLabel}</h2>")
+                .doesNotContain("manager-queue-filter-stack");
+        }
         assertThat(consoleCss)
-            .contains(".manager-queue-filter-summary")
-            .contains("border-left: 3px solid var(--aws-orange)")
-            .contains("min-height: 46px")
-            .contains(".manager-queue-filter-kicker")
-            .contains(".manager-queue-filter-value")
+            .contains(".aws-current-filter-toolbar")
+            .contains(".aws-current-filter-summary")
+            .contains("border-left: 3px solid var(--aws-orange, #ec7211)")
+            .contains("min-height: 38px")
+            .contains(".aws-current-filter-kicker")
+            .contains(".aws-current-filter-value")
+            .contains(".aws-current-filter-toolbar > .aws-filter-toolbar")
+            .contains(".aws-current-filter-toolbar > .aws-current-filter-tabs")
+            .doesNotContain("min-height: 46px")
             .doesNotContain(".manager-queue-filter-stack");
     }
 
@@ -122,7 +143,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260809-select-visibility-v25")
+            .contains("console-components.css?v=20260809-loan-detail-action-v33")
             .contains("shell.css?v=20260809-select-visibility-v24")
             .contains("shell.js?v=20260809-file-picker-v11")
             .contains("app-global-logo")
@@ -324,6 +345,7 @@ class AwsConsoleViewContractTest {
             .doesNotContain("rounded-full");
         assertThat(loanDetail)
             .contains("loan-application-detail-page")
+            .contains("class=\"loan-detail-action-row\"")
             .contains("data-aws-action-pin=\"true\"")
             .contains("app-table-titlebar")
             .contains("erp-table-wrap erp-table-scroll")
@@ -344,6 +366,8 @@ class AwsConsoleViewContractTest {
             .contains(".loan-guarantor-search-row")
             .contains(".loan-summary-table .erp-table")
             .contains(".loan-application-detail-page")
+            .contains(".loan-detail-action-row")
+            .contains("justify-content: flex-end")
             .contains("border-radius: 2px !important");
         assertThat(shellJs)
             .contains("data-aws-no-titlebar")
@@ -368,6 +392,12 @@ class AwsConsoleViewContractTest {
             .contains("renderMetricSparklines")
             .doesNotContain("loan-analytics-command-header")
             .doesNotContain("reports.controls");
+        int portfolioPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-portfolio-panel\"");
+        int trendPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-trend-panel\"");
+        int productPanelIndex = staffAnalytics.indexOf("class=\"erp-panel staff-product-panel\"");
+        assertThat(portfolioPanelIndex).isGreaterThanOrEqualTo(0);
+        assertThat(trendPanelIndex).isGreaterThan(portfolioPanelIndex);
+        assertThat(productPanelIndex).isGreaterThan(trendPanelIndex);
         assertThat(staffAnalytics)
             .contains("class=\"erp-panel staff-analytics-command-panel\"")
             .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
@@ -428,6 +458,8 @@ class AwsConsoleViewContractTest {
             .contains(".staff-analytics-control.is-date input[type=\"date\"]")
             .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
             .contains("grid-column: 1 / -1")
+            .contains("grid-row: 2")
+            .contains("grid-row: 3")
             .contains("position: relative")
             .contains("overflow-x: visible")
             .contains(".staff-trend-period-button")
@@ -440,6 +472,8 @@ class AwsConsoleViewContractTest {
             .contains("border-radius: 2px")
             .contains(".staff-metric-meta-value")
             .doesNotContain(".staff-card-info")
+            .doesNotContain("grid-column: 7 / -1")
+            .doesNotContain("grid-column: 1 / span 6")
             .doesNotContain(".loan-analytics-page-header .erp-breadcrumb");
         assertThat(shellCss)
             .contains(".app-table-heading h2")
@@ -573,7 +607,14 @@ class AwsConsoleViewContractTest {
             .contains("window.sessionStorage.setItem(storageKey")
             .contains("const workflowScrollTarget = (step) =>")
             .contains("step.querySelector('.product-config-subsection')")
+            .contains("const workflowScrollOffset = () =>")
+            .contains("workspace.querySelector('.product-config-workspace-nav')")
+            .contains("workspaceNav.offsetHeight + 12")
+            .contains("const target = workflowScrollTarget(step) || step")
+            .contains("window.scrollTo({ top: Math.max(0, targetTop), behavior })")
             .contains("scrollStepIntoView(steps[activeIndex])")
+            .contains("window.requestAnimationFrame(() => scrollStepIntoView(steps[activeIndex]))")
+            .doesNotContain("if (target !== step && typeof window.scrollTo === 'function')")
             .contains("resolvedInitialKey === 'workflow'")
             .contains("window.showToast('error', message")
             .contains("workflowFormIsActive")
@@ -625,7 +666,22 @@ class AwsConsoleViewContractTest {
             assertThat(detail)
                 .contains("include file=\"../fragments/loan-application-progress.jspf\"")
                 .contains("include file=\"../fragments/live-account-status-message.jspf\"")
+                .contains("class=\"loan-detail-action-row\"")
                 .doesNotContain("<div class=\"mt-6 loan-simple-progress\"");
+
+            int headerStart = detail.indexOf("data-aws-page-header");
+            int headerEnd = detail.indexOf("</div>", headerStart);
+            int actionRow = detail.indexOf("class=\"loan-detail-action-row\"");
+            int heroSummary = detail.indexOf("class=\"loan-view-hero-summary loan-staff-review-template\"");
+
+            assertThat(headerStart).isGreaterThanOrEqualTo(0);
+            assertThat(headerEnd).isGreaterThan(headerStart);
+            assertThat(actionRow).isGreaterThan(headerEnd);
+            assertThat(heroSummary).isGreaterThan(actionRow);
+            assertThat(detail.substring(headerStart, headerEnd))
+                .contains("erp-breadcrumb")
+                .contains("erp-page-title")
+                .doesNotContain("data-loan-export-url");
         }
         assertThat(staffDetail).contains("data-aws-action-pin=\"true\"");
         assertThat(boardDetail).contains("data-aws-action-pin=\"true\"");

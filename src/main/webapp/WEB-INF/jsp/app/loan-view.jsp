@@ -7,16 +7,11 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
-<div class="loan-application-detail-page">
-<div class="erp-page-header flex flex-wrap items-start justify-between gap-3" data-aws-page-header>
-    <div>
-        <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
-        <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
-    </div>
-    <c:if test="${canPrint}">
-        <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral"><spring:message code="common.export" text="Export" /></button>
-    </c:if>
+<div class="erp-page-header" data-aws-page-header>
+    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
+    <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
 </div>
+<div class="loan-application-detail-page">
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
 <c:if test="${app.status eq 'AWAITING_GUARANTORS'}">
     <div class="aws-inline-notice loan-detail-notice" role="status">
@@ -49,6 +44,11 @@
             <input type="hidden" name="returnTo" value="detail" />
             <button type="submit" class="app-btn btn-neutral"><spring:message code="common.acknowledge" text="Acknowledge" /></button>
         </form>
+    </div>
+</c:if>
+<c:if test="${canPrint}">
+    <div class="loan-detail-action-row">
+        <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral"><spring:message code="common.export" text="Export" /></button>
     </div>
 </c:if>
 <div class="loan-view-hero-summary loan-staff-review-template">

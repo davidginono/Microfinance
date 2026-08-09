@@ -11,11 +11,11 @@
     <p class="erp-breadcrumb"><spring:message code="manager.queue.breadcrumb" text="Manager Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="manager.queue.title" text="Manager Queue" /></h1>
 </div>
-<section class="manager-queue-filter-toolbar" aria-labelledby="managerQueueCurrentFilterLabel">
-    <div class="manager-queue-filter-summary">
-        <div class="manager-queue-filter-copy">
-            <p id="managerQueueCurrentFilterLabel" class="manager-queue-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <p class="manager-queue-filter-value"><c:out value="${currentFilterLabel}" /></p>
+<section class="aws-current-filter-toolbar manager-queue-filter-toolbar" aria-labelledby="managerQueueCurrentFilterLabel">
+    <div class="aws-current-filter-summary manager-queue-filter-summary">
+        <div class="aws-current-filter-copy manager-queue-filter-copy">
+            <p id="managerQueueCurrentFilterLabel" class="aws-current-filter-kicker manager-queue-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+            <p class="aws-current-filter-value manager-queue-filter-value"><c:out value="${currentFilterLabel}" /></p>
         </div>
     </div>
     <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>

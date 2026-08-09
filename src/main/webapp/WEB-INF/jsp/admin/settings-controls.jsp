@@ -184,54 +184,58 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'guarantor'}">
-    <section class="erp-panel overflow-hidden mb-4">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.qualification.title" text="Applicant And Guarantor Controls" /></h2>
+    <section class="erp-panel aws-settings-panel aws-qualification-settings mb-4" aria-labelledby="qualification-settings-title">
+        <div class="aws-settings-header">
+            <p class="aws-settings-kicker"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
+            <h2 id="qualification-settings-title" class="aws-settings-title"><spring:message code="admin.settings.qualification.title" text="Applicant And Guarantor Controls" /></h2>
         </div>
-        <form action="/admin/settings-controls/qualification-policies" method="post" class="erp-panel-body grid gap-5">
+        <form action="/admin/settings-controls/qualification-policies" method="post" class="aws-settings-form aws-qualification-form">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar settings-action-bar--split">
-                <p class="settings-action-note max-w-3xl text-sm text-slate-500"><spring:message code="admin.settings.qualification.subtitle" text="These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
-                <button type="submit" class="settings-action-button app-btn btn-primary"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
+            <div class="aws-settings-commandbar">
+                <p class="aws-settings-description"><spring:message code="admin.settings.qualification.subtitle" text="These are general applicant and guarantor rules for this station. Product-specific guarantor savings are configured inside each loan product." /></p>
+                <button type="submit" class="app-btn btn-primary aws-settings-save-action"><spring:message code="admin.settings.saveConfiguration" text="Save configuration" /></button>
             </div>
-            <div class="grid gap-4 lg:grid-cols-2">
-                <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title"><spring:message code="admin.settings.loanApplicants" text="Loan Applicants" /></p>
-                    <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
+            <div class="aws-settings-grid aws-qualification-grid">
+                <section class="aws-settings-group" aria-labelledby="loan-applicant-policy-title">
+                    <div class="aws-settings-group-header">
+                        <h3 id="loan-applicant-policy-title"><spring:message code="admin.settings.loanApplicants" text="Loan Applicants" /></h3>
+                    </div>
+                    <div class="aws-settings-group-body">
+                        <label class="aws-settings-checkbox-row">
+                            <input class="aws-settings-checkbox" name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
+                            <span class="aws-settings-checkbox-copy">
+                                <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
+                                <span class="aws-settings-help"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
                             </span>
                         </label>
                     </div>
-                </div>
-                <div class="rounded-md border border-slate-200 bg-white p-4">
-                    <p class="erp-widget-title"><spring:message code="loan.guarantors" text="Guarantors" /></p>
-                    <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, members with active loans cannot guarantee." /></span>
+                </section>
+                <section class="aws-settings-group" aria-labelledby="guarantor-policy-title">
+                    <div class="aws-settings-group-header">
+                        <h3 id="guarantor-policy-title"><spring:message code="loan.guarantors" text="Guarantors" /></h3>
+                    </div>
+                    <div class="aws-settings-group-body aws-settings-policy-grid">
+                        <label class="aws-settings-checkbox-row">
+                            <input class="aws-settings-checkbox" name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
+                            <span class="aws-settings-checkbox-copy">
+                                <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
+                                <span class="aws-settings-help"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, members with active loans cannot guarantee." /></span>
                             </span>
                         </label>
                         <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <label class="aws-settings-field aws-settings-field--compact">
                             Max Guarantees
-                            <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${policyGuarantorMaxGuarantees}" />
+                            <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="aws-control" value="${policyGuarantorMaxGuarantees}" />
                         </label>
-                        <label class="settings-checkbox-card flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <input name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
-                            <span>
-                                <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
-                                <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
+                        <label class="aws-settings-checkbox-row">
+                            <input class="aws-settings-checkbox" name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
+                            <span class="aws-settings-checkbox-copy">
+                                <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
+                                <span class="aws-settings-help"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
                             </span>
                         </label>
                     </div>
-                </div>
+                </section>
             </div>
         </form>
     </section>

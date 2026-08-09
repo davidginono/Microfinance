@@ -18,6 +18,37 @@ class AdminUsersJspLayoutTest {
     }
 
     @Test
+    void usersAndRolesFiltersUseCompactAwsToolbarWithoutVerticalTableScroll() throws Exception {
+        String usersJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/users.jsp"));
+        String componentCss = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
+
+        assertThat(usersJsp)
+            .contains("class=\"erp-table-wrap admin-register-shell admin-users-register\"")
+            .contains("class=\"admin-filter-form aws-filter-toolbar admin-users-filter-form\"")
+            .contains("class=\"admin-users-filter-field admin-users-filter-field--type\"")
+            .contains("class=\"admin-users-filter-field admin-users-filter-field--query\"")
+            .contains("class=\"admin-users-filter-field admin-users-filter-field--rows\"")
+            .contains("class=\"admin-users-filter-actions\"")
+            .contains("<span class=\"sr-only\">Search By</span>")
+            .contains("<span class=\"sr-only\">Search User</span>")
+            .contains("<span class=\"sr-only\">Rows Per Page</span>")
+            .contains("type=\"search\"")
+            .contains("class=\"fcms-control w-full\"")
+            .doesNotContain("tracking-[0.22em] text-slate-500\">Search By")
+            .doesNotContain("tracking-[0.22em] text-slate-500\">Rows Per Page");
+        assertThat(componentCss)
+            .contains(".admin-users-filter-form")
+            .contains("overflow-y: hidden !important")
+            .contains(".admin-users-filter-field--query")
+            .contains("flex: 1 1 25rem !important")
+            .contains(".admin-users-filter-actions")
+            .contains(".aws-console .admin-users-register.admin-register-shell > .erp-table-scroll")
+            .contains("max-height: none !important")
+            .contains("overflow-y: visible !important")
+            .contains("@media (max-width: 767px)");
+    }
+
+    @Test
     void editPageRendersDisabledUnsupportedMatrixCells() throws Exception {
         String editJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp"));
         String componentCss = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));

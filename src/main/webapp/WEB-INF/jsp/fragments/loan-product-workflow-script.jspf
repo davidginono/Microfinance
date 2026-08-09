@@ -1213,8 +1213,30 @@
                     ? step.querySelector('.product-config-subsection')
                     : null;
             };
+            const workflowScrollOffset = () => {
+                const workspaceNav = workspace.querySelector('.product-config-workspace-nav');
+                if (workspaceNav && window.getComputedStyle) {
+                    const navStyle = window.getComputedStyle(workspaceNav);
+                    if (navStyle.position === 'sticky') {
+                        const stickyTop = Number.parseFloat(navStyle.top);
+                        const resolvedTop = Number.isFinite(stickyTop)
+                            ? stickyTop
+                            : Math.max(0, workspaceNav.getBoundingClientRect().top);
+                        return Math.ceil(resolvedTop + workspaceNav.offsetHeight + 12);
+                    }
+                }
+
+                const pageHeader = document.querySelector('.erp-page-header[data-aws-page-header]');
+                return pageHeader ? Math.ceil(Math.max(0, pageHeader.getBoundingClientRect().bottom) + 12) : 12;
+            };
             const scrollStepIntoView = (step, behavior = 'smooth') => {
                 const target = workflowScrollTarget(step) || step;
+                if (typeof window.scrollTo === 'function') {
+                    const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+                    const targetTop = target.getBoundingClientRect().top + scrollY - workflowScrollOffset();
+                    window.scrollTo({ top: Math.max(0, targetTop), behavior });
+                    return;
+                }
                 target.scrollIntoView({ behavior, block: 'start' });
             };
 
@@ -1259,7 +1281,7 @@
                 }
 
                 if (options.scroll) {
-                    scrollStepIntoView(steps[activeIndex]);
+                    window.requestAnimationFrame(() => scrollStepIntoView(steps[activeIndex]));
                 }
                 if (options.focus) {
                     navButtons.find((button) => button.getAttribute('aria-current') === 'step')?.focus({ preventScroll: true });
