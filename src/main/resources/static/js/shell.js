@@ -1174,7 +1174,9 @@
             return;
         }
         const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
-        if (!link || link.matches('[download], [target], [data-download-action="true"], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
+        if (!link
+            || link.matches('[download], [target], [data-download-action="true"], [data-no-page-preloader="true"], [data-page-preloader="false"]')
+            || isConsoleDownloadAction(link)) {
             return;
         }
         const href = link.getAttribute('href');

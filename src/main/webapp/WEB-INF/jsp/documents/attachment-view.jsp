@@ -20,7 +20,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="${fn:escapeXml(previewInlineHref)}" target="_blank" rel="noopener" class="app-btn btn-neutral">Open Raw File</a>
-                <a href="${fn:escapeXml(previewDownloadHref)}" class="app-btn btn-primary">Download</a>
+                <a href="${fn:escapeXml(previewDownloadHref)}" class="app-btn btn-primary" data-download-action="true">Download</a>
             </div>
         </div>
     </div>

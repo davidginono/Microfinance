@@ -145,7 +145,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260809-loan-detail-action-v33")
             .contains("shell.css?v=20260809-select-visibility-v24")
-            .contains("shell.js?v=20260809-file-picker-v11")
+            .contains("shell.js?v=20260809-download-preloader-v12")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -271,6 +271,7 @@ class AwsConsoleViewContractTest {
             .contains("showConsoleTableLoading")
             .contains("showPageSubmitPreloader(null)")
             .contains("[data-download-action=\"true\"]")
+            .contains("|| isConsoleDownloadAction(link)")
             .contains("syncConsoleFiltersFromUrl")
             .contains("breadcrumbRouteGroups")
             .contains("'admin tools'")
@@ -649,6 +650,35 @@ class AwsConsoleViewContractTest {
             .contains("const regionalLoaderActive")
             .contains("if (regionalLoaderActive || regionalForm)")
             .contains("[data-aws-table-region][aria-busy=\"true\"]");
+    }
+
+    @Test
+    void documentDownloadsDoNotTriggerFullPagePreloader() throws Exception {
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+        String loanExportModal = read(JSP_ROOT.resolve("fragments/loan-export-modal.jspf"));
+        String attachmentPreview = read(JSP_ROOT.resolve("documents/attachment-view.jsp"));
+        List<String> loanDetails = List.of(
+            read(JSP_ROOT.resolve("app/loan-view.jsp")),
+            read(JSP_ROOT.resolve("manager/detail.jsp")),
+            read(JSP_ROOT.resolve("board/detail.jsp"))
+        );
+
+        assertThat(shellJs)
+            .contains("|| isConsoleDownloadAction(link)")
+            .contains("[data-download-action=\"true\"]")
+            .contains("showPageSubmitPreloader(null)");
+        assertThat(loanExportModal)
+            .contains("data-loan-export-signed data-download-action=\"true\"")
+            .contains("data-loan-export-unsigned data-download-action=\"true\"");
+        assertThat(attachmentPreview)
+            .contains("previewDownloadHref")
+            .contains("data-download-action=\"true\">Download</a>");
+        for (String detail : loanDetails) {
+            assertThat(detail)
+                .contains("data-loan-export-url=")
+                .contains("/documents/loan-applications/${app.id}/attachments/${file.id}\"")
+                .contains("data-download-action=\"true\"><spring:message code=\"common.download\"");
+        }
     }
 
     @Test

@@ -13,11 +13,11 @@
             </button>
         </div>
         <div class="app-modal-body space-y-3">
-            <a href="#" data-loan-export-signed class="loan-export-option app-modal-section block">
+            <a href="#" data-loan-export-signed data-download-action="true" class="loan-export-option app-modal-section block">
                 <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.systemSigned" text="System Signed" /></span>
                 <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.systemSignedHelp" text="Includes signatures already recorded in the approval workflow." /></span>
             </a>
-            <a href="#" data-loan-export-unsigned class="loan-export-option app-modal-section block">
+            <a href="#" data-loan-export-unsigned data-download-action="true" class="loan-export-option app-modal-section block">
                 <span class="loan-export-option-title block font-semibold text-slate-900"><spring:message code="loan.export.physicalSigned" text="Physically Signed (with empty signature slots)" /></span>
                 <span class="mt-1 block text-sm text-slate-500"><spring:message code="loan.export.physicalSignedHelp" text="Leaves staff signature spaces empty for signing on paper." /></span>
             </a>

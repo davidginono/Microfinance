@@ -436,7 +436,7 @@
                         <td class="px-3 py-2">
                             <div class="flex flex-wrap gap-2">
                                 <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral"><spring:message code="common.view" text="View" /></a>
-                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary"><spring:message code="common.download" text="Download" /></a>
+                                <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary" data-download-action="true"><spring:message code="common.download" text="Download" /></a>
                             </div>
                         </td>
                     </tr>
@@ -471,7 +471,7 @@
                     <td class="px-3 py-2">${file.sizeLabel}</td>
                     <td class="px-3 py-2">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</td>
                     <td class="px-3 py-2"><a href="/documents/loan-applications/${app.id}/attachments/${file.id}"
-                            class="app-btn btn-primary"><spring:message code="common.download" text="Download" /></a></td>
+                            class="app-btn btn-primary" data-download-action="true"><spring:message code="common.download" text="Download" /></a></td>
                 </tr>
             </c:forEach>
             <c:if test="${empty attachments}">
