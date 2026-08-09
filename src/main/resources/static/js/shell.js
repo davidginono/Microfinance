@@ -10,6 +10,7 @@
     const maxVisibleToasts = 3;
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
+    let transientPagePreloaderTimer = null;
     const legacyScrollRestoreStorageKey = 'saccos:restore-scroll';
     const scrollRestoreStorageKeyPrefix = 'saccos:restore-scroll:';
     const modalRestoreStorageKey = 'saccos:open-modal';
@@ -763,6 +764,10 @@
     };
 
     const hidePageSubmitPreloader = function () {
+        if (transientPagePreloaderTimer) {
+            window.clearTimeout(transientPagePreloaderTimer);
+            transientPagePreloaderTimer = null;
+        }
         pageSubmitPreloaderActive = false;
         document.documentElement.classList.remove('page-submit-preloader-active');
         document.body.removeAttribute('aria-busy');
@@ -796,6 +801,17 @@
                 control.classList.add('opacity-60', 'cursor-not-allowed');
             });
         }
+    };
+
+    const showTransientDownloadPreloader = function () {
+        if (!pageSubmitPreloader) {
+            return;
+        }
+        if (transientPagePreloaderTimer) {
+            window.clearTimeout(transientPagePreloaderTimer);
+        }
+        showPageSubmitPreloader(null);
+        transientPagePreloaderTimer = window.setTimeout(hidePageSubmitPreloader, 1800);
     };
 
     const currentScrollRestorePath = function () {
@@ -1174,9 +1190,7 @@
             return;
         }
         const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
-        if (!link
-            || link.matches('[download], [target], [data-download-action="true"], [data-no-page-preloader="true"], [data-page-preloader="false"]')
-            || isConsoleDownloadAction(link)) {
+        if (!link || link.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
             return;
         }
         const href = link.getAttribute('href');
@@ -1185,8 +1199,18 @@
         }
         const target = new URL(link.href, window.location.href);
         if (target.origin !== window.location.origin
-            || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)
             || (target.pathname === window.location.pathname && target.search === window.location.search && target.hash)) {
+            return;
+        }
+        if (link.matches('[download], [data-download-action="true"]')
+            || isConsoleDownloadAction(link)
+            || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)) {
+            rememberScrollForReload();
+            window.setTimeout(function () {
+                if (!event.defaultPrevented) {
+                    showTransientDownloadPreloader();
+                }
+            }, 0);
             return;
         }
         rememberScrollForReload();

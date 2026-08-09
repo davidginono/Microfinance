@@ -145,7 +145,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260809-loan-detail-action-v33")
             .contains("shell.css?v=20260809-select-visibility-v24")
-            .contains("shell.js?v=20260809-download-preloader-v12")
+            .contains("shell.js?v=20260809-download-preloader-v13")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -271,7 +271,7 @@ class AwsConsoleViewContractTest {
             .contains("showConsoleTableLoading")
             .contains("showPageSubmitPreloader(null)")
             .contains("[data-download-action=\"true\"]")
-            .contains("|| isConsoleDownloadAction(link)")
+            .contains("showTransientDownloadPreloader")
             .contains("syncConsoleFiltersFromUrl")
             .contains("breadcrumbRouteGroups")
             .contains("'admin tools'")
@@ -653,7 +653,7 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void documentDownloadsDoNotTriggerFullPagePreloader() throws Exception {
+    void documentDownloadsUseSelfClearingPagePreloader() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
         String loanExportModal = read(JSP_ROOT.resolve("fragments/loan-export-modal.jspf"));
         String attachmentPreview = read(JSP_ROOT.resolve("documents/attachment-view.jsp"));
@@ -664,9 +664,13 @@ class AwsConsoleViewContractTest {
         );
 
         assertThat(shellJs)
-            .contains("|| isConsoleDownloadAction(link)")
+            .contains("showTransientDownloadPreloader")
+            .contains("transientPagePreloaderTimer = window.setTimeout(hidePageSubmitPreloader, 1800)")
+            .contains("showPageSubmitPreloader(null)")
+            .contains("isConsoleDownloadAction(link)")
             .contains("[data-download-action=\"true\"]")
-            .contains("showPageSubmitPreloader(null)");
+            .contains("link.matches('[download], [data-download-action=\"true\"]')")
+            .contains("showTransientDownloadPreloader();");
         assertThat(loanExportModal)
             .contains("data-loan-export-signed data-download-action=\"true\"")
             .contains("data-loan-export-unsigned data-download-action=\"true\"");
