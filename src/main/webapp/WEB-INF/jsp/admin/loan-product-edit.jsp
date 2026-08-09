@@ -34,7 +34,6 @@
             <p class="erp-widget-title">Selected product</p>
             <h2><c:out value="${product.displayName}" /></h2>
             <div class="product-config-workspace-meta">
-                <span><c:out value="${product.displayCode}" /></span>
                 <span class="product-config-status
                     ${product.status eq 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : ''}
                     ${product.status eq 'DRAFT' ? 'bg-amber-50 text-amber-700' : ''}

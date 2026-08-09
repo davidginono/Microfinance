@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${boardReportsBreadcrumb}</p>
     <h1 class="erp-page-title">${boardReportsTitle}</h1>
-    <p class="erp-page-subtitle">${boardReportsSubtitle}</p>
 </div>
 
 <form method="get" action="/documents/reports/board-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>

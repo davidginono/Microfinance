@@ -10,7 +10,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.queue.breadcrumb" text="Disbursement Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="disbursement.queue.subtitle" text="Release approved loans that are ready for final disbursement." /></p>
 </div>
 <div class="erp-toolbar">
     <div class="space-y-3">

@@ -1,31 +1,37 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 
 <div class="mt-5 loan-financial-section-grid">
-    <c:forEach items="${financialFieldSections}" var="section">
-        <div class="loan-view-summary-card overflow-hidden">
-            <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">${section.key}</h5>
+    <c:forEach items="${financialFieldSections}" var="section" varStatus="sectionLoop">
+        <section class="erp-table-wrap loan-financial-section"
+                 aria-label="${fn:escapeXml(section.key)}"
+                 data-aws-table-region
+                 data-aws-no-titlebar="true"
+                 data-aws-no-refresh="true">
+            <div class="loan-financial-section__header">
+                <h5><c:out value="${section.key}" /></h5>
             </div>
-            <div class="erp-table-wrap erp-table-scroll">
+            <div class="erp-table-scroll erp-table-scroll-sm"
+                 data-view-position-key="loan-financial-section-${sectionLoop.index}">
                 <table class="erp-table">
-                    <thead class="bg-slate-50">
+                    <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left"><spring:message code="common.section" text="Section" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="common.value" text="Value" /></th>
+                        <th><spring:message code="common.section" text="Section" /></th>
+                        <th><spring:message code="common.value" text="Value" /></th>
                     </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody>
                     <c:forEach items="${section.value}" var="entry">
                         <tr>
-                            <td class="px-3 py-2 font-medium text-slate-700">${entry.key}</td>
-                            <td class="px-3 py-2">${entry.value}</td>
+                            <td><c:out value="${entry.key}" /></td>
+                            <td><c:out value="${entry.value}" /></td>
                         </tr>
                     </c:forEach>
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
     </c:forEach>
     <c:if test="${empty financialFieldSections}">
         <div class="loan-view-summary-card px-4 py-4 text-sm text-slate-500">

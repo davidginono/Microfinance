@@ -65,6 +65,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -116,14 +117,51 @@ class StaffAnalyticsControllerSecurityTest {
             ));
 
         mockMvc.perform(get("/staff/analytics")
-                .param("fromDate", "10/07/2025")
-                .param("toDate", "11/07/2025")
+                .param("fromDate", "2025-07-10")
+                .param("toDate", "2025-07-11")
                 .with(authentication(authenticationFor(principal))))
             .andExpect(status().isOk())
-            .andExpect(view().name("staff/analytics"));
+            .andExpect(view().name("staff/analytics"))
+            .andExpect(model().attribute("fromDate", "10/07/2025"))
+            .andExpect(model().attribute("toDate", "11/07/2025"))
+            .andExpect(model().attribute("fromDateInput", "2025-07-10"))
+            .andExpect(model().attribute("toDateInput", "2025-07-11"))
+            .andExpect(model().attribute("viewAs", "staff"))
+            .andExpect(model().attribute("stationWideStaffView", true))
+            .andExpect(model().attribute("staffReviewView", false))
+            .andExpect(model().attribute("staffAnalyticsTitle", "Station Loan Status"));
 
         verify(loanAnalyticsService).forStation(any(), any(), any(), any(), any(), any(), any());
         verify(loanAnalyticsService, never()).forStaff(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void staffReportUsesReviewMetricsAndKeepsTheSameAnalyticsPage() throws Exception {
+        AppUserPrincipal principal = principal(Position.MANAGER, false, Set.of(UserClaim.STAFF_ANALYTICS_VIEW));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
+        LoanAnalyticsService.StaffReviewAnalytics reviewAnalytics = new LoanAnalyticsService.StaffReviewAnalytics(
+            4, 2, 1, 1, 2, 0, List.of(), List.of()
+        );
+        when(loanAnalyticsService.staffReviewAnalytics(any(), any(), any(), any(), any(), any())).thenReturn(reviewAnalytics);
+        when(loanAnalyticsService.forStaff(any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 4, 2, 1, BigDecimal.ZERO));
+        when(loanAnalyticsService.staffPortfolio(any(), any(), any(), any(), any(), any()))
+            .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(4, 2, 1, 2, 0, BigDecimal.ZERO, "Low"));
+        when(loanAnalyticsService.staffReviewProductChartSeries(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/staff/analytics")
+                .param("viewAs", "member")
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isOk())
+            .andExpect(view().name("staff/analytics"))
+            .andExpect(model().attribute("viewAs", "member"))
+            .andExpect(model().attribute("stationWideStaffView", false))
+            .andExpect(model().attribute("staffReviewView", true))
+            .andExpect(model().attribute("staffAnalyticsTitle", "Staff Loan Review Analytics"));
+
+        verify(loanAnalyticsService).staffReviewAnalytics(any(), any(), any(), any(), any(), any());
+        verify(loanAnalyticsService).forStaff(any(), any(), any(), any(), any(), any());
+        verify(loanAnalyticsService, never()).forStation(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

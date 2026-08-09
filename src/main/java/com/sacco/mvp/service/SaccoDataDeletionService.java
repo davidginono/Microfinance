@@ -24,6 +24,7 @@ public class SaccoDataDeletionService {
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final MemberRepository memberRepository;
     private final SaccoRegistryService saccoRegistryService;
+    private final SaccoLogoStorageService saccoLogoStorageService;
 
     @Transactional
     public void deleteSacco(String saccoId, String confirmation) {
@@ -34,6 +35,7 @@ public class SaccoDataDeletionService {
         requireExactConfirmation(confirmation, "delete " + sacco.getSaccoName() + " and all its data");
 
         deleteSaccoScopedRows(normalizedSaccoId);
+        saccoLogoStorageService.deleteSaccoFiles(normalizedSaccoId);
         saccoRegistryService.invalidateRegisteredSaccoCache();
     }
 
@@ -86,10 +88,9 @@ public class SaccoDataDeletionService {
     private void deleteSaccoScopedRows(String saccoId) {
         update("""
             delete from stored_uploads
-            where (owner_type = 'SACCO' and owner_id = ?)
-               or (owner_type = 'MEMBER' and owner_id in (select id::text from members where sacco_id = ?))
+            where (owner_type = 'MEMBER' and owner_id in (select id::text from members where sacco_id = ?))
                or (owner_type = 'LOAN_APPLICATION' and owner_id in (select id::text from loan_applications where sacco_id = ?))
-            """, saccoId, saccoId, saccoId);
+            """, saccoId, saccoId);
 
         update("""
             delete from admin_incidents

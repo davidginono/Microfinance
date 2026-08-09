@@ -154,29 +154,24 @@
             }
 
             const viewportPadding = 8;
+            const maxVisibleRows = 6;
+            const compactRowHeight = 30;
             const rect = state.button.getBoundingClientRect();
-            const maxWidth = Math.max(220, window.innerWidth - (viewportPadding * 2));
-            const menuWidth = Math.min(Math.max(rect.width, 220), maxWidth);
-            const left = Math.min(
-                Math.max(rect.left, viewportPadding),
-                Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
-            );
             const availableBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
-            const desiredHeight = Math.min(state.menu.scrollHeight || 0, 272);
-            const menuHeight = Math.min(desiredHeight || 272, Math.max(48, availableBelow));
-            const top = rect.bottom - 1;
+            const visibleRows = Math.max(1, Math.min(maxVisibleRows, state.menu.children.length || 1));
+            const contentHeight = visibleRows * compactRowHeight + 2;
+            const desiredHeight = Math.min(state.menu.scrollHeight || contentHeight, contentHeight);
+            const menuHeight = Math.min(desiredHeight, Math.max(compactRowHeight + 2, availableBelow));
 
-            state.menu.style.left = left + 'px';
-            state.menu.style.top = top + 'px';
-            state.menu.style.setProperty('--neo-select-menu-width', menuWidth + 'px');
             state.menu.style.maxHeight = menuHeight + 'px';
+            state.menu.style.overflowY = state.menu.scrollHeight > menuHeight + 1 ? 'auto' : 'hidden';
         }
 
         function makeRoomBelow(state) {
             const rect = state.button.getBoundingClientRect();
             const availableBelow = window.innerHeight - rect.bottom - 8;
-            const desiredHeight = Math.min(state.menu.scrollHeight || 272, 272);
-            if (availableBelow < Math.min(desiredHeight, 160)) {
+            const desiredHeight = Math.min(state.menu.scrollHeight || 182, 182);
+            if (availableBelow < Math.min(desiredHeight, 120)) {
                 state.button.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
             }
         }
@@ -250,7 +245,7 @@
             menu.setAttribute('data-neo-select-menu', 'true');
 
             wrapper.appendChild(button);
-            document.body.appendChild(menu);
+            wrapper.appendChild(menu);
 
             const state = {
                 select: select,

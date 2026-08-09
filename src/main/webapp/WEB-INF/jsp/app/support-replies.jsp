@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="support.replies.breadcrumb" text="Member Workspace / Support / Replies" /></p>
     <h1 class="erp-page-title"><spring:message code="support.replies.title" text="Support Replies" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="support.replies.subtitle" text="Read replies and broadcasts from your station admin." /></p>
 </div>
 
 <section class="erp-panel">

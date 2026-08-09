@@ -12,7 +12,6 @@
     <div>
         <p class="erp-breadcrumb"><spring:message code="reports.member.breadcrumb" text="Member Workspace / Reports & Analytics" /></p>
         <h1 class="erp-page-title"><spring:message code="reports.member.title" text="Loan Reports and Analytics" /></h1>
-        <p class="erp-page-subtitle"><spring:message code="reports.member.subtitle" text="View loan performance, status breakdown, and risk indicators within a selected period." /></p>
     </div>
 </div>
 

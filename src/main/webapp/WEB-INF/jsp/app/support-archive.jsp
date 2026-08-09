@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="support.archive.breadcrumb" text="Member Workspace / Support / Sent Archive" /></p>
     <h1 class="erp-page-title"><spring:message code="support.archive.title" text="Sent Support Archive" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="support.archive.subtitle" text="Track messages sent to your station admin." /></p>
 </div>
 
 <section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">

@@ -4,7 +4,6 @@ import tools.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.StoredUpload;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -95,10 +94,8 @@ class LegacyUploadMigrationServiceTest {
                                                  JdbcTemplate jdbc,
                                                  Path loanRoot) {
         LegacyUploadMigrationService service = new LegacyUploadMigrationService(
-            storage, loans, mock(RegisteredSaccoRepository.class),
-            JsonMapper.builder().findAndAddModules().build(), jdbc);
+            storage, loans, JsonMapper.builder().findAndAddModules().build(), jdbc);
         ReflectionTestUtils.setField(service, "loanRoot", loanRoot.toString());
-        ReflectionTestUtils.setField(service, "logoRoot", tempDir.resolve("logos").toString());
         return service;
     }
 }

@@ -184,12 +184,12 @@ public class LoanAnalyticsService {
         List<StaffLoanEvent> events = filterEventsByLoanProductId(staffLoanEvents(principal, start, end, loanType, loanStatus), loanProductId);
 
         return List.of(
-            staffTrendSeries("Applied", "#2563eb", months, events, event -> true),
-            staffTrendSeries("Active", "#059669", months, events, event -> ACTIVE_STATUSES.contains(event.loan().getStatus())),
-            staffTrendSeries("Disbursed", "#059669", months, events, event -> event.disbursed() || DISBURSED_STATUSES.contains(event.loan().getStatus())),
-            staffTrendSeries("Paid", "#7c3aed", months, events, event -> event.loan().getStatus() == LoanStatus.PAID),
-            staffTrendSeries("Defaulted", "#dc2626", months, events, event -> event.loan().getStatus() == LoanStatus.DEFAULTED),
-            staffTrendSeries("Rejected", "#475569", months, events, event -> event.rejected() || REJECTED_STATUSES.contains(event.loan().getStatus()))
+            staffTrendSeries("Applied", "#0972d3", months, events, event -> true),
+            staffTrendSeries("Active", "#037f0c", months, events, event -> ACTIVE_STATUSES.contains(event.loan().getStatus())),
+            staffTrendSeries("Disbursed", "#0073bb", months, events, event -> event.disbursed() || DISBURSED_STATUSES.contains(event.loan().getStatus())),
+            staffTrendSeries("Paid", "#6b3fa0", months, events, event -> event.loan().getStatus() == LoanStatus.PAID),
+            staffTrendSeries("Defaulted", "#d13212", months, events, event -> event.loan().getStatus() == LoanStatus.DEFAULTED),
+            staffTrendSeries("Rejected", "#5f6b7a", months, events, event -> event.rejected() || REJECTED_STATUSES.contains(event.loan().getStatus()))
         );
     }
 
@@ -215,12 +215,12 @@ public class LoanAnalyticsService {
         List<LoanApplication> loans = filterByLoanProductId(stationLoans(saccoId, stationId, start, end, loanType, loanStatus), loanProductId);
 
         return List.of(
-            trendSeries("Applied", "#2563eb", months, loans, app -> app.getStatus() != LoanStatus.DRAFT),
-            trendSeries("Active", "#059669", months, loans, app -> ACTIVE_STATUSES.contains(app.getStatus())),
-            trendSeries("Disbursed", "#059669", months, loans, app -> DISBURSED_STATUSES.contains(app.getStatus())),
-            trendSeries("Paid", "#7c3aed", months, loans, app -> app.getStatus() == LoanStatus.PAID),
-            trendSeries("Defaulted", "#dc2626", months, loans, app -> app.getStatus() == LoanStatus.DEFAULTED),
-            trendSeries("Rejected", "#475569", months, loans, app -> REJECTED_STATUSES.contains(app.getStatus()))
+            trendSeries("Applied", "#0972d3", months, loans, app -> app.getStatus() != LoanStatus.DRAFT),
+            trendSeries("Active", "#037f0c", months, loans, app -> ACTIVE_STATUSES.contains(app.getStatus())),
+            trendSeries("Disbursed", "#0073bb", months, loans, app -> DISBURSED_STATUSES.contains(app.getStatus())),
+            trendSeries("Paid", "#6b3fa0", months, loans, app -> app.getStatus() == LoanStatus.PAID),
+            trendSeries("Defaulted", "#d13212", months, loans, app -> app.getStatus() == LoanStatus.DEFAULTED),
+            trendSeries("Rejected", "#5f6b7a", months, loans, app -> REJECTED_STATUSES.contains(app.getStatus()))
         );
     }
 
@@ -366,10 +366,14 @@ public class LoanAnalyticsService {
             events
         );
         List<MetricTrendSeries> trendSeries = List.of(
-            staffTrendSeries("Reviewed", "#111827", months, events, event -> true),
-            staffTrendSeries("Approved", "#65a30d", months, events, StaffLoanEvent::approved),
-            staffTrendSeries("Rejected", "#ef4444", months, events, StaffLoanEvent::rejected),
-            staffTrendSeries("Pending", "#7e22ce", months, events, StaffLoanEvent::pending)
+            staffTrendSeries("Reviewed", "#0972d3", months, events, event -> true),
+            staffTrendSeries("Approved", "#037f0c", months, events, StaffLoanEvent::approved),
+            staffTrendSeries("Rejected", "#5f6b7a", months, events, StaffLoanEvent::rejected),
+            staffTrendSeries("Pending", "#8d6605", months, events, StaffLoanEvent::pending),
+            staffTrendSeries("Disbursed", "#0073bb", months, events,
+                event -> event.disbursed() || DISBURSED_STATUSES.contains(event.loan().getStatus())),
+            staffTrendSeries("Defaulted", "#d13212", months, events,
+                event -> event.approved() && event.loan().getStatus() == LoanStatus.DEFAULTED)
         );
         return new StaffReviewAnalytics(
             events.size(),
@@ -421,19 +425,19 @@ public class LoanAnalyticsService {
 
     public List<Map<String, Object>> productChartSeries(List<LoanProductPerformance> performance) {
         return List.of(
-            productChartSeries("Total Loans", "#2563eb", performance, LoanProductPerformance::totalLoans),
-            productChartSeries("Paid Loans", "#059669", performance, LoanProductPerformance::paidLoans),
-            productChartSeries("Defaulted Loans", "#f97316", performance, LoanProductPerformance::defaultedLoans),
-            productChartSeries("Rejected Loans", "#ef4444", performance, LoanProductPerformance::rejectedLoans)
+            productChartSeries("Total Loans", "#0972d3", performance, LoanProductPerformance::totalLoans),
+            productChartSeries("Paid Loans", "#037f0c", performance, LoanProductPerformance::paidLoans),
+            productChartSeries("Defaulted Loans", "#d13212", performance, LoanProductPerformance::defaultedLoans),
+            productChartSeries("Rejected Loans", "#5f6b7a", performance, LoanProductPerformance::rejectedLoans)
         );
     }
 
     public List<Map<String, Object>> staffReviewProductChartSeries(List<StaffReviewProductPerformance> performance) {
         return List.of(
-            staffReviewProductChartSeries("Reviewed", "#111827", performance, StaffReviewProductPerformance::reviewed),
-            staffReviewProductChartSeries("Approved", "#65a30d", performance, StaffReviewProductPerformance::approved),
-            staffReviewProductChartSeries("Rejected", "#ef4444", performance, StaffReviewProductPerformance::rejected),
-            staffReviewProductChartSeries("Pending", "#7e22ce", performance, StaffReviewProductPerformance::pending)
+            staffReviewProductChartSeries("Reviewed", "#0972d3", performance, StaffReviewProductPerformance::reviewed),
+            staffReviewProductChartSeries("Approved", "#037f0c", performance, StaffReviewProductPerformance::approved),
+            staffReviewProductChartSeries("Rejected", "#5f6b7a", performance, StaffReviewProductPerformance::rejected),
+            staffReviewProductChartSeries("Pending", "#8d6605", performance, StaffReviewProductPerformance::pending)
         );
     }
 

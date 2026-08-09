@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guaranteedLoans.breadcrumb" text="Member Workspace / Guarantees" /></p>
     <h1 class="erp-page-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="guaranteedLoans.subtitle" text="Current status of active loans linked to your approved guarantees." /></p>
 </div>
 
 <section class="erp-panel overflow-hidden">

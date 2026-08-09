@@ -10,7 +10,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.archive.breadcrumb" text="Disbursement Panel / Archive" /></p>
     <h1 class="erp-page-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="disbursement.archive.subtitle" text="Open the loans you already released and track where they are now." /></p>
 </div>
 
 <div class="erp-toolbar">

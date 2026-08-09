@@ -1,6 +1,7 @@
 target/
 tmp/
 loan-uploads/
+registered-saccos/
 node_modules/
 docs/assets/
 docs/**/*.pdf

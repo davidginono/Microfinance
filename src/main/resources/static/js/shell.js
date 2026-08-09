@@ -15,6 +15,165 @@
     const modalRestoreStorageKey = 'saccos:open-modal';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
     let scrollStateSaveTimer = null;
+    const normalizeBreadcrumbSegment = function (value) {
+        return (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    };
+    const currentReviewWorkspaceBase = function () {
+        const path = window.location.pathname || '';
+        if (path.indexOf('/chairperson') === 0) {
+            return '/chairperson';
+        }
+        if (path.indexOf('/credit-committee') === 0) {
+            return '/credit-committee';
+        }
+        return '/board';
+    };
+    const currentStaffWorkspaceHome = function () {
+        const path = window.location.pathname || '';
+        const match = path.match(/^\/(manager|chairperson|credit-committee|board|loan-officer|accountant|disbursement)(?:\/|$)/);
+        return match ? '/' + match[1] + '/dashboard' : '/staff/analytics';
+    };
+    const breadcrumbRouteGroups = {
+        'admin tools': {
+            'audit log': '/admin/events',
+            'dashboard': '/admin/dashboard',
+            'event log': '/admin/events',
+            'incidents': '/admin/incidents',
+            'loan product controls': '/admin/loan-products',
+            'loan products': '/admin/settings-controls?section=loan',
+            'outbox monitor': '/admin/outbox',
+            'platform dashboard': '/admin/dashboard',
+            'platform settings': '/admin/platform-settings',
+            'reports': '/admin/reports',
+            'sacco registration': '/admin/saccos/registry',
+            'sacco workspace': '/admin/scope/select',
+            'saccos': '/admin/saccos',
+            'settings & controls': '/admin/settings-controls',
+            'sms usage': '/admin/sms-usage',
+            'support': '/admin/support',
+            'users & roles': '/admin/users'
+        },
+        'member workspace': {
+            'application detail': '/app/loan-applications',
+            'application progress': '/app/loan-applications',
+            'archives': '/app/archives',
+            'guarantee archive': '/app/archives?section=guarantors',
+            'guarantee requests': '/app/guarantee-requests',
+            'guarantees': '/app/guaranteed-loans',
+            'guarantor selection': '/app/loan-applications',
+            'loan products': '/app/loan-products',
+            'notifications': '/app/notifications',
+            'reports & analytics': '/app/reports',
+            'replies': '/app/support/replies',
+            'sent archive': '/app/support/archive',
+            'settings': '/app/settings',
+            'support': '/app/support'
+        },
+        'staff workspace': {
+            'settings': '/staff/settings',
+            'staff reports and analytics': '/staff/analytics'
+        },
+        'manager panel': {
+            'archive': '/manager/archive',
+            'loan reports': '/manager/reports',
+            'notifications': '/manager/notifications',
+            'queue': '/manager/loan-applications?status=READY_FOR_MANAGER',
+            'settings': '/manager/settings'
+        },
+        'accountant panel': {
+            'archive': '/accountant/archive',
+            'notifications': '/accountant/notifications',
+            'queue': '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT',
+            'reports': '/accountant/reports'
+        },
+        'disbursement panel': {
+            'archive': '/disbursement/archive',
+            'notifications': '/disbursement/notifications',
+            'queue': '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT',
+            'reports': '/disbursement/reports'
+        },
+        'loan officer panel': {
+            'archive': '/loan-officer/archive',
+            'assigned': '/loan-officer/assigned',
+            'loan reports': '/loan-officer/reports',
+            'notifications': '/loan-officer/notifications',
+            'queue': '/loan-officer/queue'
+        },
+        'board panel': {
+            'archive': '/board/archive',
+            'assigned': '/board/assigned',
+            'loan reports': '/board/reports',
+            'notifications': '/board/notifications',
+            'queue': '/board/queue',
+            'reports': '/board/reports'
+        },
+        'chairperson panel': {
+            'archive': '/chairperson/archive',
+            'assigned': '/chairperson/assigned',
+            'loan reports': '/chairperson/reports',
+            'notifications': '/chairperson/notifications',
+            'queue': '/chairperson/queue',
+            'reports': '/chairperson/reports'
+        },
+        'credit committee panel': {
+            'archive': '/credit-committee/archive',
+            'assigned': '/credit-committee/assigned',
+            'loan reports': '/credit-committee/reports',
+            'notifications': '/credit-committee/notifications',
+            'queue': '/credit-committee/queue',
+            'reports': '/credit-committee/reports'
+        },
+        'documents': {
+            'attachment preview': window.location.pathname + window.location.search
+        },
+        'workspace': {
+            'profile': '/profile'
+        }
+    };
+    const breadcrumbRootHref = function (root) {
+        if (root === 'admin tools') {
+            return '/admin/dashboard';
+        }
+        if (root === 'member workspace') {
+            return '/app/dashboard';
+        }
+        if (root === 'staff workspace') {
+            return currentStaffWorkspaceHome();
+        }
+        if (root === 'manager panel') {
+            return '/manager/dashboard';
+        }
+        if (root === 'accountant panel') {
+            return '/accountant/dashboard';
+        }
+        if (root === 'disbursement panel') {
+            return '/disbursement/dashboard';
+        }
+        if (root === 'loan officer panel') {
+            return '/loan-officer/dashboard';
+        }
+        if (root === 'board panel' || root === 'chairperson panel' || root === 'credit committee panel') {
+            return currentReviewWorkspaceBase() + '/dashboard';
+        }
+        if (root === 'documents') {
+            return '/app/loan-applications';
+        }
+        if (root === 'workspace') {
+            return currentStaffWorkspaceHome();
+        }
+        return null;
+    };
+    const resolveBreadcrumbHref = function (segment, index, segments) {
+        if (index === segments.length - 1) {
+            return null;
+        }
+        const root = normalizeBreadcrumbSegment(segments[0]);
+        if (index === 0) {
+            return breadcrumbRootHref(root);
+        }
+        const routes = breadcrumbRouteGroups[root] || {};
+        return routes[normalizeBreadcrumbSegment(segment)] || null;
+    };
     if ('scrollRestoration' in window.history) {
         window.history.scrollRestoration = 'manual';
     }
@@ -127,6 +286,48 @@
                 }
             });
         });
+    };
+    const filePickerLabelText = function (input, emptyText) {
+        const files = Array.from(input.files || []);
+        if (files.length === 0) {
+            return emptyText || 'No file chosen';
+        }
+        if (files.length === 1) {
+            return files[0].name || 'Selected file';
+        }
+        return String(files.length) + ' files selected';
+    };
+    const refreshAwsFilePicker = function (input) {
+        if (!input) {
+            return;
+        }
+        const picker = input.closest('.aws-file-picker, .aws-file-dropzone, .profile-photo-dropzone');
+        const label = picker?.querySelector('[data-file-picker-name]');
+        if (!label) {
+            return;
+        }
+        const emptyText = input.getAttribute('data-file-picker-empty') || label.getAttribute('data-file-picker-empty') || label.textContent.trim();
+        label.setAttribute('data-file-picker-empty', emptyText || 'No file chosen');
+        const nextText = filePickerLabelText(input, emptyText);
+        label.textContent = nextText;
+        label.title = nextText;
+    };
+    const initAwsFilePickers = function (root) {
+        (root || document).querySelectorAll('[data-file-picker-input]').forEach(function (input) {
+            if (input.dataset.filePickerReady === 'true') {
+                refreshAwsFilePicker(input);
+                return;
+            }
+            input.dataset.filePickerReady = 'true';
+            input.addEventListener('change', function () {
+                refreshAwsFilePicker(input);
+            });
+            refreshAwsFilePicker(input);
+        });
+    };
+    window.SaccosFilePickers = {
+        init: initAwsFilePickers,
+        refresh: refreshAwsFilePicker
     };
     const enhanceConsolePagination = function () {
         document.querySelectorAll('a.app-btn, button.app-btn, span.app-btn').forEach(function (control) {
@@ -397,9 +598,13 @@
                     separator.textContent = '>';
                     path.appendChild(separator);
                 }
-                const item = document.createElement('span');
-                item.className = 'erp-page-path__item';
+                const href = resolveBreadcrumbHref(segment, index, segments);
+                const item = document.createElement(href ? 'a' : 'span');
+                item.className = href ? 'erp-page-path__item erp-page-path__link' : 'erp-page-path__item';
                 item.textContent = segment;
+                if (href) {
+                    item.href = href;
+                }
                 if (index === segments.length - 1) {
                     item.setAttribute('aria-current', 'page');
                 }
@@ -1481,6 +1686,7 @@
         syncShellNavHeight();
         initConsoleNavigationSearch();
         initUppercaseInputs();
+        initAwsFilePickers(document);
         enhanceConsolePagination();
         enhanceConsoleTables();
         syncConsoleFiltersFromUrl();

@@ -10,7 +10,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.archive.breadcrumb" text="Manager Panel / Archive" /></p>
     <h1 class="erp-page-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="manager.archive.subtitle" text="Open the loans you already reviewed and track what happened after your decision." /></p>
 </div>
 
 <div class="erp-filter-row">

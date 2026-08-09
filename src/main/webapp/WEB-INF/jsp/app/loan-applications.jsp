@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="apps.breadcrumb" text="Member Workspace / Application Progress" /></p>
     <h1 class="erp-page-title"><spring:message code="apps.title" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="apps.subtitle" text="Review your loan applications and track the current workflow progress." /></p>
 </div>
 <c:set var="hasAwaitingGuarantors" value="false" />
 <c:forEach items="${apps}" var="a">

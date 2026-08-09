@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="support.member.breadcrumb" text="Member Workspace / Support" /></p>
     <h1 class="erp-page-title"><spring:message code="support.member.title" text="Contact Station Admin" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="support.member.subtitle" text="Send support messages to your station admin team." /></p>
 </div>
 
 <section class="erp-panel max-w-4xl overflow-hidden">

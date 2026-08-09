@@ -12,7 +12,6 @@
     <div>
         <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
         <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
-        <p class="erp-page-subtitle"><spring:message code="loan.view.subtitle" text="Review your application information, decision feedback, repayment schedule, and supporting records." /></p>
     </div>
     <c:if test="${canPrint}">
         <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral"><spring:message code="common.export" text="Export" /></button>
@@ -111,32 +110,10 @@
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
-            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}aws-inline-notice loan-detail-notice"
-                 data-live-account-status-box>
-                ${applicantExternalAccountStatus.statusMessage}
-            </div>
+            <%@ include file="../fragments/live-account-status-message.jspf" %>
         </div>
 
-        <div class="mt-6 loan-simple-progress">
-            <h3 class="text-lg font-semibold text-slate-900"><spring:message code="loan.progress" text="Progress" /></h3>
-            <div class="loan-simple-progress-list">
-                <c:forEach items="${loanProgressItems}" var="item">
-                    <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
-                        <span class="loan-simple-progress-dot" aria-hidden="true"></span>
-                        <span class="loan-simple-progress-content">
-                            <span class="loan-simple-progress-label">${item.label}</span>
-                            <span class="loan-simple-progress-state">
-                                <c:choose>
-                                    <c:when test="${item.current}"><spring:message code="loan.progress.inProgress" text="In Progress" /></c:when>
-                                    <c:when test="${item.active}"><spring:message code="loan.progress.completed" text="Completed" /></c:when>
-                                    <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
-                                </c:choose>
-                            </span>
-                        </span>
-                    </div>
-                </c:forEach>
-            </div>
-        </div>
+        <%@ include file="../fragments/loan-application-progress.jspf" %>
 
     </div>
 </div>

@@ -51,6 +51,40 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void conciseWorkspaceHeadersDoNotExposePageSubtitles() throws Exception {
+        for (String workspace : List.of("app", "manager", "board", "loan-officer", "disbursement")) {
+            try (Stream<Path> paths = Files.walk(JSP_ROOT.resolve(workspace))) {
+                paths.filter(path -> path.toString().endsWith(".jsp"))
+                    .forEach(path -> assertThat(read(path))
+                        .as(path.toString())
+                        .doesNotContain("erp-page-subtitle"));
+            }
+        }
+    }
+
+    @Test
+    void managerQueueCurrentFilterUsesCompactAwsSummaryStrip() throws Exception {
+        String managerQueue = read(JSP_ROOT.resolve("manager/queue.jsp"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+
+        assertThat(managerQueue)
+            .contains("<section class=\"manager-queue-filter-toolbar\" aria-labelledby=\"managerQueueCurrentFilterLabel\">")
+            .contains("class=\"manager-queue-filter-summary\"")
+            .contains("id=\"managerQueueCurrentFilterLabel\"")
+            .contains("class=\"manager-queue-filter-value\"><c:out value=\"${currentFilterLabel}\" /></p>")
+            .contains("class=\"erp-filter-form manager-queue-search-form aws-filter-toolbar\"")
+            .doesNotContain("erp-toolbar manager-queue-filter-toolbar")
+            .doesNotContain("manager-queue-filter-stack");
+        assertThat(consoleCss)
+            .contains(".manager-queue-filter-summary")
+            .contains("border-left: 3px solid var(--aws-orange)")
+            .contains("min-height: 46px")
+            .contains(".manager-queue-filter-kicker")
+            .contains(".manager-queue-filter-value")
+            .doesNotContain(".manager-queue-filter-stack");
+    }
+
+    @Test
     void jspMarkupContainsNoLocalStylesOrAutomaticFilterSubmission() throws Exception {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
@@ -88,9 +122,9 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260806-staff-analytics-v9")
-            .contains("shell.css?v=20260806-sidebar-toggle-v10")
-            .contains("shell.js?v=20260806-no-info-v9")
+            .contains("console-components.css?v=20260809-select-visibility-v25")
+            .contains("shell.css?v=20260809-select-visibility-v24")
+            .contains("shell.js?v=20260809-file-picker-v11")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -101,6 +135,7 @@ class AwsConsoleViewContractTest {
             .contains("app-topbar-left")
             .contains("app-topbar-actions")
             .contains("app-notification-control")
+            .contains("app-notification-badge")
             .contains("app-account-copy")
             .contains("app-profile-control")
             .contains("shellPageBreadcrumbRailText")
@@ -139,7 +174,11 @@ class AwsConsoleViewContractTest {
             .contains("#appToastContainer .app-toast-close")
             .contains("background: transparent !important")
             .contains(".erp-page-header[data-aws-page-header] .erp-page-title")
-            .contains("font-size: 20px !important")
+            .contains("font-size: 18px !important")
+            .contains("line-height: 22px !important")
+            .contains(".erp-page-path__link")
+            .contains("text-decoration: none")
+            .contains(".erp-page-path__link:focus-visible")
             .contains(".aws-console .loan-applicant-photo-frame img")
             .contains("border-radius: 50% !important")
             .contains(".aws-console .workflow-table-head")
@@ -152,6 +191,17 @@ class AwsConsoleViewContractTest {
             .contains("background: #25313a !important")
             .contains("color: #ffffff !important")
             .contains(".app-global-brand .app-global-logo")
+            .contains("width: min(37.8vw, 648px)")
+            .contains("max-width: 648px")
+            .contains("margin: 0 8px 0 16px !important")
+            .contains("width: min(30.6vw, 396px)")
+            .contains("margin-left: 16px !important")
+            .contains("height: 25px !important")
+            .contains("background: transparent !important")
+            .contains(".app-notification-badge")
+            .contains("top: 0;")
+            .contains("right: -5px")
+            .contains("border-radius: 2px")
             .contains(".app-topbar-actions .app-profile-control")
             .contains(".app-topbar .profile-icon-btn .profile-avatar-img")
             .contains("SIMS reference shell")
@@ -201,6 +251,14 @@ class AwsConsoleViewContractTest {
             .contains("showPageSubmitPreloader(null)")
             .contains("[data-download-action=\"true\"]")
             .contains("syncConsoleFiltersFromUrl")
+            .contains("breadcrumbRouteGroups")
+            .contains("'admin tools'")
+            .contains("'member workspace'")
+            .contains("'staff workspace'")
+            .contains("'users & roles': '/admin/users'")
+            .contains("resolveBreadcrumbHref")
+            .contains("document.createElement(href ? 'a' : 'span')")
+            .contains("item.href = href")
             .contains("aws-pagination-chevron")
             .contains("maxVisibleToasts = 3")
             .contains("promoteQueuedToast")
@@ -311,11 +369,42 @@ class AwsConsoleViewContractTest {
             .doesNotContain("loan-analytics-command-header")
             .doesNotContain("reports.controls");
         assertThat(staffAnalytics)
-            .contains("class=\"staff-analytics-actions md:justify-end\" data-aws-action-pin=\"true\"")
+            .contains("class=\"erp-panel staff-analytics-command-panel\"")
+            .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
+            .contains("data-aws-filter-pin=\"true\"")
+            .contains("class=\"erp-breadcrumb\"")
+            .contains("staff.analytics.breadcrumb")
+            .contains("name=\"fromDate\" type=\"date\"")
+            .contains("name=\"toDate\" type=\"date\"")
+            .contains("value=\"${fromDateInput}\"")
+            .contains("value=\"${toDateInput}\"")
+            .contains("dateFilterControls")
+            .contains("dateInput.showPicker()")
+            .contains("class=\"erp-panel staff-portfolio-panel\"")
+            .contains("class=\"erp-panel staff-product-panel\"")
+            .contains("class=\"erp-panel staff-trend-panel\"")
+            .contains("<div class=\"staff-financial-breakdown-grid\">")
+            .contains("<div class=\"staff-interest-summary\">")
+            .contains("id=\"staffAnalyticsViewAs\" type=\"hidden\" name=\"viewAs\"")
+            .contains("type=\"button\" data-report-view=\"member\"")
+            .contains("type=\"button\" data-report-view=\"staff\"")
+            .contains("reportScopeForm.requestSubmit()")
+            .contains("reportScopeForm.setAttribute('aria-busy', 'true')")
+            .contains("candidate.classList.toggle('is-switching', selected)")
+            .contains("data-trend-interval=\"monthly\"")
+            .contains("data-trend-interval=\"quarterly\"")
+            .contains("data-trend-interval=\"yearly\"")
+            .contains("trendRangeLimit(interval)")
             .contains("data-download-action=\"true\"")
             .contains("class=\"erp-table-scroll\" data-view-position-key=\"staff-analytics-financial-breakdown\"")
             .contains("staff-metric-meta-value")
-            .doesNotContain("staff-card-info");
+            .contains("exactLinePath")
+            .doesNotContain("Math.sin")
+            .doesNotContain("staffTrendRange")
+            .doesNotContain("syncTrendRangeControl")
+            .doesNotContain("staff-info-bar")
+            .doesNotContain("staff-card-info")
+            .doesNotContain("staff-analytics-primary-column");
         assertThat(sidebar)
             .contains("data-view-position-key=\"sidebar-navigation\"")
             .contains("<sec:authorize access=\"@authz.staffAnalyticsAccess(principal)\">")
@@ -323,12 +412,34 @@ class AwsConsoleViewContractTest {
         assertThat(consoleCss)
             .contains(".loan-analytics-command-panel .loan-analytics-actions")
             .contains("height: var(--sacco-control-height)")
+            .contains(".staff-analytics-command-panel")
             .contains(".staff-analytics-filter")
             .contains("grid-auto-rows: auto")
-            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
+            .contains(".staff-metric-grid.is-station")
+            .contains(".staff-metric-grid.is-staff")
+            .contains(".staff-analytics-layout")
+            .contains(".staff-portfolio-panel")
+            .contains(".staff-product-panel")
+            .contains(".staff-trend-panel")
+            .contains("align-items: stretch")
+            .contains("height: 100%")
+            .contains("flex-wrap: nowrap")
+            .contains("text-overflow: clip")
+            .contains(".staff-analytics-control.is-date input[type=\"date\"]")
+            .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
+            .contains("grid-column: 1 / -1")
+            .contains("position: relative")
+            .contains("overflow-x: visible")
+            .contains(".staff-trend-period-button")
+            .contains("@keyframes staffScopeSelect")
+            .contains("@keyframes staffScopeIndicator")
+            .contains(".staff-view-switch.is-submitting")
+            .contains(".staff-view-option.is-switching")
+            .contains(".staff-view-option.is-switching::after")
+            .contains("padding-right: 12px")
+            .contains("border-radius: 2px")
             .contains(".staff-metric-meta-value")
             .doesNotContain(".staff-card-info")
-            .doesNotContain(".staff-metric-grid.is-station")
             .doesNotContain(".loan-analytics-page-header .erp-breadcrumb");
         assertThat(shellCss)
             .contains(".app-table-heading h2")
@@ -340,7 +451,21 @@ class AwsConsoleViewContractTest {
             .contains("overflow-x: hidden !important")
             .contains("font-size: 0 !important")
             .contains("width: 24px !important")
-            .contains("padding-left: 12px !important");
+            .contains("padding-left: 12px !important")
+            .contains(".staff-analytics-command-panel .staff-analytics-filter")
+            .contains("flex-flow: row nowrap !important")
+            .contains("gap: 4px 8px !important")
+            .contains("overflow-x: visible !important")
+            .contains("white-space: nowrap !important")
+            .contains("min-width: 8.15rem")
+            .contains("min-width: 10.25rem")
+            .contains("min-width: 15.9rem")
+            .contains("padding-left: 2px")
+            .contains("flex-flow: row wrap !important")
+            .contains(".staff-analytics-control.is-view .staff-view-switch")
+            .contains("width: fit-content !important")
+            .contains("max-width: 100% !important")
+            .contains("overflow-x: auto !important");
         assertThat(shellJs)
             .contains("isConsoleDownloadAction")
             .contains("header.querySelector('.erp-breadcrumb')")
@@ -425,6 +550,7 @@ class AwsConsoleViewContractTest {
             .contains("data-product-config-nav=\"preview\"")
             .contains("data-product-config-step=\"workflow\"")
             .contains("data-product-config-panel hidden")
+            .doesNotContain("<span><c:out value=\"${product.displayCode}\" /></span>")
             .doesNotContain("data-product-config-progress")
             .contains("text=\"Included\"")
             .contains("text=\"Order\"")
@@ -445,6 +571,10 @@ class AwsConsoleViewContractTest {
             .contains("disclosure.open = true")
             .contains("saveState.textContent = 'Unsaved changes'")
             .contains("window.sessionStorage.setItem(storageKey")
+            .contains("const workflowScrollTarget = (step) =>")
+            .contains("step.querySelector('.product-config-subsection')")
+            .contains("scrollStepIntoView(steps[activeIndex])")
+            .contains("resolvedInitialKey === 'workflow'")
             .contains("window.showToast('error', message")
             .contains("workflowFormIsActive")
             .contains("warningsRoot.hidden = warnings.length === 0")
@@ -457,6 +587,7 @@ class AwsConsoleViewContractTest {
             .contains("grid-template-columns: repeat(5, minmax(11rem, 1fr))")
             .contains(".product-config-workspace.is-enhanced .product-config-step:not(.is-active)")
             .contains(".product-config-subsection")
+            .contains("scroll-margin-top: calc(var(--shell-nav-height, 52px) + var(--shell-context-height, 36px) + 12px)")
             .contains(".product-config-step.is-active")
             .contains(".product-config-actionbar")
             .contains("grid-template-columns: 1.55rem minmax(0, 1fr)")
@@ -477,6 +608,50 @@ class AwsConsoleViewContractTest {
             .contains("const regionalLoaderActive")
             .contains("if (regionalLoaderActive || regionalForm)")
             .contains("[data-aws-table-region][aria-busy=\"true\"]");
+    }
+
+    @Test
+    void loanDetailsReuseProgressBalanceAndFinancialTableComponents() throws Exception {
+        String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
+        String staffDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
+        String boardDetail = read(JSP_ROOT.resolve("board/detail.jsp"));
+        String progress = read(JSP_ROOT.resolve("fragments/loan-application-progress.jspf"));
+        String liveStatus = read(JSP_ROOT.resolve("fragments/live-account-status-message.jspf"));
+        String liveHydration = read(JSP_ROOT.resolve("fragments/live-account-status-hydration.jspf"));
+        String financialSections = read(JSP_ROOT.resolve("fragments/financial-field-sections.jspf"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+
+        for (String detail : List.of(memberDetail, staffDetail, boardDetail)) {
+            assertThat(detail)
+                .contains("include file=\"../fragments/loan-application-progress.jspf\"")
+                .contains("include file=\"../fragments/live-account-status-message.jspf\"")
+                .doesNotContain("<div class=\"mt-6 loan-simple-progress\"");
+        }
+        assertThat(staffDetail).contains("data-aws-action-pin=\"true\"");
+        assertThat(boardDetail).contains("data-aws-action-pin=\"true\"");
+        assertThat(progress)
+            .contains("is-${item.state}")
+            .contains("item.state eq 'rejected'")
+            .contains("item.state eq 'closed'")
+            .contains("loan.progress.currentStatus");
+        assertThat(liveStatus)
+            .contains("live-account-status-message")
+            .contains("data-live-account-status-message");
+        assertThat(liveHydration)
+            .contains("setStatusBoxState(box, \"available\", \"\")")
+            .contains("LIVE_ACCOUNT_STATUS_TIMEOUT_MS")
+            .contains("finish({")
+            .contains("window.addEventListener(\"pageshow\"");
+        assertThat(financialSections)
+            .contains("data-aws-no-titlebar=\"true\"")
+            .contains("data-aws-no-refresh=\"true\"")
+            .contains("class=\"erp-table-scroll erp-table-scroll-sm\"")
+            .doesNotContain("erp-table-wrap erp-table-scroll");
+        assertThat(consoleCss)
+            .contains(".loan-simple-progress-item.is-rejected")
+            .contains(".loan-simple-progress-item.is-closed")
+            .contains(".live-account-status-message[hidden]")
+            .contains(".loan-financial-section > .erp-table-scroll .erp-table");
     }
 
     @Test

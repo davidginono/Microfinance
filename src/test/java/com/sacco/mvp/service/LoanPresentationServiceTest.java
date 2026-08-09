@@ -60,6 +60,8 @@ class LoanPresentationServiceTest {
         messageSource.addMessage("loan.status.READY_FOR_MANAGER", Locale.ENGLISH, "On Review By Manager");
         messageSource.addMessage("loan.status.AWAITING_LOAN_OFFICER", Locale.ENGLISH, "On Review By Loan Officer");
         messageSource.addMessage("loan.status.AWAITING_BOARD", Locale.ENGLISH, "On Review By Board");
+        messageSource.addMessage("loan.status.AWAITING_CREDIT_COMMITTEE", Locale.ENGLISH, "On Review By Credit Committee");
+        messageSource.addMessage("loan.status.CREDIT_COMMITTEE_REJECTED", Locale.ENGLISH, "Credit Committee Rejected");
         messageSource.addMessage("loan.status.AWAITING_ACCOUNTANT", Locale.ENGLISH, "On Review By Accountant");
         messageSource.addMessage("loan.status.READY_FOR_DISBURSEMENT", Locale.ENGLISH, "Approved For Disbursement");
         loanPresentationService = new LoanPresentationService(
@@ -422,6 +424,49 @@ class LoanPresentationServiceTest {
             "Approved For Disbursement"
         );
         assertThat(items.get(2)).containsEntry("current", true);
+    }
+
+    @Test
+    void buildProgressItemsMarksRejectedStageAndClosesFutureStages() {
+        LoanApplication app = LoanApplication.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-1")
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .status(LoanStatus.CREDIT_COMMITTEE_REJECTED)
+            .requiredGuarantors(0)
+            .build();
+
+        when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(
+            workflow(
+                ApprovalWorkflowStage.MANAGER,
+                ApprovalWorkflowStage.CREDIT_COMMITTEE,
+                ApprovalWorkflowStage.ACCOUNTANT,
+                ApprovalWorkflowStage.DISBURSEMENT_OFFICER
+            )
+        );
+
+        List<Map<String, Object>> items = loanPresentationService.buildProgressItems(app);
+
+        assertThat(items).extracting(item -> item.get("label")).containsExactly(
+            "Draft",
+            "On Review By Manager",
+            "Credit Committee Rejected",
+            "On Review By Accountant",
+            "Approved For Disbursement"
+        );
+        assertThat(items).extracting(item -> item.get("state")).containsExactly(
+            "completed",
+            "completed",
+            "rejected",
+            "closed",
+            "closed"
+        );
+        assertThat(items.get(2))
+            .containsEntry("current", true)
+            .containsEntry("active", false);
+        assertThat(items.get(3))
+            .containsEntry("current", false)
+            .containsEntry("active", false);
     }
 
     @Test

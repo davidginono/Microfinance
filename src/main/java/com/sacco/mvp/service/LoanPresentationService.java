@@ -253,7 +253,7 @@ public class LoanPresentationService {
 
     public List<Map<String, Object>> buildProgressItems(LoanApplication app) {
         if (app == null || app.getStatus() == null) {
-            return List.of(progressItem("Draft", true, true));
+            return List.of(progressItem("Draft", true, true, "current"));
         }
 
         List<String> labels = new ArrayList<>();
@@ -277,40 +277,28 @@ public class LoanPresentationService {
             case SUBMITTED, AWAITING_GUARANTORS -> currentIndex = hasGuarantorStage ? 1 : Math.max(labels.size() - 1, 0);
             case ALL_GUARANTORS_APPROVED -> currentIndex = hasGuarantorStage ? 2 : Math.max(labels.size() - 1, 0);
             case READY_FOR_MANAGER -> currentIndex = indexOfLabel(labels, "On Review By Manager");
-            case MANAGER_REJECTED -> {
-                labels.add("Manager Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case MANAGER_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Manager", "Manager Rejected");
             case MANAGER_ACCEPTED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Manager");
             case AWAITING_LOAN_OFFICER -> currentIndex = indexOfLabel(labels, "On Review By Loan Officer");
-            case LOAN_OFFICER_REJECTED -> {
-                labels.add("Loan Officer Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case LOAN_OFFICER_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Loan Officer", "Loan Officer Rejected");
             case LOAN_OFFICER_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Loan Officer");
             case AWAITING_CHAIRPERSON -> currentIndex = indexOfLabel(labels, "On Review By Chairperson");
-            case CHAIRPERSON_REJECTED -> {
-                labels.add("Chairperson Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case CHAIRPERSON_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Chairperson", "Chairperson Rejected");
             case CHAIRPERSON_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Chairperson");
             case AWAITING_BOARD -> currentIndex = indexOfLabel(labels, "On Review By Board");
             case AWAITING_CREDIT_COMMITTEE -> currentIndex = indexOfLabel(labels, "On Review By Credit Committee");
-            case BOARD_REJECTED -> {
-                labels.add("Board Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case BOARD_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Board", "Board Rejected");
             case BOARD_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Board");
-            case CREDIT_COMMITTEE_REJECTED -> {
-                labels.add("Credit Committee Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case CREDIT_COMMITTEE_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Credit Committee", "Credit Committee Rejected");
             case CREDIT_COMMITTEE_APPROVED -> currentIndex = nextConfiguredStageIndex(labels, "On Review By Credit Committee");
             case AWAITING_ACCOUNTANT -> currentIndex = indexOfLabel(labels, "On Review By Accountant");
-            case ACCOUNTANT_REJECTED -> {
-                labels.add("Accountant Rejected");
-                currentIndex = labels.size() - 1;
-            }
+            case ACCOUNTANT_REJECTED -> currentIndex = replaceRejectedStageLabel(
+                labels, "On Review By Accountant", "Accountant Rejected");
             case ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT -> currentIndex = indexOfLabel(labels, "Approved For Disbursement");
             case REJECTED -> {
                 labels.add("Rejected");
@@ -332,9 +320,24 @@ public class LoanPresentationService {
             }
         }
 
+        boolean rejectedStatus = isRejectedStatus(app.getStatus());
         List<Map<String, Object>> items = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
-            items.add(progressItem(progressDisplayLabel(labels.get(i)), i <= currentIndex, i == currentIndex));
+            boolean current = i == currentIndex;
+            String state;
+            if (current && rejectedStatus) {
+                state = "rejected";
+            } else if (rejectedStatus && i > currentIndex) {
+                state = "closed";
+            } else if (i < currentIndex) {
+                state = "completed";
+            } else if (current) {
+                state = "current";
+            } else {
+                state = "pending";
+            }
+            boolean active = "completed".equals(state) || "current".equals(state);
+            items.add(progressItem(progressDisplayLabel(labels.get(i)), active, current, state));
         }
         return items;
     }
@@ -667,6 +670,16 @@ public class LoanPresentationService {
             return current + 1;
         }
         return Math.max(labels.size() - 1, 0);
+    }
+
+    private int replaceRejectedStageLabel(List<String> labels, String currentLabel, String rejectedLabel) {
+        int index = labels.indexOf(currentLabel);
+        if (index < 0) {
+            labels.add(rejectedLabel);
+            return labels.size() - 1;
+        }
+        labels.set(index, rejectedLabel);
+        return index;
     }
 
     private String progressLabel(ApprovalWorkflowStage stage) {
@@ -1202,11 +1215,12 @@ public class LoanPresentationService {
         html.append("</div>");
     }
 
-    private Map<String, Object> progressItem(String label, boolean active, boolean current) {
+    private Map<String, Object> progressItem(String label, boolean active, boolean current, String state) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("label", label);
         item.put("active", active);
         item.put("current", current);
+        item.put("state", state);
         return item;
     }
 

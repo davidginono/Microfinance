@@ -9,7 +9,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="products.breadcrumb" /></p>
     <h1 class="erp-page-title"><spring:message code="products.title" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="products.subtitle" /></p>
 </div>
 
 <section class="erp-form-wrap mb-4 space-y-4">

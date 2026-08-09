@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">${notificationBreadcrumb}</p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
-    <p class="erp-page-subtitle">${notificationSubtitle}</p>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="${reviewBasePath}/notifications/mark-all-read" method="post" class="m-0">

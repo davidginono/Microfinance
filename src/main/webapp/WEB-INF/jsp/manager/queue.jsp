@@ -10,15 +10,15 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="manager.queue.breadcrumb" text="Manager Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="manager.queue.title" text="Manager Queue" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="manager.queue.subtitle" text="Move across workflow stages, inspect applicant details, and finalize the records waiting on manager action." /></p>
 </div>
-<div class="erp-toolbar manager-queue-filter-toolbar">
-    <div class="manager-queue-filter-stack">
-        <div>
-            <p class="erp-widget-title"><spring:message code="common.currentFilter" text="Current Filter" /></p>
-            <h2 class="erp-widget-heading">${currentFilterLabel}</h2>
+<section class="manager-queue-filter-toolbar" aria-labelledby="managerQueueCurrentFilterLabel">
+    <div class="manager-queue-filter-summary">
+        <div class="manager-queue-filter-copy">
+            <p id="managerQueueCurrentFilterLabel" class="manager-queue-filter-kicker"><spring:message code="common.currentFilter" text="Current Filter" /></p>
+            <p class="manager-queue-filter-value"><c:out value="${currentFilterLabel}" /></p>
         </div>
-<form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
+    </div>
+    <form action="/manager/loan-applications" method="get" class="erp-filter-form manager-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar>
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 ${queueSearchLabel}
                 <input type="search"
@@ -35,8 +35,7 @@
                 <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
             </div>
         </form>
-    </div>
-</div>
+</section>
 <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
 <table class="erp-table">
     <thead>

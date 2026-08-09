@@ -10,7 +10,7 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-400.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260805-cloudscape-type-v2' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-select-visibility-v25' />" />
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260806-clean-toast-v4' />" />
 </head>
 <body class="aws-auth-shell">

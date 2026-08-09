@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loanOfficer.reports.breadcrumb" text="Loan Officer Panel / Loan Reports" /></p>
     <h1 class="erp-page-title"><spring:message code="loanOfficer.reports.title" text="Loan Officer Review Reports" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="loanOfficer.reports.subtitle" text="Filter the loans you reviewed by date range and decision, then export the report when needed." /></p>
 </div>
 
 <form method="get" action="/documents/reports/loan-officer-loans.pdf" data-page-preloader="false" class="erp-form-wrap erp-filter-form erp-table-toolbar mb-4 aws-filter-toolbar" data-aws-filter-toolbar>

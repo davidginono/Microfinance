@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="guarantor.selection.breadcrumb" text="Member Workspace / Guarantor Selection" /></p>
     <h1 class="erp-page-title"><spring:message code="guarantor.select" text="Select Guarantor" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="guarantor.selection.subtitle" text="Search and select the exact number of guarantors required." /></p>
 </div>
 <form method="post" action="/app/loan-applications/${app.id}/guarantors" class="erp-form-wrap guarantor-selection-page">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />

@@ -67,7 +67,7 @@ spring:
       enabled: ${SPRING_DEVTOOLS_LIVERELOAD_ENABLED:true}
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:8085}
   shutdown: graceful
   compression:
     enabled: ${SERVER_COMPRESSION_ENABLED:true}
@@ -112,7 +112,8 @@ app:
   upload-migration:
     enabled: ${APP_UPLOAD_MIGRATION_ENABLED:false}
     loan-root: ${APP_UPLOAD_MIGRATION_LOAN_ROOT:loan-uploads/applications}
-    logo-root: ${APP_UPLOAD_MIGRATION_LOGO_ROOT:branding/sacco-logos}
+  saccos:
+    files-root: ${APP_SACCOS_FILES_ROOT:registered-saccos}
   sms:
     enabled: ${APP_SMS_ENABLED:true}
     connect-timeout: ${APP_SMS_CONNECT_TIMEOUT:3s}

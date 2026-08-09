@@ -1,6 +1,23 @@
 <script>
     (() => {
         const LIVE_ACCOUNT_STATUS_TIMEOUT_MS = 10000;
+        const activeRequests = new WeakMap();
+
+        function setStatusBoxState(box, state, statusMessage) {
+            if (!box) {
+                return;
+            }
+            const hidden = state === "available";
+            box.hidden = hidden;
+            box.classList.toggle("hidden", hidden);
+            box.classList.toggle("is-loading", state === "loading");
+            box.classList.toggle("is-unavailable", state === "unavailable");
+            box.setAttribute("aria-hidden", hidden ? "true" : "false");
+            const message = box.querySelector("[data-live-account-status-message]");
+            if (message) {
+                message.textContent = statusMessage || "";
+            }
+        }
 
         function applyLiveAccountStatus(container, payload) {
             if (!container || !payload) {
@@ -20,20 +37,21 @@
             if (message) {
                 message.textContent = payload.statusMessage || "";
             }
-            if (!box) {
-                return;
-            }
             if (payload.available) {
-                box.classList.add("hidden");
+                setStatusBoxState(box, "available", "");
                 return;
             }
-            box.classList.remove("hidden");
-            box.textContent = payload.statusMessage || "Live balances are unavailable right now.";
-            box.classList.remove("border-amber-200", "bg-amber-50", "text-amber-800", "border-slate-200", "bg-slate-50", "text-slate-600");
-            if (payload.pending) {
-                box.classList.add("border-slate-200", "bg-slate-50", "text-slate-600");
-            } else {
-                box.classList.add("border-amber-200", "bg-amber-50", "text-amber-800");
+            setStatusBoxState(
+                box,
+                payload.pending ? "loading" : "unavailable",
+                payload.statusMessage || "Live balances are unavailable right now."
+            );
+        }
+
+        function cancelLiveAccountStatusRequest(container) {
+            const request = activeRequests.get(container);
+            if (request) {
+                request.cancel();
             }
         }
 
@@ -42,10 +60,50 @@
             if (!url) {
                 return;
             }
+            cancelLiveAccountStatusRequest(container);
             const controller = typeof AbortController === "function" ? new AbortController() : null;
-            const timeoutId = controller
-                ? window.setTimeout(() => controller.abort(), LIVE_ACCOUNT_STATUS_TIMEOUT_MS)
-                : null;
+            let settled = false;
+            let timeoutId = null;
+
+            const cancel = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timeoutId !== null) {
+                    window.clearTimeout(timeoutId);
+                }
+                if (controller) {
+                    controller.abort();
+                }
+                activeRequests.delete(container);
+            };
+            const finish = (payload) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timeoutId !== null) {
+                    window.clearTimeout(timeoutId);
+                }
+                activeRequests.delete(container);
+                applyLiveAccountStatus(container, payload);
+            };
+
+            activeRequests.set(container, { cancel });
+            timeoutId = window.setTimeout(() => {
+                if (controller) {
+                    controller.abort();
+                }
+                finish({
+                    available: false,
+                    pending: false,
+                    savingsLabel: "-",
+                    sharesLabel: "-",
+                    statusMessage: "Live balances are taking too long to load. Try again later."
+                });
+            }, LIVE_ACCOUNT_STATUS_TIMEOUT_MS);
+
             fetch(url, {
                 headers: {
                     "Accept": "application/json"
@@ -58,27 +116,40 @@
                     if (!ok) {
                         throw new Error((payload && payload.message) || "Live balances are unavailable right now.");
                     }
-                    applyLiveAccountStatus(container, payload);
+                    finish(payload);
                 })
                 .catch((error) => {
-                    const statusMessage = error && error.name === "AbortError"
-                        ? "Live balances are taking too long to load. Try again later."
-                        : (error && error.message ? error.message : "Live balances are unavailable right now.");
-                    applyLiveAccountStatus(container, {
+                    if (settled) {
+                        return;
+                    }
+                    finish({
                         available: false,
                         pending: false,
                         savingsLabel: "-",
                         sharesLabel: "-",
-                        statusMessage
+                        statusMessage: error && error.message
+                            ? error.message
+                            : "Live balances are unavailable right now."
                     });
-                })
-                .finally(() => {
-                    if (timeoutId !== null) {
-                        window.clearTimeout(timeoutId);
-                    }
                 });
         }
 
-        document.querySelectorAll("[data-live-account-status-url]").forEach(hydrateLiveAccountStatus);
+        function hydrateAllLiveAccountStatuses() {
+            document.querySelectorAll("[data-live-account-status-url]").forEach(hydrateLiveAccountStatus);
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", hydrateAllLiveAccountStatuses, { once: true });
+        } else {
+            hydrateAllLiveAccountStatuses();
+        }
+        window.addEventListener("pagehide", () => {
+            document.querySelectorAll("[data-live-account-status-url]").forEach(cancelLiveAccountStatusRequest);
+        });
+        window.addEventListener("pageshow", (event) => {
+            if (event.persisted) {
+                hydrateAllLiveAccountStatuses();
+            }
+        });
     })();
 </script>

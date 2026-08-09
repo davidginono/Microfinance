@@ -24,8 +24,26 @@ class AdminUsersJspLayoutTest {
 
         assertThat(editJsp).contains("data-restore-default-claims");
         assertThat(editJsp).contains("admin-access-matrix-restore");
+        assertThat(editJsp)
+            .contains("admin-user-edit-context-bar")
+            .contains("admin-user-summary-header")
+            .contains("admin-user-detail-grid")
+            .contains("admin-role-option")
+            .contains("admin-cloud-checkbox")
+            .contains("admin-user-edit-actions")
+            .contains("class=\"fcms-control\"")
+            .doesNotContain("erp-page-subtitle")
+            .doesNotContain("class=\"erp-toolbar\"");
         assertThat(componentCss).contains(".admin-access-matrix-restore");
         assertThat(componentCss).contains("width: auto");
+        assertThat(componentCss)
+            .contains(".admin-user-edit-context-bar")
+            .contains("border-radius: 2px")
+            .contains(".admin-user-section-header")
+            .contains(".admin-role-grid")
+            .contains(".admin-role-option")
+            .contains(".admin-status-callout")
+            .contains(".admin-delete-callout");
         assertThat(editJsp).contains("disabled");
         assertThat(editJsp).contains("No supported claim");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");

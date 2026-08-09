@@ -14,8 +14,8 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260806-staff-analytics-v9' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260806-sidebar-toggle-v10' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-select-visibility-v25' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260809-select-visibility-v24' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -106,7 +106,7 @@
                         <path d="M10 2a4 4 0 00-4 4v1.172c0 .53-.211 1.039-.586 1.414L4.293 9.707A1 1 0 004 10.414V12a2 2 0 002 2h8a2 2 0 002-2v-1.586a1 1 0 00-.293-.707l-1.121-1.121A2 2 0 0114 7.172V6a4 4 0 00-4-4zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z"/>
                     </svg>
                 </button>
-                <span id="notificationBadge" class="pointer-events-none absolute -right-1 -top-1 z-10 hidden min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white shadow-sm sm:-right-1.5 sm:-top-1.5 sm:min-h-[1.35rem] sm:min-w-[1.35rem] sm:text-[11px] max-[374px]:min-h-[1rem] max-[374px]:min-w-[1rem] max-[374px]:text-[9px]"></span>
+                <span id="notificationBadge" class="app-notification-badge hidden"></span>
                 <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50">
                     <div class="erp-dropdown-header">
                         <div class="erp-dropdown-heading">
@@ -281,4 +281,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260806-no-info-v9' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260809-file-picker-v11' />" defer></script>

@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="notifications.member.breadcrumb" text="Member Workspace / Notifications" /></p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="notifications.member.subtitle" text="Read workflow updates, approval alerts, and repayment reminders in one place." /></p>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="/app/notifications/mark-all-read" method="post" class="m-0">

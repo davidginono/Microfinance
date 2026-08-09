@@ -97,7 +97,9 @@ public class StaffAnalyticsController {
         ProductFinancialTotals productFinancialTotals = productFinancialTotals(productFinancialRows);
 
         model.addAttribute("analytics", analytics);
-        model.addAttribute("metricCards", metricCards(analytics));
+        model.addAttribute("metricCards", staffReviewView
+            ? reviewMetricCards(staffReviewAnalytics)
+            : metricCards(analytics));
         model.addAttribute("staffPortfolio", staffReviewView
             ? loanAnalyticsService.staffPortfolio(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : stationWideStaffView
@@ -119,6 +121,8 @@ public class StaffAnalyticsController {
         model.addAttribute("trendSeriesJson", toJson(trendSeries));
         model.addAttribute("fromDate", StrictAnalyticsLocalDateEditor.format(resolvedFrom));
         model.addAttribute("toDate", StrictAnalyticsLocalDateEditor.format(resolvedTo));
+        model.addAttribute("fromDateInput", resolvedFrom.toString());
+        model.addAttribute("toDateInput", resolvedTo.toString());
         model.addAttribute("loanProductId", resolvedLoanProductId);
         model.addAttribute("loanType", resolvedLoanType);
         model.addAttribute("loanProducts", loanProducts);
@@ -127,9 +131,6 @@ public class StaffAnalyticsController {
         model.addAttribute("canViewStationAnalytics", canViewStationAnalytics);
         model.addAttribute("stationWideStaffView", stationWideStaffView);
         model.addAttribute("staffAnalyticsTitle", stationWideStaffView ? "Station Loan Status" : "Staff Loan Review Analytics");
-        model.addAttribute("staffAnalyticsSubtitle", stationWideStaffView
-            ? "View paid, disbursed, active, defaulted, rejected, and other loan status metrics for all members in your station."
-            : "View review activity, decisions, and staff portfolio performance within a selected period.");
         if (stationWideStaffView) {
             LoanReportService.StationAnalyticsExportReport stationReport = loanReportService.stationAnalyticsReport(
                 principal.getSaccoId(),
@@ -194,10 +195,21 @@ public class StaffAnalyticsController {
         return List.of(
             new AnalyticsMetricCard("applied", "Applied Loans", analytics.appliedLoans(), "blue", "Applied"),
             new AnalyticsMetricCard("active", "Active Loans", analytics.activeLoans(), "emerald", "Active"),
-            new AnalyticsMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "violet", "Disbursed"),
-            new AnalyticsMetricCard("paid", "Paid Loans", analytics.paidLoans(), "green", "Paid"),
-            new AnalyticsMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "orange", "Defaulted"),
+            new AnalyticsMetricCard("disbursed", "Disbursed Loans", analytics.disbursedLoans(), "teal", "Disbursed"),
+            new AnalyticsMetricCard("paid", "Paid Loans", analytics.paidLoans(), "violet", "Paid"),
+            new AnalyticsMetricCard("defaulted", "Defaulted Loans", analytics.defaultedLoans(), "red", "Defaulted"),
             new AnalyticsMetricCard("rejected", "Rejected Loans", analytics.rejectedLoans(), "slate", "Rejected")
+        );
+    }
+
+    private List<AnalyticsMetricCard> reviewMetricCards(LoanAnalyticsService.StaffReviewAnalytics analytics) {
+        return List.of(
+            new AnalyticsMetricCard("reviewed", "Reviews Handled", analytics.reviewedLoans(), "blue", "Reviewed"),
+            new AnalyticsMetricCard("approved", "Approved", analytics.approvedLoans(), "emerald", "Approved"),
+            new AnalyticsMetricCard("rejected", "Rejected", analytics.rejectedLoans(), "red", "Rejected"),
+            new AnalyticsMetricCard("pending", "Pending Decision", analytics.pendingLoans(), "violet", "Pending"),
+            new AnalyticsMetricCard("disbursed", "Disbursed After Review", analytics.disbursedLoans(), "teal", "Disbursed"),
+            new AnalyticsMetricCard("defaulted", "Defaulted After Approval", analytics.defaultedAfterApproval(), "red", "Defaulted")
         );
     }
 

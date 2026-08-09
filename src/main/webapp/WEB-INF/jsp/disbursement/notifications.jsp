@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.notifications.breadcrumb" text="Disbursement Panel / Notifications" /></p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="disbursement.notifications.subtitle" text="Workflow updates and alerts for the disbursement queue in one place." /></p>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="/disbursement/notifications/mark-all-read" method="post" class="m-0">

@@ -76,6 +76,8 @@ class LoanAnalyticsServiceTest {
             service.productPerformanceForStaff(principal, now.minusDays(7).toLocalDate(), now.toLocalDate(), null);
         LoanAnalyticsService.StaffPortfolioSummary portfolio =
             service.staffPortfolio(principal, now.minusDays(7).toLocalDate(), now.toLocalDate(), null, null);
+        LoanAnalyticsService.StaffReviewAnalytics reviewAnalytics =
+            service.staffReviewAnalytics(principal, now.minusDays(7).toLocalDate(), now.toLocalDate(), null, null);
 
         assertThat(performance).isEmpty();
         assertThat(portfolio.handledLoans()).isEqualTo(3);
@@ -83,6 +85,19 @@ class LoanAnalyticsServiceTest {
         assertThat(portfolio.rejectedLoans()).isEqualTo(1);
         assertThat(portfolio.defaultedAfterApproval()).isEqualTo(1);
         assertThat(portfolio.defaultedAfterApprovalRate()).isEqualByComparingTo("50.00");
+        assertThat(reviewAnalytics.trendSeries())
+            .extracting(LoanAnalyticsService.MetricTrendSeries::name)
+            .containsExactly("Reviewed", "Approved", "Rejected", "Pending", "Disbursed", "Defaulted");
+        assertThat(reviewAnalytics.trendSeries())
+            .extracting(LoanAnalyticsService.MetricTrendSeries::name, this::trendTotal)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Reviewed", 3L),
+                org.assertj.core.groups.Tuple.tuple("Approved", 2L),
+                org.assertj.core.groups.Tuple.tuple("Rejected", 1L),
+                org.assertj.core.groups.Tuple.tuple("Pending", 0L),
+                org.assertj.core.groups.Tuple.tuple("Disbursed", 2L),
+                org.assertj.core.groups.Tuple.tuple("Defaulted", 1L)
+            );
     }
 
     @Test
@@ -201,5 +216,11 @@ class LoanAnalyticsServiceTest {
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build();
+    }
+
+    private long trendTotal(LoanAnalyticsService.MetricTrendSeries series) {
+        return series.dataPoints().stream()
+            .mapToLong(point -> ((Number) point.get("y")).longValue())
+            .sum();
     }
 }

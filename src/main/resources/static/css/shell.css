@@ -474,7 +474,7 @@ button:active {
     margin-top: 0.25rem;
     color: var(--text-main);
     font-family: "Open Sans", Helvetica, Arial, sans-serif;
-    font-size: 1.55rem;
+    font-size: 1.42rem;
     font-weight: 700;
     line-height: 1.2;
 }
@@ -1068,7 +1068,7 @@ button:active {
 }
 @media (max-width: 1024px) {
     .erp-page-title {
-        font-size: 1.35rem;
+        font-size: 1.24rem;
     }
     .erp-page-subtitle {
         font-size: 0.86rem;
@@ -2197,6 +2197,7 @@ body.aws-console {
 
 .aws-console .aws-filter-toolbar input,
 .aws-console .aws-filter-toolbar select,
+.aws-console .aws-filter-toolbar .neo-select-button,
 .aws-console .aws-filter-toolbar .app-btn {
     height: var(--sacco-control-height) !important;
     min-height: var(--sacco-control-height) !important;
@@ -2206,6 +2207,26 @@ body.aws-console {
 .aws-console .erp-table-wrap > .aws-filter-toolbar {
     position: relative;
     z-index: 2;
+}
+
+.aws-console .aws-filter-toolbar:has(.neo-select--open),
+.aws-console .admin-filter-form:has(.neo-select--open),
+.aws-console .erp-filter-form:has(.neo-select--open),
+.aws-console .staff-analytics-filter:has(.neo-select--open),
+.aws-console .loan-analytics-filter:has(.neo-select--open) {
+    overflow: visible !important;
+}
+
+.aws-console .erp-table-wrap:has(.neo-select--open),
+.aws-console .admin-register-shell:has(.neo-select--open) {
+    overflow: visible !important;
+    position: relative;
+    z-index: 30;
+}
+
+.aws-console .erp-table-wrap > .aws-filter-toolbar:has(.neo-select--open),
+.aws-console .admin-register-shell > .aws-filter-toolbar:has(.neo-select--open) {
+    z-index: 60;
 }
 
 .aws-console .erp-table-wrap > .erp-filter-row {
@@ -2341,6 +2362,29 @@ body.aws-console {
 .app-icon-button:hover {
     box-shadow: none !important;
     transform: none !important;
+}
+
+.aws-console .neo-select--open {
+    z-index: 160 !important;
+}
+
+.aws-console .neo-select-menu {
+    z-index: 180 !important;
+    max-height: 12rem;
+    box-shadow: 0 2px 6px rgba(0, 28, 36, 0.24) !important;
+}
+
+.aws-console .neo-select-option,
+.aws-console .neo-select-empty {
+    min-height: 30px !important;
+    padding: 5px 8px !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    line-height: 18px !important;
+}
+
+.aws-console .neo-select-option.is-selected {
+    font-weight: 700 !important;
 }
 
 .btn-neutral {
@@ -2916,10 +2960,14 @@ body.aws-console {
 }
 
 .member-dashboard-flow-node--current,
-.member-dashboard-mobile-node--current,
-.loan-simple-progress-item.is-current {
+.member-dashboard-mobile-node--current {
     border-color: var(--aws-orange) !important;
     background: #fff7ed !important;
+}
+
+.aws-console .loan-simple-progress-item.is-current {
+    border-color: var(--aws-blue) !important;
+    background: #f1faff !important;
 }
 
 .accountant-archive-search-form,
@@ -4109,20 +4157,20 @@ body.aws-console,
 
 .app-global-search {
     flex: 1 1 auto;
-    width: min(42vw, 720px);
-    max-width: 720px;
-    margin: 0 8px !important;
+    width: min(37.8vw, 648px);
+    max-width: 648px;
+    margin: 0 8px 0 16px !important;
 }
 
 .aws-console .app-topbar .app-global-search,
 .aws-console .app-topbar .app-global-search input {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
+    height: 25px !important;
+    min-height: 25px !important;
+    max-height: 25px !important;
 }
 
 .aws-console .app-topbar .app-global-search input {
-    background: #0f1115 !important;
+    background: transparent !important;
     border-color: #545b64 !important;
     border-radius: 2px !important;
     color: #f2f3f3 !important;
@@ -4174,6 +4222,27 @@ body.aws-console,
 
 .app-notification-control {
     order: 2;
+}
+
+.app-notification-badge {
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    right: -5px;
+    z-index: 10;
+    min-width: 18px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #f2f3f3;
+    border-radius: 2px;
+    background: var(--aws-danger);
+    color: #ffffff;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    box-shadow: none;
 }
 
 .app-topbar .erp-icon-btn,
@@ -4460,9 +4529,9 @@ body.aws-console,
     }
 
     .app-global-search {
-        width: min(34vw, 440px);
+        width: min(30.6vw, 396px);
         margin-right: 8px !important;
-        margin-left: 8px !important;
+        margin-left: 16px !important;
     }
 
     .app-account-copy {
@@ -5191,6 +5260,21 @@ body.aws-console,
     color: var(--aws-ink);
 }
 
+.erp-page-path__link {
+    color: var(--aws-blue);
+    text-decoration: none;
+}
+
+.erp-page-path__link:hover {
+    color: var(--aws-blue-dark);
+    text-decoration: underline;
+}
+
+.erp-page-path__link:focus-visible {
+    outline: 2px solid var(--aws-blue);
+    outline-offset: 2px;
+}
+
 .shell-content-frame > .erp-page-path + .erp-page-header[data-aws-page-header],
 .shell-main > .erp-page-path + .erp-page-header[data-aws-page-header] {
     margin-top: 0 !important;
@@ -5234,8 +5318,8 @@ body.aws-console,
 
 .erp-page-header[data-aws-page-header] .erp-page-title,
 .erp-page-header[data-aws-page-header] h1 {
-    font-size: 20px !important;
-    line-height: 24px !important;
+    font-size: 18px !important;
+    line-height: 22px !important;
 }
 
 .erp-page-header[data-aws-page-header] > .erp-page-title {
@@ -5266,6 +5350,80 @@ body.aws-console,
     .erp-page-header[data-aws-page-header] h1 {
         font-size: 18px !important;
         line-height: 22px !important;
+    }
+}
+
+/* Staff analytics keeps its report scope and staged filters in one AWS toolbar. */
+.aws-console .staff-analytics-command-panel .staff-analytics-filter {
+    min-width: 0 !important;
+    flex-flow: row nowrap !important;
+    gap: 4px 8px !important;
+    overflow-x: visible !important;
+}
+
+.aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-date {
+    min-width: 8.15rem;
+    flex: 0 0 8.15rem;
+}
+
+.aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-product {
+    min-width: 10.25rem;
+    flex: 0 1 10.75rem;
+}
+
+.aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-view {
+    min-width: 15.9rem;
+    flex: 0 0 15.9rem;
+}
+
+.aws-console .staff-analytics-command-panel .staff-filter-actions {
+    flex: 0 0 auto;
+    gap: 4px !important;
+    padding-left: 2px;
+}
+
+.aws-console .staff-analytics-command-panel .staff-filter-action {
+    min-width: 5rem;
+    padding-right: 9px;
+    padding-left: 9px;
+}
+
+.aws-console .staff-analytics-command-panel .staff-analytics-control,
+.aws-console .staff-analytics-command-panel .staff-view-option,
+.aws-console .staff-analytics-command-panel .staff-filter-action {
+    white-space: nowrap !important;
+}
+
+@media (max-width: 767px) {
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter {
+        flex-flow: row wrap !important;
+        overflow-x: visible !important;
+    }
+
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-date,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-product,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-view {
+        min-width: min(100%, 15rem);
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-view .staff-view-switch {
+        width: fit-content !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: thin;
+    }
+}
+
+@media (max-width: 520px) {
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-date,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-product,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter > .staff-analytics-control.is-view {
+        min-width: 100%;
+        flex-basis: 100%;
     }
 }
 

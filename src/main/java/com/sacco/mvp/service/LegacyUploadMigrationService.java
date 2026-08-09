@@ -3,10 +3,8 @@ package com.sacco.mvp.service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanApplication;
-import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.StoredUpload;
 import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.RegisteredSaccoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.Collections;
@@ -34,15 +31,11 @@ public class LegacyUploadMigrationService {
 
     private final StoredUploadStorageService storedUploadStorageService;
     private final LoanApplicationRepository loanApplicationRepository;
-    private final RegisteredSaccoRepository registeredSaccoRepository;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
 
     @Value("${app.upload-migration.loan-root:loan-uploads/applications}")
     private String loanRoot;
-
-    @Value("${app.upload-migration.logo-root:branding/sacco-logos}")
-    private String logoRoot;
 
     public MigrationSummary migrate() {
         if (isComplete()) {
@@ -52,7 +45,6 @@ public class LegacyUploadMigrationService {
 
         MutableSummary summary = new MutableSummary();
         migrateLoanAttachments(Paths.get(loanRoot), summary);
-        migrateLogos(Paths.get(logoRoot), summary);
         if (summary.failed == 0) {
             jdbcTemplate.update(
                 "insert into stored_upload_migrations (migration_key, completed_at, imported_count, failed_count) values (?, ?, ?, ?)",
@@ -95,33 +87,6 @@ public class LegacyUploadMigrationService {
                     migrateFile(file, uploadId, StoredUploadStorageService.OWNER_LOAN_APPLICATION,
                         loanId.toString(), category, originalName, contentType, summary);
                 }, summary);
-            }
-        } catch (Exception ex) {
-            retainFailure(root, summary, ex.getMessage());
-        }
-    }
-
-    private void migrateLogos(Path root, MutableSummary summary) {
-        if (!Files.isDirectory(root)) {
-            return;
-        }
-        Map<String, String> saccoIdsByFolder = new LinkedHashMap<>();
-        for (RegisteredSacco sacco : registeredSaccoRepository.findAll()) {
-            saccoIdsByFolder.put(safeFolderName(sacco.getSaccoId()), sacco.getSaccoId());
-        }
-        try (Stream<Path> folders = Files.list(root)) {
-            for (Path folder : folders.filter(Files::isDirectory).toList()) {
-                String saccoId = saccoIdsByFolder.getOrDefault(folder.getFileName().toString(), folder.getFileName().toString());
-                migrateFolderFiles(folder, file -> migrateFile(
-                    file,
-                    UUID.nameUUIDFromBytes(("SACCO_LOGO:" + saccoId).getBytes(StandardCharsets.UTF_8)),
-                    StoredUploadStorageService.OWNER_SACCO,
-                    saccoId,
-                    StoredUploadStorageService.CATEGORY_SACCO_LOGO,
-                    file.getFileName().toString(),
-                    probeContentType(file),
-                    summary
-                ), summary);
             }
         } catch (Exception ex) {
             retainFailure(root, summary, ex.getMessage());
@@ -227,10 +192,6 @@ public class LegacyUploadMigrationService {
 
     private String stringValue(Object value, String fallback) {
         return value == null || String.valueOf(value).isBlank() ? fallback : String.valueOf(value);
-    }
-
-    private String safeFolderName(String saccoId) {
-        return saccoId.trim().replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
     private void retainFailure(Path path, MutableSummary summary, String reason) {

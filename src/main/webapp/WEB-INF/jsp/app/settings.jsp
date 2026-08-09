@@ -11,11 +11,9 @@
     <c:choose>
         <c:when test="${settingsSection eq 'payment-details'}">
             <h1 class="erp-page-title"><spring:message code="member.settings.payment.title" /></h1>
-            <p class="erp-page-subtitle"><spring:message code="member.settings.payment.help" /></p>
         </c:when>
         <c:otherwise>
             <h1 class="erp-page-title"><spring:message code="member.settings.title" /></h1>
-            <p class="erp-page-subtitle"><spring:message code="member.settings.subtitle" /></p>
         </c:otherwise>
     </c:choose>
 </div>

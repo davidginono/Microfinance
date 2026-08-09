@@ -15,11 +15,8 @@
     <div>
         <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
         <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-        <c:if test="${not empty reviewPanelSubtitle}">
-            <p class="erp-page-subtitle">${reviewPanelSubtitle}</p>
-        </c:if>
     </div>
-    <button type="button" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
+    <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
 </div>
 <c:if test="${app.status eq 'AWAITING_BOARD'}">
     <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -139,35 +136,10 @@
                     <div class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</div>
                 </div>
             </div>
-            <div class="${applicantExternalAccountStatus.available ? 'hidden ' : ''}rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-                 data-live-account-status-box>
-                ${applicantExternalAccountStatus.statusMessage}
-            </div>
+            <%@ include file="../fragments/live-account-status-message.jspf" %>
         </div>
 
-        <div class="mt-6 loan-simple-progress">
-            <h3 class="text-lg font-semibold text-slate-900"><spring:message code="loan.progress" text="Progress" /></h3>
-            <div class="loan-simple-progress-list">
-                <c:forEach items="${loanProgressItems}" var="item">
-                    <div class="loan-simple-progress-item${item.active ? ' is-active' : ' is-pending'}${item.current ? ' is-current' : ''}">
-                        <span class="loan-simple-progress-dot" aria-hidden="true"></span>
-                        <span class="loan-simple-progress-content">
-                            <span class="loan-simple-progress-label">${item.label}</span>
-                            <span class="loan-simple-progress-state">
-                                <c:choose>
-                                    <c:when test="${item.current}"><spring:message code="loan.progress.inProgress" text="In Progress" /></c:when>
-                                    <c:when test="${item.active}"><spring:message code="loan.progress.completed" text="Completed" /></c:when>
-                                    <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
-                                </c:choose>
-                            </span>
-                            <c:if test="${item.current}">
-                                <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
-                            </c:if>
-                        </span>
-                    </div>
-                </c:forEach>
-            </div>
-        </div>
+        <%@ include file="../fragments/loan-application-progress.jspf" %>
     </div>
 </div>
 </div>

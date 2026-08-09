@@ -1208,6 +1208,15 @@
                 const nav = navButtons.find((button) => button.getAttribute('data-product-config-nav') === key);
                 return nav?.querySelector('strong')?.textContent.trim() || 'section';
             };
+            const workflowScrollTarget = (step) => {
+                return step.getAttribute('data-product-config-step') === 'workflow'
+                    ? step.querySelector('.product-config-subsection')
+                    : null;
+            };
+            const scrollStepIntoView = (step, behavior = 'smooth') => {
+                const target = workflowScrollTarget(step) || step;
+                target.scrollIntoView({ behavior, block: 'start' });
+            };
 
             const activateStep = (key, options = {}) => {
                 let activeIndex = stepIndex(key);
@@ -1250,7 +1259,7 @@
                 }
 
                 if (options.scroll) {
-                    steps[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    scrollStepIntoView(steps[activeIndex]);
                 }
                 if (options.focus) {
                     navButtons.find((button) => button.getAttribute('aria-current') === 'step')?.focus({ preventScroll: true });
@@ -1309,7 +1318,12 @@
                     initialKey = null;
                 }
             }
-            activateStep(initialKey || steps[0].getAttribute('data-product-config-step'));
+            const resolvedInitialKey = initialKey || steps[0].getAttribute('data-product-config-step');
+            activateStep(resolvedInitialKey);
+            const resolvedInitialIndex = stepIndex(resolvedInitialKey);
+            if (resolvedInitialKey === 'workflow' && resolvedInitialIndex >= 0) {
+                window.requestAnimationFrame(() => scrollStepIntoView(steps[resolvedInitialIndex], 'auto'));
+            }
         });
     })();
 </script>

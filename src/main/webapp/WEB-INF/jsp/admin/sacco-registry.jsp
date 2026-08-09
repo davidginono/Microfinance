@@ -162,32 +162,37 @@
                     Station IDs
                     <textarea name="stationIds" rows="5" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="Enter one or more station IDs, separated by commas or new lines.&#10;Example:&#10;STN789&#10;STN790"></textarea>
                 </label>
-                <div class="rounded border border-slate-200 bg-slate-50 p-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO Logo</p>
-                    <div class="mt-3 flex items-start gap-4">
-                        <div data-logo-preview-shell class="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-300 bg-white">
+                <div class="sacco-logo-upload-card" data-logo-upload-card>
+                    <p class="aws-file-card-kicker">SACCO Logo</p>
+                    <div class="sacco-logo-upload-layout">
+                        <div data-logo-preview-shell class="sacco-logo-preview-shell is-empty">
                             <img data-logo-preview-image src="" alt="New SACCO logo preview" class="hidden h-full w-full object-contain p-2" />
                             <span data-logo-preview-fallback class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Auto</span>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <label class="block text-sm font-semibold text-slate-700">
-                                Optional logo image
+                            <label class="aws-file-picker">
+                                <span class="aws-file-picker-label">Optional logo image</span>
+                                <span class="aws-file-picker-control">
                                 <input name="logoFile"
                                        type="file"
                                        accept="image/png,image/jpeg"
                                        data-logo-file-input
-                                       class="mt-2 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700" />
+                                       data-file-picker-input
+                                       class="aws-file-picker-input" />
+                                    <span class="aws-file-picker-button">Choose File</span>
+                                    <span class="aws-file-picker-name" data-file-picker-name>No file chosen</span>
+                                </span>
                             </label>
                             <button type="button"
                                     data-logo-paste-target
-                                    class="mt-3 flex w-full items-center justify-between gap-3 rounded border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-200">
+                                    class="aws-file-paste-target">
                                 <span class="min-w-0">
                                     <span class="block text-sm font-semibold text-slate-700">Paste image</span>
                                     <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
                                 </span>
-                                <span class="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ctrl+V</span>
+                                <span class="aws-file-paste-shortcut">Ctrl+V</span>
                             </button>
-                            <span class="mt-2 block text-xs font-medium text-slate-500">
+                            <span class="aws-file-help">
                                 Optional. ${logoUploadPolicy.helpText} If you skip this, the navbar will use the SACCO initials.
                             </span>
                         </div>
@@ -280,10 +285,10 @@
                             </c:forEach>
                         </div>
                     </div>
-                    <div class="rounded border border-slate-200 bg-slate-50 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO Logo</p>
-                        <div class="mt-3 flex items-start gap-4">
-                            <div data-logo-preview-shell class="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                    <div class="sacco-logo-upload-card" data-logo-upload-card>
+                        <p class="aws-file-card-kicker">SACCO Logo</p>
+                        <div class="sacco-logo-upload-layout">
+                            <div data-logo-preview-shell class="sacco-logo-preview-shell">
                                 <c:choose>
                                     <c:when test="${sacco.hasLogo}">
                                         <img data-logo-preview-image
@@ -299,24 +304,29 @@
                                 </c:choose>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <label class="block text-sm font-semibold text-slate-700">
-                                    Replace logo image
+                                <label class="aws-file-picker">
+                                    <span class="aws-file-picker-label">Replace logo image</span>
+                                    <span class="aws-file-picker-control">
                                     <input name="logoFile"
                                            type="file"
                                            accept="image/png,image/jpeg"
                                            data-logo-file-input
-                                           class="mt-2 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700" />
+                                           data-file-picker-input
+                                           class="aws-file-picker-input" />
+                                        <span class="aws-file-picker-button">Choose File</span>
+                                        <span class="aws-file-picker-name" data-file-picker-name>No file chosen</span>
+                                    </span>
                                 </label>
                                 <button type="button"
                                         data-logo-paste-target
-                                        class="mt-3 flex w-full items-center justify-between gap-3 rounded border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-200">
+                                        class="aws-file-paste-target">
                                     <span class="min-w-0">
                                         <span class="block text-sm font-semibold text-slate-700">Paste replacement image</span>
                                         <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
                                     </span>
-                                    <span class="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ctrl+V</span>
+                                    <span class="aws-file-paste-shortcut">Ctrl+V</span>
                                 </button>
-                                <span class="mt-2 block text-xs font-medium text-slate-500">
+                                <span class="aws-file-help">
                                     Leave this empty to keep the current logo. Upload or paste a new image to replace it. ${logoUploadPolicy.helpText}
                                 </span>
                             </div>
@@ -391,10 +401,10 @@
                 </div>
                 <form action="/admin/saccos/${sacco.saccoId}/logo" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                    <div class="rounded border border-slate-200 bg-slate-50 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO Logo</p>
-                        <div class="mt-3 flex items-start gap-4">
-                            <div data-logo-preview-shell class="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                    <div class="sacco-logo-upload-card" data-logo-upload-card>
+                        <p class="aws-file-card-kicker">SACCO Logo</p>
+                        <div class="sacco-logo-upload-layout">
+                            <div data-logo-preview-shell class="sacco-logo-preview-shell">
                                 <c:choose>
                                     <c:when test="${sacco.hasLogo}">
                                         <img data-logo-preview-image
@@ -410,25 +420,30 @@
                                 </c:choose>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <label class="block text-sm font-semibold text-slate-700">
-                                    Replace logo image
+                                <label class="aws-file-picker">
+                                    <span class="aws-file-picker-label">Replace logo image</span>
+                                    <span class="aws-file-picker-control">
                                     <input name="logoFile"
                                            type="file"
                                            accept="image/png,image/jpeg"
                                            required
                                            data-logo-file-input
-                                           class="mt-2 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700" />
+                                           data-file-picker-input
+                                           class="aws-file-picker-input" />
+                                        <span class="aws-file-picker-button">Choose File</span>
+                                        <span class="aws-file-picker-name" data-file-picker-name>No file chosen</span>
+                                    </span>
                                 </label>
                                 <button type="button"
                                         data-logo-paste-target
-                                        class="mt-3 flex w-full items-center justify-between gap-3 rounded border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-200">
+                                        class="aws-file-paste-target">
                                     <span class="min-w-0">
                                         <span class="block text-sm font-semibold text-slate-700">Paste replacement image</span>
                                         <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
                                     </span>
-                                    <span class="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ctrl+V</span>
+                                    <span class="aws-file-paste-shortcut">Ctrl+V</span>
                                 </button>
-                                <span class="mt-2 block text-xs font-medium text-slate-500">
+                                <span class="aws-file-help">
                                     ${logoUploadPolicy.helpText}
                                 </span>
                             </div>
@@ -544,16 +559,15 @@
                 const transfer = new DataTransfer();
                 transfer.items.add(file);
                 fileInput.files = transfer.files;
-                updateLogoPreview(previewShell, file);
-                pasteTarget.classList.remove('border-dashed');
-                pasteTarget.classList.add('border-emerald-300', 'bg-emerald-50');
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                pasteTarget.classList.add('is-ready');
                 if (pasteHint) {
                     pasteHint.textContent = 'Pasted image ready. Save the form to apply this logo.';
                 }
             });
         }
 
-        document.querySelectorAll('.app-modal-body .rounded.border.border-slate-200.bg-slate-50.p-4').forEach(function (card) {
+        document.querySelectorAll('[data-logo-upload-card]').forEach(function (card) {
             if (card.querySelector('[data-logo-file-input]')) {
                 bindLogoUploadCard(card);
             }

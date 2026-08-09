@@ -46,10 +46,20 @@
 
             <form id="profilePhotoForm" action="/profile/image" method="post" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                <label id="profilePhotoDropzone" class="profile-photo-dropzone block rounded-md p-5 text-center">
-                    <span class="block text-sm font-semibold text-slate-800"><spring:message code="profile.photo.dropTitle" text="Drop your profile photo here" /></span>
-                    <span class="mt-1 block text-sm text-slate-500"><spring:message code="profile.photo.dropHelp" text="or choose a PNG/JPEG image up to 2 MB. Drag and zoom it to fill the rounded crop area." /></span>
-                    <input id="profileImageInput" type="file" name="profileImage" accept="image/png,image/jpeg" class="mt-4 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700" required />
+                <label id="profilePhotoDropzone" class="profile-photo-dropzone aws-file-dropzone">
+                    <span class="aws-file-dropzone-title"><spring:message code="profile.photo.dropTitle" text="Drop your profile photo here" /></span>
+                    <span class="aws-file-dropzone-help"><spring:message code="profile.photo.dropHelp" text="or choose a PNG/JPEG image up to 2 MB. Drag and zoom it to fill the rounded crop area." /></span>
+                    <span class="aws-file-picker-control profile-photo-picker">
+                        <input id="profileImageInput"
+                               type="file"
+                               name="profileImage"
+                               accept="image/png,image/jpeg"
+                               class="aws-file-picker-input"
+                               data-file-picker-input
+                               required />
+                        <span class="aws-file-picker-button"><spring:message code="attachments.dropzone.chooseOne" text="Choose file" /></span>
+                        <span class="aws-file-picker-name" data-file-picker-name><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
+                    </span>
                 </label>
                 <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <div class="font-semibold text-slate-800">${profileMember.fullName}</div>
@@ -135,7 +145,7 @@
         dropzone.addEventListener('drop', function (event) {
             if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length) {
                 input.files = event.dataTransfer.files;
-                updatePreview(event.dataTransfer.files[0]);
+                input.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
         input.addEventListener('change', function () {
