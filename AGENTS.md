@@ -122,6 +122,11 @@ Default local URL:
 ## Editing Rules
 
 - Prefer minimal, targeted changes.
+- After completing and verifying a user-requested change, automatically create a local Git commit unless the user explicitly asks not to commit.
+  - stage only files changed for the current request; never include unrelated or pre-existing worktree changes
+  - use a concise commit message that describes the completed change
+  - do not amend an existing commit and do not push unless the user explicitly requests it
+  - if the current change cannot be separated safely from unrelated edits, leave it uncommitted and clearly report why
 - Always consider RESPONSIVENESS FOR MOBILE DEVICES.
 - Reuse existing services and controller flows instead of duplicating logic.
 - Avoid changing database structure unless explicitly required.
