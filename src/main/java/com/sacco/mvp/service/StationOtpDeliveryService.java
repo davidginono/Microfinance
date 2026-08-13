@@ -117,7 +117,7 @@ public class StationOtpDeliveryService {
         if (email == null || email.isBlank()) {
             throw new IllegalStateException("This account has no valid email address for OTP delivery.");
         }
-        notificationEmailService.sendDirectEmail(email.trim().toLowerCase(), subject, message);
+        notificationEmailService.sendRequiredDirectEmail(email.trim().toLowerCase(), subject, message);
     }
 
     public record DeliveryReceipt(OtpDeliveryChannel deliveredBy, String userMessage) {

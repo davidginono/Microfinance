@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,7 +43,7 @@ class StationOtpDeliveryServiceTest {
             EmailOtpPurpose.LOGIN, "Subject", "Intro", "123456", 10);
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
-        verify(emailService).sendDirectEmail(eq("member@example.com"), eq("Subject"), any());
+        verify(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
         verify(unitService, never()).reserve(any(), any(), any(), any());
     }
 
@@ -61,7 +62,7 @@ class StationOtpDeliveryServiceTest {
             EmailOtpPurpose.LOGIN, "Subject", "Intro", "123456", 10);
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.SMS);
-        verify(emailService, never()).sendDirectEmail(any(), any(), any());
+        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any());
         verify(smsGateway).send(eq("255700000001"), argThat(message ->
             message.contains("Intro")
                 && message.contains("OTP: 123456")
@@ -80,7 +81,7 @@ class StationOtpDeliveryServiceTest {
 
         assertThat(receipt.deliveredBy()).isEqualTo(OtpDeliveryChannel.EMAIL);
         verify(smsGateway, never()).send(any(), any());
-        verify(emailService).sendDirectEmail(eq("member@example.com"), eq("Subject"), any());
+        verify(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
     }
 
     @Test
@@ -95,6 +96,27 @@ class StationOtpDeliveryServiceTest {
             .hasMessageContaining("depleted");
 
         verify(smsGateway, never()).send(any(), any());
-        verify(emailService, never()).sendDirectEmail(any(), any(), any());
+        verify(emailService, never()).sendRequiredDirectEmail(any(), any(), any());
+    }
+
+    @Test
+    void emailDeliveryFailureIsReportedInsteadOfReturningFalseSuccess() {
+        when(settingsService.channel("SACCO-1", "ST-1")).thenReturn(OtpDeliveryChannel.EMAIL);
+        doThrow(new IllegalStateException("SMTP unavailable"))
+            .when(emailService).sendRequiredDirectEmail(eq("member@example.com"), eq("Subject"), any());
+
+        assertThatThrownBy(() -> service.deliver(
+            "SACCO-1",
+            "ST-1",
+            "member@example.com",
+            "255700000001",
+            EmailOtpPurpose.BOARD_SIGNATURE,
+            "Subject",
+            "Intro",
+            "123456",
+            10
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("SMTP unavailable");
     }
 }

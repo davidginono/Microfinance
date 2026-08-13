@@ -28,11 +28,25 @@ public class NotificationEmailService {
     private String overrideRecipient;
 
     public void sendDirectEmail(String email, String subject, String message) {
+        sendDirectEmail(email, subject, message, false);
+    }
+
+    public void sendRequiredDirectEmail(String email, String subject, String message) {
+        sendDirectEmail(email, subject, message, true);
+    }
+
+    private void sendDirectEmail(String email, String subject, String message, boolean deliveryRequired) {
         if (email == null || email.isBlank()) {
+            if (deliveryRequired) {
+                throw new IllegalStateException("A recipient email address is required for OTP delivery.");
+            }
             return;
         }
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
+            if (deliveryRequired) {
+                throw new IllegalStateException("Email delivery is not configured. Contact the system administrator.");
+            }
             log.info("Mail sender not configured. OTP/notification email for {}: {}", email, message);
             return;
         }
@@ -46,6 +60,9 @@ public class NotificationEmailService {
             mailSender.send(mail);
         } catch (Exception ex) {
             log.warn("Unable to send direct email to {}: {}", email, ex.getMessage());
+            if (deliveryRequired) {
+                throw new IllegalStateException("The approval email could not be delivered. Please try again.", ex);
+            }
         }
     }
 

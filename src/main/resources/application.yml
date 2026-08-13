@@ -40,14 +40,17 @@ spring:
       cache:
         period: ${SPRING_WEB_RESOURCES_CACHE_PERIOD:0}
   mail:
-    host: smtp.stackmail.com
-    port: 465
-    username: no-reply@foresight.co.tz
-    password: qwerty1!
+    host: ${SPRING_MAIL_HOST:smtp.stackmail.com}
+    port: ${SPRING_MAIL_PORT:465}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
+          connectiontimeout: ${SPRING_MAIL_CONNECTION_TIMEOUT_MS:10000}
+          timeout: ${SPRING_MAIL_READ_TIMEOUT_MS:10000}
+          writetimeout: ${SPRING_MAIL_WRITE_TIMEOUT_MS:10000}
           ssl:
             enable: true
           starttls:
@@ -99,7 +102,7 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
   time-zone: ${APP_TIME_ZONE:Africa/Nairobi}
   mail:
-    from-address: no-reply@foresight.co.tz
+    from-address: ${APP_MAIL_FROM_ADDRESS:${SPRING_MAIL_USERNAME:no-reply@sacco.local}}
     override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
