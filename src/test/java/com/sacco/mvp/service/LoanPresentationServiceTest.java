@@ -301,6 +301,41 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void activeLoanOutstandingBalanceIncludesContractualInterest() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .financialSnapshot("""
+                {
+                  "interestAmount": 70000.00,
+                  "principalPlusInterest": 770000.00
+                }
+                """)
+            .build();
+
+        assertThat(loanPresentationService.activeLoanOutstandingBalance(app))
+            .isEqualByComparingTo("770000.00");
+    }
+
+    @Test
+    void activeLoanOutstandingBalanceRecalculatesTotalForReleasedPrincipal() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .financialSnapshot("""
+                {
+                  "principalAmount": 800000.00,
+                  "interestAmount": 70000.00,
+                  "principalPlusInterest": 870000.00
+                }
+                """)
+            .build();
+
+        assertThat(loanPresentationService.activeLoanOutstandingBalance(app))
+            .isEqualByComparingTo("770000.00");
+    }
+
+    @Test
     void reviewRepaymentRowsBuildEstimatedScheduleBeforeDisbursement() {
         LoanApplication app = LoanApplication.builder()
             .amount(new BigDecimal("120000.00"))

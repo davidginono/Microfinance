@@ -472,9 +472,12 @@ public class AppController {
                 row.put("repaymentStateClasses", repaymentStateClasses(app, today));
                 row.put("loanDescription", loanProductName(app, loanProductNames));
                 row.put("lastPaymentDate", "-");
-                row.put("totalOutstanding", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                String outstandingBalance = loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanOutstandingBalance(app)
+                );
+                row.put("totalOutstanding", outstandingBalance);
                 row.put("paidAmount", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));
-                row.put("currentBalance", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
+                row.put("currentBalance", outstandingBalance);
                 row.put("outstandingPrincipal", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
                 row.put("outstandingInterest", "-");
                 row.put("totalPrincipalPaid", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));

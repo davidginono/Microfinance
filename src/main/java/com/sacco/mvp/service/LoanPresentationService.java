@@ -833,6 +833,25 @@ public class LoanPresentationService {
         return formatMoney(amount);
     }
 
+    public BigDecimal activeLoanOutstandingBalance(LoanApplication app) {
+        if (app == null || app.getStatus() == LoanStatus.PAID) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal principal = nonNegative(app.getAmount()).setScale(2, RoundingMode.HALF_UP);
+        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            return principal;
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
+            BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principal);
+            return principalPlusInterest == null
+                ? principal
+                : nonNegative(principalPlusInterest).setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception ex) {
+            return principal;
+        }
+    }
+
     public String latestManagerReason(UUID loanId) {
         return managerReviewRepository.findFirstByLoanApplicationIdOrderByCreatedAtDesc(loanId)
             .filter(review -> review.getDecision() == ManagerDecision.REJECT)
