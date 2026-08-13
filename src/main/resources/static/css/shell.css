@@ -2612,7 +2612,10 @@ body.aws-console {
     font-size: 11px !important;
     font-weight: 700 !important;
     line-height: 18px !important;
+    text-align: left !important;
     text-transform: none !important;
+    vertical-align: top;
+    overflow-wrap: anywhere;
 }
 
 .erp-table td {
@@ -2622,6 +2625,23 @@ body.aws-console {
     padding: 5px 8px !important;
     font-size: 12px !important;
     line-height: 18px !important;
+    overflow-wrap: anywhere;
+}
+
+.erp-table th.text-left,
+.erp-table td.text-left {
+    text-align: left !important;
+}
+
+.erp-table th.text-center,
+.erp-table td.text-center {
+    text-align: center !important;
+}
+
+.erp-table th.text-right,
+.erp-table td.text-right {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
 }
 
 .erp-table tbody tr:hover td {
