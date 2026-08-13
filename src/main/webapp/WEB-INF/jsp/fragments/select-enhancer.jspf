@@ -79,6 +79,7 @@
             state.button.classList.toggle('is-disabled', select.disabled);
             state.button.disabled = select.disabled;
             state.buttonText.textContent = selectedLabel || 'Select an option';
+            state.button.title = selectedLabel || 'Select an option';
             state.menu.innerHTML = '';
 
             if (!visibleOptions.length) {

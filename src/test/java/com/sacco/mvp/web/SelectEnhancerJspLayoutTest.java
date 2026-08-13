@@ -48,10 +48,13 @@ class SelectEnhancerJspLayoutTest {
     }
 
     @Test
-    void enhancedSelectsUseNormalAwsDropdownStylingWithoutTruncatedLabels() throws Exception {
+    void enhancedSelectsKeepOptionsReadableAndSelectedValuesWithinTheControl() throws Exception {
+        String fragment = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/select-enhancer.jspf"));
         String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
         String shellStyles = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
 
+        assertThat(fragment)
+            .contains("state.button.title = selectedLabel || 'Select an option'");
         assertThat(styles)
             .contains(".neo-select-button-text")
             .contains("overflow: visible")
@@ -70,9 +73,15 @@ class SelectEnhancerJspLayoutTest {
         assertThat(shellStyles)
             .contains(".aws-console .aws-filter-toolbar .neo-select-button")
             .contains("height: var(--sacco-control-height) !important")
+            .contains(".aws-console .neo-select-button-text")
+            .contains("overflow: hidden !important")
+            .contains("text-overflow: ellipsis !important")
+            .contains("white-space: nowrap !important")
             .contains(".aws-console .neo-select-option")
             .contains("min-height: 30px !important")
             .contains("font-size: 13px !important")
             .contains("font-weight: 400 !important");
+        assertThat(shellStyles.indexOf("/* Keep selected enhanced-select values"))
+            .isGreaterThan(shellStyles.indexOf(".aws-console .neo-select-button-text,"));
     }
 }

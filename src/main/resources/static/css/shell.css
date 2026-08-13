@@ -5539,3 +5539,16 @@ body.aws-console,
 .shell-powered-by-wordmark > span:last-child {
     font-size: 9px;
 }
+
+/* Keep selected enhanced-select values inside their assigned control width. */
+.aws-console .neo-select-button {
+    min-width: 0;
+}
+
+.aws-console .neo-select-button-text {
+    min-width: 0 !important;
+    max-width: 100%;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
