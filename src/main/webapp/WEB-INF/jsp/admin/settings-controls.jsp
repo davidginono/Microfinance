@@ -117,14 +117,14 @@
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
             <div class="grid gap-4 lg:grid-cols-2">
-                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <label class="flex items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="loanOfficerReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.loanOfficerReviewRequired ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.loanOfficerRequired" text="Require Loan Officer Review" /></span>
                         <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Sets the tenant default for products that inherit Loan Officer review." /></span>
                     </span>
                 </label>
-                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <label class="flex items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
                     <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.boardRequired" text="Require Credit Committee Review" /></span>
@@ -147,13 +147,13 @@
                     </span>
                 </label>
 
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <div class="border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.approvalFlow.resolved" text="Resolved Flow" /></p>
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <c:forEach items="${approvalFlowStageLabels}" var="stage" varStatus="status">
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-800 ring-1 ring-slate-200">${stage}</span>
                             <c:if test="${not status.last}">
-                                <span class="text-slate-400">→</span>
+                                <span class="text-slate-400">â†’</span>
                             </c:if>
                         </c:forEach>
                     </div>
@@ -161,17 +161,17 @@
                 </div>
             </div>
 
-            <div class="grid gap-3 md:grid-cols-4">
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     Active Loan Officers: <strong>${activeLoanOfficerCount}</strong>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     Active Board Members: <strong>${activeBoardMemberCount}</strong>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     Active Accountants: <strong>${activeAccountantCount}</strong>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     Active Disbursement Claim Holders: <strong>${activeDisbursementClaimHolderCount}</strong>
                 </div>
             </div>
@@ -515,10 +515,10 @@
                     <input type="hidden" name="modalKey" value="application-fee" />
 
                     <c:if test="${openProductModalKey eq 'application-fee' and not empty message}">
-                        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
+                        <div class="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
                     </c:if>
                     <c:if test="${openProductModalKey eq 'application-fee' and not empty error}">
-                        <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
+                        <div class="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
                     </c:if>
                     <c:if test="${openProductModalKey eq 'application-fee' and not empty loanSettingsFieldErrors}">
                         <div hidden data-modal-server-errors>
@@ -593,10 +593,10 @@
                     <input type="hidden" name="workflowStartStage" value="MANAGER" data-workflow-start-stage-field />
 
                     <c:if test="${openProductModalKey eq 'create-product' and not empty message}">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
+                        <div class="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
                     </c:if>
                     <c:if test="${openProductModalKey eq 'create-product' and not empty error}">
-                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
+                        <div class="border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
                     </c:if>
                     <c:if test="${openProductModalKey eq 'create-product' and not empty loanSettingsFieldErrors}">
                         <div hidden data-modal-server-errors>
@@ -922,7 +922,7 @@
                                     </label>
                                     <input type="hidden" name="applicantAttachmentRequired" value="false" />
                                 </div>
-                                <div class="mt-3 hidden rounded-md border border-slate-200 bg-white p-3" data-required-attachments-panel>
+                                <div class="mt-3 hidden border border-slate-200 bg-white p-3" data-required-attachments-panel>
                                     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
                                         <button type="button" class="app-btn btn-neutral" data-add-required-attachment>Add Name of Required Attachment</button>
@@ -1034,10 +1034,10 @@
                 <c:set var="productModalKey" value="product-${product.id}" />
 
                 <c:if test="${openProductModalKey eq productModalKey and not empty message}">
-                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
+                    <div class="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">${message}</div>
                 </c:if>
                 <c:if test="${openProductModalKey eq productModalKey and not empty error}">
-                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
+                    <div class="border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">${error}</div>
                 </c:if>
                 <c:if test="${openProductModalKey eq productModalKey and not empty loanSettingsFieldErrors}">
                     <div hidden data-modal-server-errors>
@@ -1367,7 +1367,7 @@
                                 </label>
                                 <input type="hidden" name="applicantAttachmentRequired" value="false" />
                             </div>
-                            <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '}rounded-md border border-slate-200 bg-white p-3" data-required-attachments-panel>
+                            <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '} border border-slate-200 bg-white p-3" data-required-attachments-panel>
                                 <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
                                     <button type="button" class="app-btn btn-neutral" data-add-required-attachment>Add Name of Required Attachment</button>

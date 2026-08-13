@@ -5,20 +5,37 @@
 <%@ include file="fragments/alerts.jspf" %>
 
 
+<c:choose>
+    <c:when test="${memberWorkspace}">
+        <c:set var="profileWorkspaceHome" value="/app/dashboard" />
+        <c:set var="profileWorkspaceLabel" value="Member Workspace" />
+    </c:when>
+    <c:when test="${isPlatformAdminIdentity or not empty adminScope}">
+        <c:set var="profileWorkspaceHome" value="/admin/dashboard" />
+        <c:set var="profileWorkspaceLabel" value="Admin Tools" />
+    </c:when>
+    <c:when test="${not empty staffDashboardHref}">
+        <c:set var="profileWorkspaceHome" value="${staffDashboardHref}" />
+        <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
+    </c:when>
+    <c:otherwise>
+        <c:set var="profileWorkspaceHome" value="/staff/analytics" />
+        <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
+    </c:otherwise>
+</c:choose>
+
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="profile.page.breadcrumb" text="Workspace / Profile" /></p>
+    <p class="erp-breadcrumb" data-breadcrumb-root-href="${profileWorkspaceHome}">${profileWorkspaceLabel} / <spring:message code="profile.page.title" text="Profile" /></p>
     <h1 class="erp-page-title"><spring:message code="profile.page.title" text="Profile" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="profile.page.subtitle" text="Update your profile photo for workspace and loan reviews." /></p>
 </div>
 
-<section class="erp-panel overflow-hidden">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-        <p class="erp-widget-title"><spring:message code="profile.photo.eyebrow" text="Profile Photo" /></p>
-        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="profile.photo.title" text="Passport Photo" /></h2>
+<section class="erp-panel profile-page-panel">
+    <div class="profile-page-panel-header">
+        <h2><spring:message code="profile.photo.title" text="Passport Photo" /></h2>
     </div>
-    <div class="erp-panel-body">
-        <div class="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
-            <div class="profile-photo-preview rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <div class="erp-panel-body profile-page-body">
+        <div class="profile-page-layout">
+            <div class="profile-photo-preview">
                 <div id="profilePhotoFrame" class="profile-photo-frame">
                     <img id="profilePhotoPreview"
                          src="<c:url value='/profile/image/me' />"
@@ -33,7 +50,7 @@
                     <span class="profile-photo-crop-border" aria-hidden="true"></span>
                 </div>
                 <div class="profile-photo-frame-label"><spring:message code="profile.photo.frameLabel" text="Rounded profile crop area" /></div>
-                <div id="profilePhotoEditor" class="profile-photo-editor hidden rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left">
+                <div id="profilePhotoEditor" class="profile-photo-editor hidden border border-slate-200 bg-slate-50 px-3 py-2 text-left">
                     <label for="profilePhotoZoom" class="block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                         <spring:message code="profile.photo.zoom" text="Zoom" />
                     </label>
@@ -44,7 +61,7 @@
                 </div>
             </div>
 
-            <form id="profilePhotoForm" action="/profile/image" method="post" enctype="multipart/form-data" class="space-y-4">
+            <form id="profilePhotoForm" action="/profile/image" method="post" enctype="multipart/form-data" class="profile-photo-form">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <label id="profilePhotoDropzone" class="profile-photo-dropzone aws-file-dropzone">
                     <span class="aws-file-dropzone-title"><spring:message code="profile.photo.dropTitle" text="Drop your profile photo here" /></span>
@@ -61,18 +78,29 @@
                         <span class="aws-file-picker-name" data-file-picker-name><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
                     </span>
                 </label>
-                <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <div class="font-semibold text-slate-800">${profileMember.fullName}</div>
-                    <div class="mt-1">${profileMember.memberNo}</div>
+                <div class="profile-identity-panel">
+                    <h3>${profileMember.fullName}</h3>
+                    <dl>
+                    <div>
+                        <dt><spring:message code="profile.memberNumber" text="Member Number" /></dt>
+                        <dd>${profileMember.memberNo}</dd>
+                </div>
                     <c:if test="${not empty profileMember.staffNo}">
-                        <div class="mt-1">Staff Number: ${profileMember.staffNo}</div>
+                        <div>
+                            <dt><spring:message code="profile.staffNumber" text="Staff Number" /></dt>
+                            <dd>${profileMember.staffNo}</dd>
+                </div>
                     </c:if>
                     <c:if test="${not empty profileMember.email}">
-                        <div class="mt-1">${profileMember.email}</div>
+                        <div>
+                            <dt><spring:message code="common.email" text="Email" /></dt>
+                            <dd>${profileMember.email}</dd>
+        </div>
                     </c:if>
-                </div>
-                <div class="flex flex-wrap items-center justify-end gap-2">
-                    <a href="javascript:history.back()" class="app-btn btn-neutral"><spring:message code="common.back" text="Back" /></a>
+                    </dl>
+    </div>
+                <div class="profile-page-actions">
+                    <a href="${profileWorkspaceHome}" class="app-btn btn-neutral"><spring:message code="common.back" text="Back" /></a>
                     <c:if test="${hasProfileImage}">
                         <button type="submit"
                                 class="app-btn btn-reject"

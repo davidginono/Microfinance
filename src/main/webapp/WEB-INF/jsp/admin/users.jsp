@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.users.breadcrumb" text="Admin Tools / Users &amp; Roles" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.users.title" text="Users &amp; Roles" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.users.subtitle" text="Manage workspace access." /></p>
 </div>
 
 <c:if test="${not empty createdStaffUserId}">

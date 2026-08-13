@@ -46,11 +46,15 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         where l.applicantMemberId = :applicantMemberId
           and l.status in :statuses
           and (cast(:loanIdQuery as string) is null or lower(coalesce(l.loanId, '')) like concat('%', cast(:loanIdQuery as string), '%'))
+          and (cast(:updatedFrom as timestamp) is null or l.updatedAt >= :updatedFrom)
+          and (cast(:updatedToExclusive as timestamp) is null or l.updatedAt < :updatedToExclusive)
         order by l.updatedAt desc, l.createdAt desc
         """)
     Page<LoanApplication> findMemberArchivePage(@Param("applicantMemberId") UUID applicantMemberId,
                                                 @Param("statuses") Collection<LoanStatus> statuses,
                                                 @Param("loanIdQuery") String loanIdQuery,
+                                                @Param("updatedFrom") OffsetDateTime updatedFrom,
+                                                @Param("updatedToExclusive") OffsetDateTime updatedToExclusive,
                                                 Pageable pageable);
 
     @Query("""
@@ -246,6 +250,40 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                         @Param("searchTerm") String searchTerm,
                                         @Param("searchByLoanId") boolean searchByLoanId,
                                         Pageable pageable);
+
+    @Query("""
+        select l from LoanApplication l
+        where l.saccoId = :saccoId
+          and lower(l.stationId) = lower(:stationId)
+          and l.status in :statuses
+          and (:search = ''
+            or lower(coalesce(l.loanId, '')) like concat(:search, '%')
+            or str(l.applicationNumber) like concat(:search, '%'))
+          and (cast(:updatedFrom as timestamp) is null or l.updatedAt >= :updatedFrom)
+          and (cast(:updatedToExclusive as timestamp) is null or l.updatedAt < :updatedToExclusive)
+          and (cast(:status as string) is null or l.status = :status)
+        order by l.updatedAt desc, l.id desc
+        """)
+    Page<LoanApplication> findProcessedLoansPage(@Param("saccoId") String saccoId,
+                                                  @Param("stationId") String stationId,
+                                                  @Param("statuses") Collection<LoanStatus> statuses,
+                                                  @Param("search") String search,
+                                                  @Param("updatedFrom") OffsetDateTime updatedFrom,
+                                                  @Param("updatedToExclusive") OffsetDateTime updatedToExclusive,
+                                                  @Param("status") LoanStatus status,
+                                                  Pageable pageable);
+
+    @Query("""
+        select l from LoanApplication l
+        where l.id = :loanId
+          and l.saccoId = :saccoId
+          and lower(l.stationId) = lower(:stationId)
+          and l.status in :statuses
+        """)
+    Optional<LoanApplication> findProcessedLoan(@Param("loanId") UUID loanId,
+                                                 @Param("saccoId") String saccoId,
+                                                 @Param("stationId") String stationId,
+                                                 @Param("statuses") Collection<LoanStatus> statuses);
 
     @Query("""
         select l.status as status, count(l) as total

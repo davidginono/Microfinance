@@ -20,17 +20,21 @@
                     <p class="aws-current-filter-value"><c:out value="${currentFilterLabel}" /></p>
                 </div>
             </div>
+            <c:url var="boardArchiveAllUrl" value="${boardListRoute}"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+            <c:url var="boardArchiveApprovedUrl" value="${boardListRoute}"><c:param name="filter" value="APPROVED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+            <c:url var="boardArchiveRejectedUrl" value="${boardListRoute}"><c:param name="filter" value="REJECTED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+            <c:url var="boardArchiveDisbursedUrl" value="${boardListRoute}"><c:param name="filter" value="DISBURSED" /><c:param name="searchId" value="${boardSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
             <div class="erp-filter-row aws-current-filter-tabs">
-                <a href="${boardListRoute}?filter=ALL" class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
+                <a href="${boardArchiveAllUrl}" class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
                     <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
                 </a>
-                <a href="${boardListRoute}?filter=APPROVED" class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
+                <a href="${boardArchiveApprovedUrl}" class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
                     <spring:message code="archive.approvedLoans" text="Approved Loans" />
                 </a>
-                <a href="${boardListRoute}?filter=REJECTED" class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
+                <a href="${boardArchiveRejectedUrl}" class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
                     <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
                 </a>
-                <a href="${boardListRoute}?filter=DISBURSED" class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
+                <a href="${boardArchiveDisbursedUrl}" class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
                     <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
                 </a>
             </div>
@@ -51,14 +55,31 @@
                    inputmode="numeric"
                    class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
         </label>
+        <c:if test="${archiveView}">
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.fromDate" text="From Date" />
+                <input type="date" name="fromDate" value="${fromDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+            </label>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.toDate" text="To Date" />
+                <input type="date" name="toDate" value="${toDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+            </label>
+        </c:if>
         <div class="board-queue-search-actions">
-            <c:if test="${not empty boardSearchValue}">
-                <a href="${boardListRoute}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
+            <c:if test="${not empty boardSearchValue or (archiveView and (not empty fromDate or not empty toDate))}">
+                <c:url var="boardArchiveResetUrl" value="${boardListRoute}"><c:if test="${archiveView}"><c:param name="filter" value="${currentFilterKey}" /></c:if></c:url>
+                <a href="${boardArchiveResetUrl}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
             </c:if>
-            <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
+            <button type="submit" class="app-btn btn-primary">
+                <c:choose>
+                    <c:when test="${archiveView}"><spring:message code="common.applyFilters" text="Apply Filters" /></c:when>
+                    <c:otherwise><spring:message code="common.search" text="Search" /></c:otherwise>
+                </c:choose>
+            </button>
         </div>
     </form>
-<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
         <table class="erp-table">
             <thead>
             <tr>
@@ -131,6 +152,7 @@
         </table>
     </div>
 </div>
+        </div>
 
 <c:if test="${archiveView and archivePage.totalPages gt 1}">
     <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -140,6 +162,8 @@
                 <c:url var="archivePreviousUrl" value="${boardListRoute}">
                     <c:param name="filter" value="${currentFilterKey}" />
                     <c:param name="searchId" value="${boardSearchValue}" />
+                    <c:param name="fromDate" value="${fromDate}" />
+                    <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
                 <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
@@ -148,11 +172,13 @@
                 <c:url var="archiveNextUrl" value="${boardListRoute}">
                     <c:param name="filter" value="${currentFilterKey}" />
                     <c:param name="searchId" value="${boardSearchValue}" />
+                    <c:param name="fromDate" value="${fromDate}" />
+                    <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
                 <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>
             </c:if>
-        </div>
+    </div>
     </div>
 </c:if>
 

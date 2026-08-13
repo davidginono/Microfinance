@@ -18,6 +18,10 @@ class FileUploadControlViewContractTest {
         assertThat(profile)
             .contains("class=\"profile-photo-dropzone aws-file-dropzone\"")
             .contains("class=\"aws-file-picker-control profile-photo-picker\"")
+            .contains("data-breadcrumb-root-href=\"${profileWorkspaceHome}\"")
+            .contains("class=\"profile-page-layout\"")
+            .contains("href=\"${profileWorkspaceHome}\"")
+            .doesNotContain("javascript:history.back()")
             .contains("data-file-picker-input")
             .contains("data-file-picker-name")
             .contains("input.dispatchEvent(new Event('change', { bubbles: true }))")
@@ -38,7 +42,15 @@ class FileUploadControlViewContractTest {
             .contains("initAwsFilePickers(document)")
             .contains("data-file-picker-input")
             .contains("refreshAwsFilePicker")
+            .contains("data-breadcrumb-root-href")
+            .contains("index === 0 && explicitRootHref")
             .contains("window.SaccosFilePickers");
+
+        assertThat(componentCss)
+            .contains(".profile-page-layout")
+            .contains("grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr)")
+            .contains(".profile-identity-panel dl")
+            .contains("@media (max-width: 767px)");
 
         assertThat(componentCss)
             .contains(".aws-file-picker-control")

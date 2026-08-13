@@ -3,6 +3,11 @@ package com.sacco.mvp.repository;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import com.sacco.mvp.domain.LoanProductStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +19,20 @@ public interface LoanProductSettingRepository extends JpaRepository<LoanProductS
     Optional<LoanProductSetting> findBySaccoIdAndLoanType(String saccoId, LoanType loanType);
 
     Optional<LoanProductSetting> findByIdAndSaccoId(UUID id, String saccoId);
+
+    @Query("""
+        select p from LoanProductSetting p
+        where p.saccoId = :saccoId
+          and (p.productStatus is null or p.productStatus not in :excludedStatuses)
+          and (:search = ''
+            or lower(coalesce(p.productCode, '')) like concat(:search, '%')
+            or lower(coalesce(p.productName, '')) like concat(:search, '%'))
+        order by coalesce(p.displayOrder, 2147483647), lower(coalesce(p.productName, '')), p.id
+        """)
+    Page<LoanProductSetting> findConfigurationPage(@Param("saccoId") String saccoId,
+                                                    @Param("excludedStatuses") java.util.Collection<LoanProductStatus> excludedStatuses,
+                                                    @Param("search") String search,
+                                                    Pageable pageable);
 
     Optional<LoanProductSetting> findByIdAndSaccoIdAndActiveTrue(UUID id, String saccoId);
 

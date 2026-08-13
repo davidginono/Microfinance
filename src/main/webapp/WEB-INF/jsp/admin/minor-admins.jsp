@@ -8,11 +8,10 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.minorAdmins.breadcrumb" text="Admin Tools / SACCO Registration / SACCOS Admins Registration" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.minorAdmins.title" text="SACCOS Admins Registration" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.minorAdmins.subtitle" text="Register SACCOS Admin accounts under the correct station." /></p>
 </div>
 
 <c:if test="${not empty createdMinorAdminStaffNumber}">
-    <div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800" aria-live="polite">
+    <div class="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800" aria-live="polite">
         <p class="text-xs font-semibold uppercase tracking-wide">Created SACCOS Admin Staff Number</p>
         <p class="mt-1 text-sm font-semibold">${createdMinorAdminStaffNumber}</p>
     </div>
@@ -99,7 +98,8 @@
         </div>
     </div>
 
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
         <table class="erp-table min-w-[1120px]">
             <thead>
             <tr>
@@ -211,6 +211,7 @@
         </table>
     </div>
 </div>
+                    </div>
 
 <c:forEach items="${minorAdmins}" var="minorAdmin">
     <div class="app-modal-overlay hidden" data-minor-admin-modal="edit-${minorAdmin.accountId}">
@@ -220,13 +221,13 @@
                     <div>
                         <p class="erp-panel-title"><spring:message code="admin.minorAdmins.edit" text="Edit SACCOS Admin" /></p>
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.minorAdmins.editHelp" text="Update the assigned workspace and contact details." /></p>
-                    </div>
+                </div>
                     <button type="button" class="app-modal-close" data-minor-admin-modal-close="edit-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                    </div>
                 <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}" method="post" class="app-modal-body space-y-4" data-minor-admin-edit-form data-minor-admin-form>
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
@@ -283,11 +284,11 @@
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-close="edit-${minorAdmin.accountId}"><spring:message code="common.cancel" text="Cancel" /></button>
                         <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" /></button>
-                    </div>
-                </form>
             </div>
+                </form>
         </div>
     </div>
+                        </div>
 </c:forEach>
 
 <c:forEach items="${minorAdmins}" var="minorAdmin">
@@ -299,13 +300,13 @@
                         <div>
                             <p class="erp-panel-title"><spring:message code="common.delete" text="Delete" /> ${minorAdmin.fullName}</p>
                             <p class="mt-2 text-sm text-slate-500">This permanently removes the inactive SACCOS Admin record and its activation data.</p>
-                        </div>
+                    </div>
                         <button type="button" class="app-modal-close" data-minor-admin-modal-close="delete-${minorAdmin.accountId}" aria-label="<spring:message code='common.close' text='Close' />">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                             </svg>
                         </button>
-                    </div>
+                        </div>
                     <form action="/admin/saccos/minor-admins/${minorAdmin.accountId}/delete" method="post" class="app-modal-body space-y-4" data-minor-admin-form>
                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                         <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -318,10 +319,10 @@
                         <div class="app-modal-actions">
                             <button type="button" class="app-btn btn-neutral" data-minor-admin-modal-close="delete-${minorAdmin.accountId}"><spring:message code="common.cancel" text="Cancel" /></button>
                             <button type="submit" class="app-btn btn-reject"><spring:message code="common.delete" text="Delete" /></button>
-                        </div>
-                    </form>
                 </div>
+                    </form>
             </div>
+        </div>
         </div>
     </c:if>
 </c:forEach>

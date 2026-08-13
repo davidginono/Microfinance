@@ -6,7 +6,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Reports</p>
     <h1 class="erp-page-title">Reporting & Export Architecture</h1>
-    <p class="erp-page-subtitle">Reference architecture for operational, disbursement, and audit reporting.</p>
 </div>
 
 <section class="erp-panel overflow-hidden">
@@ -14,7 +13,8 @@
         <p class="erp-widget-title">25.1 Report Categories</p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink">Report Categories</h2>
     </div>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
         <table class="erp-table">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -46,6 +46,7 @@
             </tbody>
         </table>
     </div>
+        </div>
 </section>
 
 <section class="grid gap-4 xl:grid-cols-2">
@@ -53,7 +54,7 @@
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
             <p class="erp-widget-title">25.2 Disbursement Handoff Report</p>
             <h2 class="mt-1 text-xl font-bold text-sacco-ink">Disbursement Handoff Report</h2>
-        </div>
+            </div>
         <div class="erp-panel-body space-y-5">
             <div>
                 <p class="text-sm font-semibold text-sacco-ink">Purpose</p>
@@ -81,14 +82,14 @@
                     <li>Approval decision summary</li>
                     <li>Prepared by and date</li>
                 </ul>
-            </div>
         </div>
     </div>
+        </div>
     <div class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
             <p class="erp-widget-title">25.3 Reconciliation Report</p>
             <h2 class="mt-1 text-xl font-bold text-sacco-ink">Reconciliation Report</h2>
-        </div>
+            </div>
         <div class="erp-panel-body space-y-5">
             <div>
                 <p class="text-sm font-semibold text-sacco-ink">Purpose</p>
@@ -96,7 +97,8 @@
                     Identify approved applications not yet completed with Loan ID and disbursement details.
                 </p>
             </div>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
@@ -117,7 +119,8 @@
                         <tr><td class="px-4 py-3 font-semibold text-sacco-ink">Remarks</td><td class="px-4 py-3">Notes or exceptions</td></tr>
                     </tbody>
                 </table>
-            </div>
+        </div>
+    </div>
         </div>
     </div>
 </section>

@@ -14,7 +14,8 @@
         <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
     </form>
 </div>
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>
@@ -52,6 +53,7 @@
         </c:if>
         </tbody>
     </table>
+</div>
 </div>
 
 <script>

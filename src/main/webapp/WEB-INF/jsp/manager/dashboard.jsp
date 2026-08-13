@@ -242,7 +242,7 @@ if (!pieRows.isEmpty() && totalStatusCount > 0L) {
     <div class="erp-panel-body">
         <c:choose>
             <c:when test="${dashboardChartTotalCount gt 0}">
-                <div id="managerPieWrap" class="relative rounded-md border border-slate-200 bg-white p-4 sm:p-6">
+                <div id="managerPieWrap" class="relative border border-slate-200 bg-white p-4 sm:p-6">
                     <svg id="managerPieChart" viewBox="0 0 920 480" class="manager-pie-chart mx-auto block w-full max-w-[68rem]" role="img" aria-label="Application status pie chart">
                         <rect x="0" y="0" width="920" height="480" rx="16" fill="#ffffff"></rect>
                         <%= pieMarkup.toString() %>

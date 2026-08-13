@@ -8,14 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.incidents.breadcrumb" text="Admin Tools / Incidents" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.incidents.subtitle" text="Review support messages from SACCO workspace admins." /></p>
-</div>
-
-<div class="mb-3 flex items-center justify-end">
-    <form action="/admin/notifications/mark-all-read" method="post" class="m-0">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllRead" text="Mark all read" /></button>
-    </form>
 </div>
 
 <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
@@ -61,7 +53,8 @@
         </div>
     </form>
 
-<section class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr><th>Subject</th><th>Category</th><th>Status</th><th>Created</th><th>Action</th></tr>
@@ -84,6 +77,7 @@
         </c:if>
         </tbody>
     </table>
+                </div>
 </section>
 
 <c:if test="${isPlatformAdminIdentity}">
@@ -108,10 +102,10 @@
                 <div>
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                     <textarea name="message" rows="5" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
-                </div>
+        </div>
                 <button type="submit" class="app-btn btn-primary">Send Reply</button>
             </form>
-        </div>
+                </div>
 
         <div class="erp-form-wrap">
             <h5 class="erp-panel-title">Broadcast To SACCOS Admins</h5>
@@ -124,7 +118,7 @@
                 <div>
                     <label class="mb-1 block text-sm font-semibold text-slate-700">Message</label>
                     <textarea name="message" rows="6" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required></textarea>
-                </div>
+        </div>
                 <button type="submit" class="app-btn btn-primary">Send Broadcast</button>
             </form>
         </div>

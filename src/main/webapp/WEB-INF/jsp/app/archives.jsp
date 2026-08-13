@@ -22,7 +22,7 @@
                     </div>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(guarantorArchives)} <spring:message code="common.shown" text="shown" /></span>
                 </div>
-<form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto] aws-filter-toolbar" data-aws-filter-toolbar>
+<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar>
                     <input type="hidden" name="section" value="guarantors" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="archives.loanIdSearch" text="Loan ID Search" /></span>
@@ -30,24 +30,33 @@
                                name="guarantorArchiveQuery"
                                value="${guarantorArchiveQuery}"
                                placeholder="<spring:message code='common.searchLoanId' text='Search loan ID' />"
-                               class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none" />
+                               class="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none" />
                     </label>
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="common.filter" text="Filter" /></span>
-                        <select name="guarantorArchiveFilter" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none">
+                        <select name="guarantorArchiveFilter" class="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none">
                             <option value="ALL" ${guarantorArchiveFilter eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
                             <option value="APPROVED" ${guarantorArchiveFilter eq 'APPROVED' ? 'selected' : ''}><spring:message code="review.approved" text="Approved" /></option>
                             <option value="REJECTED" ${guarantorArchiveFilter eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
                             <option value="EXPIRED" ${guarantorArchiveFilter eq 'EXPIRED' ? 'selected' : ''}><spring:message code="common.expired" text="Expired" /></option>
                         </select>
                     </label>
-                    <div class="flex items-end gap-2">
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.apply" text="Apply" /></button>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="common.fromDate" text="From Date" />
+                        <input type="date" name="fromDate" value="${fromDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+                    </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="common.toDate" text="To Date" />
+                        <input type="date" name="toDate" value="${toDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+                    </label>
+                    <div class="archive-filter-actions">
+                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
                         <a href="/app/archives?section=guarantors" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                     </div>
                 </form>
             </div>
-<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -87,6 +96,7 @@
                     </tbody>
                 </table>
             </div>
+                    </div>
         </section>
     </c:when>
     <c:otherwise>
@@ -96,10 +106,10 @@
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="archives.loan.title" text="Loan Archive" /></p>
                         <p class="mt-2 text-sm text-slate-600"><spring:message code="archives.loan.subtitle" text="Search by loan ID and filter archived loan outcomes." /></p>
-                    </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(archives)} <spring:message code="common.shown" text="shown" /></span>
                 </div>
-                <form action="/app/archives" method="get" class="erp-filter-form mt-4 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_220px_auto]">
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">${fn:length(archives)} <spring:message code="common.shown" text="shown" /></span>
+                    </div>
+<form action="/app/archives" method="get" class="erp-filter-form mt-4 aws-filter-toolbar" data-aws-filter-toolbar>
                     <input type="hidden" name="section" value="loans" />
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="archives.loanIdSearch" text="Loan ID Search" /></span>
@@ -107,11 +117,11 @@
                                name="loanArchiveQuery"
                                value="${loanArchiveQuery}"
                                placeholder="<spring:message code='common.searchLoanId' text='Search loan ID' />"
-                               class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none" />
+                               class="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none" />
                     </label>
                     <label class="block">
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"><spring:message code="common.filter" text="Filter" /></span>
-                        <select name="loanArchiveFilter" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none">
+                        <select name="loanArchiveFilter" class="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none">
                             <option value="ALL" ${loanArchiveFilter eq 'ALL' ? 'selected' : ''}><spring:message code="archives.loan.allArchived" text="All archived loans" /></option>
                             <option value="DISBURSED" ${loanArchiveFilter eq 'DISBURSED' ? 'selected' : ''}><spring:message code="archives.loan.disbursedOnly" text="Disbursed only" /></option>
                             <option value="DEFAULTED" ${loanArchiveFilter eq 'DEFAULTED' ? 'selected' : ''}><spring:message code="archives.loan.defaultedOnly" text="Defaulted only" /></option>
@@ -119,13 +129,22 @@
                             <option value="REJECTED" ${loanArchiveFilter eq 'REJECTED' ? 'selected' : ''}><spring:message code="archives.loan.rejectedOnly" text="Rejected only" /></option>
                         </select>
                     </label>
-                    <div class="flex items-end gap-2">
-                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.apply" text="Apply" /></button>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="common.fromDate" text="From Date" />
+                        <input type="date" name="fromDate" value="${fromDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+                    </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="common.toDate" text="To Date" />
+                        <input type="date" name="toDate" value="${toDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+                    </label>
+                    <div class="archive-filter-actions">
+                        <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
                         <a href="/app/archives?section=loans" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
-                    </div>
+            </div>
                 </form>
             </div>
-<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -135,7 +154,7 @@
                         <th><spring:message code="common.amount" text="Amount" /></th>
                         <th><spring:message code="common.status" text="Status" /></th>
                         <th><spring:message code="loan.date" text="Date" /></th>
-                        <th></th>
+                        <th scope="col" class="erp-table-action-column"><spring:message code="common.actions" text="Actions" /></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -158,7 +177,11 @@
                                     <c:otherwise>${fn:replace(fn:substring(app.updatedAt, 0, 16), 'T', ' ')}</c:otherwise>
                                 </c:choose>
                             </td>
-                            <td><a href="/app/loan-applications/${app.id}" class="app-btn btn-primary"><spring:message code="common.view" /></a></td>
+                            <td class="erp-table-action-column">
+                                <div class="erp-table-actions">
+                                    <a href="/app/loan-applications/${app.id}" class="app-btn btn-primary"><spring:message code="common.view" /></a>
+                                </div>
+                            </td>
                         </tr>
                     </c:forEach>
                     <c:if test="${empty archives}">
@@ -168,6 +191,7 @@
                     </c:if>
                     </tbody>
                 </table>
+</div>
             </div>
         </section>
     </c:otherwise>
@@ -184,6 +208,8 @@
                     <c:param name="loanArchiveFilter" value="${loanArchiveFilter}" />
                     <c:param name="guarantorArchiveQuery" value="${guarantorArchiveQuery}" />
                     <c:param name="guarantorArchiveFilter" value="${guarantorArchiveFilter}" />
+                    <c:param name="fromDate" value="${fromDate}" />
+                    <c:param name="toDate" value="${toDate}" />
                 </c:url>
                 <a class="app-btn btn-neutral" href="${archivePreviousUrl}">Previous</a>
             </c:when>
@@ -198,6 +224,8 @@
                 <c:param name="loanArchiveFilter" value="${loanArchiveFilter}" />
                 <c:param name="guarantorArchiveQuery" value="${guarantorArchiveQuery}" />
                 <c:param name="guarantorArchiveFilter" value="${guarantorArchiveFilter}" />
+                <c:param name="fromDate" value="${fromDate}" />
+                <c:param name="toDate" value="${toDate}" />
             </c:url>
             <a class="app-btn btn-neutral" href="${archiveNextUrl}">Next</a>
         </c:if>

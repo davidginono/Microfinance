@@ -9,7 +9,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.outbox.breadcrumb" text="Admin Tools / Outbox Monitor" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.outbox.subtitle" text="Monitor event delivery and retries." /></p>
 </div>
 <section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results">
     <div class="app-table-titlebar">

@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.AdminIncident;
 import com.sacco.mvp.domain.IncidentSeverity;
 import com.sacco.mvp.domain.IncidentStatus;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,6 +34,22 @@ public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UU
                                             Pageable pageable);
 
     List<AdminIncident> findByReportedByMemberIdOrderByCreatedAtDesc(UUID reportedByMemberId);
+
+    @Query("""
+        select i
+        from AdminIncident i
+        where i.reportedByMemberId = :reporterId
+          and i.category = 'SUPPORT_MESSAGE'
+          and i.source = :source
+          and (cast(:sentFrom as timestamp) is null or i.createdAt >= :sentFrom)
+          and (cast(:sentToExclusive as timestamp) is null or i.createdAt < :sentToExclusive)
+        order by i.createdAt desc
+        """)
+    Page<AdminIncident> findSupportArchivePage(@Param("reporterId") UUID reporterId,
+                                               @Param("source") String source,
+                                               @Param("sentFrom") OffsetDateTime sentFrom,
+                                               @Param("sentToExclusive") OffsetDateTime sentToExclusive,
+                                               Pageable pageable);
 
     List<AdminIncident> findBySaccoIdAndStatusOrderByCreatedAtDesc(String saccoId, IncidentStatus status);
 

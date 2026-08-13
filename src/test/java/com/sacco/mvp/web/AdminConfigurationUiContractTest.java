@@ -174,6 +174,7 @@ class AdminConfigurationUiContractTest {
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(sidebar)
+            .contains("shell-sidebar-group shell-sidebar-support-group space-y-1")
             .contains("staffDashboardActive ? 'shell-nav-active")
             .contains("staffReportsActive ? 'shell-nav-active")
             .contains("/images/computer-resources-mark-orange.png")
@@ -209,15 +210,23 @@ class AdminConfigurationUiContractTest {
     void incidentAndManagerArchiveFiltersLeaveNoEmptyToolbarBars() throws Exception {
         String incidents = read(JSP_ROOT.resolve("admin/incidents.jsp"));
         String managerArchive = read(JSP_ROOT.resolve("manager/archive.jsp"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(incidents)
             .contains("class=\"admin-filter-form admin-filter-bar aws-filter-toolbar\"")
+            .doesNotContain("/admin/notifications/mark-all-read")
             .doesNotContain("<section class=\"erp-form-wrap\">\n<form action=\"/admin/incidents\"");
         assertThat(managerArchive)
             .contains("<div class=\"erp-filter-row\">")
             .contains("class=\"erp-filter-form manager-archive-search-form aws-filter-toolbar\"")
             .doesNotContain("common.currentFilter")
             .doesNotContain("<div class=\"erp-toolbar\">");
+        assertThat(shellCss)
+            .contains(".aws-console .aws-filter-toolbar label > .neo-select")
+            .contains("height: var(--sacco-control-height) !important")
+            .contains("max-height: var(--sacco-control-height) !important")
+            .contains("padding-top: 0 !important")
+            .contains("margin-top: 4px !important");
     }
 
     @Test

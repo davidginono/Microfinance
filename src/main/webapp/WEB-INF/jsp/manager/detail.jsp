@@ -16,7 +16,7 @@
     <h1 class="erp-page-title">${reviewPanelTitle}</h1>
 </div>
 <c:if test="${app.status eq 'AWAITING_BOARD'}">
-    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <div class="mb-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
     </div>
 </c:if>
@@ -146,7 +146,7 @@
 
 <div class="mt-4 space-y-4">
     <c:if test="${not empty managerReason}">
-        <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
+        <div class="border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
             <strong><spring:message code="review.currentRejectionReason" text="Current Rejection Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
@@ -225,7 +225,8 @@
                     <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
                 </div>
             </div>
-<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -263,14 +264,15 @@
                     </tbody>
                 </table>
             </div>
+            </div>
         </c:when>
         <c:otherwise>
-            <div class="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <div class="mt-5 border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
                 <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
-            </div>
+</div>
         </c:otherwise>
     </c:choose>
-</div>
+            </div>
 </c:if>
 
 <c:choose>
@@ -288,8 +290,8 @@
             </button>
             <div id="disbursementFinancialDetailsPanel" class="disbursement-collapsible-content" hidden>
                 <%@ include file="../fragments/financial-field-sections.jspf" %>
-            </div>
         </div>
+                        </div>
     </c:when>
     <c:otherwise>
         <%@ include file="../fragments/financial-field-sections.jspf" %>
@@ -297,9 +299,10 @@
 </c:choose>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap mt-5 overflow-x-auto">
+    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <div class="erp-table-scroll">
+        <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -318,7 +321,7 @@
                         <div class="flex flex-wrap gap-2">
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral"><spring:message code="common.view" text="View" /></a>
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary" data-download-action="true"><spring:message code="common.download" text="Download" /></a>
-                        </div>
+    </div>
                     </td>
                 </tr>
             </c:forEach>
@@ -327,13 +330,15 @@
             </c:if>
             </tbody>
         </table>
-    </div>
+</div>
+                        </div>
 </c:if>
 
 <c:if test="${not hideDisbursementSupportSections}">
-<div class="erp-table-wrap mt-5 overflow-x-auto">
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <div class="erp-table-scroll">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -356,13 +361,15 @@
         </c:if>
         </tbody>
     </table>
-</div>
+                        </div>
+                    </div>
 </c:if>
 
 <c:if test="${not hideDisbursementSupportSections}">
-<div class="erp-table-wrap mt-5 overflow-x-auto">
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <div class="erp-table-scroll">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
@@ -405,7 +412,7 @@
                         <div class="guarantor-financial-result-row">
                             <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Savings" /></span>
                             <span class="guarantor-financial-result-value" data-financial-savings>-</span>
-                        </div>
+</div>
                         <div class="guarantor-financial-result-row">
                             <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Shares" /></span>
                             <span class="guarantor-financial-result-value" data-financial-shares>-</span>
@@ -420,7 +427,8 @@
         </c:if>
         </tbody>
     </table>
-</div>
+                        </div>
+                    </div>
 </c:if>
 
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
@@ -429,15 +437,15 @@
     <form action="${reviewBasePath}/loan-applications/${app.id}/decision" method="post" class="erp-form-wrap mt-5 space-y-3" data-manager-decision-form="true">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <label class="block text-sm font-medium text-slate-700">${reviewCommentLabel}</label>
-        <textarea name="reasons" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
+        <textarea name="reasons" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" placeholder="${reviewCommentPlaceholder}"></textarea>
         <c:choose>
             <c:when test="${staffDecisionOtpEnabled}">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div class="border border-slate-200 bg-slate-50 px-4 py-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                             <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.otp.requestBeforeDecision" text="Request a one-time code before submitting your review decision." /></p>
-                        </div>
+                </div>
                         <button type="button"
                                 class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
                                 data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-decision-otp"
@@ -445,8 +453,8 @@
                             <span class="otp-button-spinner hidden"></span>
                             <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                         </button>
-                    </div>
-                    <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                </div>
+                    <div class="staff-otp-feedback mt-3 hidden border px-4 py-3 text-sm"></div>
                     <div class="mt-3">
                         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                         <input type="text"
@@ -456,23 +464,23 @@
                                autocomplete="one-time-code"
                                data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.decisionCode' text='Decision OTP code' />"
                                required
-                               class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                               class="w-full border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                placeholder="123456" />
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.decisionCodeHelp" text="Enter the 6-digit code sent to your email before approving or rejecting." /></p>
-                        <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                        <div class="staff-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                             <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                             <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
                             </svg>
                             <span data-otp-text>Enter the code to verify it.</span>
-                        </div>
-                    </div>
-                </div>
+        </div>
+        </div>
+        </div>
             </c:when>
             <c:otherwise>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                <div class="border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
                     <spring:message code="otp.approvalDisabledHelp" text="OTP confirmation is disabled for this approval." />
-                </div>
+    </div>
             </c:otherwise>
         </c:choose>
         <div class="flex flex-wrap gap-2">
@@ -484,9 +492,9 @@
 
 <c:if test="${showManagerReversalRequests and not empty pendingManagerStageWithdrawal}">
     <div class="erp-form-wrap mt-5 space-y-3">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             The applicant wants this loan application removed while it is still under manager review. Review the request before anything changes.
-        </div>
+    </div>
         <div class="flex flex-wrap gap-2">
             <form action="${reviewBasePath}/loan-applications/${app.id}/reversal-requests/${pendingManagerStageWithdrawal.id}/approve"
                   method="post"
@@ -507,21 +515,21 @@
                     <textarea name="decisionReason"
                               rows="2"
                               required
-                              class="mt-1 w-full min-w-[16rem] rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 focus:border-sacco-blue focus:outline-none"
+                              class="mt-1 w-full min-w-[16rem] border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 focus:border-sacco-blue focus:outline-none"
                               placeholder="Enter why this removal request is declined."></textarea>
                 </label>
                 <button type="submit" class="app-btn btn-reject">Decline Removal</button>
             </form>
+            </div>
         </div>
-    </div>
 </c:if>
 
 <c:if test="${showDisbursementPermissionMessage}">
     <div class="erp-form-wrap mt-5">
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+        <div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
             <spring:message code="loan.disbursement.permissionMissing" text="This loan is ready for disbursement, but your account does not have the Disburse Loan claim. Ask the admin to update your role claims, then sign in again." />
-        </div>
-    </div>
+            </div>
+            </div>
 </c:if>
 
 <c:if test="${showDisbursementForm}">
@@ -538,23 +546,23 @@
             <div>
                 <label class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></label>
                 <p class="mt-1 text-sm text-slate-500"><spring:message code="loan.disbursement.formHelp" text="Enter the release date and repayment terms before final approval." /></p>
-            </div>
+                            </div>
             <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                 <c:choose>
                     <c:when test="${app.status eq 'BOARD_APPROVED'}"><spring:message code="loan.disbursement.committeeThresholdReady" text="Committee approval threshold reached" /></c:when>
                     <c:otherwise><spring:message code="loan.disbursement.readyStatus" text="Ready for disbursement" /></c:otherwise>
                 </c:choose>
             </span>
-        </div>
+                            </div>
         <div class="grid gap-4 md:grid-cols-2">
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.disbursementDate" text="Disbursement Date" /></label>
-                <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
-            </div>
+                <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                            </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.firstRepayment" text="First Repayment Date" /></label>
-                <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
-            </div>
+                <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                        </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
@@ -564,7 +572,7 @@
                        inputmode="decimal"
                        autocomplete="off"
                        required
-                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        placeholder="100,000" />
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <button type="button"
@@ -581,7 +589,7 @@
                         <spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" />
                     </button>
                     <c:if test="${not empty deductibleFeeRows}">
-                        <div class="hidden w-full rounded-md border border-slate-200 bg-white px-4 py-4 shadow-sm"
+                        <div class="hidden w-full border border-slate-200 bg-white px-4 py-4 shadow-sm"
                              data-fee-deduction-card>
                             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                                 <p class="text-sm font-semibold text-sacco-ink"><spring:message code="loan.disbursement.selectFees" text="Select fees to deduct" /></p>
@@ -591,21 +599,21 @@
                                            data-fee-select-all />
                                     <span><spring:message code="loan.disbursement.includeAllFees" text="Include all fees" /></span>
                                 </label>
-                            </div>
+                </div>
                             <div class="mt-3 space-y-2">
                                 <c:forEach items="${deductibleFeeRows}" var="fee">
-                                    <label class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                    <label class="flex items-center justify-between gap-3 border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                                         <span class="inline-flex min-w-0 items-center gap-2">
                                             <input type="checkbox"
                                                    class="h-4 w-4 shrink-0 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue"
                                                    data-fee-option
                                                    data-fee-amount="${fee.amount}" />
-                                            <span class="truncate font-semibold text-slate-700"><c:out value="${fee.label}" /></span>
+                                            <span class="min-w-0 break-words font-semibold text-slate-700"><c:out value="${fee.label}" /></span>
                                         </span>
                                         <span class="shrink-0 font-semibold text-sacco-ink"><c:out value="${fee.amountLabel}" /></span>
                                     </label>
                                 </c:forEach>
-                            </div>
+            </div>
                             <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                                 <p class="text-xs font-semibold text-slate-500">
                                     <spring:message code="loan.disbursement.selectedFees" text="Selected fees" />:
@@ -617,46 +625,46 @@
                                         disabled>
                                     <spring:message code="loan.disbursement.deductSelectedFees" text="Deduct" />
                                 </button>
-                            </div>
+                        </div>
                         </div>
                     </c:if>
                     <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.cashOrDepositHelp" text="This is the amount the applicant will receive in cash/bank, while the required loan to be returned by the applicant remains the approved amount." /></p>
-                </div>
-            </div>
+                        </div>
+                    </div>
             <div class="md:col-span-2">
-                <div class="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
+                <div class="border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-700">
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.approvedLoanAmount" text="Approved Loan Amount" /></span>
                             <span class="mt-1 block font-semibold text-slate-900" data-disbursement-requested-amount><fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
-                        </div>
+                </div>
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.totalFees" text="Total Fees" /></span>
                             <span class="mt-1 block font-semibold text-slate-900" data-disbursement-fees-amount>${totalDeductions}</span>
-                        </div>
+            </div>
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /></span>
                             <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
-                        </div>
-                    </div>
+            </div>
                 </div>
             </div>
+        </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.loanId" text="Loan ID" /> <span class="text-rose-600">*</span></label>
                 <input type="text" name="loanId" value="${app.loanId}"
                        pattern="[0-9]{4,20}" inputmode="numeric" required maxlength="20"
                        title="<spring:message code='loan.disbursement.loanIdTitle' text='Enter the SACCO loan-book number (4-20 digits)' />"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        placeholder="<spring:message code='loan.disbursement.loanIdPlaceholder' text='SACCO loan-book number (digits only)' />" />
                 <p class="mt-1 text-xs text-slate-500"><spring:message code="loan.disbursement.loanIdHelp" text="Entered at disbursement. 4-20 digits, unique within this SACCO." /></p>
-            </div>
+        </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
                 <div class="erp-section-muted text-sm text-slate-600">
                     <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The repayment schedule will use the standard monthly cycle and calculate the final due date automatically." />
+        </div>
                 </div>
             </div>
-        </div>
         <div>
             <label class="mb-1 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
                 <span><spring:message code="loan.attachments.disbursementProof" text="Disbursement Proof" /></span>
@@ -693,17 +701,17 @@
                     <c:otherwise><spring:message code="loan.disbursement.proofOptionalHelp" text="This product allows disbursement without proof, but a proof file can still be attached." /></c:otherwise>
                 </c:choose>
             </p>
-        </div>
+                </div>
         <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">${disbursementNotesLabel}</label>
-            <textarea name="disbursementNotes" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${app.disbursementNotes}</textarea>
-        </div>
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <textarea name="disbursementNotes" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" rows="3" placeholder="<spring:message code='loan.disbursement.notesPlaceholder' text='Optional disbursement or repayment instructions' />">${app.disbursementNotes}</textarea>
+            </div>
+        <div class="border border-slate-200 bg-slate-50 px-4 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                     <p class="mt-2 text-sm text-slate-600"><spring:message code="loan.disbursement.otpHelp" text="Request a one-time code before disbursing this loan." /></p>
-                </div>
+        </div>
                 <button type="button"
                         class="app-btn btn-primary otp-request-button staff-otp-request inline-flex items-center justify-center gap-2"
                         data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-disbursement-otp"
@@ -712,7 +720,7 @@
                     <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                 </button>
             </div>
-            <div class="staff-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+            <div class="staff-otp-feedback mt-3 hidden border px-4 py-3 text-sm"></div>
             <div class="mt-3">
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                 <input type="text"
@@ -722,10 +730,10 @@
                        autocomplete="one-time-code"
                        data-otp-hidden="true" data-otp-label="<spring:message code='loan.disbursement.otpCode' text='Disbursement OTP code' />"
                        required
-                       class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                       class="w-full border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                        placeholder="123456" />
                 <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.disbursement.codeHelp" text="Enter the 6-digit code sent to your email before completing disbursement." /></p>
-                <div class="staff-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                <div class="staff-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                     <span data-otp-spinner class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                     <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21A1 1 0 114.71 7.796l4.037 4.037 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -1014,10 +1022,7 @@
             }
 
             function setStatus(state, message) {
-                statusBox.classList.remove(
-                    "hidden", "border-slate-200", "bg-white", "text-slate-600",
-                    "border-emerald-200", "bg-emerald-50", "text-emerald-700",
-                    "border-rose-200", "bg-rose-50", "text-rose-700"
+                statusBox.classList.remove("hidden","border-slate-200","bg-white","text-slate-600","border-emerald-200","bg-emerald-50","text-emerald-700","border-rose-200","bg-rose-50","text-rose-700"
                 );
                 statusBox.classList.add("flex");
                 spinner?.classList.toggle("hidden", state !== "checking");
@@ -1058,10 +1063,7 @@
                     body.set("otpCode", code);
                     const response = await fetch(verifyUrl, {
                         method: "POST",
-                        headers: {
-                            "X-CSRF-TOKEN": csrfToken,
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json"
+                        headers: {"X-CSRF-TOKEN": csrfToken,"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                         },
                         body,
                         credentials: "same-origin"
@@ -1174,9 +1176,7 @@
                 try {
                     const response = await fetch(requestUrl, {
                         method: "POST",
-                        headers: {
-                            "X-CSRF-TOKEN": csrfToken,
-                            "Accept": "application/json"
+                        headers: {"X-CSRF-TOKEN": csrfToken,"Accept":"application/json"
                         },
                         credentials: "same-origin"
                     });

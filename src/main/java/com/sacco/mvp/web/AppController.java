@@ -8,6 +8,8 @@ import com.sacco.mvp.service.EligibilityService;
 import com.sacco.mvp.service.FinancialDetailsService;
 import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.AdminService;
+import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanAttachmentService;
@@ -37,6 +39,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
@@ -91,6 +94,7 @@ public class AppController {
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final AdminService adminService;
+    private final ApplicationClock applicationClock;
     private final EmailOtpService emailOtpService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
@@ -301,9 +305,12 @@ public class AppController {
                            @RequestParam(required = false, defaultValue = "ALL") String loanArchiveFilter,
                            @RequestParam(required = false) String guarantorArchiveQuery,
                            @RequestParam(required = false, defaultValue = "ALL") String guarantorArchiveFilter,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                            @RequestParam(required = false, defaultValue = "0") int page,
                            Model model) {
         String archiveSection = normalizeArchiveSection(section);
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
         int safePage = Math.max(page, 0);
         PageRequest pageRequest = PageRequest.of(safePage, MEMBER_ARCHIVE_PAGE_SIZE);
         Page<LoanApplication> loanArchivePage = Page.empty(pageRequest);
@@ -314,6 +321,8 @@ public class AppController {
                 OffsetDateTime.now().minusHours(REVERSAL_WINDOW_HOURS),
                 safeGuarantorArchiveStatus(guarantorArchiveFilter),
                 normalizedArchiveQuery(guarantorArchiveQuery),
+                dateRange.fromInclusive(),
+                dateRange.toExclusive(),
                 pageRequest
             );
         } else {
@@ -321,6 +330,8 @@ public class AppController {
                 principal.getMemberId(),
                 loanArchiveStatuses(loanArchiveFilter),
                 normalizedArchiveQuery(loanArchiveQuery),
+                dateRange.fromInclusive(),
+                dateRange.toExclusive(),
                 pageRequest
             );
         }
@@ -336,6 +347,8 @@ public class AppController {
         model.addAttribute("loanArchiveFilter", safeArchiveFilter(loanArchiveFilter));
         model.addAttribute("guarantorArchiveQuery", safeArchiveQuery(guarantorArchiveQuery));
         model.addAttribute("guarantorArchiveFilter", safeArchiveFilter(guarantorArchiveFilter));
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         addGuaranteeContext(guarantorArchives, model);
         return "app/archives";
     }
@@ -2037,8 +2050,17 @@ public class AppController {
     @GetMapping("/support/archive")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String supportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
+                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                 @RequestParam(defaultValue = "0") int page,
                                  Model model) {
-        model.addAttribute("supportArchive", adminService.memberSupportArchive(principal.getMemberId()));
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
+        Page<AdminService.SupportArchiveView> archivePage = adminService.memberSupportArchive(
+            principal.getMemberId(), dateRange.fromDate(), dateRange.toDate(), page);
+        model.addAttribute("supportArchive", archivePage.getContent());
+        model.addAttribute("archivePage", archivePage);
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return "app/support-archive";
     }
 

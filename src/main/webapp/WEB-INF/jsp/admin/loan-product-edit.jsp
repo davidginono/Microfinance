@@ -349,7 +349,7 @@
                                 </label>
                                 <input type="hidden" name="applicantAttachmentRequired" value="false" />
                             </div>
-                            <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '}rounded-md border border-slate-200 bg-white p-3" data-required-attachments-panel>
+                            <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '} border border-slate-200 bg-white p-3" data-required-attachments-panel>
                                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
@@ -357,7 +357,7 @@
                                     </div>
                                     <button type="button" class="app-btn btn-neutral" data-required-attachment-add>Add Name of Required Attachment</button>
                                 </div>
-                                <div class="hidden rounded-md border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
+                                <div class="hidden border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
                                     <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end">
                                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             Attachment Name
@@ -371,7 +371,8 @@
                                         <button type="button" class="app-btn btn-neutral" data-required-attachment-cancel>Cancel</button>
                                     </div>
                                 </div>
-                                <div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm mt-4" data-aws-table-region data-loading-label="Loading members...">
+                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading members...">
+                                    <div class="erp-table-scroll erp-table-scroll-sm">
                                     <table class="erp-table min-w-[620px]">
                                         <thead>
                                         <tr>
@@ -402,6 +403,7 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
                             </div>
                             </div>
                         </details>
@@ -443,9 +445,9 @@
                             <summary class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></summary>
                             <div class="product-config-subsection-body">
                             <div class="workflow-warning-stack" data-workflow-warnings></div>
-                            </div>
-                        </details>
                     </div>
+                        </details>
+                        </div>
                 </section>
 
                 <section class="product-builder-section product-config-step" data-product-config-step="preview" aria-label="Review flow">
@@ -453,7 +455,7 @@
                         <div class="workflow-preview-shell">
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
                             <div class="mt-3 workflow-preview-runtime" data-workflow-preview-runtime></div>
-                        </div>
+                    </div>
                     </div>
                 </section>
 
@@ -466,10 +468,10 @@
                         <span class="product-config-save-state" data-product-config-save-state>Changes save only when you select Save product.</span>
                         <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral">Cancel</a>
                         <button type="submit" class="app-btn btn-primary">Save product</button>
-                    </div>
                 </div>
-        </form>
     </div>
+        </form>
+</div>
 </div>
 
 <form id="requiredAttachmentCreateForm" action="/admin/settings-controls/loan-products/${product.id}/required-attachments" method="post" class="hidden">

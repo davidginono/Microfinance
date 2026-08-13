@@ -150,6 +150,38 @@ class AccessControlServiceTest {
         ))).isTrue();
     }
 
+    @Test
+    void chairpersonReadOnlyDestinationsDependOnIndependentClaimsNotPosition() {
+        AppUserPrincipal managerWithProcessedLoans = principal(
+            List.of(Position.MANAGER), false, true, Set.of(UserClaim.PROCESSED_LOANS_VIEW));
+        AppUserPrincipal chairpersonWithoutClaims = principal(
+            List.of(Position.CHAIRPERSON), false, true, Set.of());
+        AppUserPrincipal configurationsOnly = principal(
+            List.of(Position.ACCOUNTANT), false, true, Set.of(UserClaim.SACCO_CONFIGURATIONS_VIEW));
+
+        assertThat(access.canViewProcessedLoans(managerWithProcessedLoans)).isTrue();
+        assertThat(access.canViewSaccoConfigurations(managerWithProcessedLoans)).isFalse();
+        assertThat(access.canViewProcessedLoans(chairpersonWithoutClaims)).isFalse();
+        assertThat(access.canViewSaccoConfigurations(chairpersonWithoutClaims)).isFalse();
+        assertThat(access.canViewSaccoConfigurations(configurationsOnly)).isTrue();
+        assertThat(access.canViewProcessedLoans(configurationsOnly)).isFalse();
+    }
+
+    @Test
+    void chairpersonReadOnlyDestinationsFailClosedWithoutStationScope() {
+        Member member = Member.builder()
+            .id(UUID.randomUUID()).saccoId("SACCO-01").stationId(null).memberNo("MEM-1").staffNo("STAFF-1")
+            .fullName("Missing Station").memberAccount(false).staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .status(MemberStatus.ACTIVE).position(Position.MANAGER)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER))).passwordHash("secret")
+            .createdAt(OffsetDateTime.now()).build();
+        AppUserPrincipal principal = new AppUserPrincipal(member,
+            Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.SACCO_CONFIGURATIONS_VIEW), true);
+
+        assertThat(access.canViewProcessedLoans(principal)).isFalse();
+        assertThat(access.canViewSaccoConfigurations(principal)).isFalse();
+    }
+
     private AppUserPrincipal principal(List<Position> staffRoles,
                                        boolean memberAccess,
                                        boolean staffSession,

@@ -755,6 +755,23 @@ button:active {
     border-bottom: 0;
 }
 .erp-table-actions {
+    display: flex;
+    min-width: 0;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: normal;
+}
+.erp-table-actions > form {
+    margin: 0;
+}
+.erp-table th.erp-table-action-column,
+.erp-table td.erp-table-action-column {
+    width: 1%;
+    min-width: 10rem;
+    text-align: center !important;
+    vertical-align: middle;
     white-space: nowrap;
 }
 .erp-table {
@@ -1615,7 +1632,7 @@ button:active {
 
 /* AWS Management Console-inspired application theme. */
 :root {
-    --sacco-topbar: #101820;
+    --sacco-topbar: #162238;
     --sacco-sidebar: #183038;
     --sacco-sidebar-hover: #21414b;
     --sacco-sidebar-active: #1f414c;
@@ -1639,7 +1656,7 @@ button:active {
     --sacco-sidebar-width: 236px;
     --sacco-sidebar-collapsed-width: 48px;
     --aws-ink: #16191f;
-    --aws-topbar: #101820;
+    --aws-topbar: #162238;
     --aws-sidebar: #183038;
     --aws-sidebar-hover: #21414b;
     --aws-sidebar-active: #1f414c;
@@ -3596,8 +3613,8 @@ body.aws-console,
 .aws-settings-header {
     min-height: 39px;
     border-bottom: 1px solid var(--aws-line);
-    background: #eaeded;
-    padding: 7px 10px;
+    background: #f7f8f8;
+    padding: 8px 10px;
 }
 
 .aws-settings-kicker {
@@ -3605,12 +3622,12 @@ body.aws-console,
 }
 
 .aws-settings-title {
-    margin: 1px 0 0;
+    margin: 0;
     color: var(--aws-ink);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0;
-    line-height: 20px;
+    line-height: 22px;
 }
 
 .aws-settings-description,
@@ -3631,11 +3648,13 @@ body.aws-console,
 }
 
 .aws-settings-control-row {
-    display: grid;
-    grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
-    align-items: end;
-    gap: 8px 12px;
-    max-width: 58rem;
+    display: flex;
+    width: min(100%, 34rem);
+    max-width: 34rem;
+    min-width: 0;
+    flex-flow: column nowrap;
+    align-items: stretch;
+    gap: 4px;
 }
 
 .aws-settings-grid,
@@ -4049,7 +4068,6 @@ body.aws-console,
 
 @media (max-width: 767px) {
     .aws-status-summary-grid,
-    .aws-settings-control-row,
     .aws-settings-grid,
     .platform-settings-grid {
         grid-template-columns: minmax(0, 1fr) !important;
@@ -4107,21 +4125,36 @@ body.aws-console,
     white-space: nowrap;
 }
 
-/* SIMS reference shell: compact utility bar, grouped dark rail, and breadcrumb strip. */
+.aws-console .platform-sacco-card-header {
+    flex-wrap: wrap;
+}
+
+.aws-console .platform-sacco-card-title {
+    flex: 1 1 15rem;
+}
+
+.aws-console .platform-sacco-card-status {
+    max-width: 100%;
+    flex: 0 1 auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Final Cloudscape workspace shell shared by every authenticated role. */
 :root {
-    --shell-sidebar-width: 220px;
-    --shell-sidebar-collapsed-width: 56px;
-    --shell-nav-height: 38px;
+    --shell-sidebar-width: var(--sacco-sidebar-width);
+    --shell-sidebar-collapsed-width: var(--sacco-sidebar-collapsed-width);
+    --shell-nav-height: var(--sacco-topbar-height);
     --shell-context-height: 36px;
     --shell-content-gap: 0px;
-    --shell-nav-fixed-height: 38px;
-    --shell-topbar-control-height: 32px;
-    --shell-sims-topbar: #16191f;
-    --shell-sims-sidebar: #1e272e;
-    --shell-sims-sidebar-border: #3b4851;
-    --shell-sims-sidebar-control: #25313a;
-    --shell-sims-sidebar-hover: #232e36;
-    --shell-sims-sidebar-active: #25313a;
+    --shell-nav-fixed-height: var(--sacco-topbar-height);
+    --shell-topbar-control-height: var(--sacco-control-height);
+    --shell-sims-topbar: var(--sacco-topbar);
+    --shell-sims-sidebar: var(--sacco-sidebar);
+    --shell-sims-sidebar-border: #50616d;
+    --shell-sims-sidebar-control: #203b45;
+    --shell-sims-sidebar-hover: var(--sacco-sidebar-hover);
+    --shell-sims-sidebar-active: var(--sacco-sidebar-active);
     --shell-sims-sidebar-muted: #aab7b8;
 }
 
@@ -4137,8 +4170,8 @@ body.aws-console,
     min-height: 100%;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0 !important;
-    padding: 0 8px !important;
-    font-size: 12px;
+    padding: 0 12px !important;
+    font-size: 14px;
 }
 
 .app-topbar-left {
@@ -4158,24 +4191,24 @@ body.aws-console,
 
 .app-global-brand {
     align-self: stretch;
-    flex: 0 0 174px;
-    min-width: 174px;
+    flex: 0 0 212px;
+    min-width: 212px;
     gap: 8px !important;
     border-right: 1px solid #414750;
     padding-right: 8px;
 }
 
 .app-global-brand .app-global-logo {
-    width: 32px !important;
-    height: 28px !important;
-    min-width: 32px;
-    border-radius: 0 !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px;
+    border-radius: var(--sacco-radius) !important;
 }
 
 .app-global-brand p:first-child {
-    max-width: 126px;
-    font-size: 13px !important;
-    line-height: 18px !important;
+    max-width: 158px;
+    font-size: 14px !important;
+    line-height: 20px !important;
     white-space: nowrap !important;
 }
 
@@ -4192,9 +4225,9 @@ body.aws-console,
 
 .aws-console .app-topbar .app-global-search,
 .aws-console .app-topbar .app-global-search input {
-    height: 25px !important;
-    min-height: 25px !important;
-    max-height: 25px !important;
+    height: var(--sacco-control-height) !important;
+    min-height: var(--sacco-control-height) !important;
+    max-height: var(--sacco-control-height) !important;
 }
 
 .aws-console .app-topbar .app-global-search input {
@@ -4202,7 +4235,7 @@ body.aws-console,
     border-color: #545b64 !important;
     border-radius: 2px !important;
     color: #f2f3f3 !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
 }
 
 .aws-console .app-topbar .app-global-search input::placeholder {
@@ -4343,7 +4376,7 @@ body.aws-console,
 
 .app-account-copy p:first-child {
     font-size: 13px !important;
-    line-height: 16px !important;
+    line-height: 18px !important;
 }
 
 .app-account-copy p:last-child {
@@ -4429,15 +4462,15 @@ body.aws-console,
 .shell-sidebar-scroll > div > button,
 .shell-sidebar-scroll .shell-review-panel-link {
     width: calc(100% - 16px) !important;
-    min-height: 36px !important;
+    min-height: 38px !important;
     margin-right: 8px !important;
     margin-left: 8px !important;
     gap: 8px !important;
     padding: 8px !important;
     color: #d5dfe2 !important;
-    font-size: 12px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
-    line-height: 16px !important;
+    line-height: 20px !important;
 }
 
 .shell-sidebar-scroll > a:hover,
@@ -4451,9 +4484,9 @@ body.aws-console,
 
 .shell-sidebar-scroll a > span:first-child,
 .shell-sidebar-scroll button > span:first-child {
-    width: 16px !important;
-    height: 16px !important;
-    min-width: 16px !important;
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
     border: 0 !important;
     background: transparent !important;
 }
@@ -4506,10 +4539,10 @@ body.aws-console,
 .shell-sidebar-group > div > a {
     width: 100% !important;
     margin: 0 !important;
-    min-height: 32px !important;
+    min-height: 34px !important;
     padding: 6px 8px !important;
-    font-size: 12px !important;
-    line-height: 16px !important;
+    font-size: 13px !important;
+    line-height: 18px !important;
 }
 
 .shell-powered-by {
@@ -4548,12 +4581,12 @@ body.aws-console,
 
 @media (max-width: 1279px) {
     :root {
-        --shell-sidebar-width: 220px;
+        --shell-sidebar-width: var(--sacco-sidebar-width);
     }
 
     .app-global-brand {
-        flex-basis: 174px;
-        min-width: 174px;
+        flex-basis: 190px;
+        min-width: 190px;
     }
 
     .app-global-search {
@@ -4563,15 +4596,15 @@ body.aws-console,
     }
 
     .app-account-copy {
-        min-width: 132px;
+        display: none !important;
     }
 }
 
 @media (max-width: 1023px) {
     :root {
         --shell-sidebar-width: 284px;
-        --shell-nav-height: 38px;
-        --shell-nav-fixed-height: 38px;
+        --shell-nav-height: var(--sacco-topbar-height);
+        --shell-nav-fixed-height: var(--sacco-topbar-height);
         --shell-context-height: 0px;
     }
 
@@ -4609,6 +4642,22 @@ body.aws-console,
     .shell-sidebar-nav-heading {
         padding-right: 14px !important;
         padding-left: 14px !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .app-global-search {
+        display: none !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .app-station-selector {
+        display: none !important;
+    }
+
+    .app-station-mobile {
+        display: flex !important;
     }
 }
 
@@ -5014,7 +5063,7 @@ body.aws-console,
     .shell-sidebar-collapsed .shell-sidebar-scroll > button,
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > a,
     .shell-sidebar-collapsed .shell-sidebar-scroll > div > button {
-        width: 40px !important;
+        width: 32px !important;
         margin-right: 8px !important;
         margin-left: 8px !important;
         justify-content: center !important;
@@ -5072,16 +5121,16 @@ body.aws-console,
     display: flex !important;
     align-items: center;
     width: 100% !important;
-    min-height: 32px !important;
+    min-height: 34px !important;
     margin: 0 !important;
     border: 1px solid transparent !important;
     border-left: 3px solid transparent !important;
     border-radius: 2px !important;
     padding: 6px 8px !important;
     color: #c4ced4 !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 600 !important;
-    line-height: 16px !important;
+    line-height: 18px !important;
     text-decoration: none !important;
     transition: background-color .12s ease, border-color .12s ease, color .12s ease;
 }
@@ -5255,7 +5304,7 @@ body.aws-console,
     color: #ffffff;
 }
 
-/* Keep the real page heading in view and remove the duplicated shell title strip. */
+/* Keep one compact Cloudscape page heading and remove the duplicated shell rail. */
 .shell-page-title-rail {
     display: none !important;
 }
@@ -5265,16 +5314,18 @@ body.aws-console,
 }
 
 .erp-page-path {
-    position: static !important;
+    position: sticky !important;
+    top: var(--shell-nav-height) !important;
+    z-index: 37;
     display: flex;
     flex-wrap: wrap;
-    min-height: 28px;
+    min-height: 24px;
     align-items: center;
     gap: 3px 6px;
     margin: 0 !important;
-    border-bottom: 1px solid var(--aws-line);
-    background: #ffffff;
-    padding: 4px 12px;
+    border: 0;
+    background: var(--sacco-canvas);
+    padding: 0 0 4px;
     color: var(--aws-muted);
     font-size: 12px;
     font-weight: 700;
@@ -5327,39 +5378,52 @@ body.aws-console,
 
 .erp-page-subtitle,
 .erp-page-header[data-aws-page-header] > p:not(.erp-breadcrumb):not(.erp-page-kicker) {
-    display: none !important;
+    order: 2;
+    display: block !important;
+    flex-basis: 100%;
+    max-width: 760px;
+    margin: 2px 0 0 !important;
+    color: var(--sacco-muted) !important;
+    font-size: 14px !important;
+    line-height: 20px !important;
 }
 
 .erp-page-header[data-aws-page-header] {
-    position: sticky !important;
-    top: var(--shell-nav-height) !important;
-    z-index: 37;
+    position: static !important;
+    z-index: auto;
     display: flex;
     flex-wrap: wrap;
     width: 100%;
-    min-height: var(--shell-context-height);
+    min-height: 0;
     align-self: flex-start;
     align-items: baseline;
     gap: 4px 10px;
     margin: 0 0 10px !important;
-    border-bottom: 1px solid var(--aws-line) !important;
-    background: #ffffff !important;
-    padding: 6px 12px !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
 }
 
 .erp-page-header[data-aws-page-header] .erp-page-title,
 .erp-page-header[data-aws-page-header] h1 {
-    font-size: 18px !important;
-    line-height: 22px !important;
+    font-size: 24px !important;
+    line-height: 30px !important;
 }
 
 .erp-page-header[data-aws-page-header] > .erp-page-title {
     order: 1;
+    flex: 1 0 100%;
+    max-width: 100%;
 }
 
-.erp-page-header[data-aws-page-header] > .erp-breadcrumb,
 .erp-page-header[data-aws-page-header] > .erp-page-kicker {
-    order: 2;
+    order: 0;
+    flex-basis: 100%;
+    margin: 0 !important;
+}
+
+.erp-page-header[data-aws-page-header] > .erp-breadcrumb {
+    order: 0;
     margin: 0 !important;
 }
 
@@ -5369,18 +5433,18 @@ body.aws-console,
 
 @media (max-width: 640px) {
     .erp-page-path {
-        padding-inline: 8px;
+        padding-inline: 0;
     }
 
     .erp-page-header[data-aws-page-header] {
         align-items: flex-start;
-        padding: 6px 8px !important;
+        padding: 0 !important;
     }
 
     .erp-page-header[data-aws-page-header] .erp-page-title,
     .erp-page-header[data-aws-page-header] h1 {
-        font-size: 18px !important;
-        line-height: 22px !important;
+        font-size: 22px !important;
+        line-height: 28px !important;
     }
 }
 
@@ -5456,6 +5520,70 @@ body.aws-console,
         min-width: 100%;
         flex-basis: 100%;
     }
+}
+
+/* Guaranteed-loan registry and shared table state refinements. */
+.aws-console .app-table-heading {
+    min-width: 0;
+}
+
+.aws-console .app-table-count {
+    color: var(--aws-text-secondary, #545b64);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.aws-console .erp-table-empty {
+    height: 88px;
+    padding: 20px 12px !important;
+    color: var(--aws-text-secondary, #545b64);
+    text-align: center !important;
+    white-space: normal;
+}
+
+.aws-console .erp-table-footer {
+    min-height: 48px;
+    padding: 8px 12px;
+    align-items: center;
+    border-top: 1px solid var(--aws-border-default, #d5dbdb);
+    background: var(--aws-surface, #ffffff);
+}
+
+.aws-console .guaranteed-loans-filter .erp-table-toolbar__search {
+    flex: 1 1 16rem;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+}
+
+.aws-console .guaranteed-loans-filter input[type="search"] {
+    width: 100%;
+}
+
+.aws-console .guaranteed-loans-table .loan-status-badge {
+    border-color: #037f0c;
+    color: #037f0c;
+    background: #f2fcf3;
+    white-space: nowrap;
+}
+
+.aws-console .guaranteed-loans-table .erp-table {
+    min-width: max(100%, 42rem);
+}
+
+.aws-console .attachment-preview-frame {
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid var(--aws-border-default, #d5dbdb);
+    border-radius: 2px;
+    background: var(--aws-surface-muted, #f7f8f8);
+}
+
+.aws-console .attachment-preview-frame--image {
+    padding: 12px;
+    background: #16191f;
 }
 
 /* Applicant photos remain circular without inheriting the generic console-card frame. */
@@ -5551,6 +5679,97 @@ body.aws-console,
     font-size: 9px;
 }
 
+/* Complete Cloudscape workspace layout: readable labels, even controls, and resilient cards. */
+.aws-console .app-global-brand p:first-child,
+.aws-console .app-account-copy p:first-child,
+.aws-console .app-station-copy p,
+.aws-console .app-station-mobile,
+.aws-console .shell-sidebar-toggle-label,
+.aws-console .shell-sidebar-scroll a,
+.aws-console .shell-sidebar-scroll button,
+.aws-console .shell-sidebar-flyout-link,
+.aws-console .erp-page-title,
+.aws-console .erp-page-heading,
+.aws-console .erp-panel-title,
+.aws-console .app-table-heading h2,
+.aws-console .app-btn,
+.aws-console label,
+.aws-console legend {
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+
+.aws-console .app-global-brand p:first-child {
+    max-width: 170px;
+    line-height: 16px !important;
+    white-space: normal !important;
+}
+
+.aws-console .app-account-copy p:first-child,
+.aws-console .app-station-copy p,
+.aws-console .app-station-mobile,
+.aws-console .shell-sidebar-toggle-label,
+.aws-console .shell-sidebar-scroll a,
+.aws-console .shell-sidebar-scroll button,
+.aws-console .shell-sidebar-flyout-link {
+    white-space: normal;
+}
+
+.aws-console .app-station-mobile {
+    width: auto;
+    max-width: 7rem;
+    line-height: 14px;
+    text-align: center;
+}
+
+.aws-console .app-btn {
+    max-width: 100%;
+    flex-shrink: 0;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+
+.aws-console .neo-select-button {
+    height: auto !important;
+    max-height: none !important;
+    min-height: var(--sacco-control-height) !important;
+}
+
+.aws-console .aws-filter-toolbar .neo-select-button {
+    box-sizing: border-box;
+    height: var(--sacco-control-height) !important;
+    max-height: var(--sacco-control-height) !important;
+    min-height: var(--sacco-control-height) !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.aws-console .aws-filter-toolbar label > .neo-select,
+.aws-console .aws-filter-toolbar .erp-table-toolbar__control > .neo-select {
+    height: var(--sacco-control-height);
+    margin-top: 4px !important;
+}
+
+.aws-console .aws-filter-toolbar .neo-select-button-text {
+    line-height: 20px !important;
+    white-space: nowrap !important;
+}
+
+.aws-console .neo-select-button-text,
+.aws-console .neo-select-option,
+.aws-console .neo-select-empty {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+}
+
+.aws-console .neo-select-menu {
+    max-width: calc(100vw - 16px) !important;
+}
+
 /* Keep selected enhanced-select values inside their assigned control width. */
 .aws-console .neo-select-button {
     min-width: 0;
@@ -5562,4 +5781,208 @@ body.aws-console,
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
+}
+
+.aws-console .aws-filter-toolbar {
+    min-width: 0 !important;
+    align-items: flex-end !important;
+    column-gap: 8px !important;
+    row-gap: 8px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
+}
+
+.aws-console .aws-filter-toolbar > :not(input[type="hidden"]) {
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.aws-console .aws-filter-toolbar > label,
+.aws-console .aws-filter-toolbar > .erp-table-toolbar__control,
+.aws-console .aws-filter-toolbar > .admin-filter-field,
+.aws-console .aws-filter-toolbar > .staff-analytics-control,
+.aws-console .aws-filter-toolbar > .loan-analytics-filter-field,
+.aws-console .aws-filter-toolbar > .form-field {
+    min-width: 10.5rem;
+    flex: 0 1 14rem;
+    margin: 0 !important;
+}
+
+.aws-console .aws-filter-toolbar > label:has(input[type="search"]),
+.aws-console .aws-filter-toolbar > label:has(input[name*="search" i]),
+.aws-console .aws-filter-toolbar > label:has(input[name*="query" i]) {
+    width: min(100%, 728px);
+    max-width: 728px;
+    min-width: 15rem;
+    flex: 1 1 34rem;
+}
+
+.aws-console .aws-filter-toolbar > [class*="actions"] {
+    display: flex !important;
+    min-width: max-content;
+    flex: 0 0 auto !important;
+    align-items: flex-end !important;
+    justify-content: flex-end;
+    gap: 6px !important;
+    margin-left: auto !important;
+    padding-top: 0 !important;
+}
+
+.aws-console .aws-filter-toolbar > button:first-of-type {
+    margin-left: auto !important;
+}
+
+.aws-console .aws-filter-toolbar label > input,
+.aws-console .aws-filter-toolbar label > select,
+.aws-console .aws-filter-toolbar .erp-table-toolbar__control > input,
+.aws-console .aws-filter-toolbar .erp-table-toolbar__control > select {
+    width: 100%;
+    margin-top: 4px !important;
+}
+
+.aws-console .aws-filter-toolbar input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.aws-console .aws-filter-toolbar select,
+.aws-console .aws-filter-toolbar .fcms-control,
+.aws-console .aws-filter-toolbar .app-btn,
+.aws-console .aws-filter-toolbar > button,
+.aws-console .aws-filter-toolbar > a {
+    min-height: var(--sacco-control-height) !important;
+    height: var(--sacco-control-height) !important;
+    max-height: none !important;
+}
+
+.aws-console .erp-stat-grid,
+.aws-console .staff-metric-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch;
+    gap: 8px !important;
+}
+
+.aws-console .loan-metrics-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch;
+}
+
+.aws-console .erp-stat-grid > *,
+.aws-console .staff-metric-grid > *,
+.aws-console .loan-metrics-grid > *,
+.aws-console .aws-status-summary-grid > *,
+.aws-console .aws-detail-grid > *,
+.aws-console .product-catalog-grid > *,
+.aws-console .platform-settings-grid > *,
+.aws-console .aws-settings-grid > * {
+    min-width: 0;
+    max-width: 100%;
+    grid-column: auto !important;
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+    .aws-console .erp-stat-grid,
+    .aws-console .staff-metric-grid,
+    .aws-console .loan-metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .aws-console .erp-stat-grid,
+    .aws-console .staff-metric-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (min-width: 1280px) {
+    .aws-console .erp-stat-grid,
+    .aws-console .staff-metric-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+
+    .aws-console .loan-metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .aws-console .aws-filter-toolbar,
+    .aws-console .staff-analytics-command-panel .staff-analytics-filter {
+        flex-flow: row wrap !important;
+        align-items: flex-end !important;
+        overflow: visible !important;
+    }
+
+    .aws-console .aws-filter-toolbar > label,
+    .aws-console .aws-filter-toolbar > .erp-table-toolbar__control,
+    .aws-console .aws-filter-toolbar > .admin-filter-field,
+    .aws-console .aws-filter-toolbar > .staff-analytics-control,
+    .aws-console .aws-filter-toolbar > .loan-analytics-filter-field,
+    .aws-console .aws-filter-toolbar > .form-field {
+        min-width: min(100%, 12rem);
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    .aws-console .aws-filter-toolbar > label:has(input[type="search"]),
+    .aws-console .aws-filter-toolbar > label:has(input[name*="search" i]),
+    .aws-console .aws-filter-toolbar > label:has(input[name*="query" i]) {
+        width: 100%;
+        max-width: none;
+        min-width: 100%;
+        flex-basis: 100%;
+    }
+
+    .aws-console .aws-filter-toolbar > [class*="actions"] {
+        min-width: 0;
+        flex: 1 1 100% !important;
+    }
+
+    .aws-console .aws-filter-toolbar input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    .aws-console .aws-filter-toolbar select,
+    .aws-console .aws-filter-toolbar .neo-select,
+    .aws-console .aws-filter-toolbar .neo-select-button,
+    .aws-console .aws-filter-toolbar .app-btn,
+    .aws-console .aws-filter-toolbar > button,
+    .aws-console .aws-filter-toolbar > a {
+        height: 38px !important;
+        max-height: 38px !important;
+        min-height: 38px !important;
+        white-space: normal;
+        text-align: center;
+    }
+
+    .aws-console .loan-calculator-steps,
+    .aws-console .loan-application-steps {
+        grid-template-columns: repeat(3, minmax(9rem, 1fr));
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
+
+    .aws-console .loan-application-steps {
+        grid-template-columns: repeat(5, minmax(9rem, 1fr));
+    }
+
+    .aws-console .loan-calculator-steps strong,
+    .aws-console .loan-application-steps button > span:last-child {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+    }
+}
+
+@media (max-width: 520px) {
+    .aws-console .aws-filter-toolbar > label,
+    .aws-console .aws-filter-toolbar > .erp-table-toolbar__control,
+    .aws-console .aws-filter-toolbar > .admin-filter-field,
+    .aws-console .aws-filter-toolbar > .staff-analytics-control,
+    .aws-console .aws-filter-toolbar > .loan-analytics-filter-field,
+    .aws-console .aws-filter-toolbar > .form-field {
+        min-width: 100%;
+        flex-basis: 100%;
+    }
 }

@@ -135,7 +135,8 @@
         <p class="erp-widget-title"><spring:message code="reports.activeLoanDetails" text="Active Loan Details" /></p>
         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="reports.activeLoanDetailsSummary" text="Active Loans and Interest Summary" /></h2>
     </div>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
         <table class="erp-table loan-active-detail-table">
             <thead>
                 <tr>
@@ -173,6 +174,7 @@
                 </c:choose>
             </tbody>
         </table>
+    </div>
     </div>
 </section>
 

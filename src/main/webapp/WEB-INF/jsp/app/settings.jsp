@@ -19,22 +19,21 @@
 </div>
 
 <c:if test="${settingsSection eq 'language'}">
-<section class="erp-panel aws-settings-panel overflow-hidden">
+<section class="erp-panel aws-settings-panel overflow-hidden" aria-labelledby="memberLanguageSettingsTitle">
     <div class="aws-settings-header">
-        <p class="aws-settings-kicker"><spring:message code="member.settings.language.eyebrow" /></p>
-        <h2 class="aws-settings-title"><spring:message code="member.settings.language.title" /></h2>
+        <h2 id="memberLanguageSettingsTitle" class="aws-settings-title"><spring:message code="member.settings.language.title" /></h2>
     </div>
     <form action="/app/settings/language" method="post" class="aws-settings-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         <div class="aws-settings-control-row">
-            <label class="aws-settings-field">
+            <label class="aws-settings-field" for="memberSettingsLanguage">
                 <spring:message code="member.settings.language.label" />
-                <select name="language" class="aws-control">
+                <select id="memberSettingsLanguage" name="language" class="aws-control" aria-describedby="memberSettingsLanguageHelp">
                     <option value="en" ${memberSettingsLanguage eq 'en' ? 'selected' : ''}><spring:message code="member.settings.language.english" /></option>
                     <option value="sw" ${memberSettingsLanguage eq 'sw' ? 'selected' : ''}><spring:message code="member.settings.language.swahili" /></option>
                 </select>
             </label>
-            <p class="aws-settings-help">
+            <p id="memberSettingsLanguageHelp" class="aws-settings-help">
                 <spring:message code="member.settings.language.help" />
             </p>
         </div>
@@ -89,7 +88,7 @@
                        placeholder="Enter the 6-digit code" required />
             </label>
         </div>
-        <p id="paymentDetailsOtpMessage" class="mt-4 hidden rounded-md border px-4 py-3 text-sm" role="status"></p>
+        <p id="paymentDetailsOtpMessage" class="mt-4 hidden border px-4 py-3 text-sm" role="status"></p>
         <div class="aws-settings-footer">
             <button id="requestPaymentDetailsOtpButton" type="button" class="app-btn btn-neutral">
                 <spring:message code="member.settings.payment.requestOtp" text="Request OTP" />
@@ -111,24 +110,21 @@
         requestButton.addEventListener("click", async () => {
             requestButton.disabled = true;
             requestButton.textContent = "Requesting...";
-            message.className = "mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700";
+            message.className = "mt-4  border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700";
             message.textContent = "Requesting confirmation code...";
             try {
                 const body = new URLSearchParams();
                 body.set("${_csrf.parameterName}", "${_csrf.token}");
                 const response = await fetch("/app/settings/payment-details/request-otp", {
                     method: "POST",
-                    headers: {
-                        "Accept": "application/json",
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                        "X-Requested-With": "XMLHttpRequest"
+                    headers: {"Accept":"application/json","Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","X-Requested-With":"XMLHttpRequest"
                     },
                     body
                 });
                 const result = await response.json();
                 message.className = response.ok
-                    ? "mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-                    : "mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
+                    ? "mt-4  border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+                    : "mt-4  border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
                 message.textContent = result.message || "The confirmation code could not be requested.";
                 if (response.ok) {
                     const remaining = Number.isFinite(Number(result.resendAttemptsRemaining))
@@ -140,7 +136,7 @@
                     requestButton.disabled = remaining <= 0;
                 }
             } catch (error) {
-                message.className = "mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
+                message.className = "mt-4  border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800";
                 message.textContent = "The confirmation code could not be requested. Try again.";
                 requestButton.textContent = "Request OTP";
                 requestButton.disabled = false;

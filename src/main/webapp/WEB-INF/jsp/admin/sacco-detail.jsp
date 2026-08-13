@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SACCOs / Detail</p>
     <h1 class="erp-page-title">${saccoDetail.summary.saccoName}</h1>
-    <p class="erp-page-subtitle">Read-only platform view for ${saccoDetail.summary.saccoId}.</p>
 </div>
 
 <section class="erp-panel mb-4 overflow-hidden">
@@ -41,10 +40,10 @@
                     <c:when test="${saccoDetail.summary.hasLogo}">
                         <img src="${saccoDetail.summary.logoUrl}"
                              alt="${saccoDetail.summary.saccoName} logo"
-                             class="h-16 w-16 rounded-md border border-slate-200 bg-white object-contain p-2 shadow-sm" />
+                             class="h-16 w-16 border border-slate-200 bg-white object-contain p-2 shadow-sm" />
                     </c:when>
                     <c:otherwise>
-                        <span class="inline-flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-lg font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <span class="inline-flex h-16 w-16 items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-lg font-semibold uppercase tracking-[0.16em] text-slate-500">
                             ${saccoDetail.summary.logoFallbackText}
                         </span>
                     </c:otherwise>
@@ -177,7 +176,8 @@
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.overdueLoanCount}</p>
                     </div>
                 </div>
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="erp-table-scroll">
                     <table class="erp-table min-w-[760px]">
                         <thead>
                         <tr>
@@ -207,13 +207,14 @@
                     </table>
                 </div>
             </div>
+            </div>
         </section>
     </c:when>
     <c:when test="${selectedSection eq 'members'}">
         <section class="erp-panel mt-4">
             <div class="erp-panel-header">
                 <p class="erp-panel-title">Member Summary</p>
-            </div>
+                    </div>
             <div class="erp-panel-body space-y-4">
                 <div class="grid gap-3 sm:grid-cols-3">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
@@ -227,23 +228,23 @@
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive Members</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.inactiveMembers}</p>
-                    </div>
                 </div>
+                        </div>
                 <div class="rounded border border-slate-200 bg-slate-50 px-4 py-4">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <p class="erp-widget-title">Member List</p>
                             <p class="mt-1 text-sm text-slate-500">Search by User ID, member number, or name.</p>
                         </div>
-                        <div class="inline-flex flex-wrap items-center gap-2 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
+                        <div class="inline-flex flex-wrap items-center gap-2 border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-slate-600">
                             <span class="rounded border border-sky-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Current Slice</span>
                             <c:set var="memberTotal" value="${saccoMembersPage.totalElements}" />
                             <c:set var="memberSliceStart" value="${memberTotal == 0 ? 0 : (saccoMembersPage.number * saccoMembersPage.size) + 1}" />
                             <c:set var="memberSliceEndRaw" value="${(saccoMembersPage.number * saccoMembersPage.size) + fn:length(saccoMembers)}" />
                             <c:set var="memberSliceEnd" value="${memberTotal == 0 ? 0 : memberSliceEndRaw}" />
                             <span>Showing <span class="font-semibold text-slate-800">${memberSliceStart}-${memberSliceEnd}</span> of <span class="font-semibold text-slate-800">${memberTotal}</span> accounts</span>
-                        </div>
                     </div>
+                        </div>
 <form method="get" action="/admin/saccos/${saccoDetail.saccoId}" class="mt-4 flex flex-row flex-wrap items-end gap-3 aws-filter-toolbar" data-aws-filter-toolbar>
                         <input type="hidden" name="section" value="members" />
                         <input type="hidden" name="stationId" value="${saccoDetail.selectedStationId}" />
@@ -267,10 +268,11 @@
                         <div class="flex shrink-0 flex-wrap items-end gap-2">
                             <button type="submit" class="app-btn btn-primary">Search</button>
                             <a href="/admin/saccos/${saccoDetail.saccoId}?section=members${stationTabQuery}" class="app-btn btn-neutral">Reset</a>
-                        </div>
+                </div>
                     </form>
                 </div>
-                <div class="erp-table-wrap erp-table-scroll">
+                <div class="erp-table-wrap">
+                    <div class="erp-table-scroll">
                     <table class="erp-table min-w-[1120px]">
                         <thead>
                         <tr>
@@ -321,6 +323,7 @@
                         </c:choose>
                         </tbody>
                     </table>
+                        </div>
                 </div>
                 <div class="flex flex-col gap-3 rounded border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-sm text-slate-600">The table is server-paged to keep large member lists manageable.</p>
@@ -345,17 +348,17 @@
                                     <a href="/admin/saccos/${saccoDetail.saccoId}?memberPage=${saccoMembersPage.number + 1}${saccoMembersPaginationQuery}" class="app-btn btn-primary">Next</a>
                                 </c:otherwise>
                             </c:choose>
-                        </div>
-                    </c:if>
-                </div>
             </div>
+                    </c:if>
+            </div>
+                    </div>
         </section>
     </c:when>
     <c:when test="${selectedSection eq 'financials'}">
         <section class="erp-panel mt-4">
             <div class="erp-panel-header">
                 <p class="erp-panel-title">Financial Summary</p>
-            </div>
+                    </div>
             <div class="erp-panel-body">
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
@@ -369,14 +372,14 @@
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Repayment Proxy</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.repaymentPercentLabel}</p>
-                    </div>
+                </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Default / Liquidity</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.defaultPercentLabel}</p>
                         <p class="mt-1 text-sm text-slate-500">Liquidity: ${saccoDetail.summary.liquidityRatioLabel}</p>
-                    </div>
-                </div>
             </div>
+                        </div>
+                    </div>
         </section>
     </c:when>
     <c:when test="${selectedSection eq 'sms'}">
@@ -387,9 +390,9 @@
                         <div>
                             <p class="erp-panel-title">SMS Units: ${saccoDetail.selectedStationId}</p>
                             <p class="mt-1 text-sm text-slate-500">Current station balance and usage status.</p>
-                        </div>
+                            </div>
                         <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}&stationId=${saccoDetail.selectedStationId}" class="app-btn btn-neutral">Manage SMS Units</a>
-                    </div>
+                            </div>
                     <div class="erp-panel-body">
                         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
@@ -403,22 +406,22 @@
                             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Warning Baseline</p>
                                 <p class="mt-2 text-xl font-semibold text-slate-900"><fmt:formatNumber value="${smsAccount.warningBaseline}" /></p>
-                            </div>
+                        </div>
                             <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">SMS Status</p>
                                 <p class="mt-3">
-                                    <span class="rounded-md border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${smsAccount.status}</span>
+                                    <span class="border px-2 py-1 text-xs font-bold ${smsAccount.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : smsAccount.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : smsAccount.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${smsAccount.status}</span>
                                 </p>
-                            </div>
-                        </div>
                     </div>
+                    </div>
+                            </div>
                 </section>
 
-                <section class="erp-panel mt-4">
-                    <div class="erp-panel-header">
-                        <p class="erp-panel-title">Recent SMS Usage</p>
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="app-table-titlebar">
+                        <div class="app-table-heading"><h2>Recent SMS Usage</h2></div>
                     </div>
-                    <div class="erp-panel-body overflow-x-auto">
+                    <div class="erp-table-scroll">
                         <table class="erp-table min-w-[760px]">
                             <thead>
                             <tr>
@@ -446,25 +449,24 @@
                             </c:if>
                             </tbody>
                         </table>
+                        </div>
                         <c:if test="${smsHistory.totalPages gt 1}">
-                            <div class="mt-4 flex justify-end gap-2">
+                        <div class="erp-table-footer flex justify-end gap-2">
                                 <c:if test="${not smsHistory.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number - 1}">Previous</a></c:if>
                                 <c:if test="${not smsHistory.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${saccoDetail.selectedStationId}&smsHistoryPage=${smsHistory.number + 1}">Next</a></c:if>
-                            </div>
-                        </c:if>
                     </div>
+                        </c:if>
                 </section>
             </c:when>
             <c:otherwise>
-                <section class="erp-panel mt-4">
-                    <div class="erp-panel-header">
-                        <div>
-                            <p class="erp-panel-title">Station SMS Balances</p>
-                            <p class="mt-1 text-sm text-slate-500">Select a station above to view its usage history.</p>
-                        </div>
+                <section class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="app-table-titlebar">
+                        <div class="app-table-heading"><h2>Station SMS Balances</h2></div>
+                        <div class="app-table-toolbar">
                         <a href="/admin/sms-usage?saccoId=${saccoDetail.saccoId}" class="app-btn btn-neutral">Manage SMS Units</a>
+                            </div>
                     </div>
-                    <div class="erp-panel-body overflow-x-auto">
+                    <div class="erp-table-scroll">
                         <table class="erp-table min-w-[680px]">
                             <thead>
                             <tr>
@@ -483,7 +485,7 @@
                                     <td><fmt:formatNumber value="${account.availableUnits}" /></td>
                                     <td><fmt:formatNumber value="${account.alertReservedUnits}" /> / 3</td>
                                     <td><fmt:formatNumber value="${account.warningBaseline}" /></td>
-                                    <td><span class="rounded-md border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
+                                    <td><span class="border px-2 py-1 text-xs font-bold ${account.status eq 'DEPLETED' ? 'border-rose-200 bg-rose-50 text-rose-700' : account.status eq 'CRITICAL' ? 'border-orange-200 bg-orange-50 text-orange-700' : account.status eq 'LOW' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${account.status}</span></td>
                                     <td class="text-right"><a href="/admin/saccos/${saccoDetail.saccoId}?section=sms&stationId=${account.stationId}" class="app-btn btn-neutral">View Details</a></td>
                                 </tr>
                             </c:forEach>
@@ -492,48 +494,48 @@
                             </c:if>
                             </tbody>
                         </table>
+            </div>
                         <c:if test="${smsAccounts.totalPages gt 1}">
-                            <div class="mt-4 flex justify-end gap-2">
+                        <div class="erp-table-footer flex justify-end gap-2">
                                 <c:if test="${not smsAccounts.first}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number - 1}">Previous</a></c:if>
                                 <c:if test="${not smsAccounts.last}"><a class="app-btn btn-neutral" href="/admin/saccos/${saccoDetail.saccoId}?section=sms&smsPage=${smsAccounts.number + 1}">Next</a></c:if>
-                            </div>
+                                </div>
                         </c:if>
-                    </div>
                 </section>
             </c:otherwise>
         </c:choose>
     </c:when>
     <c:when test="${selectedSection eq 'audit'}">
-        <section class="erp-panel mt-4">
-            <div class="erp-panel-header">
+                <section class="erp-panel mt-4">
+                    <div class="erp-panel-header">
                 <p class="erp-panel-title">Recent Audit Activity</p>
-            </div>
-            <div class="erp-panel-body">
+                            </div>
+                    <div class="erp-panel-body">
                 <div class="space-y-3">
                     <c:forEach items="${saccoDetail.recentAuditEntries}" var="entry">
                         <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                             <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div>
+                        <div>
                                     <p class="font-semibold text-slate-900">${entry.actionLabel}</p>
                                     <p class="mt-1 text-sm text-slate-600">${entry.sourceLabel} | ${entry.actorLabel}</p>
-                                </div>
-                                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">${entry.createdAtLabel}</span>
-                            </div>
                         </div>
+                                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">${entry.createdAtLabel}</span>
+                </div>
+            </div>
                     </c:forEach>
                     <c:if test="${empty saccoDetail.recentAuditEntries}">
                         <p class="text-sm text-slate-500">No recent audit entries were matched to this SACCO.</p>
                     </c:if>
-                </div>
             </div>
+                    </div>
         </section>
     </c:when>
     <c:otherwise>
-        <section class="erp-panel mt-4">
-            <div class="erp-panel-header">
+                <section class="erp-panel mt-4">
+                    <div class="erp-panel-header">
                 <p class="erp-panel-title">Overview</p>
-            </div>
-            <div class="erp-panel-body">
+                    </div>
+                    <div class="erp-panel-body">
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Stations</p>
@@ -547,11 +549,11 @@
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Active Exposure</p>
                         <p class="mt-2 text-xl font-semibold text-slate-900">${saccoDetail.summary.activeExposureLabel}</p>
-                    </div>
+                </div>
                     <div class="rounded border border-slate-200 bg-slate-50 px-4 py-3">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Health Note</p>
                         <p class="mt-2 text-sm font-medium text-slate-700">${saccoDetail.summary.healthNote}</p>
-                    </div>
+            </div>
                 </div>
             </div>
         </section>

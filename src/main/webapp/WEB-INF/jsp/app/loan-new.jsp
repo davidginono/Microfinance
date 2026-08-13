@@ -59,7 +59,7 @@
         <div class="loan-flow-panel-body">
 
     <c:if test="${not empty topUpSourceLoan}">
-        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <spring:message code="newloan.topUp.notice" text="This application is being created as a loan top-up from application" />
             <strong>${topUpSourceLoan.applicationNumber}</strong><c:if test="${not empty topUpSourceLoan.loanId}"> (<spring:message code="newloan.topUp.loanLabel" text="loan" /> ${topUpSourceLoan.loanId})</c:if>.
         </div>
@@ -74,7 +74,7 @@
                    placeholder="100,000"
                    data-min-amount="${product.minimumAmount}"
                    data-max-amount="${product.maximumAmount}"
-                   class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                   class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                    required />
             <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedRange" /> ${minimumAmountLabel} <spring:message code="common.to" text="to" /> ${maximumAmountLabel}</p>
         </div>
@@ -93,7 +93,7 @@
                        placeholder="12"
                        data-min-months="${product.minimumRepaymentMonths}"
                        data-max-months="${product.maxRepaymentMonths}"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                       class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                        required />
             </div>
             <p id="tenorRangeHelp" class="mt-1 text-xs text-slate-500"
@@ -110,7 +110,7 @@
                   rows="4"
                   maxlength="120"
                   data-loan-purpose
-                  class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                  class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                   placeholder="<spring:message code='newloan.purpose.placeholder' />">${formValues['purpose']}</textarea>
         <p class="mt-2 text-xs text-slate-500"><spring:message code="newloan.purpose.help" /></p>
     </div>
@@ -121,7 +121,7 @@
             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="${field.labelKey}" text="${field.name}" /></label>
             <c:choose>
                 <c:when test="${field.type eq 'select'}">
-                    <select class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                    <select class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                             name="${field.name}"
                             <c:if test="${field.required}">required</c:if>>
                         <c:forEach items="${field.enumOptions}" var="opt">
@@ -130,19 +130,19 @@
                     </select>
                 </c:when>
                 <c:when test="${field.type eq 'number'}">
-                    <input class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                    <input class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            type="number" name="${field.name}" step="0.01"
                            value="${fieldValue}" placeholder="<spring:message code='newloan.number.placeholder' text='e.g. 100000' />"
                            <c:if test="${field.required}">required</c:if> />
                 </c:when>
                 <c:when test="${field.type eq 'textarea'}">
-                    <textarea class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                    <textarea class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                               name="${field.name}"
                               placeholder="<spring:message code='newloan.field.placeholder' arguments='${field.name}' text='Enter {0}' />"
                               <c:if test="${field.required}">required</c:if>>${fieldValue}</textarea>
                 </c:when>
                 <c:otherwise>
-                    <input class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                    <input class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            type="text" name="${field.name}"
                            value="${fieldValue}" placeholder="<spring:message code='newloan.field.placeholder' arguments='${field.name}' text='Enter {0}' />"
                            <c:if test="${field.required}">required</c:if> />
@@ -172,7 +172,7 @@
                 <spring:message code="newloan.loanDetails.button" />
             </button>
         </div>
-        <div id="financialFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+        <div id="financialFeedback" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
         <div id="financialLoading" class="mt-3 hidden erp-section text-sm text-slate-600">
             <span class="sr-only"><spring:message code="newloan.loanDetails.loading" /></span>
             <div class="skeleton-table" aria-hidden="true">
@@ -193,10 +193,11 @@
         </div>
         <div id="financialPreviewCard" class="<c:if test='${empty financialSnapshotSections}'>hidden </c:if>mt-4 grid gap-3 md:grid-cols-2">
             <c:forEach items="${financialSnapshotSections}" var="section">
-<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
+<div class="erp-table-wrap loan-summary-table" aria-label="${fn:escapeXml(section.key)}" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2">
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">${section.key}</p>
                     </div>
+                    <div class="erp-table-scroll erp-table-scroll-sm">
                     <table class="erp-table">
                         <thead>
                         <tr>
@@ -214,17 +215,19 @@
                         </tbody>
                     </table>
                 </div>
-            </c:forEach>
         </div>
+            </c:forEach>
     </div>
+            </div>
 
     <div id="repaymentSchedulePreviewCard" class="<c:if test='${empty repaymentSchedulePreviewRows}'>hidden </c:if>erp-section-muted">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="repayment.scheduler" text="Repayment Scheduler" /></h5>
-            </div>
         </div>
-<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
+        </div>
+<div class="erp-table-wrap" aria-label="<spring:message code='repayment.scheduler' text='Repayment Scheduler' />" data-aws-table-region data-aws-no-titlebar="true" data-aws-no-refresh="true" data-loading-label="Loading results...">
+            <div class="erp-table-scroll erp-table-scroll-sm">
             <table class="erp-table">
                 <thead>
                 <tr>
@@ -251,10 +254,11 @@
                 </c:forEach>
                 </tbody>
             </table>
-        </div>
     </div>
-
         </div>
+        </div>
+
+            </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
             <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Select Guarantor</button>
@@ -267,8 +271,8 @@
             <div>
                 <h2 id="loanFlowStep3Title">Select Guarantor</h2>
                 <p>Choose the required guarantor and approval method for this application.</p>
+                </div>
             </div>
-        </div>
         <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors gt 0}">
         <div class="loan-workflow-section loan-guarantor-section">
@@ -284,12 +288,12 @@
                 <span id="guarantorSelectedCount" class="app-badge loan-selection-counter">
                     <spring:message code="newloan.guarantors.counter" arguments="${requiredGuarantors}" />
                 </span>
-            </div>
+                </div>
 
             <div class="loan-guarantor-mode">
                 <div class="loan-control-label">
                     <spring:message code="newloan.guarantors.approvalMode" text="Guarantor approval mode" />
-                </div>
+            </div>
                 <input type="hidden"
                        id="guarantorApprovalMode"
                        name="guarantorApprovalMode"
@@ -309,7 +313,7 @@
                             aria-pressed="${guarantorApprovalMode eq 'DIRECT_OTP'}">
                         <spring:message code="newloan.guarantors.directOtp" text="Direct OTP" />
                     </button>
-                </div>
+            </div>
             </div>
 
             <div class="loan-guarantor-search-row">
@@ -324,7 +328,7 @@
                        class="fcms-control loan-guarantor-search-input" />
                 <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action"><spring:message code="common.search" /></button>
                 <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
-            </div>
+        </div>
 
            
             <p id="guarantorHint" class="mt-2 text-sm text-slate-500"></p>
@@ -341,7 +345,7 @@
                         <span class="selected-guarantor-remove" aria-hidden="true">&times;</span>
                     </button>
                 </c:forEach>
-            </div>
+        </div>
             <div id="selectedGuarantorInputs"></div>
             <c:if test="${not empty guarantorValidationErrorId}">
                 <div id="guarantorValidationErrorMarker"
@@ -358,7 +362,7 @@
         </div>
     </c:if>
 
-        </div>
+            </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
             <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Attachments</button>
@@ -378,7 +382,7 @@
         <div class="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
                 <h5 class="erp-panel-title"><spring:message code="newloan.attachments.title" /></h5>
-            </div>
+                                </div>
             <span class="app-badge loan-requirement-badge ${product.applicantAttachmentRequired ? 'is-required' : ''}">
                 <c:choose>
                     <c:when test="${product.applicantAttachmentRequired}">
@@ -389,7 +393,7 @@
                     </c:otherwise>
                 </c:choose>
             </span>
-        </div>
+                            </div>
         <c:choose>
             <c:when test="${not empty requiredAttachmentDefinitions}">
                 <div class="grid gap-3">
@@ -400,11 +404,11 @@
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900"><c:out value="${requirement.attachmentName}" /></p>
                                     <p class="text-xs text-slate-500">Maximum file size: ${requirement.maxSizeMb} MB</p>
-                                </div>
+                        </div>
                                 <c:if test="${existingRequiredAttachmentIds.contains(requirement.id.toString())}">
                                     <span class="app-badge loan-uploaded-badge">Already uploaded</span>
                                 </c:if>
-                            </div>
+                </div>
                             <label class="attachment-dropzone" data-attachment-dropzone>
                                 <input type="file" name="requiredAttachmentFiles_${requirement.id}" class="attachment-dropzone-input" data-attachment-input />
                                 <span class="attachment-dropzone-main">
@@ -420,9 +424,9 @@
                                     <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
                                 </span>
                             </label>
-                        </div>
+    </div>
                     </c:forEach>
-                </div>
+        </div>
             </c:when>
             <c:otherwise>
                 <label class="attachment-dropzone" data-attachment-dropzone>
@@ -442,9 +446,9 @@
                 <span class="attachment-dropzone-help"><spring:message code="attachments.dropzone.help" text="Images and documents can be attached." /></span>
             </p>
         </c:if>
-    </div>
-
         </div>
+
+            </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
             <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Submit</button>
@@ -457,8 +461,8 @@
             <div>
                 <h2 id="loanFlowStep5Title">Submit</h2>
                 <p>Review the declaration, save the draft, or submit the application.</p>
-            </div>
-        </div>
+                        </div>
+                            </div>
         <div class="loan-flow-panel-body">
     <c:if test="${requiredGuarantors le 0}">
     <div class="loan-workflow-section loan-submit-section">
@@ -498,7 +502,7 @@
                                 <span class="otp-button-label"><spring:message code="newloan.otp.sendCode" /></span>
                             </button>
                         </div>
-                        <div id="applicantSignatureOtpFeedback" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                        <div id="applicantSignatureOtpFeedback" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
                         <div class="mt-3">
                             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.otp.codeLabel" /></label>
                             <input type="text" name="applicantSignatureOtpCode" id="applicantSignatureOtpCode"
@@ -507,19 +511,19 @@
                                    class="fcms-control loan-otp-input"
                                    placeholder="123456" />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="newloan.otp.codeHelp" /></p>
-                            <div id="applicantSignatureOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <div id="applicantSignatureOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
                                 </svg>
                                 <span data-otp-text><spring:message code="newloan.otp.checkingCode" /></span>
-                            </div>
-                        </div>
-                    </c:otherwise>
-                </c:choose>
             </div>
         </div>
+                    </c:otherwise>
+                </c:choose>
     </div>
+    </div>
+        </div>
     </c:if>
 
     <div class="loan-action-row">
@@ -981,19 +985,19 @@
             financialCard.innerHTML = "";
             Object.entries(sections || {}).forEach(function (section) {
                 const wrapper = document.createElement("div");
-                wrapper.className = "erp-table-wrap erp-table-scroll erp-table-scroll-sm loan-summary-table";
+                wrapper.className ="erp-table-wrap loan-summary-table";
                 wrapper.setAttribute("data-aws-table-region", "");
                 wrapper.setAttribute("data-aws-no-titlebar", "true");
                 wrapper.setAttribute("data-aws-no-refresh", "true");
                 wrapper.innerHTML = ""
-                    + "<div class='border-b border-slate-200 bg-slate-50 px-3 py-2'>"
-                    + "<p class='text-xs font-bold uppercase tracking-[0.16em] text-slate-600'></p>"
+                    +"<div class='app-table-titlebar'>"
+                    +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    + "<table class='erp-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm'><table class='erp-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
-                    + "</table>";
-                wrapper.querySelector("p").textContent = section[0];
+                    +"</table></div>";
+                wrapper.querySelector("h3").textContent = section[0];
                 const headerCells = wrapper.querySelectorAll("th");
                 headerCells[0].textContent = tableSectionLabel;
                 headerCells[1].textContent = tableValueLabel;
@@ -1042,14 +1046,7 @@
                 return;
             }
             signatureOtpFeedback.textContent = text;
-            signatureOtpFeedback.classList.remove(
-                "hidden",
-                "border-emerald-200",
-                "bg-emerald-50",
-                "text-emerald-700",
-                "border-sacco-brown/30",
-                "bg-[#f7efe9]",
-                "text-sacco-brown"
+            signatureOtpFeedback.classList.remove("hidden","border-emerald-200","bg-emerald-50","text-emerald-700","border-sacco-brown/30","bg-[#f7efe9]","text-sacco-brown"
             );
             if (type === "success") {
                 signatureOtpFeedback.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
@@ -1223,9 +1220,7 @@
             eligibilityExternalStatus.classList.add("text-slate-500");
             try {
                 const response = await fetch("/app/loan-applications/external-eligibility-summary?loanProductId=${loanProductId}", {
-                    headers: {
-                        "Accept": "application/json",
-                        "X-Requested-With": "XMLHttpRequest"
+                    headers: {"Accept":"application/json","X-Requested-With":"XMLHttpRequest"
                     }
                 });
                 if (!response.ok) {
@@ -1290,14 +1285,9 @@
                 const applicationId = "${formValues['applicationId']}";
                 const response = await fetch("/app/loan-applications/verify-signature-otp", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                        "Accept": "application/json"
+                    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                     },
-                    body: new URLSearchParams({
-                        "${_csrf.parameterName}": csrfInput.value,
-                        "applicationId": applicationId,
-                        "otpCode": code
+                    body: new URLSearchParams({"${_csrf.parameterName}": csrfInput.value,"applicationId": applicationId,"otpCode": code
                     })
                 });
                 const payload = await response.json();
@@ -1320,18 +1310,9 @@
             try {
                 const response = await fetch("/app/loan-applications/financial-preview", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                        "Accept": "application/json"
+                    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                     },
-                    body: new URLSearchParams({
-                        "${_csrf.parameterName}": csrfInput.value,
-                        "loanProductId": "${loanProductId}",
-                        "loanType": "${loanType}",
-                        "amount": amountInput.value,
-                        "tenorMonths": tenorInput.value,
-                        "applicationId": "${formValues['applicationId']}",
-                        "topUpLoanId": topUpLoanIdInput ? topUpLoanIdInput.value : ""
+                    body: new URLSearchParams({"${_csrf.parameterName}": csrfInput.value,"loanProductId":"${loanProductId}","loanType":"${loanType}","amount": amountInput.value,"tenorMonths": tenorInput.value,"applicationId":"${formValues['applicationId']}","topUpLoanId": topUpLoanIdInput ? topUpLoanIdInput.value :""
                     })
                 });
 
@@ -1361,13 +1342,9 @@
                 try {
                     const response = await fetch("/app/loan-applications/request-signature-otp", {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json"
+                        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                         },
-                        body: new URLSearchParams({
-                            "${_csrf.parameterName}": csrfInput.value,
-                            "applicationId": "${formValues['applicationId']}"
+                        body: new URLSearchParams({"${_csrf.parameterName}": csrfInput.value,"applicationId":"${formValues['applicationId']}"
                         })
                     });
                     const payload = await response.json();
@@ -1632,8 +1609,7 @@
                 }
                 const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
                 const response = await fetch("/app/guarantors/search?" + query.toString(), {
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest"
+                    headers: {"X-Requested-With":"XMLHttpRequest"
                     }
                 });
                 const data = response.ok ? await response.json() : [];

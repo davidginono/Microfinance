@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260806-clean-toast-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260812-navbar-v6' />" />
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="flex min-h-screen items-center justify-center px-4 py-10">
@@ -32,8 +32,8 @@
             </p>
         </div>
 
-        <div id="staffMfaError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"></div>
-        <div id="staffMfaSuccess" class="hidden rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
+        <div id="staffMfaError" class="hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"></div>
+        <div id="staffMfaSuccess" class="hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"></div>
 
         <form id="staffMfaVerifyForm" class="mt-5 space-y-4">
             <input type="hidden" id="staffMfaCsrfName" value="${_csrf.parameterName}" />
@@ -54,7 +54,7 @@
                        placeholder="123456" />
             </label>
 
-            <div id="staffMfaOtpStatus" class="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" aria-live="polite">
+            <div id="staffMfaOtpStatus" class="hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600" aria-live="polite">
                 <span id="staffMfaOtpSpinner" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#14b8c4]"></span>
                 <svg id="staffMfaOtpTick" class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.2a1 1 0 01-1.41 0L3.296 9.19a1 1 0 111.408-1.42l4.044 4.018 6.548-6.5a1 1 0 011.408.002z" clip-rule="evenodd" />

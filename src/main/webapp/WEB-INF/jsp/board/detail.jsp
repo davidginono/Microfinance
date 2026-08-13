@@ -139,7 +139,7 @@
 
 <div class="mt-4 space-y-4">
     <c:if test="${not empty managerReason}">
-        <div class="rounded-lg border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
+        <div class="border border-sacco-brown/30 bg-[#f7efe9] px-4 py-3 text-sm text-sacco-brown">
             <strong><spring:message code="review.managerReason" text="Manager Reason:" /></strong> ${managerReason}
         </div>
     </c:if>
@@ -187,7 +187,8 @@
                     <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
                 </div>
             </div>
-<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                <div class="erp-table-scroll">
                 <table class="erp-table">
                     <thead>
                     <tr>
@@ -225,21 +226,23 @@
                     </tbody>
                 </table>
             </div>
+            </div>
         </c:when>
         <c:otherwise>
-            <div class="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <div class="mt-5 border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
                 <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
-            </div>
+</div>
         </c:otherwise>
     </c:choose>
-</div>
+    </div>
 
 <div class="loan-view-summary-card mt-5 px-5 py-5">
     <div>
         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewAssessorTitle}</p>
         <p class="mt-2 text-base text-slate-600">${reviewAssessorDescription}</p>
     </div>
-<div class="mt-5 erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
         <table class="erp-table">
             <thead>
             <tr>
@@ -289,17 +292,19 @@
             </c:forEach>
             </tbody>
         </table>
-    </div>
 </div>
+                        </div>
+    </div>
 
 <%@ include file="../fragments/financial-field-sections.jspf" %>
 
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <c:if test="${not empty disbursementProofAttachments or app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div class="erp-table-wrap mt-5 overflow-x-auto">
+    <div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
         <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.disbursementProof" text="Disbursement Proof" /></h5>
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <div class="erp-table-scroll">
+        <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50">
             <tr>
                 <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -318,7 +323,7 @@
                         <div class="flex flex-wrap gap-2">
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}/view" target="_blank" rel="noopener" class="app-btn btn-neutral"><spring:message code="common.view" text="View" /></a>
                             <a href="/documents/loan-applications/${app.id}/attachments/${file.id}" class="app-btn btn-primary" data-download-action="true"><spring:message code="common.download" text="Download" /></a>
-                        </div>
+</div>
                     </td>
                 </tr>
             </c:forEach>
@@ -327,12 +332,14 @@
             </c:if>
             </tbody>
         </table>
-    </div>
+                        </div>
+                        </div>
 </c:if>
 
-<div class="erp-table-wrap mt-5 overflow-x-auto">
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.applicationAttachments" text="Application Attachments" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <div class="erp-table-scroll">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="common.file" text="File" /></th>
@@ -355,11 +362,13 @@
         </c:if>
         </tbody>
     </table>
+                    </div>
 </div>
 
-<div class="erp-table-wrap mt-5 overflow-x-auto">
+<div class="erp-table-wrap mt-5" data-aws-table-region data-loading-label="Loading results...">
     <h5 class="px-4 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.guarantors" text="Guarantors" /></h5>
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <div class="erp-table-scroll">
+    <table class="erp-table min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
         <tr>
             <th class="px-3 py-2 text-left"><spring:message code="loan.guarantor" text="Guarantor" /></th>
@@ -402,13 +411,13 @@
                         <div class="guarantor-financial-result-row">
                             <span class="guarantor-financial-result-label"><spring:message code="financial.savings" text="Savings" /></span>
                             <span class="guarantor-financial-result-value" data-financial-savings>-</span>
-                        </div>
+            </div>
                         <div class="guarantor-financial-result-row">
                             <span class="guarantor-financial-result-label"><spring:message code="financial.shares" text="Shares" /></span>
                             <span class="guarantor-financial-result-value" data-financial-shares>-</span>
-                        </div>
+            </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>
-                    </div>
+                            </div>
                 </td>
             </tr>
         </c:forEach>
@@ -417,7 +426,8 @@
         </c:if>
         </tbody>
     </table>
-</div>
+                        </div>
+                            </div>
 
 <c:choose>
     <c:when test="${myReview.decision eq 'PENDING' and app.status eq reviewAwaitingStatus}">
@@ -426,19 +436,19 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">${reviewDecisionLabel}</p>
                 <p class="mt-1 text-sm text-slate-600"><spring:message code="review.commentHelp" text="Comments are optional for approval and required for rejection." /></p>
-            </div>
+                        </div>
             <div>
                 <label class="mb-2 block text-sm font-medium text-slate-700"><spring:message code="review.comment" text="Comment" /></label>
-                <textarea class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" name="comment"></textarea>
-            </div>
+                <textarea class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" name="comment"></textarea>
+                    </div>
             <c:choose>
                 <c:when test="${reviewApprovalOtpEnabled}">
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div class="border border-slate-200 bg-slate-50 px-4 py-4">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                                 <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalHelp" arguments="${reviewRoleLabelLower}" text="Request a one-time code to confirm this review decision." /></p>
-                            </div>
+                    </div>
                              <button type="button"
                                      class="app-btn btn-primary otp-request-button board-otp-request inline-flex items-center justify-center gap-2"
                                      data-request-url="${reviewBasePath}/loan-applications/${app.id}/request-signature-otp"
@@ -446,8 +456,8 @@
                                 <span class="otp-button-spinner hidden"></span>
                                 <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                             </button>
-                        </div>
-                        <div class="board-otp-feedback mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+            </div>
+                        <div class="board-otp-feedback mt-3 hidden border px-4 py-3 text-sm"></div>
                         <div class="mt-3">
                             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                             <input type="text"
@@ -456,11 +466,11 @@
                                    maxlength="6"
                                    autocomplete="one-time-code"
                                    data-otp-hidden="true" data-otp-label="<spring:message code='loan.otp.roleCodeLabel' arguments='${reviewRoleLabel}' text='${reviewRoleLabel} OTP code' />"
-                                   class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                   class="w-full border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                    placeholder="123456"
                                    ${reviewApprovalOtpEnabled ? 'required' : ''} />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.codeHelp" text="Enter the 6-digit code sent to your email before confirming your decision." /></p>
-                            <div class="board-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <div class="board-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
@@ -471,7 +481,7 @@
                     </div>
                 </c:when>
                 <c:otherwise>
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div class="border border-slate-200 bg-slate-50 px-4 py-4">
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                         <p class="mt-2 text-sm text-slate-600"><spring:message code="otp.approvalDisabledHelp" arguments="${reviewRoleLabelLower}" text="OTP confirmation is disabled for this approval." /></p>
                     </div>
@@ -598,13 +608,9 @@
                 try {
                     const response = await fetch(verifyUrl, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json",
-                            "X-CSRF-TOKEN": csrfToken
+                        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json","X-CSRF-TOKEN": csrfToken
                         },
-                        body: new URLSearchParams({
-                            "otpCode": code
+                        body: new URLSearchParams({"otpCode": code
                         }),
                         credentials: "same-origin"
                     });
@@ -705,9 +711,7 @@
                 try {
                     const response = await fetch(requestUrl, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                            "X-CSRF-TOKEN": csrfToken
+                        headers: {"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-CSRF-TOKEN": csrfToken
                         },
                         body: "_csrf=" + encodeURIComponent(csrfToken)
                     });

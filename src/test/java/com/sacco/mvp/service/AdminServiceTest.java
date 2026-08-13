@@ -194,7 +194,8 @@ class AdminServiceTest {
             minorAdminInvitationService,
             objectMapper,
             nameSignatureService,
-            foresightDirectoryService
+            foresightDirectoryService,
+            new ApplicationClock("Africa/Nairobi")
         );
     }
 
@@ -518,8 +519,9 @@ class AdminServiceTest {
             .readAt(OffsetDateTime.now())
             .createdAt(OffsetDateTime.now())
             .build();
-        when(adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(memberId))
-            .thenReturn(List.of(incident));
+        when(adminIncidentRepository.findSupportArchivePage(
+            eq(memberId), eq("Member Support"), isNull(), isNull(), any()))
+            .thenReturn(new PageImpl<>(List.of(incident)));
         when(notificationRepository.findReadSupportIncidentIds(Set.of(incidentId)))
             .thenReturn(List.of(incidentId));
 

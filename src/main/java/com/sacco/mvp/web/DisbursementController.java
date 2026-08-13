@@ -16,6 +16,8 @@ import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
+import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -77,6 +79,7 @@ public class DisbursementController {
     private final PaymentDetailsService paymentDetailsService;
     private final MessageSource messageSource;
     private final AccessControlService access;
+    private final ApplicationClock applicationClock;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -155,9 +158,12 @@ public class DisbursementController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String filter,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
         String normalizedSearchId = StaffQueueViewSupport.normalizeSearch(searchId);
         List<String> statuses = currentFilter.status() == null
             ? List.of(LoanStatus.DRAFT.name())
@@ -167,6 +173,8 @@ public class DisbursementController {
             ApprovalWorkflowStage.DISBURSEMENT_OFFICER.name(),
             principal.getSaccoId(),
             principal.getStationId(),
+            dateRange.fromInclusive(),
+            dateRange.toExclusive(),
             false,
             ManagerDecision.ACCEPT.name(),
             currentFilter.status() != null,
@@ -209,6 +217,8 @@ public class DisbursementController {
         model.addAttribute("currentFilterLabel", currentFilter.label());
         model.addAttribute("queueSearchValue", normalizedSearchId);
         model.addAttribute("archivePage", archivePage);
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return "disbursement/archive";
     }
 

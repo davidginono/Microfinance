@@ -19,7 +19,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</p>
     <h1 class="erp-page-title">${superAdmin ? saccoRegistrationLabel : stationRegistryLabel}</h1>
-    <p class="erp-page-subtitle">${superAdmin ? saccoRegistrationSubtitle : stationRegistrySubtitle}</p>
 </div>
 
 <div class="erp-panel">
@@ -36,7 +35,8 @@
         </div>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table min-w-[680px]">
                 <thead>
                 <tr>
@@ -59,10 +59,10 @@
                                 <c:when test="${sacco.hasLogo}">
                                     <img src="${sacco.logoUrl}"
                                          alt="${sacco.saccoName} logo"
-                                         class="h-10 w-10 rounded-md border border-slate-200 bg-white object-contain p-1 shadow-sm" />
+                                         class="h-10 w-10 border border-slate-200 bg-white object-contain p-1 shadow-sm" />
                                 </c:when>
                                 <c:otherwise>
-                                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                    <span class="inline-flex h-10 w-10 items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                                         Logo
                                     </span>
                                 </c:otherwise>
@@ -132,6 +132,7 @@
         </div>
     </div>
 </div>
+                </div>
 
 <c:if test="${superAdmin}">
 <div class="app-modal-overlay hidden" data-sacco-modal="create-sacco">
@@ -141,19 +142,19 @@
                 <div>
                     <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addSacco" text="Add SACCO" /></p>
                     <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addSaccoHelp" text="Save the SACCO and its station IDs." /></p>
-                </div>
+            </div>
                 <button type="button" class="app-modal-close" data-sacco-modal-close="create-sacco" aria-label="Close modal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                     </svg>
                 </button>
-            </div>
+                </div>
             <form action="/admin/saccos" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                 <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
                     <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SACCO ID</span>
                     <span class="mt-1 block font-medium text-slate-700">Generated automatically after saving.</span>
-                </div>
+                        </div>
                 <label class="block text-sm font-semibold text-slate-700">
                     <spring:message code="admin.saccoRegistry.saccoName" text="SACCO Name" />
                     <input name="saccoName" type="text" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2.5 text-sm text-slate-800" placeholder="e.g. IAA SACCOS LTD" />
@@ -195,8 +196,8 @@
                             <span class="aws-file-help">
                                 Optional. ${logoUploadPolicy.helpText} If you skip this, the navbar will use the SACCO initials.
                             </span>
-                        </div>
                     </div>
+                </div>
                 </div>
                 <div class="app-modal-section text-sm text-slate-600">
                     <spring:message code="admin.saccoRegistry.stationHelp" text="Add at least one station ID for every SACCO. Admin selection and member registration will use these values." />
@@ -204,11 +205,11 @@
                 <div class="app-modal-actions">
                     <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="create-sacco"><spring:message code="common.cancel" text="Cancel" /></button>
                     <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveSacco" text="Save SACCO" /></button>
-                </div>
-            </form>
         </div>
+            </form>
     </div>
 </div>
+                    </div>
 </c:if>
 
 <c:if test="${superAdmin}">
@@ -220,13 +221,13 @@
                     <div>
                         <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addStation" text="Add Station" /></p>
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addStationHelp" text="Save one new station under this SACCO." /></p>
-                    </div>
+                </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="add-station-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                    </div>
                 <form action="/admin/saccos/${sacco.saccoId}/stations" method="post" class="app-modal-body space-y-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <label class="block text-sm font-semibold text-slate-700">
@@ -240,11 +241,11 @@
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="add-station-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
                         <button type="submit" class="app-btn btn-primary"><spring:message code="admin.saccoRegistry.saveStation" text="Save Station" /></button>
-                    </div>
-                </form>
             </div>
+                </form>
         </div>
     </div>
+                    </div>
     <div class="app-modal-overlay hidden" data-sacco-modal="edit-${sacco.saccoId}">
         <div class="app-modal-panel app-modal-panel--compact">
             <div class="app-modal-scroll">
@@ -252,13 +253,13 @@
                     <div>
                         <p class="erp-panel-title">${editSaccoLabel}</p>
                         <p class="mt-2 text-sm text-slate-500">${editSaccoHelp}</p>
-                    </div>
+                </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="edit-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                        </div>
                 <form action="/admin/saccos/${sacco.saccoId}" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <label class="block text-sm font-semibold text-slate-700">
@@ -283,8 +284,8 @@
                                     <input name="stationAddressLocations" type="text" maxlength="255" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" value="${station.addressLocation}" placeholder="Enter station address or location" />
                                 </label>
                             </c:forEach>
-                        </div>
                     </div>
+                            </div>
                     <div class="sacco-logo-upload-card" data-logo-upload-card>
                         <p class="aws-file-card-kicker">SACCO Logo</p>
                         <div class="sacco-logo-upload-layout">
@@ -329,8 +330,8 @@
                                 <span class="aws-file-help">
                                     Leave this empty to keep the current logo. Upload or paste a new image to replace it. ${logoUploadPolicy.helpText}
                                 </span>
-                            </div>
                         </div>
+                    </div>
                     </div>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="edit-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
@@ -344,11 +345,11 @@
                             </button>
                         </c:if>
                         <button type="submit" class="app-btn btn-primary">${saveChangesLabel}</button>
-                    </div>
-                </form>
             </div>
+                </form>
         </div>
     </div>
+                    </div>
     <div class="app-modal-overlay hidden" data-sacco-modal="delete-${sacco.saccoId}">
         <div class="app-modal-panel app-modal-panel--compact">
             <div class="app-modal-scroll">
@@ -356,13 +357,13 @@
                     <div>
                         <p class="erp-panel-title"><spring:message code="common.delete" text="Delete" /> ${sacco.saccoName}</p>
                         <p class="mt-2 text-sm text-slate-500">This permanently removes the SACCO and all related onboarding, member, staff, loan, station, SMS, upload, and workflow data.</p>
-                    </div>
+                </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="delete-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                    </div>
                 <form action="/admin/saccos/${sacco.saccoId}/delete" method="post" class="app-modal-body space-y-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <div class="rounded border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -375,11 +376,11 @@
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="delete-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
                         <button type="submit" class="app-btn btn-reject"><spring:message code="common.delete" text="Delete" /></button>
-                    </div>
-                </form>
             </div>
+                </form>
         </div>
     </div>
+                    </div>
 </c:forEach>
 </c:if>
 
@@ -392,13 +393,13 @@
                     <div>
                         <p class="erp-panel-title">Edit SACCO Logo</p>
                         <p class="mt-2 text-sm text-slate-500">Update the logo shown for ${sacco.saccoName}.</p>
-                    </div>
+                </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="logo-${sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                            </div>
                 <form action="/admin/saccos/${sacco.saccoId}/logo" method="post" enctype="multipart/form-data" class="app-modal-body space-y-4">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <div class="sacco-logo-upload-card" data-logo-upload-card>
@@ -446,8 +447,8 @@
                                 <span class="aws-file-help">
                                     ${logoUploadPolicy.helpText}
                                 </span>
-                            </div>
                         </div>
+                    </div>
                     </div>
                     <div class="app-modal-actions">
                         <button type="button" class="app-btn btn-neutral" data-sacco-modal-close="logo-${sacco.saccoId}"><spring:message code="common.cancel" text="Cancel" /></button>
@@ -461,10 +462,10 @@
                             </button>
                         </c:if>
                         <button type="submit" class="app-btn btn-primary">Save Logo</button>
-                    </div>
-                </form>
             </div>
+                </form>
         </div>
+    </div>
     </div>
 </c:forEach>
 </c:if>

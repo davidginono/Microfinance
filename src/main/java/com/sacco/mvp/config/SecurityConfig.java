@@ -112,6 +112,16 @@ public class SecurityConfig {
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && accessControlService.canAccessDisbursementArea(appUser));
                 })
+                .requestMatchers("/chairperson/processed-loans", "/chairperson/processed-loans/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canViewProcessedLoans(appUser));
+                })
+                .requestMatchers("/chairperson/configurations", "/chairperson/configurations/**").access((authentication, context) -> {
+                    Object principal = authentication.get().getPrincipal();
+                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
+                        && accessControlService.canViewSaccoConfigurations(appUser));
+                })
                 .requestMatchers("/chairperson/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser

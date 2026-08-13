@@ -14,8 +14,8 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260809-select-visibility-v24' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260812-profile-layout-v35' />" />
+    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260812-navbar-support-v33' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -57,7 +57,7 @@
                     </c:otherwise>
                 </c:choose>
                 <div class="min-w-0 leading-tight">
-                    <p class="truncate font-display text-[0.92rem] font-semibold tracking-tight text-white sm:text-base">
+                    <p class="break-words font-display text-[0.92rem] font-semibold tracking-tight text-white sm:text-base">
                         <c:choose>
                             <c:when test="${not empty activeSaccoName}">${activeSaccoName}</c:when>
                             <c:otherwise><spring:message code="app.title" /></c:otherwise>
@@ -86,17 +86,17 @@
 
         <div class="app-topbar-actions erp-mobile-compact flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
             <c:if test="${not empty headerStation}">
-                <div class="app-station-selector hidden min-[520px]:flex max-w-[13rem] items-center gap-2 rounded-md border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
-                    <span class="app-station-icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 text-cyan-50">
+                <div class="app-station-selector hidden min-[520px]:flex max-w-[13rem] items-center gap-2 border border-white/35 bg-white/10 px-2.5 py-1.5 text-white shadow-sm lg:max-w-[15rem] xl:max-w-[18rem]">
+                    <span class="app-station-icon inline-flex h-7 w-7 shrink-0 items-center justify-center bg-white/15 text-cyan-50">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg>
                     </span>
                     <div class="app-station-copy min-w-0">
                         <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-50/85"><spring:message code="header.currentStation" text="Current Station" /></p>
-                        <p class="truncate text-xs font-semibold text-white">${headerStation.stationId}</p>
-                        <p class="truncate text-[10px] font-medium text-cyan-50/85">${headerStation.stationAddressLocation}</p>
+                        <p class="break-words text-xs font-semibold text-white">${headerStation.stationId}</p>
+                        <p class="break-words text-[10px] font-medium text-cyan-50/85">${headerStation.stationAddressLocation}</p>
                     </div>
                 </div>
-                <div class="app-station-mobile flex min-[520px]:hidden items-center rounded-md border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                <div class="app-station-mobile flex min-[520px]:hidden items-center border border-white/35 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
                     ${headerStation.stationId}
                 </div>
             </c:if>
@@ -122,7 +122,7 @@
             </div>
             <div class="app-account-copy hidden lg:flex items-center px-2 py-0 text-right">
                 <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-white">
+                    <p class="break-words text-sm font-semibold text-white">
                         <c:choose>
                             <c:when test="${not empty currentMember and not empty currentMember.fullName}">${currentMember.fullName}</c:when>
                             <c:otherwise><sec:authentication property="principal.username" /></c:otherwise>
@@ -194,14 +194,14 @@
                                 </c:choose>
                             </p>
                             <c:if test="${not empty currentMember and not empty currentMember.email}">
-                                <p class="mt-1 truncate text-xs text-slate-500">${currentMember.email}</p>
+                                <p class="mt-1 break-words text-xs text-slate-500">${currentMember.email}</p>
                             </c:if>
                             <c:if test="${not isPlatformAdminIdentity and not empty adminScope}">
                                 <p class="mt-1 text-[11px] font-medium text-slate-500">${adminScope.saccoId} / ${adminScope.stationId}</p>
                             </c:if>
                         </div>
                     </div>
-                    <div class="mt-3 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <div class="mt-3 grid gap-3 border border-slate-200 bg-slate-50 p-3 text-sm">
                         <div class="flex items-center justify-between gap-4">
                             <span class="text-slate-500">
                                 <c:choose>
@@ -244,7 +244,7 @@
                             </div>
                         </c:if>
                     </div>
-                    <a href="/profile" class="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                    <a href="/profile" class="mt-3 inline-flex w-full items-center justify-center border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
                         <spring:message code="profile.photo.edit" text="Edit Profile Photo" />
                     </a>
                     </div>

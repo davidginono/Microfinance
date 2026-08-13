@@ -187,6 +187,20 @@ public class AccessControlService {
         return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.CHAIRPERSON_QUEUE_VIEW);
     }
 
+    public boolean canViewProcessedLoans(AppUserPrincipal principal) {
+        return hasScopedStaffClaim(principal, UserClaim.PROCESSED_LOANS_VIEW);
+    }
+
+    public boolean canViewSaccoConfigurations(AppUserPrincipal principal) {
+        return hasScopedStaffClaim(principal, UserClaim.SACCO_CONFIGURATIONS_VIEW);
+    }
+
+    public boolean canAccessChairpersonOffice(AppUserPrincipal principal) {
+        return canAccessChairpersonArea(principal)
+            || canViewProcessedLoans(principal)
+            || canViewSaccoConfigurations(principal);
+    }
+
     public boolean canAccessCreditCommitteeArea(AppUserPrincipal principal) {
         return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
     }
@@ -214,5 +228,15 @@ public class AccessControlService {
 
     private boolean isStaffSession(AppUserPrincipal principal) {
         return principal != null && principal.isStaffSession();
+    }
+
+    private boolean hasScopedStaffClaim(AppUserPrincipal principal, UserClaim claim) {
+        return isStaffSession(principal)
+            && notPlatformIdentity(principal)
+            && has(principal, claim)
+            && principal.getSaccoId() != null
+            && !principal.getSaccoId().isBlank()
+            && principal.getStationId() != null
+            && !principal.getStationId().isBlank();
     }
 }

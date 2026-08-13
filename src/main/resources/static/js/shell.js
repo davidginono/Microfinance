@@ -491,6 +491,65 @@
             }
         });
     };
+    const initAwsClientTables = function () {
+        document.querySelectorAll('[data-aws-table-refresh]').forEach(function (control) {
+            if (control.dataset.awsRefreshReady === 'true') {
+                return;
+            }
+            control.dataset.awsRefreshReady = 'true';
+            control.addEventListener('click', function () {
+                showConsoleTableLoading(control);
+                window.location.reload();
+            });
+        });
+
+        document.querySelectorAll('[data-aws-client-table]').forEach(function (region) {
+            const input = region.querySelector('[data-aws-table-search]');
+            const table = region.querySelector('.erp-table');
+            const body = table?.tBodies?.[0];
+            if (!input || !body || input.dataset.awsSearchReady === 'true') {
+                return;
+            }
+            input.dataset.awsSearchReady = 'true';
+            const rows = Array.from(body.querySelectorAll('[data-aws-table-row]'));
+            const count = region.querySelector('.app-table-count');
+            const emptyText = input.getAttribute('data-empty-label') || 'No matching results.';
+
+            const applySearch = function () {
+                const query = input.value.trim().toLocaleLowerCase();
+                let visibleCount = 0;
+                body.querySelector('.aws-client-table-empty')?.remove();
+                rows.forEach(function (row) {
+                    const visible = !query || (row.textContent || '').toLocaleLowerCase().includes(query);
+                    row.hidden = !visible;
+                    if (visible) {
+                        visibleCount += 1;
+                    }
+                });
+                if (query && visibleCount === 0) {
+                    const emptyRow = document.createElement('tr');
+                    emptyRow.className = 'aws-client-table-empty';
+                    const cell = document.createElement('td');
+                    cell.className = 'erp-table-empty';
+                    cell.colSpan = Math.max(table.tHead?.rows?.[0]?.cells?.length || 1, 1);
+                    cell.textContent = emptyText;
+                    emptyRow.appendChild(cell);
+                    body.appendChild(emptyRow);
+                }
+                if (count) {
+                    count.textContent = '(' + String(visibleCount) + ')';
+                }
+            };
+
+            input.addEventListener('input', applySearch);
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && input.value) {
+                    input.value = '';
+                    applySearch();
+                }
+            });
+        });
+    };
     const syncConsoleFiltersFromUrl = function () {
         const query = new URLSearchParams(window.location.search);
         document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
@@ -544,9 +603,8 @@
         const spinner = document.createElement('span');
         spinner.className = 'aws-table-loader__spinner';
         spinner.setAttribute('aria-hidden', 'true');
-        const label = document.createElement('span');
-        label.textContent = nearbyRegion.getAttribute('data-loading-label') || 'Loading results...';
-        loader.append(spinner, label);
+        loader.setAttribute('aria-label', nearbyRegion.getAttribute('data-loading-label') || 'Loading results...');
+        loader.appendChild(spinner);
         nearbyRegion.appendChild(loader);
     };
     const initConsoleTableLoading = function () {
@@ -593,6 +651,7 @@
             const path = document.createElement('nav');
             path.className = 'erp-page-path';
             path.setAttribute('aria-label', 'Breadcrumb');
+            const explicitRootHref = breadcrumb.getAttribute('data-breadcrumb-root-href');
             segments.forEach(function (segment, index) {
                 if (index > 0) {
                     const separator = document.createElement('span');
@@ -601,7 +660,9 @@
                     separator.textContent = '>';
                     path.appendChild(separator);
                 }
-                const href = resolveBreadcrumbHref(segment, index, segments);
+                const href = index === 0 && explicitRootHref
+                    ? explicitRootHref
+                    : resolveBreadcrumbHref(segment, index, segments);
                 const item = document.createElement(href ? 'a' : 'span');
                 item.className = href ? 'erp-page-path__item erp-page-path__link' : 'erp-page-path__item';
                 item.textContent = segment;
@@ -1804,6 +1865,7 @@
         initAwsFilePickers(document);
         enhanceConsolePagination();
         enhanceConsoleTables();
+        initAwsClientTables();
         syncConsoleFiltersFromUrl();
         initConsoleTableLoading();
         schedulePageTitleRailUpdate();

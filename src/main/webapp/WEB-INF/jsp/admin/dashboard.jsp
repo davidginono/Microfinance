@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.dashboard.breadcrumb" text="Admin Tools / Dashboard" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.dashboard.title" text="Admin Dashboard" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.dashboard.subtitle" text="Track incidents, SMS units, and storage." /></p>
 </div>
 
 <section class="erp-stat-grid">
@@ -158,7 +157,8 @@
 <section class="erp-panel">
     <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="admin.dashboard.failedOutboxEvents" text="Failed Outbox Events" /></p></div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap max-h-72 overflow-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll erp-table-scroll-sm">
             <table class="erp-table">
                 <thead>
                 <tr><th><spring:message code="admin.dashboard.event" text="Event" /></th><th><spring:message code="admin.dashboard.aggregate" text="Aggregate" /></th><th><spring:message code="admin.dashboard.created" text="Created" /></th></tr>
@@ -177,6 +177,7 @@
                 </tbody>
             </table>
         </div>
+    </div>
     </div>
 </section>
 

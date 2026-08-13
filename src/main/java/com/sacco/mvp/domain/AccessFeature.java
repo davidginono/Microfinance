@@ -22,6 +22,8 @@ public enum AccessFeature {
     ACCOUNTANT_QUEUE("Accountant Queue"),
     BOARD_QUEUE("Board Queue"),
     CHAIRPERSON_QUEUE("Chairperson Queue"),
+    PROCESSED_LOANS("Processed Loans"),
+    SACCO_CONFIGURATIONS("SACCO Configurations"),
     CREDIT_COMMITTEE_QUEUE("Credit Committee Queue"),
     DISBURSEMENT_QUEUE("Disbursement Queue"),
     LOAN_REPORTS("Loan Reports"),

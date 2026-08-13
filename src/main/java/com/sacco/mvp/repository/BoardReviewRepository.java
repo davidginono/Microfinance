@@ -18,6 +18,8 @@ import java.util.UUID;
 public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> {
     List<BoardReview> findByLoanApplicationId(UUID loanApplicationId);
 
+    List<BoardReview> findByLoanApplicationIdInOrderByCreatedAtDesc(Collection<UUID> loanApplicationIds);
+
     List<BoardReview> findByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
 
     long countByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
@@ -58,10 +60,12 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
             from board_reviews r
             join loan_applications l on l.id = r.loan_application_id
             where r.board_member_id = :reviewerId
-              and r.review_stage = :reviewStage
+              and r.review_stage in (:reviewStages)
               and r.decision <> 'PENDING'
               and l.sacco_id = :saccoId
-              and (cast(:stationId as text) is null or lower(l.station_id) = lower(cast(:stationId as text)))
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
               and (:filterDecision = false or r.decision = :decision)
               and (:filterStatuses = false or l.status in (:statuses))
               and (
@@ -76,10 +80,12 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
             from board_reviews r
             join loan_applications l on l.id = r.loan_application_id
             where r.board_member_id = :reviewerId
-              and r.review_stage = :reviewStage
+              and r.review_stage in (:reviewStages)
               and r.decision <> 'PENDING'
               and l.sacco_id = :saccoId
-              and (cast(:stationId as text) is null or lower(l.station_id) = lower(cast(:stationId as text)))
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
               and (:filterDecision = false or r.decision = :decision)
               and (:filterStatuses = false or l.status in (:statuses))
               and (
@@ -91,9 +97,11 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
         nativeQuery = true
     )
     Page<BoardReview> findArchivePage(@Param("reviewerId") UUID reviewerId,
-                                      @Param("reviewStage") String reviewStage,
+                                      @Param("reviewStages") Collection<String> reviewStages,
                                       @Param("saccoId") String saccoId,
                                       @Param("stationId") String stationId,
+                                      @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                      @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
                                       @Param("filterDecision") boolean filterDecision,
                                       @Param("decision") String decision,
                                       @Param("filterStatuses") boolean filterStatuses,

@@ -36,7 +36,8 @@
             </div>
         </form>
 </section>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-scroll">
 <table class="erp-table">
     <thead>
     <tr>
@@ -98,6 +99,7 @@
     </c:if>
     </tbody>
 </table>
+</div>
 </div>
 
 <%@ include file="../fragments/confirm-modal.jspf" %>

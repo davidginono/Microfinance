@@ -427,7 +427,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div id="activeLoansTablePanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
                 <c:choose>
                     <c:when test="${not empty activeLoanChartRows}">
-                        <div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+                        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                            <div class="erp-table-scroll">
                             <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5">
                                 <thead>
                                     <tr>
@@ -455,7 +456,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                             </td>
                                             <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.loanId}</td>
                                             <td class="px-3 py-3">
-                                                <span class="inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">
+                                                <span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">
                                                     ${loanRow.repaymentStateLabel}
                                                 </span>
                                             </td>
@@ -480,6 +481,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </tbody>
                             </table>
                         </div>
+                        </div>
                         <div class="aws-table-pagination-footer">
                             <p class="font-semibold text-slate-600" data-active-loans-pagination-summary></p>
                             <div class="flex items-center gap-2" data-active-loans-pagination></div>
@@ -495,11 +497,11 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.activeLoans.empty.title" /></p>
                                 </c:otherwise>
                             </c:choose>
-                        </div>
+                </div>
                     </c:otherwise>
                 </c:choose>
-                </div>
             </div>
+    </div>
         </section>
     </div>
 </section>

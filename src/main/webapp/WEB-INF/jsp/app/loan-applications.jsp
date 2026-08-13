@@ -23,7 +23,8 @@
         setTimeout(function () { window.location.reload(); }, 3600000);
     </script>
 </c:if>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
             <tr>
@@ -39,7 +40,7 @@
                 </th>
                 <th class="px-3 py-2 text-left"><spring:message code="common.reason" text="Reason" /></th>
                 <th class="px-3 py-2 text-left"><spring:message code="loan.date" text="Date" /></th>
-                <th class="px-3 py-2 text-left"><spring:message code="common.actions" text="Actions" /></th>
+                <th scope="col" class="erp-table-action-column"><spring:message code="common.actions" text="Actions" /></th>
             </tr>
         </thead>
         <tbody>
@@ -70,8 +71,8 @@
                         </c:choose>
                     </td>
                     <td class="px-3 py-2">${fn:replace(fn:substring(app.createdAt, 0, 16), 'T', ' ')}</td>
-                    <td class="px-3 py-2">
-                        <div class="flex flex-wrap gap-2">
+                    <td class="erp-table-action-column">
+                        <div class="erp-table-actions">
                             <a href="${pageContext.request.contextPath}/app/loan-applications/${app.id}"
                                class="app-btn btn-primary">
                                 <spring:message code="common.view" />
@@ -95,11 +96,12 @@
         </tbody>
     </table>
 </div>
+    </div>
 
 <section class="erp-panel mt-4">
     <div class="erp-panel-header">
         <p class="erp-panel-title"><spring:message code="apps.progress.title" text="Current Application Progress" /></p>
-    </div>
+                </div>
     <div class="erp-panel-body min-w-0">
         <c:choose>
             <c:when test="${not empty currentWorkflowApplication}">
@@ -108,7 +110,7 @@
             <c:otherwise>
                 <div class="erp-section text-center text-sm text-slate-500">
                     <spring:message code="apps.progress.empty" text="There is no current loan application to track right now." />
-                </div>
+    </div>
             </c:otherwise>
         </c:choose>
     </div>

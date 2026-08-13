@@ -15,6 +15,8 @@ import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
+import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
@@ -35,6 +37,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
@@ -61,6 +64,7 @@ import java.util.UUID;
 @PreAuthorize("@access.canAccessAdminArea(principal)")
 public class AdminController {
     private final AdminService adminService;
+    private final ApplicationClock applicationClock;
     private final AdminScopeService adminScopeService;
     private final SaccoRegistryService saccoRegistryService;
     private final PlatformAdminService platformAdminService;
@@ -538,8 +542,17 @@ public class AdminController {
     @GetMapping("/support/archive")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'SUPPORT_VIEW')")
     public String adminSupportArchive(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+                                      @RequestParam(defaultValue = "0") int page,
                                       Model model) {
-        model.addAttribute("supportArchive", adminService.platformSupportArchive(principal.getMemberId()));
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
+        var archivePage = adminService.platformSupportArchive(
+            principal.getMemberId(), dateRange.fromDate(), dateRange.toDate(), page);
+        model.addAttribute("supportArchive", archivePage.getContent());
+        model.addAttribute("archivePage", archivePage);
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return "admin/support-archive";
     }
 

@@ -159,6 +159,36 @@ class AuthzServiceTest {
         assertThat(authzService.staffAnalyticsAccess(null)).isFalse();
     }
 
+    @Test
+    void processedLoanAttachmentsRequireBothClaimsAndExactScope() {
+        UUID loanId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder().id(loanId).saccoId("CIRCLE-1001").stationId("ST-1")
+            .applicantMemberId(UUID.randomUUID()).loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN)
+            .tenorMonths(1).status(LoanStatus.READY_FOR_MANAGER).formData("{}").requiredGuarantors(0)
+            .policySnapshot("{}").createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).version(0).build();
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+
+        AppUserPrincipal both = scopedPrincipal("CIRCLE-1001", "ST-1",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+        AppUserPrincipal processedOnly = scopedPrincipal("CIRCLE-1001", "ST-1",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW));
+        AppUserPrincipal otherStation = scopedPrincipal("CIRCLE-1001", "ST-2",
+            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+
+        assertThat(authzService.canViewLoan(loanId, both)).isTrue();
+        assertThat(authzService.canViewLoan(loanId, processedOnly)).isFalse();
+        assertThat(authzService.canViewLoan(loanId, otherStation)).isFalse();
+    }
+
+    private AppUserPrincipal scopedPrincipal(String saccoId, String stationId, java.util.Set<UserClaim> claims) {
+        Member member = Member.builder().id(UUID.randomUUID()).saccoId(saccoId).stationId(stationId)
+            .memberNo("MEM").staffNo("STAFF").fullName("Scoped Staff").memberAccount(false)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).position(Position.MANAGER)
+            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MANAGER))).passwordHash("x")
+            .createdAt(OffsetDateTime.now()).build();
+        return new AppUserPrincipal(member, claims, true);
+    }
+
     private AppUserPrincipal principalWith(Position position, boolean memberAccess) {
         java.util.LinkedHashSet<Position> staffRoles = new java.util.LinkedHashSet<>();
         if (position != null && position.isStaffRole()) {

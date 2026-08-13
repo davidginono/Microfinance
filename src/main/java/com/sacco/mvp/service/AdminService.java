@@ -8,6 +8,7 @@ import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class AdminService {
     private static final int MAX_LOG_PAGE_SIZE = 100;
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
+    private static final int DEFAULT_SUPPORT_ARCHIVE_PAGE_SIZE = 50;
     private static final String USER_SEARCH_BY_USER_ID = "userId";
     private static final String USER_SEARCH_BY_NAME = "name";
     private static final int FIRST_GENERATED_USER_ID = 10000;
@@ -74,6 +76,7 @@ public class AdminService {
     private final ObjectMapper objectMapper;
     private final NameSignatureService nameSignatureService;
     private final ForesightDirectoryService foresightDirectoryService;
+    private final ApplicationClock applicationClock;
 
     public AdminDashboard dashboard(String saccoId, UUID adminId) {
         return dashboard(saccoId, null, adminId);
@@ -1594,23 +1597,47 @@ public class AdminService {
     }
 
     public List<SupportArchiveView> platformSupportArchive(UUID reporterId) {
-        if (reporterId == null) {
-            return List.of();
-        }
-        List<AdminIncident> incidents = adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
-            .filter(this::isPlatformSupportIncident)
-            .toList();
-        return toSupportArchiveViews(incidents);
+        return platformSupportArchive(reporterId, null, null, 0).getContent();
     }
 
     public List<SupportArchiveView> memberSupportArchive(UUID reporterId) {
+        return memberSupportArchive(reporterId, null, null, 0).getContent();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SupportArchiveView> platformSupportArchive(UUID reporterId,
+                                                           LocalDate fromDate,
+                                                           LocalDate toDate,
+                                                           int page) {
+        return supportArchive(reporterId, "Workspace Admin Support", fromDate, toDate, page);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SupportArchiveView> memberSupportArchive(UUID reporterId,
+                                                         LocalDate fromDate,
+                                                         LocalDate toDate,
+                                                         int page) {
+        return supportArchive(reporterId, "Member Support", fromDate, toDate, page);
+    }
+
+    private Page<SupportArchiveView> supportArchive(UUID reporterId,
+                                                    String source,
+                                                    LocalDate fromDate,
+                                                    LocalDate toDate,
+                                                    int page) {
+        PageRequest pageRequest = PageRequest.of(Math.max(page, 0), DEFAULT_SUPPORT_ARCHIVE_PAGE_SIZE);
         if (reporterId == null) {
-            return List.of();
+            return Page.empty(pageRequest);
         }
-        List<AdminIncident> incidents = adminIncidentRepository.findByReportedByMemberIdOrderByCreatedAtDesc(reporterId).stream()
-            .filter(this::isMemberSupportIncident)
-            .toList();
-        return toSupportArchiveViews(incidents);
+        ArchiveDateRange range = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
+        Page<AdminIncident> incidents = adminIncidentRepository.findSupportArchivePage(
+            reporterId,
+            source,
+            range.fromInclusive(),
+            range.toExclusive(),
+            pageRequest
+        );
+        return new PageImpl<>(toSupportArchiveViews(incidents.getContent()), pageRequest, incidents.getTotalElements());
     }
 
     public AdminIncident incident(String saccoId, UUID incidentId) {

@@ -6,6 +6,7 @@ import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.service.AccessControlService;
+import com.sacco.mvp.service.ChairpersonProcessedLoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -128,6 +129,13 @@ public class AuthzService {
                 }
                 if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
                     && isBoardAssignee(loanId, principal)) {
+                    return true;
+                }
+                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
+                    && access.canViewProcessedLoans(principal)
+                    && ChairpersonProcessedLoanService.isProcessedStatus(app.getStatus())
+                    && app.getSaccoId().equals(principal.getSaccoId())
+                    && sameStationScope(app, principal)) {
                     return true;
                 }
                 return false;

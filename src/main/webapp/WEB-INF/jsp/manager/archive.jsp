@@ -12,20 +12,24 @@
     <h1 class="erp-page-title"><spring:message code="manager.archive.title" text="Manager Archive" /></h1>
 </div>
 
+<c:url var="managerArchiveAllUrl" value="/manager/archive"><c:param name="filter" value="ALL" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+<c:url var="managerArchiveApprovedUrl" value="/manager/archive"><c:param name="filter" value="APPROVED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+<c:url var="managerArchiveRejectedUrl" value="/manager/archive"><c:param name="filter" value="REJECTED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
+<c:url var="managerArchiveDisbursedUrl" value="/manager/archive"><c:param name="filter" value="DISBURSED" /><c:param name="searchId" value="${queueSearchValue}" /><c:param name="fromDate" value="${fromDate}" /><c:param name="toDate" value="${toDate}" /></c:url>
 <div class="erp-filter-row">
-    <a href="/manager/archive?filter=ALL"
+    <a href="${managerArchiveAllUrl}"
        class="erp-filter-tab ${currentFilterKey eq 'ALL' ? 'is-active' : ''}">
         <spring:message code="archive.allReviewedLoans" text="All Reviewed Loans" />
     </a>
-    <a href="/manager/archive?filter=APPROVED"
+    <a href="${managerArchiveApprovedUrl}"
        class="erp-filter-tab ${currentFilterKey eq 'APPROVED' ? 'is-active' : ''}">
         <spring:message code="archive.approvedLoans" text="Approved Loans" />
     </a>
-    <a href="/manager/archive?filter=REJECTED"
+    <a href="${managerArchiveRejectedUrl}"
        class="erp-filter-tab ${currentFilterKey eq 'REJECTED' ? 'is-active' : ''}">
         <spring:message code="archive.rejectedLoans" text="Rejected Loans" />
     </a>
-    <a href="/manager/archive?filter=DISBURSED"
+    <a href="${managerArchiveDisbursedUrl}"
        class="erp-filter-tab ${currentFilterKey eq 'DISBURSED' ? 'is-active' : ''}">
         <spring:message code="archive.disbursedLoans" text="Disbursed Loans" />
     </a>
@@ -41,11 +45,19 @@
                        inputmode="${currentFilterKey eq 'DISBURSED' ? 'text' : 'numeric'}"
                        class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
             </label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.fromDate" text="From Date" />
+                <input type="date" name="fromDate" value="${fromDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+            </label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <spring:message code="common.toDate" text="To Date" />
+                <input type="date" name="toDate" value="${toDate}" class="mt-1 w-full border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />
+            </label>
             <div class="manager-archive-search-actions">
-                <c:if test="${not empty queueSearchValue}">
+                <c:if test="${not empty queueSearchValue or not empty fromDate or not empty toDate}">
                     <a href="/manager/archive?filter=${currentFilterKey}" class="app-btn btn-neutral"><spring:message code="common.reset" text="Reset" /></a>
                 </c:if>
-                <button type="submit" class="app-btn btn-primary"><spring:message code="common.search" text="Search" /></button>
+                <button type="submit" class="app-btn btn-primary"><spring:message code="common.applyFilters" text="Apply Filters" /></button>
             </div>
         </form>
 
@@ -101,6 +113,8 @@
                 <c:url var="archivePreviousUrl" value="/manager/archive">
                     <c:param name="filter" value="${currentFilterKey}" />
                     <c:param name="searchId" value="${queueSearchValue}" />
+                    <c:param name="fromDate" value="${fromDate}" />
+                    <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number - 1}" />
                 </c:url>
                 <a class="app-btn btn-neutral" href="${archivePreviousUrl}"><spring:message code="common.previous" text="Previous" /></a>
@@ -109,6 +123,8 @@
                 <c:url var="archiveNextUrl" value="/manager/archive">
                     <c:param name="filter" value="${currentFilterKey}" />
                     <c:param name="searchId" value="${queueSearchValue}" />
+                    <c:param name="fromDate" value="${fromDate}" />
+                    <c:param name="toDate" value="${toDate}" />
                     <c:param name="page" value="${archivePage.number + 1}" />
                 </c:url>
                 <a class="app-btn btn-primary" href="${archiveNextUrl}"><spring:message code="common.next" text="Next" /></a>

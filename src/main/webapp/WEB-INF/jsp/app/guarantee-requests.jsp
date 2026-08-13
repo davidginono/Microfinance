@@ -11,7 +11,8 @@
     <h1 class="erp-page-title"><spring:message code="menu.grequests" /></h1>
 </div>
 <c:set var="hasGuarantorSignature" value="${not empty guarantorSavedSignatureText}" />
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-scroll">
 <table class="erp-table">
     <thead><tr><th><spring:message code="archives.loanReference" text="Loan Reference" /></th><th><spring:message code="guaranteeRequests.guaranteeName" text="Guarantee Name" /></th><th><spring:message code="reports.loanProduct" text="Loan Product" /></th><th><spring:message code="dashboard.table.loanAmount" text="Loan Amount" /></th><th><spring:message code="common.status" text="Status" /></th><th><spring:message code="loan.date" text="Date" /></th><th><spring:message code="common.actions" text="Actions" /></th></tr></thead>
     <tbody>
@@ -91,6 +92,7 @@
     </tbody>
 </table>
 </div>
+                    </div>
 
 <c:forEach items="${requests}" var="req">
     <c:set var="policyEligible" value="${guaranteePolicyEligible[req.id] ne false}" />
@@ -105,11 +107,11 @@
                         <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="guaranteeRequests.approveTitle" text="Approve Guarantee" /></p>
                         <h2 class="mt-2 text-3xl font-semibold text-sacco-ink">${guaranteeNames[req.loanApplicationId]}</h2>
                         <p class="guarantee-modal-subtitle-legacy mt-2 text-sm text-slate-500">
-                            Loan ${fn:substring(req.loanApplicationId, 0, 8)} •
+                            Loan ${fn:substring(req.loanApplicationId, 0, 8)} â€¢
                             <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
                                 <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
                             </c:if>
-                            • ${guaranteeLoanAmounts[req.loanApplicationId]}
+                            â€¢ ${guaranteeLoanAmounts[req.loanApplicationId]}
                         </p>
                         <p class="mt-2 text-sm text-slate-500">
                             <spring:message code="loan.single" text="Loan" /> ${fn:substring(req.loanApplicationId, 0, 8)}
@@ -118,7 +120,7 @@
                             </c:if>
                             | ${guaranteeLoanAmountLabels[req.loanApplicationId]}
                         </p>
-                    </div>
+                </div>
                     <button type="button"
                             class="app-modal-close"
                             data-guarantee-modal-close="approve-${req.id}"
@@ -127,13 +129,13 @@
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                        </div>
                 <form action="/app/guarantee-requests/${req.id}/approve" method="post" class="app-modal-body space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <c:if test="${not policyEligible}">
                         <div class="app-modal-section border-rose-200 bg-rose-50 text-sm leading-6 text-rose-700">
                             ${policyReason}
-                        </div>
+                    </div>
                     </c:if>
                     <div class="app-modal-section text-sm leading-7 text-slate-700">
                         <p>
@@ -147,7 +149,7 @@
                             </strong>,
                             <spring:message code="guaranteeRequests.declarationTail" text="accept responsibility for recoveries and penalties if the applicant defaults on this loan." />
                         </p>
-                    </div>
+                            </div>
                     <label class="app-modal-section flex items-start gap-3 text-sm text-slate-700">
                         <input type="checkbox"
                                name="guarantorDeclarationAccepted"
@@ -170,7 +172,7 @@
                                 <c:if test="${not policyEligible}">
                                     <p class="mt-2 text-sm text-rose-600">${policyReason}</p>
                                 </c:if>
-                            </div>
+                        </div>
                             <button type="button"
                                     class="app-btn btn-primary otp-request-button guarantor-otp-request inline-flex items-center justify-center gap-2"
                                     ${hasGuarantorSignature and policyEligible ? '' : 'disabled'}
@@ -179,8 +181,8 @@
                                 <span class="otp-button-spinner hidden"></span>
                                 <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                             </button>
-                        </div>
-                        <div id="approve-feedback-${req.id}" data-auto-scroll-message="true" class="mt-3 hidden rounded-lg border px-4 py-3 text-sm"></div>
+                            </div>
+                        <div id="approve-feedback-${req.id}" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
                         <div class="mt-3">
                             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                              <input type="text"
@@ -189,18 +191,18 @@
                                     maxlength="6"
                                     autocomplete="one-time-code"
                                     data-otp-hidden="true" data-otp-label="<spring:message code='guaranteeRequests.guarantorOtpCode' text='Guarantor OTP code' />"
-                                    class="w-full rounded-lg border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                    class="w-full border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
                                     placeholder="123456"
                                     required />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.codeHelp" text="Enter the 6-digit code sent to your email before confirming approval." /></p>
-                            <div class="guarantor-otp-live-status mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <div class="guarantor-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
                                 </svg>
                                 <span data-otp-text><spring:message code="loan.otp.checking" text="Checking code..." /></span>
-                            </div>
                         </div>
+                    </div>
                     </div>
                     </c:if>
                     <div class="flex flex-wrap justify-end gap-3">
@@ -214,11 +216,11 @@
                                 ${guarantorOtpEnabled ? 'disabled' : ''}>
                             <spring:message code="guaranteeRequests.confirmApproval" text="Confirm Approval" />
                         </button>
-                    </div>
-                </form>
                 </div>
+                </form>
             </div>
         </div>
+                    </div>
 
         <div class="app-modal-overlay hidden"
              data-guarantee-modal="reject-${req.id}">
@@ -229,7 +231,7 @@
                         <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="guaranteeRequests.rejectTitle" text="Reject Guarantee" /></p>
                         <h2 class="mt-2 text-2xl font-semibold text-sacco-ink">${guaranteeNames[req.loanApplicationId]}</h2>
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="guaranteeRequests.rejectHelp" text="This request will be marked as declined by guarantor." /></p>
-                    </div>
+                </div>
                     <button type="button"
                             class="app-modal-close"
                             data-guarantee-modal-close="reject-${req.id}"
@@ -238,7 +240,7 @@
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                    </div>
                 <form action="/app/guarantee-requests/${req.id}/reject" method="post" class="app-modal-body space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <div class="app-modal-section text-sm text-slate-700">
@@ -251,7 +253,7 @@
                         <textarea name="reason"
                                   rows="3"
                                   required
-                                  class="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none"
+                                  class="w-full border border-slate-300 px-3 py-3 text-sm focus:border-sacco-blue focus:outline-none"
                                   placeholder="Enter why you are rejecting this guarantee request."></textarea>
                     </div>
                     <div class="flex flex-wrap justify-end gap-3">
@@ -261,11 +263,11 @@
                             <spring:message code="common.cancel" text="Cancel" />
                         </button>
                         <button type="submit" class="app-btn btn-reject"><spring:message code="guaranteeRequests.confirmRejection" text="Confirm Rejection" /></button>
-                    </div>
-                </form>
                 </div>
+                </form>
             </div>
         </div>
+                    </div>
     </c:if>
 
     <c:if test="${req.status ne 'PENDING'}">
@@ -278,7 +280,7 @@
                         <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="guaranteeRequests.requestRemovalTitle" text="Request Guarantor Removal" /></p>
                         <h2 class="mt-2 text-2xl font-semibold text-sacco-ink">${guaranteeNames[req.loanApplicationId]}</h2>
                         <p class="mt-2 text-sm text-slate-500"><spring:message code="guaranteeRequests.requestRemovalHelp" text="This asks the applicant to remove you from this loan instead of keeping you attached as a guarantor." /></p>
-                    </div>
+                </div>
                     <button type="button"
                             class="app-modal-close"
                             data-guarantee-modal-close="undo-${req.id}"
@@ -287,7 +289,7 @@
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                         </svg>
                     </button>
-                </div>
+                    </div>
                 <form action="/app/guarantee-requests/${req.id}/undo" method="post" class="app-modal-body space-y-5">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <div class="app-modal-section text-sm text-slate-700">
@@ -300,10 +302,10 @@
                             <spring:message code="common.cancel" text="Cancel" />
                         </button>
                         <button type="submit" class="app-btn btn-primary"><spring:message code="guaranteeRequests.sendRemovalRequest" text="Send Removal Request" /></button>
-                    </div>
-                </form>
                 </div>
+                </form>
             </div>
+        </div>
         </div>
     </c:if>
 </c:forEach>
@@ -367,14 +369,7 @@
                 return;
             }
             element.textContent = text;
-            element.classList.remove(
-                "hidden",
-                "border-emerald-200",
-                "bg-emerald-50",
-                "text-emerald-700",
-                "border-rose-200",
-                "bg-rose-50",
-                "text-rose-700"
+            element.classList.remove("hidden","border-emerald-200","bg-emerald-50","text-emerald-700","border-rose-200","bg-rose-50","text-rose-700"
             );
             if (type === "success") {
                 element.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
@@ -567,14 +562,9 @@
                 const otpUi = bindOtpLiveStatus(otpInput, statusBox, proceedButton, async function (code) {
                     const response = await fetch("/app/guarantee-requests/verify-signature-otp", {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json"
+                        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                         },
-                        body: new URLSearchParams({
-                            "${_csrf.parameterName}": csrfToken,
-                            "requestId": requestId,
-                            "otpCode": code
+                        body: new URLSearchParams({"${_csrf.parameterName}": csrfToken,"requestId": requestId,"otpCode": code
                         })
                     });
                     const payload = await response.json();
@@ -588,13 +578,9 @@
                 try {
                     const response = await fetch("/app/guarantee-requests/request-signature-otp", {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-                            "Accept": "application/json"
+                        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"
                         },
-                        body: new URLSearchParams({
-                            "${_csrf.parameterName}": csrfToken,
-                            "requestId": requestId
+                        body: new URLSearchParams({"${_csrf.parameterName}": csrfToken,"requestId": requestId
                         })
                     });
                     const payload = await response.json();

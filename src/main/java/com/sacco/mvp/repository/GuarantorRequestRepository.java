@@ -137,12 +137,16 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           )
           and (cast(:status as string) is null or g.status = :status)
           and (cast(:loanIdQuery as string) is null or lower(cast(g.loanApplicationId as string)) like concat('%', cast(:loanIdQuery as string), '%'))
+          and (cast(:reviewedFrom as timestamp) is null or coalesce(g.decidedAt, g.createdAt) >= :reviewedFrom)
+          and (cast(:reviewedToExclusive as timestamp) is null or coalesce(g.decidedAt, g.createdAt) < :reviewedToExclusive)
         order by coalesce(g.decidedAt, g.createdAt) desc
         """)
     Page<GuarantorRequest> findArchivePageByGuarantorMemberId(@Param("guarantorMemberId") UUID guarantorMemberId,
                                                               @Param("removalCutoff") OffsetDateTime removalCutoff,
                                                               @Param("status") GuarantorRequestStatus status,
                                                               @Param("loanIdQuery") String loanIdQuery,
+                                                              @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                                              @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
                                                               Pageable pageable);
 
     @Query("""

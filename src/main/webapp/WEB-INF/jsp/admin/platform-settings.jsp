@@ -9,7 +9,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Platform Settings</p>
     <h1 class="erp-page-title">Platform Settings</h1>
-    <p class="erp-page-subtitle">Manage platform-wide session, support, and branding rules for SACCO workspaces.</p>
 </div>
 
 <section class="erp-panel aws-settings-panel overflow-hidden">

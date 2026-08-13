@@ -6,7 +6,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / SACCO Workspace</p>
     <h1 class="erp-page-title">Choose A SACCO</h1>
-    <p class="erp-page-subtitle">Choose the SACCO workspace to manage.</p>
 </div>
 
 <section class="erp-panel overflow-hidden">

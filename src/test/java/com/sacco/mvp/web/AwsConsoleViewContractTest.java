@@ -17,7 +17,7 @@ class AwsConsoleViewContractTest {
     void everyRouteUsesTheAwsConsoleOrAuthShell() throws Exception {
         List<Path> routes = routeViews();
 
-        assertThat(routes).hasSize(69);
+        assertThat(routes).hasSize(73);
         assertThat(routes).allSatisfy(path -> {
             String view = read(path);
             assertThat(view)
@@ -127,6 +127,113 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void workspaceLabelsAndFiltersUseTheSharedResponsiveLayoutContract() throws Exception {
+        for (Path path : routeViews()) {
+            String view = read(path);
+            if (!view.contains("fragments/header.jspf")) {
+                continue;
+            }
+            assertThat(view)
+                .as(path.toString())
+                .doesNotContainPattern("class=[\"'][^\"']*\\btruncate\\b[^\"']*[\"']");
+
+            java.util.regex.Matcher getForms = java.util.regex.Pattern
+                .compile("<form\\b[^>]*\\bmethod\\s*=\\s*[\"']get[\"'][^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(view);
+            while (getForms.find()) {
+                assertThat(getForms.group())
+                    .as(path + " GET form")
+                    .contains("data-aws-filter-toolbar");
+            }
+        }
+
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+        assertThat(shellCss)
+            .contains("Complete Cloudscape workspace layout")
+            .contains(".aws-console .aws-filter-toolbar > [class*=\"actions\"]")
+            .contains("flex: 1 1 34rem")
+            .contains("width: min(100%, 728px)")
+            .contains("grid-template-columns: repeat(4, minmax(0, 1fr)) !important")
+            .contains(".aws-console .loan-application-steps")
+            .contains("overflow-x: auto")
+            .contains("white-space: normal");
+    }
+
+    @Test
+    void authenticatedOperationalTablesUseNestedCloudscapeSurfacesEverywhere() throws Exception {
+        try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
+            paths.filter(path -> path.toString().endsWith(".jsp") || path.toString().endsWith(".jspf"))
+                .forEach(path -> {
+                    String view = read(path);
+                    assertThat(view)
+                        .as(path.toString())
+                        .doesNotContainPattern("class=[\"'][^\"']*\\brounded-(?:md|lg|xl|2xl|3xl)\\b[^\"']*[\"']")
+                        .doesNotContainPattern("class=[\"'][^\"']*\\bshadow-(?:md|lg|xl|2xl)\\b[^\"']*[\"']")
+                        .doesNotContainPattern("class=[\"'][^\"']*\\b(?:overflow-x-auto|min-w-max)\\b[^\"']*[\"']");
+                    if (view.contains("fragments/header.jspf")) {
+                        assertThat(view)
+                            .as(path.toString())
+                            .doesNotContain("erp-page-subtitle");
+                    }
+                    if (!view.contains("<table")) {
+                        return;
+                    }
+                    assertThat(view)
+                        .as(path.toString())
+                        .contains("erp-table")
+                        .contains("erp-table-scroll")
+                        .doesNotContain("erp-table-wrap erp-table-scroll");
+                });
+        }
+    }
+
+    @Test
+    void guaranteedLoansUsesOneSearchableCloudscapeTableSurface() throws Exception {
+        String view = read(JSP_ROOT.resolve("app/guaranteed-loans.jsp"));
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+
+        assertThat(view)
+            .contains("class=\"erp-table-wrap guaranteed-loans-table\"")
+            .contains("id=\"guaranteedLoansTableTitle\"")
+            .contains("data-aws-client-table")
+            .contains("data-aws-table-search")
+            .contains("class=\"erp-table-scroll\"")
+            .contains("<table class=\"erp-table\">")
+            .contains("text=\"Loan ID\"")
+            .contains("text=\"Amount\" /> (TZS)")
+            .doesNotContain("erp-widget-title")
+            .doesNotContain("erp-panel overflow-hidden")
+            .doesNotContain("erp-table-wrap erp-table-scroll");
+        assertThat(shellJs)
+            .contains("const initAwsClientTables")
+            .contains("[data-aws-table-search]")
+            .contains("row.hidden = !visible")
+            .contains("loader.setAttribute('aria-label'")
+            .doesNotContain("loader.append(spinner, label)");
+    }
+
+    @Test
+    void memberLoanTablesAlignActionsWithTheirColumnHeaders() throws Exception {
+        String applications = read(JSP_ROOT.resolve("app/loan-applications.jsp"));
+        String archives = read(JSP_ROOT.resolve("app/archives.jsp"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+
+        assertThat(applications)
+            .contains("<th scope=\"col\" class=\"erp-table-action-column\"")
+            .contains("<td class=\"erp-table-action-column\"")
+            .contains("<div class=\"erp-table-actions\">");
+        assertThat(archives)
+            .contains("<th scope=\"col\" class=\"erp-table-action-column\"")
+            .contains("<td class=\"erp-table-action-column\"")
+            .contains("<div class=\"erp-table-actions\">")
+            .doesNotContain("<th></th>");
+        assertThat(shellCss)
+            .contains(".erp-table th.erp-table-action-column")
+            .contains("min-width: 10rem")
+            .contains("justify-content: center");
+    }
+
+    @Test
     void sharedAssetsProvideAwsShellTableAndResponsiveFilterPrimitives() throws Exception {
         String header = read(JSP_ROOT.resolve("fragments/header.jspf"));
         String footer = read(JSP_ROOT.resolve("fragments/footer.jspf"));
@@ -143,8 +250,8 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260809-loan-detail-action-v33")
-            .contains("shell.css?v=20260809-select-visibility-v24")
+            .contains("console-components.css?v=20260812-profile-layout-v35")
+            .contains("shell.css?v=20260812-navbar-support-v33")
             .contains("shell.js?v=20260813-export-preloader-v16")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
@@ -176,7 +283,7 @@ class AwsConsoleViewContractTest {
             .contains("\"/fonts/**\"")
             .contains(".permitAll()");
         assertThat(shellCss)
-            .contains("--sacco-topbar: #101820")
+            .contains("--sacco-topbar: #162238")
             .contains("--sacco-font-family: \"Open Sans\", Helvetica, Arial, sans-serif")
             .contains("--sacco-sidebar: #183038")
             .contains("--sacco-canvas: #eaeded")
@@ -195,9 +302,11 @@ class AwsConsoleViewContractTest {
             .contains("#appToastContainer .app-toast-close")
             .contains("background: transparent !important")
             .contains(".erp-page-header[data-aws-page-header] .erp-page-title")
-            .contains("font-size: 18px !important")
-            .contains("line-height: 22px !important")
+            .contains("font-size: 24px !important")
+            .contains("line-height: 30px !important")
             .contains(".erp-page-path__link")
+            .contains("position: sticky !important")
+            .contains("top: var(--shell-nav-height) !important")
             .contains("text-decoration: none")
             .contains(".erp-page-path__link:focus-visible")
             .contains(".aws-console .loan-applicant-photo-frame img")
@@ -217,7 +326,7 @@ class AwsConsoleViewContractTest {
             .contains("margin: 0 8px 0 16px !important")
             .contains("width: min(30.6vw, 396px)")
             .contains("margin-left: 16px !important")
-            .contains("height: 25px !important")
+            .contains("height: var(--sacco-control-height) !important")
             .contains("background: transparent !important")
             .contains(".app-notification-badge")
             .contains("top: 0;")
@@ -225,13 +334,13 @@ class AwsConsoleViewContractTest {
             .contains("border-radius: 2px")
             .contains(".app-topbar-actions .app-profile-control")
             .contains(".app-topbar .profile-icon-btn .profile-avatar-img")
-            .contains("SIMS reference shell")
+            .contains("Final Cloudscape workspace shell")
             .contains(".shell-sidebar-nav-heading")
-            .contains("--shell-sidebar-width: 220px")
-            .contains("--shell-nav-fixed-height: 38px")
-            .contains("--shell-topbar-control-height: 32px")
-            .contains("--shell-sims-topbar: #16191f")
-            .contains("--shell-sims-sidebar: #1e272e")
+            .contains("--shell-sidebar-width: var(--sacco-sidebar-width)")
+            .contains("--shell-nav-fixed-height: var(--sacco-topbar-height)")
+            .contains("--shell-topbar-control-height: var(--sacco-control-height)")
+            .contains("--shell-sims-topbar: var(--sacco-topbar)")
+            .contains("--shell-sims-sidebar: var(--sacco-sidebar)")
             .contains("@media (max-width: 420px)")
             .contains(".app-global-brand > div")
             .contains(".shell-nav-active")
@@ -254,15 +363,21 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)
-            .contains("aws-auth.css?v=20260806-forgot-link-v5")
+            .contains("aws-auth.css?v=20260813-ribbonless-v7")
             .contains("href=\"#forgotPasswordModal\" class=\"auth-text-link\"")
             .contains("event.preventDefault()")
             .doesNotContain("data-forgot-password-open=\"member\">Forgot password?</button>")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
-            .contains("aws-auth.css?v=20260806-clean-toast-v4")
+            .contains("aws-auth.css?v=20260813-ribbonless-v7")
             .contains("class=\"app-toast-close-icon\"")
             .doesNotContain("&times;");
+        assertThat(authCss)
+            .contains("body.auth-shell.aws-auth-shell::before")
+            .contains("display: none")
+            .contains("body.auth-shell.aws-auth-shell > .min-h-screen")
+            .contains("body.auth-shell.aws-auth-shell .auth-notification-rail")
+            .contains("inset-block-start: 0");
         assertThat(shellJs)
             .contains("syncActiveSidebarLink")
             .contains("app-toast-close-icon")
@@ -313,7 +428,7 @@ class AwsConsoleViewContractTest {
             .contains("inset: 52px 0 auto")
             .contains("--sacco-topbar-height: 52px")
             .contains("--sacco-control-height: 32px")
-            .contains("--aws-topbar: #101820")
+            .contains("--aws-topbar: #162238")
             .contains("transform: none !important");
         assertThat(loanProducts)
             .contains("loan-calculator-steps")
@@ -349,7 +464,9 @@ class AwsConsoleViewContractTest {
             .contains("class=\"loan-detail-action-row\"")
             .contains("data-aws-action-pin=\"true\"")
             .contains("app-table-titlebar")
-            .contains("erp-table-wrap erp-table-scroll")
+            .contains("erp-table-wrap")
+            .contains("class=\"erp-table-scroll")
+            .doesNotContain("erp-table-wrap erp-table-scroll")
             .contains("loan-summary-table")
             .contains("loan-detail-disclosure")
             .doesNotContain("loan-staff-kpi-icon");
@@ -358,12 +475,15 @@ class AwsConsoleViewContractTest {
             .contains("loan-applicant-photo-frame")
             .contains("/profile/image/members/${applicant.id}");
         assertThat(shellCss)
-            .contains("position: sticky !important")
-            .contains("top: var(--shell-nav-height) !important")
+            .contains(".erp-page-header[data-aws-page-header]")
+            .contains("position: static !important")
+            .contains("font-size: 24px !important")
             .contains(".shell-content-frame")
             .contains("overflow-y: visible !important");
         assertThat(consoleCss)
             .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
+            .containsPattern("\\.loan-application-steps\\s*\\{\\s*position: static;")
+            .doesNotContainPattern("\\.loan-application-steps\\s*\\{\\s*position: sticky;")
             .contains(".loan-guarantor-search-row")
             .contains(".loan-summary-table .erp-table")
             .contains(".loan-application-detail-page")
@@ -535,11 +655,19 @@ class AwsConsoleViewContractTest {
             .contains("aws-settings-control-row")
             .contains("aws-settings-grid")
             .contains("aws-settings-footer")
+            .contains("aria-labelledby=\"memberLanguageSettingsTitle\"")
+            .contains("for=\"memberSettingsLanguage\"")
+            .contains("aria-describedby=\"memberSettingsLanguageHelp\"")
+            .doesNotContain("member.settings.language.eyebrow")
             .doesNotContain("member-settings-action-bar");
         assertThat(staffSettings)
             .contains("aws-settings-panel")
             .contains("aws-settings-control-row")
             .contains("aws-settings-footer")
+            .contains("aria-labelledby=\"staffLanguageSettingsTitle\"")
+            .contains("for=\"staffSettingsLanguage\"")
+            .contains("aria-describedby=\"staffSettingsLanguageHelp\"")
+            .doesNotContain("member.settings.language.eyebrow")
             .doesNotContain("staff-settings-action-bar");
         assertThat(platformSettings)
             .contains("aws-settings-panel")
@@ -549,6 +677,8 @@ class AwsConsoleViewContractTest {
             .contains(".aws-status-summary-grid")
             .contains(".aws-settings-header")
             .contains(".aws-settings-control-row")
+            .contains("width: min(100%, 34rem)")
+            .contains("flex-flow: column nowrap")
             .contains(".aws-dashboard-detail-panel")
             .contains(".aws-disclosure-button")
             .contains(".shell-page-title-rail__inner")

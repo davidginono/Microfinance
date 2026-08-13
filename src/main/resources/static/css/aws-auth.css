@@ -1,5 +1,5 @@
 :root {
-    --sacco-topbar: #101820;
+    --sacco-topbar: #162238;
     --sacco-canvas: #eaeded;
     --sacco-panel: #ffffff;
     --sacco-line: #d5dbdb;
@@ -15,7 +15,7 @@
     --sacco-control-height: 32px;
     --sacco-font-family: "Open Sans", Helvetica, Arial, sans-serif;
     --aws-ink: #16191f;
-    --aws-topbar: #101820;
+    --aws-topbar: #162238;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
     --aws-bg: #eaeded;
@@ -57,11 +57,20 @@ body.aws-auth-shell::before {
     line-height: 21px;
 }
 
+body.auth-shell.aws-auth-shell::before {
+    display: none;
+    content: none;
+}
+
 body.aws-auth-shell main,
 body.aws-auth-shell > .auth-page-shell,
 body.aws-auth-shell > .min-h-screen {
     padding-top: 76px !important;
     background: transparent !important;
+}
+
+body.auth-shell.aws-auth-shell > .min-h-screen {
+    padding-top: 32px !important;
 }
 
 body.aws-auth-shell .auth-layout,
@@ -296,6 +305,10 @@ body.aws-auth-shell [role="tabpanel"][hidden] {
     pointer-events: none;
 }
 
+body.auth-shell.aws-auth-shell .auth-notification-rail {
+    inset-block-start: 0;
+}
+
 .auth-notification-rail > * {
     position: absolute !important;
     inset: 0 0 auto !important;
@@ -485,6 +498,10 @@ body.aws-auth-shell .error-btn-primary {
     body.aws-auth-shell > .min-h-screen {
         align-items: flex-start !important;
         padding: 64px 10px 16px !important;
+    }
+
+    body.auth-shell.aws-auth-shell > .min-h-screen {
+        padding-top: 16px !important;
     }
 
     body.aws-auth-shell .auth-layout,

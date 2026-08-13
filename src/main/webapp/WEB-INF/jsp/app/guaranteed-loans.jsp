@@ -1,5 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
@@ -10,36 +11,56 @@
     <h1 class="erp-page-title"><spring:message code="guaranteedLoans.title" text="Loans I Guarantee" /></h1>
 </div>
 
-<section class="erp-panel overflow-hidden">
-    <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-        <p class="erp-widget-title"><spring:message code="guaranteedLoans.panel" text="Guaranteed Loans" /></p>
-        <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="guaranteedLoans.activePosition" text="Active Guarantee Position" /></h2>
+<section class="erp-table-wrap guaranteed-loans-table" aria-labelledby="guaranteedLoansTableTitle"
+         data-aws-table-region data-aws-client-table data-loading-label="Loading results...">
+    <div class="app-table-titlebar">
+        <div class="app-table-heading">
+            <h2 id="guaranteedLoansTableTitle"><spring:message code="guaranteedLoans.activePosition" text="Active Guarantee Position" /></h2>
+            <span class="app-table-count">(<fmt:formatNumber value="${fn:length(guaranteedLoans)}" />)</span>
     </div>
-<div class="erp-table-wrap erp-table-scroll border-0 shadow-none" data-aws-table-region data-loading-label="Loading results...">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div class="app-table-toolbar">
+            <button type="button" class="app-icon-button btn-neutral" data-aws-table-refresh
+                    aria-label="<spring:message code='common.refresh' text='Refresh guaranteed loans' />">
+                <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            </button>
+    </div>
+    </div>
+
+    <div class="aws-filter-toolbar guaranteed-loans-filter" data-aws-client-table-toolbar>
+        <label class="erp-table-toolbar__search" for="guaranteedLoansSearch">
+            <span class="sr-only"><spring:message code="guaranteedLoans.search" text="Find guaranteed loans" /></span>
+            <input id="guaranteedLoansSearch" type="search" class="aws-control"
+                   data-aws-table-search
+                   placeholder="<spring:message code='guaranteedLoans.search' text='Find guaranteed loans' />"
+                   autocomplete="off" />
+        </label>
+    </div>
+
+    <div class="erp-table-scroll" data-view-position-key="member-guaranteed-loans">
+        <table class="erp-table">
+            <thead>
             <tr>
-                <th class="px-5 py-3"><spring:message code="loan.single" text="Loan" /></th>
-                <th class="px-5 py-3"><spring:message code="common.status" text="Status" /></th>
-                <th class="px-5 py-3"><spring:message code="common.amount" text="Amount" /></th>
-                <th class="px-5 py-3"><spring:message code="loan.repayment.timeLeft" text="Time Left" /></th>
+                <th><spring:message code="loan.id" text="Loan ID" /></th>
+                <th><spring:message code="common.status" text="Status" /></th>
+                <th><spring:message code="common.amount" text="Amount" /> (TZS)</th>
+                <th><spring:message code="loan.repayment.timeLeft" text="Time Left" /></th>
             </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200 bg-white">
+            <tbody>
             <c:forEach items="${guaranteedLoans}" var="row">
-                <tr>
-                    <td class="px-5 py-4 font-semibold text-sacco-ink">
+                <tr data-aws-table-row>
+                    <td class="font-semibold text-sacco-ink">
                         <c:choose>
                             <c:when test="${row.loan ne null and not empty row.loan.loanId}">${row.loan.loanId}</c:when>
                             <c:when test="${row.loan ne null}">${row.loan.applicationNumber}</c:when>
                             <c:otherwise>${row.request.loanApplicationId}</c:otherwise>
                         </c:choose>
                     </td>
-                    <td class="px-5 py-4 text-slate-700">${row.statusLabel}</td>
-                    <td class="px-5 py-4 text-slate-700">
+                    <td><span class="app-badge loan-status-badge">${row.statusLabel}</span></td>
+                    <td class="text-right whitespace-nowrap">
                         <c:if test="${row.loan ne null}"><fmt:formatNumber value="${row.loan.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:if>
                     </td>
-                    <td class="px-5 py-4 text-slate-700">
+                    <td class="whitespace-nowrap">
                         <c:choose>
                             <c:when test="${row.daysLeft ne null}">${row.daysLeft} <spring:message code="common.days" text="day(s)" /></c:when>
                             <c:otherwise><spring:message code="loan.repayment.notScheduled" text="Not scheduled" /></c:otherwise>
@@ -49,7 +70,7 @@
             </c:forEach>
             <c:if test="${empty guaranteedLoans}">
                 <tr>
-                    <td colspan="4" class="px-5 py-8 text-center text-slate-500"><spring:message code="guaranteedLoans.empty" text="No active guaranteed loans yet." /></td>
+                    <td colspan="4" class="erp-table-empty"><spring:message code="guaranteedLoans.empty" text="No active guaranteed loans yet." /></td>
                 </tr>
             </c:if>
             </tbody>

@@ -17,6 +17,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
@@ -154,30 +155,30 @@ public class BoardController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String searchId,
                           @RequestParam(required = false) String filter,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         applyBoardUi(model, principal);
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
         String normalizedSearch = normalizeBoardSearch(searchId);
-        List<BoardReview> archiveReviews = assignedReviews(principal).stream()
-            .filter(review -> review.getDecision() != BoardDecision.PENDING)
-            .filter(review -> currentFilter.decision() == null || review.getDecision() == currentFilter.decision())
-            .filter(review -> currentFilter.statuses().isEmpty()
-                || loanApplicationRepository.findById(review.getLoanApplicationId())
-                    .map(app -> currentFilter.statuses().contains(app.getStatus()))
-                    .orElse(false))
-            .filter(review -> loanApplicationRepository.findById(review.getLoanApplicationId())
-                .map(app -> matchesBoardSearch(app, normalizedSearch))
-                .orElse(false))
-            .toList();
-        org.springframework.data.domain.PageRequest archivePageRequest =
-            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50);
-        int fromIndex = Math.min((int) archivePageRequest.getOffset(), archiveReviews.size());
-        int toIndex = Math.min(fromIndex + archivePageRequest.getPageSize(), archiveReviews.size());
-        org.springframework.data.domain.Page<BoardReview> archivePage = new org.springframework.data.domain.PageImpl<>(
-            archiveReviews.subList(fromIndex, toIndex),
-            archivePageRequest,
-            archiveReviews.size()
+        List<String> statuses = currentFilter.statuses().isEmpty()
+            ? List.of(LoanStatus.DRAFT.name())
+            : currentFilter.statuses().stream().map(Enum::name).toList();
+        org.springframework.data.domain.Page<BoardReview> archivePage = boardReviewRepository.findArchivePage(
+            principal.getMemberId(),
+            reviewerStages(principal).stream().map(Enum::name).toList(),
+            principal.getSaccoId(),
+            principal.getStationId(),
+            dateRange.fromInclusive(),
+            dateRange.toExclusive(),
+            currentFilter.decision() != null,
+            currentFilter.decision() == null ? BoardDecision.APPROVED.name() : currentFilter.decision().name(),
+            !currentFilter.statuses().isEmpty(),
+            statuses,
+            normalizedSearch,
+            org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
         );
         String view = populateListing(
             principal,
@@ -194,6 +195,8 @@ public class BoardController {
         model.addAttribute("archivePage", archivePage);
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return view;
     }
 

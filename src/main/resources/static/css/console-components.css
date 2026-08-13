@@ -3414,6 +3414,7 @@ body {
     }
     .profile-photo-picker {
         width: min(100%, 40rem);
+        max-width: 100%;
         justify-self: center;
         margin-top: 2px;
         text-align: left;
@@ -3444,7 +3445,40 @@ body {
             flex-basis: 72px;
         }
     }
-.profile-photo-dropzone {
+    .profile-page-panel {
+        min-width: 0;
+        overflow: hidden;
+    }
+    .profile-page-panel-header {
+        border-bottom: 1px solid var(--aws-line, #d5dbdb);
+        background: var(--aws-panel-muted, #f7f8f8);
+        padding: 10px 12px;
+    }
+    .profile-page-panel-header h2 {
+        margin: 2px 0 0;
+        color: var(--aws-ink, #16191f);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 22px;
+    }
+    .profile-page-body {
+        min-width: 0;
+        padding: 12px !important;
+    }
+    .profile-page-layout {
+        display: grid;
+        min-width: 0;
+        grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr);
+        align-items: start;
+        gap: 12px;
+    }
+    .profile-photo-form {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .profile-photo-dropzone {
         border-color: var(--aws-line-dark, #879596);
         background: #ffffff;
         border-radius: 2px !important;
@@ -3456,12 +3490,18 @@ body {
     }
     .profile-photo-preview {
         display: inline-flex;
-        width: fit-content;
+        box-sizing: border-box;
+        width: 100%;
         max-width: 100%;
         flex-direction: column;
         align-items: center;
         justify-self: center;
         gap: 0.55rem;
+        border: 1px solid var(--aws-line, #d5dbdb);
+        border-radius: 2px;
+        background: #ffffff;
+        padding: 12px;
+        box-shadow: none;
     }
     .profile-photo-frame {
         position: relative;
@@ -3525,6 +3565,61 @@ body {
     .profile-photo-editor input[type="range"] {
         width: 100%;
         accent-color: #0284c7;
+    }
+    .profile-identity-panel {
+        min-width: 0;
+        border: 1px solid var(--aws-line, #d5dbdb);
+        border-radius: 2px;
+        background: var(--aws-panel-muted, #f7f8f8);
+        padding: 10px 12px;
+    }
+    .profile-identity-panel h3 {
+        margin: 0 0 8px;
+        color: var(--aws-ink, #16191f);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 22px;
+        overflow-wrap: anywhere;
+    }
+    .profile-identity-panel dl {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px 12px;
+        margin: 0;
+    }
+    .profile-identity-panel dl > div {
+        min-width: 0;
+    }
+    .profile-identity-panel dt {
+        color: var(--aws-muted, #5f6b7a);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px;
+    }
+    .profile-identity-panel dd {
+        margin: 2px 0 0;
+        color: var(--aws-ink, #16191f);
+        font-size: 14px;
+        line-height: 20px;
+        overflow-wrap: anywhere;
+    }
+    .profile-page-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+    @media (max-width: 767px) {
+        .profile-page-layout {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .profile-photo-preview {
+            width: min(100%, 22rem);
+        }
+        .profile-identity-panel dl {
+            grid-template-columns: minmax(0, 1fr);
+        }
     }
 
 /* Source: src/main/webapp/WEB-INF/jsp/register-member.jsp */
@@ -6615,9 +6710,7 @@ html.session-timeout-active,
 }
 
 .loan-application-steps {
-    position: sticky;
-    top: calc(var(--shell-nav-height) + 4px);
-    z-index: 8;
+    position: static;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     border: 1px solid #d5dbdb;
 }
@@ -7942,6 +8035,267 @@ html.session-timeout-active,
             flex: 1 1 auto;
         }
     }
+
+/* Chairperson read-only SACCO configuration */
+.aws-console .chairperson-config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+}
+
+.aws-console .chairperson-config-panel {
+    min-width: 0;
+    padding: 16px;
+}
+
+.aws-console .chairperson-config-context {
+    margin-top: 4px;
+    color: #5f6b7a;
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.aws-console .chairperson-config-list {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.aws-console .chairperson-config-row,
+.aws-console .chairperson-config-flow-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7rem, auto);
+    align-items: start;
+    gap: 10px;
+    border-top: 1px solid #eaeded;
+    padding: 8px 0;
+}
+
+.aws-console .chairperson-config-list > :first-child {
+    border-top: 0;
+}
+
+.aws-console .chairperson-config-row dt,
+.aws-console .chairperson-config-flow-row dt {
+    min-width: 0;
+    color: #232f3e;
+    line-height: 18px;
+}
+
+.aws-console .chairperson-config-row dd {
+    min-width: 0;
+    max-width: 18rem;
+    margin: 0;
+    color: #16191f;
+    font-weight: 700;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+.aws-console .chairperson-config-row--sourced dd {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+}
+
+.aws-console .chairperson-config-source {
+    color: #687078;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 16px;
+}
+
+.aws-console .chairperson-config-flow-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.aws-console .chairperson-config-flow-row dd {
+    margin: 0;
+}
+
+.aws-console .chairperson-flow-list {
+    display: grid;
+    gap: 5px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.aws-console .chairperson-flow-list li {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    color: #232f3e;
+    line-height: 18px;
+}
+
+.aws-console .chairperson-flow-list li > span {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #aab7b8;
+    border-radius: 2px;
+    background: #f2f3f3;
+    color: #414d5c;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.aws-console .chairperson-table-code,
+.aws-console .chairperson-product-code {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.aws-console .chairperson-workflow-cell {
+    min-width: 15rem;
+    white-space: normal;
+}
+
+.aws-console .erp-table--left-headings th {
+    text-align: left !important;
+}
+
+.aws-console .erp-table--left-headings th.erp-table-action-column {
+    text-align: center !important;
+}
+
+.aws-console .erp-table-scroll-fit .erp-table {
+    min-width: 100%;
+    table-layout: fixed;
+}
+
+.aws-console .erp-table-scroll-md .erp-table {
+    min-width: max(100%, 32rem);
+    table-layout: fixed;
+}
+
+.aws-console .chairperson-product-summary {
+    min-width: 0;
+    padding: 16px;
+}
+
+.aws-console .chairperson-product-summary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(7rem, 0.65fr) minmax(10rem, 1fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
+    align-items: start;
+    gap: 16px;
+}
+
+.aws-console .chairperson-product-summary-item {
+    min-width: 0;
+}
+
+.aws-console .chairperson-product-summary-label {
+    color: #5f6b7a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 16px;
+    text-transform: uppercase;
+}
+
+.aws-console .chairperson-product-summary-value,
+.aws-console .chairperson-product-code {
+    margin-top: 4px;
+    color: #16191f;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+.aws-console .chairperson-product-summary-description {
+    grid-column: 1 / -1;
+}
+
+.aws-console .chairperson-product-summary-description-value {
+    margin-top: 4px;
+    color: #414d5c;
+    font-size: 13px;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+}
+
+.aws-console .chairperson-product-rules-grid,
+.aws-console .chairperson-product-tables-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.aws-console .chairperson-table-order-column {
+    width: 8rem;
+}
+
+.aws-console .chairperson-table-size-column {
+    width: 11rem;
+}
+
+.aws-console .chairperson-table-stage-column {
+    width: 32%;
+}
+
+.aws-console .chairperson-table-staff-column {
+    width: 26%;
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+    .aws-console .chairperson-config-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aws-console .chairperson-config-grid > :last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 1179px) {
+    .aws-console .chairperson-product-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aws-console .chairperson-product-summary-description {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 899px) {
+    .aws-console .chairperson-product-rules-grid,
+    .aws-console .chairperson-product-tables-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
+    .aws-console .chairperson-config-grid,
+    .aws-console .chairperson-product-summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .aws-console .chairperson-product-summary-description {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .aws-console .chairperson-config-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 3px;
+    }
+
+    .aws-console .chairperson-config-row dd,
+    .aws-console .chairperson-config-row--sourced dd {
+        max-width: none;
+        justify-items: start;
+        text-align: left;
+    }
+}
 
 /* Member repayment schedule alignment */
 @media (min-width: 1024px) {

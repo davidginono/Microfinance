@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260806-clean-toast-v4' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260813-ribbonless-v7' />" />
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
@@ -154,7 +154,7 @@
                                     data-otp-label="Registration OTP code"
                                     cssClass="sr-only" />
                         <p class="registration-note mt-2 text-sm">Enter the 6-digit code sent to your email to finish registration.</p>
-                        <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        <div id="registrationOtpLiveStatus" class="mt-3 hidden items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                             <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#2F348D]"></span>
                             <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
@@ -283,7 +283,7 @@
             successBox.textContent = "";
             successBox.classList.add("hidden");
             errorBox.textContent = message;
-            errorBox.className = "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700";
+            errorBox.className = " border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700";
             scrollToFeedback(errorBox);
         };
 
@@ -291,7 +291,7 @@
             errorBox.textContent = "";
             errorBox.classList.add("hidden");
             successBox.textContent = message;
-            successBox.className = "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700";
+            successBox.className = " border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700";
         };
 
         const clearMessages = () => {
@@ -419,8 +419,7 @@
             try {
                 const verifyResponse = await fetch("/register/member/request-otp", {
                     method: "POST",
-                    headers: {
-                        "Accept": "application/json"
+                    headers: {"Accept":"application/json"
                     },
                     body: new FormData(form)
                 });

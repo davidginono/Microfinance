@@ -79,7 +79,9 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
             where r.manager_member_id = :reviewerId
               and r.review_stage = :reviewStage
               and l.sacco_id = :saccoId
-              and (cast(:stationId as text) is null or lower(l.station_id) = lower(cast(:stationId as text)))
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or r.created_at >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or r.created_at < :reviewedToExclusive)
               and r.id = (
                 select r2.id
                 from manager_reviews r2
@@ -105,7 +107,9 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
             where r.manager_member_id = :reviewerId
               and r.review_stage = :reviewStage
               and l.sacco_id = :saccoId
-              and (cast(:stationId as text) is null or lower(l.station_id) = lower(cast(:stationId as text)))
+              and lower(l.station_id) = lower(:stationId)
+              and (cast(:reviewedFrom as timestamp) is null or r.created_at >= :reviewedFrom)
+              and (cast(:reviewedToExclusive as timestamp) is null or r.created_at < :reviewedToExclusive)
               and r.id = (
                 select r2.id
                 from manager_reviews r2
@@ -129,6 +133,8 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
                                               @Param("reviewStage") String reviewStage,
                                               @Param("saccoId") String saccoId,
                                               @Param("stationId") String stationId,
+                                              @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                              @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
                                               @Param("filterDecision") boolean filterDecision,
                                               @Param("decision") String decision,
                                               @Param("filterStatuses") boolean filterStatuses,

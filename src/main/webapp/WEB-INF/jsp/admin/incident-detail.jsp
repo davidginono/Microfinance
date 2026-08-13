@@ -6,7 +6,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Incidents / Detail</p>
     <h1 class="erp-page-title">Incident Detail</h1>
-    <p class="erp-page-subtitle">Review the full incident payload, reporter context, and resolution notes before updating its status.</p>
 </div>
 
 <section class="grid gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.9fr)]">

@@ -8,7 +8,7 @@
             </div>
             <div class="aws-usage-range-picker relative text-xs font-semibold uppercase tracking-wide text-slate-500" data-usage-range-picker>
                 <span>Timeline</span>
-                <button type="button" class="mt-1 flex h-10 w-full items-center justify-between gap-3 rounded-md border border-slate-300 bg-slate-50 px-2.5 pl-3 text-sm font-semibold normal-case tracking-normal text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-200" data-usage-range-button aria-expanded="false">
+                <button type="button" class="mt-1 flex h-10 w-full items-center justify-between gap-3 border border-slate-300 bg-slate-50 px-2.5 pl-3 text-sm font-semibold normal-case tracking-normal text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-200" data-usage-range-button aria-expanded="false">
                     <span data-usage-range-label>Today</span>
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition-transform" data-usage-range-caret aria-hidden="true">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -16,7 +16,7 @@
                         </svg>
                     </span>
                 </button>
-                <div class="absolute right-0 top-full z-20 mt-1 hidden w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm font-semibold normal-case tracking-normal text-slate-700 shadow-lg" data-usage-range-menu>
+                <div class="absolute right-0 top-full z-20 mt-1 hidden w-full overflow-hidden border border-slate-200 bg-white text-sm font-semibold normal-case tracking-normal text-slate-700" data-usage-range-menu>
                     <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="today">Today</button>
                     <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="7d">Last 7 Days</button>
                     <button type="button" class="block w-full px-3 py-2 text-left hover:bg-slate-50" data-usage-range-option data-value="30d">Last 30 Days</button>
@@ -26,22 +26,22 @@
     </div>
     <div class="erp-panel-body min-w-0 space-y-4">
         <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div class="border border-slate-200 bg-slate-50 p-4">
                 <p class="erp-widget-title">Online Users</p>
                 <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="activeUsers">-</p>
                 <p class="mt-1 text-xs text-slate-500">Unique users active now</p>
             </div>
-            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div class="border border-slate-200 bg-slate-50 p-4">
                 <p class="erp-widget-title">Active Sessions</p>
                 <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="activeSessions">-</p>
                 <p class="mt-1 text-xs text-slate-500">Sessions active in 5 minutes</p>
             </div>
-            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div class="border border-slate-200 bg-slate-50 p-4">
                 <p class="erp-widget-title">Page Views</p>
                 <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="pageViews">-</p>
                 <p class="mt-1 text-xs text-slate-500">Authenticated page requests</p>
             </div>
-            <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div class="border border-slate-200 bg-slate-50 p-4">
                 <p class="erp-widget-title">Logins</p>
                 <p class="mt-2 text-2xl font-bold text-sacco-ink" data-usage-metric="logins">-</p>
                 <p class="mt-1 text-xs text-slate-500">For the selected period</p>
@@ -49,14 +49,14 @@
         </div>
 
         <div class="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(260px,0.65fr)]">
-            <div class="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-3 sm:p-4">
+            <div class="min-w-0 overflow-hidden border border-slate-200 bg-white p-3 sm:p-4">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p class="font-semibold text-slate-900">Logged in Users</p>
                     <span class="text-xs text-slate-500">Updated <span data-usage-updated>-</span></span>
                 </div>
                 <canvas data-usage-chart class="block max-w-full" height="260"></canvas>
             </div>
-            <div class="aws-usage-chart-panel flex min-h-0 flex-col overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div class="aws-usage-chart-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
                 <div class="admin-usage-scroll min-h-0 flex-1 p-3 sm:p-4">
                     <div class="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
                         <p class="font-semibold text-slate-900">Devices</p>
@@ -74,11 +74,11 @@
         </div>
 
         <div class="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-2">
-            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
                 <div class="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <p class="font-semibold text-slate-900">Top Pages</p>
                 </div>
-                <div class="admin-usage-scroll admin-usage-table-scroll min-h-0 flex-1">
+                <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
                     <table class="erp-table min-w-full table-fixed">
                         <colgroup>
                             <c:choose>
@@ -106,11 +106,11 @@
                     </table>
                 </div>
             </div>
-            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div class="aws-usage-table-panel flex min-h-0 flex-col overflow-hidden border border-slate-200 bg-white">
                 <div class="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <p class="font-semibold text-slate-900">Active Users</p>
                 </div>
-                <div class="admin-usage-scroll admin-usage-table-scroll min-h-0 flex-1">
+                <div class="admin-usage-scroll admin-usage-table-scroll erp-table-scroll min-h-0 flex-1">
                     <table class="erp-table min-w-full table-fixed">
                         <colgroup>
                             <c:choose>

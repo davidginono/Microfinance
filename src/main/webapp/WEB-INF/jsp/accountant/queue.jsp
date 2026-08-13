@@ -10,7 +10,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="accountant.queue.breadcrumb" text="Accountant Panel / Queue" /></p>
     <h1 class="erp-page-title"><spring:message code="accountant.queue.title" text="Accountant Queue" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="accountant.queue.subtitle" text="Review approved loans before they move to the disbursement/teller officer." /></p>
 </div>
 <section class="aws-current-filter-toolbar" aria-labelledby="accountantQueueCurrentFilterLabel">
         <div class="aws-current-filter-summary">
@@ -44,7 +43,8 @@
             </div>
         </form>
 </section>
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>
@@ -95,6 +95,7 @@
         </c:if>
         </tbody>
     </table>
+</div>
 </div>
 
 <%@ include file="../fragments/footer.jspf" %>

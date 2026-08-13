@@ -59,7 +59,7 @@
             <div class="grid gap-3 md:grid-cols-2">
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.calculator.chooseProduct" /></label>
-                    <select id="productsLoanType" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+                    <select id="productsLoanType" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
                         <c:forEach items="${products}" var="p">
                             <option value="${p.id}" data-loan-type="${p.loanType}" data-min-months="${p.minimumRepaymentMonths}" data-max-months="${p.maxRepaymentMonths}">
                                 <c:out value="${p.displayName}" />
@@ -71,7 +71,7 @@
                     <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="products.amount.label" /> (TSh)</label>
                     <input id="productsLoanAmount" type="hidden" />
                     <input id="productsLoanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
-                           class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                           class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="100,000" />
                 </div>
                 <div>
@@ -84,7 +84,7 @@
                         <button type="button" class="tenure-unit-toggle px-3 py-2 transition" data-products-tenure-unit="YEARS" aria-pressed="false"><spring:message code="common.years.label" text="Years" /></button>
                     </div>
                     <input id="productsTenorDisplay" type="number" min="1" step="1"
-                           class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
+                           class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                            placeholder="12" />
                     <p id="productsTenorRangeHelp" class="mt-1 text-xs text-slate-500"
                        data-prefix="<spring:message code='newloan.allowedTenureRange' text='Allowed range:' />"
@@ -134,7 +134,7 @@
                     <p>Review the decision first, then inspect the supporting figures and repayment schedule.</p>
                 </div>
             </div>
-            <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
+            <div id="productsFinancialFeedback" data-auto-scroll-message="true" class="hidden border px-4 py-3 text-sm"></div>
             <div id="productsFinancialLoading" class="hidden app-modal-section text-sm text-slate-600">
                 <span class="sr-only"><spring:message code="products.loadingCalculator" /></span>
                 <div class="skeleton-table" aria-hidden="true">
@@ -161,7 +161,8 @@
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="repayment.estimatedScheduleHelp" text="Estimated monthly installments with loan amount, interest, and balance after each payment." /></p>
                     </div>
                 </div>
-<div class="erp-table-wrap erp-table-scroll erp-table-scroll-sm" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                    <div class="erp-table-scroll erp-table-scroll-sm">
                     <table class="erp-table">
                         <thead>
                         <tr>
@@ -178,21 +179,22 @@
                     </table>
                 </div>
             </div>
+            </div>
             <div class="loan-calculator-footer-actions">
                 <button type="button" class="app-btn btn-neutral" data-calculator-edit>Change figures</button>
                 <c:if test="${empty applicationLockApp and applicantPolicyEligible ne false}">
                     <a id="productsCalculatorApplyLink" class="app-btn btn-launch hidden" href="#">Continue to application</a>
                 </c:if>
             </div>
-            </div>
         </div>
         </div>
     </div>
 </div>
+</div>
 
 <div class="mb-3 px-1">
     <p class="text-base font-medium text-slate-700"><spring:message code="products.chooseLoan" /></p>
-</div>
+        </div>
 
 <c:if test="${not empty applicationLockApp}">
     <div class="erp-section mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -201,7 +203,7 @@
             <strong>${applicationLockApp.applicationNumber}</strong>
             (<strong>${applicationLockStatusLabel}</strong>).
             <spring:message code="products.applicationLock.followup" />
-        </div>
+    </div>
         <a href="/app/loan-applications/${applicationLockApp.id}" class="app-btn btn-neutral"><spring:message code="products.applicationLock.viewCurrent" /></a>
     </div>
 </c:if>
@@ -215,10 +217,11 @@
 <c:if test="${applicantPolicyEligible eq false}">
     <div class="erp-section mb-4 text-sm leading-6 text-rose-700">
         ${applicantPolicyReason}
-    </div>
+                    </div>
 </c:if>
 
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
             <tr>
@@ -253,7 +256,7 @@
                                 <c:otherwise><spring:message code="products.amount.notSet" /></c:otherwise>
                             </c:choose>
                         </strong>
-                    </div>
+                            </div>
                 </td>
                 <td>${p.guarantorsRequired}</td>
                 <td>
@@ -279,7 +282,7 @@
                                     <spring:message code="products.js.notEligibleStatus" text="Not eligible" />
                                 </button>
                                 <p class="max-w-xs text-xs leading-5 text-rose-600">${applicantPolicyReason}</p>
-                            </div>
+</div>
                         </c:when>
                         <c:when test="${not empty activeDisbursedLoanApp and not p.applicationWithActiveLoanAllowed}">
                             <button type="button" class="app-btn btn-neutral opacity-60 cursor-not-allowed" disabled>
@@ -297,6 +300,7 @@
         </c:forEach>
         </tbody>
     </table>
+</div>
 </div>
 
 <script>
@@ -577,16 +581,16 @@
             card.innerHTML = "";
             Object.entries(sections || {}).forEach(function (section) {
                 const wrapper = document.createElement("div");
-                wrapper.className = "erp-table-wrap overflow-hidden";
+                wrapper.className ="erp-table-wrap";
                 wrapper.innerHTML = ""
-                    + "<div class='border-b border-slate-200 bg-slate-50 px-3 py-2'>"
-                    + "<p class='text-xs font-bold uppercase tracking-[0.16em] text-slate-600'></p>"
+                    +"<div class='app-table-titlebar'>"
+                    +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    + "<table class='erp-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm'><table class='erp-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
-                    + "</table>";
-                wrapper.querySelector("p").textContent = section[0];
+                    +"</table></div>";
+                wrapper.querySelector("h3").textContent = section[0];
                 const headerCells = wrapper.querySelectorAll("th");
                 headerCells[0].textContent = tableSectionLabel;
                 headerCells[1].textContent = tableValueLabel;
@@ -681,8 +685,7 @@
             try {
                 const response = await fetch("/app/loan-applications/financial-preview", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+                    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"
                     },
                     body: new URLSearchParams({
                         [csrfParam]: csrfToken,

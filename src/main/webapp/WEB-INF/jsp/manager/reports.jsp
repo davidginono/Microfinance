@@ -17,18 +17,18 @@
         <input type="date"
                name="fromDate"
                value="${fromDateValue}"
-               class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
+               class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="common.toDate" text="To Date" /></label>
         <input type="date"
                name="toDate"
                value="${toDateValue}"
-               class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
+               class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" />
     </div>
     <div class="erp-table-toolbar__control">
         <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="review.decision" text="Decision" /></label>
-        <select name="decisionFilter" class="w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
+        <select name="decisionFilter" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
             <option value="ALL" ${decisionFilterValue eq 'ALL' ? 'selected' : ''}><spring:message code="review.allDecisions" text="All decisions" /></option>
             <option value="APPROVED" ${decisionFilterValue eq 'APPROVED' ? 'selected' : ''}><spring:message code="review.approved" text="Approved" /></option>
             <option value="REJECTED" ${decisionFilterValue eq 'REJECTED' ? 'selected' : ''}><spring:message code="review.rejected" text="Rejected" /></option>
@@ -39,7 +39,8 @@
     </div>
 </form>
 
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>
@@ -77,6 +78,7 @@
         </c:if>
         </tbody>
     </table>
+</div>
 </div>
 
 <%@ include file="../fragments/footer.jspf" %>

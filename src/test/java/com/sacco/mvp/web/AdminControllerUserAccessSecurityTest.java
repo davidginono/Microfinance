@@ -298,6 +298,7 @@ class AdminControllerUserAccessSecurityTest {
                                         PlatformSupportContactSettingsService platformSupportContactSettingsService) {
             return new AdminController(
                 adminService,
+                new com.sacco.mvp.service.ApplicationClock("Africa/Nairobi"),
                 adminScopeService,
                 saccoRegistryService,
                 platformAdminService,

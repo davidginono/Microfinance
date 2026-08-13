@@ -8,7 +8,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.events.breadcrumb" text="Admin Tools / Event Log" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.events.title" text="Event Log" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.events.subtitle" text="Review recorded system activity." /></p>
 </div>
 <section class="erp-table-wrap admin-register-shell" aria-label="Event log results">
     <div class="app-table-titlebar">

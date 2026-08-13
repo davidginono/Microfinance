@@ -87,4 +87,16 @@ class UserClaimTest {
             UserClaim.USER_ACCESS_UPDATE
         );
     }
+
+    @Test
+    void chairpersonReadOnlyClaimsAreIndependentMatrixFeaturesAndFutureDefaults() {
+        assertThat(UserClaim.forFeatureAction(AccessFeature.PROCESSED_LOANS, AccessAction.VIEW))
+            .contains(UserClaim.PROCESSED_LOANS_VIEW);
+        assertThat(UserClaim.forFeatureAction(AccessFeature.SACCO_CONFIGURATIONS, AccessAction.VIEW))
+            .contains(UserClaim.SACCO_CONFIGURATIONS_VIEW);
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.CHAIRPERSON), false))
+            .contains(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.SACCO_CONFIGURATIONS_VIEW);
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.MANAGER), false))
+            .doesNotContain(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.SACCO_CONFIGURATIONS_VIEW);
+    }
 }

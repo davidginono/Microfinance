@@ -18,7 +18,8 @@
         </form>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
                 <tr><th><spring:message code="common.subject" text="Subject" /></th><th><spring:message code="common.message" text="Message" /></th><th><spring:message code="notifications.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
@@ -46,12 +47,14 @@
             </table>
         </div>
     </div>
+        </div>
 </section>
 
 <section class="erp-panel">
     <div class="erp-panel-header"><p class="erp-panel-title"><spring:message code="support.broadcasts.title" text="Station Admin Broadcasts" /></p></div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
                 <tr><th><spring:message code="common.subject" text="Subject" /></th><th><spring:message code="common.message" text="Message" /></th><th><spring:message code="notifications.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
@@ -77,6 +80,7 @@
                 </c:if>
                 </tbody>
             </table>
+    </div>
         </div>
     </div>
 </section>

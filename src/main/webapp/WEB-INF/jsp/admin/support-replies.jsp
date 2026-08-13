@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.support.repliesBreadcrumb" text="Admin Tools / Support / Replies" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.support.repliesTitle" text="Support Replies" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.support.repliesSubtitle" text="Read replies and broadcasts from the platform admin." /></p>
 </div>
 
 <section class="erp-panel">
@@ -19,7 +18,8 @@
         </form>
     </div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
                 <tr><th><spring:message code="support.subject" text="Subject" /></th><th><spring:message code="support.message" text="Message" /></th><th><spring:message code="support.source" text="Source" /></th><th><spring:message code="loan.date" text="Date" /></th></tr>
@@ -47,12 +47,14 @@
             </table>
         </div>
     </div>
+        </div>
 </section>
 
 <section class="erp-panel">
     <div class="erp-panel-header"><p class="erp-panel-title">Super Admin Broadcasts</p></div>
     <div class="erp-panel-body">
-<div class="erp-table-wrap erp-table-scroll" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
                 <tr><th>Subject</th><th>Message</th><th>Source</th><th>Date</th></tr>
@@ -78,6 +80,7 @@
                 </c:if>
                 </tbody>
             </table>
+    </div>
         </div>
     </div>
 </section>

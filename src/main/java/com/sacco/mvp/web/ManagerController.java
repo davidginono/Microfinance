@@ -16,6 +16,8 @@ import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanProductDisplayService;
+import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -70,6 +72,7 @@ public class ManagerController {
     private final PaymentDetailsService paymentDetailsService;
     private final MessageSource messageSource;
     private final StationOtpSettingsService stationOtpSettingsService;
+    private final ApplicationClock applicationClock;
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
@@ -153,9 +156,12 @@ public class ManagerController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String filter,
                           @RequestParam(required = false) String searchId,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
         String normalizedSearchId = normalizeQueueSearch(searchId);
         boolean loanIdSearch = currentFilter.usesLoanId();
         List<String> statuses = currentFilter.statuses().isEmpty()
@@ -166,6 +172,8 @@ public class ManagerController {
             ApprovalWorkflowStage.MANAGER.name(),
             principal.getSaccoId(),
             principal.getStationId(),
+            dateRange.fromInclusive(),
+            dateRange.toExclusive(),
             currentFilter.decision() != null,
             currentFilter.decision() == null ? ManagerDecision.ACCEPT.name() : currentFilter.decision().name(),
             !currentFilter.statuses().isEmpty(),
@@ -223,6 +231,8 @@ public class ManagerController {
         model.addAttribute("archiveSearchLabel", loanIdSearch ? message("loan.loanId") : message("loan.applicationId"));
         model.addAttribute("archiveSearchPlaceholder", loanIdSearch ? "Search loan ID" : "Search loan application ID");
         model.addAttribute("archivePage", archivePage);
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return "manager/archive";
     }
 

@@ -4,7 +4,8 @@
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.previousApprovals" text="Previous Review Decisions" /></p>
             <p class="mt-2 text-base text-slate-600"><spring:message code="review.previousApprovalsHelp" text="Approved decisions from earlier workflow stages." /></p>
         </div>
-        <div class="mt-5 erp-table-wrap overflow-x-auto">
+        <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+            <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>
                 <tr>
@@ -34,5 +35,6 @@
                 </tbody>
             </table>
         </div>
+    </div>
     </div>
 </c:if>

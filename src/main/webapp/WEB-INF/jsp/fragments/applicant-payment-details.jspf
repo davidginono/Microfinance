@@ -42,7 +42,7 @@
             </div>
         </c:when>
         <c:otherwise>
-            <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div class="mt-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 <spring:message code="applicant.paymentDetails.empty" text="The applicant has not provided financial details for the disbursement deposit yet." />
             </div>
         </c:otherwise>

@@ -6,7 +6,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb">Admin Tools / Platform Dashboard</p>
     <h1 class="erp-page-title">Platform Dashboard</h1>
-    <p class="erp-page-subtitle">Review every registered SACCO from one platform view.</p>
 </div>
 
 <section class="erp-stat-grid">

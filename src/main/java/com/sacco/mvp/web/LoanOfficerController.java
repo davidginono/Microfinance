@@ -17,6 +17,7 @@ import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
@@ -157,18 +158,23 @@ public class LoanOfficerController {
     public String archive(@AuthenticationPrincipal AppUserPrincipal principal,
                           @RequestParam(required = false) String searchId,
                           @RequestParam(required = false) String filter,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
                           @RequestParam(defaultValue = "0") int page,
                           Model model) {
         applyLoanOfficerUi(model);
         ArchiveFilter currentFilter = resolveArchiveFilter(filter);
+        ArchiveDateRange dateRange = ArchiveDateRange.inclusive(fromDate, toDate, applicationClock);
         List<String> statuses = currentFilter.statuses().isEmpty()
             ? List.of(com.sacco.mvp.domain.LoanStatus.DRAFT.name())
             : currentFilter.statuses().stream().map(Enum::name).toList();
         org.springframework.data.domain.Page<BoardReview> archivePage = boardReviewRepository.findArchivePage(
             principal.getMemberId(),
-            STAGE.name(),
+            List.of(STAGE.name()),
             principal.getSaccoId(),
             principal.getStationId(),
+            dateRange.fromInclusive(),
+            dateRange.toExclusive(),
             currentFilter.decision() != null,
             currentFilter.decision() == null ? BoardDecision.APPROVED.name() : currentFilter.decision().name(),
             !currentFilter.statuses().isEmpty(),
@@ -191,6 +197,8 @@ public class LoanOfficerController {
         model.addAttribute("archivePage", archivePage);
         model.addAttribute("currentFilterKey", currentFilter.key());
         model.addAttribute("currentFilterLabel", currentFilter.label());
+        model.addAttribute("fromDate", dateRange.fromDate());
+        model.addAttribute("toDate", dateRange.toDate());
         return view;
     }
 

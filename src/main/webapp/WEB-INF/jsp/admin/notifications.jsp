@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.notifications.breadcrumb" text="Admin Tools / Notifications" /></p>
     <h1 class="erp-page-title"><spring:message code="notifications.title" text="Notifications" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.notifications.subtitle" text="View system alerts, support updates, and admin messages in one place." /></p>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="/admin/notifications/mark-all-read" method="post" class="m-0">
@@ -15,7 +14,8 @@
         <button type="submit" class="app-btn btn-primary"><spring:message code="notifications.markAllReadLong" text="Mark all as read" /></button>
     </form>
 </div>
-<div class="erp-table-wrap overflow-x-auto" data-aws-table-region data-loading-label="Loading results...">
+<div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
         <tr>
@@ -60,6 +60,7 @@
         </c:if>
         </tbody>
     </table>
+</div>
 </div>
 
 <script>

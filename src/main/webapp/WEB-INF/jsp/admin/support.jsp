@@ -7,7 +7,6 @@
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.support.breadcrumb" text="Admin Tools / Support" /></p>
     <h1 class="erp-page-title"><spring:message code="admin.support.title" text="Contact Platform Admin" /></h1>
-    <p class="erp-page-subtitle"><spring:message code="admin.support.subtitle" text="Report SACCO workspace incidents that need platform attention." /></p>
 </div>
 
 <section class="erp-panel max-w-4xl overflow-hidden">
