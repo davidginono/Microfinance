@@ -5156,7 +5156,8 @@ body.aws-console,
 
 .shell-sidebar-group > div .shell-support-contact__link {
     display: grid !important;
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 12px;
     align-items: start;
     width: 100% !important;
     min-height: 0 !important;
@@ -5183,6 +5184,8 @@ body.aws-console,
 .shell-support-contact__label {
     color: #aab7b8 !important;
     font-weight: 700;
+    overflow-wrap: normal;
+    white-space: nowrap;
 }
 
 .shell-support-contact__value {
