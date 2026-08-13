@@ -2533,6 +2533,18 @@ body {
     .staff-analytics-control.is-product {
         flex: 0 1 10.75rem;
         min-width: 10.25rem;
+        max-width: 10.75rem !important;
+    }
+    .staff-analytics-control.is-product .neo-select,
+    .staff-analytics-control.is-product .neo-select-button,
+    .staff-analytics-control.is-product .neo-select-button-text {
+        min-width: 0;
+        max-width: 100%;
+    }
+    .staff-analytics-control.is-product .neo-select-button-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .staff-analytics-control.is-view {
         flex: 0 0 15.9rem;
@@ -3175,6 +3187,7 @@ body {
         .staff-analytics-control.is-product,
         .staff-analytics-control.is-view {
             min-width: min(100%, 15rem);
+            max-width: none !important;
             flex: 1 1 calc(50% - 4px);
         }
         .staff-filter-actions {
