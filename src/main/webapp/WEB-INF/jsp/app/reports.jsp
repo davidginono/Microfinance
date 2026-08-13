@@ -16,7 +16,7 @@
 </div>
 
 <section class="erp-panel loan-analytics-command-panel overflow-hidden">
-<form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter aws-filter-toolbar" data-aws-filter-toolbar data-aws-filter-pin="true">
+<form action="/app/reports" method="get" class="erp-panel-body loan-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true">
         <label class="loan-analytics-filter-field block text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="reports.startDate" text="Start Date" />
             <input name="fromDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" value="${fromDate}" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800" />

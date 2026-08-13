@@ -784,10 +784,14 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
-    void staffAnalyticsFiltersUseThePagePreloaderInsteadOfAnOffscreenTableLoader() throws Exception {
+    void analyticsFiltersUseThePagePreloaderInsteadOfAnOffscreenTableLoader() throws Exception {
+        String memberAnalytics = read(JSP_ROOT.resolve("app/reports.jsp"));
         String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
 
+        assertThat(memberAnalytics)
+            .contains("action=\"/app/reports\" method=\"get\"")
+            .contains("data-page-preloader=\"true\"");
         assertThat(staffAnalytics)
             .contains("action=\"/staff/analytics\" method=\"get\"")
             .contains("data-page-preloader=\"true\"");
