@@ -1,6 +1,6 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<div id="guarantorFinancialModal" class="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="guarantorFinancialModalTitle" aria-hidden="true">
-    <div class="app-modal-panel app-modal-panel--compact">
+<div id="guarantorFinancialModal" class="app-modal-overlay" aria-hidden="true">
+    <div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="guarantorFinancialModalTitle" tabindex="-1">
         <div class="app-modal-scroll">
             <div class="app-modal-header">
                 <div>
@@ -46,6 +46,12 @@
     if (!modal) {
         return;
     }
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    var dialog = modal.querySelector('[role="dialog"]');
+    var closeButton = modal.querySelector('[data-gf-modal-close]');
+    var activeTrigger = null;
     var nameEl = modal.querySelector('[data-gf-modal-name]');
     var readyEl = modal.querySelector('[data-gf-modal-ready]');
     var loadingEl = modal.querySelector('[data-gf-modal-loading]');
@@ -66,13 +72,16 @@
     function openModal() {
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
+        document.body.classList.add('overflow-hidden');
+        (closeButton || dialog)?.focus();
     }
 
     function closeModal() {
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
+        document.body.classList.remove('overflow-hidden');
+        activeTrigger?.focus();
+        activeTrigger = null;
     }
 
     function setState(state) {
@@ -102,7 +111,7 @@
     }
 
     modal.addEventListener('click', function (event) {
-        if (event.target.closest('[data-gf-modal-close]')) {
+        if (event.target === modal || event.target.closest('[data-gf-modal-close]')) {
             closeModal();
         }
     });
@@ -123,6 +132,7 @@
         btn.addEventListener('click', function () {
             var url = btn.getAttribute('data-url');
             if (!url) return;
+            activeTrigger = btn;
             if (nameEl) nameEl.textContent = guarantorNameFor(btn);
             setState('loading');
             openModal();
