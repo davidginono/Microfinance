@@ -2645,20 +2645,13 @@ body.aws-console {
     overflow-wrap: anywhere;
 }
 
-.erp-table tbody td:not([colspan]),
-.erp-table tfoot td:not([colspan]) {
-    white-space: nowrap;
-    overflow-wrap: normal;
-    word-break: normal;
-}
-
-.erp-table tbody td.erp-table-cell-wrap,
-.erp-table tfoot td.erp-table-cell-wrap,
-.erp-table tbody td[data-table-wrap="true"],
-.erp-table tfoot td[data-table-wrap="true"] {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: normal;
+.erp-table tbody td,
+.erp-table tbody td :where(*),
+.erp-table tfoot td,
+.erp-table tfoot td :where(*) {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
 }
 
 @media (min-width: 768px) {

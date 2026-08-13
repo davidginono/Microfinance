@@ -48,20 +48,20 @@ class ErpTableAlignmentContractTest {
     }
 
     @Test
-    void atomicTableValuesStayOnOneLineWhileNarrativeCellsCanOptIntoWrapping() throws Exception {
+    void tableValuesWrapBetweenWordsButNeverInsideWords() throws Exception {
         String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(shellCss)
             .contains("""
-                .erp-table tbody td:not([colspan]),
-                .erp-table tfoot td:not([colspan]) {
-                    white-space: nowrap;
-                    overflow-wrap: normal;
-                    word-break: normal;
+                .erp-table tbody td,
+                .erp-table tbody td :where(*),
+                .erp-table tfoot td,
+                .erp-table tfoot td :where(*) {
+                    overflow-wrap: normal !important;
+                    word-break: normal !important;
+                    hyphens: none !important;
                 }
                 """)
-            .contains(".erp-table tbody td.erp-table-cell-wrap,")
-            .contains(".erp-table tbody td[data-table-wrap=\"true\"]")
             .containsPattern("(?s)\\.erp-table-scroll \\{.*?overflow-x: auto;");
     }
 
