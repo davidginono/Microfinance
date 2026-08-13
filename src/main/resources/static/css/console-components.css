@@ -7929,3 +7929,49 @@ html.session-timeout-active,
             flex: 1 1 auto;
         }
     }
+
+/* Member repayment schedule alignment */
+@media (min-width: 1024px) {
+    .loan-application-detail-page .loan-repayment-grid:has(> .loan-repayment-card:nth-child(7):last-child) {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .loan-application-detail-page .loan-repayment-grid:has(> .loan-repayment-card:nth-child(7):last-child) > .loan-repayment-card {
+        grid-column: span 3;
+    }
+
+    .loan-application-detail-page .loan-repayment-grid:has(> .loan-repayment-card:nth-child(7):last-child) > .loan-repayment-card:nth-child(n + 5) {
+        grid-column: span 4;
+    }
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table {
+    min-width: max(100%, 64rem);
+    table-layout: fixed;
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table th,
+.loan-application-detail-page .loan-repayment-schedule-table td {
+    vertical-align: middle;
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table th {
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table th:first-child {
+    width: 7%;
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table th:nth-child(2) {
+    width: 14%;
+}
+
+.loan-application-detail-page .loan-repayment-schedule-table th:nth-child(n + 3),
+.loan-application-detail-page .loan-repayment-schedule-table td:nth-child(n + 3) {
+    width: 15.8%;
+    text-align: right !important;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}

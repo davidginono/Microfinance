@@ -503,6 +503,15 @@ public class LoanPresentationService {
                 row.put("payment", formatMoneyValue(item.get("amount")));
                 row.put("loanAmount", formatMoneyValue(item.get("principalComponent")));
                 row.put("interest", formatMoneyValue(item.get("interestComponent")));
+                BigDecimal endingBalance = toBigDecimal(item.get("outstandingBalance"));
+                BigDecimal principalComponent = toBigDecimal(item.get("principalComponent"));
+                if (endingBalance != null) {
+                    row.put("endingBalance", formatMoney(endingBalance));
+                    row.put("outstandingBalance", formatMoney(endingBalance));
+                    if (principalComponent != null) {
+                        row.put("beginningBalance", formatMoney(endingBalance.add(principalComponent)));
+                    }
+                }
                 row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
                 Map<String, Object> correctedRow = !correctedScheduleRows.isEmpty() && rowIndex < correctedScheduleRows.size()
                     ? correctedScheduleRows.get(rowIndex)
@@ -524,6 +533,9 @@ public class LoanPresentationService {
         copyDisplayValue(row, calculatedRow, "payment");
         copyDisplayValue(row, calculatedRow, "loanAmount");
         copyDisplayValue(row, calculatedRow, "interest");
+        copyDisplayValue(row, calculatedRow, "beginningBalance");
+        copyDisplayValue(row, calculatedRow, "endingBalance");
+        copyDisplayValue(row, calculatedRow, "outstandingBalance");
         copyDisplayValue(row, calculatedRow, "scheduledBreakdown");
     }
 

@@ -609,6 +609,42 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void parseRepaymentRowsAlignsStoredBeginningAndEndingBalances() {
+        String scheduleJson = """
+            {
+              "schedule": [
+                {
+                  "installmentNumber": 1,
+                  "dueDate": "2026-09-13",
+                  "amount": 64166.66,
+                  "principalComponent": 58333.33,
+                  "interestComponent": 5833.33,
+                  "outstandingBalance": 641666.67
+                },
+                {
+                  "installmentNumber": 2,
+                  "dueDate": "2026-10-13",
+                  "amount": 64166.66,
+                  "principalComponent": 58333.33,
+                  "interestComponent": 5833.33,
+                  "outstandingBalance": 583333.34
+                }
+              ]
+            }
+            """;
+
+        List<Map<String, Object>> rows = loanPresentationService.parseRepaymentRows(scheduleJson);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.getFirst())
+            .containsEntry("beginningBalance", "TSh 700,000")
+            .containsEntry("endingBalance", "TSh 641,666.67");
+        assertThat(rows.get(1))
+            .containsEntry("beginningBalance", "TSh 641,666.67")
+            .containsEntry("endingBalance", "TSh 583,333.34");
+    }
+
+    @Test
     void printablePdfIncludesCalculatedRepaymentScheduleWhenStoredScheduleIsMissing() throws IOException {
         LoanApplication app = LoanApplication.builder()
             .id(UUID.randomUUID())

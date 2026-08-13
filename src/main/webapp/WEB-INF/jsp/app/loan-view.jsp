@@ -203,7 +203,7 @@
         <div class="app-table-titlebar">
             <div class="app-table-heading"><h2><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></h2></div>
         </div>
-        <table class="erp-table">
+        <table class="erp-table loan-repayment-schedule-table">
             <thead>
                 <tr>
                     <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
@@ -381,7 +381,7 @@
                     <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="erp-table-wrap erp-table-scroll rounded-none border-0" data-aws-no-titlebar="true">
-                    <table class="erp-table">
+                    <table class="erp-table loan-repayment-schedule-table">
                         <thead>
                             <tr>
                                 <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
