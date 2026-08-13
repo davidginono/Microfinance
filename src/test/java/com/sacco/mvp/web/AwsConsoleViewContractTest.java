@@ -145,7 +145,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260809-loan-detail-action-v33")
             .contains("shell.css?v=20260809-select-visibility-v24")
-            .contains("shell.js?v=20260809-download-preloader-v13")
+            .contains("shell.js?v=20260813-export-preloader-v16")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -271,7 +271,7 @@ class AwsConsoleViewContractTest {
             .contains("showConsoleTableLoading")
             .contains("showPageSubmitPreloader(null)")
             .contains("[data-download-action=\"true\"]")
-            .contains("showTransientDownloadPreloader")
+            .contains("downloadWithPagePreloader")
             .contains("syncConsoleFiltersFromUrl")
             .contains("breadcrumbRouteGroups")
             .contains("'admin tools'")
@@ -664,13 +664,19 @@ class AwsConsoleViewContractTest {
         );
 
         assertThat(shellJs)
-            .contains("showTransientDownloadPreloader")
-            .contains("transientPagePreloaderTimer = window.setTimeout(hidePageSubmitPreloader, 1800)")
+            .contains("downloadWithPagePreloader")
+            .contains("const exportDownloadTimeoutMs = 60 * 1000")
+            .contains("const response = await window.fetch")
+            .contains("triggerBrowserDownload(blob, resolveDownloadFilename(response, target))")
+            .contains("controller.abort()")
+            .contains("finally {")
+            .contains("hidePageSubmitPreloader();")
+            .contains("resolveExportFormUrl(form, event.submitter)")
             .contains("showPageSubmitPreloader(null)")
             .contains("isConsoleDownloadAction(link)")
             .contains("[data-download-action=\"true\"]")
             .contains("link.matches('[download], [data-download-action=\"true\"]')")
-            .contains("showTransientDownloadPreloader();");
+            .contains("void downloadWithPagePreloader(target.toString())");
         assertThat(loanExportModal)
             .contains("data-loan-export-signed data-download-action=\"true\"")
             .contains("data-loan-export-unsigned data-download-action=\"true\"");

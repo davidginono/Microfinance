@@ -10,7 +10,8 @@
     const maxVisibleToasts = 3;
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
-    let transientPagePreloaderTimer = null;
+    let exportDownloadActive = false;
+    const exportDownloadTimeoutMs = 60 * 1000;
     const legacyScrollRestoreStorageKey = 'saccos:restore-scroll';
     const scrollRestoreStorageKeyPrefix = 'saccos:restore-scroll:';
     const modalRestoreStorageKey = 'saccos:open-modal';
@@ -765,10 +766,6 @@
     };
 
     const hidePageSubmitPreloader = function () {
-        if (transientPagePreloaderTimer) {
-            window.clearTimeout(transientPagePreloaderTimer);
-            transientPagePreloaderTimer = null;
-        }
         pageSubmitPreloaderActive = false;
         document.documentElement.classList.remove('page-submit-preloader-active');
         document.body.removeAttribute('aria-busy');
@@ -804,15 +801,102 @@
         }
     };
 
-    const showTransientDownloadPreloader = function () {
+    const resolveDownloadFilename = function (response, target) {
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        const plainFilename = disposition.match(/filename="?([^";]+)"?/i);
+        let filename = encodedFilename ? encodedFilename[1] : (plainFilename ? plainFilename[1] : '');
+        if (encodedFilename) {
+            try {
+                filename = decodeURIComponent(filename);
+            } catch (ignored) {
+            }
+        }
+        if (!filename) {
+            filename = target.pathname.split('/').filter(Boolean).pop() || 'download';
+        }
+        filename = filename.trim().replace(/^["']|["']$/g, '');
+        return filename.replace(/[\\/:*?"<>|]/g, '_');
+    };
+
+    const triggerBrowserDownload = function (blob, filename) {
+        const objectUrl = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        anchor.hidden = true;
+        anchor.setAttribute('data-no-page-preloader', 'true');
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(function () {
+            window.URL.revokeObjectURL(objectUrl);
+        }, 1000);
+    };
+
+    const downloadWithPagePreloader = async function (url) {
         if (!pageSubmitPreloader) {
+            window.location.assign(url);
             return;
         }
-        if (transientPagePreloaderTimer) {
-            window.clearTimeout(transientPagePreloaderTimer);
+        if (exportDownloadActive) {
+            return;
         }
+        exportDownloadActive = true;
+        clearConsoleTableLoading();
         showPageSubmitPreloader(null);
-        transientPagePreloaderTimer = window.setTimeout(hidePageSubmitPreloader, 1800);
+        const controller = new AbortController();
+        const timeout = window.setTimeout(function () {
+            controller.abort();
+        }, exportDownloadTimeoutMs);
+        try {
+            const target = new URL(url, window.location.href);
+            const response = await window.fetch(target.toString(), {
+                credentials: 'same-origin',
+                signal: controller.signal
+            });
+            const redirectedPath = response.redirected ? new URL(response.url, window.location.href).pathname : '';
+            if (!response.ok || /^\/(?:login|auth)(?:\/|$)/.test(redirectedPath)) {
+                throw new Error('Export request failed');
+            }
+            const blob = await response.blob();
+            triggerBrowserDownload(blob, resolveDownloadFilename(response, target));
+        } catch (error) {
+            const timedOut = error && error.name === 'AbortError';
+            if (typeof window.showToast === 'function') {
+                window.showToast('error', timedOut
+                    ? 'The export took too long. Please try again.'
+                    : 'The export could not be completed. Please try again.');
+            }
+        } finally {
+            window.clearTimeout(timeout);
+            exportDownloadActive = false;
+            hidePageSubmitPreloader();
+        }
+    };
+
+    const resolveExportFormUrl = function (form, submitter) {
+        if (!form || (form.method && form.method.toLowerCase() !== 'get')) {
+            return null;
+        }
+        const target = new URL(form.action || window.location.href, window.location.href);
+        if (target.origin !== window.location.origin) {
+            return null;
+        }
+        if (!isConsoleDownloadAction(submitter)
+            && !/\.(?:csv|pdf|xlsx?|zip)$/i.test(target.pathname)) {
+            return null;
+        }
+        target.search = '';
+        new FormData(form).forEach(function (value, name) {
+            if (typeof value === 'string') {
+                target.searchParams.append(name, value);
+            }
+        });
+        if (submitter && submitter.name && !target.searchParams.has(submitter.name)) {
+            target.searchParams.append(submitter.name, submitter.value || '');
+        }
+        return target.toString();
     };
 
     const currentScrollRestorePath = function () {
@@ -1166,9 +1250,6 @@
         if (!form || event.defaultPrevented) {
             return;
         }
-        if (form.matches('[data-no-page-preloader="true"], [data-page-preloader="false"]')) {
-            return;
-        }
         if (form.method && form.method.toLowerCase() === 'dialog') {
             return;
         }
@@ -1176,6 +1257,16 @@
             return;
         }
         if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+            return;
+        }
+        const exportUrl = resolveExportFormUrl(form, event.submitter);
+        if (exportUrl) {
+            event.preventDefault();
+            rememberScrollForReload();
+            void downloadWithPagePreloader(exportUrl);
+            return;
+        }
+        if (form.matches('[data-no-page-preloader="true"], [data-page-preloader="false"]')) {
             return;
         }
         window.setTimeout(function () {
@@ -1206,12 +1297,9 @@
         if (link.matches('[download], [data-download-action="true"]')
             || isConsoleDownloadAction(link)
             || /\.(?:csv|pdf|xlsx?)(?:$|\?)/i.test(target.pathname + target.search)) {
+            event.preventDefault();
             rememberScrollForReload();
-            window.setTimeout(function () {
-                if (!event.defaultPrevented) {
-                    showTransientDownloadPreloader();
-                }
-            }, 0);
+            void downloadWithPagePreloader(target.toString());
             return;
         }
         rememberScrollForReload();
