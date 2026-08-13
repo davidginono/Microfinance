@@ -2628,6 +2628,14 @@ body.aws-console {
     overflow-wrap: anywhere;
 }
 
+@media (min-width: 768px) {
+    .erp-table thead th {
+        white-space: nowrap !important;
+        overflow-wrap: normal !important;
+        word-break: normal !important;
+    }
+}
+
 .erp-table th.text-left,
 .erp-table td.text-left {
     text-align: left !important;

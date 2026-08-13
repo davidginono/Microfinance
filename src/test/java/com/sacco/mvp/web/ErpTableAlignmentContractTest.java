@@ -31,6 +31,23 @@ class ErpTableAlignmentContractTest {
     }
 
     @Test
+    void laptopTableColumnLabelsStayOnOneLineInsideScrollableTables() throws Exception {
+        String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
+
+        assertThat(shellCss)
+            .contains("""
+                @media (min-width: 768px) {
+                    .erp-table thead th {
+                        white-space: nowrap !important;
+                        overflow-wrap: normal !important;
+                        word-break: normal !important;
+                    }
+                }
+                """)
+            .containsPattern("(?s)\\.erp-table-scroll \\{.*?overflow-x: auto;");
+    }
+
+    @Test
     void everyJspTableUsesTheSharedErpTableAndDedicatedScrollContract() throws Exception {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             for (Path path : paths.filter(Files::isRegularFile)
