@@ -406,7 +406,8 @@
             region.setAttribute('data-aws-table-region', '');
             region.setAttribute('aria-busy', 'false');
             let titlebar = region.querySelector(':scope > .app-table-titlebar');
-            const suppressTitlebar = region.getAttribute('data-aws-no-titlebar') === 'true';
+            const suppressTitlebar = region.getAttribute('data-aws-no-titlebar') === 'true'
+                || Boolean(region.closest('[data-staff-review-page="true"]'));
             if (!titlebar && !suppressTitlebar) {
                 titlebar = document.createElement('div');
                 titlebar.className = 'app-table-titlebar';

@@ -719,6 +719,11 @@ class AwsConsoleViewContractTest {
         }
         assertThat(staffDetail).contains("data-aws-action-pin=\"true\"");
         assertThat(boardDetail).contains("data-aws-action-pin=\"true\"");
+        assertThat(staffDetail).contains("data-staff-review-page=\"true\"");
+        assertThat(boardDetail).contains("data-staff-review-page=\"true\"");
+        assertThat(memberDetail).doesNotContain("data-staff-review-page=\"true\"");
+        assertThat(read(Path.of("src/main/resources/static/js/shell.js")))
+            .contains("region.closest('[data-staff-review-page=\"true\"]')");
         assertThat(progress)
             .contains("is-${item.state}")
             .contains("item.state eq 'rejected'")

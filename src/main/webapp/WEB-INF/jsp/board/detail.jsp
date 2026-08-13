@@ -16,7 +16,7 @@
 <div class="loan-detail-action-row">
     <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
 </div>
-<div class="loan-view-hero-summary loan-staff-review-template">
+<div class="loan-view-hero-summary loan-staff-review-template" data-staff-review-page="true">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 lg:px-8">
         <div class="loan-hero-with-photo">
         <div class="min-w-0">
