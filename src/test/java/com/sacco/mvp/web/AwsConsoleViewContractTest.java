@@ -251,7 +251,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260812-profile-layout-v35")
-            .contains("shell.css?v=20260812-navbar-support-v33")
+            .contains("shell.css?v=20260813-table-values-v34")
             .contains("shell.js?v=20260813-staff-filter-preloader-v17")
             .contains("app-global-logo")
             .contains("app-global-logo-image")

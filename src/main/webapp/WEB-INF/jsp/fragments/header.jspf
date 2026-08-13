@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260812-profile-layout-v35' />" />
-    <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260812-navbar-support-v33' />" />
+<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260813-table-values-v34' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">

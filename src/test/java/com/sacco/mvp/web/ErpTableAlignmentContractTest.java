@@ -48,6 +48,24 @@ class ErpTableAlignmentContractTest {
     }
 
     @Test
+    void atomicTableValuesStayOnOneLineWhileNarrativeCellsCanOptIntoWrapping() throws Exception {
+        String shellCss = Files.readString(Path.of("src/main/resources/static/css/shell.css"));
+
+        assertThat(shellCss)
+            .contains("""
+                .erp-table tbody td:not([colspan]),
+                .erp-table tfoot td:not([colspan]) {
+                    white-space: nowrap;
+                    overflow-wrap: normal;
+                    word-break: normal;
+                }
+                """)
+            .contains(".erp-table tbody td.erp-table-cell-wrap,")
+            .contains(".erp-table tbody td[data-table-wrap=\"true\"]")
+            .containsPattern("(?s)\\.erp-table-scroll \\{.*?overflow-x: auto;");
+    }
+
+    @Test
     void everyJspTableUsesTheSharedErpTableAndDedicatedScrollContract() throws Exception {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             for (Path path : paths.filter(Files::isRegularFile)
