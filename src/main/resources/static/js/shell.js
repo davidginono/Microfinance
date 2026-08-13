@@ -611,6 +611,10 @@
         clearConsoleTableLoading();
         document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
             form.addEventListener('submit', function () {
+                if (form.matches('[data-page-preloader="true"]')) {
+                    clearConsoleTableLoading();
+                    return;
+                }
                 showConsoleTableLoading(form);
             });
         });
@@ -840,13 +844,14 @@
         if (!pageSubmitPreloader || pageSubmitPreloaderActive) {
             return;
         }
+        const pagePreloaderRequested = form?.matches('[data-page-preloader="true"]') || false;
         const regionalLoaderActive = document.querySelector('.erp-table-wrap.is-loading, [data-aws-table-region][aria-busy="true"]');
         const regionalForm = form && (
             form.matches('form[method="get"], form:not([method]), [data-aws-filter-toolbar], .aws-filter-toolbar, .admin-filter-form, .loan-analytics-filter, .staff-analytics-filter')
             || form.closest('[data-aws-table-region], .erp-table-wrap')
             || form.parentElement?.querySelector('[data-aws-table-region], .erp-table-wrap')
         );
-        if (regionalLoaderActive || regionalForm) {
+        if (!pagePreloaderRequested && (regionalLoaderActive || regionalForm)) {
             return;
         }
         pageSubmitPreloaderActive = true;

@@ -281,4 +281,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260813-export-preloader-v16' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260813-staff-filter-preloader-v17' />" defer></script>

@@ -252,7 +252,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260812-profile-layout-v35")
             .contains("shell.css?v=20260812-navbar-support-v33")
-            .contains("shell.js?v=20260813-export-preloader-v16")
+            .contains("shell.js?v=20260813-staff-filter-preloader-v17")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -777,9 +777,23 @@ class AwsConsoleViewContractTest {
 
         assertThat(shellJs)
             .contains("hidePageSubmitPreloader();")
+            .contains("const pagePreloaderRequested")
             .contains("const regionalLoaderActive")
-            .contains("if (regionalLoaderActive || regionalForm)")
+            .contains("if (!pagePreloaderRequested && (regionalLoaderActive || regionalForm))")
             .contains("[data-aws-table-region][aria-busy=\"true\"]");
+    }
+
+    @Test
+    void staffAnalyticsFiltersUseThePagePreloaderInsteadOfAnOffscreenTableLoader() throws Exception {
+        String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+
+        assertThat(staffAnalytics)
+            .contains("action=\"/staff/analytics\" method=\"get\"")
+            .contains("data-page-preloader=\"true\"");
+        assertThat(shellJs)
+            .contains("if (form.matches('[data-page-preloader=\"true\"]'))")
+            .contains("clearConsoleTableLoading();");
     }
 
     @Test

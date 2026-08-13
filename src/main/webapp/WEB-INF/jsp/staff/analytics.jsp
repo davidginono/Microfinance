@@ -55,7 +55,7 @@
             </a>
         </div>
     </div>
-    <form action="/staff/analytics" method="get" class="staff-analytics-filter aws-filter-toolbar" data-aws-filter-toolbar data-aws-filter-pin="true" data-view-position-key="staff-analytics-filters">
+    <form action="/staff/analytics" method="get" class="staff-analytics-filter aws-filter-toolbar" data-page-preloader="true" data-aws-filter-toolbar data-aws-filter-pin="true" data-view-position-key="staff-analytics-filters">
         <label class="staff-analytics-control is-date fcms-label">
             <spring:message code="reports.startDate" text="Start Date" />
             <input name="fromDate" type="date" autocomplete="off" value="${fromDateInput}" class="fcms-control" />
