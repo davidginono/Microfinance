@@ -14,8 +14,8 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260814-chairperson-config-v36' />" />
-<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260813-word-boundary-v35' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260814-staff-review-v37' />" />
+<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260814-console-popover-v36' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -101,21 +101,20 @@
                 </div>
             </c:if>
             <div class="app-notification-control relative">
-                <button id="notificationToggle" type="button" class="erp-icon-btn" aria-label="<spring:message code='notifications.title' text='Notifications' />">
+                <button id="notificationToggle" type="button" class="erp-icon-btn" aria-label="<spring:message code='notifications.title' text='Notifications' />" aria-controls="notificationPanel" aria-expanded="false">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10 2a4 4 0 00-4 4v1.172c0 .53-.211 1.039-.586 1.414L4.293 9.707A1 1 0 004 10.414V12a2 2 0 002 2h8a2 2 0 002-2v-1.586a1 1 0 00-.293-.707l-1.121-1.121A2 2 0 0114 7.172V6a4 4 0 00-4-4zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z"/>
                     </svg>
                 </button>
                 <span id="notificationBadge" class="app-notification-badge hidden"></span>
-                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50">
+                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50" role="dialog" aria-label="<spring:message code='notifications.title' text='Notifications' />">
                     <div class="erp-dropdown-header">
                         <div class="erp-dropdown-heading">
                             <p class="erp-dropdown-title"><spring:message code="notifications.title" text="Notifications" /></p>
-                            <p id="notificationPanelSubtitle" class="erp-dropdown-subtitle"><spring:message code="notifications.loadingLatest" text="Loading latest notifications..." /></p>
                         </div>
                         <a id="notificationViewAll" href="#" class="erp-dropdown-link"><spring:message code="common.viewAll" text="View all" /></a>
                     </div>
-                    <div id="notificationPanelBody" class="erp-notification-body space-y-2">
+                    <div id="notificationPanelBody" class="erp-notification-body">
                         <div class="erp-notification-empty"><spring:message code="common.loading" text="Loading..." /></div>
                     </div>
                 </div>
@@ -149,7 +148,7 @@
                 </div>
             </div>
             <div class="app-profile-control relative">
-                <button id="profileToggle" type="button" class="erp-icon-btn profile-icon-btn" aria-label="<spring:message code='profile.openDetails' text='Open profile details' />">
+                <button id="profileToggle" type="button" class="erp-icon-btn profile-icon-btn" aria-label="<spring:message code='profile.openDetails' text='Open profile details' />" aria-controls="profilePanel" aria-expanded="false">
                     <img src="<c:url value='/profile/image/me' />"
                          alt=""
                          class="profile-avatar-img h-full w-full rounded-full object-cover"
@@ -281,4 +280,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260813-staff-filter-preloader-v17' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260814-console-popover-v18' />" defer></script>

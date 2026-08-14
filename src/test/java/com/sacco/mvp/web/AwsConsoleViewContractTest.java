@@ -250,9 +250,9 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260814-chairperson-config-v36")
-            .contains("shell.css?v=20260813-word-boundary-v35")
-            .contains("shell.js?v=20260813-staff-filter-preloader-v17")
+            .contains("console-components.css?v=20260814-staff-review-v37")
+            .contains("shell.css?v=20260814-console-popover-v36")
+            .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -411,6 +411,8 @@ class AwsConsoleViewContractTest {
         String guarantorSelection = read(JSP_ROOT.resolve("app/guarantor-selection.jsp"));
         String loanDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
         String staffLoanDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
+        String staffReviewSummary = read(JSP_ROOT.resolve("fragments/staff-loan-review-summary.jspf"));
+        String header = read(JSP_ROOT.resolve("fragments/header.jspf"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
@@ -470,10 +472,18 @@ class AwsConsoleViewContractTest {
             .contains("loan-summary-table")
             .contains("loan-detail-disclosure")
             .doesNotContain("loan-staff-kpi-icon");
-        assertThat(staffLoanDetail)
+        assertThat(staffLoanDetail).contains("include file=\"../fragments/staff-loan-review-summary.jspf\"");
+        assertThat(staffReviewSummary)
             .contains("loan-applicant-photo-card")
             .contains("loan-applicant-photo-frame")
-            .contains("/profile/image/members/${applicant.id}");
+            .contains("/profile/image/members/${applicant.id}")
+            .contains("loan-staff-review-section-title")
+            .doesNotContain("loan-staff-kpi-icon");
+        assertThat(header)
+            .contains("aria-controls=\"notificationPanel\"")
+            .contains("aria-expanded=\"false\"")
+            .doesNotContain("notificationPanelSubtitle")
+            .doesNotContain("erp-notification-body space-y-2");
         assertThat(shellCss)
             .contains(".erp-page-header[data-aws-page-header]")
             .contains("position: static !important")
@@ -493,7 +503,14 @@ class AwsConsoleViewContractTest {
         assertThat(shellJs)
             .contains("data-aws-no-titlebar")
             .contains("!suppressTitlebar")
-            .contains("control.closest('table')");
+            .contains("control.closest('table')")
+            .contains("link.className = 'erp-notification-item'")
+            .contains("notificationToggle.setAttribute('aria-expanded', 'true')")
+            .doesNotContain("rounded-md border border-slate-300");
+        assertThat(shellCss)
+            .contains(".erp-notification-item")
+            .contains(".erp-notification-meta")
+            .contains("background: #f1faff");
     }
 
     @Test
@@ -844,23 +861,33 @@ class AwsConsoleViewContractTest {
         String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
         String staffDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
         String boardDetail = read(JSP_ROOT.resolve("board/detail.jsp"));
+        String staffReviewSummary = read(JSP_ROOT.resolve("fragments/staff-loan-review-summary.jspf"));
         String progress = read(JSP_ROOT.resolve("fragments/loan-application-progress.jspf"));
         String liveStatus = read(JSP_ROOT.resolve("fragments/live-account-status-message.jspf"));
         String liveHydration = read(JSP_ROOT.resolve("fragments/live-account-status-hydration.jspf"));
         String financialSections = read(JSP_ROOT.resolve("fragments/financial-field-sections.jspf"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
 
-        for (String detail : List.of(memberDetail, staffDetail, boardDetail)) {
+        assertThat(memberDetail)
+            .contains("include file=\"../fragments/loan-application-progress.jspf\"")
+            .contains("include file=\"../fragments/live-account-status-message.jspf\"")
+            .doesNotContain("<div class=\"mt-6 loan-simple-progress\"");
+        assertThat(staffReviewSummary)
+            .contains("include file=\"loan-application-progress.jspf\"")
+            .contains("include file=\"live-account-status-message.jspf\"")
+            .contains("class=\"loan-view-hero-summary loan-staff-review-template\"")
+            .contains("data-staff-review-page=\"true\"");
+
+        for (String detail : List.of(staffDetail, boardDetail)) {
             assertThat(detail)
-                .contains("include file=\"../fragments/loan-application-progress.jspf\"")
-                .contains("include file=\"../fragments/live-account-status-message.jspf\"")
+                .contains("include file=\"../fragments/staff-loan-review-summary.jspf\"")
                 .contains("class=\"loan-detail-action-row\"")
                 .doesNotContain("<div class=\"mt-6 loan-simple-progress\"");
 
             int headerStart = detail.indexOf("data-aws-page-header");
             int headerEnd = detail.indexOf("</div>", headerStart);
             int actionRow = detail.indexOf("class=\"loan-detail-action-row\"");
-            int heroSummary = detail.indexOf("class=\"loan-view-hero-summary loan-staff-review-template\"");
+            int heroSummary = detail.indexOf("include file=\"../fragments/staff-loan-review-summary.jspf\"");
 
             assertThat(headerStart).isGreaterThanOrEqualTo(0);
             assertThat(headerEnd).isGreaterThan(headerStart);
@@ -873,8 +900,8 @@ class AwsConsoleViewContractTest {
         }
         assertThat(staffDetail).contains("data-aws-action-pin=\"true\"");
         assertThat(boardDetail).contains("data-aws-action-pin=\"true\"");
-        assertThat(staffDetail).contains("data-staff-review-page=\"true\"");
-        assertThat(boardDetail).contains("data-staff-review-page=\"true\"");
+        assertThat(staffDetail).contains("reviewStatusBadgeClass");
+        assertThat(boardDetail).contains("reviewStatusBadgeClass");
         assertThat(memberDetail).doesNotContain("data-staff-review-page=\"true\"");
         assertThat(read(Path.of("src/main/resources/static/js/shell.js")))
             .contains("document.querySelector('[data-staff-review-page=\"true\"]')");
@@ -900,6 +927,9 @@ class AwsConsoleViewContractTest {
             .contains(".loan-simple-progress-item.is-rejected")
             .contains(".loan-simple-progress-item.is-closed")
             .contains(".live-account-status-message[hidden]")
+            .contains(".loan-staff-review-template[data-staff-review-page=\"true\"]")
+            .contains(".loan-staff-review-section-title")
+            .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
             .contains(".loan-financial-section > .erp-table-scroll .erp-table");
     }
 

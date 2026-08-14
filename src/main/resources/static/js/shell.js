@@ -1911,7 +1911,6 @@
     const notificationToggle = document.getElementById('notificationToggle');
     const notificationPanel = document.getElementById('notificationPanel');
     const notificationBadge = document.getElementById('notificationBadge');
-    const notificationPanelSubtitle = document.getElementById('notificationPanelSubtitle');
     const notificationPanelBody = document.getElementById('notificationPanelBody');
     const notificationViewAll = document.getElementById('notificationViewAll');
     const profileToggle = document.getElementById('profileToggle');
@@ -1923,6 +1922,8 @@
     function closePanels() {
         notificationPanel.classList.remove('is-open');
         profilePanel.classList.remove('is-open');
+        notificationToggle.setAttribute('aria-expanded', 'false');
+        profileToggle.setAttribute('aria-expanded', 'false');
     }
 
     let notificationsLoaded = false;
@@ -1938,7 +1939,6 @@
 
     function renderHeaderNotifications(payload) {
         notificationsLoaded = true;
-        notificationPanelSubtitle.textContent = payload.subtitle || '';
         notificationViewAll.href = payload.targetUrl || '#';
         notificationPanelBody.innerHTML = '';
         const count = Number(payload.count || 0);
@@ -1958,16 +1958,20 @@
         notifications.forEach(function (notification) {
             const link = document.createElement('a');
             link.href = notification.href || payload.targetUrl || '#';
-            link.className = 'block rounded-md border border-slate-300 bg-slate-50 px-3 py-3 transition hover:border-slate-300 hover:bg-slate-50';
+            link.className = 'erp-notification-item';
             const row = document.createElement('div');
-            row.className = 'flex items-start justify-between gap-3';
+            row.className = 'erp-notification-item-row';
             const content = document.createElement('div');
-            appendNotificationText(content, 'p', 'text-sm font-semibold text-slate-800', notification.subject);
-            appendNotificationText(content, 'p', 'mt-1 text-xs text-slate-600', notification.message);
+            content.className = 'erp-notification-content';
+            appendNotificationText(content, 'p', 'erp-notification-subject', notification.subject);
+            appendNotificationText(content, 'p', 'erp-notification-message', notification.message);
             row.appendChild(content);
-            appendNotificationText(row, 'span', 'shrink-0 rounded-sm border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600', notification.source);
             link.appendChild(row);
-            appendNotificationText(link, 'p', 'mt-2 text-[11px] text-slate-400', notification.createdAtLabel);
+            const meta = document.createElement('div');
+            meta.className = 'erp-notification-meta';
+            appendNotificationText(meta, 'span', 'erp-notification-source', notification.source);
+            appendNotificationText(meta, 'time', 'erp-notification-time', notification.createdAtLabel);
+            link.appendChild(meta);
             notificationPanelBody.appendChild(link);
         });
     }
@@ -2010,6 +2014,7 @@
         if (willOpen) {
             loadHeaderNotifications();
             notificationPanel.classList.add('is-open');
+            notificationToggle.setAttribute('aria-expanded', 'true');
         }
     });
 
@@ -2019,6 +2024,7 @@
         closePanels();
         if (willOpen) {
             profilePanel.classList.add('is-open');
+            profileToggle.setAttribute('aria-expanded', 'true');
         }
     });
 
