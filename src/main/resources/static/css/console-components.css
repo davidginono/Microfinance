@@ -8039,7 +8039,7 @@ html.session-timeout-active,
 /* Chairperson read-only SACCO configuration */
 .aws-console .chairperson-config-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
     gap: 12px;
 }
@@ -8061,8 +8061,7 @@ html.session-timeout-active,
     font-size: 13px;
 }
 
-.aws-console .chairperson-config-row,
-.aws-console .chairperson-config-flow-row {
+.aws-console .chairperson-config-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(7rem, auto);
     align-items: start;
@@ -8075,8 +8074,7 @@ html.session-timeout-active,
     border-top: 0;
 }
 
-.aws-console .chairperson-config-row dt,
-.aws-console .chairperson-config-flow-row dt {
+.aws-console .chairperson-config-row dt {
     min-width: 0;
     color: #232f3e;
     line-height: 18px;
@@ -8091,58 +8089,6 @@ html.session-timeout-active,
     line-height: 18px;
     overflow-wrap: anywhere;
     text-align: right;
-}
-
-.aws-console .chairperson-config-row--sourced dd {
-    display: grid;
-    justify-items: end;
-    gap: 2px;
-}
-
-.aws-console .chairperson-config-source {
-    color: #687078;
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 16px;
-}
-
-.aws-console .chairperson-config-flow-row {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.aws-console .chairperson-config-flow-row dd {
-    margin: 0;
-}
-
-.aws-console .chairperson-flow-list {
-    display: grid;
-    gap: 5px;
-    margin: 6px 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.aws-console .chairperson-flow-list li {
-    display: grid;
-    grid-template-columns: 22px minmax(0, 1fr);
-    align-items: center;
-    gap: 7px;
-    color: #232f3e;
-    line-height: 18px;
-}
-
-.aws-console .chairperson-flow-list li > span {
-    display: inline-flex;
-    width: 22px;
-    height: 22px;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #aab7b8;
-    border-radius: 2px;
-    background: #f2f3f3;
-    color: #414d5c;
-    font-size: 11px;
-    font-weight: 700;
 }
 
 .aws-console .chairperson-table-code,
@@ -8245,16 +8191,6 @@ html.session-timeout-active,
     width: 26%;
 }
 
-@media (min-width: 768px) and (max-width: 1179px) {
-    .aws-console .chairperson-config-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .aws-console .chairperson-config-grid > :last-child {
-        grid-column: 1 / -1;
-    }
-}
-
 @media (max-width: 1179px) {
     .aws-console .chairperson-product-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8289,10 +8225,8 @@ html.session-timeout-active,
         gap: 3px;
     }
 
-    .aws-console .chairperson-config-row dd,
-    .aws-console .chairperson-config-row--sourced dd {
+    .aws-console .chairperson-config-row dd {
         max-width: none;
-        justify-items: start;
         text-align: left;
     }
 }

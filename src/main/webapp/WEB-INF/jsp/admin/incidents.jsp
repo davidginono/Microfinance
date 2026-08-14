@@ -10,7 +10,8 @@
     <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
 </div>
 
-<form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar>
         <c:if test="${superAdminScopeFilters}">
             <div class="admin-filter-field min-w-0">
                 <label class="mb-1 block text-sm font-semibold text-slate-700">SACCO</label>
@@ -52,8 +53,6 @@
             <a href="/admin/incidents" class="app-btn btn-neutral">Clear</a>
         </div>
     </form>
-
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

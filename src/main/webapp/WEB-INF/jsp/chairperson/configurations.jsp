@@ -12,45 +12,10 @@
 
 <div class="chairperson-config-grid">
     <section class="erp-panel chairperson-config-panel">
-        <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.saccoDefaults" text="SACCO Defaults" /></h2>
-        <dl class="chairperson-config-list">
-            <div class="chairperson-config-row">
-                <dt><spring:message code="loan.requiredGuarantors" text="Required guarantors" /></dt>
-                <dd><c:out value="${configuration.defaults.requiredGuarantors}" /></dd>
-            </div>
-            <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.boardSize" text="Board size" /></dt>
-                <dd><c:out value="${configuration.defaults.boardSize}" /></dd>
-            </div>
-            <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.boardQuorum" text="Board quorum" /></dt>
-                <dd><c:out value="${configuration.defaults.boardQuorum}" /></dd>
-            </div>
-            <div class="chairperson-config-row">
-                <dt><spring:message code="loan.applicationFee" text="Application fee" /></dt>
-                <dd>TSh <fmt:formatNumber value="${configuration.defaults.applicationFee}" maxFractionDigits="2" /></dd>
-            </div>
-            <div class="chairperson-config-row">
-                <dt><spring:message code="chairperson.savingsMultiplier" text="Loan-to-savings multiplier" /></dt>
-                <dd><fmt:formatNumber value="${configuration.defaults.maxLoanSavingsRatio}" maxFractionDigits="2" /> <spring:message code="admin.settings.loanProducts.savingsMultiplierSuffix" text="x of savings" /></dd>
-            </div>
-            <div class="chairperson-config-row">
-                <dt><spring:message code="admin.settings.language.default" text="Default language" /></dt>
-                <dd>
-                    <c:choose>
-                        <c:when test="${configuration.defaults.defaultLanguage eq 'sw'}"><spring:message code="admin.settings.language.swahili" text="Kiswahili" /></c:when>
-                        <c:otherwise><spring:message code="admin.settings.language.english" text="English" /></c:otherwise>
-                    </c:choose>
-                </dd>
-            </div>
-        </dl>
-    </section>
-
-    <section class="erp-panel chairperson-config-panel">
-        <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.stationPolicies" text="Station Qualification & Guarantor Policies" /></h2>
+        <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.stationPolicies" text="General Applicant Qualifications & Guarantor Policies" /></h2>
         <p class="chairperson-config-context"><spring:message code="common.station" text="Station" />: <c:out value="${configuration.stationId}" /></p>
         <dl class="chairperson-config-list">
-            <div class="chairperson-config-row chairperson-config-row--sourced">
+            <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.applicantMaxDefaults" text="Applicant default limit" /></dt>
                 <dd>
                     <span class="chairperson-config-value">
@@ -59,17 +24,15 @@
                             <c:otherwise><c:out value="${configuration.policies.applicantMaxDefaults.value}" /> <spring:message code="chairperson.defaultedLoans" text="defaulted loan(s)" /></c:otherwise>
                         </c:choose>
                     </span>
-                    <span class="chairperson-config-source"><spring:message code="configuration.source.${configuration.policies.applicantMaxDefaults.sourceCode}" text="${configuration.policies.applicantMaxDefaults.sourceCode}" /></span>
                 </dd>
             </div>
-            <div class="chairperson-config-row chairperson-config-row--sourced">
+            <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.guarantorActiveLoan" text="Guarantor with active loan allowed" /></dt>
                 <dd>
                     <span class="chairperson-config-value"><c:choose><c:when test="${configuration.policies.guarantorActiveLoanAllowed.value}"><spring:message code="common.yes" text="Yes" /></c:when><c:otherwise><spring:message code="common.no" text="No" /></c:otherwise></c:choose></span>
-                    <span class="chairperson-config-source"><spring:message code="configuration.source.${configuration.policies.guarantorActiveLoanAllowed.sourceCode}" text="${configuration.policies.guarantorActiveLoanAllowed.sourceCode}" /></span>
                 </dd>
             </div>
-            <div class="chairperson-config-row chairperson-config-row--sourced">
+            <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.maximumActiveGuarantees" text="Maximum active guarantees" /></dt>
                 <dd>
                     <span class="chairperson-config-value">
@@ -78,10 +41,9 @@
                             <c:otherwise><fmt:formatNumber value="${configuration.policies.guarantorMaximumActiveGuarantees.value}" maxFractionDigits="0" /></c:otherwise>
                         </c:choose>
                     </span>
-                    <span class="chairperson-config-source"><spring:message code="configuration.source.${configuration.policies.guarantorMaximumActiveGuarantees.sourceCode}" text="${configuration.policies.guarantorMaximumActiveGuarantees.sourceCode}" /></span>
                 </dd>
             </div>
-            <div class="chairperson-config-row chairperson-config-row--sourced">
+            <div class="chairperson-config-row">
                 <dt><spring:message code="chairperson.guarantorMaxDefaults" text="Guarantor default limit" /></dt>
                 <dd>
                     <span class="chairperson-config-value">
@@ -90,14 +52,13 @@
                             <c:otherwise><c:out value="${configuration.policies.guarantorMaxDefaults.value}" /> <spring:message code="chairperson.defaultedLoans" text="defaulted loan(s)" /></c:otherwise>
                         </c:choose>
                     </span>
-                    <span class="chairperson-config-source"><spring:message code="configuration.source.${configuration.policies.guarantorMaxDefaults.sourceCode}" text="${configuration.policies.guarantorMaxDefaults.sourceCode}" /></span>
                 </dd>
             </div>
         </dl>
     </section>
 
     <section class="erp-panel chairperson-config-panel">
-        <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.otpAndApproval" text="OTP & Approval Flow" /></h2>
+        <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.otpConfiguration" text="OTP Configuration" /></h2>
         <dl class="chairperson-config-list">
             <div class="chairperson-config-row">
                 <dt><spring:message code="admin.settings.otp.channel" text="OTP delivery" /></dt>
@@ -117,16 +78,6 @@
                         <c:when test="${configuration.otp.requirementMode eq 'LOGIN_MFA_AND_APPROVAL'}"><spring:message code="admin.settings.otp.loginAndApprovals" text="Login and approvals" /></c:when>
                         <c:otherwise><spring:message code="admin.settings.otp.loginMfaOnly" text="Login MFA only" /></c:otherwise>
                     </c:choose>
-                </dd>
-            </div>
-            <div class="chairperson-config-flow-row">
-                <dt><spring:message code="admin.settings.approvalFlow" text="Default approval flow" /></dt>
-                <dd>
-                    <ol class="chairperson-flow-list">
-                        <c:forEach items="${configuration.defaults.approvalFlow}" var="stage" varStatus="loop">
-                            <li><span aria-hidden="true"><c:out value="${loop.index + 1}" /></span><spring:message code="workflow.stage.${stage.stage}" text="${stage.label}" /></li>
-                        </c:forEach>
-                    </ol>
                 </dd>
             </div>
         </dl>

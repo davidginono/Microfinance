@@ -91,7 +91,7 @@ class ChairpersonConfigurationServiceTest {
     }
 
     @Test
-    void overviewTreatsMissingActiveLoanPolicyAsAllowedAndExposesOrderedStageCodes() {
+    void overviewTreatsMissingActiveLoanPolicyAsAllowed() {
         SaccoSettings settings = SaccoSettings.builder().saccoId("SACCO-1").externalStationId("ST-1")
             .requiredGuarantors(1).boardSize(3).boardQuorum(2).loanOfficerReviewRequired(false)
             .boardReviewRequired(false).maxLoanSavingsRatio(BigDecimal.ONE)
@@ -108,9 +108,7 @@ class ChairpersonConfigurationServiceTest {
         var configuration = service.overview(principal(), "", 0);
 
         assertThat(configuration.policies().guarantorActiveLoanAllowed().value()).isTrue();
-        assertThat(configuration.defaults().approvalFlow())
-            .extracting(ChairpersonConfigurationService.WorkflowStageView::stage)
-            .containsExactly("MANAGER", "ACCOUNTANT", "DISBURSEMENT_OFFICER");
+        assertThat(configuration.policies().guarantorActiveLoanAllowed().sourceCode()).isEqualTo("saccoDefault");
     }
 
     @Test

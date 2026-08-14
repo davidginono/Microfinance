@@ -48,6 +48,9 @@ class ChairpersonReadOnlyFeatureContractTest {
 
         assertThat(detail + product).doesNotContain("<form").doesNotContain("method=\"post\"");
         assertThat(list + configurations).doesNotContain("method=\"post\"");
+        assertThat(list).contains("&middot;")
+            .doesNotContain("Â")
+            .doesNotContain(" /> · <");
         assertThat(sidebar).contains("@access.canViewProcessedLoans(principal)")
             .contains("@access.canViewSaccoConfigurations(principal)");
     }
@@ -65,6 +68,14 @@ class ChairpersonReadOnlyFeatureContractTest {
             .doesNotContain("â")
             .doesNotContain("<c:out value=\"${product.savingsCheckRequired}\"")
             .doesNotContain("<c:out value=\"${product.status}\"");
+        assertThat(overview)
+            .contains("General Applicant Qualifications & Guarantor Policies")
+            .contains("chairperson.otpConfiguration")
+            .doesNotContain("chairperson.saccoDefaults")
+            .doesNotContain("configuration.defaults")
+            .doesNotContain("chairperson-config-source")
+            .doesNotContain("Default approval flow")
+            .doesNotContain("chairperson-config-flow-row");
         assertThat(product).contains("chairperson-product-code")
             .contains("chairperson.votingSummary")
             .contains("product.guarantorSavingsCheckRequired");

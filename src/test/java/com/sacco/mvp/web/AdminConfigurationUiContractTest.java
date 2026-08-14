@@ -214,6 +214,7 @@ class AdminConfigurationUiContractTest {
 
         assertThat(incidents)
             .contains("class=\"admin-filter-form admin-filter-bar aws-filter-toolbar\"")
+            .containsPattern("(?s)<section class=\"erp-table-wrap\"[^>]*>\\s*<form action=\"/admin/incidents\"")
             .doesNotContain("/admin/notifications/mark-all-read")
             .doesNotContain("<section class=\"erp-form-wrap\">\n<form action=\"/admin/incidents\"");
         assertThat(managerArchive)

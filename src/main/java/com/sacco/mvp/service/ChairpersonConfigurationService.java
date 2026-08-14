@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -70,12 +69,6 @@ public class ChairpersonConfigurationService {
             product.getId(), product.getDisplayCode(), product.getDisplayName(), product.getStatus().name(),
             product.getMinimumAmount(), product.getMaximumAmount(), workflowStages(product))).toList();
 
-        List<ApprovalWorkflowStage> defaultApprovalFlow = settings.resolvedApprovalFlow();
-        Defaults defaults = new Defaults(settings.getRequiredGuarantors(), settings.getBoardSize(), settings.getBoardQuorum(),
-            settings.getMaxLoanSavingsRatio(), settings.getResolvedApplicationFee(), settings.getDefaultLanguage(),
-            IntStream.range(0, defaultApprovalFlow.size())
-                .mapToObj(index -> stage(defaultApprovalFlow.get(index), index + 1))
-                .toList());
         EffectiveValue<Boolean> guarantorActiveLoanAllowed = effective(
             stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(),
             settings.getGuarantorWithActiveLoanAllowed());
@@ -88,7 +81,7 @@ public class ChairpersonConfigurationService {
         OtpConfiguration otp = new OtpConfiguration(station.getResolvedOtpDeliveryChannel().name(),
             station.getResolvedOtpRequirementMode().name());
 
-        return new ConfigurationPage(scope.stationId(), defaults, policies, otp, productRows, normalizedSearch,
+        return new ConfigurationPage(scope.stationId(), policies, otp, productRows, normalizedSearch,
             products.getNumber(), products.getTotalPages(), products.getTotalElements(), products.isFirst(), products.isLast());
     }
 
@@ -162,12 +155,9 @@ public class ChairpersonConfigurationService {
 
     private record Scope(String saccoId, String stationId) {}
 
-    public record ConfigurationPage(String stationId, Defaults defaults, EffectivePolicies policies,
+    public record ConfigurationPage(String stationId, EffectivePolicies policies,
                                     OtpConfiguration otp, List<ProductRow> products, String search,
                                     int page, int totalPages, long totalElements, boolean first, boolean last) {}
-    public record Defaults(Integer requiredGuarantors, Integer boardSize, Integer boardQuorum,
-                           BigDecimal maxLoanSavingsRatio, BigDecimal applicationFee,
-                           String defaultLanguage, List<WorkflowStageView> approvalFlow) {}
     public record EffectivePolicies(EffectiveValue<Integer> applicantMaxDefaults,
                                     EffectiveValue<Boolean> guarantorActiveLoanAllowed,
                                     EffectiveValue<BigDecimal> guarantorMaximumActiveGuarantees,
