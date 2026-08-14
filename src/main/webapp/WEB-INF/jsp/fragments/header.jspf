@@ -107,7 +107,7 @@
                     </svg>
                 </button>
                 <span id="notificationBadge" class="app-notification-badge hidden"></span>
-                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50" role="dialog" aria-label="<spring:message code='notifications.title' text='Notifications' />">
+                <div id="notificationPanel" class="notification-panel erp-dropdown erp-notification-panel absolute right-0 top-[calc(100%+0.55rem)] z-50" role="region" aria-label="<spring:message code='notifications.title' text='Notifications' />">
                     <div class="erp-dropdown-header">
                         <div class="erp-dropdown-heading">
                             <p class="erp-dropdown-title"><spring:message code="notifications.title" text="Notifications" /></p>

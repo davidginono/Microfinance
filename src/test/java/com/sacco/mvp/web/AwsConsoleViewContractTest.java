@@ -495,6 +495,8 @@ class AwsConsoleViewContractTest {
         assertThat(header)
             .contains("aria-controls=\"notificationPanel\"")
             .contains("aria-expanded=\"false\"")
+            .contains("z-50\" role=\"region\" aria-label=")
+            .doesNotContain("z-50\" role=\"dialog\" aria-label=")
             .doesNotContain("notificationPanelSubtitle")
             .doesNotContain("erp-notification-body space-y-2");
         assertThat(shellCss)
