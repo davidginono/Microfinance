@@ -49,7 +49,8 @@
         <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead><tr>
-                    <th><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                    <th class="whitespace-nowrap"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+                    <th class="whitespace-nowrap"><spring:message code="loan.loanId" text="Loan ID" /></th>
                     <th><spring:message code="common.applicant" text="Applicant" /></th>
                     <th><spring:message code="reports.loanProduct" text="Loan Product" /></th>
                     <th><spring:message code="common.amount" text="Amount" /></th>
@@ -61,7 +62,8 @@
                 <tbody>
                 <c:forEach items="${processedLoans.rows}" var="row">
                     <tr>
-                        <td><span class="font-semibold text-slate-800"><c:out value="${row.applicationId}" /></span><c:if test="${not empty row.loanId}"><div class="text-xs text-slate-500"><c:out value="${row.loanId}" /></div></c:if></td>
+                        <td class="whitespace-nowrap"><span class="font-semibold text-slate-800"><c:out value="${row.applicationId}" /></span></td>
+                        <td class="whitespace-nowrap"><c:out value="${empty row.loanId ? '-' : row.loanId}" /></td>
                         <td><c:out value="${row.applicantName}" /><div class="text-xs text-slate-500"><c:out value="${row.memberNo}" /></div></td>
                         <td><c:out value="${row.productName}" /></td>
                         <td>TSh <fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
@@ -77,7 +79,7 @@
                         <td><a class="app-btn btn-neutral" href="${pageContext.request.contextPath}/chairperson/processed-loans/${row.id}"><spring:message code="common.view" text="View" /></a></td>
                     </tr>
                 </c:forEach>
-                <c:if test="${empty processedLoans.rows}"><tr><td colspan="8" class="px-4 py-8 text-center text-sm text-slate-500"><spring:message code="chairperson.processedLoans.empty" text="No reviewed loan applications were found." /></td></tr></c:if>
+                <c:if test="${empty processedLoans.rows}"><tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-500"><spring:message code="chairperson.processedLoans.empty" text="No reviewed loan applications were found." /></td></tr></c:if>
                 </tbody>
             </table>
         </div>
