@@ -53,6 +53,8 @@ class ChairpersonReadOnlyFeatureContractTest {
             .contains("include file=\"../fragments/financial-field-sections.jspf\"")
             .contains("include file=\"../fragments/staff-repayment-summary.jspf\"")
             .contains("processedLoanDetail")
+            .contains("loan.repaymentSummaryEstimated")
+            .contains("loan.calculatedRepaymentRows")
             .doesNotContain("reviewAction")
             .doesNotContain("decisionForm");
         assertThat(list + configurations).doesNotContain("method=\"post\"");

@@ -255,7 +255,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260814-loan-detail-v38")
+            .contains("console-components.css?v=20260814-loan-detail-v39")
             .contains("shell.css?v=20260814-console-popover-v36")
             .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")
@@ -482,7 +482,7 @@ class AwsConsoleViewContractTest {
             .contains("include file=\"../fragments/staff-loan-detail-header.jspf\"")
             .contains("include file=\"../fragments/staff-loan-review-summary.jspf\"");
         assertThat(staffLoanHeader)
-            .contains("class=\"loan-detail-heading-row\"")
+            .contains("class=\"erp-page-header loan-detail-heading-row\" data-aws-page-header")
             .contains("data-aws-page-header")
             .contains("class=\"loan-detail-action-row\"")
             .contains("data-loan-export-url");
@@ -910,7 +910,7 @@ class AwsConsoleViewContractTest {
             assertThat(heroSummary).isGreaterThan(headerInclude);
         }
         assertThat(staffDetailHeader)
-            .contains("class=\"loan-detail-heading-row\"")
+            .contains("class=\"erp-page-header loan-detail-heading-row\" data-aws-page-header")
             .contains("data-aws-page-header")
             .contains("class=\"loan-detail-action-row\"")
             .contains("data-aws-action-pin=\"true\"")
@@ -922,7 +922,9 @@ class AwsConsoleViewContractTest {
             .contains("include file=\"../fragments/staff-loan-review-summary.jspf\"")
             .contains("include file=\"../fragments/financial-field-sections.jspf\"")
             .contains("processedLoanDetail")
-            .contains("loan.progressItems");
+            .contains("loan.progressItems")
+            .contains("loan.repaymentSummaryEstimated")
+            .contains("loan.calculatedRepaymentRows");
         assertThat(memberDetail).doesNotContain("data-staff-review-page=\"true\"");
         assertThat(read(Path.of("src/main/resources/static/js/shell.js")))
             .contains("document.querySelector('[data-staff-review-page=\"true\"]')");
@@ -953,6 +955,7 @@ class AwsConsoleViewContractTest {
             .contains(".loan-staff-review-section-title")
             .contains("grid-template-columns: repeat(4, minmax(0, 1fr))")
             .contains(".loan-detail-heading-row")
+            .contains(".erp-page-header.loan-detail-heading-row > .erp-page-title")
             .contains(".loan-staff-kpi-icon")
             .contains("border-left: 3px solid #ec7211 !important")
             .contains(".loan-financial-section > .erp-table-scroll .erp-table");

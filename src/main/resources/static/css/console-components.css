@@ -6277,18 +6277,19 @@ html.session-timeout-active,
         margin-bottom: 10px;
     }
 
-    .loan-detail-heading-row .erp-page-header,
-    .loan-detail-heading-row .loan-detail-action-row {
-        margin-bottom: 0 !important;
+    .erp-page-header.loan-detail-heading-row > .erp-breadcrumb {
+        flex-basis: 100%;
     }
 
-    .loan-detail-heading-row .erp-page-header {
-        min-width: 0;
-        flex: 1 1 auto;
+    .erp-page-header.loan-detail-heading-row > .erp-page-title {
+        flex: 1 1 auto !important;
+        max-width: calc(100% - 110px) !important;
     }
 
-    .loan-detail-heading-row .loan-detail-action-row {
+    .erp-page-header.loan-detail-heading-row > .loan-detail-action-row {
+        order: 1 !important;
         flex: 0 0 auto;
+        margin-bottom: 0 !important;
     }
 
     .loan-application-detail-page .loan-detail-action-row {
@@ -8159,7 +8160,11 @@ html.session-timeout-active,
             flex-wrap: wrap;
         }
 
-        .loan-detail-heading-row .loan-detail-action-row {
+        .erp-page-header.loan-detail-heading-row > .erp-page-title {
+            max-width: 100% !important;
+        }
+
+        .erp-page-header.loan-detail-heading-row > .loan-detail-action-row {
             width: 100%;
         }
 

@@ -85,7 +85,7 @@ public class ChairpersonProcessedLoanService {
 
         List<ProcessedLoanRow> rows = applications.getContent().stream().map(app -> {
             List<DecisionView> loanDecisions = decisions.getOrDefault(app.getId(), List.of());
-            DecisionView latest = loanDecisions.isEmpty() ? null : loanDecisions.getFirst();
+            DecisionView latest = loanDecisions.isEmpty() ? null : loanDecisions.getLast();
             Member applicant = applicants.get(app.getApplicantMemberId());
             LoanProductSetting product = products.get(app.getLoanProductSettingId());
             return new ProcessedLoanRow(
@@ -138,6 +138,8 @@ public class ChairpersonProcessedLoanService {
             List.copyOf(loanPresentationService.buildProgressItems(app)),
             List.copyOf(loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson())),
             java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(loanPresentationService.reviewRepaymentSummary(app))),
+            loanPresentationService.isEstimatedReviewRepaymentSummary(app),
+            List.copyOf(loanPresentationService.calculatedRepaymentRows(app)),
             app.getDisbursementDate(), app.getFirstRepaymentDate(), app.getFinalDueDate(),
             app.getRepaymentFrequency() == null ? null : app.getRepaymentFrequency().name(), app.getInstallmentAmount(),
             app.getDisbursementReference(), app.getDisbursementNotes(), app.getDepositAmount(), guarantors, decisions);
@@ -173,7 +175,7 @@ public class ChairpersonProcessedLoanService {
 
         return merged.stream().collect(Collectors.groupingBy(LoanDecision::loanId,
             Collectors.mapping(LoanDecision::decision, Collectors.collectingAndThen(Collectors.toList(), values -> values.stream()
-                .sorted(Comparator.comparing(DecisionView::decidedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(Comparator.comparing(DecisionView::decidedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList()))));
     }
 
@@ -247,7 +249,8 @@ public class ChairpersonProcessedLoanService {
                                       OffsetDateTime updatedAt, Map<String, Object> formFields,
                                       Map<String, Map<String, Object>> financialFieldSections,
                                       List<Map<String, Object>> progressItems, List<Map<String, Object>> attachments,
-                                      Map<String, Object> repaymentSummary, java.time.LocalDate disbursementDate,
+                                      Map<String, Object> repaymentSummary, boolean repaymentSummaryEstimated,
+                                      List<Map<String, Object>> calculatedRepaymentRows, java.time.LocalDate disbursementDate,
                                       java.time.LocalDate firstRepaymentDate, java.time.LocalDate finalDueDate,
                                       String repaymentFrequency, BigDecimal installmentAmount,
                                       String disbursementReference, String disbursementNotes, BigDecimal depositAmount,

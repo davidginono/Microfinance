@@ -14,7 +14,7 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260814-loan-detail-v38' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260814-loan-detail-v39' />" />
 <link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260814-console-popover-v36' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>

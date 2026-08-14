@@ -1,11 +1,9 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 
-<div class="loan-detail-heading-row">
-    <div class="erp-page-header" data-aws-page-header>
-        <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-        <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-    </div>
+<div class="erp-page-header loan-detail-heading-row" data-aws-page-header>
+    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
     <c:if test="${showLoanExportAction}">
         <div class="loan-detail-action-row">
             <button type="button"

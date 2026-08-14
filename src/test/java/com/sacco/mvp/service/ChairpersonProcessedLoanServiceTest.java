@@ -33,6 +33,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -72,7 +74,7 @@ class ChairpersonProcessedLoanServiceTest {
     }
 
     @Test
-    void listingMergesBothDecisionStoresNewestFirstAndIgnoresPendingAssignments() {
+    void listingMergesBothDecisionStoresReturnsLatestDecisionAndIgnoresPendingAssignments() {
         UUID loanId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();
@@ -108,6 +110,58 @@ class ChairpersonProcessedLoanServiceTest {
         assertThat(page.rows().getFirst().decisionCount()).isEqualTo(2);
         assertThat(page.rows().getFirst().latestDecision().stage()).isEqualTo("BOARD");
         assertThat(page.rows().getFirst().latestDecision().reviewerName()).isEqualTo("Board Reviewer");
+    }
+
+    @Test
+    void detailOrdersDecisionsByApprovalTimeAndIncludesCalculatedRepaymentSchedule() {
+        UUID loanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        UUID committeeId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        LoanApplication app = LoanApplication.builder().id(loanId).applicationNumber(401L).saccoId("SACCO-1")
+            .stationId("ST-1").applicantMemberId(applicantId).loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("200000")).tenorMonths(2).status(LoanStatus.CREDIT_COMMITTEE_REJECTED)
+            .formData("{}").financialSnapshot("{}").attachmentsJson("[]").requiredGuarantors(0)
+            .policySnapshot("{}").createdAt(now.minusDays(2)).updatedAt(now).version(0).build();
+        ManagerReview manager = ManagerReview.builder().id(UUID.randomUUID()).loanApplicationId(loanId)
+            .managerMemberId(managerId).reviewStage(ApprovalWorkflowStage.MANAGER)
+            .decision(ManagerDecision.ACCEPT).createdAt(now.minusMinutes(10)).build();
+        BoardReview committee = BoardReview.builder().id(UUID.randomUUID()).loanApplicationId(loanId)
+            .boardMemberId(committeeId).reviewStage(ApprovalWorkflowStage.CREDIT_COMMITTEE)
+            .decision(BoardDecision.REJECTED).comment("Reduce amount")
+            .createdAt(now.minusMinutes(8)).decidedAt(now.minusMinutes(5)).build();
+        List<Map<String, Object>> schedule = List.of(Map.of(
+            "pmtNo", 1,
+            "month", "1",
+            "beginningBalance", "TSh 200,000",
+            "payment", "TSh 105,000",
+            "loanAmount", "TSh 100,000",
+            "interest", "TSh 5,000",
+            "endingBalance", "TSh 100,000"));
+
+        when(loanApplicationRepository.findProcessedLoan(eq(loanId), eq("SACCO-1"), eq("ST-1"), anyCollection()))
+            .thenReturn(Optional.of(app));
+        when(managerReviewRepository.findByLoanApplicationIdInOrderByCreatedAtDesc(anyCollection())).thenReturn(List.of(manager));
+        when(boardReviewRepository.findByLoanApplicationIdInOrderByCreatedAtDesc(anyCollection())).thenReturn(List.of(committee));
+        when(guarantorRequestRepository.findByLoanApplicationId(loanId)).thenReturn(List.of());
+        when(memberRepository.findAllById(any())).thenReturn(
+            List.of(member(managerId, "Manager", "MGR-1"), member(committeeId, "Committee", "COM-1")),
+            List.of(member(applicantId, "Applicant", "MEM-1")));
+        when(loanPresentationService.parseFormFields("{}")).thenReturn(Map.of());
+        when(loanPresentationService.parseFinancialFieldSections(app)).thenReturn(Map.of());
+        when(loanPresentationService.buildProgressItems(app)).thenReturn(List.of());
+        when(loanPresentationService.parseApplicationAttachments("[]")).thenReturn(List.of());
+        when(loanPresentationService.reviewRepaymentSummary(app)).thenReturn(Map.of("Number of Payments", 2));
+        when(loanPresentationService.isEstimatedReviewRepaymentSummary(app)).thenReturn(true);
+        when(loanPresentationService.calculatedRepaymentRows(app)).thenReturn(schedule);
+
+        var detail = service.detail(principal(), loanId);
+
+        assertThat(detail.decisions()).extracting(ChairpersonProcessedLoanService.DecisionView::stage)
+            .containsExactly("MANAGER", "CREDIT_COMMITTEE");
+        assertThat(detail.repaymentSummaryEstimated()).isTrue();
+        assertThat(detail.calculatedRepaymentRows()).isEqualTo(schedule);
     }
 
     @Test

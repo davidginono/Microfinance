@@ -54,7 +54,8 @@
 <%@ include file="../fragments/financial-field-sections.jspf" %>
 
 <c:set var="repaymentSummary" value="${loan.repaymentSummary}" />
-<c:set var="repaymentSummaryEstimated" value="${false}" />
+<c:set var="repaymentSummaryEstimated" value="${loan.repaymentSummaryEstimated}" />
+<c:set var="calculatedRepaymentRows" value="${loan.calculatedRepaymentRows}" />
 <%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <section class="erp-panel mt-4 overflow-hidden" data-aws-table-region>
