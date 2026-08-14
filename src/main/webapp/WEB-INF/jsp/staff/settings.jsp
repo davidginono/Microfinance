@@ -9,7 +9,7 @@
     <h1 class="erp-page-title"><spring:message code="staff.settings.title" text="Settings" /></h1>
 </div>
 
-<section class="erp-panel aws-settings-panel overflow-hidden" aria-labelledby="staffLanguageSettingsTitle">
+<section class="erp-panel aws-settings-panel" aria-labelledby="staffLanguageSettingsTitle">
     <div class="aws-settings-header">
         <h2 id="staffLanguageSettingsTitle" class="aws-settings-title"><spring:message code="member.settings.language.title" /></h2>
     </div>
@@ -18,14 +18,11 @@
         <div class="aws-settings-control-row">
             <label class="aws-settings-field" for="staffSettingsLanguage">
                 <spring:message code="staff.settings.language.label" text="Staff Workspace Language" />
-                <select id="staffSettingsLanguage" name="language" class="aws-control" aria-describedby="staffSettingsLanguageHelp">
+                <select id="staffSettingsLanguage" name="language" class="aws-control">
                     <option value="en" ${staffSettingsLanguage eq 'en' ? 'selected' : ''}><spring:message code="member.settings.language.english" /></option>
                     <option value="sw" ${staffSettingsLanguage eq 'sw' ? 'selected' : ''}><spring:message code="member.settings.language.swahili" /></option>
                 </select>
             </label>
-            <p id="staffSettingsLanguageHelp" class="aws-settings-help">
-                <spring:message code="staff.settings.language.help" text="Translated labels and shared staff navigation will switch immediately after you save." />
-            </p>
         </div>
         <div class="aws-settings-footer">
             <button type="submit" class="app-btn btn-primary"><spring:message code="member.settings.language.save" /></button>

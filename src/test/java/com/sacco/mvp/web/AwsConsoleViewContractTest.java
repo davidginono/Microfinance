@@ -698,7 +698,9 @@ class AwsConsoleViewContractTest {
             .contains("aws-settings-footer")
             .contains("aria-labelledby=\"staffLanguageSettingsTitle\"")
             .contains("for=\"staffSettingsLanguage\"")
-            .contains("aria-describedby=\"staffSettingsLanguageHelp\"")
+            .doesNotContain("overflow-hidden")
+            .doesNotContain("staffSettingsLanguageHelp")
+            .doesNotContain("staff.settings.language.help")
             .doesNotContain("member.settings.language.eyebrow")
             .doesNotContain("staff-settings-action-bar");
         assertThat(platformSettings)
