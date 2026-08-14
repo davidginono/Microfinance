@@ -1,0 +1,19 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+<div class="loan-detail-heading-row">
+    <div class="erp-page-header" data-aws-page-header>
+        <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
+        <h1 class="erp-page-title">${reviewPanelTitle}</h1>
+    </div>
+    <c:if test="${showLoanExportAction}">
+        <div class="loan-detail-action-row">
+            <button type="button"
+                    data-aws-action-pin="true"
+                    data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${reviewDocumentLoanId}/print"
+                    class="app-btn btn-primary">
+                <spring:message code="common.export" text="Export" />
+            </button>
+        </div>
+    </c:if>
+</div>

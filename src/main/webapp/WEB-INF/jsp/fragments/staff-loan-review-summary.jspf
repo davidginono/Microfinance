@@ -1,49 +1,76 @@
+<c:choose>
+    <c:when test="${processedLoanDetail}">
+        <c:set var="reviewApplicationId" value="${loan.applicationId}" />
+        <c:set var="reviewDisbursedLoanId" value="${loan.loanId}" />
+        <c:set var="reviewLoanStatus" value="${loan.status}" />
+        <c:set var="reviewApplicantId" value="${loan.applicantId}" />
+        <c:set var="reviewApplicantName" value="${loan.applicantName}" />
+        <c:set var="reviewApplicantMemberNo" value="${loan.memberNo}" />
+        <c:set var="reviewLoanProductName" value="${loan.productName}" />
+        <c:set var="reviewLoanPurpose" value="${loan.formFields['Loan Purpose']}" />
+        <c:set var="reviewLoanAmount" value="${loan.amount}" />
+        <c:set var="reviewLoanTenorMonths" value="${loan.tenorMonths}" />
+        <c:set var="reviewSavingsLabel" value="-" />
+        <c:set var="reviewSharesLabel" value="-" />
+        <c:set var="reviewLiveStatusUrl" value="" />
+    </c:when>
+    <c:otherwise>
+        <c:set var="reviewApplicationId" value="${loanIdShort}" />
+        <c:set var="reviewDisbursedLoanId" value="${disbursedLoanId}" />
+        <c:set var="reviewLoanStatus" value="${app.status}" />
+        <c:set var="reviewApplicantId" value="${applicant.id}" />
+        <c:set var="reviewApplicantName" value="${applicant.fullName}" />
+        <c:set var="reviewApplicantMemberNo" value="${applicant.memberNo}" />
+        <c:set var="reviewLoanProductName" value="${loanProductName}" />
+        <c:set var="reviewLoanPurpose" value="${formFields['Loan Purpose']}" />
+        <c:set var="reviewLoanAmount" value="${app.amount}" />
+        <c:set var="reviewLoanTenorMonths" value="${app.tenorMonths}" />
+        <c:set var="reviewSavingsLabel" value="${applicantExternalAccountStatus.savingsLabel}" />
+        <c:set var="reviewSharesLabel" value="${applicantExternalAccountStatus.sharesLabel}" />
+        <c:set var="reviewLiveStatusUrl" value="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status" />
+    </c:otherwise>
+</c:choose>
+
 <section class="loan-view-hero-summary loan-staff-review-template" data-staff-review-page="true">
     <div class="loan-staff-review-overview">
         <div class="loan-hero-with-photo">
             <dl class="loan-staff-review-facts">
                 <div class="loan-hero-inline-fact">
                     <dt class="loan-hero-inline-label"><spring:message code="loan.applicationId" text="Loan Application ID" /></dt>
-                    <dd class="loan-hero-inline-value loan-hero-inline-value--id">${loanIdShort}</dd>
+                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${reviewApplicationId}" /></dd>
                 </div>
-                <c:if test="${not empty applicant.memberNo}">
-                    <div class="loan-hero-inline-fact">
-                        <dt class="loan-hero-inline-label"><spring:message code="member.memberNo" text="Member No" /></dt>
-                        <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${applicant.memberNo}" /></dd>
-                    </div>
-                </c:if>
-                <c:if test="${not empty disbursedLoanId}">
-                    <div class="loan-hero-inline-fact">
-                        <dt class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></dt>
-                        <dd class="loan-hero-inline-value loan-hero-inline-value--id">${disbursedLoanId}</dd>
-                    </div>
-                </c:if>
+                <div class="loan-hero-inline-fact">
+                    <dt class="loan-hero-inline-label"><spring:message code="member.memberNo" text="Member No" /></dt>
+                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
+                </div>
+                <div class="loan-hero-inline-fact">
+                    <dt class="loan-hero-inline-label"><spring:message code="loan.loanId" text="Loan ID" /></dt>
+                    <dd class="loan-hero-inline-value loan-hero-inline-value--id"><c:out value="${empty reviewDisbursedLoanId ? '-' : reviewDisbursedLoanId}" /></dd>
+                </div>
                 <div class="loan-hero-inline-fact">
                     <dt class="loan-hero-inline-label"><spring:message code="common.status" text="Status" /></dt>
                     <dd class="loan-hero-inline-value">
                         <span class="loan-status-badge ${reviewStatusBadgeClass}">
-                            <spring:message code="loan.status.${app.status}" text="${app.status}" />
+                            <spring:message code="loan.status.${reviewLoanStatus}" text="${reviewLoanStatus}" />
                         </span>
                     </dd>
                 </div>
                 <div class="loan-hero-inline-fact">
                     <dt class="loan-hero-inline-label"><spring:message code="loan.applicantName" text="Applicant Name" /></dt>
-                    <dd class="loan-hero-inline-value"><c:out value="${applicant.fullName}" /></dd>
+                    <dd class="loan-hero-inline-value"><c:out value="${reviewApplicantName}" /></dd>
                 </div>
                 <div class="loan-hero-inline-fact">
                     <dt class="loan-hero-inline-label"><spring:message code="reports.loanProduct" text="Loan Product" /></dt>
-                    <dd class="loan-hero-inline-value"><c:out value="${loanProductName}" /></dd>
+                    <dd class="loan-hero-inline-value"><c:out value="${reviewLoanProductName}" /></dd>
                 </div>
-                <c:if test="${not empty formFields['Loan Purpose']}">
-                    <div class="loan-hero-inline-fact loan-staff-review-fact--wide">
-                        <dt class="loan-hero-inline-label"><spring:message code="loan.purpose" text="Loan Purpose" /></dt>
-                        <dd class="loan-hero-inline-value"><c:out value="${formFields['Loan Purpose']}" /></dd>
-                    </div>
-                </c:if>
+                <div class="loan-hero-inline-fact loan-staff-review-fact--wide">
+                    <dt class="loan-hero-inline-label"><spring:message code="loan.purpose" text="Loan Purpose" /></dt>
+                    <dd class="loan-hero-inline-value"><c:out value="${empty reviewLoanPurpose ? '-' : reviewLoanPurpose}" /></dd>
+                </div>
             </dl>
             <div class="loan-applicant-photo-card">
                 <div class="loan-applicant-photo-frame" title="<spring:message code='profile.photo.applicant' text='Applicant profile photo' />">
-                    <img src="<c:url value='/profile/image/members/${applicant.id}' />"
+                    <img src="<c:url value='/profile/image/members/${reviewApplicantId}' />"
                          alt="<spring:message code='profile.photo.applicantAlt' text='Applicant profile photo' />"
                          onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');" />
                     <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -55,30 +82,43 @@
         </div>
     </div>
 
-    <div class="loan-staff-review-financials"
-         data-live-account-status-url="${pageContext.request.contextPath}${reviewBasePath}/loan-applications/${app.id}/applicant-financial-status">
+    <div class="loan-staff-review-financials" data-live-account-status-url="${reviewLiveStatusUrl}">
         <h2 class="loan-staff-review-section-title"><spring:message code="review.loanSummary" text="Loan Summary" /></h2>
         <dl class="loan-staff-kpi-grid">
             <div class="loan-staff-kpi-card">
+                <span class="loan-staff-kpi-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h15a3 3 0 0 1 3 3v8H6a3 3 0 0 1-3-3V7Z"/><path d="M3 7a3 3 0 0 1 3-3h11v3"/><path d="M16 13h2"/></svg>
+                </span>
                 <dt class="loan-stat-label"><spring:message code="loan.amount.label" text="Loan Amount" /></dt>
-                <dd class="loan-stat-value" data-disbursement-loan-amount-display>TSh <fmt:formatNumber value="${app.amount}" minFractionDigits="0" maxFractionDigits="2" /></dd>
+                <dd class="loan-stat-value" data-disbursement-loan-amount-display>TSh <fmt:formatNumber value="${reviewLoanAmount}" minFractionDigits="0" maxFractionDigits="2" /></dd>
             </div>
             <div class="loan-staff-kpi-card">
+                <span class="loan-staff-kpi-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
+                </span>
                 <dt class="loan-stat-label"><spring:message code="loan.tenor.label" text="Tenor" /></dt>
-                <dd class="loan-stat-value">${app.tenorMonths} <spring:message code="common.months" text="month(s)" /></dd>
+                <dd class="loan-stat-value"><c:out value="${reviewLoanTenorMonths}" /> <spring:message code="common.months" text="month(s)" /></dd>
             </div>
             <div class="loan-staff-kpi-card">
+                <span class="loan-staff-kpi-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 0 8h-1l-1 3h-3l-1-3H9l-1 3H5l1-3H5a4 4 0 0 1 0-8h1Z"/><path d="M9 9V6a3 3 0 0 1 5.5-1.7"/><path d="M18 12h.01"/></svg>
+                </span>
                 <dt class="loan-stat-label"><spring:message code="loan.currentSavings" text="Current Savings" /></dt>
-                <dd class="loan-stat-value" data-live-account-status-savings>${applicantExternalAccountStatus.savingsLabel}</dd>
+                <dd class="loan-stat-value" data-live-account-status-savings><c:out value="${reviewSavingsLabel}" /></dd>
             </div>
             <div class="loan-staff-kpi-card">
+                <span class="loan-staff-kpi-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9v9h9Z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"/></svg>
+                </span>
                 <dt class="loan-stat-label"><spring:message code="loan.currentShares" text="Current Shares" /></dt>
-                <dd class="loan-stat-value" data-live-account-status-shares>${applicantExternalAccountStatus.sharesLabel}</dd>
+                <dd class="loan-stat-value" data-live-account-status-shares><c:out value="${reviewSharesLabel}" /></dd>
             </div>
         </dl>
-        <div class="loan-staff-review-live-status">
-            <%@ include file="live-account-status-message.jspf" %>
-        </div>
+        <c:if test="${not processedLoanDetail}">
+            <div class="loan-staff-review-live-status">
+                <%@ include file="live-account-status-message.jspf" %>
+            </div>
+        </c:if>
     </div>
 
     <div class="loan-staff-review-progress">

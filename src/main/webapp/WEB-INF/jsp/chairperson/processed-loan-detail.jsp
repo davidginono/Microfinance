@@ -6,49 +6,56 @@
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="chairperson.processedLoans" text="Processed Loans" /> / <c:out value="${loan.applicationId}" /></p>
-    <h1 class="erp-page-title"><spring:message code="chairperson.processedLoanDetail" text="Reviewed Loan Application" /></h1>
-</div>
+<spring:message code="chairperson.processedLoans" text="Processed Loans" var="processedLoansLabel" />
+<spring:message code="chairperson.processedLoanDetail" text="Reviewed Loan Application" var="processedLoanTitle" />
+<sec:authorize access="@access.has(principal, 'LOAN_DOCUMENTS_EXPORT')" var="canExportProcessedLoan" />
+<c:set var="reviewPanelBreadcrumb" value="${processedLoansLabel} > ${loan.applicationId}" />
+<c:set var="reviewPanelTitle" value="${processedLoanTitle}" />
+<c:set var="showLoanExportAction" value="${canExportProcessedLoan}" />
+<c:set var="reviewDocumentLoanId" value="${loan.id}" />
+<%@ include file="../fragments/staff-loan-detail-header.jspf" %>
 
-<c:if test="${not empty loan.repaymentSummary or not empty loan.disbursementDate or not empty loan.disbursementReference}">
-<section class="erp-panel mt-4 p-5">
-    <h2 class="font-semibold text-slate-900"><spring:message code="chairperson.repaymentDisbursement" text="Repayment & Disbursement" /></h2>
-    <div class="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.disbursementDate" text="Disbursement Date" /></div><div class="mt-1"><c:out value="${loan.disbursementDate}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.firstRepaymentDate" text="First Repayment Date" /></div><div class="mt-1"><c:out value="${loan.firstRepaymentDate}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.finalDueDate" text="Final Due Date" /></div><div class="mt-1"><c:out value="${loan.finalDueDate}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.installmentAmount" text="Installment Amount" /></div><div class="mt-1"><fmt:formatNumber value="${loan.installmentAmount}" maxFractionDigits="2" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.disbursementReference" text="Disbursement Reference" /></div><div class="mt-1"><c:out value="${loan.disbursementReference}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.depositAmount" text="Deposit Amount" /></div><div class="mt-1"><fmt:formatNumber value="${loan.depositAmount}" maxFractionDigits="2" /></div></div>
-        <div class="sm:col-span-2"><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.disbursementNotes" text="Disbursement Notes" /></div><div class="mt-1"><c:out value="${loan.disbursementNotes}" /></div></div>
+<c:set var="processedLoanDetail" value="${true}" />
+<c:set var="loanProgressItems" value="${loan.progressItems}" />
+<c:choose>
+    <c:when test="${fn:contains(loan.status, 'REJECTED') or loan.status eq 'REJECTED'}">
+        <c:set var="reviewStatusBadgeClass" value="bg-rose-50 text-rose-700" />
+    </c:when>
+    <c:when test="${loan.status eq 'DISBURSED' or loan.status eq 'PAID'}">
+        <c:set var="reviewStatusBadgeClass" value="bg-emerald-50 text-emerald-700" />
+    </c:when>
+    <c:when test="${loan.status eq 'DEFAULTED'}">
+        <c:set var="reviewStatusBadgeClass" value="bg-rose-50 text-rose-700" />
+    </c:when>
+    <c:otherwise>
+        <c:set var="reviewStatusBadgeClass" value="bg-blue-50 text-blue-700" />
+    </c:otherwise>
+</c:choose>
+<%@ include file="../fragments/staff-loan-review-summary.jspf" %>
+
+<section class="erp-panel mt-4 overflow-hidden">
+    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <h2 class="text-sm font-semibold text-slate-900"><spring:message code="review.applicationDetails" text="Application Details" /></h2>
     </div>
-</section>
-</c:if>
-
-<section class="erp-panel p-5 sm:p-6">
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.applicationId" text="Loan Application ID" /></div><div class="mt-1 font-semibold"><c:out value="${loan.applicationId}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="common.status" text="Status" /></div><div class="mt-1"><spring:message code="loan.status.${loan.status}" text="${fn:replace(loan.status, '_', ' ')}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="common.applicant" text="Applicant" /></div><div class="mt-1"><c:out value="${loan.applicantName}" /></div><div class="text-xs text-slate-500"><c:out value="${loan.memberNo}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="reports.loanProduct" text="Loan Product" /></div><div class="mt-1"><c:out value="${loan.productName}" /></div><div class="text-xs text-slate-500"><c:out value="${loan.productCode}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="common.amount" text="Amount" /></div><div class="mt-1 font-semibold">TSh <fmt:formatNumber value="${loan.amount}" maxFractionDigits="2" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="loan.tenor.label" text="Tenor" /></div><div class="mt-1"><c:out value="${loan.tenorMonths}" /> <spring:message code="common.months" text="months" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="register.member.email" text="Email" /></div><div class="mt-1 break-all"><c:out value="${loan.email}" /></div></div>
-        <div><div class="text-xs font-semibold uppercase text-slate-500"><spring:message code="register.member.phone" text="Phone" /></div><div class="mt-1"><c:out value="${loan.phone}" /></div></div>
-    </div>
+    <dl class="divide-y divide-slate-100 px-4">
+        <c:forEach items="${loan.formFields}" var="field">
+            <div class="grid gap-1 py-3 sm:grid-cols-2">
+                <dt class="text-sm font-semibold text-slate-600"><c:out value="${field.key}" /></dt>
+                <dd class="text-sm text-slate-900"><c:out value="${field.value}" /></dd>
+            </div>
+        </c:forEach>
+        <c:if test="${empty loan.formFields}">
+            <div class="py-5 text-sm text-slate-500"><spring:message code="common.noData" text="No data available." /></div>
+        </c:if>
+    </dl>
 </section>
 
-<div class="mt-4 grid gap-4 xl:grid-cols-2">
-    <section class="erp-panel overflow-hidden"><div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-900"><spring:message code="review.applicationDetails" text="Application Details" /></h2></div><dl class="divide-y divide-slate-100 px-5">
-        <c:forEach items="${loan.formFields}" var="field"><div class="grid gap-1 py-3 sm:grid-cols-2"><dt class="text-sm font-medium text-slate-600"><c:out value="${field.key}" /></dt><dd class="text-sm text-slate-900"><c:out value="${field.value}" /></dd></div></c:forEach>
-        <c:if test="${empty loan.formFields}"><div class="py-5 text-sm text-slate-500"><spring:message code="common.noData" text="No data available." /></div></c:if>
-    </dl></section>
-    <section class="erp-panel overflow-hidden"><div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-900"><spring:message code="review.financialDetails" text="Financial Details" /></h2></div><dl class="divide-y divide-slate-100 px-5">
-        <c:forEach items="${loan.financialFields}" var="field"><div class="grid gap-1 py-3 sm:grid-cols-2"><dt class="text-sm font-medium text-slate-600"><c:out value="${field.key}" /></dt><dd class="text-sm text-slate-900"><c:out value="${field.value}" /></dd></div></c:forEach>
-        <c:if test="${empty loan.financialFields}"><div class="py-5 text-sm text-slate-500"><spring:message code="common.noData" text="No data available." /></div></c:if>
-    </dl></section>
-</div>
+<c:set var="financialFieldSections" value="${loan.financialFieldSections}" />
+<%@ include file="../fragments/financial-field-sections.jspf" %>
+
+<c:set var="repaymentSummary" value="${loan.repaymentSummary}" />
+<c:set var="repaymentSummaryEstimated" value="${false}" />
+<%@ include file="../fragments/staff-repayment-summary.jspf" %>
 
 <section class="erp-panel mt-4 overflow-hidden" data-aws-table-region>
     <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-900"><spring:message code="review.guarantors" text="Guarantors" /></h2></div>
@@ -76,4 +83,5 @@
     </tbody></table></div>
 </section>
 
+<%@ include file="../fragments/loan-export-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

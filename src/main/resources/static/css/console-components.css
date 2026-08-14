@@ -5669,7 +5669,7 @@ html.session-timeout-active,
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         min-width: 0;
         margin: 0;
         border-top: 1px solid #d5dbdb;
@@ -5708,7 +5708,7 @@ html.session-timeout-active,
         overflow-wrap: break-word;
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-fact--wide {
-        grid-column: 1 / -1;
+        grid-column: span 2;
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-status-badge {
         border-radius: 2px !important;
@@ -5751,21 +5751,44 @@ html.session-timeout-active,
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0;
+        gap: 8px;
         margin: 0;
-        border-left: 1px solid #d5dbdb;
+        padding: 10px;
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-card {
-        display: block;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: center;
+        column-gap: 9px;
         min-width: 0;
-        min-height: 0;
+        min-height: 72px;
         margin: 0;
-        border: 0 !important;
-        border-right: 1px solid #d5dbdb !important;
-        border-bottom: 1px solid #d5dbdb !important;
-        border-radius: 0 !important;
+        border: 1px solid #d5dbdb !important;
+        border-left: 3px solid #ec7211 !important;
+        border-radius: 2px !important;
         padding: 8px 10px;
         background: #ffffff !important;
+    }
+    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-icon {
+        display: inline-flex;
+        grid-row: 1 / span 2;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d5dbdb !important;
+        border-radius: 2px !important;
+        background: #f2f3f3 !important;
+        color: #0972d3 !important;
+    }
+    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-card .loan-stat-label,
+    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-card .loan-stat-value {
+        grid-column: 2;
     }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-live-status {
         padding: 8px 10px;
@@ -5783,6 +5806,7 @@ html.session-timeout-active,
         box-shadow: none;
     }
     @media (max-width: 1023px) {
+        .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -5797,6 +5821,9 @@ html.session-timeout-active,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-facts,
         .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-grid {
             grid-template-columns: minmax(0, 1fr);
+        }
+        .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-fact--wide {
+            grid-column: auto;
         }
     }
     .loan-simple-progress {
@@ -6239,6 +6266,29 @@ html.session-timeout-active,
         align-items: center;
         justify-content: flex-end;
         margin: 0 0 10px;
+    }
+
+    .loan-detail-heading-row {
+        display: flex;
+        min-width: 0;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .loan-detail-heading-row .erp-page-header,
+    .loan-detail-heading-row .loan-detail-action-row {
+        margin-bottom: 0 !important;
+    }
+
+    .loan-detail-heading-row .erp-page-header {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .loan-detail-heading-row .loan-detail-action-row {
+        flex: 0 0 auto;
     }
 
     .loan-application-detail-page .loan-detail-action-row {
@@ -8104,6 +8154,15 @@ html.session-timeout-active,
         }
     }
     @media (max-width: 640px) {
+        .loan-detail-heading-row {
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        .loan-detail-heading-row .loan-detail-action-row {
+            width: 100%;
+        }
+
         .loan-detail-action-row {
             justify-content: stretch;
         }

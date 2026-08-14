@@ -11,18 +11,14 @@
 <c:set var="isDisbursementReview" value="${reviewBasePath eq '/disbursement'}" />
 <c:set var="hideDisbursementSupportSections" value="${isDisbursementReview and app.status eq 'READY_FOR_DISBURSEMENT'}" />
 
-<div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-</div>
+<c:set var="showLoanExportAction" value="${true}" />
+<c:set var="reviewDocumentLoanId" value="${app.id}" />
+<%@ include file="../fragments/staff-loan-detail-header.jspf" %>
 <c:if test="${app.status eq 'AWAITING_BOARD'}">
     <div class="mb-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <spring:message code="review.waitingBoardDecision" text="Loan is on review by board. Waiting for decisions." />
     </div>
 </c:if>
-<div class="loan-detail-action-row">
-    <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
-</div>
 <c:set var="reviewStatusBadgeClass" value="${managerStatusBadgeClass}" />
 <%@ include file="../fragments/staff-loan-review-summary.jspf" %>
 

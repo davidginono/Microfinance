@@ -8,14 +8,9 @@
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 <%@ include file="../fragments/confirm-modal.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb">${reviewPanelBreadcrumb}</p>
-    <h1 class="erp-page-title">${reviewPanelTitle}</h1>
-</div>
-
-<div class="loan-detail-action-row">
-    <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-primary"><spring:message code="common.export" text="Export" /></button>
-</div>
+<c:set var="showLoanExportAction" value="${true}" />
+<c:set var="reviewDocumentLoanId" value="${app.id}" />
+<%@ include file="../fragments/staff-loan-detail-header.jspf" %>
 <c:set var="reviewStatusBadgeClass" value="${boardStatusBadgeClass}" />
 <%@ include file="../fragments/staff-loan-review-summary.jspf" %>
 

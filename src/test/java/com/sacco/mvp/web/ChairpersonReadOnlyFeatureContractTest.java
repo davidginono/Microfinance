@@ -47,6 +47,14 @@ class ChairpersonReadOnlyFeatureContractTest {
         String sidebar = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf"));
 
         assertThat(detail + product).doesNotContain("<form").doesNotContain("method=\"post\"");
+        assertThat(detail)
+            .contains("include file=\"../fragments/staff-loan-detail-header.jspf\"")
+            .contains("include file=\"../fragments/staff-loan-review-summary.jspf\"")
+            .contains("include file=\"../fragments/financial-field-sections.jspf\"")
+            .contains("include file=\"../fragments/staff-repayment-summary.jspf\"")
+            .contains("processedLoanDetail")
+            .doesNotContain("reviewAction")
+            .doesNotContain("decisionForm");
         assertThat(list + configurations).doesNotContain("method=\"post\"");
         assertThat(list).contains("&middot;")
             .doesNotContain("Â")

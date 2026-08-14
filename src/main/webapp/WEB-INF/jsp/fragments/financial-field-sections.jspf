@@ -17,7 +17,7 @@
                 <table class="erp-table">
                     <thead>
                     <tr>
-                        <th><spring:message code="common.section" text="Section" /></th>
+                        <th><spring:message code="common.attribute" text="Attribute" /></th>
                         <th><spring:message code="common.value" text="Value" /></th>
                     </tr>
                     </thead>
