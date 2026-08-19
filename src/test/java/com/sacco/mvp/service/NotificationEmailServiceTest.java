@@ -126,7 +126,9 @@ class NotificationEmailServiceTest {
             .contains("timeout: ${SPRING_MAIL_READ_TIMEOUT_MS:10000}")
             .contains("writetimeout: ${SPRING_MAIL_WRITE_TIMEOUT_MS:10000}")
             .doesNotContain("password: qwerty1!");
-        assertThat(configuration).contains("encryption-key: ${APP_SECRETS_ENCRYPTION_KEY:}");
+        assertThat(configuration.replace("\r\n", "\n"))
+            .contains("encryption-key: ${APP_SECRETS_ENCRYPTION_KEY:}")
+            .contains("management:\n  health:\n    mail:\n      enabled: false");
     }
 
     private NotificationEmailService service(MemberRepository memberRepository, JavaMailSender mailSender, String overrideRecipient) {
