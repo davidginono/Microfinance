@@ -3,11 +3,14 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.PlatformSmsGatewaySettings;
 import com.sacco.mvp.repository.PlatformSmsGatewaySettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,6 +18,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PlatformSmsGatewaySettingsService {
     private static final int URL_MAX = 255;
     private static final int PATH_MAX = 255;
@@ -125,11 +129,87 @@ public class PlatformSmsGatewaySettingsService {
         if (smsGateway == null) {
             throw new IllegalStateException("SMS gateway is not configured.");
         }
-        SmsSendResult result = smsGateway.send(phoneNumber, "SACCO platform SMS test");
+        SmsSendResult result;
+        try {
+            result = smsGateway.send(phoneNumber, "SACCO platform SMS test");
+        } catch (RuntimeException ex) {
+            log.warn("Platform SMS test failed: {}", ex.getMessage());
+            throw new IllegalStateException(describeTestSendFailure(ex), ex);
+        }
         if (!result.sent()) {
-            throw new IllegalStateException(result.message() == null ? "Test SMS could not be sent." : result.message());
+            throw new IllegalStateException(describeTestSendFailure(result));
         }
         auditService.log("PLATFORM_SMS_GATEWAY_SETTINGS", null, "ADMIN_TEST_SMS", actorMemberId, Map.of("phone", normalizedPhone), Map.of());
+    }
+
+    public static String describeTestSendFailure(Throwable ex) {
+        if (causedBy(ex, SocketTimeoutException.class) || messageContains(ex, "timed out", "connect timed out")) {
+            return "Test SMS could not be sent. The SMS gateway connection timed out.";
+        }
+        if (causedBy(ex, ConnectException.class) || messageContains(ex, "connection refused", "could not connect", "i/o error")) {
+            return "Test SMS could not be sent. The SMS gateway could not be reached.";
+        }
+        return "Test SMS could not be sent. Check the SMS gateway URL and credentials.";
+    }
+
+    static String describeTestSendFailure(SmsSendResult result) {
+        String raw = result == null || result.message() == null ? "" : result.message().trim();
+        String lower = raw.toLowerCase();
+        if (lower.contains("timed out") || lower.contains("timeout")) {
+            return "Test SMS could not be sent. The SMS gateway connection timed out.";
+        }
+        if (lower.contains("could not be reached") || lower.contains("unknown") || lower.contains("empty")) {
+            return "Test SMS could not be sent. The SMS gateway could not be reached.";
+        }
+        if (!raw.isBlank() && raw.length() <= 180 && !lower.contains("exception")) {
+            String detail = stripLeadingTestSmsPrefix(raw);
+            return "Test SMS could not be sent. " + (detail.endsWith(".") ? detail : detail + ".");
+        }
+        return "Test SMS could not be sent. The SMS gateway returned an error.";
+    }
+
+    private static String stripLeadingTestSmsPrefix(String message) {
+        String prefix = "Test SMS could not be sent. ";
+        if (message.regionMatches(true, 0, prefix, 0, prefix.length())) {
+            return message.substring(prefix.length()).trim();
+        }
+        return message;
+    }
+
+    private static boolean causedBy(Throwable ex, Class<? extends Throwable> type) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
+    }
+
+    private static boolean messageContains(Throwable ex, String... snippets) {
+        StringBuilder text = new StringBuilder();
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (current.getMessage() != null) {
+                if (text.length() > 0) {
+                    text.append(' ');
+                }
+                text.append(current.getMessage());
+            }
+            current = current.getCause();
+            depth++;
+        }
+        String combined = text.toString().toLowerCase();
+        for (String snippet : snippets) {
+            if (combined.contains(snippet.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private synchronized ResolvedSmsGatewayConfig loadAndCache() {

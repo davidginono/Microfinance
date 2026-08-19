@@ -3,22 +3,28 @@ package com.sacco.mvp.service;
 import com.sacco.mvp.domain.PlatformEmailSettings;
 import com.sacco.mvp.repository.PlatformEmailSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PlatformEmailSettingsService {
     private static final int HOST_MAX = 255;
+    private static final Pattern HOST_PORT_PATTERN = Pattern.compile("(?i)host,\\s*port:\\s*([^,\\s]+),\\s*(\\d+)");
     private static final int USERNAME_MAX = 160;
     private static final int ADDRESS_MAX = 160;
     private static final int MIN_PORT = 1;
@@ -156,8 +162,100 @@ public class PlatformEmailSettingsService {
         mail.setFrom(config.fromAddress());
         mail.setSubject("SACCO platform email test");
         mail.setText("This is a test email from Platform Settings.");
-        mailSender.send(mail);
+        try {
+            mailSender.send(mail);
+        } catch (RuntimeException ex) {
+            log.warn("Platform email test failed: {}", ex.getMessage());
+            throw new IllegalStateException(describeTestSendFailure(ex, config), ex);
+        }
         auditService.log("PLATFORM_EMAIL_SETTINGS", null, "ADMIN_TEST_EMAIL", actorMemberId, Map.of("recipient", normalizedRecipient), Map.of());
+    }
+
+    public static String describeTestSendFailure(Throwable ex) {
+        return describeTestSendFailure(ex, null);
+    }
+
+    static String describeTestSendFailure(Throwable ex, ResolvedEmailConfig config) {
+        String hostPort = hostPortLabel(ex, config);
+        if (causedBy(ex, SocketTimeoutException.class) || messageContains(ex, "timed out", "connect timed out")) {
+            return hostPort == null
+                ? "Test email could not be sent. The mail server connection timed out."
+                : "Test email could not be sent. Connection to " + hostPort + " timed out.";
+        }
+        if (causedByName(ex, "AuthenticationFailedException") || messageContains(ex, "authentication failed")) {
+            return "Test email could not be sent. The mail server rejected the username or password.";
+        }
+        if (causedBy(ex, ConnectException.class) || causedByName(ex, "MailConnectException")
+            || messageContains(ex, "couldn't connect", "could not connect", "connection refused", "mail server connection failed")) {
+            return hostPort == null
+                ? "Test email could not be sent. Could not connect to the mail server."
+                : "Test email could not be sent. Could not connect to " + hostPort + ".";
+        }
+        return "Test email could not be sent. Check the SMTP host, port, and credentials.";
+    }
+
+    private static String hostPortLabel(Throwable ex, ResolvedEmailConfig config) {
+        Matcher matcher = HOST_PORT_PATTERN.matcher(combinedMessages(ex));
+        if (matcher.find()) {
+            return matcher.group(1) + " on port " + matcher.group(2);
+        }
+        if (config != null && config.host() != null && !config.host().isBlank()) {
+            return config.host() + " on port " + config.port();
+        }
+        return null;
+    }
+
+    private static boolean causedBy(Throwable ex, Class<? extends Throwable> type) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
+    }
+
+    private static boolean causedByName(Throwable ex, String simpleName) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (simpleName.equals(current.getClass().getSimpleName())) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
+    }
+
+    private static boolean messageContains(Throwable ex, String... snippets) {
+        String combined = combinedMessages(ex).toLowerCase();
+        for (String snippet : snippets) {
+            if (combined.contains(snippet.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String combinedMessages(Throwable ex) {
+        StringBuilder text = new StringBuilder();
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                if (text.length() > 0) {
+                    text.append(' ');
+                }
+                text.append(current.getMessage());
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return text.toString();
     }
 
     private synchronized ResolvedEmailConfig loadAndCache() {

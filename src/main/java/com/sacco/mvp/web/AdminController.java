@@ -338,6 +338,8 @@ public class AdminController {
             ra.addFlashAttribute("message", "Test email sent.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", PlatformEmailSettingsService.describeTestSendFailure(ex));
         }
         return "redirect:/admin/platform-settings";
     }
@@ -383,6 +385,8 @@ public class AdminController {
             ra.addFlashAttribute("message", "Test SMS sent.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+        } catch (Exception ex) {
+            ra.addFlashAttribute("error", PlatformSmsGatewaySettingsService.describeTestSendFailure(ex));
         }
         return "redirect:/admin/platform-settings";
     }

@@ -5,10 +5,12 @@ import com.sacco.mvp.repository.PlatformEmailSettingsRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -209,6 +212,38 @@ class PlatformEmailSettingsServiceTest {
 
         verify(mailSender).send(any(SimpleMailMessage.class));
         verify(auditService).log(eq("PLATFORM_EMAIL_SETTINGS"), isNull(), eq("ADMIN_TEST_EMAIL"), eq(actorId), any(), any());
+    }
+
+    @Test
+    void sendTestEmailWrapsSmtpTimeoutAsPlainLanguageFailure() {
+        PlatformEmailSettings existing = existingSettings();
+        existing.setEnabled(true);
+        existing.setHost("smtp.foresight.co.tz");
+        existing.setUsername("mailer");
+        existing.setPasswordEncrypted("enc:v1:stored");
+        existing.setFromAddress("alerts@example.com");
+        PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
+        PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
+        JavaMailSender mailSender = Mockito.mock(JavaMailSender.class);
+        PlatformMailSenderFactory factory = Mockito.mock(PlatformMailSenderFactory.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+        when(repository.findById(PlatformEmailSettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
+        when(secrets.decrypt("enc:v1:stored")).thenReturn("db-secret");
+        when(factory.getMailSender()).thenReturn(mailSender);
+        doThrow(new MailSendException(
+            "Mail server connection failed. Couldn't connect to host, port: smtp.foresight.co.tz, 465; timeout 10000",
+            new SocketTimeoutException("Connect timed out")
+        )).when(mailSender).send(any(SimpleMailMessage.class));
+        PlatformEmailSettingsService service = service(repository, secrets, factoryProvider(factory), auditService);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+            service.sendTestEmail("admin@example.com", UUID.randomUUID()));
+
+        assertEquals(
+            "Test email could not be sent. Connection to smtp.foresight.co.tz on port 465 timed out.",
+            ex.getMessage()
+        );
+        verify(auditService, never()).log(eq("PLATFORM_EMAIL_SETTINGS"), isNull(), eq("ADMIN_TEST_EMAIL"), any(), any(), any());
     }
 
     @SuppressWarnings("unchecked")

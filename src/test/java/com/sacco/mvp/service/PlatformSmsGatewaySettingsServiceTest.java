@@ -166,6 +166,58 @@ class PlatformSmsGatewaySettingsServiceTest {
         assertEquals("Enter a valid test phone number.", ex.getMessage());
     }
 
+    @Test
+    void sendTestSmsWrapsGatewayTimeoutAsPlainLanguageFailure() {
+        PlatformSmsGatewaySettings existing = existingSettings();
+        existing.setEnabled(true);
+        existing.setBaseUrl("https://api.example.com");
+        existing.setSendPath("/send");
+        existing.setClientId("client");
+        existing.setApiKeyEncrypted("enc:v1:stored");
+        existing.setSenderId("SENDER");
+        PlatformSmsGatewaySettingsRepository repository = Mockito.mock(PlatformSmsGatewaySettingsRepository.class);
+        PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
+        SmsGateway smsGateway = Mockito.mock(SmsGateway.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+        when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
+        when(secrets.decrypt("enc:v1:stored")).thenReturn("db-key");
+        when(smsGateway.send("0673054445", "SACCO platform SMS test"))
+            .thenReturn(SmsSendResult.acceptanceUnknown("The SMS gateway connection timed out."));
+        PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider(smsGateway), auditService);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+            service.sendTestSms("0673054445", UUID.randomUUID()));
+
+        assertEquals("Test SMS could not be sent. The SMS gateway connection timed out.", ex.getMessage());
+        verify(auditService, never()).log(eq("PLATFORM_SMS_GATEWAY_SETTINGS"), isNull(), eq("ADMIN_TEST_SMS"), any(), any(), any());
+    }
+
+    @Test
+    void sendTestSmsWrapsUnexpectedGatewayExceptionAsPlainLanguageFailure() {
+        PlatformSmsGatewaySettings existing = existingSettings();
+        existing.setEnabled(true);
+        existing.setBaseUrl("https://api.example.com");
+        existing.setSendPath("/send");
+        existing.setClientId("client");
+        existing.setApiKeyEncrypted("enc:v1:stored");
+        existing.setSenderId("SENDER");
+        PlatformSmsGatewaySettingsRepository repository = Mockito.mock(PlatformSmsGatewaySettingsRepository.class);
+        PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
+        SmsGateway smsGateway = Mockito.mock(SmsGateway.class);
+        AuditService auditService = Mockito.mock(AuditService.class);
+        when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
+        when(secrets.decrypt("enc:v1:stored")).thenReturn("db-key");
+        when(smsGateway.send("0673054445", "SACCO platform SMS test"))
+            .thenThrow(new RuntimeException("I/O error on POST request"));
+        PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider(smsGateway), auditService);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+            service.sendTestSms("0673054445", UUID.randomUUID()));
+
+        assertEquals("Test SMS could not be sent. The SMS gateway could not be reached.", ex.getMessage());
+        verify(auditService, never()).log(eq("PLATFORM_SMS_GATEWAY_SETTINGS"), isNull(), eq("ADMIN_TEST_SMS"), any(), any(), any());
+    }
+
     @SuppressWarnings("unchecked")
     private ObjectProvider<SmsGateway> gatewayProvider() {
         return gatewayProvider(Mockito.mock(SmsGateway.class));

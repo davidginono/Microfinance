@@ -50,8 +50,12 @@ class SessionTimeoutUiContractTest {
         assertThat(jsp).contains("/admin/platform-settings/email/test");
         assertThat(jsp).contains("/admin/platform-settings/sms-gateway");
         assertThat(jsp).contains("/admin/platform-settings/sms-gateway/test");
+        assertThat(jsp).contains("../fragments/alerts.jspf");
         assertThat(jsp).contains("Save Email Settings");
         assertThat(jsp).contains("Save SMS Gateway");
+        assertThat(jsp).contains("class=\"aws-settings-checkbox-row\"");
+        assertThat(jsp).contains("class=\"aws-settings-checkbox\"");
+        assertThat(jsp).doesNotContain("settings-checkbox-card");
         assertThat(jsp).doesNotContain("name=\"password\" value=");
         assertThat(jsp).doesNotContain("name=\"apiKey\" value=");
     }

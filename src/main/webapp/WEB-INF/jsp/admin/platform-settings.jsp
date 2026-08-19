@@ -97,20 +97,20 @@
     </div>
     <form action="/admin/platform-settings/email" method="post" class="erp-panel-body platform-settings-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <div class="platform-settings-grid">
-            <label class="platform-settings-field platform-settings-field--wide settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                <input name="enabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.enabled ? 'checked' : ''} />
-                <span>
-                    <span class="block font-semibold text-slate-900">Enable email delivery</span>
-                    <span class="mt-1 block text-xs text-slate-500">
-                        Status:
-                        <c:choose>
-                            <c:when test="${emailDeliveryStatus.configured}">Configured<c:if test="${emailDeliveryStatus.enabled}"> and active</c:if><c:if test="${not emailDeliveryStatus.enabled}"> but disabled</c:if></c:when>
-                            <c:otherwise>Not configured</c:otherwise>
-                        </c:choose>
-                    </span>
+        <label class="aws-settings-checkbox-row">
+            <input class="aws-settings-checkbox" name="enabled" type="checkbox" value="true" ${platformEmailSettings.enabled ? 'checked' : ''} />
+            <span class="aws-settings-checkbox-copy">
+                <span class="aws-settings-checkbox-title">Enable email delivery</span>
+                <span class="aws-settings-help">
+                    Status:
+                    <c:choose>
+                        <c:when test="${emailDeliveryStatus.configured}">Configured<c:if test="${emailDeliveryStatus.enabled}"> and active</c:if><c:if test="${not emailDeliveryStatus.enabled}"> but disabled</c:if></c:when>
+                        <c:otherwise>Not configured</c:otherwise>
+                    </c:choose>
                 </span>
-            </label>
+            </span>
+        </label>
+        <div class="platform-settings-grid">
             <label class="platform-settings-field">
                 SMTP host
                 <input name="host" maxlength="255" placeholder="smtp.example.com"
@@ -146,16 +146,16 @@
                        class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
                        value="${fn:escapeXml(platformEmailSettings.overrideRecipient)}" />
             </label>
-            <label class="platform-settings-field settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                <input name="sslEnabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.sslEnabled ? 'checked' : ''} />
-                <span>
-                    <span class="block font-semibold text-slate-900">Use SSL</span>
+            <label class="aws-settings-checkbox-row">
+                <input class="aws-settings-checkbox" name="sslEnabled" type="checkbox" value="true" ${platformEmailSettings.sslEnabled ? 'checked' : ''} />
+                <span class="aws-settings-checkbox-copy">
+                    <span class="aws-settings-checkbox-title">Use SSL</span>
                 </span>
             </label>
-            <label class="platform-settings-field settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                <input name="starttlsEnabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.starttlsEnabled ? 'checked' : ''} />
-                <span>
-                    <span class="block font-semibold text-slate-900">Use STARTTLS</span>
+            <label class="aws-settings-checkbox-row">
+                <input class="aws-settings-checkbox" name="starttlsEnabled" type="checkbox" value="true" ${platformEmailSettings.starttlsEnabled ? 'checked' : ''} />
+                <span class="aws-settings-checkbox-copy">
+                    <span class="aws-settings-checkbox-title">Use STARTTLS</span>
                 </span>
             </label>
             <label class="platform-settings-field">
@@ -206,20 +206,20 @@
     </div>
     <form action="/admin/platform-settings/sms-gateway" method="post" class="erp-panel-body platform-settings-form">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-        <div class="platform-settings-grid">
-            <label class="platform-settings-field platform-settings-field--wide settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                <input name="enabled" type="checkbox" value="true" class="mt-1" ${platformSmsGatewaySettings.enabled ? 'checked' : ''} />
-                <span>
-                    <span class="block font-semibold text-slate-900">Enable SMS gateway</span>
-                    <span class="mt-1 block text-xs text-slate-500">
-                        Status:
-                        <c:choose>
-                            <c:when test="${smsGatewayStatus.configured}">Configured<c:if test="${smsGatewayStatus.enabled}"> and active</c:if><c:if test="${not smsGatewayStatus.enabled}"> but disabled</c:if></c:when>
-                            <c:otherwise>Not configured</c:otherwise>
-                        </c:choose>
-                    </span>
+        <label class="aws-settings-checkbox-row">
+            <input class="aws-settings-checkbox" name="enabled" type="checkbox" value="true" ${platformSmsGatewaySettings.enabled ? 'checked' : ''} />
+            <span class="aws-settings-checkbox-copy">
+                <span class="aws-settings-checkbox-title">Enable SMS gateway</span>
+                <span class="aws-settings-help">
+                    Status:
+                    <c:choose>
+                        <c:when test="${smsGatewayStatus.configured}">Configured<c:if test="${smsGatewayStatus.enabled}"> and active</c:if><c:if test="${not smsGatewayStatus.enabled}"> but disabled</c:if></c:when>
+                        <c:otherwise>Not configured</c:otherwise>
+                    </c:choose>
                 </span>
-            </label>
+            </span>
+        </label>
+        <div class="platform-settings-grid">
             <label class="platform-settings-field">
                 Base URL
                 <input name="baseUrl" maxlength="255" placeholder="https://api.bentergroup.com"

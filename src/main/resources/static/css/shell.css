@@ -1674,11 +1674,11 @@ button:active {
 
 /* AWS Management Console-inspired application theme. */
 :root {
-    --sacco-topbar: #162238;
+    --sacco-topbar: #3A756B;
     --sacco-sidebar: #183038;
     --sacco-sidebar-hover: #21414b;
     --sacco-sidebar-active: #1f414c;
-    --sacco-canvas: #eaeded;
+    --sacco-canvas: #F2F3F3;
     --sacco-panel: #ffffff;
     --sacco-panel-muted: #f7f8f8;
     --sacco-line: #d5dbdb;
@@ -1693,18 +1693,18 @@ button:active {
     --sacco-warning: #ff9900;
     --sacco-radius: 2px;
     --sacco-shadow: 0 1px 1px rgba(0, 28, 36, 0.12);
-    --sacco-topbar-height: 52px;
+    --sacco-topbar-height: 44px;
     --sacco-control-height: 32px;
     --sacco-sidebar-width: 236px;
     --sacco-sidebar-collapsed-width: 48px;
     --aws-ink: #16191f;
-    --aws-topbar: #162238;
+    --aws-topbar: #3A756B;
     --aws-sidebar: #183038;
     --aws-sidebar-hover: #21414b;
     --aws-sidebar-active: #1f414c;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
-    --aws-bg: #eaeded;
+    --aws-bg: #F2F3F3;
     --aws-line: #d5dbdb;
     --aws-line-dark: #879596;
     --aws-blue: #0972d3;
@@ -1723,8 +1723,8 @@ button:active {
     --shell-sidebar-collapsed-width: 48px;
     --shell-content-gap: 12px;
     --shell-content-max: none;
-    --shell-nav-height: 52px;
-    --shell-topbar-control-height: 32px;
+    --shell-nav-height: 44px;
+    --shell-topbar-control-height: 28px;
     --sacco-font-family: "Open Sans", Helvetica, Arial, sans-serif;
 }
 
@@ -1774,7 +1774,7 @@ body.aws-console {
 
 .app-topbar > div {
     min-height: var(--shell-nav-height);
-    padding: 6px 18px !important;
+    padding: 0 12px !important;
 }
 
 .app-global-brand {
@@ -1817,8 +1817,8 @@ body.aws-console {
 .app-global-search {
     position: relative;
     display: none;
-    width: min(34vw, 480px);
-    height: var(--sacco-control-height);
+    width: min(22vw, 320px);
+    height: var(--shell-topbar-control-height);
     margin-left: 10px;
     align-items: center;
 }
@@ -1834,7 +1834,7 @@ body.aws-console {
 
 .app-global-search input {
     width: 100%;
-    height: var(--sacco-control-height);
+    height: var(--shell-topbar-control-height);
     border: 1px solid #687078;
     border-radius: 2px;
     background: #242a31;
@@ -1859,24 +1859,64 @@ body.aws-console {
     }
 }
 
-.app-topbar .erp-icon-btn,
-.app-topbar .erp-topbar-btn,
-.app-topbar button {
-    height: 32px !important;
-    min-height: 32px !important;
-    border: 1px solid #687078 !important;
+.app-topbar .erp-icon-btn {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    border: 0 !important;
     border-radius: 2px !important;
-    background: #17232d !important;
+    background: transparent !important;
+    color: rgba(242, 243, 243, 0.55) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.app-topbar .erp-icon-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+    opacity: 0.7;
+}
+
+.app-topbar .erp-icon-btn:hover,
+.app-topbar .erp-icon-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #f2f3f3 !important;
+}
+
+.app-topbar .erp-icon-btn:hover svg,
+.app-topbar .erp-icon-btn:focus-visible svg {
+    opacity: 1;
+}
+
+.app-topbar .erp-topbar-btn,
+.app-topbar .app-logout-control button {
+    height: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    border: 1px solid #547870 !important;
+    border-radius: 2px !important;
+    background: #2E5F56 !important;
     color: #ffffff !important;
     box-shadow: none !important;
     transform: none !important;
 }
 
-.app-topbar .erp-icon-btn:hover,
 .app-topbar .erp-topbar-btn:hover,
-.app-topbar button:hover {
+.app-topbar .app-logout-control button:hover {
     border-color: #aab7b8 !important;
-    background: #343b44 !important;
+    background: #46857B !important;
+}
+
+.app-topbar .aws-mobile-menu-button {
+    width: var(--shell-topbar-control-height) !important;
+    height: var(--shell-topbar-control-height) !important;
+    min-width: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: rgba(242, 243, 243, 0.7) !important;
+    box-shadow: none !important;
 }
 
 .aws-console .app-topbar .profile-icon-btn {
@@ -1894,12 +1934,12 @@ body.aws-console {
 
 .app-station-selector {
     box-sizing: border-box;
-    height: var(--sacco-control-height);
-    min-height: var(--sacco-control-height);
+    height: var(--shell-topbar-control-height);
+    min-height: var(--shell-topbar-control-height);
     max-width: 220px !important;
     border: 1px solid #687078 !important;
     border-radius: 2px !important;
-    background: #17232d !important;
+    background: #2E5F56 !important;
     padding: 3px 8px !important;
     box-shadow: none !important;
 }
@@ -1930,9 +1970,9 @@ body.aws-console {
 }
 
 .app-station-mobile {
-    height: 32px;
+    height: var(--shell-topbar-control-height);
     border-radius: 2px !important;
-    background: #17232d !important;
+    background: #2E5F56 !important;
     box-shadow: none !important;
 }
 
@@ -3502,7 +3542,7 @@ body.aws-console,
     .app-topbar > div {
         min-height: var(--shell-nav-height);
         gap: 6px !important;
-        padding: 6px 8px !important;
+        padding: 0 8px !important;
     }
 
     .app-global-brand {
@@ -3698,6 +3738,11 @@ body.aws-console,
     padding: 10px !important;
 }
 
+.platform-settings-form > .aws-settings-checkbox-row {
+    max-width: 58rem;
+    margin-bottom: 10px;
+}
+
 .aws-settings-control-row {
     display: flex;
     width: min(100%, 34rem);
@@ -3736,7 +3781,7 @@ body.aws-console,
 .aws-settings-field .neo-select-button,
 .aws-settings-field input,
 .aws-settings-field select,
-.platform-settings-field input,
+.platform-settings-field input:not([type="checkbox"]):not([type="radio"]),
 .platform-settings-field select {
     box-sizing: border-box;
     width: 100%;
@@ -3776,7 +3821,7 @@ body.aws-console,
 .aws-settings-field .neo-select-button:focus-visible,
 .aws-settings-field input:focus,
 .aws-settings-field select:focus,
-.platform-settings-field input:focus,
+.platform-settings-field input:not([type="checkbox"]):not([type="radio"]):focus,
 .platform-settings-field select:focus,
 .platform-settings-field textarea:focus {
     border-color: var(--aws-blue) !important;
@@ -4199,7 +4244,7 @@ body.aws-console,
     --shell-context-height: 36px;
     --shell-content-gap: 0px;
     --shell-nav-fixed-height: var(--sacco-topbar-height);
-    --shell-topbar-control-height: var(--sacco-control-height);
+    --shell-topbar-control-height: 28px;
     --shell-sims-topbar: var(--sacco-topbar);
     --shell-sims-sidebar: var(--sacco-sidebar);
     --shell-sims-sidebar-border: #50616d;
@@ -4250,16 +4295,16 @@ body.aws-console,
 }
 
 .app-global-brand .app-global-logo {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px;
     border-radius: var(--sacco-radius) !important;
 }
 
 .app-global-brand p:first-child {
     max-width: 158px;
-    font-size: 14px !important;
-    line-height: 20px !important;
+    font-size: 13px !important;
+    line-height: 16px !important;
     white-space: nowrap !important;
 }
 
@@ -4268,17 +4313,17 @@ body.aws-console,
 }
 
 .app-global-search {
-    flex: 1 1 auto;
-    width: min(37.8vw, 648px);
-    max-width: 648px;
+    flex: 0 1 auto;
+    width: min(22vw, 320px);
+    max-width: 320px;
     margin: 0 8px 0 16px !important;
 }
 
 .aws-console .app-topbar .app-global-search,
 .aws-console .app-topbar .app-global-search input {
-    height: var(--sacco-control-height) !important;
-    min-height: var(--sacco-control-height) !important;
-    max-height: var(--sacco-control-height) !important;
+    height: var(--shell-topbar-control-height) !important;
+    min-height: var(--shell-topbar-control-height) !important;
+    max-height: var(--shell-topbar-control-height) !important;
 }
 
 .aws-console .app-topbar .app-global-search input {
@@ -4357,32 +4402,56 @@ body.aws-console,
     box-shadow: none;
 }
 
-.app-topbar .erp-icon-btn,
+.app-topbar .erp-icon-btn {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: rgba(242, 243, 243, 0.55) !important;
+    box-shadow: none !important;
+}
+
+.app-topbar .erp-icon-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
 .app-topbar .erp-topbar-btn,
-.app-topbar button {
+.app-topbar .app-logout-control button {
     height: var(--shell-topbar-control-height) !important;
     min-height: var(--shell-topbar-control-height) !important;
     max-height: var(--shell-topbar-control-height) !important;
     border-radius: 2px !important;
 }
 
+.app-topbar-actions .app-notification-control,
 .app-topbar-actions .app-profile-control {
     display: flex;
-    width: var(--shell-topbar-control-height);
-    height: var(--shell-topbar-control-height);
-    min-width: var(--shell-topbar-control-height);
-    min-height: var(--shell-topbar-control-height);
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
     align-self: center;
     align-items: center;
     justify-content: center;
     line-height: 0;
 }
 
+.app-topbar-actions .app-profile-control {
+    margin-left: 12px;
+}
+
 .aws-console .app-topbar .profile-icon-btn {
-    width: var(--shell-topbar-control-height) !important;
-    min-width: var(--shell-topbar-control-height) !important;
-    max-width: var(--shell-topbar-control-height) !important;
-    flex: 0 0 var(--shell-topbar-control-height);
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-width: 28px !important;
+    max-height: 28px !important;
+    flex: 0 0 28px;
     align-self: center;
     margin: 0 !important;
     padding: 0 !important;
@@ -4407,8 +4476,16 @@ body.aws-console,
 }
 
 .app-station-icon {
-    width: 24px !important;
-    height: 24px !important;
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.app-topbar .aws-mobile-menu-button,
+.aws-console .aws-mobile-menu-button {
+    border: 0 !important;
+    background: transparent !important;
+    color: rgba(242, 243, 243, 0.7) !important;
+    box-shadow: none !important;
 }
 
 .app-station-copy p:first-child {
@@ -4426,14 +4503,14 @@ body.aws-console,
 }
 
 .app-account-copy p:first-child {
-    font-size: 13px !important;
-    line-height: 18px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
 }
 
 .app-account-copy p:last-child {
     margin-top: 0 !important;
-    font-size: 12px !important;
-    line-height: 14px !important;
+    font-size: 11px !important;
+    line-height: 13px !important;
 }
 
 .shell-sidebar-toggle-row {
@@ -4641,7 +4718,8 @@ body.aws-console,
     }
 
     .app-global-search {
-        width: min(30.6vw, 396px);
+        width: min(18vw, 240px);
+        max-width: 240px;
         margin-right: 8px !important;
         margin-left: 16px !important;
     }
@@ -4656,6 +4734,7 @@ body.aws-console,
         --shell-sidebar-width: 284px;
         --shell-nav-height: var(--sacco-topbar-height);
         --shell-nav-fixed-height: var(--sacco-topbar-height);
+        --shell-topbar-control-height: 28px;
         --shell-context-height: 0px;
     }
 
@@ -4676,13 +4755,13 @@ body.aws-console,
     }
 
     .app-global-brand .app-global-logo {
-        width: 30px !important;
-        height: 30px !important;
-        min-width: 30px;
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px;
     }
 
     .app-global-brand p:first-child {
-        font-size: 14px !important;
+        font-size: 13px !important;
     }
 
     .aws-mobile-menu-button {

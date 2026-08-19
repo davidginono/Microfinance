@@ -1489,7 +1489,7 @@ body {
         max-width: 58rem;
     }
 
-    .platform-settings-field input,
+    .platform-settings-field input:not([type="checkbox"]):not([type="radio"]),
     .platform-settings-field textarea {
         box-sizing: border-box;
         width: 100%;
@@ -1512,7 +1512,7 @@ body {
         color: #94a3b8;
     }
 
-    .platform-settings-field input:focus,
+    .platform-settings-field input:not([type="checkbox"]):not([type="radio"]):focus,
     .platform-settings-field textarea:focus {
         border-color: #0284c7;
         outline: none;

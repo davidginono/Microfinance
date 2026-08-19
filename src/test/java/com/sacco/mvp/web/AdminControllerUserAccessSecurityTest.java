@@ -51,6 +51,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mail.MailSendException;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.request.RequestContextListener;
@@ -58,6 +59,7 @@ import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
+import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,6 +68,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,6 +77,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -300,6 +304,78 @@ class AdminControllerUserAccessSecurityTest {
         verify(platformSmsGatewaySettingsService, never()).updateSettings(
             any(Boolean.class), any(), any(), any(), any(), any(), any(Integer.class), any(Integer.class), any()
         );
+    }
+
+    @Test
+    void sendTestEmailRedirectsWithSuccessFlash() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/email/test")
+                .param("testRecipient", "admin@example.com")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(flash().attribute("message", "Test email sent."))
+            .andExpect(flash().attribute("error", org.hamcrest.Matchers.nullValue()));
+
+        verify(platformEmailSettingsService).sendTestEmail("admin@example.com", principal.getMemberId());
+    }
+
+    @Test
+    void sendTestEmailRedirectsWithErrorFlashWhenSmtpConnectionFails() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+        doThrow(new MailSendException(
+            "Mail server connection failed. Couldn't connect to host, port: smtp.foresight.co.tz, 465; timeout 10000",
+            new SocketTimeoutException("Connect timed out")
+        )).when(platformEmailSettingsService).sendTestEmail(any(), any());
+
+        mockMvc.perform(post("/admin/platform-settings/email/test")
+                .param("testRecipient", "admin@example.com")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(flash().attribute(
+                "error",
+                "Test email could not be sent. Connection to smtp.foresight.co.tz on port 465 timed out."
+            ))
+            .andExpect(flash().attributeDoesNotExist("message"));
+    }
+
+    @Test
+    void sendTestSmsRedirectsWithSuccessFlash() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/sms-gateway/test")
+                .param("testPhone", "0673054445")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(flash().attribute("message", "Test SMS sent."))
+            .andExpect(flash().attribute("error", org.hamcrest.Matchers.nullValue()));
+
+        verify(platformSmsGatewaySettingsService).sendTestSms("0673054445", principal.getMemberId());
+    }
+
+    @Test
+    void sendTestSmsRedirectsWithErrorFlashWhenGatewayFails() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+        doThrow(new RuntimeException("I/O error on POST request for \"https://api.example.com/send\""))
+            .when(platformSmsGatewaySettingsService).sendTestSms(any(), any());
+
+        mockMvc.perform(post("/admin/platform-settings/sms-gateway/test")
+                .param("testPhone", "0673054445")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"))
+            .andExpect(flash().attribute(
+                "error",
+                "Test SMS could not be sent. The SMS gateway could not be reached."
+            ))
+            .andExpect(flash().attributeDoesNotExist("message"));
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {

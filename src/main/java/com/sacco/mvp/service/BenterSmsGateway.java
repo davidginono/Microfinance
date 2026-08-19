@@ -63,13 +63,16 @@ public class BenterSmsGateway implements SmsGateway {
             return resultFromResponse(response);
         } catch (RestClientResponseException ex) {
             log.warn("Benter Group SMS failed with status {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return SmsSendResult.rejected("Benter Group SMS failed with status " + ex.getStatusCode());
+            return SmsSendResult.rejected("The SMS gateway returned an error.");
         } catch (ResourceAccessException ex) {
-            log.warn("Benter Group SMS acceptance is unknown: {}", ex.getMessage());
-            return SmsSendResult.acceptanceUnknown("Benter Group SMS acceptance is unknown");
+            log.warn("Benter Group SMS request failed: {}", ex.getMessage());
+            if (causedByTimeout(ex)) {
+                return SmsSendResult.acceptanceUnknown("The SMS gateway connection timed out.");
+            }
+            return SmsSendResult.acceptanceUnknown("The SMS gateway could not be reached.");
         } catch (Exception ex) {
             log.warn("Benter Group SMS failed: {}", ex.getMessage());
-            return SmsSendResult.acceptanceUnknown("Benter Group SMS acceptance is unknown");
+            return SmsSendResult.acceptanceUnknown("The SMS gateway could not be reached.");
         }
     }
 
@@ -109,6 +112,23 @@ public class BenterSmsGateway implements SmsGateway {
         }
         String messageId = firstMessage.path("MessageId").asString(response);
         return SmsSendResult.sent(messageId);
+    }
+
+    private boolean causedByTimeout(Throwable ex) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (current instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+            String message = current.getMessage() == null ? "" : current.getMessage().toLowerCase();
+            if (message.contains("timed out") || message.contains("connect timed out")) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
     }
 
     private String trimMessage(String message) {

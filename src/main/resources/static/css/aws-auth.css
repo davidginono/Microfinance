@@ -1,6 +1,6 @@
 :root {
-    --sacco-topbar: #162238;
-    --sacco-canvas: #eaeded;
+    --sacco-topbar: #3A756B;
+    --sacco-canvas: #F2F3F3;
     --sacco-panel: #ffffff;
     --sacco-line: #d5dbdb;
     --sacco-line-strong: #879596;
@@ -11,14 +11,14 @@
     --sacco-success: #037f0c;
     --sacco-danger: #d13212;
     --sacco-radius: 2px;
-    --sacco-topbar-height: 52px;
+    --sacco-topbar-height: 44px;
     --sacco-control-height: 32px;
     --sacco-font-family: "Open Sans", Helvetica, Arial, sans-serif;
     --aws-ink: #16191f;
-    --aws-topbar: #162238;
+    --aws-topbar: #3A756B;
     --aws-muted: #5f6b7a;
     --aws-panel: #ffffff;
-    --aws-bg: #eaeded;
+    --aws-bg: #F2F3F3;
     --aws-line: #d5dbdb;
     --aws-line-dark: #879596;
     --aws-blue: #0972d3;
@@ -46,15 +46,15 @@ body.aws-auth-shell::before {
     inset: 0 0 auto;
     z-index: 100;
     box-sizing: border-box;
-    height: 52px;
+    height: 44px;
     border-bottom: 1px solid #414750;
     background: var(--aws-topbar);
     color: #ffffff;
     content: "SACCO Loan Management Console";
-    padding: 15px 18px;
-    font-size: 14px;
+    padding: 0 18px;
+    font-size: 13px;
     font-weight: 700;
-    line-height: 21px;
+    line-height: 44px;
 }
 
 body.auth-shell.aws-auth-shell::before {
@@ -65,7 +65,7 @@ body.auth-shell.aws-auth-shell::before {
 body.aws-auth-shell main,
 body.aws-auth-shell > .auth-page-shell,
 body.aws-auth-shell > .min-h-screen {
-    padding-top: 76px !important;
+    padding-top: 68px !important;
     background: transparent !important;
 }
 
@@ -297,7 +297,7 @@ body.aws-auth-shell [role="tabpanel"][hidden] {
 
 .auth-notification-rail {
     position: fixed;
-    inset: 52px 0 auto;
+    inset: 44px 0 auto;
     z-index: 110;
     display: block;
     width: 100%;
@@ -421,7 +421,7 @@ body.aws-auth-shell .forgot-password-dialog {
 body.aws-auth-shell .error-shell {
     width: min(100% - 24px, 52rem);
     margin: 0 auto;
-    padding: 76px 0 24px;
+    padding: 68px 0 24px;
 }
 
 body.aws-auth-shell .error-card {
