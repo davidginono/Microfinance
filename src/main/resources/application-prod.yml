@@ -1,4 +1,6 @@
 spring:
+  jmx:
+    enabled: false
   devtools:
     restart:
       enabled: false
@@ -8,8 +10,23 @@ spring:
     resources:
       cache:
         period: 7d
+  datasource:
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:6}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:25MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:25MB}
 
 server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:32}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:2}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:200}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:25}
   servlet:
     session:
       cookie:
@@ -17,3 +34,25 @@ server:
     jsp:
       init-parameters:
         development: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+app:
+  outbox:
+    batch-size: ${APP_OUTBOX_BATCH_SIZE:50}
+    fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:2000}
+  reports:
+    max-concurrent-exports: ${APP_REPORTS_MAX_CONCURRENT_EXPORTS:1}
+  db-utilization:
+    sample-ms: ${APP_DB_UTILIZATION_SAMPLE_MS:60000}
+  auth:
+    local-dev-minor-admin-password-login-enabled: false

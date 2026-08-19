@@ -124,6 +124,10 @@ app:
     scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:true}
     batch-size: ${APP_OUTBOX_BATCH_SIZE:250}
     fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:500}
+  reports:
+    max-concurrent-exports: ${APP_REPORTS_MAX_CONCURRENT_EXPORTS:2}
+  db-utilization:
+    sample-ms: ${APP_DB_UTILIZATION_SAMPLE_MS:15000}
   application-numbers:
     block-size: ${APP_APPLICATION_NUMBERS_BLOCK_SIZE:100}
   upload-migration:

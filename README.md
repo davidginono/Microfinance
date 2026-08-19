@@ -237,6 +237,7 @@ This repository includes:
 
 - `Dockerfile`
 - `docker-compose.yml`
+- `README.Docker.md` for small-EC2 sizing and production image flags
 
 Start the application and PostgreSQL together with:
 
@@ -249,6 +250,8 @@ Default compose services:
 - app on port `8080`
 - PostgreSQL on port `5432`
 - Mailpit SMTP on port `1025` and inbox UI on port `8025`
+
+For the smallest practical production host, run the ARM image on **t4g.small (2 GB)** with PostgreSQL off-box. See `README.Docker.md`. Do not colocate Postgres on a 2 GB instance, and do not use t4g.nano or t4g.micro for this app.
 
 ## Important Routes
 

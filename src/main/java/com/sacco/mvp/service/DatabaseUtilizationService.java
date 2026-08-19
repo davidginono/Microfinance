@@ -31,7 +31,7 @@ public class DatabaseUtilizationService {
         sampleNow();
     }
 
-    @Scheduled(fixedDelay = 15000)
+    @Scheduled(fixedDelayString = "${app.db-utilization.sample-ms:15000}")
     public void sampleNow() {
         schedulerLockService.runExclusive(SchedulerLockService.DATABASE_UTILIZATION, this::sampleLocked);
     }

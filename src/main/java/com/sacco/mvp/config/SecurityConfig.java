@@ -86,7 +86,7 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**").permitAll()
+                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/admin/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser

@@ -35,5 +35,6 @@
 **/tmp
 **/values.dev.yaml
 *.log
+.tmp-ec2-*
 LICENSE
 README.md

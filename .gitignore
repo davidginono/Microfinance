@@ -29,3 +29,4 @@ cookies-*.txt
 admin_dashboard_response.html
 login-after.html
 application-local.yml
+.tmp-ec2-*
