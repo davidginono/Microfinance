@@ -58,7 +58,7 @@ public class AuthzService {
         if (principal == null || !access.has(principal, UserClaim.MEMBER_LOANS_VIEW)) {
             return false;
         }
-        return loanApplicationRepository.findById(loanId)
+        return loanApplicationRepository.findAccessRowById(loanId)
             .map(app -> app.getApplicantMemberId().equals(principal.getMemberId()))
             .orElse(false);
     }
@@ -103,7 +103,7 @@ public class AuthzService {
         if (principal == null) {
             return false;
         }
-        return loanApplicationRepository.findById(loanId)
+        return loanApplicationRepository.findAccessRowById(loanId)
             .map(app -> {
                 if (app.getApplicantMemberId().equals(principal.getMemberId())
                     && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)) {
@@ -151,7 +151,7 @@ public class AuthzService {
         }
         return boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
                 loanId, principal.getMemberId(), stage)
-            .flatMap(review -> loanApplicationRepository.findById(loanId))
+            .flatMap(review -> loanApplicationRepository.findAccessRowById(loanId))
             .filter(app -> app.getSaccoId().equals(principal.getSaccoId()))
             .filter(app -> sameStationScope(app, principal))
             .isPresent();
@@ -194,7 +194,7 @@ public class AuthzService {
         };
     }
 
-    private boolean sameStationScope(com.sacco.mvp.domain.LoanApplication app, AppUserPrincipal principal) {
+    private boolean sameStationScope(LoanApplicationRepository.LoanAccessRow app, AppUserPrincipal principal) {
         if (principal == null || principal.getStationId() == null || principal.getStationId().isBlank()) {
             return true;
         }

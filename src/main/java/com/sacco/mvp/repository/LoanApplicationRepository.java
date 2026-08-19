@@ -363,6 +363,60 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         """)
     List<ReportLoanRow> findReportRowsById(@Param("ids") Collection<UUID> ids);
 
+    interface QueueLoanRow {
+        UUID getId();
+        Long getApplicationNumber();
+        String getLoanId();
+        LoanType getLoanType();
+        UUID getLoanProductSettingId();
+        UUID getApplicantMemberId();
+        java.math.BigDecimal getAmount();
+        LoanStatus getStatus();
+        OffsetDateTime getCreatedAt();
+        LocalDate getDisbursementDate();
+        LocalDate getFinalDueDate();
+        String getSaccoId();
+        String getStationId();
+    }
+
+    interface LoanAccessRow {
+        UUID getId();
+        UUID getApplicantMemberId();
+        String getSaccoId();
+        String getStationId();
+        LoanStatus getStatus();
+    }
+
+    @Query("""
+        select l.id as id,
+               l.applicantMemberId as applicantMemberId,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.status as status
+        from LoanApplication l
+        where l.id = :id
+        """)
+    Optional<LoanAccessRow> findAccessRowById(@Param("id") UUID id);
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.applicantMemberId as applicantMemberId,
+               l.amount as amount,
+               l.status as status,
+               l.createdAt as createdAt,
+               l.disbursementDate as disbursementDate,
+               l.finalDueDate as finalDueDate,
+               l.saccoId as saccoId,
+               l.stationId as stationId
+        from LoanApplication l
+        where l.id in :ids
+        """)
+    List<QueueLoanRow> findQueueRowsById(@Param("ids") Collection<UUID> ids);
+
     @Query("""
         select l
         from LoanApplication l
@@ -499,20 +553,44 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                              Pageable pageable);
 
     @Query("""
-        select l
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.applicantMemberId as applicantMemberId,
+               l.amount as amount,
+               l.status as status,
+               l.createdAt as createdAt,
+               l.disbursementDate as disbursementDate,
+               l.finalDueDate as finalDueDate,
+               l.saccoId as saccoId,
+               l.stationId as stationId
         from LoanApplication l
         where l.saccoId = :saccoId
           and l.status in :statuses
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
         order by l.createdAt asc
         """)
-    Page<LoanApplication> findQueuePageForScope(@Param("saccoId") String saccoId,
-                                                @Param("stationId") String stationId,
-                                                @Param("statuses") Collection<LoanStatus> statuses,
-                                                Pageable pageable);
+    Page<QueueLoanRow> findQueuePageForScope(@Param("saccoId") String saccoId,
+                                             @Param("stationId") String stationId,
+                                             @Param("statuses") Collection<LoanStatus> statuses,
+                                             Pageable pageable);
 
     @Query("""
-        select l
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.applicantMemberId as applicantMemberId,
+               l.amount as amount,
+               l.status as status,
+               l.createdAt as createdAt,
+               l.disbursementDate as disbursementDate,
+               l.finalDueDate as finalDueDate,
+               l.saccoId as saccoId,
+               l.stationId as stationId
         from LoanApplication l
         where l.saccoId = :saccoId
           and l.status in :statuses
@@ -524,12 +602,12 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
           )
         order by l.createdAt asc
         """)
-    Page<LoanApplication> findQueuePage(@Param("saccoId") String saccoId,
-                                        @Param("stationId") String stationId,
-                                        @Param("statuses") Collection<LoanStatus> statuses,
-                                        @Param("searchTerm") String searchTerm,
-                                        @Param("searchByLoanId") boolean searchByLoanId,
-                                        Pageable pageable);
+    Page<QueueLoanRow> findQueuePage(@Param("saccoId") String saccoId,
+                                     @Param("stationId") String stationId,
+                                     @Param("statuses") Collection<LoanStatus> statuses,
+                                     @Param("searchTerm") String searchTerm,
+                                     @Param("searchByLoanId") boolean searchByLoanId,
+                                     Pageable pageable);
 
     @Query("""
         select l from LoanApplication l

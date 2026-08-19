@@ -36,11 +36,18 @@ public class BoardService {
     public List<LoanApplication> assignedPending(UUID boardMemberId, ApprovalWorkflowStage stage) {
         List<BoardReview> reviews = boardReviewRepository.findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(
             boardMemberId, stage, BoardDecision.PENDING);
+        if (reviews.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, LoanApplication> loans = new LinkedHashMap<>();
+        loanApplicationRepository.findAllById(reviews.stream().map(BoardReview::getLoanApplicationId).toList())
+            .forEach(loan -> loans.put(loan.getId(), loan));
         List<LoanApplication> apps = new ArrayList<>();
         for (BoardReview review : reviews) {
-            loanApplicationRepository.findById(review.getLoanApplicationId())
-                .filter(app -> app.getStatus() == pendingStatusFor(stage))
-                .ifPresent(apps::add);
+            LoanApplication app = loans.get(review.getLoanApplicationId());
+            if (app != null && app.getStatus() == pendingStatusFor(stage)) {
+                apps.add(app);
+            }
         }
         return apps;
     }

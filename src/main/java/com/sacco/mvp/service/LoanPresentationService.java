@@ -81,9 +81,30 @@ public class LoanPresentationService {
     }
 
     public List<LoanApplication> findLoans(Collection<UUID> loanIds) {
-        return loanIds == null || loanIds.isEmpty()
-            ? List.of()
-            : loanApplicationRepository.findAllById(loanIds);
+        if (loanIds == null || loanIds.isEmpty()) {
+            return List.of();
+        }
+        return loanApplicationRepository.findQueueRowsById(loanIds).stream()
+            .map(this::toQueueLoan)
+            .toList();
+    }
+
+    private LoanApplication toQueueLoan(LoanApplicationRepository.QueueLoanRow row) {
+        LoanApplication loan = new LoanApplication();
+        loan.setId(row.getId());
+        loan.setApplicationNumber(row.getApplicationNumber());
+        loan.setLoanId(row.getLoanId());
+        loan.setLoanType(row.getLoanType());
+        loan.setLoanProductSettingId(row.getLoanProductSettingId());
+        loan.setApplicantMemberId(row.getApplicantMemberId());
+        loan.setAmount(row.getAmount());
+        loan.setStatus(row.getStatus());
+        loan.setCreatedAt(row.getCreatedAt());
+        loan.setDisbursementDate(row.getDisbursementDate());
+        loan.setFinalDueDate(row.getFinalDueDate());
+        loan.setSaccoId(row.getSaccoId());
+        loan.setStationId(row.getStationId());
+        return loan;
     }
 
     public Map<UUID, LoanApplication> loansById(Collection<UUID> loanIds) {

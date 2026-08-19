@@ -26,9 +26,11 @@ import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.SessionTimeoutPolicy;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.StationAccessService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
@@ -302,6 +304,12 @@ class StaffAnalyticsControllerSecurityTest {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }
+        @Bean MemberDirectoryService memberDirectoryService(MemberRepository memberRepository) {
+            return new MemberDirectoryService(memberRepository);
+        }
+        @Bean StationAccessService stationAccessService(SaccoStationRepository saccoStationRepository) {
+            return new StationAccessService(saccoStationRepository);
+        }
         @Bean AdminScopeService adminScopeService() { return Mockito.mock(AdminScopeService.class); }
         @Bean StaffMfaService staffMfaService() { return Mockito.mock(StaffMfaService.class); }
         @Bean StationOtpSettingsService stationOtpSettingsService() { return Mockito.mock(StationOtpSettingsService.class); }

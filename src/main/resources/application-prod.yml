@@ -1,0 +1,19 @@
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+  web:
+    resources:
+      cache:
+        period: 7d
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+    jsp:
+      init-parameters:
+        development: false

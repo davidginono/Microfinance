@@ -70,7 +70,7 @@ class AuthzServiceTest {
         BoardReview boardReview = BoardReview.builder().id(UUID.randomUUID()).loanApplicationId(loanId)
             .boardMemberId(memberId).decision(BoardDecision.PENDING).createdAt(OffsetDateTime.now()).build();
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
         when(guarantorRequestRepository.findByIdAndGuarantorMemberId(reqId, memberId)).thenReturn(Optional.of(req));
         when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
             loanId, memberId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(boardReview));
@@ -118,7 +118,7 @@ class AuthzServiceTest {
             .version(0)
             .build();
 
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
 
         assertThat(authzService.canViewLoan(loanId, principal)).isFalse();
         assertThat(authzService.notAdminClass(principal)).isFalse();
@@ -166,7 +166,7 @@ class AuthzServiceTest {
             .applicantMemberId(UUID.randomUUID()).loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN)
             .tenorMonths(1).status(LoanStatus.READY_FOR_MANAGER).formData("{}").requiredGuarantors(0)
             .policySnapshot("{}").createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).version(0).build();
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
 
         AppUserPrincipal both = scopedPrincipal("CIRCLE-1001", "ST-1",
             java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
@@ -178,6 +178,35 @@ class AuthzServiceTest {
         assertThat(authzService.canViewLoan(loanId, both)).isTrue();
         assertThat(authzService.canViewLoan(loanId, processedOnly)).isFalse();
         assertThat(authzService.canViewLoan(loanId, otherStation)).isFalse();
+    }
+
+    private LoanApplicationRepository.LoanAccessRow accessRow(LoanApplication app) {
+        return new LoanApplicationRepository.LoanAccessRow() {
+            @Override
+            public UUID getId() {
+                return app.getId();
+            }
+
+            @Override
+            public UUID getApplicantMemberId() {
+                return app.getApplicantMemberId();
+            }
+
+            @Override
+            public String getSaccoId() {
+                return app.getSaccoId();
+            }
+
+            @Override
+            public String getStationId() {
+                return app.getStationId();
+            }
+
+            @Override
+            public LoanStatus getStatus() {
+                return app.getStatus();
+            }
+        };
     }
 
     private AppUserPrincipal scopedPrincipal(String saccoId, String stationId, java.util.Set<UserClaim> claims) {

@@ -4,9 +4,9 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.repository.SaccoStationRepository;
+import com.sacco.mvp.service.MemberDirectoryService;
+import com.sacco.mvp.service.StationAccessService;
 import com.sacco.mvp.service.UserClaimService;
-import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,15 +19,15 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class AppUserDetailsService implements UserDetailsService {
-    private final MemberRepository memberRepository;
-    private final SaccoStationRepository saccoStationRepository;
+    private final MemberDirectoryService memberDirectoryService;
+    private final StationAccessService stationAccessService;
     private final UserClaimService userClaimService;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         String normalizedUsername = username == null ? "" : username.trim();
-        Member member = memberRepository.findByMemberNo(normalizedUsername)
-            .or(() -> memberRepository.findByStaffNo(normalizedUsername))
+        Member member = memberDirectoryService.findByMemberNo(normalizedUsername)
+            .or(() -> memberDirectoryService.findByStaffNo(normalizedUsername))
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(existing -> existing.isMemberAccess() || existing.isStaffAccessActive())
             .map(existing -> ensureStationAllowed(existing, existing.isStaffAccessActive()))
@@ -43,7 +43,7 @@ public class AppUserDetailsService implements UserDetailsService {
     }
 
     public UserDetails loadMemberByMemberNo(String username) throws UsernameNotFoundException {
-        return memberRepository.findByMemberNo(username)
+        return memberDirectoryService.findByMemberNo(username)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isMemberAccess)
             .map(member -> ensureStationAllowed(member, false))
@@ -56,7 +56,7 @@ public class AppUserDetailsService implements UserDetailsService {
     }
 
     public UserDetails loadStaffByStaffNo(String staffNo) throws UsernameNotFoundException {
-        return memberRepository.findByStaffNo(staffNo)
+        return memberDirectoryService.findByStaffNo(staffNo)
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
             .map(member -> ensureStationAllowed(member, true))
@@ -75,8 +75,7 @@ public class AppUserDetailsService implements UserDetailsService {
             && !member.getSaccoId().isBlank()
             && member.getStationId() != null
             && !member.getStationId().isBlank()) {
-            saccoStationRepository.findBySaccoIdAndStationId(member.getSaccoId(), member.getStationId())
-                .filter(SaccoStation::isAccessSuspended)
+            stationAccessService.suspendedStation(member.getSaccoId(), member.getStationId())
                 .ifPresent(station -> {
                     throw new DisabledException(suspendedMessage(station));
                 });

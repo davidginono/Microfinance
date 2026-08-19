@@ -124,21 +124,11 @@ public class ManagerService {
     }
 
     public List<LoanApplication> queue(String saccoId, LoanStatus status) {
-        if (status == null) {
-            return loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
-                saccoId, List.of(LoanStatus.READY_FOR_MANAGER));
-        }
-        return loanApplicationRepository.findBySaccoIdAndStatusOrderByCreatedAtAsc(saccoId, status);
+        return queue(saccoId, status == null ? List.of(LoanStatus.READY_FOR_MANAGER) : List.of(status), null, false, null);
     }
 
     public List<LoanApplication> queue(String saccoId, List<LoanStatus> statuses) {
-        if (statuses == null || statuses.isEmpty()) {
-            return queue(saccoId, LoanStatus.READY_FOR_MANAGER);
-        }
-        if (statuses.size() == 1) {
-            return queue(saccoId, statuses.get(0));
-        }
-        return loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(saccoId, statuses);
+        return queue(saccoId, statuses, null, false, null);
     }
 
     public List<LoanApplication> queue(String saccoId,
@@ -158,21 +148,46 @@ public class ManagerService {
             ? List.of(LoanStatus.READY_FOR_MANAGER)
             : statuses;
         if (normalizedSearchTerm == null) {
-            return loanApplicationRepository.findQueuePageForScope(
+            return hydrateQueueRows(loanApplicationRepository.findQueuePageForScope(
                 saccoId,
                 blankToNull(stationId),
                 resolvedStatuses,
                 PageRequest.of(0, MAX_QUEUE_ROWS)
-            ).getContent();
+            ).getContent());
         }
-        return loanApplicationRepository.findQueuePage(
+        return hydrateQueueRows(loanApplicationRepository.findQueuePage(
             saccoId,
             blankToNull(stationId),
             resolvedStatuses,
-            normalizedSearchTerm == null ? null : normalizedSearchTerm.toLowerCase(Locale.ENGLISH),
+            normalizedSearchTerm.toLowerCase(Locale.ENGLISH),
             searchByLoanId,
             PageRequest.of(0, MAX_QUEUE_ROWS)
-        ).getContent();
+        ).getContent());
+    }
+
+    private List<LoanApplication> hydrateQueueRows(List<LoanApplicationRepository.QueueLoanRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return rows.stream().map(this::toQueueLoan).toList();
+    }
+
+    private LoanApplication toQueueLoan(LoanApplicationRepository.QueueLoanRow row) {
+        LoanApplication loan = new LoanApplication();
+        loan.setId(row.getId());
+        loan.setApplicationNumber(row.getApplicationNumber());
+        loan.setLoanId(row.getLoanId());
+        loan.setLoanType(row.getLoanType());
+        loan.setLoanProductSettingId(row.getLoanProductSettingId());
+        loan.setApplicantMemberId(row.getApplicantMemberId());
+        loan.setAmount(row.getAmount());
+        loan.setStatus(row.getStatus());
+        loan.setCreatedAt(row.getCreatedAt());
+        loan.setDisbursementDate(row.getDisbursementDate());
+        loan.setFinalDueDate(row.getFinalDueDate());
+        loan.setSaccoId(row.getSaccoId());
+        loan.setStationId(row.getStationId());
+        return loan;
     }
 
     public LoanApplication get(UUID id, String saccoId) {

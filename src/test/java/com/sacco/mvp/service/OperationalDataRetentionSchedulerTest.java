@@ -19,10 +19,16 @@ class OperationalDataRetentionSchedulerTest {
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
         OutboxEventRepository outboxEventRepository = mock(OutboxEventRepository.class);
         NotificationRepository notificationRepository = mock(NotificationRepository.class);
+        SchedulerLockService schedulerLockService = mock(SchedulerLockService.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            invocation.getArgument(1, Runnable.class).run();
+            return null;
+        }).when(schedulerLockService).runExclusive(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
         OperationalDataRetentionScheduler scheduler = new OperationalDataRetentionScheduler(
             auditLogRepository,
             outboxEventRepository,
-            notificationRepository
+            notificationRepository,
+            schedulerLockService
         );
         ReflectionTestUtils.setField(scheduler, "auditLogRetentionDays", 70L);
         ReflectionTestUtils.setField(scheduler, "outboxRetentionDays", 45L);

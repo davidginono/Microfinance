@@ -51,8 +51,8 @@ class AppUserDetailsServiceTest {
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station));
 
         AppUserDetailsService service = new AppUserDetailsService(
-            memberRepository,
-            saccoStationRepository,
+            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 
@@ -78,8 +78,8 @@ class AppUserDetailsServiceTest {
         when(memberAccessClaimRepository.findByIdMemberId(admin.getId())).thenReturn(List.of());
 
         AppUserDetailsService service = new AppUserDetailsService(
-            memberRepository,
-            saccoStationRepository,
+            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
+            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
         );
 

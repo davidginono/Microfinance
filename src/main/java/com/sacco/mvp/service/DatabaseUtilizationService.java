@@ -23,6 +23,7 @@ public class DatabaseUtilizationService {
     private static final DateTimeFormatter LABEL_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchedulerLockService schedulerLockService;
     private final Deque<DatabaseUtilizationPoint> history = new ConcurrentLinkedDeque<>();
 
     @PostConstruct
@@ -32,6 +33,10 @@ public class DatabaseUtilizationService {
 
     @Scheduled(fixedDelay = 15000)
     public void sampleNow() {
+        schedulerLockService.runExclusive(SchedulerLockService.DATABASE_UTILIZATION, this::sampleLocked);
+    }
+
+    private void sampleLocked() {
         try {
             Double sizeMbRaw = jdbcTemplate.queryForObject(
                 "select pg_database_size(current_database()) / 1024.0 / 1024.0",

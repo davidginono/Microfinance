@@ -5,8 +5,6 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.security.AppUserPrincipal;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserDetailsService;
 import com.sacco.mvp.security.AppUsageTrackingFilter;
 import com.sacco.mvp.security.AuthzService;
@@ -17,8 +15,10 @@ import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.StationAccessService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import jakarta.servlet.DispatcherType;
@@ -68,8 +68,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   MemberRepository memberRepository,
-                                                   SaccoStationRepository saccoStationRepository,
+                                                   MemberDirectoryService memberDirectoryService,
+                                                   StationAccessService stationAccessService,
                                                    AdminScopeService adminScopeService,
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
@@ -160,8 +160,8 @@ public class SecurityConfig {
                         boolean staffPasswordLogin = "staff-password".equals(loginType);
                         String normalizedUsername = username.trim().toUpperCase(java.util.Locale.ROOT);
                         java.util.Optional<Member> matchedMember = staffPasswordLogin
-                            ? memberRepository.findByStaffNo(normalizedUsername)
-                            : memberRepository.findByMemberNo(normalizedUsername);
+                            ? memberDirectoryService.findByStaffNo(normalizedUsername)
+                            : memberDirectoryService.findByMemberNo(normalizedUsername);
                         auditMember = matchedMember.orElse(null);
                         message = matchedMember
                             .map(member -> {
@@ -170,7 +170,7 @@ public class SecurityConfig {
                                 }
                                 String suspensionReason = member.getSaccoId() == null || member.getStationId() == null
                                     ? null
-                                    : saccoStationRepository.findBySaccoIdAndStationId(member.getSaccoId(), member.getStationId())
+                                    : stationAccessService.suspendedStation(member.getSaccoId(), member.getStationId())
                                     .filter(SaccoStation::isAccessSuspended)
                                     .map(station -> {
                                         String reason = station.getAccessRestrictionReason();
@@ -289,7 +289,7 @@ public class SecurityConfig {
                         return;
                     }
 
-                    var ssoMember = memberRepository.findByEmailIgnoreCase(email)
+                    var ssoMember = memberDirectoryService.findByEmail(email)
                         .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
                         .filter(member -> member.isMemberAccess() || member.isStaffAccessActive())
                         .orElse(null);
@@ -305,7 +305,7 @@ public class SecurityConfig {
                         && !ssoMember.getSaccoId().isBlank()
                         && ssoMember.getStationId() != null
                         && !ssoMember.getStationId().isBlank()) {
-                        String blockedMessage = saccoStationRepository.findBySaccoIdAndStationId(ssoMember.getSaccoId(), ssoMember.getStationId())
+                        String blockedMessage = stationAccessService.suspendedStation(ssoMember.getSaccoId(), ssoMember.getStationId())
                             .filter(SaccoStation::isAccessSuspended)
                             .map(this::suspendedMessage)
                             .orElse(null);

@@ -25,6 +25,7 @@ import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PlatformAdminService;
 import com.sacco.mvp.service.PlatformEmailSettingsService;
@@ -37,6 +38,7 @@ import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.SessionTimeoutPolicy;
 import com.sacco.mvp.service.SmsUsageManagementService;
 import com.sacco.mvp.service.StaffMfaService;
+import com.sacco.mvp.service.StationAccessService;
 import com.sacco.mvp.service.StationOtpSettingsService;
 import com.sacco.mvp.service.UserClaimService;
 import org.junit.jupiter.api.BeforeEach;
@@ -564,6 +566,12 @@ class AdminControllerUserAccessSecurityTest {
         @Bean PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService() { return Mockito.mock(PlatformSmsGatewaySettingsService.class); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }
+        @Bean MemberDirectoryService memberDirectoryService(MemberRepository memberRepository) {
+            return new MemberDirectoryService(memberRepository);
+        }
+        @Bean StationAccessService stationAccessService(SaccoStationRepository saccoStationRepository) {
+            return new StationAccessService(saccoStationRepository);
+        }
         @Bean StaffMfaService staffMfaService() { return Mockito.mock(StaffMfaService.class); }
         @Bean UserClaimService userClaimService() { return Mockito.mock(UserClaimService.class); }
         @Bean AppUserDetailsService appUserDetailsService() { return Mockito.mock(AppUserDetailsService.class); }

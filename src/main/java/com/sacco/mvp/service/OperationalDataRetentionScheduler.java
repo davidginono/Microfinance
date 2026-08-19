@@ -22,6 +22,8 @@ public class OperationalDataRetentionScheduler {
     private final OutboxEventRepository outboxEventRepository;
     private final NotificationRepository notificationRepository;
 
+    private final SchedulerLockService schedulerLockService;
+
     @Value("${app.retention.audit-log-days:70}")
     private long auditLogRetentionDays;
 
@@ -34,6 +36,10 @@ public class OperationalDataRetentionScheduler {
     @Scheduled(cron = "${app.retention.cleanup-cron:0 30 2 * * *}")
     @Transactional
     public void purgeExpiredOperationalData() {
+        schedulerLockService.runExclusive(SchedulerLockService.OPERATIONAL_RETENTION, this::purgeExpiredOperationalDataLocked);
+    }
+
+    private void purgeExpiredOperationalDataLocked() {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime auditCutoff = now.minusDays(Math.max(auditLogRetentionDays, 1));
         OffsetDateTime outboxCutoff = now.minusDays(Math.max(outboxRetentionDays, 1));

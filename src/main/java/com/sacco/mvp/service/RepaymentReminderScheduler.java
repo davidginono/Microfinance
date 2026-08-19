@@ -36,11 +36,17 @@ public class RepaymentReminderScheduler {
     private final NotificationViewService notificationViewService;
     private final ObjectMapper objectMapper;
 
+    private final SchedulerLockService schedulerLockService;
+
     // Deliberately not @Transactional: delivery performs SMS/e-mail calls, so a wrapping
     // transaction would pin a pooled connection for the whole run. Each reminder is
     // independently idempotent via alreadySentToday.
     @Scheduled(fixedDelay = 3600000)
     public void sendRepaymentReminders() {
+        schedulerLockService.runExclusive(SchedulerLockService.REPAYMENT_REMINDERS, this::sendRepaymentRemindersLocked);
+    }
+
+    private void sendRepaymentRemindersLocked() {
         LocalDate today = LocalDate.now();
         List<LocalDate> dueDates = REMINDER_DAYS.stream().map(today::plusDays).toList();
         Pageable page = PageRequest.of(0, REMINDER_BATCH_SIZE);
