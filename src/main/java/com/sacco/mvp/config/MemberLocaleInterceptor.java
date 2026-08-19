@@ -1,9 +1,8 @@
 package com.sacco.mvp.config;
 
-import com.sacco.mvp.domain.UserSettings;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
-import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.SaccoRegistryService;
+import com.sacco.mvp.service.UserSettingsService;
 import com.sacco.mvp.web.WebRequestClassifier;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,8 +21,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MemberLocaleInterceptor implements HandlerInterceptor {
     private static final String USER_LOCALE_SESSION_PREFIX = MemberLocaleInterceptor.class.getName() + ".USER_LOCALE.";
-    private final UserSettingsRepository userSettingsRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
+    private final UserSettingsService userSettingsService;
+    private final SaccoRegistryService saccoRegistryService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -63,8 +62,8 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
             if (saccoId == null || saccoId.isBlank()) {
                 return null;
             }
-            return saccoSettingsRepository.findById(saccoId)
-                .map(settings -> resolveLocale(settings.getDefaultLanguage()))
+            return saccoRegistryService.defaultLanguage(saccoId)
+                .map(this::resolveLocale)
                 .orElse(Locale.ENGLISH);
         }
         if (path.startsWith(appPrefix) && principal.isMemberAccess()) {
@@ -85,10 +84,7 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
         if (cachedLocale instanceof Locale locale) {
             return locale;
         }
-        Locale locale = userSettingsRepository.findById(memberId)
-            .map(UserSettings::getLanguage)
-            .map(this::resolveLocale)
-            .orElse(Locale.ENGLISH);
+        Locale locale = resolveLocale(userSettingsService.languageOrDefault(memberId));
         request.getSession().setAttribute(userLocaleSessionKey(memberId), locale);
         return locale;
     }

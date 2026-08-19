@@ -60,14 +60,29 @@ public class SaccoRegistryService {
     }
 
     private List<RegisteredSaccoView> loadRegisteredSaccos() {
-        return registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
+        List<RegisteredSacco> saccos = registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc().stream()
             .filter(sacco -> !"PLATFORM".equalsIgnoreCase(sacco.getSaccoId()))
-            .map(this::toRegisteredSaccoView)
+            .toList();
+        if (saccos.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<SaccoStation>> stationsBySacco = saccoStationRepository
+            .findBySaccoIdInAndActiveTrueOrderBySaccoIdAscStationIdAsc(
+                saccos.stream().map(RegisteredSacco::getSaccoId).toList())
+            .stream()
+            .collect(Collectors.groupingBy(SaccoStation::getSaccoId, LinkedHashMap::new, Collectors.toList()));
+        return saccos.stream()
+            .map(sacco -> toRegisteredSaccoView(sacco, stationsBySacco.getOrDefault(sacco.getSaccoId(), List.of())))
             .toList();
     }
 
     private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco) {
-        List<SaccoStation> stations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId());
+        return toRegisteredSaccoView(
+            sacco,
+            saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(sacco.getSaccoId()));
+    }
+
+    private RegisteredSaccoView toRegisteredSaccoView(RegisteredSacco sacco, List<SaccoStation> stations) {
         return new RegisteredSaccoView(
             sacco.getSaccoId(),
             sacco.getSaccoName(),
@@ -101,6 +116,47 @@ public class SaccoRegistryService {
         return registeredSaccoRepository.findById(normalizeSaccoId(saccoId))
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalStateException("Select a SACCO ID from the list."));
+    }
+
+    public java.util.Optional<RegisteredSacco> findActiveSacco(String saccoId) {
+        return saccoId == null
+            ? java.util.Optional.empty()
+            : registeredSaccoRepository.findById(saccoId).filter(RegisteredSacco::isActive);
+    }
+
+    public java.util.Optional<String> externalSaccoName(String saccoId) {
+        return saccoId == null
+            ? java.util.Optional.empty()
+            : saccoSettingsRepository.findById(saccoId)
+                .map(SaccoSettings::getExternalSaccoName)
+                .filter(name -> name != null && !name.isBlank());
+    }
+
+    public java.util.Optional<String> defaultLanguage(String saccoId) {
+        return saccoId == null || saccoId.isBlank()
+            ? java.util.Optional.empty()
+            : saccoSettingsRepository.findById(saccoId).map(SaccoSettings::getDefaultLanguage);
+    }
+
+    public java.util.Optional<SaccoStation> findStation(String saccoId, String stationId) {
+        return saccoId == null || stationId == null
+            ? java.util.Optional.empty()
+            : saccoStationRepository.findBySaccoIdAndStationId(saccoId, stationId);
+    }
+
+    /**
+     * Name printed on exported loan documents: the registry name when set,
+     * otherwise the externally sourced SACCO name, otherwise the raw SACCO ID.
+     */
+    public String documentSaccoName(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return "SACCO";
+        }
+        return registeredSaccoRepository.findById(saccoId)
+            .filter(registeredSacco -> registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank())
+            .map(registeredSacco -> registeredSacco.getSaccoName().trim())
+            .or(() -> externalSaccoName(saccoId).map(String::trim))
+            .orElse(saccoId);
     }
 
     public List<String> activeStations(String saccoId) {

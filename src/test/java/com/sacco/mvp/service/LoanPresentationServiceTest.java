@@ -45,6 +45,8 @@ class LoanPresentationServiceTest {
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private com.sacco.mvp.repository.MemberRepository memberRepository;
+    @Mock private com.sacco.mvp.repository.LoanApplicationRepository loanApplicationRepository;
+    @Mock private com.sacco.mvp.repository.GuarantorRequestRepository guarantorRequestRepository;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
 
@@ -69,6 +71,8 @@ class LoanPresentationServiceTest {
             managerReviewRepository,
             boardReviewRepository,
             memberRepository,
+            loanApplicationRepository,
+            guarantorRequestRepository,
             loanAttachmentService,
             loanProductWorkflowService,
             messageSource

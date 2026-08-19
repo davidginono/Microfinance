@@ -24,6 +24,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.AppUsageAnalyticsService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.LoanAnalyticsService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.PlatformSessionSettingsService;
 import com.sacco.mvp.service.SessionTimeoutPolicy;
@@ -248,8 +249,8 @@ class StaffAnalyticsControllerSecurityTest {
         StaffAnalyticsController staffAnalyticsController(LoanAnalyticsService loanAnalyticsService,
                                                           LoanReportService loanReportService,
                                                           ObjectMapper objectMapper,
-                                                          LoanProductSettingRepository loanProductSettingRepository) {
-            return new StaffAnalyticsController(loanAnalyticsService, loanReportService, objectMapper, new ApplicationClock("Africa/Nairobi"), loanProductSettingRepository);
+                                                          LoanProductDisplayService loanProductDisplayService) {
+            return new StaffAnalyticsController(loanAnalyticsService, loanReportService, objectMapper, new ApplicationClock("Africa/Nairobi"), loanProductDisplayService);
         }
 
         @Bean
@@ -289,6 +290,7 @@ class StaffAnalyticsControllerSecurityTest {
 
         @Bean LoanAnalyticsService loanAnalyticsService() { return Mockito.mock(LoanAnalyticsService.class); }
         @Bean LoanReportService loanReportService() { return Mockito.mock(LoanReportService.class); }
+        @Bean LoanProductDisplayService loanProductDisplayService() { return Mockito.mock(LoanProductDisplayService.class); }
         @Bean AppUsageAnalyticsService appUsageAnalyticsService() { return Mockito.mock(AppUsageAnalyticsService.class); }
         @Bean
         PlatformSessionSettingsService platformSessionSettingsService() {

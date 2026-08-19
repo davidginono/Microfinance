@@ -10,10 +10,6 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.SaccoSettings;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.ManagerReviewRepository;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
@@ -21,6 +17,7 @@ import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.ReversalRequestService;
@@ -56,8 +53,7 @@ import java.util.stream.Collectors;
 public class ManagerController {
     private static final DateTimeFormatter REPORT_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final ManagerService managerService;
-    private final GuarantorRequestRepository guarantorRequestRepository;
-    private final MemberRepository memberRepository;
+    private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
     private final LoanProductDisplayService loanProductDisplayService;
@@ -65,8 +61,6 @@ public class ManagerController {
     private final ReversalRequestService reversalRequestService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
-    private final LoanApplicationRepository loanApplicationRepository;
-    private final ManagerReviewRepository managerReviewRepository;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
@@ -77,12 +71,10 @@ public class ManagerController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberRepository.findAllById(
-                dashboard.recentDisbursements().stream()
-                    .map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId)
-                    .collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+            dashboard.recentDisbursements().stream()
+                .map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId)
+                .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardTotalDisbursedLoans", dashboard.totalDisbursedLoans());
         model.addAttribute("dashboardTrackedApplicationCount", dashboard.totalLoans());
@@ -136,10 +128,8 @@ public class ManagerController {
             loanIdSearch,
             principal.getStationId()
         );
-        Map<UUID, String> applicantNames = memberRepository.findAllById(
-                apps.stream().map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+            apps.stream().map(com.sacco.mvp.domain.LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
@@ -167,7 +157,7 @@ public class ManagerController {
         List<String> statuses = currentFilter.statuses().isEmpty()
             ? List.of(LoanStatus.DRAFT.name())
             : currentFilter.statuses().stream().map(Enum::name).toList();
-        org.springframework.data.domain.Page<ManagerReview> archivePage = managerReviewRepository.findLatestArchivePage(
+        org.springframework.data.domain.Page<ManagerReview> archivePage = managerService.archivePage(
             principal.getMemberId(),
             ApprovalWorkflowStage.MANAGER.name(),
             principal.getSaccoId(),
@@ -183,15 +173,8 @@ public class ManagerController {
             org.springframework.data.domain.PageRequest.of(Math.max(page, 0), 50)
         );
         List<ManagerReview> latestReviews = archivePage.getContent();
-        Map<UUID, com.sacco.mvp.domain.LoanApplication> loanMap = loanApplicationRepository.findAllById(
-                latestReviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(
-                com.sacco.mvp.domain.LoanApplication::getId,
-                loan -> loan,
-                (left, right) -> left,
-                LinkedHashMap::new
-            ));
+        Map<UUID, com.sacco.mvp.domain.LoanApplication> loanMap = loanPresentationService.loansById(
+            latestReviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()));
         List<ArchiveEntry> archiveEntries = latestReviews.stream()
             .map(review -> {
                 com.sacco.mvp.domain.LoanApplication loan = loanMap.get(review.getLoanApplicationId());
@@ -199,10 +182,8 @@ public class ManagerController {
             })
             .filter(Objects::nonNull)
             .toList();
-        Map<UUID, String> applicantNames = memberRepository.findAllById(
-                archiveEntries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+            archiveEntries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()));
         Map<com.sacco.mvp.domain.LoanType, String> loanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
 
         model.addAttribute("archiveRows", archiveEntries.stream()
@@ -239,9 +220,9 @@ public class ManagerController {
     @GetMapping("/loan-applications/{id}")
     public String detail(@PathVariable UUID id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
-        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
-        List<com.sacco.mvp.domain.GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        List<Member> guarantorMembers = memberRepository.findAllById(
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        List<com.sacco.mvp.domain.GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
+        List<Member> guarantorMembers = memberDirectoryService.findAll(
             guarantorRequests.stream().map(com.sacco.mvp.domain.GuarantorRequest::getGuarantorMemberId)
                 .collect(Collectors.toSet()));
         Map<UUID, String> guarantorNames = guarantorMembers.stream()
@@ -330,7 +311,7 @@ public class ManagerController {
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
-        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
     }
 
@@ -340,12 +321,12 @@ public class ManagerController {
                                                                         @PathVariable UUID guarantorId,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
         managerService.get(loanId, principal.getSaccoId(), principal.getStationId());
-        boolean guarantorAssigned = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
+        boolean guarantorAssigned = loanPresentationService.guarantorRequests(loanId).stream()
             .anyMatch(request -> guarantorId.equals(request.getGuarantorMemberId()));
         if (!guarantorAssigned) {
             return ResponseEntity.badRequest().body(Map.of("message", "Guarantor request was not found for this loan."));
         }
-        Member guarantor = memberRepository.findById(guarantorId)
+        Member guarantor = memberDirectoryService.find(guarantorId)
             .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
         ExternalAccountStatusService.ExternalAccountStatusView status = externalAccountStatusService.resolve(guarantor);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -784,7 +765,7 @@ public class ManagerController {
     }
 
     private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {
-        Member member = memberRepository.findById(memberId)
+        Member member = memberDirectoryService.find(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException(missingEmailMessage);
@@ -793,7 +774,7 @@ public class ManagerController {
     }
 
     private Member requireMemberWithSavedSignature(UUID memberId, String missingSignatureMessage) {
-        Member member = memberRepository.findById(memberId)
+        Member member = memberDirectoryService.find(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
             throw new IllegalStateException(missingSignatureMessage);

@@ -62,12 +62,52 @@ public class BoardService {
             .orElseThrow(() -> new IllegalArgumentException("Board assignment not found"));
     }
 
+    public java.util.Optional<LoanApplication> findLoan(UUID loanId) {
+        return loanId == null ? java.util.Optional.empty() : loanApplicationRepository.findById(loanId);
+    }
+
+    public java.util.Optional<BoardReview> findMyReview(UUID loanId, UUID boardMemberId, ApprovalWorkflowStage stage) {
+        return boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(loanId, boardMemberId, stage);
+    }
+
     public List<BoardReview> reviewsForLoan(UUID loanId) {
         return reviewsForLoan(loanId, ApprovalWorkflowStage.BOARD);
     }
 
     public List<BoardReview> reviewsForLoan(UUID loanId, ApprovalWorkflowStage stage) {
         return boardReviewRepository.findByLoanApplicationIdAndReviewStage(loanId, stage);
+    }
+
+    public List<BoardReview> allReviewsForLoan(UUID loanId) {
+        return boardReviewRepository.findByLoanApplicationId(loanId);
+    }
+
+    public org.springframework.data.domain.Page<BoardReview> archivePage(UUID reviewerId,
+                                                                         java.util.Collection<String> reviewStages,
+                                                                         String saccoId,
+                                                                         String stationId,
+                                                                         OffsetDateTime reviewedFrom,
+                                                                         OffsetDateTime reviewedToExclusive,
+                                                                         boolean filterDecision,
+                                                                         String decision,
+                                                                         boolean filterStatuses,
+                                                                         java.util.Collection<String> statuses,
+                                                                         String searchTerm,
+                                                                         org.springframework.data.domain.Pageable pageable) {
+        return boardReviewRepository.findArchivePage(
+            reviewerId,
+            reviewStages,
+            saccoId,
+            stationId,
+            reviewedFrom,
+            reviewedToExclusive,
+            filterDecision,
+            decision,
+            filterStatuses,
+            statuses,
+            searchTerm,
+            pageable
+        );
     }
 
     @Transactional

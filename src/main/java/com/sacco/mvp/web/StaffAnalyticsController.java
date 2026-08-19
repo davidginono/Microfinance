@@ -4,10 +4,10 @@ import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Position;
-import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.LoanAnalyticsService;
+import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,7 +36,7 @@ public class StaffAnalyticsController {
     private final LoanReportService loanReportService;
     private final ObjectMapper objectMapper;
     private final ApplicationClock applicationClock;
-    private final LoanProductSettingRepository loanProductSettingRepository;
+    private final LoanProductDisplayService loanProductDisplayService;
 
     @GetMapping("/analytics")
     public String analytics(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -58,7 +58,8 @@ public class StaffAnalyticsController {
         String selectedView = "staff".equalsIgnoreCase(viewAs) && canViewStationAnalytics ? "staff" : "member";
         boolean stationWideStaffView = "staff".equals(selectedView);
         boolean staffReviewView = !stationWideStaffView;
-        LoanProductSetting selectedProduct = selectedAnalyticsProduct(principal.getSaccoId(), loanProductId, loanType);
+        List<LoanProductSetting> loanProducts = activeLoanProducts(principal.getSaccoId());
+        LoanProductSetting selectedProduct = selectedAnalyticsProduct(principal.getSaccoId(), loanProductId, loanType, loanProducts);
         LoanType resolvedLoanType = selectedProduct == null ? loanType : selectedProduct.getLoanType();
         java.util.UUID resolvedLoanProductId = selectedProduct == null ? null : selectedProduct.getId();
         LoanAnalyticsService.StaffReviewAnalytics staffReviewAnalytics = staffReviewView
@@ -116,7 +117,6 @@ public class StaffAnalyticsController {
         model.addAttribute("totalLoanAmountPaidLabel", moneyLabel(productFinancialTotals.totalLoanAmountPaid()));
         model.addAttribute("totalLoanAmountUnpaidLabel", moneyLabel(productFinancialTotals.totalLoanAmountUnpaid()));
         model.addAttribute("productFinancialRows", productFinancialRows);
-        List<LoanProductSetting> loanProducts = activeLoanProducts(principal.getSaccoId());
         model.addAttribute("selectedLoanProductLabel", selectedLoanProductLabel(selectedProduct, resolvedLoanType, loanProducts));
         model.addAttribute("trendSeriesJson", toJson(trendSeries));
         model.addAttribute("fromDate", StrictAnalyticsLocalDateEditor.format(resolvedFrom));
@@ -154,23 +154,26 @@ public class StaffAnalyticsController {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+        return loanProductDisplayService.activeProducts(saccoId).stream()
             .filter(product -> product.getLoanType() != null)
             .filter(LoanProductSetting::isAvailableForApplications)
             .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
     }
 
-    private LoanProductSetting selectedAnalyticsProduct(String saccoId, java.util.UUID loanProductId, LoanType fallbackLoanType) {
+    private LoanProductSetting selectedAnalyticsProduct(String saccoId,
+                                                        java.util.UUID loanProductId,
+                                                        LoanType fallbackLoanType,
+                                                        List<LoanProductSetting> activeProducts) {
         if (loanProductId != null) {
-            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+            return loanProductDisplayService.findActiveProduct(loanProductId, saccoId)
                 .filter(LoanProductSetting::isAvailableForApplications)
                 .orElse(null);
         }
         if (fallbackLoanType == null) {
             return null;
         }
-        return activeLoanProducts(saccoId).stream()
+        return activeProducts.stream()
             .filter(product -> product.getLoanType() == fallbackLoanType)
             .findFirst()
             .orElse(null);

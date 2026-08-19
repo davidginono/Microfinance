@@ -2,10 +2,9 @@ package com.sacco.mvp.config;
 
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
-import com.sacco.mvp.domain.UserSettings;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
-import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.SaccoRegistryService;
+import com.sacco.mvp.service.UserSettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -14,7 +13,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,28 +31,25 @@ class MemberLocaleInterceptorTest {
 
     @Test
     void jsonRequestSkipsDatabaseBackedLocaleResolution() {
-        UserSettingsRepository userSettings = mock(UserSettingsRepository.class);
-        SaccoSettingsRepository saccoSettings = mock(SaccoSettingsRepository.class);
-        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoSettings);
+        UserSettingsService userSettings = mock(UserSettingsService.class);
+        SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
+        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/app/dashboard/external-account-status");
         request.addHeader("Accept", "application/json");
 
         boolean allowed = interceptor.preHandle(request, new MockHttpServletResponse(), new Object());
 
         assertThat(allowed).isTrue();
-        verifyNoInteractions(userSettings, saccoSettings);
+        verifyNoInteractions(userSettings, saccoRegistry);
     }
 
     @Test
     void memberHtmlRequestsReuseSessionCachedLocale() {
         UUID memberId = UUID.randomUUID();
-        UserSettingsRepository userSettings = mock(UserSettingsRepository.class);
-        SaccoSettingsRepository saccoSettings = mock(SaccoSettingsRepository.class);
-        when(userSettings.findById(memberId)).thenReturn(Optional.of(UserSettings.builder()
-            .memberId(memberId)
-            .language("sw")
-            .build()));
-        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoSettings);
+        UserSettingsService userSettings = mock(UserSettingsService.class);
+        SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
+        when(userSettings.languageOrDefault(memberId)).thenReturn("sw");
+        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
         authenticateMember(memberId);
         MockHttpServletRequest firstRequest = new MockHttpServletRequest("GET", "/app/dashboard");
 
@@ -63,16 +58,16 @@ class MemberLocaleInterceptorTest {
         secondRequest.setSession(firstRequest.getSession());
         interceptor.preHandle(secondRequest, new MockHttpServletResponse(), new Object());
 
-        verify(userSettings, times(1)).findById(memberId);
-        verifyNoInteractions(saccoSettings);
+        verify(userSettings, times(1)).languageOrDefault(memberId);
+        verifyNoInteractions(saccoRegistry);
     }
 
     @Test
     void updatedUserLocaleReplacesCachedValueWithoutDatabaseLookup() {
         UUID memberId = UUID.randomUUID();
-        UserSettingsRepository userSettings = mock(UserSettingsRepository.class);
-        SaccoSettingsRepository saccoSettings = mock(SaccoSettingsRepository.class);
-        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoSettings);
+        UserSettingsService userSettings = mock(UserSettingsService.class);
+        SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
+        MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
         authenticateMember(memberId);
         MockHttpServletRequest updateRequest = new MockHttpServletRequest("POST", "/app/settings/language");
         interceptor.cacheUserLocale(updateRequest, memberId, "sw");
@@ -83,7 +78,7 @@ class MemberLocaleInterceptorTest {
 
         assertThat(nextRequest.getSession().getAttribute(
             MemberLocaleInterceptor.class.getName() + ".USER_LOCALE." + memberId)).isEqualTo(java.util.Locale.of("sw"));
-        verifyNoInteractions(userSettings, saccoSettings);
+        verifyNoInteractions(userSettings, saccoRegistry);
     }
 
     private void authenticateMember(UUID memberId) {

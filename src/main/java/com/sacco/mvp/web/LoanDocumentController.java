@@ -10,20 +10,15 @@ import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.ManagerReview;
-import com.sacco.mvp.repository.BoardReviewRepository;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.ManagerReviewRepository;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.RegisteredSaccoRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberProfileImageService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
+import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.AccessControlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
@@ -55,13 +50,8 @@ import java.util.regex.Pattern;
 public class LoanDocumentController {
     private static final Pattern UNSAFE_HEADER_FILENAME_CHARACTERS = Pattern.compile("[\\r\\n\\u0000-\\u001F\\u007F]");
 
-    private final LoanApplicationRepository loanApplicationRepository;
-    private final MemberRepository memberRepository;
-    private final GuarantorRequestRepository guarantorRequestRepository;
-    private final BoardReviewRepository boardReviewRepository;
-    private final ManagerReviewRepository managerReviewRepository;
-    private final RegisteredSaccoRepository registeredSaccoRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
+    private final MemberDirectoryService memberDirectoryService;
+    private final SaccoRegistryService saccoRegistryService;
     private final LoanPresentationService loanPresentationService;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanReportService loanReportService;
@@ -76,12 +66,12 @@ public class LoanDocumentController {
                                                     @AuthenticationPrincipal AppUserPrincipal principal,
                                                     @RequestParam(name = "signatureMode", defaultValue = "signed") String signatureMode) {
         boolean includeRecordedSignatures = !"unsigned".equalsIgnoreCase(signatureMode);
-        LoanApplication app = loanApplicationRepository.findById(loanId)
+        LoanApplication app = loanPresentationService.findLoan(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             throw new IllegalStateException("Load SACCO financial details before printing");
         }
-        long approvedGuarantors = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
+        long approvedGuarantors = loanPresentationService.guarantorRequests(loanId).stream()
             .filter(request -> request.getStatus() == GuarantorRequestStatus.APPROVED)
             .count();
         if (app.getRequiredGuarantors() != null && app.getRequiredGuarantors() > 0 && approvedGuarantors < app.getRequiredGuarantors()) {
@@ -91,30 +81,26 @@ public class LoanDocumentController {
             throw new IllegalStateException("Printing is available once the application is on review by manager");
         }
 
-        Member applicant = memberRepository.findById(app.getApplicantMemberId())
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
         boolean hasApplicantSignature = (app.getApplicantSignatureText() != null && !app.getApplicantSignatureText().isBlank())
             || (applicant.getSignatureText() != null && !applicant.getSignatureText().isBlank());
         if (app.getApplicantSignatureVerifiedAt() == null || !hasApplicantSignature) {
             throw new IllegalStateException("Printing is available after the applicant signature is verified");
         }
-        List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(loanId);
-        List<BoardReview> boardReviews = boardReviewRepository.findByLoanApplicationId(loanId);
-        List<ManagerReview> staffReviews = managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
+        List<GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(loanId);
+        List<BoardReview> boardReviews = loanPresentationService.boardReviewsForLoan(loanId);
+        List<ManagerReview> staffReviews = loanPresentationService.staffReviewsForLoan(loanId);
         Map<UUID, String> guarantorNames = new LinkedHashMap<>();
         Map<UUID, String> guarantorMemberNumbers = new LinkedHashMap<>();
-        for (Member member : memberRepository.findAllById(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
+        for (Member member : memberDirectoryService.findAll(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
             guarantorNames.put(member.getId(), member.getFullName());
             guarantorMemberNumbers.put(member.getId(), member.getMemberNo());
         }
-        Map<UUID, Member> staffReviewers = new LinkedHashMap<>();
-        for (Member member : memberRepository.findAllById(staffReviews.stream().map(ManagerReview::getManagerMemberId).toList())) {
-            staffReviewers.put(member.getId(), member);
-        }
-        Map<UUID, Member> boardMembers = new LinkedHashMap<>();
-        for (Member member : memberRepository.findAllById(boardReviews.stream().map(BoardReview::getBoardMemberId).toList())) {
-            boardMembers.put(member.getId(), member);
-        }
+        Map<UUID, Member> staffReviewers = memberDirectoryService.membersById(
+            staffReviews.stream().map(ManagerReview::getManagerMemberId).toList());
+        Map<UUID, Member> boardMembers = memberDirectoryService.membersById(
+            boardReviews.stream().map(BoardReview::getBoardMemberId).toList());
 
         byte[] pdf = loanPresentationService.buildPrintablePdf(
             app,
@@ -160,17 +146,7 @@ public class LoanDocumentController {
     }
 
     private String resolvePrintableSaccoName(String saccoId) {
-        if (saccoId == null || saccoId.isBlank()) {
-            return "SACCO";
-        }
-        return registeredSaccoRepository.findById(saccoId)
-            .filter(registeredSacco -> registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank())
-            .map(registeredSacco -> registeredSacco.getSaccoName().trim())
-            .or(() -> saccoSettingsRepository.findById(saccoId)
-                .map(settings -> settings.getExternalSaccoName())
-                .filter(name -> name != null && !name.isBlank())
-                .map(String::trim))
-            .orElse(saccoId);
+        return saccoRegistryService.documentSaccoName(saccoId);
     }
 
     @GetMapping("/documents/loan-applications/{loanId}/attachments/{attachmentId}")
@@ -179,7 +155,7 @@ public class LoanDocumentController {
                                                      @PathVariable String attachmentId,
                                                      @AuthenticationPrincipal AppUserPrincipal principal,
                                                      @RequestParam(name = "inline", defaultValue = "false") boolean inline) throws IOException {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
+        LoanApplication app = loanPresentationService.findLoan(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(loanId, attachmentId, app.getAttachmentsJson());
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
@@ -207,7 +183,7 @@ public class LoanDocumentController {
     public String viewAttachment(@PathVariable UUID loanId,
                                  @PathVariable String attachmentId,
                                  Model model) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
+        LoanApplication app = loanPresentationService.findLoan(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
         LoanAttachmentService.AttachmentResource resource = loanAttachmentService.load(loanId, attachmentId, app.getAttachmentsJson());
         String contentType = resource.getContentType() == null || resource.getContentType().isBlank()

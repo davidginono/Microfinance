@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -16,6 +18,25 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LoanProductDisplayService {
     private final LoanProductSettingRepository loanProductSettingRepository;
+
+    public List<LoanProductSetting> activeProducts(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return List.of();
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
+    }
+
+    public Optional<LoanProductSetting> findActiveProduct(UUID loanProductId, String saccoId) {
+        return loanProductId == null || saccoId == null || saccoId.isBlank()
+            ? Optional.empty()
+            : loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId);
+    }
+
+    public Optional<LoanProductSetting> findProduct(UUID loanProductId, String saccoId) {
+        return loanProductId == null || saccoId == null || saccoId.isBlank()
+            ? Optional.empty()
+            : loanProductSettingRepository.findByIdAndSaccoId(loanProductId, saccoId);
+    }
 
     public Map<LoanType, String> namesForSacco(String saccoId) {
         if (saccoId == null || saccoId.isBlank()) {
@@ -26,6 +47,21 @@ public class LoanProductDisplayService {
             .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .collect(Collectors.toMap(
                 LoanProductSetting::getLoanType,
+                LoanProductSetting::getDisplayName,
+                (first, ignored) -> first,
+                LinkedHashMap::new
+            ));
+    }
+
+    public Map<UUID, String> namesById(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return Map.of();
+        }
+        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+            .filter(LoanProductSetting::isAvailableForApplications)
+            .sorted(java.util.Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
+            .collect(Collectors.toMap(
+                LoanProductSetting::getId,
                 LoanProductSetting::getDisplayName,
                 (first, ignored) -> first,
                 LinkedHashMap::new

@@ -3,9 +3,8 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
-import com.sacco.mvp.repository.BoardReviewRepository;
-import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.service.LoanProductWorkflowService;
+import com.sacco.mvp.service.LoanWorkflowService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,8 +24,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AppControllerWorkflowProgressTest {
     @Mock private LoanProductWorkflowService loanProductWorkflowService;
-    @Mock private ManagerReviewRepository managerReviewRepository;
-    @Mock private BoardReviewRepository boardReviewRepository;
+    @Mock private LoanWorkflowService loanWorkflowService;
 
     @InjectMocks private AppController controller;
 
@@ -41,9 +39,9 @@ class AppControllerWorkflowProgressTest {
                 ApprovalWorkflowStage.DISBURSEMENT_OFFICER
             )
         ));
-        when(managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(any(), any()))
+        when(loanWorkflowService.staffReviewsForStage(any(), any()))
             .thenReturn(List.of());
-        when(boardReviewRepository.findByLoanApplicationIdAndReviewStage(any(), any()))
+        when(loanWorkflowService.boardReviewsForStage(any(), any()))
             .thenReturn(List.of());
 
         List<Map<String, Object>> steps = dashboardWorkflowSteps(app);
@@ -74,7 +72,7 @@ class AppControllerWorkflowProgressTest {
         when(loanProductWorkflowService.resolveForApplication(app)).thenReturn(workflow(
             List.of(ApprovalWorkflowStage.MANAGER, ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
         ));
-        when(managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(any(), any()))
+        when(loanWorkflowService.staffReviewsForStage(any(), any()))
             .thenReturn(List.of());
 
         List<Map<String, Object>> steps = dashboardWorkflowSteps(app);

@@ -9,12 +9,11 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanWorkflowService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.StationOtpDeliveryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,8 +41,7 @@ class AppControllerDirectGuarantorOtpNotificationTest {
     @Mock private LoanWorkflowService loanWorkflowService;
     @Mock private EmailOtpService emailOtpService;
     @Mock private LoanProductDisplayService loanProductDisplayService;
-    @Mock private MemberRepository memberRepository;
-    @Mock private GuarantorRequestRepository guarantorRequestRepository;
+    @Mock private MemberDirectoryService memberDirectoryService;
     @Mock private AppUserPrincipal principal;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -89,9 +87,9 @@ class AppControllerDirectGuarantorOtpNotificationTest {
 
         when(principal.getMemberId()).thenReturn(applicantId);
         when(loanWorkflowService.getMine(loanId, applicantId)).thenReturn(application);
-        when(guarantorRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
-        when(memberRepository.findById(guarantorId)).thenReturn(Optional.of(guarantor));
-        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(applicant));
+        when(loanWorkflowService.findGuarantorRequest(requestId)).thenReturn(Optional.of(request));
+        when(memberDirectoryService.find(guarantorId)).thenReturn(Optional.of(guarantor));
+        when(memberDirectoryService.find(applicantId)).thenReturn(Optional.of(applicant));
         when(loanProductDisplayService.displayName(application)).thenReturn("Watumishi Emergency Loan");
         when(emailOtpService.issueOtpWithMetadata(
             anyString(),

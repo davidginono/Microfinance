@@ -208,6 +208,44 @@ public class ManagerService {
             .orElseThrow(() -> new IllegalArgumentException("Settings missing"));
     }
 
+    public List<ManagerReview> reviewsForLoan(UUID loanId) {
+        return managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
+    }
+
+    public List<ManagerReview> reviewsForLoan(UUID loanId, ApprovalWorkflowStage stage) {
+        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(loanId, stage);
+    }
+
+    public org.springframework.data.domain.Page<ManagerReview> archivePage(UUID reviewerId,
+                                                                           String reviewStage,
+                                                                           String saccoId,
+                                                                           String stationId,
+                                                                           OffsetDateTime reviewedFrom,
+                                                                           OffsetDateTime reviewedToExclusive,
+                                                                           boolean filterDecision,
+                                                                           String decision,
+                                                                           boolean filterStatuses,
+                                                                           java.util.Collection<String> statuses,
+                                                                           String searchTerm,
+                                                                           boolean searchLoanId,
+                                                                           org.springframework.data.domain.Pageable pageable) {
+        return managerReviewRepository.findLatestArchivePage(
+            reviewerId,
+            reviewStage,
+            saccoId,
+            stationId,
+            reviewedFrom,
+            reviewedToExclusive,
+            filterDecision,
+            decision,
+            filterStatuses,
+            statuses,
+            searchTerm,
+            searchLoanId,
+            pageable
+        );
+    }
+
     @Transactional
     public void decide(UUID loanId,
                        UUID managerId,

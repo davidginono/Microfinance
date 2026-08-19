@@ -3,11 +3,11 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.PaymentDestinationType;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PaymentDetailsService;
+import com.sacco.mvp.service.UserSettingsService;
 import com.sacco.mvp.service.StationOtpDeliveryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,8 +33,8 @@ import static org.mockito.Mockito.when;
 class AppControllerPaymentSettingsTest {
     @Mock private PaymentDetailsService paymentDetailsService;
     @Mock private EmailOtpService emailOtpService;
-    @Mock private MemberRepository memberRepository;
-    @Mock private UserSettingsRepository userSettingsRepository;
+    @Mock private MemberDirectoryService memberDirectoryService;
+    @Mock private UserSettingsService userSettingsService;
     @Mock private AppUserPrincipal principal;
 
     @InjectMocks private AppController controller;
@@ -62,7 +62,7 @@ class AppControllerPaymentSettingsTest {
         assertThat(model.get("settingsSection")).isEqualTo("payment-details");
         assertThat(model).containsKey("paymentDetails").doesNotContainKey("memberSettingsLanguage");
         assertThat(model.get("paymentDestinationType")).isEqualTo("MOBILE_MONEY");
-        verify(userSettingsRepository, never()).findById(any());
+        verify(userSettingsService, never()).languageOrDefault(any());
     }
 
     @Test
@@ -70,7 +70,7 @@ class AppControllerPaymentSettingsTest {
         UUID memberId = UUID.randomUUID();
         Member member = member(memberId);
         when(principal.getMemberId()).thenReturn(memberId);
-        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
         when(emailOtpService.validateOtp(
             member.getEmail(), EmailOtpPurpose.PAYMENT_DETAILS_CHANGE, memberId, "000000"
         )).thenThrow(new IllegalStateException("The OTP code is invalid."));
@@ -97,7 +97,7 @@ class AppControllerPaymentSettingsTest {
         UUID tokenId = UUID.randomUUID();
         Member member = member(memberId);
         when(principal.getMemberId()).thenReturn(memberId);
-        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
         when(emailOtpService.validateOtp(
             member.getEmail(), EmailOtpPurpose.PAYMENT_DETAILS_CHANGE, memberId, "123456"
         )).thenReturn(tokenId);
@@ -123,7 +123,7 @@ class AppControllerPaymentSettingsTest {
         UUID memberId = UUID.randomUUID();
         Member member = member(memberId);
         when(principal.getMemberId()).thenReturn(memberId);
-        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(memberDirectoryService.find(memberId)).thenReturn(Optional.of(member));
         OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(10);
         when(emailOtpService.issueOtpWithMetadata(
             eq(member.getEmail()),

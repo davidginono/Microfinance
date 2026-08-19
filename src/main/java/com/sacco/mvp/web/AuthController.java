@@ -6,13 +6,12 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.AuditService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.UserClaimService;
@@ -47,8 +46,7 @@ import java.util.Map;
 public class AuthController {
     private final MemberRegistrationService memberRegistrationService;
     private final EmailOtpService emailOtpService;
-    private final MemberRepository memberRepository;
-    private final SaccoStationRepository saccoStationRepository;
+    private final MemberDirectoryService memberDirectoryService;
     private final UserClaimService userClaimService;
     private final SaccoRegistryService saccoRegistryService;
     private final AdminScopeService adminScopeService;
@@ -258,8 +256,7 @@ public class AuthController {
         try {
             Member member = findPasswordResetAccount(normalizedUsername, accountType);
             emailOtpService.consumeOtp(member.getEmail(), EmailOtpPurpose.PASSWORD_RESET, member.getId(), otpCode);
-            member.setPasswordHash(passwordEncoder.encode(password));
-            memberRepository.save(member);
+            memberDirectoryService.updatePasswordHash(member, passwordEncoder.encode(password));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "message", "Password updated. You can now sign in with your new password."
@@ -277,7 +274,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your email address."));
         }
 
-        Member matchedAccount = memberRepository.findByEmailIgnoreCase(normalizedEmail)
+        Member matchedAccount = memberDirectoryService.findByEmail(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .orElse(null);
         if (matchedAccount != null && !matchedAccount.isMemberAccess()) {
@@ -331,7 +328,7 @@ public class AuthController {
         }
 
         try {
-            Member member = memberRepository.findByEmailIgnoreCase(normalizedEmail)
+            Member member = memberDirectoryService.findByEmail(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
             if (!member.isMemberAccess()) {
@@ -366,8 +363,8 @@ public class AuthController {
             ));
         }
 
-        Member user = memberRepository
-            .findByEmailIgnoreCase(normalizedEmail)
+        Member user = memberDirectoryService
+            .findByEmail(normalizedEmail)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
             .orElse(null);
@@ -419,8 +416,8 @@ public class AuthController {
         }
 
         try {
-            Member user = memberRepository
-                .findByEmailIgnoreCase(normalizedEmail)
+            Member user = memberDirectoryService
+                .findByEmail(normalizedEmail)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
@@ -517,7 +514,7 @@ public class AuthController {
         if (saccoId == null || saccoId.isBlank() || stationId == null || stationId.isBlank()) {
             return null;
         }
-        return saccoStationRepository.findBySaccoIdAndStationId(saccoId, stationId)
+        return saccoRegistryService.findStation(saccoId, stationId)
             .filter(SaccoStation::isAccessSuspended)
             .map(this::suspendedMessage)
             .orElse(null);
@@ -566,12 +563,12 @@ public class AuthController {
     private Member findPasswordResetAccount(String normalizedUsername, String accountType) {
         String normalizedType = accountType == null ? "" : accountType.trim().toLowerCase();
         if ("staff".equals(normalizedType)) {
-            return memberRepository.findByStaffNo(normalizedUsername)
+            return memberDirectoryService.findByStaffNo(normalizedUsername)
                 .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
                 .filter(Member::isStaffAccessActive)
                 .orElseThrow(() -> new IllegalStateException("No active staff account was found for that staff number."));
         }
-        Member member = memberRepository.findByMemberNo(normalizedUsername)
+        Member member = memberDirectoryService.findByMemberNo(normalizedUsername)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
             .orElseThrow(() -> new IllegalStateException("No active account was found for that member number."));
         if (!member.isMemberAccess()) {

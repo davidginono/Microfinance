@@ -12,6 +12,8 @@ import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.BoardDecision;
+import com.sacco.mvp.repository.GuarantorRequestRepository;
+import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.MemberRepository;
@@ -68,9 +70,41 @@ public class LoanPresentationService {
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final MemberRepository memberRepository;
+    private final LoanApplicationRepository loanApplicationRepository;
+    private final GuarantorRequestRepository guarantorRequestRepository;
     private final LoanAttachmentService loanAttachmentService;
     private final LoanProductWorkflowService loanProductWorkflowService;
     private final MessageSource messageSource;
+
+    public java.util.Optional<LoanApplication> findLoan(UUID loanId) {
+        return loanId == null ? java.util.Optional.empty() : loanApplicationRepository.findById(loanId);
+    }
+
+    public List<LoanApplication> findLoans(Collection<UUID> loanIds) {
+        return loanIds == null || loanIds.isEmpty()
+            ? List.of()
+            : loanApplicationRepository.findAllById(loanIds);
+    }
+
+    public Map<UUID, LoanApplication> loansById(Collection<UUID> loanIds) {
+        Map<UUID, LoanApplication> loans = new LinkedHashMap<>();
+        for (LoanApplication loan : findLoans(loanIds)) {
+            loans.putIfAbsent(loan.getId(), loan);
+        }
+        return loans;
+    }
+
+    public List<GuarantorRequest> guarantorRequests(UUID loanId) {
+        return guarantorRequestRepository.findByLoanApplicationId(loanId);
+    }
+
+    public List<BoardReview> boardReviewsForLoan(UUID loanId) {
+        return boardReviewRepository.findByLoanApplicationId(loanId);
+    }
+
+    public List<ManagerReview> staffReviewsForLoan(UUID loanId) {
+        return managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
+    }
 
     public Map<String, Object> parseFormFields(String json) {
         return parseNamedMap(json, Set.of("_csrf", "financialSnapshotJson", "nationalId", "employerName", "hasExistingLoan", "additionalNotes"));
@@ -972,17 +1006,44 @@ public class LoanPresentationService {
         if (apps == null || apps.isEmpty()) {
             return Collections.emptyMap();
         }
+        List<UUID> rejectedLoanIds = apps.stream()
+            .filter(app -> app != null && app.getId() != null && isRejectedStatus(app.getStatus()))
+            .map(LoanApplication::getId)
+            .toList();
+        if (rejectedLoanIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<UUID, List<DecisionFeedback>> feedbackByLoan = new LinkedHashMap<>();
+        managerReviewRepository.findByLoanApplicationIdInOrderByCreatedAtDesc(rejectedLoanIds).stream()
+            .filter(review -> review.getDecision() == ManagerDecision.REJECT)
+            .filter(review -> review.getReasons() != null && !review.getReasons().isBlank())
+            .forEach(review -> feedbackByLoan
+                .computeIfAbsent(review.getLoanApplicationId(), ignored -> new ArrayList<>())
+                .add(new DecisionFeedback(
+                    review.getReviewStage() == null ? "Staff Review" : review.getReviewStage().getDisplayLabel(),
+                    review.getReasons(),
+                    review.getCreatedAt()
+                )));
+        boardReviewRepository.findByLoanApplicationIdIn(rejectedLoanIds).stream()
+            .filter(review -> review.getDecision() == BoardDecision.REJECTED)
+            .filter(review -> review.getComment() != null && !review.getComment().isBlank())
+            .forEach(review -> feedbackByLoan
+                .computeIfAbsent(review.getLoanApplicationId(), ignored -> new ArrayList<>())
+                .add(new DecisionFeedback(
+                    review.getReviewStage() == null ? "Board Review" : review.getReviewStage().getDisplayLabel(),
+                    review.getComment(),
+                    review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt()
+                )));
+
         Map<UUID, String> reasons = new LinkedHashMap<>();
-        for (LoanApplication app : apps) {
-            if (app == null || app.getId() == null) {
+        for (UUID loanId : rejectedLoanIds) {
+            List<DecisionFeedback> feedback = feedbackByLoan.get(loanId);
+            if (feedback == null || feedback.isEmpty()) {
                 continue;
             }
-            if (!isRejectedStatus(app.getStatus())) {
-                continue;
-            }
-            rejectionFeedback(app.getId()).stream()
-                .findFirst()
-                .ifPresent(feedback -> reasons.put(app.getId(), feedback.reason()));
+            feedback.sort(Comparator.comparing(DecisionFeedback::decidedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+            reasons.put(loanId, feedback.get(0).reason());
         }
         return reasons;
     }

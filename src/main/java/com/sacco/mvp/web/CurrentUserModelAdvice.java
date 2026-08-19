@@ -4,15 +4,12 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.PlatformSupportContactSettings;
 import com.sacco.mvp.domain.RegisteredSacco;
-import com.sacco.mvp.domain.SaccoSettings;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.RegisteredSaccoRepository;
-import com.sacco.mvp.repository.SaccoSettingsRepository;
-import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
+import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.web.view.CurrentUserView;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -29,10 +26,8 @@ public class CurrentUserModelAdvice {
     private static final String REQUEST_ACTIVE_SACCO_BRAND = CurrentUserModelAdvice.class.getName() + ".activeSaccoBrand";
 
     private final AdminScopeService adminScopeService;
-    private final MemberRepository memberRepository;
-    private final RegisteredSaccoRepository registeredSaccoRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
-    private final SaccoStationRepository saccoStationRepository;
+    private final MemberDirectoryService memberDirectoryService;
+    private final SaccoRegistryService saccoRegistryService;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
     private final ObjectMapper objectMapper;
@@ -59,7 +54,7 @@ public class CurrentUserModelAdvice {
         if (principal == null || isJsonRequest()) {
             return null;
         }
-        return memberRepository.findById(principal.getMemberId())
+        return memberDirectoryService.find(principal.getMemberId())
             .filter(Member::isStaffAccessPendingAcknowledgement)
             .map(member -> new PendingStaffAccessView(
                 member.getStaffNo(),
@@ -91,7 +86,7 @@ public class CurrentUserModelAdvice {
         if (stationId == null || stationId.isBlank()) {
             return null;
         }
-        String addressLocation = saccoStationRepository.findBySaccoIdAndStationId(principal.getSaccoId(), stationId)
+        String addressLocation = saccoRegistryService.findStation(principal.getSaccoId(), stationId)
             .map(station -> station.getAddressLocation() == null || station.getAddressLocation().isBlank()
                 ? "Location not set"
                 : station.getAddressLocation().trim())
@@ -188,8 +183,7 @@ public class CurrentUserModelAdvice {
 
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
         if (scope != null && scope.getSaccoId() != null) {
-            RegisteredSacco registeredSacco = registeredSaccoRepository.findById(scope.getSaccoId())
-                .filter(RegisteredSacco::isActive)
+            RegisteredSacco registeredSacco = saccoRegistryService.findActiveSacco(scope.getSaccoId())
                 .orElse(null);
             String saccoName = registeredSacco != null && registeredSacco.getSaccoName() != null && !registeredSacco.getSaccoName().isBlank()
                 ? registeredSacco.getSaccoName()
@@ -200,14 +194,11 @@ public class CurrentUserModelAdvice {
         }
 
         String saccoId = principal.getSaccoId();
-        RegisteredSacco registeredSacco = registeredSaccoRepository.findById(saccoId)
-            .filter(RegisteredSacco::isActive)
+        RegisteredSacco registeredSacco = saccoRegistryService.findActiveSacco(saccoId)
             .orElse(null);
         String saccoName = (registeredSacco != null ? java.util.Optional.ofNullable(registeredSacco.getSaccoName()) : java.util.Optional.<String>empty())
             .filter(name -> name != null && !name.isBlank())
-            .or(() -> saccoSettingsRepository.findById(saccoId)
-                .map(SaccoSettings::getExternalSaccoName)
-                .filter(name -> name != null && !name.isBlank()))
+            .or(() -> saccoRegistryService.externalSaccoName(saccoId))
             .orElse(saccoId);
         ActiveSaccoBrand brand = buildBrand(saccoId, saccoName, registeredSacco == null ? null : registeredSacco.getUpdatedAt());
         request.setAttribute(REQUEST_ACTIVE_SACCO_BRAND, brand);

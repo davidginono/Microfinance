@@ -1,9 +1,8 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.config.MemberLocaleInterceptor;
-import com.sacco.mvp.domain.UserSettings;
-import com.sacco.mvp.repository.UserSettingsRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.UserSettingsService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.time.OffsetDateTime;
 import java.util.Locale;
 
 @Controller
@@ -24,18 +22,13 @@ import java.util.Locale;
 @RequiredArgsConstructor
 @PreAuthorize("@authz.staffAnalyticsAccess(principal)")
 public class StaffSettingsController {
-    private final UserSettingsRepository userSettingsRepository;
+    private final UserSettingsService userSettingsService;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
 
     @GetMapping
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
-            .orElseGet(() -> UserSettings.builder()
-                .memberId(principal.getMemberId())
-                .language("en")
-                .notificationPrefs("{}")
-                .build());
-        model.addAttribute("staffSettingsLanguage", normalizeLanguage(settings.getLanguage()));
+        model.addAttribute("staffSettingsLanguage",
+            normalizeLanguage(userSettingsService.languageOrDefault(principal.getMemberId())));
         return "staff/settings";
     }
 
@@ -44,24 +37,8 @@ public class StaffSettingsController {
                                  @RequestParam String language,
                                  HttpServletRequest request,
                                  RedirectAttributes ra) {
-        OffsetDateTime now = OffsetDateTime.now();
-        UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
-            .orElseGet(() -> UserSettings.builder()
-                .memberId(principal.getMemberId())
-                .language("en")
-                .notificationPrefs("{}")
-                .createdAt(now)
-                .build());
-        settings.setLanguage(normalizeLanguage(language));
-        if (settings.getNotificationPrefs() == null || settings.getNotificationPrefs().isBlank()) {
-            settings.setNotificationPrefs("{}");
-        }
-        if (settings.getCreatedAt() == null) {
-            settings.setCreatedAt(now);
-        }
-        settings.setUpdatedAt(now);
-        userSettingsRepository.save(settings);
-        memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), settings.getLanguage());
+        String savedLanguage = userSettingsService.updateLanguage(principal.getMemberId(), normalizeLanguage(language));
+        memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), savedLanguage);
         ra.addFlashAttribute("message", "Language preference updated.");
         return "redirect:/staff/settings";
     }

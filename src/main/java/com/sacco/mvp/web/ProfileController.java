@@ -1,8 +1,8 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberProfileImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -22,12 +22,12 @@ import java.util.UUID;
 @Controller
 @RequiredArgsConstructor
 public class ProfileController {
-    private final MemberRepository memberRepository;
+    private final MemberDirectoryService memberDirectoryService;
     private final MemberProfileImageService memberProfileImageService;
 
     @GetMapping("/profile")
     public String profile(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        Member member = memberRepository.findById(principal.getMemberId())
+        Member member = memberDirectoryService.find(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Member account not found"));
         model.addAttribute("profileMember", member);
         model.addAttribute("hasProfileImage", memberProfileImageService.hasImage(principal.getMemberId()));
@@ -91,7 +91,7 @@ public class ProfileController {
         if (!isStaffOrAdmin(principal)) {
             return false;
         }
-        return memberRepository.findById(memberId)
+        return memberDirectoryService.find(memberId)
             .map(member -> member.getSaccoId() != null && member.getSaccoId().equals(principal.getSaccoId()))
             .orElse(false);
     }

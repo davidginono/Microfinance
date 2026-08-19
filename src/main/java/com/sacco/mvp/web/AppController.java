@@ -2,7 +2,6 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.config.MemberLocaleInterceptor;
-import com.sacco.mvp.repository.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.EligibilityService;
 import com.sacco.mvp.service.FinancialDetailsService;
@@ -21,10 +20,12 @@ import com.sacco.mvp.service.LoanQualificationPolicyService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.LoanProductWorkflowService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.ReversalRequestService;
 import com.sacco.mvp.service.StationOtpSettingsService;
+import com.sacco.mvp.service.UserSettingsService;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.service.dto.FormModel;
 import tools.jackson.core.type.TypeReference;
@@ -101,14 +102,8 @@ public class AppController {
     private final ReversalRequestService reversalRequestService;
     private final LoanAttachmentService loanAttachmentService;
     private final PaymentDetailsService paymentDetailsService;
-    private final MemberRepository memberRepository;
-    private final LoanApplicationRepository loanApplicationRepository;
-    private final LoanProductSettingRepository loanProductSettingRepository;
-    private final GuarantorRequestRepository guarantorRequestRepository;
-    private final ManagerReviewRepository managerReviewRepository;
-    private final BoardReviewRepository boardReviewRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
-    private final UserSettingsRepository userSettingsRepository;
+    private final MemberDirectoryService memberDirectoryService;
+    private final UserSettingsService userSettingsService;
     private final ForesightDirectoryService foresightDirectoryService;
     private final ObjectMapper objectMapper;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
@@ -194,7 +189,7 @@ public class AppController {
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> dashboardExternalAccountStatus(@AuthenticationPrincipal AppUserPrincipal principal) {
-        Member member = memberRepository.findById(principal.getMemberId()).orElse(null);
+        Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(member)));
     }
 
@@ -203,7 +198,7 @@ public class AppController {
     public String markExpiredActiveLoanChartSeen(@AuthenticationPrincipal AppUserPrincipal principal,
                                                  @PathVariable UUID loanId,
                                                  RedirectAttributes ra) {
-        LoanApplication app = loanApplicationRepository.findByIdAndApplicantMemberId(loanId, principal.getMemberId())
+        LoanApplication app = loanWorkflowService.findMine(loanId, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan not found"));
         if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.DEFAULTED) {
             ra.addFlashAttribute("error", "Only active or defaulted disbursed loans can be removed from the repayment timeline.");
@@ -316,7 +311,7 @@ public class AppController {
         Page<LoanApplication> loanArchivePage = Page.empty(pageRequest);
         Page<GuarantorRequest> guarantorArchivePage = Page.empty(pageRequest);
         if ("guarantors".equals(archiveSection)) {
-            guarantorArchivePage = guarantorRequestRepository.findArchivePageByGuarantorMemberId(
+            guarantorArchivePage = loanWorkflowService.guarantorArchivePage(
                 principal.getMemberId(),
                 OffsetDateTime.now().minusHours(REVERSAL_WINDOW_HOURS),
                 safeGuarantorArchiveStatus(guarantorArchiveFilter),
@@ -326,7 +321,7 @@ public class AppController {
                 pageRequest
             );
         } else {
-            loanArchivePage = loanApplicationRepository.findMemberArchivePage(
+            loanArchivePage = loanWorkflowService.memberArchivePage(
                 principal.getMemberId(),
                 loanArchiveStatuses(loanArchiveFilter),
                 normalizedArchiveQuery(loanArchiveQuery),
@@ -398,14 +393,14 @@ public class AppController {
 
     private LoanProductSetting selectedAnalyticsProduct(String saccoId, UUID loanProductId, LoanType fallbackLoanType) {
         if (loanProductId != null) {
-            return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loanProductId, saccoId)
+            return loanProductDisplayService.findActiveProduct(loanProductId, saccoId)
                 .filter(LoanProductSetting::isAvailableForApplications)
                 .orElse(null);
         }
         if (fallbackLoanType == null) {
             return null;
         }
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
+        return loanProductDisplayService.activeProducts(saccoId).stream()
             .filter(product -> product.getLoanType() == fallbackLoanType)
             .filter(LoanProductSetting::isAvailableForApplications)
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
@@ -501,51 +496,15 @@ public class AppController {
     }
 
     private Map<LoanType, String> loanProductNames(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
-            .filter(LoanProductSetting::isAvailableForApplications)
-            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
-            .collect(Collectors.toMap(
-                LoanProductSetting::getLoanType,
-                LoanProductSetting::getDisplayName,
-                (first, ignored) -> first,
-                LinkedHashMap::new
-            ));
+        return loanProductDisplayService.namesForSacco(saccoId);
     }
 
     private Map<UUID, String> loanProductNamesById(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId).stream()
-            .filter(LoanProductSetting::isAvailableForApplications)
-            .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
-            .collect(Collectors.toMap(
-                LoanProductSetting::getId,
-                LoanProductSetting::getDisplayName,
-                (first, ignored) -> first,
-                LinkedHashMap::new
-            ));
+        return loanProductDisplayService.namesById(saccoId);
     }
 
     private String loanProductName(LoanApplication app, Map<LoanType, String> loanProductNames) {
-        if (app == null) {
-            return "-";
-        }
-        if (app.getLoanProductSettingId() != null) {
-            String productName = loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(app.getLoanProductSettingId(), app.getSaccoId())
-                .filter(LoanProductSetting::isAvailableForApplications)
-                .map(LoanProductSetting::getDisplayName)
-                .orElse(null);
-            if (productName != null && !productName.isBlank()) {
-                return productName;
-            }
-        }
-        LoanType loanType = app.getLoanType();
-        if (loanType == null) {
-            return "-";
-        }
-        String configuredName = loanProductNames.get(loanType);
-        if (configuredName != null && !configuredName.isBlank()) {
-            return configuredName;
-        }
-        return loanType.getDisplayLabel();
+        return loanProductDisplayService.displayName(app, loanProductNames);
     }
 
     private String applicantReason(LoanApplication app) {
@@ -931,7 +890,7 @@ public class AppController {
         if (app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0) {
             return formatDashboardWorkflowTimestamp(app.getSubmittedAt());
         }
-        return guarantorRequestRepository.findByLoanApplicationId(app.getId()).stream()
+        return loanWorkflowService.guarantorRequests(app.getId()).stream()
             .map(GuarantorRequest::getDecidedAt)
             .filter(Objects::nonNull)
             .max(Comparator.naturalOrder())
@@ -944,7 +903,7 @@ public class AppController {
             return "";
         }
         if (stage == ApprovalWorkflowStage.BOARD || stage == ApprovalWorkflowStage.CREDIT_COMMITTEE) {
-            return boardReviewRepository.findByLoanApplicationIdAndReviewStage(app.getId(), stage).stream()
+            return loanWorkflowService.boardReviewsForStage(app.getId(), stage).stream()
                 .map(review -> review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt())
                 .filter(Objects::nonNull)
                 .min(Comparator.naturalOrder())
@@ -954,7 +913,7 @@ public class AppController {
         if (stage == ApprovalWorkflowStage.MANAGER
             || stage == ApprovalWorkflowStage.LOAN_OFFICER
             || stage == ApprovalWorkflowStage.ACCOUNTANT) {
-            return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(app.getId(), stage).stream()
+            return loanWorkflowService.staffReviewsForStage(app.getId(), stage).stream()
                 .map(ManagerReview::getCreatedAt)
                 .filter(Objects::nonNull)
                 .findFirst()
@@ -1193,11 +1152,11 @@ public class AppController {
     @GetMapping("/loan-applications/{id}")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @authz.isLoanOwner(#id, principal)")
     public String viewMine(@PathVariable UUID id, Model model) {
-        LoanApplication app = loanApplicationRepository.findById(id)
+        LoanApplication app = loanWorkflowService.findApplication(id)
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-        Member applicant = memberRepository.findById(app.getApplicantMemberId())
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Applicant member not found"));
-        List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
+        List<GuarantorRequest> guarantorRequests = loanWorkflowService.guarantorRequests(id);
         Set<UUID> guarantorIds = new HashSet<>();
         for (GuarantorRequest req : guarantorRequests) {
             guarantorIds.add(req.getGuarantorMemberId());
@@ -1205,7 +1164,7 @@ public class AppController {
         Map<UUID, String> guarantorNames = new HashMap<>();
         Map<UUID, Member> guarantorMembersById = new HashMap<>();
         if (!guarantorIds.isEmpty()) {
-            for (Member member : memberRepository.findAllById(guarantorIds)) {
+            for (Member member : memberDirectoryService.findAll(guarantorIds)) {
                 guarantorNames.put(member.getId(), member.getFullName());
                 guarantorMembersById.put(member.getId(), member);
             }
@@ -1215,7 +1174,7 @@ public class AppController {
         model.addAttribute("applicantExternalAccountStatus", externalAccountStatusService.loading(message("loan.loadingLiveBalances")));
         model.addAttribute("topUpSourceLoan",
             app.getTopUpSourceLoanId() == null ? null
-                : loanApplicationRepository.findByIdAndApplicantMemberId(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
+                : loanWorkflowService.findMine(app.getTopUpSourceLoanId(), app.getApplicantMemberId()).orElse(null));
         model.addAttribute("canRequestTopUp", loanWorkflowService.canRequestTopUp(app));
         model.addAttribute("loanFinalSubmitLabel", finalSubmitLabel(app));
         model.addAttribute("formFields", loanPresentationService.parseFormFields(app.getFormData()));
@@ -1289,9 +1248,9 @@ public class AppController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
-        LoanApplication app = loanApplicationRepository.findByIdAndApplicantMemberId(id, principal.getMemberId())
+        LoanApplication app = loanWorkflowService.findMine(id, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
-        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
     }
 
@@ -1586,7 +1545,7 @@ public class AppController {
     public Map<String, Object> externalEligibilitySummary(@AuthenticationPrincipal AppUserPrincipal principal,
                                                           @RequestParam(required = false) UUID loanProductId,
                                                           @RequestParam(required = false) LoanType loanType) {
-        Member member = memberRepository.findById(principal.getMemberId())
+        Member member = memberDirectoryService.find(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Logged-in member was not found."));
         if (member.getStationId() == null || member.getStationId().isBlank()) {
             throw new IllegalStateException("Station ID is not configured for this member.");
@@ -1631,7 +1590,7 @@ public class AppController {
             .map(GuarantorRequest::getLoanApplicationId)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
-        Map<UUID, LoanApplication> loans = loanApplicationRepository.findAllById(loanIds).stream()
+        Map<UUID, LoanApplication> loans = loanWorkflowService.findApplications(loanIds).stream()
             .collect(Collectors.toMap(LoanApplication::getId, loan -> loan));
         for (GuarantorRequest request : requests) {
             LoanApplication loan = loans.get(request.getLoanApplicationId());
@@ -1680,9 +1639,9 @@ public class AppController {
                 "Add an email address to your member profile before requesting a guarantor OTP.",
                 "Register your signature first before approving guarantor requests."
             );
-            GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequestForGuarantor(requestId, principal.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
-            LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
+            LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())
                 ? emailOtpService.validateOtp(guarantor.getEmail(), EmailOtpPurpose.GUARANTOR_SIGNATURE, guarantorSignatureOtpCode)
@@ -1716,12 +1675,12 @@ public class AppController {
             );
             LoanApplication workflowApplication = null;
             if (requestId != null) {
-                GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+                GuarantorRequest request = loanWorkflowService.findGuarantorRequestForGuarantor(requestId, principal.getMemberId())
                     .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
                 if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                     throw new IllegalStateException("Request already decided");
                 }
-                workflowApplication = loanApplicationRepository.findById(request.getLoanApplicationId())
+                workflowApplication = loanWorkflowService.findApplication(request.getLoanApplicationId())
                     .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             }
             String otpSaccoId = workflowApplication == null ? member.getSaccoId() : workflowApplication.getSaccoId();
@@ -1755,12 +1714,12 @@ public class AppController {
                                                                            @RequestParam UUID requestId,
                                                                            @RequestParam String otpCode) {
         try {
-            GuarantorRequest request = guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequestForGuarantor(requestId, principal.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             if (request.getStatus() != GuarantorRequestStatus.PENDING) {
                 throw new IllegalStateException("Request already decided");
             }
-            LoanApplication application = loanApplicationRepository.findById(request.getLoanApplicationId())
+            LoanApplication application = loanWorkflowService.findApplication(request.getLoanApplicationId())
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
             if (!stationOtpSettingsService.requiresApprovalOtp(application.getSaccoId(), application.getStationId())) {
                 return ResponseEntity.ok(Map.of(
@@ -1855,7 +1814,7 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
             assertDirectOtpGuarantorApproval(application);
-            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequest(requestId)
                 .filter(item -> loanId.equals(item.getLoanApplicationId()))
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             Member guarantor = requireMemberWithEmail(
@@ -1879,7 +1838,7 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
             assertDirectOtpGuarantorApproval(application);
-            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequest(requestId)
                 .filter(item -> loanId.equals(item.getLoanApplicationId()))
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             Member guarantor = requireMemberWithEmail(
@@ -1906,7 +1865,7 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
             assertDirectOtpGuarantorApproval(application);
-            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequest(requestId)
                 .filter(item -> loanId.equals(item.getLoanApplicationId()))
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             if (request.getStatus() != GuarantorRequestStatus.PENDING) {
@@ -1944,7 +1903,7 @@ public class AppController {
         try {
             LoanApplication application = loanWorkflowService.getMine(loanId, principal.getMemberId());
             assertDirectOtpGuarantorApproval(application);
-            GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+            GuarantorRequest request = loanWorkflowService.findGuarantorRequest(requestId)
                 .filter(item -> loanId.equals(item.getLoanApplicationId()))
                 .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
             if (request.getStatus() != GuarantorRequestStatus.PENDING) {
@@ -2118,15 +2077,8 @@ public class AppController {
                 paymentDetails.destinationType() == null ? "" : paymentDetails.destinationType().name()
             );
         } else {
-            UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
-                .orElseGet(() -> UserSettings.builder()
-                    .memberId(principal.getMemberId())
-                    .language("en")
-                    .notificationPrefs("{}")
-                    .createdAt(OffsetDateTime.now())
-                    .updatedAt(OffsetDateTime.now())
-                    .build());
-            model.addAttribute("memberSettingsLanguage", normalizeMemberLanguage(settings.getLanguage()));
+            model.addAttribute("memberSettingsLanguage",
+                normalizeMemberLanguage(userSettingsService.languageOrDefault(principal.getMemberId())));
         }
         return "app/settings";
     }
@@ -2137,25 +2089,9 @@ public class AppController {
                                  @RequestParam String language,
                                  HttpServletRequest request,
                                  RedirectAttributes ra) {
-        OffsetDateTime now = OffsetDateTime.now();
-        UserSettings settings = userSettingsRepository.findById(principal.getMemberId())
-            .orElseGet(() -> UserSettings.builder()
-                .memberId(principal.getMemberId())
-                .language("en")
-                .notificationPrefs("{}")
-                .createdAt(now)
-                .updatedAt(now)
-                .build());
-        settings.setLanguage(normalizeMemberLanguage(language));
-        if (settings.getNotificationPrefs() == null || settings.getNotificationPrefs().isBlank()) {
-            settings.setNotificationPrefs("{}");
-        }
-        if (settings.getCreatedAt() == null) {
-            settings.setCreatedAt(now);
-        }
-        settings.setUpdatedAt(now);
-        userSettingsRepository.save(settings);
-        memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), settings.getLanguage());
+        String savedLanguage = userSettingsService.updateLanguage(
+            principal.getMemberId(), normalizeMemberLanguage(language));
+        memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), savedLanguage);
         ra.addFlashAttribute("message", "Language preference updated.");
         return "redirect:/app/settings";
     }
@@ -2360,7 +2296,7 @@ public class AppController {
         }
         try {
             UUID appId = UUID.fromString(applicationId);
-            return loanApplicationRepository.findById(appId)
+            return loanWorkflowService.findApplication(appId)
                 .map(app -> {
                     Map<UUID, List<String>> namesByRequirement = new LinkedHashMap<>();
                     loanAttachmentService.parse(app.getAttachmentsJson()).stream()
@@ -2413,7 +2349,7 @@ public class AppController {
         if (applicationId == null) {
             return null;
         }
-        return loanApplicationRepository.findById(applicationId)
+        return loanWorkflowService.findApplication(applicationId)
             .filter(app -> app.getApplicantMemberId().equals(memberId))
             .map(LoanApplication::getRequiredGuarantors)
             .orElse(null);
@@ -2562,10 +2498,10 @@ public class AppController {
             return null;
         }
         if (application.getLoanProductSettingId() != null) {
-            return loanProductSettingRepository.findByIdAndSaccoId(
+            return loanProductDisplayService.findProduct(
                 application.getLoanProductSettingId(), application.getSaccoId()).orElse(null);
         }
-        return loanProductSettingRepository.findBySaccoIdAndActiveTrue(application.getSaccoId()).stream()
+        return loanProductDisplayService.activeProducts(application.getSaccoId()).stream()
             .filter(product -> product.getLoanType() == application.getLoanType())
             .sorted(Comparator.comparing(LoanProductSetting::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
             .findFirst()
@@ -2611,7 +2547,7 @@ public class AppController {
     }
 
     private Member requireMemberWithEmail(UUID memberId, String missingEmailMessage) {
-        Member member = memberRepository.findById(memberId)
+        Member member = memberDirectoryService.find(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException(missingEmailMessage);
@@ -2655,7 +2591,7 @@ public class AppController {
     }
 
     private DirectGuarantorOtpIssueSummary issueApplicantGuarantorConfirmationOtps(LoanApplication application) {
-        List<GuarantorRequest> pendingRequests = guarantorRequestRepository.findByLoanApplicationId(application.getId()).stream()
+        List<GuarantorRequest> pendingRequests = loanWorkflowService.guarantorRequests(application.getId()).stream()
             .filter(request -> request.getStatus() == GuarantorRequestStatus.PENDING)
             .toList();
         int sent = 0;
@@ -2726,7 +2662,7 @@ public class AppController {
         if (application == null || application.getApplicantMemberId() == null) {
             return null;
         }
-        return memberRepository.findById(application.getApplicantMemberId())
+        return memberDirectoryService.find(application.getApplicantMemberId())
             .map(Member::getFullName)
             .map(String::trim)
             .filter(name -> !name.isBlank())
@@ -2798,18 +2734,14 @@ public class AppController {
     }
 
     private String resolveSavedSignatureText(UUID memberId) {
-        return memberRepository.findById(memberId)
-            .map(Member::getSignatureText)
-            .filter(text -> text != null && !text.isBlank())
-            .orElse("");
+        return memberDirectoryService.savedSignatureText(memberId);
     }
 
     private List<Map<String, String>> selectedGuarantorItems(List<UUID> guarantorIds) {
         if (guarantorIds == null || guarantorIds.isEmpty()) {
             return Collections.emptyList();
         }
-        Map<UUID, Member> membersById = memberRepository.findAllById(guarantorIds).stream()
-            .collect(Collectors.toMap(Member::getId, member -> member));
+        Map<UUID, Member> membersById = memberDirectoryService.membersById(guarantorIds);
         List<Map<String, String>> items = new ArrayList<>();
         for (UUID guarantorId : guarantorIds) {
             Member member = membersById.get(guarantorId);
@@ -2868,7 +2800,7 @@ public class AppController {
             applicationIds.add(request.getLoanApplicationId());
         }
         if (!applicationIds.isEmpty()) {
-            for (LoanApplication application : loanApplicationRepository.findAllById(applicationIds)) {
+            for (LoanApplication application : loanWorkflowService.findApplications(applicationIds)) {
                 applicationById.put(application.getId(), application);
             }
         }
@@ -2878,12 +2810,7 @@ public class AppController {
             applicantIds.add(application.getApplicantMemberId());
         }
 
-        Map<UUID, String> applicantNames = new HashMap<>();
-        if (!applicantIds.isEmpty()) {
-            for (Member member : memberRepository.findAllById(applicantIds)) {
-                applicantNames.put(member.getId(), member.getFullName());
-            }
-        }
+        Map<UUID, String> applicantNames = new HashMap<>(memberDirectoryService.fullNames(applicantIds));
 
         Map<UUID, String> guaranteeNames = new HashMap<>();
         Map<UUID, LoanType> guaranteeLoanTypes = new HashMap<>();
@@ -2957,7 +2884,7 @@ public class AppController {
         }
         try {
             UUID loanId = UUID.fromString(topUpLoanId);
-            return loanApplicationRepository.findByIdAndApplicantMemberId(loanId, memberId).orElse(null);
+            return loanWorkflowService.findMine(loanId, memberId).orElse(null);
         } catch (IllegalArgumentException ex) {
             return null;
         }
@@ -3028,35 +2955,22 @@ public class AppController {
         if (memberId == null) {
             return Collections.emptySet();
         }
-        return userSettingsRepository.findById(memberId)
-            .map(UserSettings::getNotificationPrefs)
+        return userSettingsService.notificationPrefs(memberId)
             .map(this::parsePrefs)
             .map(prefs -> parseUuidSet(prefs.get(DISMISSED_ACTIVE_LOAN_CHARTS_KEY)))
             .orElse(Collections.emptySet());
     }
 
     private void dismissActiveLoanChart(UUID memberId, UUID loanId) {
-        OffsetDateTime now = OffsetDateTime.now();
-        UserSettings settings = userSettingsRepository.findById(memberId)
-            .orElseGet(() -> UserSettings.builder()
-                .memberId(memberId)
-                .language("en")
-                .notificationPrefs("{}")
-                .createdAt(now)
-                .updatedAt(now)
-                .build());
-        Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
-        LinkedHashSet<String> dismissedCharts = parseUuidSet(prefs.get(DISMISSED_ACTIVE_LOAN_CHARTS_KEY)).stream()
-            .map(UUID::toString)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-        dismissedCharts.add(loanId.toString());
-        prefs.put(DISMISSED_ACTIVE_LOAN_CHARTS_KEY, new ArrayList<>(dismissedCharts));
-        settings.setNotificationPrefs(writePrefs(prefs));
-        if (settings.getCreatedAt() == null) {
-            settings.setCreatedAt(now);
-        }
-        settings.setUpdatedAt(now);
-        userSettingsRepository.save(settings);
+        userSettingsService.updateNotificationPrefs(memberId, rawPrefs -> {
+            Map<String, Object> prefs = parsePrefs(rawPrefs);
+            LinkedHashSet<String> dismissedCharts = parseUuidSet(prefs.get(DISMISSED_ACTIVE_LOAN_CHARTS_KEY)).stream()
+                .map(UUID::toString)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+            dismissedCharts.add(loanId.toString());
+            prefs.put(DISMISSED_ACTIVE_LOAN_CHARTS_KEY, new ArrayList<>(dismissedCharts));
+            return writePrefs(prefs);
+        });
     }
 
     private String normalizeMemberLanguage(String language) {
@@ -3077,11 +2991,7 @@ public class AppController {
         if (applicationIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<UUID, LoanApplication> applicationById = new HashMap<>();
-        for (LoanApplication application : loanApplicationRepository.findAllById(applicationIds)) {
-            applicationById.put(application.getId(), application);
-        }
-        return applicationById;
+        return loanPresentationService.loansById(applicationIds);
     }
 
     private boolean isGuarantorRemovalStageOpen(LoanApplication application) {

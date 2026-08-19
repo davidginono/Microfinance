@@ -7,11 +7,10 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.repository.MemberRepository;
-import com.sacco.mvp.repository.SaccoStationRepository;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.service.UserClaimService;
@@ -39,8 +38,7 @@ import static org.mockito.Mockito.when;
 class AuthControllerSaccoAccessTest {
     @Mock private MemberRegistrationService memberRegistrationService;
     @Mock private EmailOtpService emailOtpService;
-    @Mock private MemberRepository memberRepository;
-    @Mock private SaccoStationRepository saccoStationRepository;
+    @Mock private MemberDirectoryService memberDirectoryService;
     @Mock private UserClaimService userClaimService;
     @Mock private SaccoRegistryService saccoRegistryService;
     @Mock private AdminScopeService adminScopeService;
@@ -50,8 +48,8 @@ class AuthControllerSaccoAccessTest {
     @Test
     void memberOtpRequestIsBlockedWhenSaccoIsSuspended() {
         Member member = member(true);
-        when(memberRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
-        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(suspendedStation("payment overdue")));
+        when(memberDirectoryService.findByEmail("member@example.com")).thenReturn(Optional.of(member));
+        when(saccoRegistryService.findStation("SACCO-01", "AR704")).thenReturn(Optional.of(suspendedStation("payment overdue")));
 
         ResponseEntity<Map<String, Object>> response = controller().requestMemberLoginOtp("member@example.com");
 
@@ -70,8 +68,8 @@ class AuthControllerSaccoAccessTest {
     @Test
     void staffOtpVerifyIsBlockedBeforeConsumingOtpWhenSaccoIsSuspended() {
         Member staff = staff(Position.MANAGER);
-        when(memberRepository.findByEmailIgnoreCase("manager@example.com")).thenReturn(Optional.of(staff));
-        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(suspendedStation(null)));
+        when(memberDirectoryService.findByEmail("manager@example.com")).thenReturn(Optional.of(staff));
+        when(saccoRegistryService.findStation("SACCO-01", "AR704")).thenReturn(Optional.of(suspendedStation(null)));
 
         ResponseEntity<Map<String, Object>> response = controller().verifyStaffLoginOtp(
             "manager@example.com",
@@ -88,7 +86,7 @@ class AuthControllerSaccoAccessTest {
     @Test
     void platformAdminOtpRequestBypassesSuspendedSacco() {
         Member admin = staff(Position.ADMIN);
-        when(memberRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+        when(memberDirectoryService.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
 
         ResponseEntity<Map<String, Object>> response = controller().requestStaffLoginOtp("admin@example.com");
 
@@ -100,15 +98,14 @@ class AuthControllerSaccoAccessTest {
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString()
         );
-        verify(saccoStationRepository, never()).findBySaccoIdAndStationId(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        verify(saccoRegistryService, never()).findStation(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
     }
 
     private AuthController controller() {
         return new AuthController(
             memberRegistrationService,
             emailOtpService,
-            memberRepository,
-            saccoStationRepository,
+            memberDirectoryService,
             userClaimService,
             saccoRegistryService,
             adminScopeService,

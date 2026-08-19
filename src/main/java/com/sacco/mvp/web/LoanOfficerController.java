@@ -10,10 +10,6 @@ import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
-import com.sacco.mvp.repository.BoardReviewRepository;
-import com.sacco.mvp.repository.LoanApplicationRepository;
-import com.sacco.mvp.repository.MemberRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.service.ApplicationClock;
@@ -25,6 +21,7 @@ import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
+import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PaymentDetailsService;
 import com.sacco.mvp.service.StationOtpSettingsService;
@@ -64,11 +61,8 @@ public class LoanOfficerController {
     private static final ApprovalWorkflowStage STAGE = ApprovalWorkflowStage.LOAN_OFFICER;
 
     private final BoardService boardService;
-    private final BoardReviewRepository boardReviewRepository;
-    private final LoanApplicationRepository loanApplicationRepository;
-    private final MemberRepository memberRepository;
+    private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
-    private final GuarantorRequestRepository guarantorRequestRepository;
     private final LoanPresentationService loanPresentationService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final ExternalAccountStatusService externalAccountStatusService;
@@ -90,12 +84,10 @@ public class LoanOfficerController {
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
-        Map<UUID, String> applicantNames = memberRepository.findAllById(
-                dashboard.recentDisbursements().stream()
-                    .map(LoanApplication::getApplicantMemberId)
-                    .collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+            dashboard.recentDisbursements().stream()
+                .map(LoanApplication::getApplicantMemberId)
+                .collect(Collectors.toSet()));
 
         model.addAttribute("dashboardBreadcrumb", "Loan Officer Panel / Dashboard");
         model.addAttribute("dashboardPageTitle", "Loan Officer Dashboard");
@@ -168,7 +160,7 @@ public class LoanOfficerController {
         List<String> statuses = currentFilter.statuses().isEmpty()
             ? List.of(com.sacco.mvp.domain.LoanStatus.DRAFT.name())
             : currentFilter.statuses().stream().map(Enum::name).toList();
-        org.springframework.data.domain.Page<BoardReview> archivePage = boardReviewRepository.findArchivePage(
+        org.springframework.data.domain.Page<BoardReview> archivePage = boardService.archivePage(
             principal.getMemberId(),
             List.of(STAGE.name()),
             principal.getSaccoId(),
@@ -251,23 +243,21 @@ public class LoanOfficerController {
                          @AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
         applyLoanOfficerUi(model);
-        LoanApplication app = loanApplicationRepository.findById(id)
+        LoanApplication app = boardService.findLoan(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        Member applicant = memberRepository.findById(app.getApplicantMemberId())
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Applicant not found"));
         BoardReview myReview = boardService.getMyReview(id, principal.getMemberId(), STAGE);
         List<BoardReview> stageReviews = boardService.reviewsForLoan(id, STAGE);
-        List<GuarantorRequest> guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(id);
-        List<Member> guarantorMembers = memberRepository.findAllById(
+        List<GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
+        List<Member> guarantorMembers = memberDirectoryService.findAll(
             guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
         Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
         Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, member -> member));
-        Map<UUID, Member> reviewers = memberRepository.findAllById(
-                stageReviews.stream().map(BoardReview::getBoardMemberId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, member -> member));
+        Map<UUID, Member> reviewers = memberDirectoryService.membersById(
+                stageReviews.stream().map(BoardReview::getBoardMemberId).collect(Collectors.toSet()));
         model.addAttribute("app", app);
         model.addAttribute("applicant", applicant);
         model.addAttribute("loanProductName", loanProductDisplayService.displayName(app));
@@ -322,12 +312,12 @@ public class LoanOfficerController {
                                                                         @PathVariable UUID guarantorId,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
         boardService.getMyReview(loanId, principal.getMemberId(), STAGE);
-        boolean guarantorAssigned = guarantorRequestRepository.findByLoanApplicationId(loanId).stream()
+        boolean guarantorAssigned = loanPresentationService.guarantorRequests(loanId).stream()
             .anyMatch(request -> guarantorId.equals(request.getGuarantorMemberId()));
         if (!guarantorAssigned) {
             return ResponseEntity.badRequest().body(Map.of("message", "Guarantor request was not found for this loan."));
         }
-        Member guarantor = memberRepository.findById(guarantorId)
+        Member guarantor = memberDirectoryService.find(guarantorId)
             .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
         ExternalAccountStatusService.ExternalAccountStatusView status = externalAccountStatusService.resolve(guarantor);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -344,9 +334,9 @@ public class LoanOfficerController {
     public ResponseEntity<Map<String, Object>> applicantFinancialStatus(@PathVariable UUID id,
                                                                         @AuthenticationPrincipal AppUserPrincipal principal) {
         boardService.getMyReview(id, principal.getMemberId(), STAGE);
-        LoanApplication app = loanApplicationRepository.findById(id)
+        LoanApplication app = boardService.findLoan(id)
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        Member applicant = memberRepository.findById(app.getApplicantMemberId()).orElse(null);
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
     }
 
@@ -356,7 +346,7 @@ public class LoanOfficerController {
     public ResponseEntity<Map<String, Object>> requestSignatureOtp(@PathVariable UUID id,
                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
         try {
-            LoanApplication app = loanApplicationRepository.findById(id)
+            LoanApplication app = boardService.findLoan(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             if (app.getStatus() != LoanStatus.AWAITING_LOAN_OFFICER) {
                 throw new IllegalStateException("This application is no longer waiting for loan officer approval.");
@@ -395,7 +385,7 @@ public class LoanOfficerController {
                                                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                                                   @RequestParam String otpCode) {
         try {
-            LoanApplication app = loanApplicationRepository.findById(id)
+            LoanApplication app = boardService.findLoan(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             if (app.getStatus() != LoanStatus.AWAITING_LOAN_OFFICER) {
                 throw new IllegalStateException("This application is no longer waiting for loan officer approval.");
@@ -433,7 +423,7 @@ public class LoanOfficerController {
                          @RequestParam(required = false) String boardSignatureOtpCode,
                          RedirectAttributes ra) {
         try {
-            LoanApplication app = loanApplicationRepository.findById(id)
+            LoanApplication app = boardService.findLoan(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
             Member reviewer = requireMemberWithEmail(principal.getMemberId());
             UUID otpTokenId = stationOtpSettingsService.requiresApprovalOtp(app.getSaccoId(), app.getStationId())
@@ -562,8 +552,10 @@ public class LoanOfficerController {
         Map<UUID, java.time.OffsetDateTime> myDecisionDates = new java.util.LinkedHashMap<>();
         Map<UUID, String> myDecisionReasons = new java.util.LinkedHashMap<>();
         String normalizedSearchId = normalizeSearch(searchId);
+        Map<UUID, LoanApplication> loans = loanPresentationService.loansById(
+            reviews.stream().map(BoardReview::getLoanApplicationId).toList());
         for (BoardReview review : reviews) {
-            loanApplicationRepository.findById(review.getLoanApplicationId())
+            java.util.Optional.ofNullable(loans.get(review.getLoanApplicationId()))
                 .filter(app -> principal.getSaccoId().equals(app.getSaccoId()))
                 .filter(app -> matchesApplicantStation(app, principal.getStationId()))
                 .filter(app -> !awaitingOnly || app.getStatus() == LoanStatus.AWAITING_LOAN_OFFICER)
@@ -579,10 +571,8 @@ public class LoanOfficerController {
                         : "-");
                 });
         }
-        Map<UUID, String> applicantNames = memberRepository.findAllById(
-                apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, Member::getFullName));
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(
+            apps.stream().map(LoanApplication::getApplicantMemberId).collect(Collectors.toSet()));
 
         model.addAttribute("apps", apps);
         model.addAttribute("applicantNames", applicantNames);
@@ -657,7 +647,7 @@ public class LoanOfficerController {
     }
 
     private Member requireMemberWithEmail(UUID memberId) {
-        Member member = memberRepository.findById(memberId)
+        Member member = memberDirectoryService.find(memberId)
             .orElseThrow(() -> new IllegalArgumentException("Member account not found."));
         if (member.getEmail() == null || member.getEmail().isBlank()) {
             throw new IllegalStateException("Add an email address to your member profile before requesting an approval OTP.");
@@ -672,10 +662,7 @@ public class LoanOfficerController {
     }
 
     private String resolveSavedSignatureText(UUID memberId) {
-        return memberRepository.findById(memberId)
-            .map(Member::getSignatureText)
-            .filter(text -> text != null && !text.isBlank())
-            .orElse("");
+        return memberDirectoryService.savedSignatureText(memberId);
     }
 
     private String shortMemberId(UUID memberId) {
