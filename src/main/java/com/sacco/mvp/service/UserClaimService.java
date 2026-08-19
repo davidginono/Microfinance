@@ -51,6 +51,40 @@ public class UserClaimService {
             .orElse(defaults);
     }
 
+    /**
+     * Batched form of {@link #effectiveClaims(UUID, Collection, boolean)}: resolves a whole
+     * candidate set with two queries instead of two per member.
+     */
+    public Map<UUID, Set<UserClaim>> effectiveClaims(Map<UUID, ClaimSubject> subjects) {
+        if (subjects == null || subjects.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Set<UserClaim>> resolved = new LinkedHashMap<>();
+        for (MemberAccessClaim claim : memberAccessClaimRepository.findByIdMemberIdIn(subjects.keySet())) {
+            resolved.computeIfAbsent(claim.getId().getMemberId(), key -> EnumSet.noneOf(UserClaim.class))
+                .addAll(UserClaim.fromStoredName(claim.getId().getClaimName()));
+        }
+
+        List<UUID> withoutStoredClaims = subjects.keySet().stream()
+            .filter(memberId -> !resolved.containsKey(memberId))
+            .toList();
+        if (!withoutStoredClaims.isEmpty()) {
+            Map<UUID, String> prefsByMember = new LinkedHashMap<>();
+            userSettingsRepository.findAllById(withoutStoredClaims)
+                .forEach(settings -> prefsByMember.put(settings.getMemberId(), settings.getNotificationPrefs()));
+            for (UUID memberId : withoutStoredClaims) {
+                ClaimSubject subject = subjects.get(memberId);
+                Map<String, Object> prefs = parsePrefs(prefsByMember.get(memberId));
+                resolved.put(memberId, prefs.containsKey("claims")
+                    ? parseClaims(prefs)
+                    : defaultClaims(subject.staffRoles(), subject.memberAccess()));
+            }
+        }
+        return resolved;
+    }
+
+    public record ClaimSubject(Collection<Position> staffRoles, boolean memberAccess) {}
+
     public boolean has(com.sacco.mvp.security.AppUserPrincipal principal, String claimName) {
         if (principal == null || claimName == null || claimName.isBlank()) {
             return false;

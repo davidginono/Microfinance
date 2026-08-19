@@ -153,6 +153,17 @@ public class MinorAdminInvitationService {
         return invitationRepository.findByMemberIdAndClaimedAtIsNullAndRevokedAtIsNull(memberId);
     }
 
+    public java.util.Map<UUID, MinorAdminInvitation> findActiveInvitations(java.util.Collection<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        return invitationRepository.findByMemberIdInAndClaimedAtIsNullAndRevokedAtIsNull(memberIds).stream()
+            .collect(java.util.stream.Collectors.toMap(
+                MinorAdminInvitation::getMemberId,
+                invitation -> invitation,
+                (left, right) -> left));
+    }
+
     @Transactional
     public MinorAdminInvitation resendInvitation(UUID memberId, UUID invitedBy) {
         Member member = memberRepository.findById(memberId)

@@ -112,8 +112,8 @@ class LoanReportServiceTest {
 
         when(memberRepository.findById(applicantId)).thenReturn(Optional.of(applicant));
         when(loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(applicantId)).thenReturn(List.of(loan));
-        when(guarantorRequestRepository.findByLoanApplicationId(loanId)).thenReturn(List.of());
-        when(boardReviewRepository.findByLoanApplicationId(loanId)).thenReturn(List.of(boardReview));
+        when(guarantorRequestRepository.findByLoanApplicationIdIn(any())).thenReturn(List.of());
+        when(boardReviewRepository.findByLoanApplicationIdIn(any())).thenReturn(List.of(boardReview));
         when(memberRepository.findAllById(any())).thenReturn(List.of(boardMember));
 
         LoanReportService.MemberLoanReport report = loanReportService.memberReport(applicantId);
@@ -386,10 +386,10 @@ class LoanReportServiceTest {
                 """)
             .build();
 
-        when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
+        when(loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of(loan));
-        when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
-            .thenReturn(Optional.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
         List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
             memberId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null);
@@ -424,10 +424,10 @@ class LoanReportServiceTest {
                 """)
             .build();
 
-        when(loanApplicationRepository.findMemberLoansForAnalytics(any(), any(), any(), any(), any()))
+        when(loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of(loan));
-        when(loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(productId, "IAA"))
-            .thenReturn(Optional.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
 
         List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
             memberId, LocalDate.of(2025, 7, 13), LocalDate.of(2026, 7, 13), null);

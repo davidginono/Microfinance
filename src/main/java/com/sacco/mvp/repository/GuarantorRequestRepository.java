@@ -11,12 +11,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface GuarantorRequestRepository extends JpaRepository<GuarantorRequest, UUID> {
     List<GuarantorRequest> findByLoanApplicationId(UUID loanApplicationId);
+
+    List<GuarantorRequest> findByLoanApplicationIdIn(Collection<UUID> loanApplicationIds);
 
     @Query("""
         select count(g)

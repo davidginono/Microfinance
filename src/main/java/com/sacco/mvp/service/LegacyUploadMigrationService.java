@@ -11,11 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +31,7 @@ import java.util.stream.Stream;
 @Slf4j
 public class LegacyUploadMigrationService {
     private static final String MIGRATION_KEY = "filesystem-uploads-to-postgresql-v1";
+    private static final int LOAN_LOOKUP_BATCH_SIZE = 500;
 
     private final StoredUploadStorageService storedUploadStorageService;
     private final LoanApplicationRepository loanApplicationRepository;
@@ -64,33 +68,66 @@ public class LegacyUploadMigrationService {
         if (!Files.isDirectory(root)) {
             return;
         }
-        Map<UUID, LoanApplication> loans = new LinkedHashMap<>();
-        loanApplicationRepository.findAll().forEach(loan -> loans.put(loan.getId(), loan));
-        try (Stream<Path> folders = Files.list(root)) {
-            for (Path folder : folders.filter(Files::isDirectory).toList()) {
-                UUID loanId;
-                try {
-                    loanId = UUID.fromString(folder.getFileName().toString());
-                } catch (IllegalArgumentException ex) {
-                    retainFailure(folder, summary, "Invalid loan folder name");
-                    continue;
+        List<Path> folders;
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(root)) {
+            folders = new ArrayList<>();
+            for (Path folder : entries) {
+                if (Files.isDirectory(folder)) {
+                    folders.add(folder);
                 }
-                LoanApplication loan = loans.get(loanId);
-                Map<String, Map<String, Object>> metadata = attachmentMetadataByStoredName(
-                    loan == null ? null : loan.getAttachmentsJson());
-                migrateFolderFiles(folder, file -> {
-                    Map<String, Object> item = metadata.getOrDefault(file.getFileName().toString(), Collections.emptyMap());
-                    UUID uploadId = parseUuid(item.get("id"), file);
-                    String category = stringValue(item.get("attachmentCategory"), LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT);
-                    String originalName = stringValue(item.get("originalName"), file.getFileName().toString());
-                    String contentType = stringValue(item.get("contentType"), probeContentType(file));
-                    migrateFile(file, uploadId, StoredUploadStorageService.OWNER_LOAN_APPLICATION,
-                        loanId.toString(), category, originalName, contentType, summary);
-                }, summary);
             }
         } catch (Exception ex) {
             retainFailure(root, summary, ex.getMessage());
+            return;
         }
+
+        // Folder paths are cheap; loan rows are not. Resolve metadata in bounded lookup
+        // batches instead of loading the whole loan_applications table.
+        List<Map.Entry<Path, UUID>> pending = new ArrayList<>(LOAN_LOOKUP_BATCH_SIZE);
+        for (Path folder : folders) {
+            try {
+                pending.add(Map.entry(folder, UUID.fromString(folder.getFileName().toString())));
+            } catch (IllegalArgumentException ex) {
+                retainFailure(folder, summary, "Invalid loan folder name");
+                continue;
+            }
+            if (pending.size() >= LOAN_LOOKUP_BATCH_SIZE) {
+                migrateLoanFolderBatch(pending, summary);
+                pending.clear();
+            }
+        }
+        if (!pending.isEmpty()) {
+            migrateLoanFolderBatch(pending, summary);
+        }
+    }
+
+    private void migrateLoanFolderBatch(List<Map.Entry<Path, UUID>> folders, MutableSummary summary) {
+        Map<UUID, LoanApplication> loans = loansById(folders.stream().map(Map.Entry::getValue).toList());
+        for (Map.Entry<Path, UUID> entry : folders) {
+            Path folder = entry.getKey();
+            UUID loanId = entry.getValue();
+            LoanApplication loan = loans.get(loanId);
+            Map<String, Map<String, Object>> metadata = attachmentMetadataByStoredName(
+                loan == null ? null : loan.getAttachmentsJson());
+            migrateFolderFiles(folder, file -> {
+                Map<String, Object> item = metadata.getOrDefault(file.getFileName().toString(), Collections.emptyMap());
+                UUID uploadId = parseUuid(item.get("id"), file);
+                String category = stringValue(item.get("attachmentCategory"), LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT);
+                String originalName = stringValue(item.get("originalName"), file.getFileName().toString());
+                String contentType = stringValue(item.get("contentType"), probeContentType(file));
+                migrateFile(file, uploadId, StoredUploadStorageService.OWNER_LOAN_APPLICATION,
+                    loanId.toString(), category, originalName, contentType, summary);
+            }, summary);
+        }
+    }
+
+    private Map<UUID, LoanApplication> loansById(Collection<UUID> loanIds) {
+        if (loanIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, LoanApplication> loans = new LinkedHashMap<>();
+        loanApplicationRepository.findAllById(loanIds).forEach(loan -> loans.put(loan.getId(), loan));
+        return loans;
     }
 
     private void migrateFolderFiles(Path folder, FileMigration action, MutableSummary summary) {

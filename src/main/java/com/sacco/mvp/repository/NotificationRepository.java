@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
-    List<Notification> findByRecipientMemberIdOrderByCreatedAtDesc(UUID recipientMemberId);
     long countByRecipientMemberId(UUID recipientMemberId);
 
     @Query(
@@ -49,8 +48,6 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
     List<Notification> findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
 
-    List<Notification> findByRecipientMemberIdAndTypeOrderByCreatedAtDesc(UUID recipientMemberId, String type);
-    List<Notification> findByTypeOrderByCreatedAtDesc(String type);
 
     @Query(
         value = """
@@ -70,6 +67,25 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     @Query(
         value = """
+            select exists (
+                select 1
+                from notifications n
+                where n.recipient_member_id = :recipientId
+                  and n.type = 'REPAYMENT_REMINDER'
+                  and n.created_at >= :since
+                  and n.payload -> 'details' ->> 'loanId' = :loanId
+                  and n.payload -> 'details' ->> 'daysLeft' = :daysLeft
+            )
+            """,
+        nativeQuery = true
+    )
+    boolean existsRepaymentReminder(@Param("recipientId") UUID recipientId,
+                                    @Param("loanId") String loanId,
+                                    @Param("daysLeft") String daysLeft,
+                                    @Param("since") OffsetDateTime since);
+
+    @Query(
+        value = """
             select distinct cast(n.payload -> 'details' ->> 'incidentId' as uuid)
             from notifications n
             where n.type = 'SUPPORT_MESSAGE'
@@ -79,6 +95,21 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
         nativeQuery = true
     )
     List<UUID> findReadSupportIncidentIds(@Param("incidentIds") Collection<UUID> incidentIds);
+
+    @Modifying
+    @Query(
+        value = """
+            update notifications n
+            set read_at = now()
+            where n.recipient_member_id = :recipientId
+              and n.type = 'SUPPORT_MESSAGE'
+              and n.read_at is null
+              and cast(n.payload -> 'details' ->> 'incidentId' as uuid) = :incidentId
+            """,
+        nativeQuery = true
+    )
+    int markSupportIncidentAsRead(@Param("recipientId") UUID recipientId,
+                                  @Param("incidentId") UUID incidentId);
 
     @Modifying
     @Query("update Notification n set n.readAt = CURRENT_TIMESTAMP where n.recipientMemberId = :memberId and n.readAt is null")

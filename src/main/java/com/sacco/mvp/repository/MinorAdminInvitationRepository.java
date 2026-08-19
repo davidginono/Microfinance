@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface MinorAdminInvitationRepository extends JpaRepository<MinorAdminInvitation, UUID> {
     Optional<MinorAdminInvitation> findByMemberIdAndClaimedAtIsNullAndRevokedAtIsNull(UUID memberId);
 
+    List<MinorAdminInvitation> findByMemberIdInAndClaimedAtIsNullAndRevokedAtIsNull(java.util.Collection<UUID> memberIds);
+
     Optional<MinorAdminInvitation> findByTokenHashAndClaimedAtIsNullAndRevokedAtIsNull(String tokenHash);
 
     List<MinorAdminInvitation> findByClaimedAtIsNullAndRevokedAtIsNullAndExpiresAtBefore(OffsetDateTime now);

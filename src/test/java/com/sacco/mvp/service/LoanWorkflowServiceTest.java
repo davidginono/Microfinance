@@ -378,6 +378,7 @@ class LoanWorkflowServiceTest {
             UUID memberId = invocation.getArgument(0);
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
         });
+        stubActiveMemberBatchLookup(saccoId);
         when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
             .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
                 new BigDecimal("166650.00")));
@@ -428,7 +429,7 @@ class LoanWorkflowServiceTest {
         when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
         when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
         when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
-        when(memberRepository.findById(staffOnlyGuarantor)).thenReturn(Optional.of(staffOnlyMember(staffOnlyGuarantor, saccoId, "ST01")));
+        when(memberRepository.findAllById(any())).thenReturn(List.of(staffOnlyMember(staffOnlyGuarantor, saccoId, "ST01")));
 
         assertThatThrownBy(() -> loanWorkflowService.saveDraft(
             saccoId,
@@ -571,7 +572,7 @@ class LoanWorkflowServiceTest {
         when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
         when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
         when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
-        when(memberRepository.findById(guarantorId)).thenReturn(Optional.of(activeMember(guarantorId, saccoId, "ST01")));
+        when(memberRepository.findAllById(any())).thenReturn(List.of(activeMember(guarantorId, saccoId, "ST01")));
         when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, new BigDecimal("100000"), product))
             .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
 
@@ -646,6 +647,7 @@ class LoanWorkflowServiceTest {
             UUID memberId = invocation.getArgument(0);
             return Optional.of(activeMember(memberId, saccoId, "ST01"));
         });
+        stubActiveMemberBatchLookup(saccoId);
 
         loanWorkflowService.submit(appId, applicantId);
 
@@ -655,6 +657,15 @@ class LoanWorkflowServiceTest {
                 && request.getCommittedAmount() == null
                 && request.getRequestedAmount() == null
         ));
+    }
+
+    private void stubActiveMemberBatchLookup(String saccoId) {
+        when(memberRepository.findAllById(any())).thenAnswer(invocation -> {
+            Iterable<UUID> ids = invocation.getArgument(0);
+            List<Member> members = new java.util.ArrayList<>();
+            ids.forEach(id -> members.add(activeMember(id, saccoId, "ST01")));
+            return members;
+        });
     }
 
     private Member activeMember(UUID id, String saccoId, String stationId) {

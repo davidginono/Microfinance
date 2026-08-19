@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface MemberAccessClaimRepository extends JpaRepository<MemberAccessClaim, MemberAccessClaimId> {
     List<MemberAccessClaim> findByIdMemberId(UUID memberId);
 
+    List<MemberAccessClaim> findByIdMemberIdIn(java.util.Collection<UUID> memberIds);
+
     boolean existsByIdMemberId(UUID memberId);
 
     @Modifying

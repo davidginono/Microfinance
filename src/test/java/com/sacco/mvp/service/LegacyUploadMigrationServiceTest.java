@@ -41,7 +41,7 @@ class LegacyUploadMigrationServiceTest {
         when(storage.store(any(), anyString(), anyString(), anyString(), anyString(), anyString(), any())).thenReturn(stored);
         when(storage.verify(stored, content)).thenReturn(true);
         LoanApplicationRepository loans = mock(LoanApplicationRepository.class);
-        when(loans.findAll()).thenReturn(List.of(LoanApplication.builder()
+        when(loans.findAllById(any())).thenReturn(List.of(LoanApplication.builder()
             .id(loanId)
             .attachmentsJson("[{\"id\":\"" + attachmentId + "\",\"storedName\":\"" + attachmentId + ".pdf\",\"originalName\":\"proof.pdf\",\"contentType\":\"application/pdf\"}]")
             .build()));
@@ -69,7 +69,7 @@ class LegacyUploadMigrationServiceTest {
             .thenReturn(StoredUpload.builder().build());
         when(storage.verify(any(), any())).thenReturn(false);
         LoanApplicationRepository loans = mock(LoanApplicationRepository.class);
-        when(loans.findAll()).thenReturn(List.of(LoanApplication.builder().id(loanId).build()));
+        when(loans.findAllById(any())).thenReturn(List.of(LoanApplication.builder().id(loanId).build()));
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(0);
 

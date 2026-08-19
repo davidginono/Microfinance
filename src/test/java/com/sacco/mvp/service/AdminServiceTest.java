@@ -51,6 +51,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -404,6 +405,23 @@ class AdminServiceTest {
                 .filter(member -> UserClaim.defaultClaims(member.getStaffRolesResolved(), member.isMemberAccess()).contains(claim))
                 .toList();
         });
+        lenient().when(memberRepository.findActiveMembersWithAnyClaimInStation(eq(saccoId), any(), any())).thenAnswer(invocation ->
+            membersWithAnyClaim(activeMembers, invocation.getArgument(1), invocation.getArgument(2)));
+        lenient().when(memberRepository.countActiveMembersWithAnyClaimInStation(eq(saccoId), any(), any())).thenAnswer(invocation ->
+            (long) membersWithAnyClaim(activeMembers, invocation.getArgument(1), invocation.getArgument(2)).size());
+    }
+
+    private static List<Member> membersWithAnyClaim(List<Member> activeMembers,
+                                                    String stationId,
+                                                    Collection<String> claimNames) {
+        Set<UserClaim> wanted = claimNames.stream().map(UserClaim::valueOf).collect(java.util.stream.Collectors.toSet());
+        return activeMembers.stream()
+            .filter(member -> stationId == null || stationId.equalsIgnoreCase(member.getStationId()))
+            .filter(member -> {
+                Set<UserClaim> granted = UserClaim.defaultClaims(member.getStaffRolesResolved(), member.isMemberAccess());
+                return wanted.stream().anyMatch(granted::contains);
+            })
+            .toList();
     }
 
     @Test

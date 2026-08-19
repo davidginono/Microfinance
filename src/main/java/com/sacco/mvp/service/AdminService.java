@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ public class AdminService {
     private static final int MAX_LOG_PAGE_SIZE = 100;
     private static final int DEFAULT_USER_PAGE_SIZE = 25;
     private static final int MAX_USER_PAGE_SIZE = 100;
+    private static final int BROADCAST_PAGE_SIZE = 500;
     private static final int DEFAULT_SUPPORT_ARCHIVE_PAGE_SIZE = 50;
     private static final String USER_SEARCH_BY_USER_ID = "userId";
     private static final String USER_SEARCH_BY_NAME = "name";
@@ -400,13 +403,20 @@ public class AdminService {
     public List<MinorAdminAccessView> minorAdmins() {
         Comparator<String> textComparator = Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER);
         OffsetDateTime now = OffsetDateTime.now();
-        return memberRepository.findAllWithRole(Position.MINOR_ADMIN).stream()
+        List<Member> admins = memberRepository.findAllWithRole(Position.MINOR_ADMIN).stream()
             .filter(member -> member.getStaffRolesResolved().contains(Position.MINOR_ADMIN))
             .sorted(Comparator.comparing(Member::getSaccoId, textComparator)
                 .thenComparing(Member::getStationId, textComparator)
                 .thenComparing(Member::getFullName, textComparator))
+            .toList();
+        Map<UUID, MinorAdminInvitation> invitations = minorAdminInvitationService.findActiveInvitations(
+            admins.stream()
+                .filter(member -> member.getStatus() == MemberStatus.INVITED)
+                .map(Member::getId)
+                .toList());
+        return admins.stream()
             .map(member -> {
-                MinorAdminInvitationState state = resolveInvitationState(member, now);
+                MinorAdminInvitationState state = resolveInvitationState(member, now, invitations);
                 return new MinorAdminAccessView(
                     member.getId(),
                     displayStaffNo(member),
@@ -424,21 +434,23 @@ public class AdminService {
             .toList();
     }
 
-    private MinorAdminInvitationState resolveInvitationState(Member member, OffsetDateTime now) {
+    private MinorAdminInvitationState resolveInvitationState(Member member,
+                                                             OffsetDateTime now,
+                                                             Map<UUID, MinorAdminInvitation> invitations) {
         if (member.getStatus() == MemberStatus.ACTIVE) {
             return new MinorAdminInvitationState("ACTIVE", null);
         }
         if (member.getStatus() != MemberStatus.INVITED) {
             return new MinorAdminInvitationState(member.getStatus().name(), null);
         }
-        return minorAdminInvitationService.findActiveInvitation(member.getId())
-            .map(invite -> {
-                if (invite.getExpiresAt() != null && invite.getExpiresAt().isBefore(now)) {
-                    return new MinorAdminInvitationState("EXPIRED", invite.getExpiresAt());
-                }
-                return new MinorAdminInvitationState("INVITED", invite.getExpiresAt());
-            })
-            .orElse(new MinorAdminInvitationState("INVITED", null));
+        MinorAdminInvitation invite = invitations.get(member.getId());
+        if (invite == null) {
+            return new MinorAdminInvitationState("INVITED", null);
+        }
+        if (invite.getExpiresAt() != null && invite.getExpiresAt().isBefore(now)) {
+            return new MinorAdminInvitationState("EXPIRED", invite.getExpiresAt());
+        }
+        return new MinorAdminInvitationState("INVITED", invite.getExpiresAt());
     }
 
     private record MinorAdminInvitationState(String label, OffsetDateTime expiresAt) {
@@ -528,8 +540,8 @@ public class AdminService {
     }
 
     public List<LoanProductSetting> loanProducts(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdOrderByLoanTypeAsc(saccoId).stream()
-            .filter(product -> product.getProductStatus() != LoanProductStatus.RETIRED)
+        // getResolvedDisplayOrder falls back to the loan type order, so the final sort stays in Java.
+        return loanProductSettingRepository.findBySaccoIdAndProductStatusNot(saccoId, LoanProductStatus.RETIRED).stream()
             .sorted(Comparator.comparingInt(LoanProductSetting::getResolvedDisplayOrder))
             .toList();
     }
@@ -626,15 +638,15 @@ public class AdminService {
     }
 
     public int activeBoardMemberCount(String saccoId) {
-        return roleDirectoryService.activeByClaim(saccoId, UserClaim.BOARD_QUEUE_APPROVE).size();
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.BOARD_QUEUE_APPROVE);
     }
 
     public int activeCreditCommitteeMemberCount(String saccoId) {
-        return roleDirectoryService.activeByClaim(saccoId, UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE).size();
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE);
     }
 
     public int activeChairpersonCount(String saccoId) {
-        return roleDirectoryService.activeByClaim(saccoId, UserClaim.CHAIRPERSON_QUEUE_APPROVE).size();
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.CHAIRPERSON_QUEUE_APPROVE);
     }
 
     public List<BoardReviewerOption> activeBoardReviewerOptions(String saccoId) {
@@ -683,24 +695,23 @@ public class AdminService {
     }
 
     public int activeLoanOfficerCount(String saccoId) {
-        return roleDirectoryService.activeByAnyClaim(saccoId, List.of(
+        return (int) roleDirectoryService.countActiveByAnyClaim(saccoId, List.of(
             UserClaim.LOAN_OFFICER_QUEUE_ASSIGN,
             UserClaim.LOAN_OFFICER_QUEUE_APPROVE
-        )).size();
+        ));
     }
 
     public int activeAccountantCount(String saccoId) {
-        return roleDirectoryService.activeByClaim(saccoId, UserClaim.ACCOUNTANT_QUEUE_APPROVE).size();
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.ACCOUNTANT_QUEUE_APPROVE);
     }
 
     public int activeDisbursementOfficerCount(String saccoId) {
-        return roleDirectoryService.activeByClaim(saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE).size();
+        return (int) roleDirectoryService.countActiveByClaim(saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE);
     }
 
     public int activeDisbursementClaimHolderCount(String saccoId) {
-        return (int) roleDirectoryService.activeByClaim(saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE).stream()
-            .filter(ref -> roleDirectoryService.hasActiveClaimInSacco(ref.getId(), saccoId, UserClaim.DISBURSEMENT_QUEUE_VIEW))
-            .count();
+        return (int) roleDirectoryService.countActiveInSaccoWithAllClaims(
+            saccoId, UserClaim.DISBURSEMENT_QUEUE_DISBURSE, List.of(UserClaim.DISBURSEMENT_QUEUE_VIEW));
     }
 
     @Transactional
@@ -1559,10 +1570,8 @@ public class AdminService {
     }
 
     public List<Member> activeMembers(String saccoId, String stationId) {
-        return filterMembersByStation(
-            memberRepository.findBySaccoIdAndStatusOrderByFullNameAsc(saccoId, MemberStatus.ACTIVE),
-            stationId
-        );
+        return memberRepository.findByScopeAndStatusOrderByFullNameAsc(
+            saccoId, normalizeOptional(stationId), MemberStatus.ACTIVE);
     }
 
     public List<AdminIncident> incidents(String saccoId, IncidentStatus status, IncidentSeverity severity) {
@@ -1688,13 +1697,7 @@ public class AdminService {
         if (incident == null || adminId == null) {
             return;
         }
-        notificationRepository.findTop200ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(adminId, "SUPPORT_MESSAGE").stream()
-            .filter(notification -> incident.getId().equals(notificationIncidentId(notification)))
-            .filter(notification -> notification.getReadAt() == null)
-            .forEach(notification -> {
-                notification.setReadAt(OffsetDateTime.now());
-                notificationRepository.save(notification);
-            });
+        notificationRepository.markSupportIncidentAsRead(adminId, incident.getId());
         if (incident.getRelatedNotificationId() == null) {
             return;
         }
@@ -1749,17 +1752,19 @@ public class AdminService {
             Map.of("incidentId", incident.getId(), "subject", subject, "message", message, "recipientMemberNo", reporter.getMemberNo()));
     }
 
-    @Transactional
     public void broadcastToMinorAdmins(UUID adminId, String subject, String message) {
         Member admin = memberRepository.findById(adminId)
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
         List<RoleDirectoryService.RoleAccountRef> recipients =
             roleDirectoryService.activeRoleHoldersByClaim(Position.MINOR_ADMIN, UserClaim.NOTIFICATIONS_VIEW);
         OffsetDateTime now = OffsetDateTime.now();
+        List<Notification> notifications = new ArrayList<>(recipients.size());
         for (RoleDirectoryService.RoleAccountRef recipient : recipients) {
-            createNotification(recipient.getId(), "ADMIN_BROADCAST", "Platform Admin Broadcast", subject, message,
-                adminId, admin.getFullName(), Map.of("recipientMemberNo", recipient.getIdentifier()), now);
+            notifications.add(newNotification(recipient.getId(), "ADMIN_BROADCAST", "Platform Admin Broadcast",
+                subject, message, adminId, admin.getFullName(),
+                Map.of("recipientMemberNo", recipient.getIdentifier()), now));
         }
+        persistNotificationBatch(notifications);
         auditService.log("NOTIFICATION", null, "PLATFORM_ADMIN_BROADCAST_MINOR_ADMINS", adminId, null,
             Map.of("subject", subject, "message", message, "recipientCount", recipients.size()));
     }
@@ -1804,23 +1809,39 @@ public class AdminService {
         auditService.log("ADMIN_INCIDENT", incidentId, "ADMIN_UPDATE_INCIDENT", adminId, before, snapshotIncident(incident));
     }
 
-    @Transactional
     public void broadcast(String saccoId, UUID adminId, String subject, String message) {
         broadcast(saccoId, null, adminId, subject, message);
     }
 
-    @Transactional
     public void broadcast(String saccoId, String stationId, UUID adminId, String subject, String message) {
         Member admin = memberRepository.findById(adminId)
             .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
-        List<Member> recipients = activeMembers(saccoId, stationId);
         OffsetDateTime now = OffsetDateTime.now();
-        for (Member recipient : recipients) {
-            createNotification(recipient.getId(), "ADMIN_BROADCAST", "Admin Broadcast", subject, message,
-                adminId, admin.getFullName(), Map.of("recipientMemberNo", recipient.getMemberNo()), now);
+        String normalizedStationId = normalizeOptional(stationId);
+        long recipientCount = 0;
+        // Recipients are streamed in pages so a SACCO-wide broadcast never holds the whole
+        // member list in memory. Each page is persisted in its own repository transaction so
+        // this method does not pin a pooled connection across the full fan-out (in-app rows
+        // here; SMS/e-mail is delivered later by the outbox publisher).
+        Pageable page = PageRequest.of(0, BROADCAST_PAGE_SIZE);
+        while (true) {
+            Slice<MemberRepository.BroadcastRecipientProjection> batch = memberRepository.findBroadcastRecipients(
+                saccoId, normalizedStationId, MemberStatus.ACTIVE, page);
+            List<Notification> notifications = new ArrayList<>(batch.getNumberOfElements());
+            for (MemberRepository.BroadcastRecipientProjection recipient : batch.getContent()) {
+                notifications.add(newNotification(recipient.getId(), "ADMIN_BROADCAST", "Admin Broadcast",
+                    subject, message, adminId, admin.getFullName(),
+                    Map.of("recipientMemberNo", recipient.getMemberNo()), now));
+            }
+            persistNotificationBatch(notifications);
+            recipientCount += batch.getNumberOfElements();
+            if (!batch.hasNext()) {
+                break;
+            }
+            page = batch.nextPageable();
         }
         auditService.log("NOTIFICATION", null, "ADMIN_BROADCAST", adminId, null,
-            Map.of("subject", subject, "message", message, "recipientCount", recipients.size()));
+            Map.of("subject", subject, "message", message, "recipientCount", recipientCount));
     }
 
     @Transactional
@@ -2226,7 +2247,19 @@ public class AdminService {
 
     private void createNotification(UUID recipientId, String type, String source, String subject, String message,
                                     UUID senderId, String senderName, Map<String, Object> details, OffsetDateTime now) {
-        notificationRepository.save(Notification.builder()
+        notificationRepository.save(newNotification(recipientId, type, source, subject, message,
+            senderId, senderName, details, now));
+    }
+
+    private void persistNotificationBatch(List<Notification> notifications) {
+        if (!notifications.isEmpty()) {
+            notificationRepository.saveAll(notifications);
+        }
+    }
+
+    private Notification newNotification(UUID recipientId, String type, String source, String subject, String message,
+                                         UUID senderId, String senderName, Map<String, Object> details, OffsetDateTime now) {
+        return Notification.builder()
             .id(UUID.randomUUID())
             .recipientMemberId(recipientId)
             .type(type)
@@ -2234,7 +2267,7 @@ public class AdminService {
             .status(NotificationStatus.SENT)
             .createdAt(now)
             .sentAt(now)
-            .build());
+            .build();
     }
 
     private Map<String, Object> snapshotMember(Member member) {
@@ -2416,23 +2449,6 @@ public class AdminService {
                 readIncidentIds.contains(incident.getId())
             ))
             .toList();
-    }
-
-    private UUID notificationIncidentId(Notification notification) {
-        if (notification == null || notification.getPayload() == null || notification.getPayload().isBlank()) {
-            return null;
-        }
-        try {
-            Map<String, Object> payload = objectMapper.readValue(notification.getPayload(), new TypeReference<Map<String, Object>>() {});
-            Object detailsValue = payload.get("details");
-            if (!(detailsValue instanceof Map<?, ?> details)) {
-                return null;
-            }
-            Object incidentId = details.get("incidentId");
-            return incidentId == null ? null : UUID.fromString(String.valueOf(incidentId));
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     private UserAccessView toUserAccessView(Member member) {

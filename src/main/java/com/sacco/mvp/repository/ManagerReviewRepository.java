@@ -3,6 +3,7 @@ package com.sacco.mvp.repository;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
+import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -47,8 +48,6 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
     Optional<ManagerReview> findFirstByLoanApplicationIdAndReviewStageOrderByCreatedAtDesc(UUID loanApplicationId,
                                                                                             ApprovalWorkflowStage reviewStage);
 
-    List<ManagerReview> findAllByOrderByCreatedAtDesc();
-
     List<ManagerReview> findByManagerMemberIdAndReviewStageOrderByCreatedAtDesc(UUID managerMemberId,
                                                                                  ApprovalWorkflowStage reviewStage);
 
@@ -56,6 +55,27 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
                                                                                                      ApprovalWorkflowStage reviewStage,
                                                                                                      OffsetDateTime from,
                                                                                                      OffsetDateTime to);
+
+    @Query("""
+        select r
+        from ManagerReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.managerMemberId = :reviewerId
+          and r.reviewStage = :reviewStage
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:decision as string) is null or r.decision = :decision)
+          and r.createdAt >= :reviewedFrom
+          and r.createdAt <= :reviewedTo
+        order by r.createdAt desc
+        """)
+    List<ManagerReview> findForWorkflowReport(@Param("reviewerId") UUID reviewerId,
+                                              @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                              @Param("saccoId") String saccoId,
+                                              @Param("stationId") String stationId,
+                                              @Param("decision") ManagerDecision decision,
+                                              @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                              @Param("reviewedTo") OffsetDateTime reviewedTo);
 
     @Query("""
         select r

@@ -138,6 +138,65 @@ public class LoanWorkflowService {
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
     }
 
+    public Optional<LoanApplication> findMine(UUID appId, UUID memberId) {
+        return appId == null || memberId == null
+            ? Optional.empty()
+            : loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId);
+    }
+
+    public Optional<LoanApplication> findApplication(UUID appId) {
+        return appId == null ? Optional.empty() : loanApplicationRepository.findById(appId);
+    }
+
+    public List<LoanApplication> findApplications(Collection<UUID> appIds) {
+        return appIds == null || appIds.isEmpty()
+            ? List.of()
+            : loanApplicationRepository.findAllById(appIds);
+    }
+
+    public Page<LoanApplication> memberArchivePage(UUID applicantMemberId,
+                                                   Collection<LoanStatus> statuses,
+                                                   String loanIdQuery,
+                                                   OffsetDateTime updatedFrom,
+                                                   OffsetDateTime updatedToExclusive,
+                                                   PageRequest pageRequest) {
+        return loanApplicationRepository.findMemberArchivePage(
+            applicantMemberId, statuses, loanIdQuery, updatedFrom, updatedToExclusive, pageRequest);
+    }
+
+    public List<GuarantorRequest> guarantorRequests(UUID loanApplicationId) {
+        return guarantorRequestRepository.findByLoanApplicationId(loanApplicationId);
+    }
+
+    public Optional<GuarantorRequest> findGuarantorRequest(UUID requestId) {
+        return requestId == null ? Optional.empty() : guarantorRequestRepository.findById(requestId);
+    }
+
+    public Optional<GuarantorRequest> findGuarantorRequestForGuarantor(UUID requestId, UUID guarantorMemberId) {
+        return requestId == null || guarantorMemberId == null
+            ? Optional.empty()
+            : guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorMemberId);
+    }
+
+    public Page<GuarantorRequest> guarantorArchivePage(UUID guarantorMemberId,
+                                                       OffsetDateTime removalCutoff,
+                                                       GuarantorRequestStatus status,
+                                                       String loanIdQuery,
+                                                       OffsetDateTime reviewedFrom,
+                                                       OffsetDateTime reviewedToExclusive,
+                                                       PageRequest pageRequest) {
+        return guarantorRequestRepository.findArchivePageByGuarantorMemberId(
+            guarantorMemberId, removalCutoff, status, loanIdQuery, reviewedFrom, reviewedToExclusive, pageRequest);
+    }
+
+    public List<BoardReview> boardReviewsForStage(UUID loanApplicationId, ApprovalWorkflowStage stage) {
+        return boardReviewRepository.findByLoanApplicationIdAndReviewStage(loanApplicationId, stage);
+    }
+
+    public List<ManagerReview> staffReviewsForStage(UUID loanApplicationId, ApprovalWorkflowStage stage) {
+        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(loanApplicationId, stage);
+    }
+
     @Transactional
     public void acknowledgeDisbursement(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
@@ -1041,12 +1100,17 @@ public class LoanWorkflowService {
             throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " different guarantors");
         }
 
+        Map<UUID, Member> guarantorsById = memberRepository.findAllById(uniqueGuarantors).stream()
+            .collect(java.util.stream.Collectors.toMap(Member::getId, member -> member, (left, right) -> left));
+
         for (UUID guarantorId : uniqueGuarantors) {
             if (guarantorId.equals(applicantId)) {
                 throw new IllegalArgumentException("You cannot select yourself as a guarantor");
             }
-            Member guarantor = memberRepository.findById(guarantorId)
-                .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
+            Member guarantor = guarantorsById.get(guarantorId);
+            if (guarantor == null) {
+                throw new IllegalArgumentException("Guarantor not found");
+            }
             if (!guarantor.getSaccoId().equals(saccoId) || guarantor.getStatus() != MemberStatus.ACTIVE) {
                 throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
             }

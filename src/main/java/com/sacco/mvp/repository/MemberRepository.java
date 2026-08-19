@@ -5,6 +5,7 @@ import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,6 +19,11 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     interface StatusCountProjection {
         MemberStatus getStatus();
         long getTotal();
+    }
+
+    interface BroadcastRecipientProjection {
+        UUID getId();
+        String getMemberNo();
     }
 
     interface SaccoMemberStatsProjection {
@@ -57,6 +63,36 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findBySaccoIdAndStationIdIgnoreCaseOrderByFullNameAsc(String saccoId, String stationId);
 
     List<Member> findBySaccoIdAndStatusOrderByFullNameAsc(String saccoId, MemberStatus status);
+
+    @Query("""
+        select m
+        from Member m
+        where m.saccoId = :saccoId
+          and m.status = :status
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
+        order by m.fullName asc
+        """)
+    List<Member> findByScopeAndStatusOrderByFullNameAsc(@Param("saccoId") String saccoId,
+                                                        @Param("stationId") String stationId,
+                                                        @Param("status") MemberStatus status);
+
+    /**
+     * Broadcast fan-out only needs the recipient id and member number, so this avoids
+     * materialising whole {@code Member} graphs (including the eager staff-role collection)
+     * for every member in the scope.
+     */
+    @Query("""
+        select m.id as id, m.memberNo as memberNo
+        from Member m
+        where m.saccoId = :saccoId
+          and m.status = :status
+          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
+        order by m.id asc
+        """)
+    Slice<BroadcastRecipientProjection> findBroadcastRecipients(@Param("saccoId") String saccoId,
+                                                                @Param("stationId") String stationId,
+                                                                @Param("status") MemberStatus status,
+                                                                Pageable pageable);
 
     @Query("""
         select m
@@ -104,8 +140,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                                        @Param("applicantId") UUID applicantId,
                                                        @Param("digits") String digits,
                                                        Pageable pageable);
-
-    List<Member> findBySaccoIdIn(Collection<String> saccoIds);
 
     @Query("""
         select m.saccoId as saccoId,
@@ -195,6 +229,49 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findActiveMembersWithClaimInStation(@Param("saccoId") String saccoId,
                                                      @Param("stationId") String stationId,
                                                      @Param("claimName") String claimName);
+
+    @Query(
+        value = """
+            select distinct m.*
+            from members m
+            where m.sacco_id = :saccoId
+              and m.status = 'ACTIVE'
+              and m.staff_access_status = 'ACTIVE'
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and exists (
+                select 1
+                from member_access_claims mac
+                where mac.member_id = m.id
+                  and mac.claim_name in (:claimNames)
+              )
+            order by m.full_name asc
+            """,
+        nativeQuery = true
+    )
+    List<Member> findActiveMembersWithAnyClaimInStation(@Param("saccoId") String saccoId,
+                                                        @Param("stationId") String stationId,
+                                                        @Param("claimNames") Collection<String> claimNames);
+
+    @Query(
+        value = """
+            select count(distinct m.id)
+            from members m
+            where m.sacco_id = :saccoId
+              and m.status = 'ACTIVE'
+              and m.staff_access_status = 'ACTIVE'
+              and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
+              and exists (
+                select 1
+                from member_access_claims mac
+                where mac.member_id = m.id
+                  and mac.claim_name in (:claimNames)
+              )
+            """,
+        nativeQuery = true
+    )
+    long countActiveMembersWithAnyClaimInStation(@Param("saccoId") String saccoId,
+                                                 @Param("stationId") String stationId,
+                                                 @Param("claimNames") Collection<String> claimNames);
 
     @Query("""
         select distinct m

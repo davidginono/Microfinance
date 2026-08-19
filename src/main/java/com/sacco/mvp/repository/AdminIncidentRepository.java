@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UUID> {
-    List<AdminIncident> findBySaccoIdOrderByCreatedAtDesc(String saccoId);
-
     List<AdminIncident> findTop250ByOrderByCreatedAtDesc();
 
     List<AdminIncident> findTop250BySaccoIdOrderByCreatedAtDesc(String saccoId);
@@ -32,8 +30,6 @@ public interface AdminIncidentRepository extends JpaRepository<AdminIncident, UU
                                             @Param("status") IncidentStatus status,
                                             @Param("severity") IncidentSeverity severity,
                                             Pageable pageable);
-
-    List<AdminIncident> findByReportedByMemberIdOrderByCreatedAtDesc(UUID reportedByMemberId);
 
     @Query("""
         select i

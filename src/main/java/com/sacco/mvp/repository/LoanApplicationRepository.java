@@ -61,6 +61,50 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         select l
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
+          and l.status in :statuses
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:loanProductId as uuid) is null or l.loanProductSettingId = :loanProductId)
+        order by l.createdAt desc
+        """)
+    List<LoanApplication> findMemberLoansForAnalyticsByStatuses(@Param("applicantMemberId") UUID applicantMemberId,
+                                                                @Param("statuses") Collection<LoanStatus> statuses,
+                                                                @Param("createdFrom") OffsetDateTime createdFrom,
+                                                                @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                                @Param("loanType") LoanType loanType,
+                                                                @Param("loanProductId") UUID loanProductId);
+
+    @Query("""
+        select distinct year(l.disbursementDate)
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and l.status in :statuses
+          and l.disbursementDate is not null
+        order by year(l.disbursementDate) desc
+        """)
+    List<Integer> findDisbursementYears(@Param("saccoId") String saccoId,
+                                        @Param("statuses") Collection<LoanStatus> statuses);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and l.status in :statuses
+          and l.disbursementDate is not null
+          and l.disbursementDate >= :fromDate
+          and l.disbursementDate <= :toDate
+        order by l.disbursementDate desc, l.createdAt desc
+        """)
+    List<LoanApplication> findDisbursedInRange(@Param("saccoId") String saccoId,
+                                               @Param("statuses") Collection<LoanStatus> statuses,
+                                               @Param("fromDate") LocalDate fromDate,
+                                               @Param("toDate") LocalDate toDate);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
           and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
           and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
           and (cast(:loanType as string) is null or l.loanType = :loanType)
@@ -105,11 +149,19 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                                      @Param("statuses") Collection<LoanStatus> statuses,
                                                                      @Param("loanType") LoanType loanType);
 
-    List<LoanApplication> findBySaccoIdOrderByCreatedAtDesc(String saccoId);
-    List<LoanApplication> findBySaccoIdIn(Collection<String> saccoIds);
     List<LoanApplication> findBySaccoIdAndStatusOrderByCreatedAtAsc(String saccoId, LoanStatus status);
     List<LoanApplication> findBySaccoIdAndStatusInOrderByCreatedAtAsc(String saccoId, List<LoanStatus> statuses);
-    List<LoanApplication> findByStatusAndFinalDueDateIsNotNull(LoanStatus status);
+
+    @Query("""
+        select l
+        from LoanApplication l
+        where l.status = :status
+          and l.finalDueDate in :dueDates
+        order by l.finalDueDate asc, l.id asc
+        """)
+    Page<LoanApplication> findDueForReminder(@Param("status") LoanStatus status,
+                                             @Param("dueDates") Collection<LocalDate> dueDates,
+                                             Pageable pageable);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
     long countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(UUID applicantMemberId, LoanStatus status);
     long countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(UUID applicantMemberId, Collection<LoanStatus> statuses);

@@ -88,13 +88,11 @@ public class PlatformAdminService {
     public SaccoDetailView saccoDetail(String saccoId, String stationId) {
         String normalizedSaccoId = normalizeSaccoId(saccoId);
         String normalizedStationId = normalizeOptional(stationId);
+        // Deliberately no platform-wide snapshot here: this view only renders one SACCO, and
+        // the active-registration lookup above is the same existence check the snapshot gave.
         RegisteredSacco sacco = registeredSaccoRepository.findById(normalizedSaccoId)
             .filter(RegisteredSacco::isActive)
             .orElseThrow(() -> new IllegalArgumentException("SACCO not found."));
-        PortfolioSnapshot snapshot = buildSnapshot();
-        if (!snapshot.summaryById().containsKey(normalizedSaccoId)) {
-            throw new IllegalArgumentException("SACCO not found.");
-        }
 
         List<SaccoStation> activeStations = saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(normalizedSaccoId);
         List<String> stationOptions = activeStations.stream()
@@ -176,11 +174,7 @@ public class PlatformAdminService {
     private PortfolioSnapshot buildSnapshot() {
         List<RegisteredSacco> registeredSaccos = registeredSaccoRepository.findByActiveTrueOrderBySaccoNameAsc();
         if (registeredSaccos.isEmpty()) {
-            return new PortfolioSnapshot(
-                List.of(),
-                Map.of(),
-                0
-            );
+            return new PortfolioSnapshot(List.of(), 0);
         }
 
         Set<String> saccoIds = registeredSaccos.stream().map(RegisteredSacco::getSaccoId).collect(Collectors.toSet());
@@ -215,7 +209,6 @@ public class PlatformAdminService {
             ));
 
         List<SaccoSummary> summaries = new ArrayList<>();
-        Map<String, SaccoSummary> summaryById = new LinkedHashMap<>();
         Map<String, SaccoSettings> settingsBySacco = saccoSettingsRepository.findAllById(saccoIds).stream()
             .collect(Collectors.toMap(SaccoSettings::getSaccoId, settings -> settings, (left, right) -> left, LinkedHashMap::new));
         Map<String, List<SaccoStation>> stationsBySacco = saccoStationRepository
@@ -236,13 +229,12 @@ public class PlatformAdminService {
                 resolveStationAccess(activeStations, null)
             );
             summaries.add(summary);
-            summaryById.put(summary.saccoId(), summary);
         }
 
         int totalMembers = memberStatsBySacco.values().stream()
             .mapToInt(stats -> Math.toIntExact(stats.totalMembers()))
             .sum();
-        return new PortfolioSnapshot(summaries, summaryById, totalMembers);
+        return new PortfolioSnapshot(summaries, totalMembers);
     }
 
     private SaccoSummary buildSummary(RegisteredSacco sacco,
@@ -1044,7 +1036,6 @@ public class PlatformAdminService {
 
     private record PortfolioSnapshot(
         List<SaccoSummary> summaries,
-        Map<String, SaccoSummary> summaryById,
         int totalMembers
     ) {
     }

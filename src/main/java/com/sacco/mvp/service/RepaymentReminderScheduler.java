@@ -9,9 +9,11 @@ import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -25,6 +27,7 @@ import java.util.UUID;
 @Slf4j
 public class RepaymentReminderScheduler {
     private static final List<Long> REMINDER_DAYS = List.of(30L, 14L, 7L, 3L, 1L, 0L);
+    private static final int REMINDER_BATCH_SIZE = 200;
 
     private final LoanApplicationRepository loanApplicationRepository;
     private final NotificationRepository notificationRepository;
@@ -33,66 +36,79 @@ public class RepaymentReminderScheduler {
     private final NotificationViewService notificationViewService;
     private final ObjectMapper objectMapper;
 
+    // Deliberately not @Transactional: delivery performs SMS/e-mail calls, so a wrapping
+    // transaction would pin a pooled connection for the whole run. Each reminder is
+    // independently idempotent via alreadySentToday.
     @Scheduled(fixedDelay = 3600000)
-    @Transactional
     public void sendRepaymentReminders() {
-        List<LoanApplication> loans = loanApplicationRepository.findByStatusAndFinalDueDateIsNotNull(LoanStatus.DISBURSED);
-        for (LoanApplication loan : loans) {
-            long daysLeft = repaymentScheduleService.daysLeft(loan.getFinalDueDate());
-            if (!REMINDER_DAYS.contains(daysLeft)) {
-                continue;
+        LocalDate today = LocalDate.now();
+        List<LocalDate> dueDates = REMINDER_DAYS.stream().map(today::plusDays).toList();
+        Pageable page = PageRequest.of(0, REMINDER_BATCH_SIZE);
+        while (true) {
+            Page<LoanApplication> batch = loanApplicationRepository.findDueForReminder(
+                LoanStatus.DISBURSED, dueDates, page);
+            for (LoanApplication loan : batch.getContent()) {
+                sendReminder(loan);
             }
-            if (alreadySentToday(loan, daysLeft)) {
-                continue;
+            if (!batch.hasNext()) {
+                return;
             }
-            try {
-                Map<String, Object> details = new LinkedHashMap<>();
-                details.put("loanId", loan.getId().toString());
-                details.put("daysLeft", daysLeft);
-                details.put("finalDueDate", loan.getFinalDueDate().toString());
-                details.put("installmentAmount", loan.getInstallmentAmount());
-                String payload = objectMapper.writeValueAsString(Map.of(
-                    "subject", "Repayment reminder",
-                    "message", daysLeft == 0
-                        ? "Your loan repayment reaches its final due date today."
-                        : "Your loan repayment final due date is in " + daysLeft + " day(s).",
-                    "source", "Repayment Scheduler",
-                    "details", details
-                ));
-                Notification notification = notificationRepository.save(Notification.builder()
-                    .id(UUID.randomUUID())
-                    .recipientMemberId(loan.getApplicantMemberId())
-                    .type("REPAYMENT_REMINDER")
-                    .payload(payload)
-                    .status(NotificationStatus.SENT)
-                    .createdAt(OffsetDateTime.now())
-                    .sentAt(OffsetDateTime.now())
-                    .build());
-                NotificationViewService.NotificationView view = notificationViewService.toView(notification);
-                notificationDeliveryService.deliver(
-                    loan.getSaccoId(),
-                    loan.getStationId(),
-                    notification.getId(),
-                    loan.getApplicantMemberId(),
-                    "REPAYMENT_REMINDER",
-                    view.getSubject(),
-                    view.getMessage()
-                );
-            } catch (Exception ex) {
-                log.warn("Unable to create repayment reminder for loan {}: {}", loan.getId(), ex.getMessage());
-            }
+            page = batch.nextPageable();
+        }
+    }
+
+    private void sendReminder(LoanApplication loan) {
+        long daysLeft = repaymentScheduleService.daysLeft(loan.getFinalDueDate());
+        if (!REMINDER_DAYS.contains(daysLeft)) {
+            return;
+        }
+        if (alreadySentToday(loan, daysLeft)) {
+            return;
+        }
+        try {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("loanId", loan.getId().toString());
+            details.put("daysLeft", daysLeft);
+            details.put("finalDueDate", loan.getFinalDueDate().toString());
+            details.put("installmentAmount", loan.getInstallmentAmount());
+            String payload = objectMapper.writeValueAsString(Map.of(
+                "subject", "Repayment reminder",
+                "message", daysLeft == 0
+                    ? "Your loan repayment reaches its final due date today."
+                    : "Your loan repayment final due date is in " + daysLeft + " day(s).",
+                "source", "Repayment Scheduler",
+                "details", details
+            ));
+            Notification notification = notificationRepository.save(Notification.builder()
+                .id(UUID.randomUUID())
+                .recipientMemberId(loan.getApplicantMemberId())
+                .type("REPAYMENT_REMINDER")
+                .payload(payload)
+                .status(NotificationStatus.SENT)
+                .createdAt(OffsetDateTime.now())
+                .sentAt(OffsetDateTime.now())
+                .build());
+            NotificationViewService.NotificationView view = notificationViewService.toView(notification);
+            notificationDeliveryService.deliver(
+                loan.getSaccoId(),
+                loan.getStationId(),
+                notification.getId(),
+                loan.getApplicantMemberId(),
+                "REPAYMENT_REMINDER",
+                view.getSubject(),
+                view.getMessage()
+            );
+        } catch (Exception ex) {
+            log.warn("Unable to create repayment reminder for loan {}: {}", loan.getId(), ex.getMessage());
         }
     }
 
     private boolean alreadySentToday(LoanApplication loan, long daysLeft) {
-        LocalDate today = LocalDate.now();
-        return notificationRepository.findTop100ByRecipientMemberIdAndTypeOrderByCreatedAtDesc(
-                loan.getApplicantMemberId(), "REPAYMENT_REMINDER")
-            .stream()
-            .anyMatch(item -> item.getCreatedAt() != null
-                && item.getCreatedAt().toLocalDate().isEqual(today)
-                && item.getPayload() != null
-                && item.getPayload().contains(loan.getId().toString())
-                && item.getPayload().contains("\"daysLeft\":" + daysLeft));
+        return notificationRepository.existsRepaymentReminder(
+            loan.getApplicantMemberId(),
+            loan.getId().toString(),
+            Long.toString(daysLeft),
+            LocalDate.now().atStartOfDay().atOffset(OffsetDateTime.now().getOffset())
+        );
     }
 }

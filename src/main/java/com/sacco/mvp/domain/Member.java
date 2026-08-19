@@ -73,9 +73,13 @@ public class Member {
     @Column(nullable = false)
     private Position position;
 
+    // Must stay EAGER: staff roles are read outside any transaction (principal assembly,
+    // request filters, JSP rendering) and open-in-view is disabled. @BatchSize keeps
+    // multi-row member queries from degrading into one collection select per row.
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "member_staff_roles", joinColumns = @JoinColumn(name = "member_id"))
+    @org.hibernate.annotations.BatchSize(size = 64)
     @Enumerated(EnumType.STRING)
     @Column(name = "role_name", nullable = false)
     private Set<Position> staffRoles = new LinkedHashSet<>();

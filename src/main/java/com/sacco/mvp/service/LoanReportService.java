@@ -140,15 +140,12 @@ public class LoanReportService {
         int effectiveYear = year == null ? applicationClock.today().getYear() : year;
         LocalDate fromDate = LocalDate.of(effectiveYear, 1, 1);
         LocalDate toDate = LocalDate.of(effectiveYear, 12, 31);
-        List<LoanApplication> loans = loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
-                saccoId, DISBURSED_STATUSES).stream()
-            .filter(loan -> loan.getDisbursementDate() != null)
-            .filter(loan -> fromDate == null || !loan.getDisbursementDate().isBefore(fromDate))
-            .filter(loan -> toDate == null || !loan.getDisbursementDate().isAfter(toDate))
-            .filter(loan -> !returnedOnly || loan.getStatus() == LoanStatus.PAID)
-            .sorted(Comparator.comparing(LoanApplication::getDisbursementDate, Comparator.reverseOrder())
-                .thenComparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
+        List<LoanApplication> loans = loanApplicationRepository.findDisbursedInRange(
+            saccoId,
+            returnedOnly ? List.of(LoanStatus.PAID) : DISBURSED_STATUSES,
+            fromDate,
+            toDate
+        );
 
         Set<UUID> applicantIds = loans.stream().map(LoanApplication::getApplicantMemberId).collect(java.util.stream.Collectors.toSet());
         Map<UUID, Member> applicantMap = new LinkedHashMap<>();
@@ -161,14 +158,8 @@ public class LoanReportService {
     }
 
     public List<Integer> managerReportYears(String saccoId) {
-        List<Integer> years = loanApplicationRepository.findBySaccoIdAndStatusInOrderByCreatedAtAsc(
-                saccoId, DISBURSED_STATUSES).stream()
-            .map(LoanApplication::getDisbursementDate)
-            .filter(java.util.Objects::nonNull)
-            .map(LocalDate::getYear)
-            .distinct()
-            .sorted(Comparator.reverseOrder())
-            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        List<Integer> years = new ArrayList<>(
+            loanApplicationRepository.findDisbursementYears(saccoId, DISBURSED_STATUSES));
         int currentYear = applicationClock.today().getYear();
         if (!years.contains(currentYear)) {
             years.add(0, currentYear);
@@ -195,17 +186,13 @@ public class LoanReportService {
             ? "ALL"
             : (expectedDecision == ManagerDecision.ACCEPT ? "APPROVED" : "REJECTED");
 
-        List<ManagerReview> reviews = managerReviewRepository
-            .findByManagerMemberIdAndReviewStageAndCreatedAtBetweenOrderByCreatedAtDesc(
-                accountantId, ApprovalWorkflowStage.ACCOUNTANT, fromAt, toAt).stream()
-            .filter(review -> expectedDecision == null || review.getDecision() == expectedDecision)
-            .toList();
+        List<ManagerReview> reviews = managerReviewRepository.findForWorkflowReport(
+            accountantId, ApprovalWorkflowStage.ACCOUNTANT, saccoId, blankToNull(stationId),
+            expectedDecision, fromAt, toAt);
 
         Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
                 reviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
             .stream()
-            .filter(loan -> loan.getSaccoId().equals(saccoId))
-            .filter(loan -> matchesApplicantStation(loan, stationId))
             .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
 
         List<AccountantReviewEntry> entries = reviews.stream()
@@ -260,17 +247,13 @@ public class LoanReportService {
             ? "ALL"
             : (expectedDecision == ManagerDecision.ACCEPT ? "APPROVED" : "REJECTED");
 
-        List<ManagerReview> reviews = managerReviewRepository
-            .findByManagerMemberIdAndReviewStageAndCreatedAtBetweenOrderByCreatedAtDesc(
-                managerId, ApprovalWorkflowStage.MANAGER, fromAt, toAt).stream()
-            .filter(review -> expectedDecision == null || review.getDecision() == expectedDecision)
-            .toList();
+        List<ManagerReview> reviews = managerReviewRepository.findForWorkflowReport(
+            managerId, ApprovalWorkflowStage.MANAGER, saccoId, blankToNull(stationId),
+            expectedDecision, fromAt, toAt);
 
         Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
                 reviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
             .stream()
-            .filter(loan -> loan.getSaccoId().equals(saccoId))
-            .filter(loan -> matchesApplicantStation(loan, stationId))
             .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
 
         List<ManagerWorkflowEntry> entries = reviews.stream()
@@ -324,17 +307,13 @@ public class LoanReportService {
         BoardDecision expectedDecision = resolveBoardDecisionFilter(decisionFilter);
         String effectiveFilter = expectedDecision == null ? "ALL" : expectedDecision.name();
 
-        List<BoardReview> reviews = boardReviewRepository
-            .findForAnalytics(reviewerId, reviewStage, fromAt, toExclusive).stream()
-            .filter(review -> review.getDecision() != BoardDecision.PENDING)
-            .filter(review -> expectedDecision == null || review.getDecision() == expectedDecision)
-            .toList();
+        List<BoardReview> reviews = boardReviewRepository.findForWorkflowReport(
+            reviewerId, reviewStage, saccoId, blankToNull(stationId),
+            expectedDecision, fromAt, toExclusive);
 
         Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
                 reviews.stream().map(BoardReview::getLoanApplicationId).collect(Collectors.toSet()))
             .stream()
-            .filter(loan -> loan.getSaccoId().equals(saccoId))
-            .filter(loan -> matchesApplicantStation(loan, stationId))
             .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
 
         List<BoardWorkflowEntry> entries = reviews.stream()
@@ -384,17 +363,13 @@ public class LoanReportService {
 
         OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
         OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
-        List<ManagerReview> reviews = managerReviewRepository
-            .findByManagerMemberIdAndReviewStageAndCreatedAtBetweenOrderByCreatedAtDesc(
-                disbursementOfficerId, ApprovalWorkflowStage.DISBURSEMENT_OFFICER, fromAt, toAt).stream()
-            .filter(review -> review.getDecision() == ManagerDecision.ACCEPT)
-            .toList();
+        List<ManagerReview> reviews = managerReviewRepository.findForWorkflowReport(
+            disbursementOfficerId, ApprovalWorkflowStage.DISBURSEMENT_OFFICER, saccoId, blankToNull(stationId),
+            ManagerDecision.ACCEPT, fromAt, toAt);
 
         Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
                 reviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
             .stream()
-            .filter(loan -> loan.getSaccoId().equals(saccoId))
-            .filter(loan -> matchesApplicantStation(loan, stationId))
             .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
 
         List<DisbursementReviewEntry> entries = reviews.stream()
@@ -669,11 +644,8 @@ public class LoanReportService {
                                                              LocalDate toDate,
                                                              com.sacco.mvp.domain.LoanType loanType) {
         DateRange range = resolveReportRange(fromDate, toDate);
-        List<LoanApplication> loans = loanApplicationRepository.findMemberLoansForAnalytics(
-                memberId, startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)
-            .stream()
-            .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
+        List<LoanApplication> loans = loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(
+            memberId, ACTIVE_STATUSES, startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null);
         return activeLoanRowsFromLoans(loans);
     }
 
@@ -837,6 +809,7 @@ public class LoanReportService {
 
     public byte[] buildAccountantPdf(AccountantLoanReport report) {
         List<String[]> rows = new ArrayList<>();
+        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
         for (AccountantReviewEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
             LoanApplication loan = entry.loan();
@@ -844,7 +817,7 @@ public class LoanReportService {
                 applicationLabel(loan),
                 loanIdLabel(loan),
                 applicantLabel(applicant),
-                loanTypeLabel(loan),
+                loanTypeLabel(loan, productNames),
                 formatMoney(loan.getAmount()),
                 entry.review().getDecision() == ManagerDecision.ACCEPT ? "Ready for Disbursement" : "Rejected",
                 formatTimestamp(entry.review().getCreatedAt()),
@@ -870,6 +843,7 @@ public class LoanReportService {
 
     public byte[] buildManagerWorkflowPdf(ManagerWorkflowReport report) {
         List<String[]> rows = new ArrayList<>();
+        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
         for (ManagerWorkflowEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
             LoanApplication loan = entry.loan();
@@ -877,7 +851,7 @@ public class LoanReportService {
                 applicationLabel(loan),
                 loanIdLabel(loan),
                 applicantLabel(applicant),
-                loanTypeLabel(loan),
+                loanTypeLabel(loan, productNames),
                 formatMoney(loan.getAmount()),
                 entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected",
                 formatTimestamp(entry.review().getCreatedAt()),
@@ -930,6 +904,7 @@ public class LoanReportService {
                                               String emptyMessage,
                                               String footerTitle) {
         List<String[]> rows = new ArrayList<>();
+        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
         for (BoardWorkflowEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
             LoanApplication loan = entry.loan();
@@ -937,7 +912,7 @@ public class LoanReportService {
                 applicationLabel(loan),
                 loanIdLabel(loan),
                 applicantLabel(applicant),
-                loanTypeLabel(loan),
+                loanTypeLabel(loan, productNames),
                 formatMoney(loan.getAmount()),
                 boardDecisionLabel(entry.review().getDecision()),
                 formatTimestamp(reviewSortTime(entry.review())),
@@ -963,6 +938,7 @@ public class LoanReportService {
 
     public byte[] buildDisbursementPdf(DisbursementLoanReport report) {
         List<String[]> rows = new ArrayList<>();
+        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
         for (DisbursementReviewEntry entry : report.entries()) {
             Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
             LoanApplication loan = entry.loan();
@@ -970,7 +946,7 @@ public class LoanReportService {
                 applicationLabel(loan),
                 loanIdLabel(loan),
                 applicantLabel(applicant),
-                loanTypeLabel(loan),
+                loanTypeLabel(loan, productNames),
                 formatMoney(loan.getAmount()),
                 formatTimestamp(entry.review().getCreatedAt()),
                 humanizeLoanStatusForReport(loan.getStatus())
@@ -1208,6 +1184,7 @@ public class LoanReportService {
     }
 
     private List<ActiveLoanDetailRow> activeLoanRowsFromLoans(List<LoanApplication> loans) {
+        Map<UUID, String> productNames = productNamesForLoans(loans);
         return loans.stream()
             .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -1217,7 +1194,7 @@ public class LoanReportService {
                 BigDecimal remainingInterest = interestUnpaidAmount(loan);
                 return new ActiveLoanDetailRow(
                     loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
-                    loanProductName(loan),
+                    loanProductName(loan, productNames),
                     moneyPlain(loan.getAmount()),
                     moneyPlain(outstanding),
                     moneyPlain(requiredInterest),
@@ -1303,13 +1280,14 @@ public class LoanReportService {
     }
 
     private List<ActivityRow> recentActivityRows(List<LoanApplication> loans) {
+        Map<UUID, String> productNames = productNamesForLoans(loans);
         return loans.stream()
             .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .limit(6)
             .map(loan -> new ActivityRow(
                 loan.getCreatedAt() == null ? "-" : HUMAN_DATE_FORMATTER.format(loan.getCreatedAt().toLocalDate()),
                 activityLabel(loan),
-                loanProductName(loan),
+                loanProductName(loan, productNames),
                 moneyPlain(loan.getAmount()),
                 humanizeLoanStatusForReport(loan.getStatus())
             ))
@@ -2130,19 +2108,41 @@ public class LoanReportService {
         return blankToFallback(applicant.getFullName(), applicant.getMemberNo());
     }
 
-    private String loanTypeLabel(LoanApplication loan) {
-        return loanProductName(loan);
+    private String loanTypeLabel(LoanApplication loan, Map<UUID, String> productNames) {
+        return loanProductName(loan, productNames);
     }
 
-    private String loanProductName(LoanApplication loan) {
-        if (loan == null || loan.getLoanProductSettingId() == null || loan.getSaccoId() == null || loan.getSaccoId().isBlank()) {
+    private String loanProductName(LoanApplication loan, Map<UUID, String> productNames) {
+        if (loan == null || loan.getLoanProductSettingId() == null) {
             return "-";
         }
-        return loanProductSettingRepository.findByIdAndSaccoIdAndActiveTrue(loan.getLoanProductSettingId(), loan.getSaccoId())
-            .filter(LoanProductSetting::isAvailableForApplications)
-            .map(LoanProductSetting::getDisplayName)
-            .filter(name -> name != null && !name.isBlank())
-            .orElse("-");
+        return productNames.getOrDefault(loan.getLoanProductSettingId(), "-");
+    }
+
+    private Map<UUID, String> productNamesForSacco(String saccoId) {
+        if (saccoId == null || saccoId.isBlank()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new LinkedHashMap<>();
+        for (LoanProductSetting product : loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId)) {
+            if (product.isAvailableForApplications()
+                && product.getDisplayName() != null
+                && !product.getDisplayName().isBlank()) {
+                names.put(product.getId(), product.getDisplayName());
+            }
+        }
+        return names;
+    }
+
+    private Map<UUID, String> productNamesForLoans(List<LoanApplication> loans) {
+        if (loans == null || loans.isEmpty()) {
+            return Map.of();
+        }
+        return productNamesForSacco(loans.stream()
+            .map(LoanApplication::getSaccoId)
+            .filter(id -> id != null && !id.isBlank())
+            .findFirst()
+            .orElse(null));
     }
 
     private String blankToFallback(String value, String fallback) {
@@ -2330,6 +2330,10 @@ public class LoanReportService {
         return review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt();
     }
 
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private boolean matchesApplicantStation(LoanApplication loan, String stationId) {
         if (loan == null || stationId == null || stationId.isBlank()) {
             return true;
@@ -2353,26 +2357,21 @@ public class LoanReportService {
         if (loans.isEmpty()) {
             return List.of();
         }
-        Map<UUID, List<GuarantorRequest>> guarantorsByLoan = new LinkedHashMap<>();
-        Map<UUID, List<BoardReview>> boardReviewsByLoan = new LinkedHashMap<>();
+        Set<UUID> loanIds = loans.stream().map(LoanApplication::getId).collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+        Map<UUID, List<GuarantorRequest>> guarantorsByLoan = guarantorRequestRepository.findByLoanApplicationIdIn(loanIds)
+            .stream()
+            .collect(Collectors.groupingBy(GuarantorRequest::getLoanApplicationId, LinkedHashMap::new, Collectors.toList()));
+        Map<UUID, List<BoardReview>> boardReviewsByLoan = boardReviewRepository.findByLoanApplicationIdIn(loanIds)
+            .stream()
+            .collect(Collectors.groupingBy(BoardReview::getLoanApplicationId, LinkedHashMap::new, Collectors.toList()));
+
         Set<UUID> memberIds = new java.util.LinkedHashSet<>();
-
-        for (LoanApplication loan : loans) {
-            List<GuarantorRequest> requests = guarantorRequestRepository.findByLoanApplicationId(loan.getId());
-            guarantorsByLoan.put(loan.getId(), requests);
-            requests.stream()
-                .map(GuarantorRequest::getGuarantorMemberId)
-                .forEach(memberIds::add);
-
-            List<BoardReview> boardReviews = boardReviewRepository.findByLoanApplicationId(loan.getId());
-            boardReviewsByLoan.put(loan.getId(), boardReviews);
-            boardReviews.stream()
-                .map(BoardReview::getBoardMemberId)
-                .forEach(memberIds::add);
-        }
+        guarantorsByLoan.values().forEach(requests -> requests.forEach(request -> memberIds.add(request.getGuarantorMemberId())));
+        boardReviewsByLoan.values().forEach(reviews -> reviews.forEach(review -> memberIds.add(review.getBoardMemberId())));
 
         Map<UUID, Member> memberMap = memberRepository.findAllById(memberIds).stream()
             .collect(Collectors.toMap(Member::getId, item -> item));
+        Map<UUID, String> productNames = productNamesForLoans(loans);
 
         return loans.stream()
             .map(loan -> buildMemberLoanDetail(
@@ -2380,7 +2379,8 @@ public class LoanReportService {
                 loan,
                 guarantorsByLoan.getOrDefault(loan.getId(), List.of()),
                 boardReviewsByLoan.getOrDefault(loan.getId(), List.of()),
-                memberMap
+                memberMap,
+                productNames
             ))
             .toList();
     }
@@ -2389,7 +2389,8 @@ public class LoanReportService {
                                                    LoanApplication loan,
                                                    List<GuarantorRequest> guarantorRequests,
                                                    List<BoardReview> boardReviews,
-                                                   Map<UUID, Member> memberMap) {
+                                                   Map<UUID, Member> memberMap,
+                                                   Map<UUID, String> productNames) {
         Map<String, Object> financialSnapshot = parseJsonMap(loan.getFinancialSnapshot());
         String applicationFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("applicationFee")));
         String insuranceFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("insuranceFee")));
@@ -2404,7 +2405,7 @@ public class LoanReportService {
             loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber().toString(),
             loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
             formatMemberDetails(member),
-            loanTypeLabel(loan),
+            loanTypeLabel(loan, productNames),
             formatMoney(loan.getAmount()),
             loan.getTenorMonths() == null ? "-" : loan.getTenorMonths() + " month(s)",
             applicationFeeLabel,

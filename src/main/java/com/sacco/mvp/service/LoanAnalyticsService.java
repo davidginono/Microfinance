@@ -34,6 +34,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 @Service
 @RequiredArgsConstructor
@@ -464,6 +467,29 @@ public class LoanAnalyticsService {
             memberId, saccoId, stationId, ACTIVE_STATUSES);
     }
 
+    /**
+     * A single analytics page asks for the same dataset four to eight times (summary, trend,
+     * product performance, portfolio, export). The underlying rows cannot change mid-request,
+     * so the first load is reused. Outside a web request there is no cache and every call loads.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T oncePerRequest(String key, Supplier<T> loader) {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return loader.get();
+        }
+        String attributeName = "loanAnalytics:" + key;
+        Object cached = attributes.getAttribute(attributeName, RequestAttributes.SCOPE_REQUEST);
+        if (cached != null) {
+            return (T) cached;
+        }
+        T loaded = loader.get();
+        if (loaded != null) {
+            attributes.setAttribute(attributeName, loaded, RequestAttributes.SCOPE_REQUEST);
+        }
+        return loaded;
+    }
+
     private boolean matchesStation(LoanApplication app, String stationId) {
         if (stationId == null || stationId.isBlank()) {
             return true;
@@ -506,13 +532,15 @@ public class LoanAnalyticsService {
                                               LoanStatus loanStatus) {
         OffsetDateTime createdFrom = fromDate == null ? null : fromDate.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime createdToExclusive = toDate == null ? null : toDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-        return loanApplicationRepository.findMemberLoansForAnalytics(
+        String key = String.join("|", "member", String.valueOf(memberId), String.valueOf(createdFrom),
+            String.valueOf(createdToExclusive), String.valueOf(loanType), String.valueOf(loanStatus));
+        return oncePerRequest(key, () -> loanApplicationRepository.findMemberLoansForAnalytics(
             memberId,
             createdFrom,
             createdToExclusive,
             loanType,
             loanStatus
-        );
+        ));
     }
 
     private List<LoanApplication> stationLoans(String saccoId,
@@ -524,14 +552,16 @@ public class LoanAnalyticsService {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
-        return loanApplicationRepository.findScopeLoansForAnalytics(
+        String key = String.join("|", "station", saccoId, String.valueOf(stationId), String.valueOf(fromDate),
+            String.valueOf(toDate), String.valueOf(loanType), String.valueOf(loanStatus));
+        return oncePerRequest(key, () -> loanApplicationRepository.findScopeLoansForAnalytics(
             saccoId,
             stationId,
             startOfDay(fromDate),
             dayAfter(toDate),
             loanType,
             loanStatus
-        );
+        ));
     }
 
     private List<LoanApplication> staffLoans(AppUserPrincipal principal,
@@ -553,6 +583,17 @@ public class LoanAnalyticsService {
         if (principal == null) {
             return List.of();
         }
+        String key = String.join("|", "staffEvents", String.valueOf(principal.getMemberId()),
+            String.valueOf(principal.getSaccoId()), String.valueOf(principal.getStationId()),
+            String.valueOf(fromDate), String.valueOf(toDate), String.valueOf(loanType), String.valueOf(loanStatus));
+        return oncePerRequest(key, () -> loadStaffLoanEvents(principal, fromDate, toDate, loanType, loanStatus));
+    }
+
+    private List<StaffLoanEvent> loadStaffLoanEvents(AppUserPrincipal principal,
+                                                     LocalDate fromDate,
+                                                     LocalDate toDate,
+                                                     LoanType loanType,
+                                                     LoanStatus loanStatus) {
         Map<UUID, LoanApplication> loanMap = new LinkedHashMap<>();
         List<ReviewRef> reviewRefs = new ArrayList<>();
         OffsetDateTime createdFrom = startOfDay(fromDate);
@@ -684,6 +725,10 @@ public class LoanAnalyticsService {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
+        return oncePerRequest("productRefs|" + saccoId, () -> loadConfiguredProductRefs(saccoId));
+    }
+
+    private List<ProductRef> loadConfiguredProductRefs(String saccoId) {
         List<com.sacco.mvp.domain.LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
         if (products == null || products.isEmpty()) {
             return List.of();

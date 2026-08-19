@@ -18,6 +18,8 @@ import java.util.UUID;
 public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> {
     List<BoardReview> findByLoanApplicationId(UUID loanApplicationId);
 
+    List<BoardReview> findByLoanApplicationIdIn(Collection<UUID> loanApplicationIds);
+
     List<BoardReview> findByLoanApplicationIdInOrderByCreatedAtDesc(Collection<UUID> loanApplicationIds);
 
     List<BoardReview> findByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
@@ -41,8 +43,6 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
     List<BoardReview> findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(UUID boardMemberId,
                                                                                               ApprovalWorkflowStage reviewStage,
                                                                                               BoardDecision decision);
-
-    List<BoardReview> findByBoardMemberIdOrderByCreatedAtDesc(UUID boardMemberId);
 
     List<BoardReview> findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
 
@@ -108,6 +108,28 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
                                       @Param("statuses") Collection<String> statuses,
                                       @Param("searchTerm") String searchTerm,
                                       Pageable pageable);
+
+    @Query("""
+        select r
+        from BoardReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.boardMemberId = :reviewerId
+          and r.reviewStage = :reviewStage
+          and r.decision <> com.sacco.mvp.domain.BoardDecision.PENDING
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:decision as string) is null or r.decision = :decision)
+          and coalesce(r.decidedAt, r.createdAt) >= :reviewedFrom
+          and coalesce(r.decidedAt, r.createdAt) < :reviewedToExclusive
+        order by coalesce(r.decidedAt, r.createdAt) desc
+        """)
+    List<BoardReview> findForWorkflowReport(@Param("reviewerId") UUID reviewerId,
+                                            @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                            @Param("saccoId") String saccoId,
+                                            @Param("stationId") String stationId,
+                                            @Param("decision") BoardDecision decision,
+                                            @Param("reviewedFrom") OffsetDateTime reviewedFrom,
+                                            @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive);
 
     @Query("""
         select r
