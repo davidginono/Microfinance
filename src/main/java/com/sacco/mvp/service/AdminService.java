@@ -88,7 +88,7 @@ public class AdminService {
     public AdminDashboard dashboard(String saccoId, String stationId, UUID adminId) {
         OffsetDateTime recentWindowStart = OffsetDateTime.now().minusDays(DASHBOARD_RECENT_WINDOW_DAYS);
         String normalizedStationId = normalizeOptional(stationId);
-        List<OutboxEvent> failedEvents = outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(OutboxStatus.FAILED);
+        List<OutboxEvent> failedEvents = outboxEventRepository.findRecentFailedForScope(saccoId, normalizedStationId);
         List<AuditLog> auditEntries = auditLogRepository.searchEventLogViewScoped(
             recentWindowStart,
             null,
@@ -109,9 +109,13 @@ public class AdminService {
         loanApplicationRepository.countByStatusForScope(saccoId, normalizedStationId)
             .forEach(row -> applicationCounts.put(row.getStatus(), row.getTotal()));
         Map<OutboxStatus, Long> outboxCounts = new EnumMap<>(OutboxStatus.class);
-        outboxCounts.put(OutboxStatus.NEW, outboxEventRepository.countByStatus(OutboxStatus.NEW));
-        outboxCounts.put(OutboxStatus.PUBLISHED, outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED));
-        outboxCounts.put(OutboxStatus.FAILED, outboxEventRepository.countByStatus(OutboxStatus.FAILED));
+        outboxEventRepository.countGroupedByStatusForScope(saccoId, normalizedStationId)
+            .forEach(row -> {
+                OutboxStatus status = parseOutboxStatus(row.getStatus());
+                if (status != null) {
+                    outboxCounts.put(status, row.getTotal());
+                }
+            });
 
         boolean attachmentStorageReady = true;
         return new AdminDashboard(
@@ -152,11 +156,7 @@ public class AdminService {
     }
 
     public List<UserAccessView> users(String saccoId, String stationId) {
-        List<UserAccessView> users = new java.util.ArrayList<>();
-        scopedUserAccessMembers(saccoId, stationId)
-            .forEach(member -> users.add(toUserAccessView(member)));
-        users.sort(Comparator.comparing(UserAccessView::getFullName, String.CASE_INSENSITIVE_ORDER));
-        return users;
+        return usersPage(saccoId, stationId, USER_SEARCH_BY_USER_ID, "", 0, MAX_USER_PAGE_SIZE).getContent();
     }
 
     public Page<UserAccessView> usersPage(String saccoId, String query, int page, int size) {
@@ -2372,37 +2372,6 @@ public class AdminService {
         return member.getStaffRolesResolved().isEmpty() ? "Member" : "Staff And Member";
     }
 
-    private List<Member> filterMembersByStation(List<Member> members, String stationId) {
-        String normalizedStationId = normalizeOptional(stationId);
-        if (normalizedStationId == null) {
-            return members;
-        }
-        return members.stream()
-            .filter(member -> normalizedStationId.equalsIgnoreCase(normalizeOptional(member.getStationId())))
-            .toList();
-    }
-
-    private List<Member> scopedUserAccessMembers(String saccoId, String stationId) {
-        List<Member> saccoMembers = memberRepository.findBySaccoIdOrderByFullNameAsc(saccoId);
-        String normalizedStationId = normalizeOptional(stationId);
-        if (normalizedStationId == null) {
-            return saccoMembers;
-        }
-
-        List<Member> stationMembers = filterMembersByStation(saccoMembers, normalizedStationId);
-        List<Member> stationWideMatches = memberRepository.findBySaccoIdAndStationIdIgnoreCaseOrderByFullNameAsc(saccoId, normalizedStationId);
-        if (stationWideMatches.isEmpty()) {
-            return stationMembers;
-        }
-
-        Map<UUID, Member> mergedById = new LinkedHashMap<>();
-        stationMembers.forEach(member -> mergedById.put(member.getId(), member));
-        stationWideMatches.forEach(member -> mergedById.putIfAbsent(member.getId(), member));
-        return mergedById.values().stream()
-            .sorted(Comparator.comparing(Member::getFullName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
-            .toList();
-    }
-
     private List<AdminIncident> filterIncidentsByStation(List<AdminIncident> incidents, String stationId) {
         String normalizedStationId = normalizeOptional(stationId);
         if (normalizedStationId == null || incidents == null || incidents.isEmpty()) {
@@ -2784,6 +2753,17 @@ public class AdminService {
         }
         String normalized = value.trim().replaceAll("\\s+", " ");
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private OutboxStatus parseOutboxStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OutboxStatus.valueOf(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private String normalizeAdminPhone(String value) {

@@ -52,6 +52,48 @@ public interface AppUsagePageMetricRepository extends JpaRepository<AppUsagePage
                           @Param("browserFamily") String browserFamily,
                           @Param("recordedAt") OffsetDateTime recordedAt);
 
+    @Modifying
+    @Query(
+        value = """
+            insert into app_usage_page_metrics (
+                id,
+                bucket_start,
+                sacco_id,
+                station_id,
+                page_path,
+                device_type,
+                browser_family,
+                hit_count,
+                last_recorded_at
+            )
+            values (
+                :id,
+                :bucketStart,
+                cast(:saccoId as text),
+                cast(:stationId as text),
+                cast(:pagePath as text),
+                cast(:deviceType as text),
+                cast(:browserFamily as text),
+                :hitCount,
+                :recordedAt
+            )
+            on conflict on constraint uk_app_usage_page_metrics_bucket_scope_page_device
+            do update set
+                hit_count = app_usage_page_metrics.hit_count + excluded.hit_count,
+                last_recorded_at = excluded.last_recorded_at
+            """,
+        nativeQuery = true
+    )
+    int incrementPageViews(@Param("id") UUID id,
+                           @Param("bucketStart") OffsetDateTime bucketStart,
+                           @Param("saccoId") String saccoId,
+                           @Param("stationId") String stationId,
+                           @Param("pagePath") String pagePath,
+                           @Param("deviceType") String deviceType,
+                           @Param("browserFamily") String browserFamily,
+                           @Param("hitCount") long hitCount,
+                           @Param("recordedAt") OffsetDateTime recordedAt);
+
     @Query(
         value = """
             select coalesce(sum(hit_count), 0)

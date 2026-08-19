@@ -260,10 +260,10 @@ class LoanReportServiceTest {
             .thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
-        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+        when(loanApplicationRepository.findScopeReportRows(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of());
-        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
-            .thenReturn(List.of(olderActiveLoan));
+        when(loanApplicationRepository.findScopeFinancialReportRows(any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(olderActiveLoan)));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
@@ -333,10 +333,10 @@ class LoanReportServiceTest {
             .thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
-        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
+        when(loanApplicationRepository.findScopeReportRows(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of());
-        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
-            .thenReturn(List.of(activeLoan));
+        when(loanApplicationRepository.findScopeFinancialReportRows(any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(activeLoan)));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
         when(registeredSaccoRepository.findById("IAA")).thenReturn(Optional.empty());
@@ -386,8 +386,8 @@ class LoanReportServiceTest {
                 """)
             .build();
 
-        when(loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(loan));
+        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(loan)));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
 
@@ -424,8 +424,8 @@ class LoanReportServiceTest {
                 """)
             .build();
 
-        when(loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(loan));
+        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(loan)));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
 
@@ -488,10 +488,10 @@ class LoanReportServiceTest {
             .updatedAt(OffsetDateTime.parse("2026-03-10T08:00:00Z"))
             .build();
 
-        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(paidLoan, activeLoan));
-        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
-            .thenReturn(List.of(paidLoan, activeLoan));
+        when(loanApplicationRepository.findScopeReportRows(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(paidLoan), reportRow(activeLoan)));
+        when(loanApplicationRepository.findScopeFinancialReportRows(any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(paidLoan), reportRow(activeLoan)));
         when(memberRepository.countActiveMemberAccountsForScope("IAA", "AR704")).thenReturn(10L);
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
             .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
@@ -541,10 +541,10 @@ class LoanReportServiceTest {
                 """)
             .build();
 
-        when(loanApplicationRepository.findScopeLoansForAnalytics(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(activeLoan));
-        when(loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(any(), any(), any(), any()))
-            .thenReturn(List.of(activeLoan));
+        when(loanApplicationRepository.findScopeReportRows(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(activeLoan)));
+        when(loanApplicationRepository.findScopeFinancialReportRows(any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(activeLoan)));
         when(memberRepository.countActiveMemberAccountsForScope("TAHA", "AR704")).thenReturn(3L);
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("TAHA"))
             .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
@@ -663,6 +663,80 @@ class LoanReportServiceTest {
             List.of("Total loan applications increased by 100%.", "No defaults recorded during the reporting period."),
             "This report summarizes the loan performance and status within the selected period."
         );
+    }
+
+    private LoanApplicationRepository.ReportLoanRow reportRow(LoanApplication loan) {
+        return new LoanApplicationRepository.ReportLoanRow() {
+            @Override
+            public UUID getId() {
+                return loan.getId();
+            }
+
+            @Override
+            public Long getApplicationNumber() {
+                return loan.getApplicationNumber();
+            }
+
+            @Override
+            public String getLoanId() {
+                return loan.getLoanId();
+            }
+
+            @Override
+            public LoanStatus getStatus() {
+                return loan.getStatus();
+            }
+
+            @Override
+            public LoanType getLoanType() {
+                return loan.getLoanType();
+            }
+
+            @Override
+            public UUID getLoanProductSettingId() {
+                return loan.getLoanProductSettingId();
+            }
+
+            @Override
+            public OffsetDateTime getCreatedAt() {
+                return loan.getCreatedAt();
+            }
+
+            @Override
+            public OffsetDateTime getUpdatedAt() {
+                return loan.getUpdatedAt();
+            }
+
+            @Override
+            public BigDecimal getAmount() {
+                return loan.getAmount();
+            }
+
+            @Override
+            public String getSaccoId() {
+                return loan.getSaccoId();
+            }
+
+            @Override
+            public String getStationId() {
+                return loan.getStationId();
+            }
+
+            @Override
+            public UUID getApplicantMemberId() {
+                return loan.getApplicantMemberId();
+            }
+
+            @Override
+            public LocalDate getDisbursementDate() {
+                return loan.getDisbursementDate();
+            }
+
+            @Override
+            public String getFinancialSnapshot() {
+                return loan.getFinancialSnapshot();
+            }
+        };
     }
 
     private LoanProductSetting product(UUID id, LoanType loanType, String name) {

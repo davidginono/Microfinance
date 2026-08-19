@@ -39,9 +39,10 @@ class OutboxPublisherSchedulerTest {
             .createdAt(OffsetDateTime.now())
             .build();
         when(outboxRepository.findNextPublishBatch(anyInt())).thenReturn(List.of(event));
+        when(outboxRepository.saveAll(List.of(event))).thenReturn(List.of(event));
 
         OutboxPublisherScheduler scheduler = new OutboxPublisherScheduler(
-            outboxRepository,
+            new OutboxPublishService(outboxRepository),
             notificationRepository,
             objectMapper,
             mock(AdminAlertService.class),

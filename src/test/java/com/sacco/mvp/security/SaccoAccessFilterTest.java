@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.SaccoStationRepository;
+import com.sacco.mvp.service.StationAccessService;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void suspendedWorkspaceUserIsSignedOutAndRedirected() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(saccoStationRepository);
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
         AppUserPrincipal principal = principal(Position.MANAGER, "SACCO-01");
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.SUSPENDED, "payment overdue")));
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
@@ -62,7 +63,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void platformAdminBypassesSuspendedWorkspaceCheck() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(saccoStationRepository);
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
         AppUserPrincipal principal = principal(Position.ADMIN, "SACCO-01");
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
 
@@ -79,7 +80,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void suspendedStationDoesNotBlockOtherStationsInSameSacco() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(saccoStationRepository);
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
         AppUserPrincipal principal = principal(Position.MANAGER, "SACCO-01", "BR001");
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "BR001")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE, null)));
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
@@ -96,7 +97,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void missingSaccoIdDoesNotBreakFiltering() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(saccoStationRepository);
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
         AppUserPrincipal principal = principal(Position.MANAGER, null);
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
 

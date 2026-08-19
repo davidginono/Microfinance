@@ -340,7 +340,7 @@ class AdminControllerUserAccessSecurityTest {
                 "error",
                 "Test email could not be sent. Connection to smtp.foresight.co.tz on port 465 timed out."
             ))
-            .andExpect(flash().attributeDoesNotExist("message"));
+            .andExpect(flash().attribute("message", org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
@@ -375,7 +375,7 @@ class AdminControllerUserAccessSecurityTest {
                 "error",
                 "Test SMS could not be sent. The SMS gateway could not be reached."
             ))
-            .andExpect(flash().attributeDoesNotExist("message"));
+            .andExpect(flash().attribute("message", org.hamcrest.Matchers.nullValue()));
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {
@@ -508,7 +508,7 @@ class AdminControllerUserAccessSecurityTest {
 
         @Bean
         SaccoAccessFilter saccoAccessFilter(SaccoStationRepository saccoStationRepository) {
-            return new SaccoAccessFilter(saccoStationRepository);
+            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository));
         }
 
         @Bean("authz")

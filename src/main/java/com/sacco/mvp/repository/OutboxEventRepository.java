@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,6 +26,50 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
         for update skip locked
         """, nativeQuery = true)
     List<OutboxEvent> findNextPublishBatch(@Param("limit") int limit);
+
+    @Modifying
+    @Query("""
+        update OutboxEvent e
+        set e.status = com.sacco.mvp.domain.OutboxStatus.NEW, e.publishedAt = null
+        where e.status = com.sacco.mvp.domain.OutboxStatus.PROCESSING
+          and e.publishedAt < :staleBefore
+        """)
+    int reclaimStaleProcessing(@Param("staleBefore") OffsetDateTime staleBefore);
+
+    List<OutboxEvent> findTop10ByStatusOrderByCreatedAtDesc(OutboxStatus status);
+
+    @Query(
+        value = """
+            select *
+            from outbox_events
+            where status = 'FAILED'
+              and payload ->> 'saccoId' = :saccoId
+              and (cast(:stationId as text) is null or payload ->> 'stationId' = :stationId)
+            order by created_at desc
+            limit 10
+            """,
+        nativeQuery = true
+    )
+    List<OutboxEvent> findRecentFailedForScope(@Param("saccoId") String saccoId,
+                                               @Param("stationId") String stationId);
+
+    interface StatusCountRow {
+        String getStatus();
+        long getTotal();
+    }
+
+    @Query(
+        value = """
+            select status as status, count(*) as total
+            from outbox_events
+            where payload ->> 'saccoId' = :saccoId
+              and (cast(:stationId as text) is null or payload ->> 'stationId' = :stationId)
+            group by status
+            """,
+        nativeQuery = true
+    )
+    List<StatusCountRow> countGroupedByStatusForScope(@Param("saccoId") String saccoId,
+                                                      @Param("stationId") String stationId);
 
     List<OutboxEvent> findTop100ByOrderByCreatedAtDesc();
 

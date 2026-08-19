@@ -79,15 +79,20 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
 
     @Query("""
         select r
-        from ManagerReview r
-        where r.managerMemberId = :managerMemberId
+        from ManagerReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.managerMemberId = :managerMemberId
           and r.reviewStage = :reviewStage
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and (cast(:createdFrom as timestamp) is null or r.createdAt >= :createdFrom)
           and (cast(:createdToExclusive as timestamp) is null or r.createdAt < :createdToExclusive)
         order by r.createdAt desc
         """)
     List<ManagerReview> findForAnalytics(@Param("managerMemberId") UUID managerMemberId,
                                          @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                         @Param("saccoId") String saccoId,
+                                         @Param("stationId") String stationId,
                                          @Param("createdFrom") OffsetDateTime createdFrom,
                                          @Param("createdToExclusive") OffsetDateTime createdToExclusive);
 

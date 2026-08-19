@@ -26,9 +26,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,7 +48,9 @@ class AppUsageAnalyticsServiceTest {
         ArgumentCaptor<AppUsageEvent> eventCaptor = ArgumentCaptor.forClass(AppUsageEvent.class);
         verify(usageEventRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(AppUsageEventType.LOGIN);
-        verify(pageMetricRepository).incrementPageView(
+        verify(pageMetricRepository, never()).incrementPageView(any(), any(), any(), any(), any(), any(), any(), any());
+        service.flushPendingPageViews();
+        verify(pageMetricRepository).incrementPageViews(
             any(),
             any(),
             eq("SACCO-1"),
@@ -56,6 +58,7 @@ class AppUsageAnalyticsServiceTest {
             eq("/admin/dashboard"),
             eq("Desktop"),
             eq("Chrome"),
+            eq(1L),
             any()
         );
     }
@@ -72,7 +75,9 @@ class AppUsageAnalyticsServiceTest {
         ArgumentCaptor<AppUsageEvent> eventCaptor = ArgumentCaptor.forClass(AppUsageEvent.class);
         verify(usageEventRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getEventType()).isEqualTo(AppUsageEventType.LOGIN);
-        verify(pageMetricRepository, times(2)).incrementPageView(
+        verify(pageMetricRepository, never()).incrementPageView(any(), any(), any(), any(), any(), any(), any(), any());
+        service.flushPendingPageViews();
+        verify(pageMetricRepository).incrementPageViews(
             any(),
             any(),
             eq("SACCO-1"),
@@ -80,6 +85,7 @@ class AppUsageAnalyticsServiceTest {
             eq("/admin/dashboard"),
             eq("Desktop"),
             eq("Chrome"),
+            eq(2L),
             any()
         );
     }
@@ -92,6 +98,7 @@ class AppUsageAnalyticsServiceTest {
 
         verify(usageEventRepository, never()).save(any());
         verify(pageMetricRepository, never()).incrementPageView(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pageMetricRepository, never()).incrementPageViews(any(), any(), any(), any(), any(), any(), any(), anyLong(), any());
     }
 
     @Test

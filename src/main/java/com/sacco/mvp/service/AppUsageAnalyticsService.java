@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +49,7 @@ public class AppUsageAnalyticsService {
     private final RegisteredSaccoRepository registeredSaccoRepository;
     private final ApplicationClock applicationClock;
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<PageMetricKey, AtomicLong> pendingPageViews = new ConcurrentHashMap<>();
 
     @Transactional
     public void recordAuthenticatedRequest(AppUserPrincipal principal, HttpServletRequest request) {
@@ -70,18 +72,49 @@ public class AppUsageAnalyticsService {
         }
 
         if (isPageViewRequest(request, path)) {
-            pageMetricRepository.incrementPageView(
-                UUID.randomUUID(),
-                hourlyBucket(now),
-                metricScope(session.saccoId(), PLATFORM_SCOPE),
-                metricScope(session.stationId(), UNASSIGNED_STATION_SCOPE),
-                path,
-                deviceType,
-                browserFamily,
-                now
-            );
+            pendingPageViews
+                .computeIfAbsent(new PageMetricKey(
+                    hourlyBucket(now),
+                    metricScope(session.saccoId(), PLATFORM_SCOPE),
+                    metricScope(session.stationId(), UNASSIGNED_STATION_SCOPE),
+                    path,
+                    deviceType,
+                    browserFamily
+                ), ignored -> new AtomicLong())
+                .incrementAndGet();
         }
         pruneStaleSessions(now);
+    }
+
+    @Scheduled(fixedDelayString = "${app.usage.page-metric-flush-ms:5000}")
+    @Transactional
+    public void flushPendingPageViews() {
+        if (pendingPageViews.isEmpty()) {
+            return;
+        }
+        OffsetDateTime now = applicationClock.now();
+        for (Map.Entry<PageMetricKey, AtomicLong> entry : pendingPageViews.entrySet()) {
+            long hits = entry.getValue().getAndSet(0L);
+            if (hits <= 0) {
+                pendingPageViews.remove(entry.getKey(), entry.getValue());
+                continue;
+            }
+            PageMetricKey key = entry.getKey();
+            pageMetricRepository.incrementPageViews(
+                UUID.randomUUID(),
+                key.bucketStart(),
+                key.saccoId(),
+                key.stationId(),
+                key.pagePath(),
+                key.deviceType(),
+                key.browserFamily(),
+                hits,
+                now
+            );
+            if (entry.getValue().get() == 0L) {
+                pendingPageViews.remove(key, entry.getValue());
+            }
+        }
     }
 
     @Transactional
@@ -502,6 +535,15 @@ public class AppUsageAnalyticsService {
             };
         }
     }
+
+    private record PageMetricKey(
+        OffsetDateTime bucketStart,
+        String saccoId,
+        String stationId,
+        String pagePath,
+        String deviceType,
+        String browserFamily
+    ) {}
 
     private record ActiveSession(
         String sessionId,

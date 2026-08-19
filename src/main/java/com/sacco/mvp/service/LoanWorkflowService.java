@@ -13,7 +13,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -80,6 +82,7 @@ public class LoanWorkflowService {
     private final PaymentDetailsService paymentDetailsService;
     private final ReversalRequestRepository reversalRequestRepository;
     private final AuditService auditService;
+    private final PlatformTransactionManager transactionManager;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -304,7 +307,6 @@ public class LoanWorkflowService {
         return sourceLoan;
     }
 
-    @Transactional
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                      List<UUID> guarantorIds,
@@ -314,7 +316,6 @@ public class LoanWorkflowService {
             financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
     }
 
-    @Transactional
     public LoanApplication saveDraft(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                      List<UUID> guarantorIds,
@@ -407,10 +408,13 @@ public class LoanWorkflowService {
         application.setApplicantSignatureText(null);
         application.setApplicantSignatureVerifiedAt(null);
         application.setUpdatedAt(OffsetDateTime.now());
-        LoanApplication saved = loanApplicationRepository.save(application);
-        if (reEditingAfterGuarantorApproval) {
-            expireGuarantorApprovalsForApplicantEdit(saved.getId());
-        }
+        LoanApplication saved = inTransaction(() -> {
+            LoanApplication persisted = loanApplicationRepository.save(application);
+            if (reEditingAfterGuarantorApproval) {
+                expireGuarantorApprovalsForApplicantEdit(persisted.getId());
+            }
+            return persisted;
+        });
         saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
         saved.setAttachmentsJson(loanAttachmentService.storeRequired(
             saved.getId(),
@@ -423,9 +427,11 @@ public class LoanWorkflowService {
                 .toList(),
             saved.getAttachmentsJson()
         ));
-        LoanApplication finalSaved = loanApplicationRepository.save(saved);
-        auditLoan(finalSaved, applicantId, "LOAN_APPLICATION_DRAFT", "Loan application draft");
-        return finalSaved;
+        return inTransaction(() -> {
+            LoanApplication finalSaved = loanApplicationRepository.save(saved);
+            auditLoan(finalSaved, applicantId, "LOAN_APPLICATION_DRAFT", "Loan application draft");
+            return finalSaved;
+        });
     }
 
     private void expireGuarantorApprovalsForApplicantEdit(UUID appId) {
@@ -527,7 +533,6 @@ public class LoanWorkflowService {
         return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
-    @Transactional
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                          List<UUID> guarantorIds,
@@ -541,7 +546,6 @@ public class LoanWorkflowService {
         return getMine(submitted.getId(), applicantId);
     }
 
-    @Transactional
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
                                          List<UUID> guarantorIds,
@@ -554,7 +558,6 @@ public class LoanWorkflowService {
         return getMine(submitted.getId(), applicantId);
     }
 
-    @Transactional
     public LoanApplication submit(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED) {
@@ -579,9 +582,12 @@ public class LoanWorkflowService {
                 loanProductWorkflowService.resolveForProduct(app.getSaccoId(), product)
             )
         ));
-
-        app.setSubmittedAt(OffsetDateTime.now());
         capturePaymentDetailsIfMissing(app);
+        return inTransaction(() -> persistSubmittedApplication(app, memberId));
+    }
+
+    private LoanApplication persistSubmittedApplication(LoanApplication app, UUID memberId) {
+        app.setSubmittedAt(OffsetDateTime.now());
 
         if (app.getRequiredGuarantors() == 0) {
             moveIntoConfiguredReviewStage(app, memberId);
@@ -609,7 +615,6 @@ public class LoanWorkflowService {
         return submitted;
     }
 
-    @Transactional
     public LoanApplication submitToManager(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
@@ -635,10 +640,12 @@ public class LoanWorkflowService {
         ));
 
         capturePaymentDetailsIfMissing(app);
-        moveIntoConfiguredReviewStage(app, memberId);
-        LoanApplication saved = loanApplicationRepository.save(app);
-        auditLoan(saved, memberId, "LOAN_SENT_TO_STAFF", "Application sent to staff");
-        return saved;
+        return inTransaction(() -> {
+            moveIntoConfiguredReviewStage(app, memberId);
+            LoanApplication saved = loanApplicationRepository.save(app);
+            auditLoan(saved, memberId, "LOAN_SENT_TO_STAFF", "Application sent to staff");
+            return saved;
+        });
     }
 
     private void capturePaymentDetailsIfMissing(LoanApplication app) {
@@ -1548,6 +1555,11 @@ public class LoanWorkflowService {
             app.getStationId(),
             details
         );
+    }
+
+    private <T> T inTransaction(java.util.function.Supplier<T> work) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        return template.execute(status -> work.get());
     }
 
     public record MemberDashboardData(

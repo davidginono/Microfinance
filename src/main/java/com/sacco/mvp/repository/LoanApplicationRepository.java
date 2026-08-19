@@ -135,6 +135,234 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                      @Param("loanType") LoanType loanType,
                                                      @Param("status") LoanStatus status);
 
+    interface AnalyticsLoanRow {
+        UUID getId();
+        LoanStatus getStatus();
+        LoanType getLoanType();
+        UUID getLoanProductSettingId();
+        OffsetDateTime getCreatedAt();
+        java.math.BigDecimal getAmount();
+        String getSaccoId();
+        String getStationId();
+    }
+
+    @Query("""
+        select l.id as id,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<AnalyticsLoanRow> findMemberAnalyticsRows(@Param("applicantMemberId") UUID applicantMemberId,
+                                                   @Param("createdFrom") OffsetDateTime createdFrom,
+                                                   @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                   @Param("loanType") LoanType loanType,
+                                                   @Param("status") LoanStatus status);
+
+    @Query("""
+        select l.id as id,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<AnalyticsLoanRow> findScopeAnalyticsRows(@Param("saccoId") String saccoId,
+                                                  @Param("stationId") String stationId,
+                                                  @Param("createdFrom") OffsetDateTime createdFrom,
+                                                  @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                  @Param("loanType") LoanType loanType,
+                                                  @Param("status") LoanStatus status);
+
+    @Query("""
+        select l.id as id,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId
+        from LoanApplication l
+        where l.id in :ids
+        """)
+    List<AnalyticsLoanRow> findAnalyticsRowsById(@Param("ids") Collection<UUID> ids);
+
+    interface ReportLoanRow {
+        UUID getId();
+        Long getApplicationNumber();
+        String getLoanId();
+        LoanStatus getStatus();
+        LoanType getLoanType();
+        UUID getLoanProductSettingId();
+        OffsetDateTime getCreatedAt();
+        OffsetDateTime getUpdatedAt();
+        java.math.BigDecimal getAmount();
+        String getSaccoId();
+        String getStationId();
+        UUID getApplicantMemberId();
+        LocalDate getDisbursementDate();
+        String getFinancialSnapshot();
+    }
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.updatedAt as updatedAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.applicantMemberId as applicantMemberId,
+               l.disbursementDate as disbursementDate,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<ReportLoanRow> findMemberReportRows(@Param("applicantMemberId") UUID applicantMemberId,
+                                             @Param("createdFrom") OffsetDateTime createdFrom,
+                                             @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                             @Param("loanType") LoanType loanType,
+                                             @Param("status") LoanStatus status);
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.updatedAt as updatedAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.applicantMemberId as applicantMemberId,
+               l.disbursementDate as disbursementDate,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and l.status in :statuses
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:loanProductId as uuid) is null or l.loanProductSettingId = :loanProductId)
+        order by l.createdAt desc
+        """)
+    List<ReportLoanRow> findMemberReportRowsByStatuses(@Param("applicantMemberId") UUID applicantMemberId,
+                                                       @Param("statuses") Collection<LoanStatus> statuses,
+                                                       @Param("createdFrom") OffsetDateTime createdFrom,
+                                                       @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                                       @Param("loanType") LoanType loanType,
+                                                       @Param("loanProductId") UUID loanProductId);
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.updatedAt as updatedAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.applicantMemberId as applicantMemberId,
+               l.disbursementDate as disbursementDate,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
+          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+          and (cast(:status as string) is null or l.status = :status)
+        order by l.createdAt desc
+        """)
+    List<ReportLoanRow> findScopeReportRows(@Param("saccoId") String saccoId,
+                                            @Param("stationId") String stationId,
+                                            @Param("createdFrom") OffsetDateTime createdFrom,
+                                            @Param("createdToExclusive") OffsetDateTime createdToExclusive,
+                                            @Param("loanType") LoanType loanType,
+                                            @Param("status") LoanStatus status);
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.updatedAt as updatedAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.applicantMemberId as applicantMemberId,
+               l.disbursementDate as disbursementDate,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and l.status in :statuses
+          and (cast(:loanType as string) is null or l.loanType = :loanType)
+        order by l.createdAt desc
+        """)
+    List<ReportLoanRow> findScopeFinancialReportRows(@Param("saccoId") String saccoId,
+                                                     @Param("stationId") String stationId,
+                                                     @Param("statuses") Collection<LoanStatus> statuses,
+                                                     @Param("loanType") LoanType loanType);
+
+    @Query("""
+        select l.id as id,
+               l.applicationNumber as applicationNumber,
+               l.loanId as loanId,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.updatedAt as updatedAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.applicantMemberId as applicantMemberId,
+               l.disbursementDate as disbursementDate,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.id in :ids
+        """)
+    List<ReportLoanRow> findReportRowsById(@Param("ids") Collection<UUID> ids);
+
     @Query("""
         select l
         from LoanApplication l

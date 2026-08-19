@@ -430,14 +430,15 @@ public class LoanReportService {
             effectiveTo = swap;
         }
 
-        List<LoanApplication> loans = filterByLoanProductId(loanApplicationRepository.findScopeLoansForAnalytics(
-            saccoId,
-            stationId,
-            applicationClock.startOfDay(effectiveFrom),
-            applicationClock.dayAfter(effectiveTo),
-            loanType,
-            null
-        ), loanProductId);
+        List<LoanApplication> loans = filterByLoanProductId(hydrateReportRows(
+            loanApplicationRepository.findScopeReportRows(
+                saccoId,
+                stationId,
+                applicationClock.startOfDay(effectiveFrom),
+                applicationClock.dayAfter(effectiveTo),
+                loanType,
+                null
+            )), loanProductId);
         List<LoanApplication> appliedLoans = loans.stream()
             .filter(loan -> loan.getStatus() != LoanStatus.DRAFT)
             .toList();
@@ -601,11 +602,9 @@ public class LoanReportService {
         DateRange range = resolveReportRange(fromDate, toDate);
         Member member = memberRepository.findById(principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<LoanApplication> loans = filterByLoanProductId(loanApplicationRepository.findMemberLoansForAnalytics(
-                principal.getMemberId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)
-            .stream()
-            .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList(), loanProductId);
+        List<LoanApplication> loans = filterByLoanProductId(hydrateReportRows(
+            loanApplicationRepository.findMemberReportRows(
+                principal.getMemberId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)), loanProductId);
         LoanAnalyticsService.MemberLoanAnalytics analytics =
             loanAnalyticsService.forMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
         List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
@@ -644,8 +643,9 @@ public class LoanReportService {
                                                              LocalDate toDate,
                                                              com.sacco.mvp.domain.LoanType loanType) {
         DateRange range = resolveReportRange(fromDate, toDate);
-        List<LoanApplication> loans = loanApplicationRepository.findMemberLoansForAnalyticsByStatuses(
-            memberId, ACTIVE_STATUSES, startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null);
+        List<LoanApplication> loans = hydrateReportRows(
+            loanApplicationRepository.findMemberReportRowsByStatuses(
+                memberId, ACTIVE_STATUSES, startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null));
         return activeLoanRowsFromLoans(loans);
     }
 
@@ -678,9 +678,9 @@ public class LoanReportService {
             ? loanAnalyticsService.stationPortfolio(principal.getSaccoId(), principal.getStationId(), range.fromDate(), range.toDate(), loanType, loanProductId, null)
             : loanAnalyticsService.staffPortfolio(principal, range.fromDate(), range.toDate(), loanType, loanProductId, null);
         List<LoanApplication> stationLoans = filterByLoanProductId(stationWideStaffView
-            ? loanApplicationRepository.findScopeLoansForAnalytics(
-                principal.getSaccoId(), principal.getStationId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)
-            : loanAnalyticsService.loansForStaffAnalytics(principal, range.fromDate(), range.toDate(), loanType, null), loanProductId);
+            ? hydrateReportRows(loanApplicationRepository.findScopeReportRows(
+                principal.getSaccoId(), principal.getStationId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null))
+            : hydrateReportRows(loanIdsForStaffReport(principal, range, loanType)), loanProductId);
         List<LoanApplication> financialLoans = stationWideStaffView
             ? filterByLoanProductId(stationFinancialLoans(principal.getSaccoId(), principal.getStationId(), loanType), loanProductId)
             : stationLoans;
@@ -1158,15 +1158,54 @@ public class LoanReportService {
             ));
     }
 
+    private List<LoanApplication> hydrateReportRows(Collection<LoanApplicationRepository.ReportLoanRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return rows.stream().map(this::toReportLoan).toList();
+    }
+
+    private List<LoanApplicationRepository.ReportLoanRow> loanIdsForStaffReport(AppUserPrincipal principal,
+                                                                               DateRange range,
+                                                                               LoanType loanType) {
+        List<UUID> ids = loanAnalyticsService.loanIdsForStaffAnalytics(
+            principal, range.fromDate(), range.toDate(), loanType, null);
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return loanApplicationRepository.findReportRowsById(ids);
+    }
+
+    private LoanApplication toReportLoan(LoanApplicationRepository.ReportLoanRow row) {
+        LoanApplication loan = new LoanApplication();
+        loan.setId(row.getId());
+        loan.setApplicationNumber(row.getApplicationNumber());
+        loan.setLoanId(row.getLoanId());
+        loan.setStatus(row.getStatus());
+        loan.setLoanType(row.getLoanType());
+        loan.setLoanProductSettingId(row.getLoanProductSettingId());
+        loan.setCreatedAt(row.getCreatedAt());
+        loan.setUpdatedAt(row.getUpdatedAt());
+        loan.setAmount(row.getAmount());
+        loan.setSaccoId(row.getSaccoId());
+        loan.setStationId(row.getStationId());
+        loan.setApplicantMemberId(row.getApplicantMemberId());
+        loan.setDisbursementDate(row.getDisbursementDate());
+        loan.setFinancialSnapshot(row.getFinancialSnapshot());
+        return loan;
+    }
+
     private List<LoanApplication> stationFinancialLoans(String saccoId, String stationId, com.sacco.mvp.domain.LoanType loanType) {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
         }
-        List<LoanApplication> loans = loanApplicationRepository.findScopeLoansForStationFinancialAnalytics(
-            saccoId,
-            stationId,
-            DISBURSED_STATUSES,
-            loanType
+        List<LoanApplication> loans = hydrateReportRows(
+            loanApplicationRepository.findScopeFinancialReportRows(
+                saccoId,
+                stationId,
+                DISBURSED_STATUSES,
+                loanType
+            )
         );
         return loans == null ? List.of() : loans;
     }

@@ -209,7 +209,7 @@ class AdminServiceTest {
             .availableUnits(17)
             .status(SmsUnitStatus.LOW)
             .build();
-        when(outboxEventRepository.findTop100ByStatusOrderByCreatedAtDesc(com.sacco.mvp.domain.OutboxStatus.FAILED))
+        when(outboxEventRepository.findRecentFailedForScope("SACCO-1", "ST-1"))
             .thenReturn(List.of());
         when(auditLogRepository.searchEventLogViewScoped(any(), any(), any(), eq("SACCO-1"), eq("ST-1"), any()))
             .thenReturn(new PageImpl<>(List.of()));

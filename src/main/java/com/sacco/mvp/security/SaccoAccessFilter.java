@@ -1,7 +1,7 @@
 package com.sacco.mvp.security;
 
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.repository.SaccoStationRepository;
+import com.sacco.mvp.service.StationAccessService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +19,10 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 public class SaccoAccessFilter extends OncePerRequestFilter {
-    private final SaccoStationRepository saccoStationRepository;
+    static final String CHECKED_AT_ATTR = SaccoAccessFilter.class.getName() + ".checkedAt";
+    static final long RECHECK_AFTER_MS = 30_000L;
+
+    private final StationAccessService stationAccessService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -28,7 +31,7 @@ public class SaccoAccessFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Object principal = authentication == null ? null : authentication.getPrincipal();
         if (principal instanceof AppUserPrincipal appUser) {
-            Optional<SaccoStation> suspendedStation = suspendedStation(appUser);
+            Optional<SaccoStation> suspendedStation = suspendedStation(request, appUser);
             if (suspendedStation.isEmpty()) {
                 filterChain.doFilter(request, response);
                 return;
@@ -45,17 +48,23 @@ public class SaccoAccessFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private Optional<SaccoStation> suspendedStation(AppUserPrincipal appUser) {
+    private Optional<SaccoStation> suspendedStation(HttpServletRequest request, AppUserPrincipal appUser) {
         if (appUser == null || appUser.isPlatformIdentity()) {
             return Optional.empty();
         }
-        String saccoId = appUser.getSaccoId();
-        String stationId = appUser.getStationId();
-        if (saccoId == null || saccoId.isBlank() || stationId == null || stationId.isBlank()) {
-            return Optional.empty();
+        HttpSession session = request.getSession(false);
+        long now = System.currentTimeMillis();
+        if (session != null) {
+            Object checkedAt = session.getAttribute(CHECKED_AT_ATTR);
+            if (checkedAt instanceof Long checked && now - checked < RECHECK_AFTER_MS) {
+                return Optional.empty();
+            }
         }
-        return saccoStationRepository.findBySaccoIdAndStationId(saccoId, stationId)
-            .filter(SaccoStation::isAccessSuspended);
+        Optional<SaccoStation> suspended = stationAccessService.suspendedStation(appUser.getSaccoId(), appUser.getStationId());
+        if (suspended.isEmpty() && session != null) {
+            session.setAttribute(CHECKED_AT_ATTR, now);
+        }
+        return suspended;
     }
 
     private String suspendedMessage(SaccoStation station) {

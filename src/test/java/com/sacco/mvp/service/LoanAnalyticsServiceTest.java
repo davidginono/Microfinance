@@ -58,18 +58,18 @@ class LoanAnalyticsServiceTest {
         );
 
         when(managerReviewRepository.findForAnalytics(
-            any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any()
         ))
             .thenReturn(List.of(
                 review(paidLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(2)),
                 review(defaultedLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(1)),
                 review(rejectedLoanId, staffId, ManagerDecision.REJECT, now)
             ));
-        when(loanApplicationRepository.findAllById(any()))
+        when(loanApplicationRepository.findAnalyticsRowsById(any()))
             .thenReturn(List.of(
-                loan(paidLoanId, LoanType.EDUCATION_LOAN, LoanStatus.PAID),
-                loan(defaultedLoanId, LoanType.EMERGENCY_LOAN, LoanStatus.DEFAULTED),
-                loan(rejectedLoanId, LoanType.DEVELOPMENT_LOAN, LoanStatus.MANAGER_REJECTED)
+                analyticsRow(loan(paidLoanId, LoanType.EDUCATION_LOAN, LoanStatus.PAID)),
+                analyticsRow(loan(defaultedLoanId, LoanType.EMERGENCY_LOAN, LoanStatus.DEFAULTED)),
+                analyticsRow(loan(rejectedLoanId, LoanType.DEVELOPMENT_LOAN, LoanStatus.MANAGER_REJECTED))
             ));
 
         List<LoanAnalyticsService.LoanProductPerformance> performance =
@@ -117,15 +117,15 @@ class LoanAnalyticsServiceTest {
             new AccessControlService(),
             new ApplicationClock("Africa/Nairobi")
         );
-        when(managerReviewRepository.findForAnalytics(any(), any(), any(), any()))
+        when(managerReviewRepository.findForAnalytics(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of(
                 review(firstLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(1)),
                 review(secondLoanId, staffId, ManagerDecision.ACCEPT, now)
             ));
-        when(loanApplicationRepository.findAllById(any()))
+        when(loanApplicationRepository.findAnalyticsRowsById(any()))
             .thenReturn(List.of(
-                loan(firstLoanId, firstProductId, LoanStatus.PAID),
-                loan(secondLoanId, secondProductId, LoanStatus.DEFAULTED)
+                analyticsRow(loan(firstLoanId, firstProductId, LoanStatus.PAID)),
+                analyticsRow(loan(secondLoanId, secondProductId, LoanStatus.DEFAULTED))
             ));
         when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("SACCO-01"))
             .thenReturn(List.of(
@@ -178,6 +178,50 @@ class LoanAnalyticsServiceTest {
             .decision(decision)
             .createdAt(createdAt)
             .build();
+    }
+
+    private LoanApplicationRepository.AnalyticsLoanRow analyticsRow(LoanApplication loan) {
+        return new LoanApplicationRepository.AnalyticsLoanRow() {
+            @Override
+            public UUID getId() {
+                return loan.getId();
+            }
+
+            @Override
+            public LoanStatus getStatus() {
+                return loan.getStatus();
+            }
+
+            @Override
+            public LoanType getLoanType() {
+                return loan.getLoanType();
+            }
+
+            @Override
+            public UUID getLoanProductSettingId() {
+                return loan.getLoanProductSettingId();
+            }
+
+            @Override
+            public OffsetDateTime getCreatedAt() {
+                return loan.getCreatedAt();
+            }
+
+            @Override
+            public BigDecimal getAmount() {
+                return loan.getAmount();
+            }
+
+            @Override
+            public String getSaccoId() {
+                return loan.getSaccoId();
+            }
+
+            @Override
+            public String getStationId() {
+                return loan.getStationId();
+            }
+        };
     }
 
     private LoanApplication loan(UUID loanId, LoanType loanType, LoanStatus status) {

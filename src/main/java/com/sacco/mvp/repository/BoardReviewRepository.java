@@ -133,15 +133,20 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
 
     @Query("""
         select r
-        from BoardReview r
-        where r.boardMemberId = :boardMemberId
+        from BoardReview r, LoanApplication l
+        where r.loanApplicationId = l.id
+          and r.boardMemberId = :boardMemberId
           and r.reviewStage = :reviewStage
+          and l.saccoId = :saccoId
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and (cast(:createdFrom as timestamp) is null or coalesce(r.decidedAt, r.createdAt) >= :createdFrom)
           and (cast(:createdToExclusive as timestamp) is null or coalesce(r.decidedAt, r.createdAt) < :createdToExclusive)
         order by coalesce(r.decidedAt, r.createdAt) desc
         """)
     List<BoardReview> findForAnalytics(@Param("boardMemberId") UUID boardMemberId,
                                        @Param("reviewStage") ApprovalWorkflowStage reviewStage,
+                                       @Param("saccoId") String saccoId,
+                                       @Param("stationId") String stationId,
                                        @Param("createdFrom") OffsetDateTime createdFrom,
                                        @Param("createdToExclusive") OffsetDateTime createdToExclusive);
 }

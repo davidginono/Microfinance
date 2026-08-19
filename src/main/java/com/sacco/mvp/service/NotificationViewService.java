@@ -29,9 +29,10 @@ public class NotificationViewService {
         if (notifications == null) {
             return Collections.emptyList();
         }
+        Map<UUID, String> memberLabels = memberLabelsFor(notifications);
         return notifications.stream()
             .filter(notification -> !isObsoleteRepaymentSyncNotification(notification))
-            .map(this::toView)
+            .map(notification -> toView(notification, memberLabels))
             .toList();
     }
 
@@ -106,6 +107,10 @@ public class NotificationViewService {
     }
 
     public NotificationView toView(Notification notification) {
+        return toView(notification, memberLabelsFor(notification == null ? List.of() : List.of(notification)));
+    }
+
+    private NotificationView toView(Notification notification, Map<UUID, String> memberLabels) {
         Map<String, Object> payload = parse(notification.getPayload());
         String subject = stringValue(payload.get("subject"));
         String message = stringValue(payload.get("message"));
@@ -134,7 +139,7 @@ public class NotificationViewService {
             senderName,
             senderId,
             incidentId,
-            flattenDetails(notification.getType(), payload.get("details")),
+            flattenDetails(notification.getType(), payload.get("details"), memberLabels),
             notification.getStatus().name(),
             notification.getCreatedAt() == null ? "" : notification.getCreatedAt().toString(),
             formatCreatedAt(notification.getCreatedAt()),
@@ -293,7 +298,7 @@ public class NotificationViewService {
         };
     }
 
-    private String flattenDetails(String notificationType, Object value) {
+    private String flattenDetails(String notificationType, Object value, Map<UUID, String> memberLabels) {
         Map<String, Object> details = toMap(value);
         if (details.isEmpty()) {
             return "";
@@ -303,7 +308,9 @@ public class NotificationViewService {
             if (builder.length() > 0) {
                 builder.append(" | ");
             }
-            builder.append(formatDetailLabel(notificationType, entry.getKey(), entry.getValue())).append(": ").append(formatDetailValue(entry.getKey(), entry.getValue()));
+            builder.append(formatDetailLabel(notificationType, entry.getKey(), entry.getValue()))
+                .append(": ")
+                .append(formatDetailValue(entry.getKey(), entry.getValue(), memberLabels));
         }
         return builder.toString();
     }
@@ -350,13 +357,14 @@ public class NotificationViewService {
         }
     }
 
-    private String formatDetailValue(String key, Object value) {
+    private String formatDetailValue(String key, Object value, Map<UUID, String> memberLabels) {
         if (value == null) {
             return "";
         }
         String text = String.valueOf(value);
         return switch (key) {
-            case "managerId", "senderId", "boardMemberId", "recipientMemberId", "reviewerMemberId" -> resolveMemberLabel(text);
+            case "managerId", "senderId", "boardMemberId", "recipientMemberId", "reviewerMemberId" ->
+                resolveMemberLabel(text, memberLabels);
             case "loanId", "incidentId" -> shortenUuid(text);
             case "disbursementAmount", "depositAmount", "installmentAmount" -> text.matches("-?\\d+(\\.\\d+)?") ? "TSh " + text : text;
             case "repaymentFrequency" -> humanizeKey(text);
@@ -364,12 +372,42 @@ public class NotificationViewService {
         };
     }
 
-    private String resolveMemberLabel(String value) {
+    private Map<UUID, String> memberLabelsFor(List<Notification> notifications) {
+        java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+        for (Notification notification : notifications) {
+            if (notification == null) {
+                continue;
+            }
+            Map<String, Object> payload = parse(notification.getPayload());
+            collectMemberId(ids, payload.get("senderId"));
+            Map<String, Object> details = toMap(payload.get("details"));
+            collectMemberId(ids, details.get("managerId"));
+            collectMemberId(ids, details.get("senderId"));
+            collectMemberId(ids, details.get("boardMemberId"));
+            collectMemberId(ids, details.get("recipientMemberId"));
+            collectMemberId(ids, details.get("reviewerMemberId"));
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> labels = new LinkedHashMap<>();
+        memberRepository.findAllById(ids).forEach(member ->
+            labels.put(member.getId(), member.getMemberNo() + " - " + member.getFullName()));
+        return labels;
+    }
+
+    private void collectMemberId(java.util.Set<UUID> ids, Object value) {
+        UUID id = parseUuid(value);
+        if (id != null) {
+            ids.add(id);
+        }
+    }
+
+    private String resolveMemberLabel(String value, Map<UUID, String> memberLabels) {
         try {
             UUID id = UUID.fromString(value);
-            return memberRepository.findById(id)
-                .map(member -> member.getMemberNo() + " - " + member.getFullName())
-                .orElse(shortenUuid(value));
+            String label = memberLabels == null ? null : memberLabels.get(id);
+            return label != null ? label : shortenUuid(value);
         } catch (Exception ex) {
             return value;
         }

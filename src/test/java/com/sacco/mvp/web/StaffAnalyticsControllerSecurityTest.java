@@ -255,7 +255,7 @@ class StaffAnalyticsControllerSecurityTest {
 
         @Bean
         SaccoAccessFilter saccoAccessFilter(SaccoStationRepository saccoStationRepository) {
-            return new SaccoAccessFilter(saccoStationRepository);
+            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository));
         }
 
         @Bean("authz")

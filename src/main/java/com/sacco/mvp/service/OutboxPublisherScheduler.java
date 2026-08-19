@@ -5,16 +5,13 @@ import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Notification;
 import com.sacco.mvp.domain.NotificationStatus;
 import com.sacco.mvp.domain.OutboxEvent;
-import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.repository.NotificationRepository;
-import com.sacco.mvp.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -25,7 +22,7 @@ import java.util.UUID;
 @Slf4j
 @ConditionalOnProperty(name = "app.outbox.scheduler-enabled", havingValue = "true", matchIfMissing = true)
 public class OutboxPublisherScheduler {
-    private final OutboxEventRepository outboxEventRepository;
+    private final OutboxPublishService outboxPublishService;
     private final NotificationRepository notificationRepository;
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
@@ -36,18 +33,17 @@ public class OutboxPublisherScheduler {
     @Value("${app.outbox.batch-size:250}")
     private int batchSize;
 
+    // Delivery performs SMS/e-mail calls, so this method is deliberately not @Transactional.
+    // Claim, persist, and outcome writes each run in their own short transaction.
     @Scheduled(fixedDelayString = "${app.outbox.fixed-delay-ms:500}")
-    @Transactional
     public void publish() {
-        List<OutboxEvent> events = outboxEventRepository.findNextPublishBatch(Math.max(1, batchSize));
+        List<OutboxEvent> events = outboxPublishService.claimBatch(Math.max(1, batchSize));
         for (OutboxEvent event : events) {
             try {
                 JsonNode payload = objectMapper.readTree(event.getPayload());
                 if (notificationViewService.isObsoleteRepaymentSyncNotification(event.getPayload())) {
                     log.info("Discarding obsolete repayment-sync outbox event {}", event.getId());
-                    event.setStatus(OutboxStatus.PUBLISHED);
-                    event.setPublishedAt(OffsetDateTime.now());
-                    outboxEventRepository.save(event);
+                    outboxPublishService.markPublished(event);
                     continue;
                 }
                 UUID recipientId = UUID.fromString(payload.get("recipientId").asString());
@@ -56,9 +52,7 @@ public class OutboxPublisherScheduler {
 
                 if (notificationRepository.existsDeliveredDuplicate(recipientId, event.getEventType(), event.getPayload())) {
                     log.info("Skipping duplicate notification delivery for outbox event {}", event.getId());
-                    event.setStatus(OutboxStatus.PUBLISHED);
-                    event.setPublishedAt(OffsetDateTime.now());
-                    outboxEventRepository.save(event);
+                    outboxPublishService.markPublished(event);
                     continue;
                 }
 
@@ -86,13 +80,10 @@ public class OutboxPublisherScheduler {
                     content
                 );
 
-                event.setStatus(OutboxStatus.PUBLISHED);
-                event.setPublishedAt(OffsetDateTime.now());
-                outboxEventRepository.save(event);
+                outboxPublishService.markPublished(event);
             } catch (Exception ex) {
                 log.error("Outbox publish failed for event {}", event.getId(), ex);
-                event.setStatus(OutboxStatus.FAILED);
-                outboxEventRepository.save(event);
+                outboxPublishService.markFailed(event);
                 adminAlertService.alertAllAdmins(
                     "Outbox Publisher",
                     "Outbox publish failed",

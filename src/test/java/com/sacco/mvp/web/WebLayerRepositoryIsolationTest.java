@@ -60,4 +60,32 @@ class WebLayerRepositoryIsolationTest {
             violations.add(relative + ": field type " + typeName);
         }
     }
+
+    @Test
+    void requestFiltersMustNotDeclareSpringDataRepositoryDependencies() throws IOException {
+        Path securitySource = Path.of("src/main/java/com/sacco/mvp/security");
+        List<String> violations = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(securitySource)) {
+            paths.filter(path -> path.getFileName().toString().endsWith("Filter.java"))
+                .sorted()
+                .forEach(path -> collectFilterViolations(securitySource, path, violations));
+        }
+        assertTrue(violations.isEmpty(),
+            "Request filters must reach persistence through services:\n"
+                + String.join("\n", violations));
+    }
+
+    private void collectFilterViolations(Path root, Path path, List<String> violations) {
+        String source;
+        try {
+            source = Files.readString(path);
+        } catch (IOException ex) {
+            throw new RuntimeException(path.toString(), ex);
+        }
+        String relative = root.relativize(path).toString().replace('\\', '/');
+        Matcher importMatcher = REPOSITORY_IMPORT.matcher(source);
+        while (importMatcher.find()) {
+            violations.add(relative + ": " + importMatcher.group().trim());
+        }
+    }
 }

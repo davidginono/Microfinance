@@ -16,6 +16,7 @@ import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +26,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -58,6 +62,7 @@ class LoanWorkflowServiceTest {
     @Mock private EligibilityService eligibilityService;
     @Mock private OutboxService outboxService;
     @Mock private LoanAttachmentService loanAttachmentService;
+    @Mock private LoanProductRequiredAttachmentService requiredAttachmentService;
     @Mock private FinancialDetailsService financialDetailsService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private ForesightDirectoryService foresightDirectoryService;
@@ -70,9 +75,18 @@ class LoanWorkflowServiceTest {
     @Mock private PaymentDetailsService paymentDetailsService;
     @Mock private ReversalRequestRepository reversalRequestRepository;
     @Mock private AuditService auditService;
+    @Mock private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
+
+    @BeforeEach
+    void stubTransactions() {
+        SimpleTransactionStatus status = new SimpleTransactionStatus();
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        lenient().doNothing().when(transactionManager).commit(any());
+        lenient().doNothing().when(transactionManager).rollback(any());
+    }
 
     @Test
     void memberDashboardUsesFocusedAggregateAndCurrentLoanQueries() {
