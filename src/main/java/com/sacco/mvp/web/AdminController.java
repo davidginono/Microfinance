@@ -22,8 +22,10 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.PlatformAdminService;
+import com.sacco.mvp.service.PlatformEmailSettingsService;
 import com.sacco.mvp.service.PlatformBrandingSettingsService;
 import com.sacco.mvp.service.PlatformSessionSettingsService;
+import com.sacco.mvp.service.PlatformSmsGatewaySettingsService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
@@ -78,6 +80,8 @@ public class AdminController {
     private final PlatformBrandingSettingsService platformBrandingSettingsService;
     private final PlatformSessionSettingsService platformSessionSettingsService;
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
+    private final PlatformEmailSettingsService platformEmailSettingsService;
+    private final PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
 
     @GetMapping("/scope/select")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_VIEW')")
@@ -212,6 +216,10 @@ public class AdminController {
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
         model.addAttribute("platformSessionSettings", platformSessionSettingsService.settings());
         model.addAttribute("supportContactSettings", platformSupportContactSettingsService.settings());
+        model.addAttribute("platformEmailSettings", platformEmailSettingsService.settings());
+        model.addAttribute("emailDeliveryStatus", platformEmailSettingsService.resolvedConfig());
+        model.addAttribute("platformSmsGatewaySettings", platformSmsGatewaySettingsService.settings());
+        model.addAttribute("smsGatewayStatus", platformSmsGatewaySettingsService.resolvedConfig());
         return "admin/platform-settings";
     }
 
@@ -275,6 +283,104 @@ public class AdminController {
                 principal.getMemberId()
             );
             ra.addFlashAttribute("message", "Platform support contact updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/email")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String updateEmailSettings(@AuthenticationPrincipal AppUserPrincipal principal,
+                                      @RequestParam(defaultValue = "false") boolean enabled,
+                                      @RequestParam(required = false) String host,
+                                      @RequestParam int port,
+                                      @RequestParam(required = false) String username,
+                                      @RequestParam(required = false) String password,
+                                      @RequestParam(required = false) String fromAddress,
+                                      @RequestParam(required = false) String overrideRecipient,
+                                      @RequestParam(defaultValue = "false") boolean sslEnabled,
+                                      @RequestParam(defaultValue = "false") boolean starttlsEnabled,
+                                      @RequestParam int connectionTimeoutMs,
+                                      @RequestParam int readTimeoutMs,
+                                      @RequestParam int writeTimeoutMs,
+                                      RedirectAttributes ra) {
+        try {
+            platformEmailSettingsService.updateSettings(
+                enabled,
+                host,
+                port,
+                username,
+                password,
+                fromAddress,
+                overrideRecipient,
+                sslEnabled,
+                starttlsEnabled,
+                connectionTimeoutMs,
+                readTimeoutMs,
+                writeTimeoutMs,
+                principal.getMemberId()
+            );
+            ra.addFlashAttribute("message", "Email delivery settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/email/test")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String sendTestEmail(@AuthenticationPrincipal AppUserPrincipal principal,
+                                @RequestParam String testRecipient,
+                                RedirectAttributes ra) {
+        try {
+            platformEmailSettingsService.sendTestEmail(testRecipient, principal.getMemberId());
+            ra.addFlashAttribute("message", "Test email sent.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/sms-gateway")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String updateSmsGatewaySettings(@AuthenticationPrincipal AppUserPrincipal principal,
+                                           @RequestParam(defaultValue = "false") boolean enabled,
+                                           @RequestParam(required = false) String baseUrl,
+                                           @RequestParam(required = false) String sendPath,
+                                           @RequestParam(required = false) String clientId,
+                                           @RequestParam(required = false) String apiKey,
+                                           @RequestParam(required = false) String senderId,
+                                           @RequestParam int connectTimeoutSeconds,
+                                           @RequestParam int readTimeoutSeconds,
+                                           RedirectAttributes ra) {
+        try {
+            platformSmsGatewaySettingsService.updateSettings(
+                enabled,
+                baseUrl,
+                sendPath,
+                clientId,
+                apiKey,
+                senderId,
+                connectTimeoutSeconds,
+                readTimeoutSeconds,
+                principal.getMemberId()
+            );
+            ra.addFlashAttribute("message", "SMS gateway settings updated.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/platform-settings/sms-gateway/test")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'PLATFORM_SETTINGS_UPDATE')")
+    public String sendTestSms(@AuthenticationPrincipal AppUserPrincipal principal,
+                              @RequestParam String testPhone,
+                              RedirectAttributes ra) {
+        try {
+            platformSmsGatewaySettingsService.sendTestSms(testPhone, principal.getMemberId());
+            ra.addFlashAttribute("message", "Test SMS sent.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

@@ -41,4 +41,18 @@ class SessionTimeoutUiContractTest {
         assertThat(jsp).contains("value=\"${platformSessionSettings.timeoutMinutes}\"");
         assertThat(jsp).contains("Save Timeout");
     }
+
+    @Test
+    void platformSettingsRendersEmailAndSmsGatewayCards() throws Exception {
+        String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
+
+        assertThat(jsp).contains("/admin/platform-settings/email");
+        assertThat(jsp).contains("/admin/platform-settings/email/test");
+        assertThat(jsp).contains("/admin/platform-settings/sms-gateway");
+        assertThat(jsp).contains("/admin/platform-settings/sms-gateway/test");
+        assertThat(jsp).contains("Save Email Settings");
+        assertThat(jsp).contains("Save SMS Gateway");
+        assertThat(jsp).doesNotContain("name=\"password\" value=");
+        assertThat(jsp).doesNotContain("name=\"apiKey\" value=");
+    }
 }

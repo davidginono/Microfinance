@@ -3,17 +3,17 @@ package com.sacco.mvp.service;
 import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class BenterSmsGatewayTest {
 
@@ -46,8 +46,21 @@ class BenterSmsGatewayTest {
         server.start();
         try {
             ObjectMapper objectMapper = new ObjectMapper();
-            BenterSmsGateway gateway = new BenterSmsGateway(RestClient.builder(), objectMapper);
-            configure(gateway, "http://localhost:" + server.getAddress().getPort());
+            PlatformSmsGatewaySettingsService settingsService = mock(PlatformSmsGatewaySettingsService.class);
+            when(settingsService.resolvedConfig()).thenReturn(new PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig(
+                true,
+                "http://localhost:" + server.getAddress().getPort(),
+                "/v1/sms/SendBulkSMS",
+                "foresight",
+                "api-key",
+                "FORESIGHT",
+                3,
+                8,
+                true,
+                true,
+                true
+            ));
+            BenterSmsGateway gateway = new BenterSmsGateway(RestClient.builder(), objectMapper, settingsService);
 
             SmsSendResult result = gateway.send("0673054445", "Test Message");
 
@@ -68,16 +81,5 @@ class BenterSmsGatewayTest {
         } finally {
             server.stop(0);
         }
-    }
-
-    private void configure(BenterSmsGateway gateway, String baseUrl) {
-        ReflectionTestUtils.setField(gateway, "enabled", true);
-        ReflectionTestUtils.setField(gateway, "baseUrl", baseUrl);
-        ReflectionTestUtils.setField(gateway, "sendPath", "/v1/sms/SendBulkSMS");
-        ReflectionTestUtils.setField(gateway, "clientId", "foresight");
-        ReflectionTestUtils.setField(gateway, "apiKey", "api-key");
-        ReflectionTestUtils.setField(gateway, "senderId", "FORESIGHT");
-        ReflectionTestUtils.setField(gateway, "connectTimeout", Duration.ofSeconds(3));
-        ReflectionTestUtils.setField(gateway, "readTimeout", Duration.ofSeconds(8));
     }
 }

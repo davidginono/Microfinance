@@ -91,6 +91,200 @@
 
 <section class="erp-panel aws-settings-panel overflow-hidden">
     <div class="aws-settings-header">
+        <p class="aws-settings-kicker">Delivery</p>
+        <h2 class="aws-settings-title">Email Delivery</h2>
+        <p class="aws-settings-description">Configure platform SMTP settings for OTP codes, notifications, and invitations. Leave password blank to keep the saved value.</p>
+    </div>
+    <form action="/admin/platform-settings/email" method="post" class="erp-panel-body platform-settings-form">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <div class="platform-settings-grid">
+            <label class="platform-settings-field platform-settings-field--wide settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <input name="enabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.enabled ? 'checked' : ''} />
+                <span>
+                    <span class="block font-semibold text-slate-900">Enable email delivery</span>
+                    <span class="mt-1 block text-xs text-slate-500">
+                        Status:
+                        <c:choose>
+                            <c:when test="${emailDeliveryStatus.configured}">Configured<c:if test="${emailDeliveryStatus.enabled}"> and active</c:if><c:if test="${not emailDeliveryStatus.enabled}"> but disabled</c:if></c:when>
+                            <c:otherwise>Not configured</c:otherwise>
+                        </c:choose>
+                    </span>
+                </span>
+            </label>
+            <label class="platform-settings-field">
+                SMTP host
+                <input name="host" maxlength="255" placeholder="smtp.example.com"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformEmailSettings.host)}" />
+            </label>
+            <label class="platform-settings-field">
+                SMTP port
+                <input name="port" type="number" min="1" max="65535" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformEmailSettings.port}" />
+            </label>
+            <label class="platform-settings-field">
+                SMTP username
+                <input name="username" maxlength="160"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformEmailSettings.username)}" />
+            </label>
+            <label class="platform-settings-field">
+                SMTP password
+                <input name="password" type="password" autocomplete="new-password" placeholder="${emailDeliveryStatus.passwordConfigured ? 'Saved password on file' : 'Enter SMTP password'}"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            </label>
+            <label class="platform-settings-field">
+                From address
+                <input name="fromAddress" type="email" maxlength="160" placeholder="no-reply@example.com"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformEmailSettings.fromAddress)}" />
+            </label>
+            <label class="platform-settings-field">
+                Override recipient
+                <input name="overrideRecipient" type="email" maxlength="160" placeholder="Optional staging inbox"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformEmailSettings.overrideRecipient)}" />
+            </label>
+            <label class="platform-settings-field settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <input name="sslEnabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.sslEnabled ? 'checked' : ''} />
+                <span>
+                    <span class="block font-semibold text-slate-900">Use SSL</span>
+                </span>
+            </label>
+            <label class="platform-settings-field settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <input name="starttlsEnabled" type="checkbox" value="true" class="mt-1" ${platformEmailSettings.starttlsEnabled ? 'checked' : ''} />
+                <span>
+                    <span class="block font-semibold text-slate-900">Use STARTTLS</span>
+                </span>
+            </label>
+            <label class="platform-settings-field">
+                Connection timeout (ms)
+                <input name="connectionTimeoutMs" type="number" min="1000" max="120000" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformEmailSettings.connectionTimeoutMs}" />
+            </label>
+            <label class="platform-settings-field">
+                Read timeout (ms)
+                <input name="readTimeoutMs" type="number" min="1000" max="120000" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformEmailSettings.readTimeoutMs}" />
+            </label>
+            <label class="platform-settings-field">
+                Write timeout (ms)
+                <input name="writeTimeoutMs" type="number" min="1000" max="120000" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformEmailSettings.writeTimeoutMs}" />
+            </label>
+        </div>
+        <div class="platform-settings-actions">
+            <p>Leave the password blank to keep the saved value. New passwords are stored encrypted.</p>
+            <button type="submit" class="app-btn btn-primary">Save Email Settings</button>
+        </div>
+    </form>
+    <form action="/admin/platform-settings/email/test" method="post" class="erp-panel-body platform-settings-form border-t border-slate-200">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <div class="platform-settings-grid">
+            <label class="platform-settings-field platform-settings-field--wide">
+                Send test email to
+                <input name="testRecipient" type="email" maxlength="160" required placeholder="admin@example.com"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            </label>
+        </div>
+        <div class="platform-settings-actions">
+            <p>Uses the current saved or environment email configuration.</p>
+            <button type="submit" class="app-btn btn-neutral">Send Test Email</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-panel aws-settings-panel overflow-hidden">
+    <div class="aws-settings-header">
+        <p class="aws-settings-kicker">Delivery</p>
+        <h2 class="aws-settings-title">SMS Gateway</h2>
+        <p class="aws-settings-description">Configure the Benter Group SMS gateway used for OTP codes and alerts. Leave API key blank to keep the saved value.</p>
+    </div>
+    <form action="/admin/platform-settings/sms-gateway" method="post" class="erp-panel-body platform-settings-form">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <div class="platform-settings-grid">
+            <label class="platform-settings-field platform-settings-field--wide settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+                <input name="enabled" type="checkbox" value="true" class="mt-1" ${platformSmsGatewaySettings.enabled ? 'checked' : ''} />
+                <span>
+                    <span class="block font-semibold text-slate-900">Enable SMS gateway</span>
+                    <span class="mt-1 block text-xs text-slate-500">
+                        Status:
+                        <c:choose>
+                            <c:when test="${smsGatewayStatus.configured}">Configured<c:if test="${smsGatewayStatus.enabled}"> and active</c:if><c:if test="${not smsGatewayStatus.enabled}"> but disabled</c:if></c:when>
+                            <c:otherwise>Not configured</c:otherwise>
+                        </c:choose>
+                    </span>
+                </span>
+            </label>
+            <label class="platform-settings-field">
+                Base URL
+                <input name="baseUrl" maxlength="255" placeholder="https://api.bentergroup.com"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformSmsGatewaySettings.baseUrl)}" />
+            </label>
+            <label class="platform-settings-field">
+                Send path
+                <input name="sendPath" maxlength="255" placeholder="/version2/messaging/legacy"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformSmsGatewaySettings.sendPath)}" />
+            </label>
+            <label class="platform-settings-field">
+                Client ID
+                <input name="clientId" maxlength="120"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformSmsGatewaySettings.clientId)}" />
+            </label>
+            <label class="platform-settings-field">
+                Sender ID
+                <input name="senderId" maxlength="40"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${fn:escapeXml(platformSmsGatewaySettings.senderId)}" />
+            </label>
+            <label class="platform-settings-field">
+                API key
+                <input name="apiKey" type="password" autocomplete="new-password" placeholder="${smsGatewayStatus.apiKeyConfigured ? 'Saved API key on file' : 'Enter API key'}"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            </label>
+            <label class="platform-settings-field">
+                Connect timeout (seconds)
+                <input name="connectTimeoutSeconds" type="number" min="1" max="60" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformSmsGatewaySettings.connectTimeoutSeconds}" />
+            </label>
+            <label class="platform-settings-field">
+                Read timeout (seconds)
+                <input name="readTimeoutSeconds" type="number" min="1" max="60" required
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800"
+                       value="${platformSmsGatewaySettings.readTimeoutSeconds}" />
+            </label>
+        </div>
+        <div class="platform-settings-actions">
+            <p>Station SMS balances and warning thresholds remain on the SMS Usage page.</p>
+            <button type="submit" class="app-btn btn-primary">Save SMS Gateway</button>
+        </div>
+    </form>
+    <form action="/admin/platform-settings/sms-gateway/test" method="post" class="erp-panel-body platform-settings-form border-t border-slate-200">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        <div class="platform-settings-grid">
+            <label class="platform-settings-field platform-settings-field--wide">
+                Send test SMS to
+                <input name="testPhone" maxlength="40" required placeholder="Example: +255 746 359 369"
+                       class="mt-1 h-12 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-800" />
+            </label>
+        </div>
+        <div class="platform-settings-actions">
+            <p>Uses the current saved or environment SMS gateway configuration.</p>
+            <button type="submit" class="app-btn btn-neutral">Send Test SMS</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-panel aws-settings-panel overflow-hidden">
+    <div class="aws-settings-header">
         <p class="aws-settings-kicker">Branding</p>
         <h2 class="aws-settings-title">Logo Upload Rules</h2>
         <p class="aws-settings-description">These limits apply to every SACCO logo uploaded from registration or station registry.</p>

@@ -5,7 +5,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -23,41 +22,19 @@ import java.util.List;
 public class BenterSmsGateway implements SmsGateway {
     private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
-
-    @Value("${app.sms.enabled:false}")
-    private boolean enabled;
-
-    @Value("${app.sms.benter.base-url:https://api.onfonmedia.co.ke}")
-    private String baseUrl;
-
-    @Value("${app.sms.benter.send-path:/v1/sms/SendBulkSMS}")
-    private String sendPath;
-
-    @Value("${app.sms.benter.client-id:}")
-    private String clientId;
-
-    @Value("${app.sms.benter.api-key:}")
-    private String apiKey;
-
-    @Value("${app.sms.benter.sender-id:INFO}")
-    private String senderId;
-
-    @Value("${app.sms.connect-timeout:3s}")
-    private Duration connectTimeout;
-
-    @Value("${app.sms.read-timeout:8s}")
-    private Duration readTimeout;
+    private final PlatformSmsGatewaySettingsService smsGatewaySettingsService;
 
     @Override
     public SmsSendResult send(String phoneNumber, String message) {
+        PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig config = smsGatewaySettingsService.resolvedConfig();
         String normalizedPhone = TanzaniaPhoneNumber.normalizeOptional(phoneNumber);
-        if (!enabled) {
+        if (!config.enabled()) {
             return SmsSendResult.skipped("SMS is disabled");
         }
-        if (clientId.isBlank() || apiKey.isBlank()) {
+        if (config.clientId().isBlank() || config.apiKey().isBlank()) {
             return SmsSendResult.skipped("Benter Group credentials are not configured");
         }
-        if (senderId.isBlank()) {
+        if (config.senderId().isBlank()) {
             return SmsSendResult.skipped("Benter Group sender ID is not configured");
         }
         if (normalizedPhone == null) {
@@ -68,16 +45,16 @@ public class BenterSmsGateway implements SmsGateway {
         }
 
         BenterSendRequest payload = new BenterSendRequest(
-            senderId,
+            config.senderId(),
             List.of(new BenterMessage(normalizedPhone, trimMessage(message))),
-            apiKey,
-            clientId
+            config.apiKey(),
+            config.clientId()
         );
 
         try {
             String jsonBody = objectMapper.writeValueAsString(payload);
-            String response = client().post()
-                .uri(sendPath)
+            String response = client(config).post()
+                .uri(config.sendPath())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .body(jsonBody)
@@ -96,17 +73,17 @@ public class BenterSmsGateway implements SmsGateway {
         }
     }
 
-    private RestClient client() {
+    private RestClient client(PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig config) {
         return restClientBuilder
-            .requestFactory(requestFactory())
-            .baseUrl(baseUrl)
+            .requestFactory(requestFactory(config))
+            .baseUrl(config.baseUrl())
             .build();
     }
 
-    private SimpleClientHttpRequestFactory requestFactory() {
+    private SimpleClientHttpRequestFactory requestFactory(PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig config) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(connectTimeout);
-        requestFactory.setReadTimeout(readTimeout);
+        requestFactory.setConnectTimeout(Duration.ofSeconds(config.connectTimeoutSeconds()));
+        requestFactory.setReadTimeout(Duration.ofSeconds(config.readTimeoutSeconds()));
         return requestFactory;
     }
 

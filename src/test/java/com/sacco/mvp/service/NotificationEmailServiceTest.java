@@ -6,11 +6,9 @@ import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,12 +30,7 @@ class NotificationEmailServiceTest {
     void overrideRecipientRoutesOutgoingEmailToConfiguredAddress() {
         MemberRepository memberRepository = mock(MemberRepository.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(mailSender);
-        NotificationEmailService service = new NotificationEmailService(memberRepository, provider);
-        ReflectionTestUtils.setField(service, "fromAddress", "no-reply@sacco.local");
-        ReflectionTestUtils.setField(service, "overrideRecipient", " ginonodavid625@gmail.com ");
+        NotificationEmailService service = service(memberRepository, mailSender, " ginonodavid625@gmail.com ");
 
         service.sendDirectEmail("member@example.com", "Subject", "Body");
 
@@ -50,12 +43,7 @@ class NotificationEmailServiceTest {
     void blankOverrideUsesRequestedRecipient() {
         MemberRepository memberRepository = mock(MemberRepository.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(mailSender);
-        NotificationEmailService service = new NotificationEmailService(memberRepository, provider);
-        ReflectionTestUtils.setField(service, "fromAddress", "no-reply@sacco.local");
-        ReflectionTestUtils.setField(service, "overrideRecipient", " ");
+        NotificationEmailService service = service(memberRepository, mailSender, " ");
 
         service.sendDirectEmail("member@example.com", "Subject", "Body");
 
@@ -70,9 +58,6 @@ class NotificationEmailServiceTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
         MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(mailSender);
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(
             com.sacco.mvp.domain.Member.builder()
@@ -80,9 +65,7 @@ class NotificationEmailServiceTest {
                 .email("member@example.com")
                 .build()
         ));
-        NotificationEmailService service = new NotificationEmailService(memberRepository, provider);
-        ReflectionTestUtils.setField(service, "fromAddress", "no-reply@sacco.local");
-        ReflectionTestUtils.setField(service, "overrideRecipient", " audit@example.com ");
+        NotificationEmailService service = service(memberRepository, mailSender, " audit@example.com ");
 
         service.sendNotificationEmail(memberId, "Loan update", "Plain body", "<strong>HTML body</strong>");
 
@@ -96,10 +79,10 @@ class NotificationEmailServiceTest {
     @Test
     void requiredApprovalEmailFailsWhenMailSenderIsUnavailable() {
         MemberRepository memberRepository = mock(MemberRepository.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(null);
-        NotificationEmailService service = new NotificationEmailService(memberRepository, provider);
+        PlatformMailSenderFactory factory = mock(PlatformMailSenderFactory.class);
+        PlatformEmailSettingsService emailSettings = mock(PlatformEmailSettingsService.class);
+        when(factory.getMailSender()).thenReturn(null);
+        NotificationEmailService service = new NotificationEmailService(memberRepository, factory, emailSettings);
 
         assertThatThrownBy(() -> service.sendRequiredDirectEmail(
             "reviewer@example.com",
@@ -114,14 +97,9 @@ class NotificationEmailServiceTest {
     void requiredApprovalEmailPropagatesSmtpFailure() {
         MemberRepository memberRepository = mock(MemberRepository.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(mailSender);
         doThrow(new MailSendException("SMTP unavailable"))
             .when(mailSender).send(any(SimpleMailMessage.class));
-        NotificationEmailService service = new NotificationEmailService(memberRepository, provider);
-        ReflectionTestUtils.setField(service, "fromAddress", "no-reply@sacco.local");
-        ReflectionTestUtils.setField(service, "overrideRecipient", "");
+        NotificationEmailService service = service(memberRepository, mailSender, "");
 
         assertThatThrownBy(() -> service.sendRequiredDirectEmail(
             "reviewer@example.com",
@@ -148,5 +126,30 @@ class NotificationEmailServiceTest {
             .contains("timeout: ${SPRING_MAIL_READ_TIMEOUT_MS:10000}")
             .contains("writetimeout: ${SPRING_MAIL_WRITE_TIMEOUT_MS:10000}")
             .doesNotContain("password: qwerty1!");
+        assertThat(configuration).contains("encryption-key: ${APP_SECRETS_ENCRYPTION_KEY:}");
+    }
+
+    private NotificationEmailService service(MemberRepository memberRepository, JavaMailSender mailSender, String overrideRecipient) {
+        PlatformMailSenderFactory factory = mock(PlatformMailSenderFactory.class);
+        PlatformEmailSettingsService emailSettings = mock(PlatformEmailSettingsService.class);
+        when(factory.getMailSender()).thenReturn(mailSender);
+        when(emailSettings.resolvedConfig()).thenReturn(new PlatformEmailSettingsService.ResolvedEmailConfig(
+            true,
+            "smtp.example.com",
+            465,
+            "user",
+            "secret",
+            "no-reply@sacco.local",
+            overrideRecipient,
+            true,
+            false,
+            10_000,
+            10_000,
+            10_000,
+            true,
+            true,
+            true
+        ));
+        return new NotificationEmailService(memberRepository, factory, emailSettings);
     }
 }

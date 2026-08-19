@@ -1,11 +1,8 @@
 package com.sacco.mvp.service;
 
-import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -19,13 +16,8 @@ import java.util.UUID;
 @Slf4j
 public class NotificationEmailService {
     private final MemberRepository memberRepository;
-    private final ObjectProvider<JavaMailSender> mailSenderProvider;
-
-    @Value("${app.mail.from-address:${spring.mail.username:no-reply@sacco.local}}")
-    private String fromAddress;
-
-    @Value("${app.mail.override-recipient:}")
-    private String overrideRecipient;
+    private final PlatformMailSenderFactory mailSenderFactory;
+    private final PlatformEmailSettingsService emailSettingsService;
 
     public void sendDirectEmail(String email, String subject, String message) {
         sendDirectEmail(email, subject, message, false);
@@ -42,7 +34,7 @@ public class NotificationEmailService {
             }
             return;
         }
-        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        JavaMailSender mailSender = mailSenderFactory.getMailSender();
         if (mailSender == null) {
             if (deliveryRequired) {
                 throw new IllegalStateException("Email delivery is not configured. Contact the system administrator.");
@@ -51,10 +43,11 @@ public class NotificationEmailService {
             return;
         }
 
+        PlatformEmailSettingsService.ResolvedEmailConfig config = emailSettingsService.resolvedConfig();
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
-            mail.setTo(resolveRecipient(email));
-            mail.setFrom(fromAddress);
+            mail.setTo(resolveRecipient(email, config));
+            mail.setFrom(config.fromAddress());
             mail.setSubject(subject);
             mail.setText(message);
             mailSender.send(mail);
@@ -74,7 +67,7 @@ public class NotificationEmailService {
         if (memberId == null) {
             return;
         }
-        Member recipient = memberRepository.findById(memberId).orElse(null);
+        var recipient = memberRepository.findById(memberId).orElse(null);
         if (recipient == null || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
             return;
         }
@@ -86,17 +79,18 @@ public class NotificationEmailService {
     }
 
     private void sendDirectHtmlEmail(String email, String subject, String text, String html) {
-        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        JavaMailSender mailSender = mailSenderFactory.getMailSender();
         if (mailSender == null) {
             log.info("Mail sender not configured. HTML notification email for {}: {}", email, text);
             return;
         }
 
+        PlatformEmailSettingsService.ResolvedEmailConfig config = emailSettingsService.resolvedConfig();
         try {
             MimeMessage mail = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
-            helper.setTo(resolveRecipient(email));
-            helper.setFrom(fromAddress);
+            helper.setTo(resolveRecipient(email, config));
+            helper.setFrom(config.fromAddress());
             helper.setSubject(subject);
             helper.setText(text == null ? "" : text, html);
             mailSender.send(mail);
@@ -106,7 +100,8 @@ public class NotificationEmailService {
         }
     }
 
-    private String resolveRecipient(String email) {
+    private String resolveRecipient(String email, PlatformEmailSettingsService.ResolvedEmailConfig config) {
+        String overrideRecipient = config.overrideRecipient();
         if (overrideRecipient != null && !overrideRecipient.isBlank()) {
             return overrideRecipient.trim().toLowerCase();
         }

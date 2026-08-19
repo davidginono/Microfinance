@@ -27,8 +27,10 @@ import com.sacco.mvp.service.DatabaseUtilizationService;
 import com.sacco.mvp.service.LoanProductRequiredAttachmentService;
 import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.PlatformAdminService;
+import com.sacco.mvp.service.PlatformEmailSettingsService;
 import com.sacco.mvp.service.PlatformBrandingSettingsService;
 import com.sacco.mvp.service.PlatformSessionSettingsService;
+import com.sacco.mvp.service.PlatformSmsGatewaySettingsService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoDataDeletionService;
 import com.sacco.mvp.service.SaccoRegistryService;
@@ -83,12 +85,15 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private AdminScopeService adminScopeService;
     @Autowired private SaccoStationRepository saccoStationRepository;
     @Autowired private PlatformSessionSettingsService platformSessionSettingsService;
+    @Autowired private PlatformEmailSettingsService platformEmailSettingsService;
+    @Autowired private PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService);
+        Mockito.reset(adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
+            platformEmailSettingsService, platformSmsGatewaySettingsService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -189,6 +194,112 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(status().isForbidden());
 
         verify(platformSessionSettingsService, never()).updateTimeout(any(Integer.class), any());
+    }
+
+    @Test
+    void updateEmailSettingsAllowsPlatformAdminWithUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/email")
+                .param("enabled", "true")
+                .param("host", "smtp.example.com")
+                .param("port", "465")
+                .param("username", "noreply@example.com")
+                .param("password", "secret")
+                .param("fromAddress", "noreply@example.com")
+                .param("sslEnabled", "true")
+                .param("connectionTimeoutMs", "10000")
+                .param("readTimeoutMs", "10000")
+                .param("writeTimeoutMs", "10000")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"));
+
+        verify(platformEmailSettingsService).updateSettings(
+            true,
+            "smtp.example.com",
+            465,
+            "noreply@example.com",
+            "secret",
+            "noreply@example.com",
+            null,
+            true,
+            false,
+            10_000,
+            10_000,
+            10_000,
+            principal.getMemberId()
+        );
+    }
+
+    @Test
+    void updateEmailSettingsDeniesPlatformAdminWithoutUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+
+        mockMvc.perform(post("/admin/platform-settings/email")
+                .param("host", "smtp.example.com")
+                .param("port", "465")
+                .param("connectionTimeoutMs", "10000")
+                .param("readTimeoutMs", "10000")
+                .param("writeTimeoutMs", "10000")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verify(platformEmailSettingsService, never()).updateSettings(
+            any(Boolean.class), any(), any(Integer.class), any(), any(), any(), any(),
+            any(Boolean.class), any(Boolean.class), any(Integer.class), any(Integer.class), any(Integer.class), any()
+        );
+    }
+
+    @Test
+    void updateSmsGatewaySettingsAllowsPlatformAdminWithUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
+
+        mockMvc.perform(post("/admin/platform-settings/sms-gateway")
+                .param("enabled", "true")
+                .param("baseUrl", "https://api.bentergroup.com")
+                .param("sendPath", "/version2/messaging/legacy")
+                .param("clientId", "foresight")
+                .param("apiKey", "api-key")
+                .param("senderId", "FORESIGHT")
+                .param("connectTimeoutSeconds", "3")
+                .param("readTimeoutSeconds", "8")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/platform-settings"));
+
+        verify(platformSmsGatewaySettingsService).updateSettings(
+            true,
+            "https://api.bentergroup.com",
+            "/version2/messaging/legacy",
+            "foresight",
+            "api-key",
+            "FORESIGHT",
+            3,
+            8,
+            principal.getMemberId()
+        );
+    }
+
+    @Test
+    void updateSmsGatewaySettingsDeniesPlatformAdminWithoutUpdateClaim() throws Exception {
+        AppUserPrincipal principal = platformPrincipal(Set.of(UserClaim.PLATFORM_SETTINGS_VIEW));
+
+        mockMvc.perform(post("/admin/platform-settings/sms-gateway")
+                .param("baseUrl", "https://api.bentergroup.com")
+                .param("sendPath", "/version2/messaging/legacy")
+                .param("connectTimeoutSeconds", "3")
+                .param("readTimeoutSeconds", "8")
+                .with(csrf())
+                .with(authentication(authenticationFor(principal))))
+            .andExpect(status().isForbidden());
+
+        verify(platformSmsGatewaySettingsService, never()).updateSettings(
+            any(Boolean.class), any(), any(), any(), any(), any(), any(Integer.class), any(Integer.class), any()
+        );
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(AppUserPrincipal principal) {
@@ -295,7 +406,9 @@ class AdminControllerUserAccessSecurityTest {
                                         SaccoDataDeletionService saccoDataDeletionService,
                                         PlatformBrandingSettingsService platformBrandingSettingsService,
                                         PlatformSessionSettingsService platformSessionSettingsService,
-                                        PlatformSupportContactSettingsService platformSupportContactSettingsService) {
+                                        PlatformSupportContactSettingsService platformSupportContactSettingsService,
+                                        PlatformEmailSettingsService platformEmailSettingsService,
+                                        PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService) {
             return new AdminController(
                 adminService,
                 new com.sacco.mvp.service.ApplicationClock("Africa/Nairobi"),
@@ -311,7 +424,9 @@ class AdminControllerUserAccessSecurityTest {
                 saccoDataDeletionService,
                 platformBrandingSettingsService,
                 platformSessionSettingsService,
-                platformSupportContactSettingsService
+                platformSupportContactSettingsService,
+                platformEmailSettingsService,
+                platformSmsGatewaySettingsService
             );
         }
 
@@ -369,6 +484,8 @@ class AdminControllerUserAccessSecurityTest {
             return service;
         }
         @Bean PlatformSupportContactSettingsService platformSupportContactSettingsService() { return Mockito.mock(PlatformSupportContactSettingsService.class); }
+        @Bean PlatformEmailSettingsService platformEmailSettingsService() { return Mockito.mock(PlatformEmailSettingsService.class); }
+        @Bean PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService() { return Mockito.mock(PlatformSmsGatewaySettingsService.class); }
         @Bean MemberRepository memberRepository() { return Mockito.mock(MemberRepository.class); }
         @Bean SaccoStationRepository saccoStationRepository() { return Mockito.mock(SaccoStationRepository.class); }
         @Bean StaffMfaService staffMfaService() { return Mockito.mock(StaffMfaService.class); }
