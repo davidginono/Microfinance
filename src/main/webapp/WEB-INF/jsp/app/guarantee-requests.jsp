@@ -99,21 +99,15 @@
     <c:set var="policyReason" value="${guaranteePolicyReasons[req.id]}" />
     <c:if test="${req.status eq 'PENDING'}">
         <div class="app-modal-overlay hidden"
+             aria-hidden="true"
              data-guarantee-modal="approve-${req.id}">
-            <div class="app-modal-panel">
+            <div class="app-modal-panel app-modal-panel--compact guarantee-otp-modal-panel" role="dialog" aria-modal="true" aria-labelledby="guaranteeApproveTitle-${req.id}">
                 <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"><spring:message code="guaranteeRequests.approveTitle" text="Approve Guarantee" /></p>
-                        <h2 class="mt-2 text-3xl font-semibold text-sacco-ink">${guaranteeNames[req.loanApplicationId]}</h2>
-                        <p class="guarantee-modal-subtitle-legacy mt-2 text-sm text-slate-500">
-                            Loan ${fn:substring(req.loanApplicationId, 0, 8)} â€¢
-                            <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
-                                <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
-                            </c:if>
-                            â€¢ ${guaranteeLoanAmounts[req.loanApplicationId]}
-                        </p>
-                        <p class="mt-2 text-sm text-slate-500">
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500"><spring:message code="guaranteeRequests.approveTitle" text="Approve Guarantee" /></p>
+                        <h2 id="guaranteeApproveTitle-${req.id}" class="mt-1 text-lg font-semibold text-sacco-ink">${guaranteeNames[req.loanApplicationId]}</h2>
+                        <p class="guarantee-otp-summary mt-1 text-sm text-slate-500">
                             <spring:message code="loan.single" text="Loan" /> ${fn:substring(req.loanApplicationId, 0, 8)}
                             <c:if test="${not empty guaranteeLoanTypes[req.loanApplicationId]}">
                                 | <c:out value="${guaranteeLoanProductNames[req.loanApplicationId]}" />
@@ -130,14 +124,14 @@
                         </svg>
                     </button>
                         </div>
-                <form action="/app/guarantee-requests/${req.id}/approve" method="post" class="app-modal-body space-y-5">
+                <form action="/app/guarantee-requests/${req.id}/approve" method="post" class="app-modal-body guarantee-otp-modal-body space-y-3">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <c:if test="${not policyEligible}">
                         <div class="app-modal-section border-rose-200 bg-rose-50 text-sm leading-6 text-rose-700">
                             ${policyReason}
                     </div>
                     </c:if>
-                    <div class="app-modal-section text-sm leading-7 text-slate-700">
+                    <div class="app-modal-section guarantee-otp-declaration text-sm leading-6 text-slate-700">
                         <p>
                             <strong><spring:message code="guaranteeRequests.declarationTitle" text="Guarantor Declaration:" /></strong>
                             <spring:message code="guaranteeRequests.declarationI" text="I," />
@@ -150,7 +144,7 @@
                             <spring:message code="guaranteeRequests.declarationTail" text="accept responsibility for recoveries and penalties if the applicant defaults on this loan." />
                         </p>
                             </div>
-                    <label class="app-modal-section flex items-start gap-3 text-sm text-slate-700">
+                    <label class="app-modal-section guarantee-otp-check flex items-start gap-2 text-sm text-slate-700">
                         <input type="checkbox"
                                name="guarantorDeclarationAccepted"
                                value="true"
@@ -161,9 +155,9 @@
                     </label>
                     <c:set var="guarantorOtpEnabled" value="${guarantorRequestOtpEnabled[req.id]}" />
                     <c:if test="${guarantorOtpEnabled}">
-                    <div class="app-modal-section">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div>
+                    <div class="app-modal-section otp-confirmation-panel">
+                        <div class="otp-confirmation-header">
+                            <div class="min-w-0">
                                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"><spring:message code="otp.verification" text="OTP Verification" /></div>
                                 <p class="mt-2 text-sm text-slate-600"><spring:message code="guaranteeRequests.otpHelp" text="Request a one-time code to confirm that you are the guarantor approving this loan." /></p>
                                 <c:if test="${not hasGuarantorSignature}">
@@ -182,7 +176,7 @@
                                 <span class="otp-button-label"><spring:message code="loan.otp.sendCode" text="Send OTP Code" /></span>
                             </button>
                             </div>
-                        <div id="approve-feedback-${req.id}" data-auto-scroll-message="true" class="mt-3 hidden border px-4 py-3 text-sm"></div>
+                        <div id="approve-feedback-${req.id}" data-auto-scroll-message="true" class="otp-feedback-message mt-3 hidden border px-3 py-2 text-sm"></div>
                         <div class="mt-3">
                             <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.otp.code" text="OTP Code" /></label>
                              <input type="text"
@@ -191,11 +185,11 @@
                                     maxlength="6"
                                     autocomplete="one-time-code"
                                     data-otp-hidden="true" data-otp-label="<spring:message code='guaranteeRequests.guarantorOtpCode' text='Guarantor OTP code' />"
-                                    class="w-full border border-slate-300 px-3 py-3 tracking-[0.3em] focus:border-sacco-blue focus:outline-none"
+                                    class="fcms-control loan-otp-input"
                                     placeholder="123456"
                                     required />
                             <p class="mt-2 text-sm text-slate-500"><spring:message code="loan.otp.codeHelp" text="Enter the 6-digit code sent to your email before confirming approval." /></p>
-                            <div class="guarantor-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <div class="otp-live-status guarantor-otp-live-status mt-3 hidden items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                                 <span data-otp-spinner class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sacco-blue"></span>
                                 <svg data-otp-tick class="otp-checkmark-pop hidden h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/>
@@ -205,7 +199,7 @@
                     </div>
                     </div>
                     </c:if>
-                    <div class="flex flex-wrap justify-end gap-3">
+                    <div class="app-modal-actions">
                         <button type="button"
                                 class="app-btn btn-neutral"
                                 data-guarantee-modal-close="approve-${req.id}">
@@ -337,6 +331,7 @@
             document.querySelectorAll("[data-guarantee-modal]").forEach((modal) => {
                 modal.classList.add("hidden");
                 modal.classList.remove("is-open");
+                modal.setAttribute("aria-hidden", "true");
             });
             body.classList.remove("overflow-hidden");
         }
@@ -349,6 +344,7 @@
                 if (modal) {
                     modal.classList.remove("hidden");
                     modal.classList.add("is-open");
+                    modal.setAttribute("aria-hidden", "false");
                     body.classList.add("overflow-hidden");
                 }
             });

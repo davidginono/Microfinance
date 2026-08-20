@@ -995,6 +995,34 @@ class AwsConsoleViewContractTest {
         }
     }
 
+    @Test
+    void otpConfirmationModalUsesSharedCompactContainerLayout() throws Exception {
+        String guaranteeRequests = read(JSP_ROOT.resolve("app/guarantee-requests.jsp"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+
+        assertThat(guaranteeRequests)
+            .contains("class=\"app-modal-panel app-modal-panel--compact guarantee-otp-modal-panel\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"guaranteeApproveTitle-${req.id}\"")
+            .contains("id=\"guaranteeApproveTitle-${req.id}\"")
+            .contains("class=\"app-modal-body guarantee-otp-modal-body space-y-3\"")
+            .contains("class=\"app-modal-section otp-confirmation-panel\"")
+            .contains("class=\"otp-confirmation-header\"")
+            .contains("class=\"otp-feedback-message mt-3 hidden border px-3 py-2 text-sm\"")
+            .contains("class=\"otp-live-status guarantor-otp-live-status")
+            .contains("class=\"app-modal-actions\"")
+            .contains("modal.setAttribute(\"aria-hidden\", \"true\")")
+            .contains("modal.setAttribute(\"aria-hidden\", \"false\")")
+            .doesNotContain("guarantee-modal-subtitle-legacy")
+            .doesNotContain("text-3xl font-semibold text-sacco-ink");
+
+        assertThat(consoleCss)
+            .contains(".otp-confirmation-panel")
+            .contains(".otp-confirmation-header")
+            .contains(".guarantee-otp-modal-panel .app-modal-header h2")
+            .contains("width: min(100%, 16rem)")
+            .contains("border-radius: 2px")
+            .doesNotContain(".guarantee-modal-subtitle-legacy");
+    }
+
     private static List<Path> routeViews() throws IOException {
         try (Stream<Path> paths = Files.walk(JSP_ROOT)) {
             return paths
