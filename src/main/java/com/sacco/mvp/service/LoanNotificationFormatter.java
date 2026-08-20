@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -61,7 +62,16 @@ public class LoanNotificationFormatter {
     public NotificationDeliveryService.DeliveryContent format(OutboxEvent event,
                                                               JsonNode payload,
                                                               NotificationDeliveryService.DeliveryContent fallback) {
-        if (event == null || !"LOAN".equals(event.getAggregateType())) {
+        if (event == null) {
+            return fallback;
+        }
+        if ("GUARANTOR_REQUEST".equals(event.getAggregateType())) {
+            return guarantorRequestContent(event, payload, fallback);
+        }
+        if ("REVERSAL_REQUEST".equals(event.getAggregateType())) {
+            return reversalRequestContent(event, payload, fallback);
+        }
+        if (!"LOAN".equals(event.getAggregateType())) {
             return fallback;
         }
         String eventType = event.getEventType();
@@ -79,6 +89,126 @@ public class LoanNotificationFormatter {
         return staffAction
             ? staffContent(app, applicant, eventType)
             : applicantContent(app, eventType, payload);
+    }
+
+    private NotificationDeliveryService.DeliveryContent guarantorRequestContent(OutboxEvent event,
+                                                                                JsonNode payload,
+                                                                                NotificationDeliveryService.DeliveryContent fallback) {
+        Optional<LoanApplication> loan = loanFromDetails(payload);
+        if (loan.isEmpty()) {
+            return fallback;
+        }
+        LoanApplication app = loan.get();
+        String eventType = event.getEventType();
+        UUID actorId = uuid(payloadText(payload, "actorId"));
+        String guarantor = memberLabel(actorId, "Guarantor");
+        Map<String, String> rows = baseLoanRows(app);
+        String url = absoluteUrl("/app/loan-applications/" + app.getId());
+
+        if ("GUARANTOR_REQUEST_ASSIGNED".equals(eventType)) {
+            rows.put("Applicant", memberLabel(app.getApplicantMemberId(), "Applicant"));
+            return content(
+                "New guarantor request",
+                "New Guarantor Request",
+                "You have a new guarantor request waiting for your decision.",
+                rows,
+                absoluteUrl("/app/guarantee-requests")
+            );
+        }
+        if ("GUARANTOR_REQUEST_APPROVED".equals(eventType)) {
+            rows.put("Guarantor", guarantor);
+            return content(
+                "Guarantor request approved",
+                "Guarantor Request Approved",
+                guarantor + " approved your guarantee request.",
+                rows,
+                url
+            );
+        }
+        if ("GUARANTOR_REQUEST_REJECTED".equals(eventType)) {
+            rows.put("Guarantor", guarantor);
+            String reason = detailText(payload, "reasons");
+            if (!reason.isBlank()) {
+                rows.put("Reason", reason);
+            }
+            return content(
+                "Guarantor request rejected",
+                "Guarantor Request Rejected",
+                guarantor + " rejected your guarantee request.",
+                rows,
+                url
+            );
+        }
+        return fallback;
+    }
+
+    private NotificationDeliveryService.DeliveryContent reversalRequestContent(OutboxEvent event,
+                                                                               JsonNode payload,
+                                                                               NotificationDeliveryService.DeliveryContent fallback) {
+        Optional<LoanApplication> loan = loanFromDetails(payload);
+        if (loan.isEmpty()) {
+            return fallback;
+        }
+        LoanApplication app = loan.get();
+        String eventType = event.getEventType();
+        UUID actorId = uuid(payloadText(payload, "actorId"));
+        Map<String, String> rows = baseLoanRows(app);
+        String loanUrl = absoluteUrl("/app/loan-applications/" + app.getId());
+
+        if ("GUARANTOR_UNDO_REQUESTED".equals(eventType)) {
+            rows.put("Guarantor", memberLabel(actorId, "Guarantor"));
+            return content(
+                "Guarantor removal requested",
+                "Guarantor Removal Requested",
+                "A guarantor asked to be removed from your loan application.",
+                rows,
+                loanUrl
+            );
+        }
+        if ("GUARANTOR_UNDO_APPROVED".equals(eventType)) {
+            rows.put("Applicant", memberLabel(actorId, "Applicant"));
+            return content(
+                "Guarantor removal approved",
+                "Guarantor Removal Approved",
+                "The applicant approved your request to be removed from this loan.",
+                rows,
+                absoluteUrl("/app/guarantee-requests")
+            );
+        }
+        if ("GUARANTOR_UNDO_REJECTED".equals(eventType)) {
+            rows.put("Applicant", memberLabel(actorId, "Applicant"));
+            return content(
+                "Guarantor removal declined",
+                "Guarantor Removal Declined",
+                "The applicant kept you on this loan as an active guarantor.",
+                rows,
+                absoluteUrl("/app/guarantee-requests")
+            );
+        }
+        if ("MANAGER_REVERSAL_REQUESTED".equals(eventType)) {
+            rows.put("Applicant", memberLabel(actorId, "Applicant"));
+            return content(
+                "Application removal requested",
+                "Application Removal Requested",
+                "An applicant asked for manager approval to remove a loan still under manager review.",
+                rows,
+                loanUrl
+            );
+        }
+        if ("MANAGER_REVERSAL_APPROVED".equals(eventType) || "MANAGER_REVERSAL_REJECTED".equals(eventType)) {
+            boolean approved = "MANAGER_REVERSAL_APPROVED".equals(eventType);
+            rows.put("Manager", memberLabel(actorId, "Manager"));
+            return content(
+                approved ? "Application removal approved" : "Application removal declined",
+                approved ? "Application Removal Approved" : "Application Removal Declined",
+                approved
+                    ? "The manager approved your request and removed the application from review."
+                    : "The manager declined your application removal request.",
+                rows,
+                loanUrl
+            );
+        }
+        return fallback;
     }
 
     private NotificationDeliveryService.DeliveryContent staffContent(LoanApplication app,
@@ -209,6 +339,51 @@ public class LoanNotificationFormatter {
             return "";
         }
         return reasons.asString("").trim();
+    }
+
+    private Optional<LoanApplication> loanFromDetails(JsonNode payload) {
+        UUID loanId = uuid(detailText(payload, "loanId"));
+        return loanId == null ? Optional.empty() : loanApplicationRepository.findById(loanId);
+    }
+
+    private Map<String, String> baseLoanRows(LoanApplication app) {
+        Map<String, String> rows = new LinkedHashMap<>();
+        rows.put("Loan Application ID", applicationReference(app));
+        rows.put("Loan Product", loanProductLabel(app));
+        rows.put("Amount", amountLabel(app.getAmount()));
+        return rows;
+    }
+
+    private String memberLabel(UUID memberId, String fallback) {
+        if (memberId == null) {
+            return fallback;
+        }
+        return memberRepository.findById(memberId)
+            .map(this::applicantLabel)
+            .filter(label -> label != null && !label.isBlank())
+            .orElse(fallback);
+    }
+
+    private String payloadText(JsonNode payload, String field) {
+        JsonNode value = payload == null ? null : payload.get(field);
+        return value == null || value.isNull() ? "" : value.asString("").trim();
+    }
+
+    private String detailText(JsonNode payload, String field) {
+        JsonNode details = payload == null ? null : payload.get("details");
+        JsonNode value = details == null ? null : details.get(field);
+        return value == null || value.isNull() ? "" : value.asString("").trim();
+    }
+
+    private UUID uuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private String applicationReference(LoanApplication app) {

@@ -673,6 +673,101 @@ class LoanWorkflowServiceTest {
         ));
     }
 
+    @Test
+    void approveGuarantorRequestNotifiesApplicant() {
+        UUID requestId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .loanApplicationId(loanId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.PENDING)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("100000"))
+            .requiredGuarantors(2)
+            .status(LoanStatus.AWAITING_GUARANTORS)
+            .build();
+
+        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanId, GuarantorRequestStatus.APPROVED)).thenReturn(1L);
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.TEN));
+
+        loanWorkflowService.approveGuarantorRequest(requestId, guarantorId);
+
+        verify(outboxService).enqueue(
+            eq("GUARANTOR_REQUEST"),
+            eq(requestId),
+            eq("GUARANTOR_REQUEST_APPROVED"),
+            eq(applicantId),
+            eq(guarantorId),
+            eq(saccoId),
+            eq("ST01"),
+            argThat(details -> loanId.toString().equals(details.get("loanId"))
+                && requestId.toString().equals(details.get("guarantorRequestId"))
+                && guarantorId.toString().equals(details.get("guarantorId")))
+        );
+    }
+
+    @Test
+    void rejectGuarantorRequestNotifiesApplicantWithReason() {
+        UUID requestId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .loanApplicationId(loanId)
+            .guarantorMemberId(guarantorId)
+            .status(GuarantorRequestStatus.PENDING)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("100000"))
+            .requiredGuarantors(2)
+            .status(LoanStatus.AWAITING_GUARANTORS)
+            .build();
+
+        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, guarantorId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(loanId, GuarantorRequestStatus.APPROVED)).thenReturn(0L);
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.TEN));
+
+        loanWorkflowService.rejectGuarantorRequest(requestId, guarantorId, "Savings committed elsewhere");
+
+        verify(outboxService).enqueue(
+            eq("GUARANTOR_REQUEST"),
+            eq(requestId),
+            eq("GUARANTOR_REQUEST_REJECTED"),
+            eq(applicantId),
+            eq(guarantorId),
+            eq(saccoId),
+            eq("ST01"),
+            argThat(details -> loanId.toString().equals(details.get("loanId"))
+                && requestId.toString().equals(details.get("guarantorRequestId"))
+                && guarantorId.toString().equals(details.get("guarantorId"))
+                && "Savings committed elsewhere".equals(details.get("reasons")))
+        );
+    }
+
     private void stubActiveMemberBatchLookup(String saccoId) {
         when(memberRepository.findAllById(any())).thenAnswer(invocation -> {
             Iterable<UUID> ids = invocation.getArgument(0);

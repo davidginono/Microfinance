@@ -1989,6 +1989,21 @@ public class AppController {
         return "redirect:/app/loan-applications/" + loanId;
     }
 
+    @PostMapping("/loan-applications/{loanId}/guarantor-reversal-requests/{requestId}/reject")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_ASSIGN') and @authz.isLoanOwner(#loanId, principal)")
+    public String rejectGuarantorUndoRequest(@PathVariable UUID loanId,
+                                             @PathVariable UUID requestId,
+                                             @AuthenticationPrincipal AppUserPrincipal principal,
+                                             RedirectAttributes ra) {
+        try {
+            reversalRequestService.decideGuarantorUndo(requestId, principal.getMemberId(), false);
+            ra.addFlashAttribute("message", "Guarantor kept on this application.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + loanId;
+    }
+
     @GetMapping("/notifications")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'NOTIFICATIONS_VIEW')")
     public String notifications(@AuthenticationPrincipal AppUserPrincipal principal,

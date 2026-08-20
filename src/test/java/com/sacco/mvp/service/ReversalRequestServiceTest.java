@@ -19,7 +19,11 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -96,34 +100,48 @@ class ReversalRequestServiceTest {
     }
 
     @Test
-    void decideGuarantorUndoCannotBeDeclinedByApplicant() {
+    void decideGuarantorUndoCanBeDeclinedByApplicantAndNotifiesGuarantor() {
         UUID requestId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        UUID guarantorRequestId = UUID.randomUUID();
         ReversalRequest request = ReversalRequest.builder()
             .id(requestId)
             .saccoId("SACCO-A")
             .loanApplicationId(loanId)
-            .guarantorRequestId(UUID.randomUUID())
+            .guarantorRequestId(guarantorRequestId)
             .type(ReversalRequestType.GUARANTOR_DECISION_UNDO)
             .status(ReversalRequestStatus.PENDING)
-            .requesterMemberId(UUID.randomUUID())
+            .requesterMemberId(guarantorId)
             .approverMemberId(applicantId)
             .createdAt(OffsetDateTime.now())
             .build();
         LoanApplication app = LoanApplication.builder()
             .id(loanId)
             .saccoId("SACCO-A")
+            .stationId("ST01")
             .build();
 
         when(reversalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
         when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
 
-        assertThatThrownBy(() -> reversalRequestService.decideGuarantorUndo(requestId, applicantId, false))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Guarantor removal requests can only be approved by the applicant.");
+        reversalRequestService.decideGuarantorUndo(requestId, applicantId, false);
 
-        verify(reversalRequestRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verify(loanWorkflowService, never()).removeGuarantorFromLoan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThat(request.getStatus()).isEqualTo(ReversalRequestStatus.REJECTED);
+        assertThat(request.getDecidedByMemberId()).isEqualTo(applicantId);
+        verify(reversalRequestRepository).save(request);
+        verify(loanWorkflowService, never()).removeGuarantorFromLoan(any(), any());
+        verify(outboxService).enqueue(
+            eq("REVERSAL_REQUEST"),
+            eq(requestId),
+            eq("GUARANTOR_UNDO_REJECTED"),
+            eq(guarantorId),
+            eq(applicantId),
+            eq("SACCO-A"),
+            eq("ST01"),
+            argThat(details -> loanId.toString().equals(details.get("loanId"))
+                && requestId.toString().equals(details.get("reversalRequestId")))
+        );
     }
 }

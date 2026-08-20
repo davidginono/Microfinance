@@ -46,16 +46,23 @@ public class PlatformMailSenderFactory {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         mailSender.setHost(config.host());
         mailSender.setPort(config.port());
-        mailSender.setUsername(config.username());
-        mailSender.setPassword(config.password());
+        boolean authEnabled = !blank(config.username()) && !blank(config.password());
+        if (authEnabled) {
+            mailSender.setUsername(config.username());
+            mailSender.setPassword(config.password());
+        }
         Properties properties = mailSender.getJavaMailProperties();
         properties.put("mail.transport.protocol", "smtp");
-        properties.put("mail.smtp.auth", "true");
+        properties.put("mail.smtp.auth", Boolean.toString(authEnabled));
         properties.put("mail.smtp.ssl.enable", Boolean.toString(config.sslEnabled()));
         properties.put("mail.smtp.starttls.enable", Boolean.toString(config.starttlsEnabled()));
         properties.put("mail.smtp.connectiontimeout", Integer.toString(config.connectionTimeoutMs()));
         properties.put("mail.smtp.timeout", Integer.toString(config.readTimeoutMs()));
         properties.put("mail.smtp.writetimeout", Integer.toString(config.writeTimeoutMs()));
         return mailSender;
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 }

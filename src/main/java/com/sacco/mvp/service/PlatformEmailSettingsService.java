@@ -114,10 +114,6 @@ public class PlatformEmailSettingsService {
         if (enabled && normalizedHost.isBlank()) {
             throw new IllegalArgumentException("Enter SMTP host.");
         }
-        if (enabled && normalizedUsername.isBlank()) {
-            throw new IllegalArgumentException("Enter SMTP username.");
-        }
-
         PlatformEmailSettings settings = settings();
         Map<String, Object> before = snapshot(settings);
         settings.setEnabled(enabled);
@@ -133,8 +129,6 @@ public class PlatformEmailSettingsService {
         settings.setWriteTimeoutMs(writeTimeoutMs);
         if (password != null && !password.isBlank()) {
             settings.setPasswordEncrypted(secretProtectionService.encrypt(password));
-        } else if (enabled && !settings.hasStoredPassword() && blank(envPassword)) {
-            throw new IllegalArgumentException("Enter the SMTP password before enabling email delivery.");
         }
         settings.setUpdatedByMemberId(actorMemberId);
         settings.setUpdatedAt(OffsetDateTime.now());
@@ -287,7 +281,9 @@ public class PlatformEmailSettingsService {
         int connectionTimeoutMs = usingDatabase ? settings.getConnectionTimeoutMs() : envConnectionTimeoutMs;
         int readTimeoutMs = usingDatabase ? settings.getReadTimeoutMs() : envReadTimeoutMs;
         int writeTimeoutMs = usingDatabase ? settings.getWriteTimeoutMs() : envWriteTimeoutMs;
-        boolean configured = !host.isBlank() && !username.isBlank() && !password.isBlank();
+        boolean configured = usingDatabase
+            ? !host.isBlank() && !fromAddress.isBlank()
+            : !host.isBlank() && !username.isBlank() && !password.isBlank();
         boolean sendEnabled = (usingDatabase ? settings.isEnabled() : hasEnvConfiguration()) && configured;
         return new ResolvedEmailConfig(
             sendEnabled,

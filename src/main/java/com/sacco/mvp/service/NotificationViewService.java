@@ -234,6 +234,8 @@ public class NotificationViewService {
             case "LOAN_READY_FOR_DISBURSEMENT" -> "Disbursement Assigned";
             case "LOAN_GUARANTORS_APPROVED" -> "All Guarantors Approved";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "Guarantor Request";
+            case "GUARANTOR_REQUEST_APPROVED" -> "Guarantor Request Approved";
+            case "GUARANTOR_REQUEST_REJECTED" -> "Guarantor Request Rejected";
             case "BOARD_REVIEW_ASSIGNED" -> "Board Review Assigned";
             case "GUARANTOR_UNDO_REQUESTED" -> "Guarantor Removal Requested";
             case "GUARANTOR_UNDO_APPROVED" -> "Guarantor Removal Approved";
@@ -277,6 +279,13 @@ public class NotificationViewService {
             case "LOAN_READY_FOR_DISBURSEMENT" -> "A loan application is ready for disbursement.";
             case "LOAN_GUARANTORS_APPROVED" -> "All selected guarantors have approved your application. Submit it now to continue the review workflow.";
             case "GUARANTOR_REQUEST_ASSIGNED" -> "You have a new guarantor request waiting for a decision.";
+            case "GUARANTOR_REQUEST_APPROVED" -> "A selected guarantor approved your guarantee request.";
+            case "GUARANTOR_REQUEST_REJECTED" -> {
+                String reasons = stringValue(details.get("reasons"));
+                yield reasons.isBlank()
+                    ? "A selected guarantor rejected your guarantee request."
+                    : "A selected guarantor rejected your guarantee request. Reason: " + reasons;
+            }
             case "BOARD_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for board review.";
             case "CHAIRPERSON_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for chairperson review.";
             case "CREDIT_COMMITTEE_REVIEW_ASSIGNED" -> "A loan application has been assigned to you for credit committee review.";

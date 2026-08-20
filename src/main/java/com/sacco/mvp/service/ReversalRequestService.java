@@ -137,25 +137,38 @@ public class ReversalRequestService {
         LoanApplication app = loanApplicationRepository.findById(reversalRequest.getLoanApplicationId())
             .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
 
-        if (!approve) {
-            throw new IllegalStateException("Guarantor removal requests can only be approved by the applicant.");
+        if (approve) {
+            loanWorkflowService.removeGuarantorFromLoan(reversalRequest.getGuarantorRequestId(), reversalRequest.getRequesterMemberId());
+            reversalRequest.setStatus(ReversalRequestStatus.APPROVED);
+            outboxService.enqueue(
+                "REVERSAL_REQUEST",
+                reversalRequest.getId(),
+                "GUARANTOR_UNDO_APPROVED",
+                reversalRequest.getRequesterMemberId(),
+                applicantMemberId,
+                app.getSaccoId(),
+                app.getStationId(),
+                Map.of(
+                    "loanId", reversalRequest.getLoanApplicationId().toString(),
+                    "reversalRequestId", reversalRequest.getId().toString()
+                )
+            );
+        } else {
+            reversalRequest.setStatus(ReversalRequestStatus.REJECTED);
+            outboxService.enqueue(
+                "REVERSAL_REQUEST",
+                reversalRequest.getId(),
+                "GUARANTOR_UNDO_REJECTED",
+                reversalRequest.getRequesterMemberId(),
+                applicantMemberId,
+                app.getSaccoId(),
+                app.getStationId(),
+                Map.of(
+                    "loanId", reversalRequest.getLoanApplicationId().toString(),
+                    "reversalRequestId", reversalRequest.getId().toString()
+                )
+            );
         }
-
-        loanWorkflowService.removeGuarantorFromLoan(reversalRequest.getGuarantorRequestId(), reversalRequest.getRequesterMemberId());
-        reversalRequest.setStatus(ReversalRequestStatus.APPROVED);
-        outboxService.enqueue(
-            "REVERSAL_REQUEST",
-            reversalRequest.getId(),
-            "GUARANTOR_UNDO_APPROVED",
-            reversalRequest.getRequesterMemberId(),
-            applicantMemberId,
-            app.getSaccoId(),
-            app.getStationId(),
-            Map.of(
-                "loanId", reversalRequest.getLoanApplicationId().toString(),
-                "reversalRequestId", reversalRequest.getId().toString()
-            )
-        );
         reversalRequest.setDecidedByMemberId(applicantMemberId);
         reversalRequest.setDecidedAt(OffsetDateTime.now());
         reversalRequestRepository.save(reversalRequest);
@@ -204,6 +217,7 @@ public class ReversalRequestService {
                 app.getSaccoId(),
                 app.getStationId(),
                 Map.of(
+                    "loanId", reversalRequest.getLoanApplicationId().toString(),
                     "reversalRequestId", reversalRequest.getId().toString()
                 )
             );

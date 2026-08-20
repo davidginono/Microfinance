@@ -69,6 +69,56 @@ class LoanNotificationFormatterTest {
     }
 
     @Test
+    void formatsGuarantorRequestAssignedContent() throws Exception {
+        UUID loanId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        LoanApplicationRepository loanRepository = mock(LoanApplicationRepository.class);
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        LoanNotificationFormatter formatter = formatter(loanRepository, memberRepository);
+        when(loanRepository.findById(loanId)).thenReturn(Optional.of(loan(loanId, applicantId, LoanStatus.AWAITING_GUARANTORS)));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(applicant(applicantId)));
+
+        NotificationDeliveryService.DeliveryContent content = formatter.format(
+            event("GUARANTOR_REQUEST", requestId, "GUARANTOR_REQUEST_ASSIGNED"),
+            payload("{\"actorId\":\"" + applicantId + "\",\"recipientId\":\"" + guarantorId
+                + "\",\"details\":{\"loanId\":\"" + loanId + "\"}}"),
+            NotificationDeliveryService.DeliveryContent.plain("Fallback", "Fallback body")
+        );
+
+        assertThat(content.subject()).isEqualTo("New guarantor request");
+        assertThat(content.plainText()).contains("New Guarantor Request", "Applicant: Grace Member (MEM-42)");
+        assertThat(content.smsText()).contains("https://sacco.example/app/guarantee-requests");
+        assertThat(content.html()).contains("New Guarantor Request", "View Loan Details");
+    }
+
+    @Test
+    void formatsGuarantorRequestRejectedContentWithReason() throws Exception {
+        UUID loanId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        LoanApplicationRepository loanRepository = mock(LoanApplicationRepository.class);
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        LoanNotificationFormatter formatter = formatter(loanRepository, memberRepository);
+        when(loanRepository.findById(loanId)).thenReturn(Optional.of(loan(loanId, applicantId, LoanStatus.AWAITING_GUARANTORS)));
+        when(memberRepository.findById(guarantorId)).thenReturn(Optional.of(guarantor(guarantorId)));
+
+        NotificationDeliveryService.DeliveryContent content = formatter.format(
+            event("GUARANTOR_REQUEST", requestId, "GUARANTOR_REQUEST_REJECTED"),
+            payload("{\"actorId\":\"" + guarantorId + "\",\"recipientId\":\"" + applicantId
+                + "\",\"details\":{\"loanId\":\"" + loanId + "\",\"reasons\":\"Savings committed elsewhere\"}}"),
+            NotificationDeliveryService.DeliveryContent.plain("Fallback", "Fallback body")
+        );
+
+        assertThat(content.subject()).isEqualTo("Guarantor request rejected");
+        assertThat(content.plainText()).contains("Guarantor Request Rejected", "Guarantor: Peter Guarantor (GUA-7)");
+        assertThat(content.plainText()).contains("Reason: Savings committed elsewhere");
+        assertThat(content.smsText()).contains("https://sacco.example/app/loan-applications/" + loanId);
+    }
+
+    @Test
     void missingLoanUsesFallbackContent() throws Exception {
         UUID loanId = UUID.randomUUID();
         LoanApplicationRepository loanRepository = mock(LoanApplicationRepository.class);
@@ -95,10 +145,14 @@ class LoanNotificationFormatterTest {
     }
 
     private OutboxEvent event(UUID loanId, String eventType) {
+        return event("LOAN", loanId, eventType);
+    }
+
+    private OutboxEvent event(String aggregateType, UUID aggregateId, String eventType) {
         return OutboxEvent.builder()
             .id(UUID.randomUUID())
-            .aggregateType("LOAN")
-            .aggregateId(loanId)
+            .aggregateType(aggregateType)
+            .aggregateId(aggregateId)
             .eventType(eventType)
             .payload("{}")
             .createdAt(OffsetDateTime.now())
@@ -125,6 +179,14 @@ class LoanNotificationFormatterTest {
             .id(applicantId)
             .memberNo("MEM-42")
             .fullName("Grace Member")
+            .build();
+    }
+
+    private Member guarantor(UUID guarantorId) {
+        return Member.builder()
+            .id(guarantorId)
+            .memberNo("GUA-7")
+            .fullName("Peter Guarantor")
             .build();
     }
 }

@@ -157,6 +157,19 @@ public class NotificationInboxService {
         String applicationId = resolveApplicationId(details, notification.getRecipientMemberId());
         String incidentId = stringValue(details.get("incidentId"));
 
+        if (notification.getType() != null && notification.getType().startsWith("GUARANTOR_UNDO_")) {
+            return "GUARANTOR_UNDO_REQUESTED".equals(notification.getType())
+                ? memberLoanTarget(applicationId, defaultTarget)
+                : "/app/guarantee-requests";
+        }
+        if ("GUARANTOR_REQUEST_ASSIGNED".equals(notification.getType())) {
+            return "/app/guarantee-requests";
+        }
+        if ("GUARANTOR_REQUEST_APPROVED".equals(notification.getType())
+            || "GUARANTOR_REQUEST_REJECTED".equals(notification.getType())) {
+            return memberLoanTarget(applicationId, defaultTarget);
+        }
+
         if ((principal.isPlatformIdentity() || principal.isWorkspaceAdminScope())
             && "SUPPORT_MESSAGE".equals(notification.getType())
             && !incidentId.isBlank()) {
@@ -192,6 +205,12 @@ public class NotificationInboxService {
             }
         }
         return defaultTarget;
+    }
+
+    private String memberLoanTarget(String applicationId, String defaultTarget) {
+        return applicationId == null || applicationId.isBlank()
+            ? defaultTarget
+            : "/app/loan-applications/" + applicationId;
     }
 
     private String resolveApplicationId(Map<String, Object> details, UUID recipientMemberId) {

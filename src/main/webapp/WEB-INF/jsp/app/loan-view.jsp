@@ -549,6 +549,14 @@
                                             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                             <button type="submit" class="app-btn btn-primary"><spring:message code="loan.guarantorRemoval.approve" text="Approve Removal" /></button>
                                         </form>
+                                        <form action="/app/loan-applications/${app.id}/guarantor-reversal-requests/${pendingUndo.id}/reject"
+                                              method="post"
+                                              data-confirm-title="Keep Guarantor"
+                                              data-confirm-message="Decline this request and keep the guarantor on this application?"
+                                              data-confirm-proceed="Keep Guarantor">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                                            <button type="submit" class="app-btn btn-neutral"><spring:message code="loan.guarantorRemoval.keep" text="Keep Guarantor" /></button>
+                                        </form>
                             </div>
                             </div>
                             </c:when>

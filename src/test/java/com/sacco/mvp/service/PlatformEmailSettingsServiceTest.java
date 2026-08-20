@@ -165,16 +165,23 @@ class PlatformEmailSettingsServiceTest {
     }
 
     @Test
-    void rejectsEnableWithoutPassword() {
+    void allowsUnauthenticatedSmtpForMailpit() {
         PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
         when(repository.findById(PlatformEmailSettings.DEFAULT_ID)).thenReturn(Optional.of(existingSettings()));
+        when(repository.save(any(PlatformEmailSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
         PlatformEmailSettingsService service = service(repository, secretService(), factoryProvider());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            service.updateSettings(true, "smtp.example.com", 465, "mailer", "", "alerts@example.com", "",
-                true, false, 10_000, 10_000, 10_000, UUID.randomUUID()));
+        PlatformEmailSettings saved = service.updateSettings(true, "localhost", 1025, "", "", "alerts@example.com", "",
+            false, false, 10_000, 10_000, 10_000, UUID.randomUUID());
+        PlatformEmailSettingsService.ResolvedEmailConfig config = service.resolvedConfig();
 
-        assertEquals("Enter the SMTP password before enabling email delivery.", ex.getMessage());
+        assertEquals("", saved.getUsername());
+        assertEquals("", saved.getPasswordEncrypted());
+        assertTrue(config.enabled());
+        assertTrue(config.configured());
+        assertEquals("localhost", config.host());
+        assertEquals(1025, config.port());
+        assertEquals("alerts@example.com", config.fromAddress());
     }
 
     @Test

@@ -853,7 +853,23 @@ public class LoanWorkflowService {
         guarantorRequestRepository.save(request);
         evaluateReadiness(request.getLoanApplicationId());
         loanApplicationRepository.findById(request.getLoanApplicationId())
-            .ifPresent(app -> auditLoan(app, guarantorId, "GUARANTOR_REQUEST_APPROVED", "Guarantor request approved"));
+            .ifPresent(app -> {
+                outboxService.enqueue(
+                    "GUARANTOR_REQUEST",
+                    request.getId(),
+                    "GUARANTOR_REQUEST_APPROVED",
+                    app.getApplicantMemberId(),
+                    guarantorId,
+                    app.getSaccoId(),
+                    app.getStationId(),
+                    Map.of(
+                        "loanId", app.getId().toString(),
+                        "guarantorRequestId", request.getId().toString(),
+                        "guarantorId", guarantorId.toString()
+                    )
+                );
+                auditLoan(app, guarantorId, "GUARANTOR_REQUEST_APPROVED", "Guarantor request approved");
+            });
     }
 
     @Transactional
@@ -875,7 +891,24 @@ public class LoanWorkflowService {
         guarantorRequestRepository.save(request);
         evaluateReadiness(request.getLoanApplicationId());
         loanApplicationRepository.findById(request.getLoanApplicationId())
-            .ifPresent(app -> auditLoan(app, guarantorId, "GUARANTOR_REQUEST_REJECTED", "Guarantor request rejected"));
+            .ifPresent(app -> {
+                outboxService.enqueue(
+                    "GUARANTOR_REQUEST",
+                    request.getId(),
+                    "GUARANTOR_REQUEST_REJECTED",
+                    app.getApplicantMemberId(),
+                    guarantorId,
+                    app.getSaccoId(),
+                    app.getStationId(),
+                    Map.of(
+                        "loanId", app.getId().toString(),
+                        "guarantorRequestId", request.getId().toString(),
+                        "guarantorId", guarantorId.toString(),
+                        "reasons", normalizedReason
+                    )
+                );
+                auditLoan(app, guarantorId, "GUARANTOR_REQUEST_REJECTED", "Guarantor request rejected");
+            });
     }
 
     @Transactional
@@ -1251,9 +1284,12 @@ public class LoanWorkflowService {
             guarantorRequestRepository.save(request);
 
             if (!isDirectOtpGuarantorApproval(app)) {
-                outboxService.enqueue("GUARANTOR_REQUEST", app.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
+                outboxService.enqueue("GUARANTOR_REQUEST", request.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
                     applicantId, app.getSaccoId(), app.getStationId(),
-                    Map.of("loanId", app.getId().toString()));
+                    Map.of(
+                        "loanId", app.getId().toString(),
+                        "guarantorRequestId", request.getId().toString()
+                    ));
             }
         }
     }
