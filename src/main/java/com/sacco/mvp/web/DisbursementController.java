@@ -301,7 +301,7 @@ public class DisbursementController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", loan.getStatus() == LoanStatus.PAID ? formatMoney(BigDecimal.ZERO) : formatMoney(loan.getAmount()));
+                row.put("outstandingBalance", formatMoney(loanPresentationService.activeLoanOutstandingBalance(loan)));
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -314,8 +314,7 @@ public class DisbursementController {
         model.addAttribute("activeApplicantLoanCount", activeApplicantLoans.size());
         model.addAttribute("activeApplicantLoanTotalAmount", formatMoney(
             activeApplicantLoans.stream()
-                .map(LoanApplication::getAmount)
-                .filter(Objects::nonNull)
+                .map(loanPresentationService::activeLoanOutstandingBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("reviewBasePath", "/disbursement");
         model.addAttribute("reviewPanelBreadcrumb", message("review.disbursement.breadcrumb"));

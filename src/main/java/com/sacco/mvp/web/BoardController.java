@@ -45,7 +45,6 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.List;
@@ -297,7 +296,7 @@ public class BoardController {
                 row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
                 row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
                 row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", loan.getStatus() == LoanStatus.PAID ? formatMoney(BigDecimal.ZERO) : formatMoney(loan.getAmount()));
+                row.put("outstandingBalance", formatMoney(loanPresentationService.activeLoanOutstandingBalance(loan)));
                 row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
                     ? "Standard schedule"
                     : humanizeEnum(loan.getRepaymentFrequency().name()));
@@ -310,8 +309,7 @@ public class BoardController {
         model.addAttribute("activeApplicantLoanCount", activeApplicantLoans.size());
         model.addAttribute("activeApplicantLoanTotalAmount", formatMoney(
             activeApplicantLoans.stream()
-                .map(LoanApplication::getAmount)
-                .filter(Objects::nonNull)
+                .map(loanPresentationService::activeLoanOutstandingBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)));
         model.addAttribute("previousApprovedReviews",
             loanPresentationService.previousApprovedReviews(app, myReview.getReviewStage()));
