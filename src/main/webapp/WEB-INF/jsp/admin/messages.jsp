@@ -9,8 +9,8 @@
     <h1 class="erp-page-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
 </div>
 
-<section class="erp-form-wrap">
-<form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2 aws-filter-toolbar" data-aws-filter-toolbar>
+<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <form action="/admin/messages" method="get" class="admin-filter-form grid gap-3 md:grid-cols-2 aws-filter-toolbar" data-aws-filter-toolbar>
         <div>
             <label class="mb-1 block text-sm font-semibold text-slate-700"><spring:message code="common.status" text="Status" /></label>
             <select name="status" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none">
@@ -25,9 +25,6 @@
             <a href="/admin/messages" class="app-btn btn-neutral"><spring:message code="common.clear" text="Clear" /></a>
         </div>
     </form>
-</section>
-
-<section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>
