@@ -1,0 +1,76 @@
+services:
+  app:
+    build:
+      context: .
+      target: final
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 1150m
+    cpus: "1.25"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-sacco}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sacco}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      APP_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL}
+      APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:-}
+      APP_UPLOADS_FILES_ROOT: /var/lib/saccos-lms/uploads
+      APP_SACCOS_FILES_ROOT: /var/lib/saccos-lms/saccos
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-465}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - app-uploads:/var/lib/saccos-lms/uploads
+      - app-saccos:/var/lib/saccos-lms/saccos
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: "0.6"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sacco}
+      POSTGRES_USER: ${POSTGRES_USER:-sacco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=96MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - wal_buffers=4MB
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sacco} -d ${POSTGRES_DB:-sacco}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"
+
+volumes:
+  db-data:
+  app-uploads:
+  app-saccos:

@@ -1,74 +1,51 @@
-# Docker and small EC2
+# Docker: 20 concurrent users, lowest AWS cost
 
-## Local compose
+This app needs a JVM, JSP, Hibernate, PostgreSQL, and occasional PDF/Excel. Twenty people using it at once is a **2 GB ARM box** with the database on that same host. Smaller than 2 GB OOMs on export. RDS, load balancers, and a 4 GB instance are extra cost, not extra capability at this size.
 
-Start the application, PostgreSQL, and Mailpit together:
+## Cheapest complete host
+
+**Amazon Lightsail Linux 2 GB (2 vCPU, 60 GB disk, public IPv4)** in us-east-1: **$12/month**, about **TSh 380,000/year**.
+
+That is the cost floor for this app. Do not go below 2 GB or TSh 380,000/year. Stay inside **TSh 500,000/year** (~$189): leftover covers a domain and snapshots, not a second instance or RDS.
+
+Do not use:
+
+- t4g.nano / Lightsail 512 MB — JVM will not start usefully
+- t4g.micro / Lightsail 1 GB — pages may work until one Excel export
+- RDS + a tiny app host — RDS alone is ~$12/month, so you pay twice and get less RAM for the app
+- T4g CPU credits **unlimited** — surplus credits can exceed the instance price
+
+Put **Cloudflare (free)** in front for HTTPS and static `/css` `/js` `/images` caching. Keep EC2/Lightsail CPU credit mode on **standard**.
+
+## Production compose
+
+Colocates the app (~1150 MB) and Postgres (~512 MB):
 
 ```bash
-docker compose up --build
+export POSTGRES_PASSWORD='...'
+export APP_BASE_URL='https://your-domain.example'
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Services:
-
-- app on port `8080`
-- PostgreSQL on port `5432`
-- Mailpit SMTP on `1025` and inbox UI on `8025`
-
-Local compose keeps the `dev` profile so HTTP session cookies work. The image itself defaults to `prod`.
-
-## Production image
+Build ARM when the host is Graviton or Lightsail ARM:
 
 ```bash
 docker build --platform linux/arm64 -t sacco-lms .
 ```
 
-Use `linux/arm64` for Graviton (`t4g`). Use `linux/amd64` only if the host is Intel/AMD.
+Runtime caps for 20 concurrent users:
 
-The image:
+- Tomcat **24** threads, **50** connections
+- Hikari **8** (Postgres `max_connections=30`)
+- Serial GC, **55%** of the app cgroup as heap
+- one PDF/Excel export at a time
 
-- builds a custom JRE with `jlink`
-- activates the `prod` profile
-- listens on `8080`
-- uses Serial GC and a 65% RAM heap cap
-- caps Tomcat at 32 threads and Hikari at 6 connections
-- allows one PDF/Excel export at a time
-- exposes `/actuator/health` for the container health check
+Postgres is not published on the public interface. Open only `8080` (or 443 on Cloudflare) to the internet.
 
-Point the container at PostgreSQL with `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. Do not run Postgres in the same process or on the cheapest app instance.
+Local development is unchanged: `docker compose up --build` (dev profile, Mailpit).
 
-## Smallest honest EC2 size
+## What 20 concurrent users means
 
-This is a Spring MVC + JSP + Hibernate app with on-request PDF/Excel. Heap, metaspace, Tomcat native threads, and one export already need about 1.2–1.6 GB RSS.
+Twenty logged-in people clicking at the same time, not 1,000 requests/second. Short service transactions (`open-in-view: false`) so eight database connections are enough; extra requests wait a few milliseconds instead of holding RAM.
 
-| Topology | Smallest practical size | Why |
-| --- | --- | --- |
-| App container only, Postgres on RDS or another host | **t4g.small (2 vCPU, 2 GB)** | Fits Serial GC + 32 Tomcat threads + one export |
-| App + Postgres on one box | **t4g.medium (2 vCPU, 4 GB)** | Postgres shared buffers and the JVM cannot share 2 GB safely |
-| t4g.micro (1 GB) | Not for production | Can boot with a tiny heap, but one Excel export can OOM |
-| t4g.nano (0.5 GB) | Not viable | Below JVM + Alpine + JSP baseline |
-
-Prefer **t4g** over **t3**: same burst family, lower price, and the ARM image above runs natively.
-
-Approximate us-east-1 Linux On-Demand (Aug 2026): t4g.small ~$12/month, t4g.medium ~$24/month. RDS is a separate bill and is still cheaper than upsizing EC2 enough to colocate Postgres.
-
-This instance size is a cost floor, not a 1,000 RPS path. Sustained high throughput needs more heap, more Tomcat threads, and a larger connection pool than a 2 GB box can hold.
-
-## Required production environment
-
-```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://<rds-host>:5432/sacco
-SPRING_DATASOURCE_USERNAME=sacco
-SPRING_DATASOURCE_PASSWORD=...
-APP_BASE_URL=https://your-domain.example
-APP_SECRETS_ENCRYPTION_KEY=...
-SERVER_SERVLET_SESSION_COOKIE_SECURE=true
-```
-
-Optional overrides if you later move to a larger instance:
-
-```bash
-SERVER_TOMCAT_THREADS_MAX=80
-SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
-APP_REPORTS_MAX_CONCURRENT_EXPORTS=2
-JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError
-```
+If you later split Postgres off-box, raise the app cgroup and `MaxRAMPercentage` — do not shrink the host below 2 GB while exports stay on the request thread.

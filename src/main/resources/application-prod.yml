@@ -12,7 +12,7 @@ spring:
         period: 7d
   datasource:
     hikari:
-      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:6}
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:8}
       minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
   servlet:
     multipart:
@@ -23,10 +23,10 @@ server:
   port: ${SERVER_PORT:8080}
   tomcat:
     threads:
-      max: ${SERVER_TOMCAT_THREADS_MAX:32}
+      max: ${SERVER_TOMCAT_THREADS_MAX:24}
       min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:2}
-    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:200}
-    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:25}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:50}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:20}
   servlet:
     session:
       cookie:

@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-# Sized for a 2 GB Graviton host (t4g.small) with PostgreSQL off-box.
-# Build ARM images for t4g with: docker build --platform linux/arm64 -t sacco-lms .
+# Sized for 20 concurrent users on a 2 GB ARM host with Postgres colocated.
+# The JVM assumes a ~1.15g cgroup (see docker-compose.prod.yml).
+# Build ARM images with: docker build --platform linux/arm64 -t sacco-lms .
 
 FROM maven:3.9.11-eclipse-temurin-25 AS build
 
@@ -38,13 +39,13 @@ ENV JAVA_HOME=/opt/java/openjdk \
     TZ=Africa/Nairobi \
     SPRING_PROFILES_ACTIVE=prod \
     SERVER_PORT=8080 \
-    JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:MaxRAMPercentage=65.0 -XX:InitialRAMPercentage=15.0 -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=64m -Xss512k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom" \
+    JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:MaxRAMPercentage=55.0 -XX:InitialRAMPercentage=10.0 -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=48m -Xss512k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom" \
     SERVER_FORWARD_HEADERS_STRATEGY=native \
-    SERVER_TOMCAT_THREADS_MAX=32 \
+    SERVER_TOMCAT_THREADS_MAX=24 \
     SERVER_TOMCAT_THREADS_MIN_SPARE=2 \
-    SERVER_TOMCAT_MAX_CONNECTIONS=200 \
-    SERVER_TOMCAT_ACCEPT_COUNT=25 \
-    SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=6 \
+    SERVER_TOMCAT_MAX_CONNECTIONS=50 \
+    SERVER_TOMCAT_ACCEPT_COUNT=20 \
+    SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=8 \
     SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1 \
     SPRING_DEVTOOLS_RESTART_ENABLED=false \
     SPRING_DEVTOOLS_LIVERELOAD_ENABLED=false \

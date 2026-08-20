@@ -236,8 +236,9 @@ APP_SEED_DEMO_DATA_ENABLED=true
 This repository includes:
 
 - `Dockerfile`
-- `docker-compose.yml`
-- `README.Docker.md` for small-EC2 sizing and production image flags
+- `docker-compose.yml` (local)
+- `docker-compose.prod.yml` (20 concurrent users, app + Postgres on one 2 GB host)
+- `README.Docker.md` for the lowest-cost AWS layout
 
 Start the application and PostgreSQL together with:
 
@@ -251,7 +252,7 @@ Default compose services:
 - PostgreSQL on port `5432`
 - Mailpit SMTP on port `1025` and inbox UI on port `8025`
 
-For the smallest practical production host, run the ARM image on **t4g.small (2 GB)** with PostgreSQL off-box. See `README.Docker.md`. Do not colocate Postgres on a 2 GB instance, and do not use t4g.nano or t4g.micro for this app.
+For 20 people using the app at once, host on **Lightsail 2 GB / t4g.small** (~TSh 380,000/year) with Postgres on the same box. See `README.Docker.md`. That is the cost floor; do not use a 1 GB instance.
 
 ## Important Routes
 

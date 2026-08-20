@@ -9,23 +9,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ContainerSmallInstanceContractTest {
     @Test
-    void containerRuntimeIsSizedForASmallOffBoxDatabaseInstance() throws Exception {
+    void containerRuntimeIsSizedForTwentyConcurrentUsersOnOneSmallHost() throws Exception {
         String dockerfile = Files.readString(Path.of("Dockerfile"));
         String prod = Files.readString(Path.of("src/main/resources/application-prod.yml"));
         String security = Files.readString(Path.of("src/main/java/com/sacco/mvp/config/SecurityConfig.java"));
         String compose = Files.readString(Path.of("docker-compose.yml"));
+        String prodCompose = Files.readString(Path.of("docker-compose.prod.yml"));
 
         assertThat(dockerfile)
             .contains("SPRING_PROFILES_ACTIVE=prod")
             .contains("SERVER_PORT=8080")
             .contains("-XX:+UseSerialGC")
-            .contains("SERVER_TOMCAT_THREADS_MAX=32")
-            .contains("SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=6")
+            .contains("MaxRAMPercentage=55.0")
+            .contains("SERVER_TOMCAT_THREADS_MAX=24")
+            .contains("SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=8")
             .contains("HEALTHCHECK")
             .contains("/actuator/health");
         assertThat(prod)
-            .contains("maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:6}")
-            .contains("max: ${SERVER_TOMCAT_THREADS_MAX:32}")
+            .contains("maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:8}")
+            .contains("max: ${SERVER_TOMCAT_THREADS_MAX:24}")
             .contains("max-concurrent-exports: ${APP_REPORTS_MAX_CONCURRENT_EXPORTS:1}")
             .contains("local-dev-minor-admin-password-login-enabled: false")
             .contains("include: health");
@@ -33,5 +35,11 @@ class ContainerSmallInstanceContractTest {
         assertThat(compose)
             .contains("SERVER_PORT: 8080")
             .contains("SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}");
+        assertThat(prodCompose)
+            .contains("mem_limit: 1150m")
+            .contains("mem_limit: 512m")
+            .contains("max_connections=30")
+            .contains("shared_buffers=96MB")
+            .doesNotContain("mailpit");
     }
 }
