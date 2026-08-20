@@ -2312,7 +2312,12 @@ body.aws-console {
 .aws-console .admin-filter-form:has(.neo-select--open),
 .aws-console .erp-filter-form:has(.neo-select--open),
 .aws-console .staff-analytics-filter:has(.neo-select--open),
-.aws-console .loan-analytics-filter:has(.neo-select--open) {
+.aws-console .loan-analytics-filter:has(.neo-select--open),
+.aws-console .aws-settings-panel:has(.neo-select--open),
+.aws-console .aws-settings-form:has(.neo-select--open),
+.aws-console .aws-settings-control-row:has(.neo-select--open),
+.aws-console .aws-settings-field:has(.neo-select--open),
+.aws-console .erp-panel:has(.neo-select--open) {
     overflow: visible !important;
 }
 
@@ -3699,6 +3704,12 @@ body.aws-console,
 .aws-settings-panel {
     width: 100%;
     max-width: 100%;
+    overflow: visible;
+}
+
+.aws-settings-panel--compact {
+    width: min(100%, 36rem);
+    max-width: 36rem;
 }
 
 .aws-settings-header {
@@ -4661,7 +4672,7 @@ body.aws-console,
     margin: 0 8px !important;
     background: #17242a !important;
     box-shadow: inset 3px 0 0 #52606b !important;
-    padding: 4px 0 4px 24px !important;
+    padding: 4px 6px 4px 10px !important;
 }
 
 .shell-sidebar-group > div > a {
@@ -5239,30 +5250,64 @@ body.aws-console,
 
 /* Sidebar submenu hierarchy: calm teal surface, clear hover, and warm active state. */
 .shell-sidebar-group > div {
+    box-sizing: border-box;
+    max-width: calc(100% - 16px);
+    margin: 0 8px !important;
     border: 0 !important;
     border-radius: 2px !important;
     background: #182229 !important;
     box-shadow: none !important;
-    padding: 4px 0 4px 28px !important;
+    padding: 4px 4px 4px 12px !important;
+    overflow: visible !important;
 }
 
 .shell-sidebar-group > div > a {
     position: relative;
     display: flex !important;
     align-items: center;
-    width: 100% !important;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     min-height: 34px !important;
     margin: 0 !important;
-    border: 1px solid transparent !important;
+    border: 0 !important;
     border-left: 3px solid transparent !important;
     border-radius: 2px !important;
     padding: 6px 8px !important;
+    overflow: visible !important;
     color: #c4ced4 !important;
     font-size: 13px !important;
     font-weight: 600 !important;
     line-height: 18px !important;
     text-decoration: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
     transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.shell-sidebar-group > div > a > .shell-sidebar-subitem-label,
+.shell-sidebar-scroll a.shell-sidebar-subitem > span:first-child,
+.shell-sidebar-scroll a.shell-sidebar-subitem > .shell-sidebar-subitem-label {
+    display: inline-block;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    color: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: inherit !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
 }
 
 .shell-sidebar-group > div > a:hover {
@@ -5281,17 +5326,17 @@ body.aws-console,
 }
 
 .shell-sidebar-group > div > a.shell-nav-active {
-    border-color: #50616d !important;
-    border-left-color: transparent !important;
+    border: 0 !important;
+    border-left: 3px solid #ec7211 !important;
     background: #25313a !important;
-    color: #c4ced4 !important;
+    color: #ffffff !important;
     font-weight: 700 !important;
     box-shadow: none !important;
 }
 
 .shell-sidebar-group > div > a.shell-nav-active:hover,
 .shell-sidebar-group > div > a.shell-nav-active:focus-visible {
-    border-color: #50616d !important;
+    border-color: transparent !important;
     border-left-color: #ec7211 !important;
     background: #34434d !important;
     color: #ffffff !important;

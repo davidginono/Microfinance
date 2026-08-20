@@ -42,6 +42,15 @@ class SidebarWorkspaceFilterTest {
             "@access.canAccessAccountantArea(principal)",
             "@access.canAccessDisbursementArea(principal)"
         );
+        assertThat(sidebar).contains(
+            "id=\"staffSettingsPanel\"",
+            "href=\"/staff/settings\"",
+            "shell-sidebar-subitem",
+            "shell-sidebar-subitem-label",
+            "menu.settings.language",
+            "Language &amp; Preferences"
+        );
+        assertThat(sidebar).contains("/staff/settings' ? 'shell-nav-active");
     }
 
     private String sidebarFragment() throws IOException {

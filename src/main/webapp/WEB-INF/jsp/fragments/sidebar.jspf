@@ -76,8 +76,10 @@
                             </svg>
                         </button>
                         <div id="memberSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                            <a href="/app/settings" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/settings' and param.section ne 'payment-details' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                                <spring:message code="menu.settings.language" text="Language & Preferences" />
+                            <a href="/app/settings"
+                               class="shell-sidebar-subitem ${requestUri eq '/app/settings' and param.section ne 'payment-details' ? 'shell-nav-active' : ''}"
+                               <c:if test="${requestUri eq '/app/settings' and param.section ne 'payment-details'}">aria-current="page"</c:if>>
+                                <span class="shell-sidebar-subitem-label"><spring:message code="menu.settings.language" text="Language &amp; Preferences" /></span>
                             </a>
                             <a href="/app/settings?section=payment-details#payment-details" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/app/settings' and param.section eq 'payment-details' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
                                 <spring:message code="menu.settings.paymentDetails" text="Financial Details for Disbursement Deposit" />
@@ -400,11 +402,15 @@
                         </svg>
                     </button>
                     <div id="staffSettingsPanel" class="mt-1 hidden space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                        <a href="/staff/settings" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/staff/settings' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                            <spring:message code="menu.settings.language" text="Language & Preferences" />
+                        <a href="/staff/settings"
+                           class="shell-sidebar-subitem ${requestUri eq '/staff/settings' ? 'shell-nav-active' : ''}"
+                           <c:if test="${requestUri eq '/staff/settings'}">aria-current="page"</c:if>>
+                            <span class="shell-sidebar-subitem-label"><spring:message code="menu.settings.language" text="Language &amp; Preferences" /></span>
                         </a>
-                        <a href="/profile" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/profile' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-                            <spring:message code="menu.profile" text="Profile" />
+                        <a href="/profile"
+                           class="shell-sidebar-subitem ${requestUri eq '/profile' ? 'shell-nav-active' : ''}"
+                           <c:if test="${requestUri eq '/profile'}">aria-current="page"</c:if>>
+                            <span class="shell-sidebar-subitem-label"><spring:message code="menu.profile" text="Profile" /></span>
                         </a>
                     </div>
                 </div>

@@ -16,23 +16,23 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'language'}">
-    <section class="erp-panel overflow-hidden">
-        <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.language.eyebrow" text="Language Settings" /></p>
-            <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.language.title" text="Workspace Default Language" /></h2>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.language.subtitle" text="Sets the default language used by SACCO workflow screens that follow the workspace setting." /></p>
+    <section class="erp-panel aws-settings-panel aws-settings-panel--compact" aria-labelledby="adminLanguageSettingsTitle">
+        <div class="aws-settings-header">
+            <h2 id="adminLanguageSettingsTitle" class="aws-settings-title"><spring:message code="admin.settings.language.title" text="Workspace Default Language" /></h2>
         </div>
-        <form action="/admin/settings-controls/language" method="post" class="erp-panel-body">
+        <form action="/admin/settings-controls/language" method="post" class="aws-settings-form">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="settings-action-bar">
-                <label class="settings-action-note block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div class="aws-settings-control-row">
+                <label class="aws-settings-field" for="adminSettingsLanguage">
                     <spring:message code="admin.settings.language.label" text="Default language" />
-                    <select name="defaultLanguage" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800">
+                    <select id="adminSettingsLanguage" name="defaultLanguage" class="aws-control">
                         <option value="en" ${settings.defaultLanguage ne 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.english" text="English" /></option>
                         <option value="sw" ${settings.defaultLanguage eq 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.swahili" text="Kiswahili" /></option>
                     </select>
                 </label>
-                <button type="submit" class="settings-action-button app-btn btn-primary"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
+            </div>
+            <div class="aws-settings-footer">
+                <button type="submit" class="app-btn btn-primary"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
             </div>
         </form>
     </section>

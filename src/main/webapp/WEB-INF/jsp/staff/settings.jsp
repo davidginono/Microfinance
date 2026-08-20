@@ -9,7 +9,7 @@
     <h1 class="erp-page-title"><spring:message code="staff.settings.title" text="Settings" /></h1>
 </div>
 
-<section class="erp-panel aws-settings-panel" aria-labelledby="staffLanguageSettingsTitle">
+<section class="erp-panel aws-settings-panel aws-settings-panel--compact" aria-labelledby="staffLanguageSettingsTitle">
     <div class="aws-settings-header">
         <h2 id="staffLanguageSettingsTitle" class="aws-settings-title"><spring:message code="member.settings.language.title" /></h2>
     </div>

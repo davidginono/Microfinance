@@ -260,6 +260,9 @@
             if (select.id) {
                 document.querySelectorAll('label[for="' + select.id + '"]').forEach(function (label) {
                     label.addEventListener('click', function (event) {
+                        if (event.target.closest('.neo-select')) {
+                            return;
+                        }
                         event.preventDefault();
                         if (!button.disabled) {
                             button.focus({ preventScroll: true });
@@ -269,7 +272,8 @@
                 });
             }
 
-            button.addEventListener('click', function () {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
                 toggleEnhancedSelect(state);
             });
             button.addEventListener('keydown', function (event) {

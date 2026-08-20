@@ -21,6 +21,8 @@ class SelectEnhancerJspLayoutTest {
             .contains("const maxVisibleRows = 6")
             .contains("const compactRowHeight = 30")
             .contains("state.menu.style.overflowY = state.menu.scrollHeight > menuHeight + 1 ? 'auto' : 'hidden'")
+            .contains("if (event.target.closest('.neo-select'))")
+            .contains("event.stopPropagation()")
             .doesNotContain("document.body.appendChild(menu)")
             .doesNotContain("--neo-select-menu-width")
             .doesNotContain("Math.max(rect.width, 220)")

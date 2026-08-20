@@ -19,7 +19,7 @@
 </div>
 
 <c:if test="${settingsSection eq 'language'}">
-<section class="erp-panel aws-settings-panel overflow-hidden" aria-labelledby="memberLanguageSettingsTitle">
+<section class="erp-panel aws-settings-panel aws-settings-panel--compact" aria-labelledby="memberLanguageSettingsTitle">
     <div class="aws-settings-header">
         <h2 id="memberLanguageSettingsTitle" class="aws-settings-title"><spring:message code="member.settings.language.title" /></h2>
     </div>

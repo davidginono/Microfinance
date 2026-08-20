@@ -256,7 +256,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260814-loan-detail-v39")
-            .contains("shell.css?v=20260819-topbar-icons-v39")
+            .contains("shell.css?v=20260819-language-select-v41")
             .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
@@ -676,6 +676,7 @@ class AwsConsoleViewContractTest {
         String memberSettings = read(JSP_ROOT.resolve("app/settings.jsp"));
         String staffSettings = read(JSP_ROOT.resolve("staff/settings.jsp"));
         String platformSettings = read(JSP_ROOT.resolve("admin/platform-settings.jsp"));
+        String adminSettings = read(JSP_ROOT.resolve("admin/settings-controls.jsp"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(dashboard)
@@ -688,7 +689,7 @@ class AwsConsoleViewContractTest {
             .contains("aws-detail-grid")
             .contains("aws-table-pagination-footer");
         assertThat(memberSettings)
-            .contains("aws-settings-panel")
+            .contains("aws-settings-panel aws-settings-panel--compact")
             .contains("aws-settings-control-row")
             .contains("aws-settings-grid")
             .contains("aws-settings-footer")
@@ -698,7 +699,7 @@ class AwsConsoleViewContractTest {
             .doesNotContain("member.settings.language.eyebrow")
             .doesNotContain("member-settings-action-bar");
         assertThat(staffSettings)
-            .contains("aws-settings-panel")
+            .contains("aws-settings-panel aws-settings-panel--compact")
             .contains("aws-settings-control-row")
             .contains("aws-settings-footer")
             .contains("aria-labelledby=\"staffLanguageSettingsTitle\"")
@@ -712,12 +713,22 @@ class AwsConsoleViewContractTest {
             .contains("aws-settings-panel")
             .contains("aws-settings-subsection")
             .doesNotContain("platform-settings-card rounded-md");
+        assertThat(adminSettings)
+            .contains("aws-settings-panel aws-settings-panel--compact")
+            .contains("aria-labelledby=\"adminLanguageSettingsTitle\"")
+            .contains("for=\"adminSettingsLanguage\"")
+            .contains("aws-settings-control-row")
+            .contains("aws-settings-footer")
+            .doesNotContain("settings-action-note");
         assertThat(shellCss)
             .contains(".aws-status-summary-grid")
             .contains(".aws-settings-header")
             .contains(".aws-settings-control-row")
             .contains("width: min(100%, 34rem)")
             .contains("flex-flow: column nowrap")
+            .contains(".aws-settings-panel--compact")
+            .contains("width: min(100%, 36rem)")
+            .contains(".aws-console .aws-settings-panel:has(.neo-select--open)")
             .contains(".aws-dashboard-detail-panel")
             .contains(".aws-disclosure-button")
             .contains(".shell-page-title-rail__inner")
