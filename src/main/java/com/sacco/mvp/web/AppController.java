@@ -1605,12 +1605,24 @@ public class AppController {
     public String guaranteedLoans(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<GuarantorRequest> requests = loanWorkflowService.myActiveGuaranteedLoans(principal.getMemberId());
         Map<UUID, LoanApplication> loansById = loanApplicationsById(requests);
+        Set<UUID> applicantIds = loansById.values().stream()
+            .map(LoanApplication::getApplicantMemberId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<UUID, String> applicantNames = memberDirectoryService.fullNames(applicantIds);
+        Map<LoanType, String> loanProductNames = loanProductNames(principal.getSaccoId());
         List<Map<String, Object>> rows = requests.stream()
             .map(request -> {
                 LoanApplication loan = loansById.get(request.getLoanApplicationId());
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("request", request);
                 row.put("loan", loan);
+                row.put("applicantName", loan == null
+                    ? message("member.unknown")
+                    : applicantNames.getOrDefault(loan.getApplicantMemberId(), message("member.unknown")));
+                row.put("loanProductName", loanProductName(loan, loanProductNames));
+                row.put("amount", loan == null ? null : loan.getAmount());
+                row.put("finalDueDate", loan == null ? null : loan.getFinalDueDate());
                 row.put("statusLabel", loan == null ? message("common.notAvailable") : dashboardStatusLabel(loan.getStatus()));
                 row.put("daysLeft", loan == null || loan.getFinalDueDate() == null
                     ? null
