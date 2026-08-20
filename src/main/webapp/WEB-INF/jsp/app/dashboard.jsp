@@ -328,7 +328,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </section>
 
-    <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
         <section class="erp-panel min-w-0">
             <div class="erp-panel-header">
                 <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
