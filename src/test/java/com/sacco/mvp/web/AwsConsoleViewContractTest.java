@@ -255,7 +255,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260820-modal-sections-v40")
+            .contains("console-components.css?v=20260820-modal-gray-v41")
             .contains("shell.css?v=20260820-modal-sections-v42")
             .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")
@@ -1021,8 +1021,9 @@ class AwsConsoleViewContractTest {
             .contains(".guarantee-otp-modal-panel .app-modal-header h2")
             .contains("width: min(100%, 16rem)")
             .contains("border-radius: 2px")
-            .containsPattern("(?s)\\.app-modal-section \\{\\s*border: 1px solid #e2e8f0;\\s*border-radius: 2px;")
+            .containsPattern("(?s)\\.app-modal-section \\{\\s*border: 1px solid #e2e8f0;\\s*border-radius: 2px;\\s*background: #f7f8f8;")
             .containsPattern("(?s)@media \\(max-width: 640px\\) \\{.*?\\.app-modal-section \\{\\s*padding: 0\\.95rem;\\s*border-radius: 2px;")
+            .doesNotContain("background: #fafcff;")
             .doesNotContainPattern("(?s)\\.app-modal-section \\{\\s*border: 1px solid #e2e8f0;\\s*border-radius: 0\\.75rem;")
             .doesNotContain(".guarantee-modal-subtitle-legacy");
 
