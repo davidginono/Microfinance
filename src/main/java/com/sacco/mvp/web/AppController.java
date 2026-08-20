@@ -11,7 +11,6 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
-import com.sacco.mvp.service.LoanAttachmentService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -100,7 +99,6 @@ public class AppController {
     private final ExternalAccountStatusService externalAccountStatusService;
     private final NotificationInboxService notificationInboxService;
     private final ReversalRequestService reversalRequestService;
-    private final LoanAttachmentService loanAttachmentService;
     private final PaymentDetailsService paymentDetailsService;
     private final MemberDirectoryService memberDirectoryService;
     private final UserSettingsService userSettingsService;
@@ -2237,12 +2235,18 @@ public class AppController {
             : Math.max(requiredGuarantorsOverride, 0);
         EligibilityService.EligibilityResult eligibility = eligibilityService.check(
             principal.getSaccoId(), principal.getMemberId(), schema, BigDecimal.ZERO);
+        List<Map<String, Object>> existingApplicationAttachments = existingApplicationForForm(principal.getMemberId(), formValues)
+            .map(app -> loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()))
+            .orElseGet(List::of);
+        Map<UUID, String> requiredAttachmentNamesByRequirement = requiredAttachmentNamesByRequirement(existingApplicationAttachments);
 
         model.addAttribute("formModel", form);
         model.addAttribute("product", schema);
         model.addAttribute("requiredAttachmentDefinitions", requiredAttachmentService.activeForProduct(schema.getId()));
-        model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(formValues));
-        model.addAttribute("existingRequiredAttachmentNames", existingRequiredAttachmentNames(formValues));
+        model.addAttribute("existingApplicationAttachments", existingApplicationAttachments);
+        model.addAttribute("existingApplicationAttachmentNames", attachmentDisplayNames(existingApplicationAttachments));
+        model.addAttribute("existingRequiredAttachmentIds", existingRequiredAttachmentIds(requiredAttachmentNamesByRequirement));
+        model.addAttribute("existingRequiredAttachmentNames", requiredAttachmentNamesByRequirement);
         model.addAttribute("loanType", loanType);
         model.addAttribute("loanProductId", schema.getId());
         model.addAttribute("loanProductName", schema.getDisplayName());
@@ -2307,50 +2311,69 @@ public class AppController {
         return filesByRequirement;
     }
 
-    private Set<String> existingRequiredAttachmentIds(Map<String, String> formValues) {
-        return existingRequiredAttachmentNames(formValues).keySet().stream()
-            .map(UUID::toString)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private Map<UUID, String> existingRequiredAttachmentNames(Map<String, String> formValues) {
+    private Optional<LoanApplication> existingApplicationForForm(UUID memberId, Map<String, String> formValues) {
         if (formValues == null) {
-            return Map.of();
+            return Optional.empty();
         }
         String applicationId = formValues.get("applicationId");
         if (applicationId == null || applicationId.isBlank()) {
-            return Map.of();
+            return Optional.empty();
         }
         try {
             UUID appId = UUID.fromString(applicationId);
             return loanWorkflowService.findApplication(appId)
-                .map(app -> {
-                    Map<UUID, List<String>> namesByRequirement = new LinkedHashMap<>();
-                    loanAttachmentService.parse(app.getAttachmentsJson()).stream()
-                        .filter(item -> LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT.equals(String.valueOf(item.get("attachmentCategory"))))
-                        .forEach(item -> {
-                            String requirementId = String.valueOf(item.getOrDefault("requiredAttachmentId", ""));
-                            if (requirementId == null || requirementId.isBlank()) {
-                                return;
-                            }
-                            try {
-                                UUID id = UUID.fromString(requirementId);
-                                String name = String.valueOf(item.getOrDefault("originalName", ""));
-                                if (name != null && !name.isBlank()) {
-                                    namesByRequirement.computeIfAbsent(id, ignored -> new ArrayList<>()).add(name);
-                                }
-                            } catch (IllegalArgumentException ignored) {
-                                // Ignore malformed historical metadata.
-                            }
-                        });
-                    Map<UUID, String> result = new LinkedHashMap<>();
-                    namesByRequirement.forEach((id, names) -> result.put(id, String.join(", ", names)));
-                    return result;
-                })
-                .orElseGet(LinkedHashMap::new);
+                .filter(app -> memberId.equals(app.getApplicantMemberId()));
         } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Set<String> existingRequiredAttachmentIds(Map<UUID, String> namesByRequirement) {
+        if (namesByRequirement == null || namesByRequirement.isEmpty()) {
+            return Set.of();
+        }
+        return namesByRequirement.keySet().stream()
+            .map(UUID::toString)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Map<UUID, String> requiredAttachmentNamesByRequirement(List<Map<String, Object>> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
             return Map.of();
         }
+        Map<UUID, List<String>> namesByRequirement = new LinkedHashMap<>();
+        attachments.forEach(item -> {
+            Object requirementValue = item.get("requiredAttachmentId");
+            if (requirementValue == null) {
+                return;
+            }
+            String requirementId = String.valueOf(requirementValue).trim();
+            if (requirementId.isBlank() || "null".equalsIgnoreCase(requirementId)) {
+                return;
+            }
+            try {
+                UUID id = UUID.fromString(requirementId);
+                String name = String.valueOf(item.getOrDefault("originalName", "")).trim();
+                if (!name.isBlank() && !"null".equalsIgnoreCase(name)) {
+                    namesByRequirement.computeIfAbsent(id, ignored -> new ArrayList<>()).add(name);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed historical metadata.
+            }
+        });
+        Map<UUID, String> result = new LinkedHashMap<>();
+        namesByRequirement.forEach((id, names) -> result.put(id, String.join(", ", names)));
+        return result;
+    }
+
+    private String attachmentDisplayNames(List<Map<String, Object>> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return "";
+        }
+        return attachments.stream()
+            .map(item -> String.valueOf(item.getOrDefault("originalName", "")).trim())
+            .filter(name -> !name.isBlank() && !"null".equalsIgnoreCase(name))
+            .collect(Collectors.joining(", "));
     }
 
     private List<Map<String, String>> draftRepaymentSchedulePreview(Map<String, String> formValues) {

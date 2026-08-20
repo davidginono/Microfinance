@@ -394,6 +394,44 @@
                 </c:choose>
             </span>
                             </div>
+        <c:if test="${not empty existingApplicationAttachments}">
+            <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading attachments...">
+                <div class="app-table-titlebar">
+                    <div class="app-table-heading"><h2><spring:message code="loan.attachments.existing" text="Existing Attachments" /></h2></div>
+                </div>
+                <div class="erp-table-scroll">
+                    <table class="erp-table">
+                        <thead>
+                        <tr>
+                            <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
+                            <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.size" text="Size" /></th>
+                            <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.uploaded" text="Uploaded" /></th>
+                            <th class="px-3 py-2 text-left"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <c:forEach items="${existingApplicationAttachments}" var="file">
+                            <tr>
+                                <td class="px-3 py-2"><c:out value="${file.originalName}" /></td>
+                                <td class="px-3 py-2"><c:out value="${file.sizeLabel}" /></td>
+                                <td class="px-3 py-2">
+                                    <c:choose>
+                                        <c:when test="${not empty file.uploadedAt}">${fn:replace(fn:substring(file.uploadedAt, 0, 16), 'T', ' ')}</c:when>
+                                        <c:otherwise>-</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <a href="/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}"
+                                       class="app-btn btn-primary"
+                                       data-download-action="true"><spring:message code="common.download" text="Download" /></a>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </c:if>
         <c:choose>
             <c:when test="${not empty requiredAttachmentDefinitions}">
                 <div class="grid gap-3">
@@ -434,7 +472,12 @@
                     <span class="attachment-dropzone-main">
                         <span class="attachment-dropzone-copy">
                             <span class="attachment-dropzone-title"><spring:message code="attachments.dropzone.title" text="Drop files here" /></span>
-                            <span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" text="No file selected" /></span>
+                            <span class="attachment-dropzone-files" data-attachment-files data-existing-attachment-files="${fn:escapeXml(existingApplicationAttachmentNames)}">
+                                <c:choose>
+                                    <c:when test="${not empty existingApplicationAttachmentNames}"><c:out value="${existingApplicationAttachmentNames}" /></c:when>
+                                    <c:otherwise><spring:message code="attachments.dropzone.none" text="No file selected" /></c:otherwise>
+                                </c:choose>
+                            </span>
                         </span>
                         <span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose" text="Choose files" /></span>
                     </span>

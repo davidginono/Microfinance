@@ -71,7 +71,12 @@ class FileUploadControlViewContractTest {
 
         assertThat(loanApplication)
             .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
-            .contains("class=\"attachment-dropzone-input\" data-attachment-input");
+            .contains("class=\"attachment-dropzone-input\" data-attachment-input")
+            .contains("existingApplicationAttachments")
+            .contains("Existing Attachments")
+            .contains("/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}")
+            .contains("data-download-action=\"true\"><spring:message code=\"common.download\"")
+            .contains("data-existing-attachment-files=\"${fn:escapeXml(existingApplicationAttachmentNames)}\"");
         assertThat(managerDetail)
             .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
             .contains("class=\"attachment-dropzone-input\"")
