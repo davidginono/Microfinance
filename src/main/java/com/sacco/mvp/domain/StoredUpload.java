@@ -17,7 +17,7 @@ import java.util.UUID;
 @Table(name = "stored_uploads")
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class StoredUpload {
@@ -45,7 +45,13 @@ public class StoredUpload {
     @Column(name = "sha256", nullable = false, length = 64)
     private String sha256Checksum;
 
-    @Column(nullable = false, columnDefinition = "bytea")
+    @Column(name = "storage_backend", nullable = false, length = 40)
+    private String storageBackend;
+
+    @Column(name = "storage_key", length = 1024)
+    private String storageKey;
+
+    @Column(columnDefinition = "bytea")
     private byte[] content;
 
     @Column(name = "created_at", nullable = false)

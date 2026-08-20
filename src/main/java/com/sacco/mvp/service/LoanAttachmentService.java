@@ -13,9 +13,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -23,6 +25,8 @@ import java.util.UUID;
 public class LoanAttachmentService {
     public static final String CATEGORY_APPLICATION_ATTACHMENT = "APPLICATION_ATTACHMENT";
     public static final String CATEGORY_DISBURSEMENT_PROOF = "DISBURSEMENT_PROOF";
+    private static final long MAX_ATTACHMENT_BYTES = 25L * 1024L * 1024L;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "png", "jpg", "jpeg");
 
     private final ObjectMapper objectMapper;
     private final AdminAlertService adminAlertService;
@@ -100,6 +104,8 @@ public class LoanAttachmentService {
         String attachmentId = UUID.randomUUID().toString();
         String cleanedName = StringUtils.cleanPath(file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename());
         String extension = StringUtils.getFilenameExtension(cleanedName);
+        byte[] content = file.getBytes();
+        String contentType = resolveAllowedContentType(cleanedName, content);
         String storedName = extension == null || extension.isBlank()
             ? attachmentId
             : attachmentId + "." + extension;
@@ -109,16 +115,16 @@ public class LoanAttachmentService {
             loanId.toString(),
             attachmentCategory,
             cleanedName,
-            file.getContentType(),
-            file.getBytes()
+            contentType,
+            content
         );
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", attachmentId);
         item.put("originalName", cleanedName);
         item.put("storedName", storedName);
-        item.put("contentType", file.getContentType() == null ? "application/octet-stream" : file.getContentType());
-        item.put("size", file.getSize());
+        item.put("contentType", contentType);
+        item.put("size", content.length);
         item.put("uploadedAt", OffsetDateTime.now().toString());
         item.put("attachmentCategory", attachmentCategory);
         if (requiredAttachmentId != null) {
@@ -128,6 +134,63 @@ public class LoanAttachmentService {
             item.put("requiredAttachmentName", requiredAttachmentName.trim());
         }
         attachments.add(item);
+    }
+
+    private String resolveAllowedContentType(String originalName, byte[] content) {
+        if (content == null || content.length == 0) {
+            throw new IllegalArgumentException("Upload a valid PDF, PNG, or JPEG attachment.");
+        }
+        if (content.length > MAX_ATTACHMENT_BYTES) {
+            throw new IllegalArgumentException("Each attachment must be 25 MB or smaller.");
+        }
+        String extension = StringUtils.getFilenameExtension(originalName == null ? "" : originalName);
+        String normalizedExtension = extension == null ? "" : extension.trim().toLowerCase(Locale.ROOT);
+        if (!ALLOWED_EXTENSIONS.contains(normalizedExtension)) {
+            throw new IllegalArgumentException("Upload attachments as PDF, PNG, or JPEG files.");
+        }
+        String detected = detectedContentType(content);
+        if (detected == null) {
+            throw new IllegalArgumentException("Upload a valid PDF, PNG, or JPEG attachment.");
+        }
+        if ("application/pdf".equals(detected) && !"pdf".equals(normalizedExtension)) {
+            throw new IllegalArgumentException("PDF attachments must use the .pdf file extension.");
+        }
+        if ("image/png".equals(detected) && !"png".equals(normalizedExtension)) {
+            throw new IllegalArgumentException("PNG attachments must use the .png file extension.");
+        }
+        if ("image/jpeg".equals(detected) && !"jpg".equals(normalizedExtension) && !"jpeg".equals(normalizedExtension)) {
+            throw new IllegalArgumentException("JPEG attachments must use the .jpg or .jpeg file extension.");
+        }
+        return detected;
+    }
+
+    private String detectedContentType(byte[] content) {
+        if (content.length >= 5
+            && content[0] == 0x25
+            && content[1] == 0x50
+            && content[2] == 0x44
+            && content[3] == 0x46
+            && content[4] == 0x2D) {
+            return "application/pdf";
+        }
+        if (content.length >= 8
+            && (content[0] & 0xFF) == 0x89
+            && content[1] == 0x50
+            && content[2] == 0x4E
+            && content[3] == 0x47
+            && content[4] == 0x0D
+            && content[5] == 0x0A
+            && content[6] == 0x1A
+            && content[7] == 0x0A) {
+            return "image/png";
+        }
+        if (content.length >= 3
+            && (content[0] & 0xFF) == 0xFF
+            && (content[1] & 0xFF) == 0xD8
+            && (content[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        return null;
     }
 
     private String normalizeCategory(String attachmentCategory) {

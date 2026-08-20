@@ -125,6 +125,9 @@ app:
     override-recipient: ${APP_MAIL_OVERRIDE_RECIPIENT:}
   uploads:
     legacy-migration-enabled: ${APP_UPLOADS_LEGACY_MIGRATION_ENABLED:false}
+    files-root: ${APP_UPLOADS_FILES_ROOT:stored-uploads}
+    database-to-file-migration-enabled: ${APP_UPLOADS_DATABASE_TO_FILE_MIGRATION_ENABLED:false}
+    database-to-file-migration-batch-size: ${APP_UPLOADS_DATABASE_TO_FILE_MIGRATION_BATCH_SIZE:100}
   outbox:
     scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:true}
     batch-size: ${APP_OUTBOX_BATCH_SIZE:250}

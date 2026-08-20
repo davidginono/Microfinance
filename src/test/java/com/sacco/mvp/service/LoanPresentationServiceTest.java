@@ -715,6 +715,67 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void printablePdfAppendsStoredApplicationAttachmentContents() throws IOException {
+        UUID loanId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+        String attachmentsJson = "[{\"id\":\"" + attachmentId + "\"}]";
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .applicationNumber(502L)
+            .saccoId("SACCO-1")
+            .stationId("AR704")
+            .loanType(LoanType.EDUCATION_LOAN)
+            .amount(new BigDecimal("500000.00"))
+            .tenorMonths(6)
+            .requiredGuarantors(0)
+            .financialSnapshot("{}")
+            .attachmentsJson(attachmentsJson)
+            .applicantSignatureText("D. Applicant")
+            .applicantSignatureVerifiedAt(OffsetDateTime.parse("2026-06-30T04:57:00+03:00"))
+            .status(LoanStatus.READY_FOR_MANAGER)
+            .build();
+        Member applicant = Member.builder()
+            .id(UUID.randomUUID())
+            .fullName("David Wankyo")
+            .memberNo("1145")
+            .signatureText("D. Applicant")
+            .build();
+        Map<String, Object> attachment = new LinkedHashMap<>();
+        attachment.put("id", attachmentId.toString());
+        attachment.put("originalName", "salary-slip.png");
+        attachment.put("attachmentCategory", LoanAttachmentService.CATEGORY_APPLICATION_ATTACHMENT);
+        attachment.put("size", 68);
+        when(loanAttachmentService.parse(attachmentsJson)).thenReturn(List.of(attachment));
+        when(loanAttachmentService.load(loanId, attachmentId.toString(), attachmentsJson))
+            .thenReturn(new LoanAttachmentService.AttachmentResource(tinyPng(), "salary-slip.png", "image/png"));
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            Map.of("Loan Purpose", "SCHOOL FEES"),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text)
+                .contains("Application Attachments")
+                .contains("Attachment Contents")
+                .contains("salary-slip.png");
+        }
+    }
+
+    @Test
     void printablePdfIncludesGeneratedAndCalculatedSchedulesForDisbursedLoan() throws IOException {
         LoanApplication app = LoanApplication.builder()
             .id(UUID.randomUUID())
@@ -1456,6 +1517,22 @@ class LoanPresentationServiceTest {
             graphics.fillOval(8, 8, 64, 64);
             graphics.setColor(java.awt.Color.WHITE);
             graphics.fillRect(34, 18, 12, 44);
+        } finally {
+            graphics.dispose();
+        }
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(image, "png", output);
+        return output.toByteArray();
+    }
+
+    private byte[] tinyPng() throws IOException {
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(24, 24, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D graphics = image.createGraphics();
+        try {
+            graphics.setColor(java.awt.Color.WHITE);
+            graphics.fillRect(0, 0, 24, 24);
+            graphics.setColor(new java.awt.Color(22, 101, 52));
+            graphics.fillRect(4, 4, 16, 16);
         } finally {
             graphics.dispose();
         }

@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -25,6 +26,7 @@ public class SaccoDataDeletionService {
     private final MemberRepository memberRepository;
     private final SaccoRegistryService saccoRegistryService;
     private final SaccoLogoStorageService saccoLogoStorageService;
+    private final StoredUploadStorageService storedUploadStorageService;
 
     @Transactional
     public void deleteSacco(String saccoId, String confirmation) {
@@ -86,6 +88,7 @@ public class SaccoDataDeletionService {
     }
 
     private void deleteSaccoScopedRows(String saccoId) {
+        deleteStoredUploadFilesForSacco(saccoId);
         update("""
             delete from stored_uploads
             where (owner_type = 'MEMBER' and owner_id in (select id::text from members where sacco_id = ?))
@@ -162,6 +165,7 @@ public class SaccoDataDeletionService {
 
     private void deleteMemberScopedRows(UUID memberId, String email) {
         String memberIdText = memberId.toString();
+        deleteStoredUploadFilesForMember(memberIdText);
         update("delete from stored_uploads where owner_type = 'MEMBER' and owner_id = ?", memberIdText);
         update("delete from admin_incidents where reported_by_member_id = ? or resolved_by_member_id = ?", memberId, memberId);
         update("delete from outbox_events where aggregate_id = ?", memberId);
@@ -189,6 +193,33 @@ public class SaccoDataDeletionService {
 
     private void update(String sql, Object... args) {
         jdbcTemplate.update(sql, args);
+    }
+
+    private void deleteStoredUploadFilesForSacco(String saccoId) {
+        List<String> storageKeys = jdbcTemplate.queryForList("""
+            select storage_key
+            from stored_uploads
+            where storage_key is not null
+              and storage_key <> ''
+              and (
+                  (owner_type = 'MEMBER' and owner_id in (select id::text from members where sacco_id = ?))
+                  or
+                  (owner_type = 'LOAN_APPLICATION' and owner_id in (select id::text from loan_applications where sacco_id = ?))
+              )
+            """, String.class, saccoId, saccoId);
+        storedUploadStorageService.deleteLocalFilesAfterCommit(storageKeys);
+    }
+
+    private void deleteStoredUploadFilesForMember(String memberIdText) {
+        List<String> storageKeys = jdbcTemplate.queryForList("""
+            select storage_key
+            from stored_uploads
+            where owner_type = 'MEMBER'
+              and owner_id = ?
+              and storage_key is not null
+              and storage_key <> ''
+            """, String.class, memberIdText);
+        storedUploadStorageService.deleteLocalFilesAfterCommit(storageKeys);
     }
 
     private String normalizeSaccoId(String value) {

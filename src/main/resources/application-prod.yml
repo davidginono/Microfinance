@@ -47,6 +47,8 @@ management:
         enabled: true
 
 app:
+  uploads:
+    files-root: ${APP_UPLOADS_FILES_ROOT:/var/lib/saccos-lms/uploads}
   outbox:
     batch-size: ${APP_OUTBOX_BATCH_SIZE:50}
     fixed-delay-ms: ${APP_OUTBOX_FIXED_DELAY_MS:2000}

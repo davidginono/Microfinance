@@ -408,27 +408,24 @@ public class LoanWorkflowService {
         application.setApplicantSignatureText(null);
         application.setApplicantSignatureVerifiedAt(null);
         application.setUpdatedAt(OffsetDateTime.now());
-        LoanApplication saved = inTransaction(() -> {
+        return inTransaction(() -> {
             LoanApplication persisted = loanApplicationRepository.save(application);
             if (reEditingAfterGuarantorApproval) {
                 expireGuarantorApprovalsForApplicantEdit(persisted.getId());
             }
-            return persisted;
-        });
-        saved.setAttachmentsJson(loanAttachmentService.store(saved.getId(), attachments, saved.getAttachmentsJson()));
-        saved.setAttachmentsJson(loanAttachmentService.storeRequired(
-            saved.getId(),
-            requiredAttachmentDefinitions.stream()
-                .map(requirement -> new LoanAttachmentService.RequiredAttachmentUpload(
-                    requirement.getId(),
-                    requirement.getAttachmentName(),
-                    requiredAttachments == null ? List.of() : requiredAttachments.getOrDefault(requirement.getId(), List.of())
-                ))
-                .toList(),
-            saved.getAttachmentsJson()
-        ));
-        return inTransaction(() -> {
-            LoanApplication finalSaved = loanApplicationRepository.save(saved);
+            persisted.setAttachmentsJson(loanAttachmentService.store(persisted.getId(), attachments, persisted.getAttachmentsJson()));
+            persisted.setAttachmentsJson(loanAttachmentService.storeRequired(
+                persisted.getId(),
+                requiredAttachmentDefinitions.stream()
+                    .map(requirement -> new LoanAttachmentService.RequiredAttachmentUpload(
+                        requirement.getId(),
+                        requirement.getAttachmentName(),
+                        requiredAttachments == null ? List.of() : requiredAttachments.getOrDefault(requirement.getId(), List.of())
+                    ))
+                    .toList(),
+                persisted.getAttachmentsJson()
+            ));
+            LoanApplication finalSaved = loanApplicationRepository.save(persisted);
             auditLoan(finalSaved, applicantId, "LOAN_APPLICATION_DRAFT", "Loan application draft");
             return finalSaved;
         });
