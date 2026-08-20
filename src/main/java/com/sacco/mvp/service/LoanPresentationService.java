@@ -64,7 +64,6 @@ import java.time.LocalDate;
 @Service
 @RequiredArgsConstructor
 public class LoanPresentationService {
-    private static final String LEGACY_FEE_INSURANCE_RECEIPT_CATEGORY = "FEE_INSURANCE_RECEIPT";
 
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
@@ -411,7 +410,7 @@ public class LoanPresentationService {
     public List<Map<String, Object>> parseApplicationAttachments(String json) {
         return parseAttachments(json).stream()
             .filter(item -> !LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(attachmentCategory(item)))
-            .filter(item -> !LEGACY_FEE_INSURANCE_RECEIPT_CATEGORY.equals(attachmentCategory(item)))
+            .filter(item -> !LoanAttachmentService.CATEGORY_LEGACY_FEE_INSURANCE_RECEIPT.equals(attachmentCategory(item)))
             .toList();
     }
 

@@ -76,6 +76,11 @@ class FileUploadControlViewContractTest {
             .contains("Existing Attachments")
             .contains("/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}")
             .contains("data-download-action=\"true\"><spring:message code=\"common.download\"")
+            .contains("form=\"removeAttachment-${file.id}\"")
+            .contains("/app/loan-applications/${formValues['applicationId']}/attachments/${file.id}/delete")
+            .contains("data-confirm-title=\"Remove Attachment\"")
+            .contains("data-confirm-proceed=\"Remove\"")
+            .contains("new URLSearchParams(window.location.search).get(\"step\")")
             .contains("data-existing-attachment-files=\"${fn:escapeXml(existingApplicationAttachmentNames)}\"");
         assertThat(managerDetail)
             .contains("class=\"attachment-dropzone\" data-attachment-dropzone")

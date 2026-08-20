@@ -25,6 +25,7 @@ import java.util.UUID;
 public class LoanAttachmentService {
     public static final String CATEGORY_APPLICATION_ATTACHMENT = "APPLICATION_ATTACHMENT";
     public static final String CATEGORY_DISBURSEMENT_PROOF = "DISBURSEMENT_PROOF";
+    public static final String CATEGORY_LEGACY_FEE_INSURANCE_RECEIPT = "FEE_INSURANCE_RECEIPT";
     private static final long MAX_ATTACHMENT_BYTES = 25L * 1024L * 1024L;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "png", "jpg", "jpeg");
 
@@ -229,6 +230,43 @@ public class LoanAttachmentService {
         );
     }
 
+    public AttachmentRemoval removeApplicationAttachment(UUID loanId, String attachmentId, String attachmentsJson) {
+        if (loanId == null || attachmentId == null || attachmentId.isBlank()) {
+            throw new IllegalArgumentException("Attachment not found");
+        }
+        List<Map<String, Object>> attachments = parse(attachmentsJson);
+        Map<String, Object> match = null;
+        for (Map<String, Object> item : attachments) {
+            if (!attachmentId.equals(String.valueOf(item.get("id")))) {
+                continue;
+            }
+            if (!isApplicantEditableAttachment(item)) {
+                throw new IllegalArgumentException("Attachment not found");
+            }
+            match = item;
+            break;
+        }
+        if (match == null) {
+            throw new IllegalArgumentException("Attachment not found");
+        }
+
+        UUID uploadId;
+        try {
+            uploadId = UUID.fromString(attachmentId);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Attachment not found", ex);
+        }
+        attachments.remove(match);
+        storedUploadStorageService.delete(uploadId, StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString());
+        return new AttachmentRemoval(writeJson(attachments), String.valueOf(match.getOrDefault("originalName", "")));
+    }
+
+    private boolean isApplicantEditableAttachment(Map<String, Object> item) {
+        String category = String.valueOf(item.getOrDefault("attachmentCategory", "")).trim();
+        return !CATEGORY_DISBURSEMENT_PROOF.equals(category)
+            && !CATEGORY_LEGACY_FEE_INSURANCE_RECEIPT.equals(category);
+    }
+
     public void deleteAll(UUID loanId) {
         storedUploadStorageService.deleteOwner(StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString());
     }
@@ -257,5 +295,8 @@ public class LoanAttachmentService {
     public record RequiredAttachmentUpload(UUID requiredAttachmentId,
                                            String requiredAttachmentName,
                                            List<MultipartFile> files) {
+    }
+
+    public record AttachmentRemoval(String attachmentsJson, String originalName) {
     }
 }

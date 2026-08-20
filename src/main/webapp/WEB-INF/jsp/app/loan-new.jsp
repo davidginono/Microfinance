@@ -406,7 +406,7 @@
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.file" text="File" /></th>
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.size" text="Size" /></th>
                             <th class="px-3 py-2 text-left"><spring:message code="loan.attachments.uploaded" text="Uploaded" /></th>
-                            <th class="px-3 py-2 text-left"></th>
+                            <th class="px-3 py-2 text-left"><spring:message code="common.actions" text="Actions" /></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -420,10 +420,18 @@
                                         <c:otherwise>-</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td class="px-3 py-2">
-                                    <a href="/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}"
-                                       class="app-btn btn-primary"
-                                       data-download-action="true"><spring:message code="common.download" text="Download" /></a>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="flex flex-wrap gap-2">
+                                        <a href="/documents/loan-applications/${formValues['applicationId']}/attachments/${file.id}"
+                                           class="app-btn btn-primary"
+                                           data-download-action="true"><spring:message code="common.download" text="Download" /></a>
+                                        <button type="submit"
+                                                form="removeAttachment-${file.id}"
+                                                formnovalidate
+                                                class="app-btn btn-reject">
+                                            <spring:message code="common.remove" text="Remove" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </c:forEach>
@@ -599,6 +607,21 @@
     </section>
 </form>
 
+<c:if test="${not empty existingApplicationAttachments}">
+    <c:forEach items="${existingApplicationAttachments}" var="file">
+        <form id="removeAttachment-${file.id}"
+              action="/app/loan-applications/${formValues['applicationId']}/attachments/${file.id}/delete"
+              method="post"
+              class="hidden"
+              data-page-preloader="true"
+              data-confirm-title="Remove Attachment"
+              data-confirm-message="Remove this attachment from the application?"
+              data-confirm-proceed="Remove">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        </form>
+    </c:forEach>
+</c:if>
+
 <script>
     (function () {
         const form = document.getElementById("loanApplicationForm");
@@ -611,7 +634,10 @@
         const maxStep = Math.max.apply(null, panels.map(function (panel) {
             return Number(panel.dataset.loanFlowStep);
         }));
-        let currentStep = document.getElementById("guarantorValidationErrorMarker") ? 3 : 1;
+        const requestedStep = Number(new URLSearchParams(window.location.search).get("step"));
+        let currentStep = Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= maxStep
+            ? requestedStep
+            : (document.getElementById("guarantorValidationErrorMarker") ? 3 : 1);
 
         function panelFor(step) {
             return panels.find(function (panel) {

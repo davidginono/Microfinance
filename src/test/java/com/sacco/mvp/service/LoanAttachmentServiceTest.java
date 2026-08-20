@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,5 +63,44 @@ class LoanAttachmentServiceTest {
 
         assertThat(resource.getContent()).containsExactly(9, 8);
         assertThat(resource.getOriginalName()).isEqualTo("proof.pdf");
+    }
+
+    @Test
+    void removesOnlyRequestedApplicationAttachmentMetadataAndStorage() {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        LoanAttachmentService service = new LoanAttachmentService(
+            JsonMapper.builder().findAndAddModules().build(), mock(AdminAlertService.class), storage);
+        UUID loanId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+        UUID remainingId = UUID.randomUUID();
+        String json = """
+            [
+              {"id":"%s","originalName":"idp.pdf","attachmentCategory":"APPLICATION_ATTACHMENT"},
+              {"id":"%s","originalName":"salary.pdf","attachmentCategory":"APPLICATION_ATTACHMENT"}
+            ]
+            """.formatted(attachmentId, remainingId);
+
+        LoanAttachmentService.AttachmentRemoval removal = service.removeApplicationAttachment(loanId, attachmentId.toString(), json);
+
+        assertThat(removal.attachmentsJson()).doesNotContain(attachmentId.toString(), "idp.pdf");
+        assertThat(removal.attachmentsJson()).contains(remainingId.toString(), "salary.pdf");
+        assertThat(removal.originalName()).isEqualTo("idp.pdf");
+        verify(storage).delete(attachmentId, StoredUploadStorageService.OWNER_LOAN_APPLICATION, loanId.toString());
+    }
+
+    @Test
+    void refusesToRemoveDisbursementProofThroughApplicantAttachmentRemoval() {
+        StoredUploadStorageService storage = mock(StoredUploadStorageService.class);
+        LoanAttachmentService service = new LoanAttachmentService(
+            JsonMapper.builder().findAndAddModules().build(), mock(AdminAlertService.class), storage);
+        UUID loanId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+        String json = "[{\"id\":\"" + attachmentId + "\",\"originalName\":\"proof.pdf\",\"attachmentCategory\":\"DISBURSEMENT_PROOF\"}]";
+
+        assertThatThrownBy(() -> service.removeApplicationAttachment(loanId, attachmentId.toString(), json))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Attachment not found");
+
+        verify(storage, never()).delete(any(), any(), any());
     }
 }

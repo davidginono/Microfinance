@@ -94,6 +94,14 @@ public class StoredUploadStorageService {
     }
 
     @Transactional
+    public void delete(UUID id, String ownerType, String ownerId) {
+        repository.findByIdAndOwnerTypeAndOwnerId(id, ownerType, ownerId).ifPresent(upload -> {
+            deleteLocalUploadsAfterCommit(List.of(upload));
+            repository.delete(upload);
+        });
+    }
+
+    @Transactional
     public void deleteOwner(String ownerType, String ownerId) {
         deleteLocalUploadsAfterCommit(repository.findByOwnerTypeAndOwnerId(ownerType, ownerId));
         repository.deleteByOwnerTypeAndOwnerId(ownerType, ownerId);

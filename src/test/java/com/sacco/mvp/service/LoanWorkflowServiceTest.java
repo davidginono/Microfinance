@@ -366,6 +366,45 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void removingAttachmentFromApprovedApplicationReopensDraftAndExpiresGuarantors() {
+        UUID appId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        String attachmentId = UUID.randomUUID().toString();
+        LoanApplication app = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(memberId)
+            .saccoId("CIRCLE-1001")
+            .stationId("ST01")
+            .status(LoanStatus.ALL_GUARANTORS_APPROVED)
+            .attachmentsJson("[{\"id\":\"" + attachmentId + "\"}]")
+            .applicantSignatureText("SIGNED")
+            .applicantSignatureVerifiedAt(OffsetDateTime.now().minusHours(1))
+            .build();
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(UUID.randomUUID())
+            .status(GuarantorRequestStatus.APPROVED)
+            .build();
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, memberId)).thenReturn(Optional.of(app));
+        when(loanAttachmentService.removeApplicationAttachment(appId, attachmentId, app.getAttachmentsJson()))
+            .thenReturn(new LoanAttachmentService.AttachmentRemoval("[]", "idp.pdf"));
+        when(guarantorRequestRepository.findByLoanApplicationId(appId)).thenReturn(List.of(request));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LoanApplication updated = loanWorkflowService.removeApplicationAttachment(appId, memberId, attachmentId);
+
+        assertThat(updated.getAttachmentsJson()).isEqualTo("[]");
+        assertThat(updated.getStatus()).isEqualTo(LoanStatus.DRAFT);
+        assertThat(updated.getApplicantSignatureText()).isNull();
+        assertThat(updated.getApplicantSignatureVerifiedAt()).isNull();
+        assertThat(request.getStatus()).isEqualTo(GuarantorRequestStatus.EXPIRED);
+        assertThat(request.getDecisionReason()).isEqualTo("Applicant reopened application for editing");
+        verify(guarantorRequestRepository).saveAll(List.of(request));
+        verify(auditService).logEvent(eq("LOAN_APPLICATION"), eq(appId), eq("LOAN_APPLICATION_ATTACHMENT_REMOVED"),
+            eq(memberId), any(), anyString(), eq("LOAN_APPLICATION"), anyString(), eq("CIRCLE-1001"), eq("ST01"), anyMap());
+    }
+
+    @Test
     void saveDraftStoresSelectedGuarantorsWithoutCommitmentAmounts() {
         // Scenario: applicants choose guarantors only; no commitment split is stored for new drafts.
         UUID applicantId = UUID.randomUUID();

@@ -1034,6 +1034,21 @@ public class AppController {
         );
     }
 
+    @PostMapping("/loan-applications/{id}/attachments/{attachmentId}/delete")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_UPDATE') and @authz.isLoanOwner(#id, principal)")
+    public String removeApplicationAttachment(@PathVariable UUID id,
+                                              @PathVariable String attachmentId,
+                                              @AuthenticationPrincipal AppUserPrincipal principal,
+                                              RedirectAttributes ra) {
+        try {
+            loanWorkflowService.removeApplicationAttachment(id, principal.getMemberId(), attachmentId);
+            ra.addFlashAttribute("message", "Attachment removed successfully.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/app/loan-applications/" + id + "/edit?step=4";
+    }
+
     @PostMapping("/loan-applications")
     @PreAuthorize("@access.canAccessMemberArea(principal) and ((#applicationId == null and @access.has(principal, 'MEMBER_LOANS_CREATE')) or (#applicationId != null and @access.has(principal, 'MEMBER_LOANS_UPDATE')))")
     public String createDraft(@AuthenticationPrincipal AppUserPrincipal principal,

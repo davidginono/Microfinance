@@ -68,4 +68,25 @@ class StoredUploadStorageServiceTest {
 
         assertThat(service.load(id, "LOAN_APPLICATION", ownerId).getContent()).containsExactly(7, 8, 9);
     }
+
+    @Test
+    void deletesOnlyTheRequestedOwnerUpload() {
+        StoredUploadRepository repository = mock(StoredUploadRepository.class);
+        StoredUploadStorageService service = new StoredUploadStorageService(repository);
+        ReflectionTestUtils.setField(service, "uploadsRoot", tempDir.toString());
+        UUID id = UUID.randomUUID();
+        StoredUpload upload = StoredUpload.builder()
+            .id(id)
+            .ownerType("LOAN_APPLICATION")
+            .ownerId("loan-1")
+            .storageKey("")
+            .build();
+        when(repository.findByIdAndOwnerTypeAndOwnerId(id, "LOAN_APPLICATION", "loan-1"))
+            .thenReturn(Optional.of(upload));
+
+        service.delete(id, "LOAN_APPLICATION", "loan-1");
+
+        verify(repository).findByIdAndOwnerTypeAndOwnerId(id, "LOAN_APPLICATION", "loan-1");
+        verify(repository).delete(upload);
+    }
 }

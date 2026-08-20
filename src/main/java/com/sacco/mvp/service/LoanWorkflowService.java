@@ -555,6 +555,35 @@ public class LoanWorkflowService {
         return getMine(submitted.getId(), applicantId);
     }
 
+    public LoanApplication removeApplicationAttachment(UUID appId, UUID memberId, String attachmentId) {
+        LoanApplication app = getMine(appId, memberId);
+        if (app.getStatus() != LoanStatus.DRAFT && app.getStatus() != LoanStatus.ALL_GUARANTORS_APPROVED) {
+            throw new IllegalStateException("Only draft applications or applications approved by all guarantors can be edited.");
+        }
+        return inTransaction(() -> {
+            LoanAttachmentService.AttachmentRemoval removal = loanAttachmentService.removeApplicationAttachment(
+                app.getId(),
+                attachmentId,
+                app.getAttachmentsJson()
+            );
+            boolean reEditingAfterGuarantorApproval = app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED;
+            app.setAttachmentsJson(removal.attachmentsJson());
+            if (reEditingAfterGuarantorApproval) {
+                app.setStatus(LoanStatus.DRAFT);
+                app.setApplicantSignatureText(null);
+                app.setApplicantSignatureVerifiedAt(null);
+                expireGuarantorApprovalsForApplicantEdit(app.getId());
+            }
+            app.setUpdatedAt(OffsetDateTime.now());
+            LoanApplication saved = loanApplicationRepository.save(app);
+            auditLoan(saved, memberId, "LOAN_APPLICATION_ATTACHMENT_REMOVED", "Loan application attachment removed", Map.of(
+                "attachmentId", attachmentId,
+                "attachmentName", removal.originalName()
+            ));
+            return saved;
+        });
+    }
+
     public LoanApplication submit(UUID appId, UUID memberId) {
         LoanApplication app = getMine(appId, memberId);
         if (app.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED) {
