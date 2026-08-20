@@ -3,6 +3,7 @@ package com.sacco.mvp.integration.foresight;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
@@ -12,6 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -77,6 +79,38 @@ public class ForesightDirectoryService {
         } catch (ResourceAccessException ex) {
             log.warn("Foresight account-summary lookup could not reach the external directory: {}", ex.getMessage());
             throw new UpstreamAvailabilityException("Unable to reach the external member directory.", ex);
+        }
+    }
+
+    public List<ForesightLoanPaymentSummary> fetchLoanPaymentSummary(String memberNumber, String stationId, String loanId) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/loan-payment-summary")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .queryParam("loanId", loanId)
+                .build()
+                .toUri();
+            log.info("Foresight loan-payment-summary lookup started: {}", requestUri);
+            List<ForesightLoanPaymentSummary> summaries = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightLoanPaymentSummary>>() {});
+            log.info("Foresight loan-payment-summary lookup completed: loanId={}, rows={}",
+                loanId,
+                summaries == null ? 0 : summaries.size());
+            return summaries == null ? List.of() : summaries;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight loan-payment-summary lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External loan payment summary service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External loan payment summary lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight loan-payment-summary lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external loan payment summary service.", ex);
         }
     }
 

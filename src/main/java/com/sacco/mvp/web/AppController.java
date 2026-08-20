@@ -14,6 +14,7 @@ import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
+import com.sacco.mvp.service.LoanPaymentSummarySyncService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanQualificationPolicyService;
 import com.sacco.mvp.service.LoanReportService;
@@ -65,6 +66,7 @@ import java.util.stream.Collectors;
 public class AppController {
     private static final long REVERSAL_WINDOW_HOURS = 24L;
     private static final int MEMBER_ARCHIVE_PAGE_SIZE = 50;
+    private static final int MEMBER_ACTIVE_LOAN_BALANCE_REFRESH_LIMIT = 50;
     private static final List<LoanStatus> ARCHIVED_LOAN_STATUSES = List.of(
         LoanStatus.MANAGER_REJECTED,
         LoanStatus.LOAN_OFFICER_REJECTED,
@@ -89,6 +91,7 @@ public class AppController {
     private final EligibilityService eligibilityService;
     private final FinancialDetailsService financialDetailsService;
     private final LoanPresentationService loanPresentationService;
+    private final LoanPaymentSummarySyncService loanPaymentSummarySyncService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
@@ -189,6 +192,28 @@ public class AppController {
     public ResponseEntity<Map<String, Object>> dashboardExternalAccountStatus(@AuthenticationPrincipal AppUserPrincipal principal) {
         Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(member)));
+    }
+
+    @PostMapping("/dashboard/active-loans/balances/refresh")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @access.has(principal, 'MEMBER_LOANS_UPDATE')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> refreshDashboardActiveLoanBalances(@AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanPaymentSummarySyncService.MemberRefreshResult refreshResult =
+            loanPaymentSummarySyncService.refreshMemberActiveLoanPaymentSummaries(
+                principal.getMemberId(),
+                MEMBER_ACTIVE_LOAN_BALANCE_REFRESH_LIMIT
+            );
+        List<Map<String, Object>> rows = buildActiveLoanChartRows(
+            loanWorkflowService.findActiveDisbursedLoans(principal.getMemberId()),
+            dismissedActiveLoanChartIds(principal.getMemberId()),
+            loanProductNames(principal.getSaccoId())
+        );
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", refreshResult.status().name());
+        payload.put("message", refreshResult.message());
+        payload.put("rows", activeLoanBalanceResponseRows(rows));
+        return ResponseEntity.ok(payload);
     }
 
     @PostMapping("/dashboard/active-loans/{loanId}/seen")
@@ -460,6 +485,7 @@ public class AppController {
                     : Math.max(0, Math.min(100, Math.round((daysLeft * 100.0d) / totalDays)));
 
                 row.put("fullId", app.getId());
+                row.put("applicationId", app.getId() == null ? "" : app.getId().toString());
                 row.put("loanId", app.getLoanId() == null || app.getLoanId().isBlank() ? "-" : app.getLoanId());
                 row.put("loanProductName", loanProductName(app, loanProductNames));
                 row.put("applicantReason", applicantReason(app));
@@ -477,17 +503,45 @@ public class AppController {
                 row.put("repaymentStateLabel", repaymentStateLabel(app, today));
                 row.put("repaymentStateClasses", repaymentStateClasses(app, today));
                 row.put("loanDescription", loanProductName(app, loanProductNames));
-                row.put("lastPaymentDate", "-");
+                row.put("lastPaymentDate", loanPresentationService.activeLoanLastPaymentDateLabel(app));
                 String outstandingBalance = loanPresentationService.formatMoneyDisplay(
                     loanPresentationService.activeLoanOutstandingBalance(app)
                 );
                 row.put("totalOutstanding", outstandingBalance);
-                row.put("paidAmount", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));
+                row.put("paidAmount", loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanPaidAmount(app)
+                ));
                 row.put("currentBalance", outstandingBalance);
-                row.put("outstandingPrincipal", app.getStatus() == LoanStatus.PAID ? formatTzs(BigDecimal.ZERO) : loanPresentationService.formatMoneyDisplay(app.getAmount()));
-                row.put("outstandingInterest", "-");
-                row.put("totalPrincipalPaid", app.getStatus() == LoanStatus.PAID ? loanPresentationService.formatMoneyDisplay(app.getAmount()) : formatTzs(BigDecimal.ZERO));
-                row.put("totalInterestPaid", "-");
+                row.put("outstandingPrincipal", loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanOutstandingPrincipal(app)
+                ));
+                row.put("outstandingInterest", loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanOutstandingInterest(app)
+                ));
+                row.put("totalPrincipalPaid", loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanTotalPrincipalPaid(app)
+                ));
+                row.put("totalInterestPaid", loanPresentationService.formatMoneyDisplay(
+                    loanPresentationService.activeLoanTotalInterestPaid(app)
+                ));
+                return row;
+            })
+            .toList();
+    }
+
+    private List<Map<String, Object>> activeLoanBalanceResponseRows(List<Map<String, Object>> sourceRows) {
+        return sourceRows.stream()
+            .map(source -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("applicationId", source.get("applicationId"));
+                row.put("loanId", source.get("loanId"));
+                row.put("currentBalance", source.get("currentBalance"));
+                row.put("paidAmount", source.get("paidAmount"));
+                row.put("outstandingPrincipal", source.get("outstandingPrincipal"));
+                row.put("outstandingInterest", source.get("outstandingInterest"));
+                row.put("totalPrincipalPaid", source.get("totalPrincipalPaid"));
+                row.put("totalInterestPaid", source.get("totalInterestPaid"));
+                row.put("lastPaymentDate", source.get("lastPaymentDate"));
                 return row;
             })
             .toList();

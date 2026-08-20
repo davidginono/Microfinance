@@ -904,18 +904,110 @@ public class LoanPresentationService {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
         BigDecimal principal = nonNegative(app.getAmount()).setScale(2, RoundingMode.HALF_UP);
-        if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+        Map<String, Object> raw = financialSnapshot(app);
+        if (raw.isEmpty()) {
             return principal;
+        }
+        BigDecimal foresightTotalOutstanding = readBigDecimal(raw.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING));
+        if (foresightTotalOutstanding != null) {
+            return nonNegative(foresightTotalOutstanding).setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principal);
+        return principalPlusInterest == null
+            ? principal
+            : nonNegative(principalPlusInterest).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal activeLoanPaidAmount(LoanApplication app) {
+        BigDecimal principalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
+        BigDecimal interestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        if (principalPaid != null || interestPaid != null) {
+            return nonNegative(zeroIfNull(principalPaid).add(zeroIfNull(interestPaid)));
+        }
+        return app != null && app.getStatus() == LoanStatus.PAID
+            ? nonNegative(app.getAmount())
+            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal activeLoanOutstandingPrincipal(LoanApplication app) {
+        if (app == null || app.getStatus() == LoanStatus.PAID) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal syncedPrincipal = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_PRINCIPAL);
+        return syncedPrincipal == null
+            ? nonNegative(app.getAmount())
+            : nonNegative(syncedPrincipal);
+    }
+
+    public BigDecimal activeLoanOutstandingInterest(LoanApplication app) {
+        if (app == null || app.getStatus() == LoanStatus.PAID) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal syncedInterest = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_INTEREST);
+        if (syncedInterest != null) {
+            return nonNegative(syncedInterest);
+        }
+        BigDecimal contractualInterest = financialSnapshotAmount(app, "interestAmount");
+        return contractualInterest == null
+            ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : nonNegative(contractualInterest);
+    }
+
+    public BigDecimal activeLoanTotalPrincipalPaid(LoanApplication app) {
+        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
+        if (syncedPrincipalPaid != null) {
+            return nonNegative(syncedPrincipalPaid);
+        }
+        return app != null && app.getStatus() == LoanStatus.PAID
+            ? nonNegative(app.getAmount())
+            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal activeLoanTotalInterestPaid(LoanApplication app) {
+        BigDecimal syncedInterestPaid = financialSnapshotAmount(app, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        if (syncedInterestPaid != null) {
+            return nonNegative(syncedInterestPaid);
+        }
+        BigDecimal contractualInterest = financialSnapshotAmount(app, "interestAmount");
+        return app != null && app.getStatus() == LoanStatus.PAID && contractualInterest != null
+            ? nonNegative(contractualInterest)
+            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public String activeLoanLastPaymentDateLabel(LoanApplication app) {
+        String lastPaymentDate = financialSnapshotText(app, LoanFinancialSnapshotKeys.FORESIGHT_LAST_PAYMENT_DATE);
+        return lastPaymentDate == null || lastPaymentDate.isBlank() ? "-" : lastPaymentDate;
+    }
+
+    private BigDecimal financialSnapshotAmount(LoanApplication app, String key) {
+        Map<String, Object> raw = financialSnapshot(app);
+        if (!raw.containsKey(key)) {
+            return null;
+        }
+        return readBigDecimal(raw.get(key));
+    }
+
+    private String financialSnapshotText(LoanApplication app, String key) {
+        Map<String, Object> raw = financialSnapshot(app);
+        if (!raw.containsKey(key) || raw.get(key) == null) {
+            return null;
+        }
+        return String.valueOf(raw.get(key)).trim();
+    }
+
+    private Map<String, Object> financialSnapshot(LoanApplication app) {
+        if (app == null || app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
+            return Map.of();
         }
         try {
-            Map<String, Object> raw = objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
-            BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(raw, principal);
-            return principalPlusInterest == null
-                ? principal
-                : nonNegative(principalPlusInterest).setScale(2, RoundingMode.HALF_UP);
+            return objectMapper.readValue(app.getFinancialSnapshot(), new TypeReference<>() {});
         } catch (Exception ex) {
-            return principal;
+            return Map.of();
         }
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     public String latestManagerReason(UUID loanId) {

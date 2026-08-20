@@ -172,3 +172,5 @@ app:
 external:
   foresight:
     base-url: ${EXTERNAL_FORESIGHT_BASE_URL:https://api.foresightfin.app}
+    loan-payment-summary-sync-cron: "${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_CRON:0 15 2 * * *}"
+    loan-payment-summary-sync-batch-size: ${EXTERNAL_FORESIGHT_LOAN_PAYMENT_SUMMARY_SYNC_BATCH_SIZE:100}

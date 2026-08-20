@@ -445,6 +445,9 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                              @Param("dueDates") Collection<LocalDate> dueDates,
                                              Pageable pageable);
     List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
+    Page<LoanApplication> findByApplicantMemberIdAndStatusInAndLoanIdIsNotNull(UUID applicantMemberId,
+                                                                                Collection<LoanStatus> statuses,
+                                                                                Pageable pageable);
     long countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(UUID applicantMemberId, LoanStatus status);
     long countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(UUID applicantMemberId, Collection<LoanStatus> statuses);
 

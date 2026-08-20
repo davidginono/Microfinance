@@ -9,9 +9,11 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ForesightDirectoryServiceTest {
 
@@ -103,6 +105,80 @@ class ForesightDirectoryServiceTest {
                 service.lookupMemberProfileByPhone("+2556764239920");
 
             assertThat(result.status()).isEqualTo(ForesightDirectoryService.MemberProfileLookupStatus.UNAVAILABLE);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void loanPaymentSummaryLookupUsesDocumentedPathAndParsesArrayResponse() throws Exception {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> query = new AtomicReference<>();
+        HttpServer server = server(200, """
+            [
+              {
+                "loanId": 1001,
+                "loanDescription": "Personal Loan",
+                "requestedAmount": 500000.00,
+                "disbursedAmount": 525000.00,
+                "interestRate": 15.5,
+                "effectiveDate": "2024-03-15",
+                "lastPaymentDate": "2024-04-10",
+                "principalAmount": 500000.00,
+                "interestAmount": 25000.00,
+                "totalPrincipalPaid": 75000.00,
+                "totalInterestPaid": 5000.00,
+                "outstandingPrincipal": 425000.00,
+                "outstandingInterest": 20000.00,
+                "totalOutstanding": 445000.00
+              }
+            ]
+            """, path, query);
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            var summaries = service.fetchLoanPaymentSummary("MEM001", "ST01", "1001");
+
+            assertThat(summaries).hasSize(1);
+            ForesightLoanPaymentSummary summary = summaries.getFirst();
+            assertThat(summary.loanIdText()).isEqualTo("1001");
+            assertThat(summary.loanDescription()).isEqualTo("Personal Loan");
+            assertThat(summary.totalOutstanding()).isEqualByComparingTo("445000.00");
+            assertThat(summary.outstandingPrincipal()).isEqualByComparingTo("425000.00");
+            assertThat(summary.outstandingInterest()).isEqualByComparingTo("20000.00");
+            assertThat(summary.totalPrincipalPaid()).isEqualByComparingTo("75000.00");
+            assertThat(summary.totalInterestPaid()).isEqualByComparingTo("5000.00");
+            assertThat(summary.lastPaymentDate()).isEqualTo(LocalDate.of(2024, 4, 10));
+            assertThat(path.get()).isEqualTo("/loan-payment-summary");
+            assertThat(query.get()).isEqualTo("memberNumber=MEM001&stationId=ST01&loanId=1001");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void loanPaymentSummaryLookupReturnsEmptyListForEmptyArray() throws Exception {
+        HttpServer server = server(200, "[]", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThat(service.fetchLoanPaymentSummary("MEM001", "ST01", "1001")).isEmpty();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void loanPaymentSummaryLookupThrowsAvailabilityExceptionForUpstreamFailure() throws Exception {
+        HttpServer server = server(500, "{\"error\":\"down\"}", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThatThrownBy(() -> service.fetchLoanPaymentSummary("MEM001", "ST01", "1001"))
+                .isInstanceOf(UpstreamAvailabilityException.class);
         } finally {
             server.stop(0);
         }

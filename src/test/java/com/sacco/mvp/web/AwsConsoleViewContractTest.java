@@ -56,6 +56,20 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void memberDashboardActiveLoansUsesForesightBalanceRefreshControl() throws Exception {
+        String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
+
+        assertThat(dashboard)
+            .contains("data-active-loans-refresh")
+            .contains("data-refresh-url=\"${pageContext.request.contextPath}/app/dashboard/active-loans/balances/refresh\"")
+            .contains("data-aws-no-refresh=\"true\"")
+            .contains("data-active-loan-current-balance")
+            .contains("data-active-loan-paid-amount")
+            .contains("updateActiveLoanBalanceRows(payload.rows)")
+            .contains("We could not refresh loan balances right now. Please retry again later.");
+    }
+
+    @Test
     void conciseWorkspaceHeadersDoNotExposePageSubtitles() throws Exception {
         for (String workspace : List.of("app", "manager", "board", "loan-officer", "disbursement")) {
             try (Stream<Path> paths = Files.walk(JSP_ROOT.resolve(workspace))) {
@@ -255,7 +269,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260820-modal-gray-v41")
+            .contains("console-components.css?v=20260820-disbursement-bar-v42")
             .contains("shell.css?v=20260820-modal-sections-v42")
             .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")

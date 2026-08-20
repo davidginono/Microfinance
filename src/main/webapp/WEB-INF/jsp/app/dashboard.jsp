@@ -427,7 +427,28 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 <div id="activeLoansTablePanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
                 <c:choose>
                     <c:when test="${not empty activeLoanChartRows}">
-                        <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+                        <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
+                            <div class="app-table-titlebar">
+                                <div class="app-table-heading">
+                                    <h2><spring:message code="dashboard.activeLoans.balancesTitle" text="Loan balances" /></h2>
+                                </div>
+                                <div class="app-table-toolbar">
+                                    <button type="button"
+                                            class="app-icon-button btn-neutral"
+                                            data-active-loans-refresh
+                                            data-refresh-url="${pageContext.request.contextPath}/app/dashboard/active-loans/balances/refresh"
+                                            data-csrf-param="${_csrf.parameterName}"
+                                            data-csrf-token="${_csrf.token}"
+                                            data-success-message="<spring:message code='dashboard.activeLoans.refreshSuccess' text='Loan balances updated.' />"
+                                            data-no-data-message="<spring:message code='dashboard.activeLoans.refreshNoData' text='No updated balance was returned. Original outstanding balance remains.' />"
+                                            data-error-message="<spring:message code='dashboard.activeLoans.refreshError' text='We could not refresh loan balances right now. Please retry again later.' />"
+                                            data-loading-label="<spring:message code='dashboard.activeLoans.refreshing' text='Refreshing balances' />"
+                                            aria-label="<spring:message code='dashboard.activeLoans.refresh' text='Refresh loan balances' />"
+                                            title="<spring:message code='dashboard.activeLoans.refresh' text='Refresh loan balances' />">
+                                        <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
                             <div class="erp-table-scroll">
                             <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5">
                                 <thead>
@@ -446,7 +467,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
                                     <c:forEach items="${activeLoanChartRows}" var="loanRow">
-                                        <tr data-active-loans-row>
+                                        <tr data-active-loans-row data-loan-application-id="${loanRow.applicationId}">
                                             <td class="px-3 py-3 text-sm font-semibold text-slate-700">${loanRow.disbursementDate}</td>
                                             <td class="px-3 py-3 text-sm font-semibold text-slate-700">
                                                 <c:choose>
@@ -468,8 +489,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                 </c:choose>
                                             </td>
                                             <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.amountLabel}</td>
-                                            <td class="px-3 py-3 text-sm font-bold text-emerald-600">${loanRow.paidAmount}</td>
-                                            <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.currentBalance}</td>
+                                            <td class="px-3 py-3 text-sm font-bold text-emerald-600" data-active-loan-paid-amount>${loanRow.paidAmount}</td>
+                                            <td class="px-3 py-3 text-sm font-bold text-blue-600" data-active-loan-current-balance>${loanRow.currentBalance}</td>
                                             <td class="px-3 py-3">
                                                 <a href="${pageContext.request.contextPath}/app/loan-applications/${loanRow.fullId}#repayment-plan"
                                                    class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">
@@ -611,9 +632,118 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             render();
         }
 
+        function cssSelectorValue(value) {
+            var text = String(value || '');
+            if (window.CSS && typeof window.CSS.escape === 'function') {
+                return window.CSS.escape(text);
+            }
+            return text.replace(/["\\]/g, '\\$&');
+        }
+
+        function showActiveLoanRefreshToast(type, message) {
+            if (typeof window.showToast === 'function') {
+                window.showToast(type, message);
+            }
+        }
+
+        function updateActiveLoanBalanceRows(rows) {
+            var table = document.querySelector('[data-active-loans-table]');
+            if (!table || !Array.isArray(rows)) {
+                return;
+            }
+            rows.forEach(function (row) {
+                if (!row || !row.applicationId) {
+                    return;
+                }
+                var target = table.querySelector('[data-active-loans-row][data-loan-application-id="' + cssSelectorValue(row.applicationId) + '"]');
+                if (!target) {
+                    return;
+                }
+                var currentBalance = target.querySelector('[data-active-loan-current-balance]');
+                var paidAmount = target.querySelector('[data-active-loan-paid-amount]');
+                if (currentBalance && row.currentBalance) {
+                    currentBalance.textContent = row.currentBalance;
+                }
+                if (paidAmount && row.paidAmount) {
+                    paidAmount.textContent = row.paidAmount;
+                }
+            });
+        }
+
+        function initActiveLoansBalanceRefresh() {
+            var refreshButton = document.querySelector('[data-active-loans-refresh]');
+            if (!refreshButton) {
+                return;
+            }
+            var refreshUrl = refreshButton.getAttribute('data-refresh-url');
+            var csrfParam = refreshButton.getAttribute('data-csrf-param');
+            var csrfToken = refreshButton.getAttribute('data-csrf-token');
+            var originalLabel = refreshButton.getAttribute('aria-label') || 'Refresh loan balances';
+            var loadingLabel = refreshButton.getAttribute('data-loading-label') || 'Refreshing balances';
+            var errorMessage = refreshButton.getAttribute('data-error-message')
+                || 'We could not refresh loan balances right now. Please retry again later.';
+            var noDataMessage = refreshButton.getAttribute('data-no-data-message')
+                || 'No updated balance was returned. Original outstanding balance remains.';
+            var successMessage = refreshButton.getAttribute('data-success-message') || 'Loan balances updated.';
+
+            refreshButton.addEventListener('click', function () {
+                if (refreshButton.disabled || !refreshUrl) {
+                    return;
+                }
+                var body = new URLSearchParams();
+                if (csrfParam && csrfToken) {
+                    body.append(csrfParam, csrfToken);
+                }
+                refreshButton.disabled = true;
+                refreshButton.setAttribute('aria-busy', 'true');
+                refreshButton.setAttribute('aria-label', loadingLabel);
+                fetch(refreshUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: body.toString()
+                })
+                    .then(function (response) {
+                        return response.json().catch(function () {
+                            return {};
+                        }).then(function (payload) {
+                            if (!response.ok && !payload.status) {
+                                payload.status = 'ERROR';
+                                payload.message = errorMessage;
+                            }
+                            return payload;
+                        });
+                    })
+                    .then(function (payload) {
+                        updateActiveLoanBalanceRows(payload.rows);
+                        if (payload.status === 'ERROR') {
+                            showActiveLoanRefreshToast('error', payload.message || errorMessage);
+                        } else if (payload.status === 'NO_DATA') {
+                            showActiveLoanRefreshToast('info', payload.message || noDataMessage);
+                        } else if (payload.status === 'PARTIAL') {
+                            showActiveLoanRefreshToast('info', payload.message || successMessage);
+                        } else {
+                            showActiveLoanRefreshToast('success', payload.message || successMessage);
+                        }
+                    })
+                    .catch(function () {
+                        showActiveLoanRefreshToast('error', errorMessage);
+                    })
+                    .finally(function () {
+                        refreshButton.disabled = false;
+                        refreshButton.setAttribute('aria-busy', 'false');
+                        refreshButton.setAttribute('aria-label', originalLabel);
+                    });
+            });
+        }
+
         initDashboardDropdowns();
         initActiveLoansShortcut();
         initActiveLoansPagination();
+        initActiveLoansBalanceRefresh();
     }());
 </script>
 

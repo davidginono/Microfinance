@@ -322,6 +322,37 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void activeLoanOutstandingBalancePrefersForesightPaymentSummaryValues() {
+        LoanApplication app = LoanApplication.builder()
+            .amount(new BigDecimal("500000.00"))
+            .status(LoanStatus.DISBURSED)
+            .financialSnapshot("""
+                {
+                  "interestAmount": 25000.00,
+                  "principalPlusInterest": 525000.00,
+                  "foresightTotalOutstanding": 445000.00,
+                  "foresightOutstandingPrincipal": 425000.00,
+                  "foresightOutstandingInterest": 20000.00,
+                  "foresightTotalPrincipalPaid": 75000.00,
+                  "foresightTotalInterestPaid": 5000.00,
+                  "foresightLastPaymentDate": "2024-04-10"
+                }
+                """)
+            .build();
+
+        assertThat(loanPresentationService.activeLoanOutstandingBalance(app))
+            .isEqualByComparingTo("445000.00");
+        assertThat(loanPresentationService.activeLoanOutstandingPrincipal(app))
+            .isEqualByComparingTo("425000.00");
+        assertThat(loanPresentationService.activeLoanOutstandingInterest(app))
+            .isEqualByComparingTo("20000.00");
+        assertThat(loanPresentationService.activeLoanPaidAmount(app))
+            .isEqualByComparingTo("80000.00");
+        assertThat(loanPresentationService.activeLoanLastPaymentDateLabel(app))
+            .isEqualTo("2024-04-10");
+    }
+
+    @Test
     void activeLoanOutstandingBalanceRecalculatesTotalForReleasedPrincipal() {
         LoanApplication app = LoanApplication.builder()
             .amount(new BigDecimal("700000.00"))

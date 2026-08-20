@@ -16,6 +16,7 @@ public class SchedulerLockService {
     static final long OPERATIONAL_RETENTION = 48_002L;
     static final long DATABASE_UTILIZATION = 48_003L;
     static final long INVITATION_CLEANUP = 48_004L;
+    static final long FORESIGHT_LOAN_PAYMENT_SUMMARY = 48_005L;
 
     private final JdbcTemplate jdbcTemplate;
 

@@ -405,6 +405,49 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void memberActiveLoanDetailsPreferSyncedForesightOutstandingBalance() {
+        UUID memberId = UUID.randomUUID();
+        UUID loanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        LoanApplication loan = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("IAA")
+            .applicantMemberId(memberId)
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .loanProductSettingId(productId)
+            .loanId("1001")
+            .amount(new BigDecimal("500000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .financialSnapshot("""
+                {
+                  "interestAmount":25000.00,
+                  "principalPlusInterest":525000.00,
+                  "foresightTotalOutstanding":445000.00,
+                  "foresightOutstandingPrincipal":425000.00,
+                  "foresightOutstandingInterest":20000.00,
+                  "foresightTotalPrincipalPaid":75000.00,
+                  "foresightTotalInterestPaid":5000.00
+                }
+                """)
+            .build();
+
+        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(loan)));
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.CUSTOMIZED_LOAN, "Personal Loan")));
+
+        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
+            memberId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), null);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("445,000");
+        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("75,000");
+        assertThat(rows.getFirst().interestPaid()).isEqualTo("5,000");
+        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("20,000");
+    }
+
+    @Test
     void memberActiveLoanDetailsUseSnapshotAndSummaryWhenTransactionsAreMissing() {
         UUID memberId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();

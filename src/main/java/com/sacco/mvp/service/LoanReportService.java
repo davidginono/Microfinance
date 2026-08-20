@@ -1251,6 +1251,10 @@ public class LoanReportService {
     }
 
     private BigDecimal outstandingBalanceAmount(LoanApplication loan) {
+        BigDecimal syncedOutstanding = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING);
+        if (syncedOutstanding != null) {
+            return syncedOutstanding.max(BigDecimal.ZERO);
+        }
         return outstandingPrincipalAmount(loan).add(interestUnpaidAmount(loan)).max(BigDecimal.ZERO);
     }
 
@@ -1261,16 +1265,28 @@ public class LoanReportService {
         if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
             return BigDecimal.ZERO;
         }
+        BigDecimal syncedPrincipal = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_PRINCIPAL);
+        if (syncedPrincipal != null) {
+            return syncedPrincipal.max(BigDecimal.ZERO);
+        }
         return loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
     }
 
     private BigDecimal interestPaidAmount(LoanApplication loan) {
+        BigDecimal syncedInterestPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_INTEREST_PAID);
+        if (syncedInterestPaid != null) {
+            return syncedInterestPaid.max(BigDecimal.ZERO);
+        }
         return loan != null && loan.getStatus() == LoanStatus.PAID
             ? requiredInterestAmount(loan)
             : BigDecimal.ZERO;
     }
 
     private BigDecimal principalPaidAmount(LoanApplication loan) {
+        BigDecimal syncedPrincipalPaid = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_PRINCIPAL_PAID);
+        if (syncedPrincipalPaid != null) {
+            return syncedPrincipalPaid.max(BigDecimal.ZERO);
+        }
         return loan != null && loan.getStatus() == LoanStatus.PAID && loan.getAmount() != null
             ? loan.getAmount()
             : BigDecimal.ZERO;
@@ -1283,6 +1299,10 @@ public class LoanReportService {
         if (loan == null || !DISBURSED_STATUSES.contains(loan.getStatus())) {
             return BigDecimal.ZERO;
         }
+        BigDecimal syncedInterest = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.FORESIGHT_OUTSTANDING_INTEREST);
+        if (syncedInterest != null) {
+            return syncedInterest.max(BigDecimal.ZERO);
+        }
         return requiredInterestAmount(loan);
     }
 
@@ -1292,8 +1312,19 @@ public class LoanReportService {
         }
         try {
             Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
-            return readBigDecimal(raw.get(key));
+            return raw.containsKey(key) ? readFinancialSnapshotBigDecimal(raw.get(key)) : null;
         } catch (JacksonException ex) {
+            return null;
+        }
+    }
+
+    private BigDecimal readFinancialSnapshotBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value)).setScale(2, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ex) {
             return null;
         }
     }
