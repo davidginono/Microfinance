@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-# Sized for 20 concurrent users on a 2 GB ARM host with Postgres colocated.
+# Sized for 20 concurrent users on Amazon Lightsail Linux 2 GB (x86 Intel, public IPv4)
+# with Postgres colocated on the same VM. Default image is linux/amd64.
 # The JVM assumes a ~1.15g cgroup (see docker-compose.prod.yml).
-# Build ARM images with: docker build --platform linux/arm64 -t sacco-lms .
+# Optional Graviton only: docker build --platform linux/arm64 -t sacco-lms .
 
 FROM maven:3.9.11-eclipse-temurin-25 AS build
 

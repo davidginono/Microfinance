@@ -235,24 +235,30 @@ APP_SEED_DEMO_DATA_ENABLED=true
 
 This repository includes:
 
-- `Dockerfile`
+- `Dockerfile` (default **linux/amd64**, Lightsail x86 2 GB with colocated Postgres)
 - `docker-compose.yml` (local)
-- `docker-compose.prod.yml` (20 concurrent users, app + Postgres on one 2 GB host)
+- `docker-compose.prod.yml` (20 concurrent users, app + Postgres on one Lightsail 2 GB IPv4 host)
 - `README.Docker.md` for the lowest-cost AWS layout
 
-Start the application and PostgreSQL together with:
+Start the application and PostgreSQL together locally with:
 
 ```bash
 docker compose up --build
 ```
 
-Default compose services:
+Default local compose services:
 
 - app on port `8080`
 - PostgreSQL on port `5432`
 - Mailpit SMTP on port `1025` and inbox UI on port `8025`
 
-For 20 people using the app at once, host on **Lightsail 2 GB / t4g.small** (~TSh 380,000/year) with Postgres on the same box. See `README.Docker.md`. That is the cost floor; do not use a 1 GB instance.
+Production is **Amazon Lightsail Linux 2 GB with public IPv4** (x86 Intel, not Graviton; default image **linux/amd64**), Postgres colocated, extra **20 GB** SSD at `/mnt/saccos-data`, about **$192 / TSh 507,000** per year. Bind `/mnt/saccos-data/postgres`, `/mnt/saccos-data/uploads`, and `/mnt/saccos-data/saccos` as in `docker-compose.prod.yml`. After the disk is mounted:
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+See `README.Docker.md`. Do not use a 1 GB instance, IPv6-only, RDS, or an ALB at this size.
 
 ## Important Routes
 

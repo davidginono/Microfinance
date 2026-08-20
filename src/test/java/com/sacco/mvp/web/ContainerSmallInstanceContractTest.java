@@ -24,7 +24,8 @@ class ContainerSmallInstanceContractTest {
             .contains("SERVER_TOMCAT_THREADS_MAX=24")
             .contains("SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=8")
             .contains("HEALTHCHECK")
-            .contains("/actuator/health");
+            .contains("/actuator/health")
+            .contains("linux/amd64");
         assertThat(prod)
             .contains("maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:8}")
             .contains("max: ${SERVER_TOMCAT_THREADS_MAX:24}")
@@ -40,6 +41,13 @@ class ContainerSmallInstanceContractTest {
             .contains("mem_limit: 512m")
             .contains("max_connections=30")
             .contains("shared_buffers=96MB")
-            .doesNotContain("mailpit");
+            .contains("linux/amd64")
+            .contains("/mnt/saccos-data/postgres")
+            .contains("/mnt/saccos-data/uploads")
+            .contains("/mnt/saccos-data/saccos")
+            .contains("APP_UPLOADS_FILES_ROOT: /var/lib/saccos-lms/uploads")
+            .contains("APP_SACCOS_FILES_ROOT: /var/lib/saccos-lms/saccos")
+            .doesNotContain("mailpit")
+            .doesNotContain("5432:5432");
     }
 }

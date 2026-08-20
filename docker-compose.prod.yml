@@ -1,5 +1,10 @@
+# Production: Amazon Lightsail Linux 2 GB (x86 Intel, public IPv4) with colocated Postgres.
+# Bind live data to the extra 20 GB disk mounted at /mnt/saccos-data on the host.
+# Default image/runtime is linux/amd64. No Mailpit, no published Postgres port.
+
 services:
   app:
+    platform: linux/amd64
     build:
       context: .
       target: final
@@ -26,8 +31,8 @@ services:
     ports:
       - "${APP_PORT:-8080}:8080"
     volumes:
-      - app-uploads:/var/lib/saccos-lms/uploads
-      - app-saccos:/var/lib/saccos-lms/saccos
+      - /mnt/saccos-data/uploads:/var/lib/saccos-lms/uploads
+      - /mnt/saccos-data/saccos:/var/lib/saccos-lms/saccos
     logging:
       driver: json-file
       options:
@@ -36,6 +41,7 @@ services:
 
   db:
     image: postgres:16-alpine
+    platform: linux/amd64
     restart: unless-stopped
     mem_limit: 512m
     cpus: "0.6"
@@ -58,7 +64,7 @@ services:
       - -c
       - wal_buffers=4MB
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - /mnt/saccos-data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sacco} -d ${POSTGRES_DB:-sacco}"]
       interval: 10s
@@ -69,8 +75,3 @@ services:
       options:
         max-size: "8m"
         max-file: "3"
-
-volumes:
-  db-data:
-  app-uploads:
-  app-saccos:
