@@ -14,8 +14,8 @@
     <link rel="preload" href="<c:url value='/fonts/open-sans/open-sans-700.woff2' />" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
-    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260814-loan-detail-v39' />" />
-<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260819-language-select-v41' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260820-modal-sections-v40' />" />
+<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260820-modal-sections-v42' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">

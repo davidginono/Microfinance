@@ -3173,6 +3173,10 @@ body.aws-console {
     padding: 10px !important;
 }
 
+.app-modal-section {
+    border-radius: 2px !important;
+}
+
 .product-builder-section-header,
 .guarantor-financial-modal-header,
 .session-timeout-header {

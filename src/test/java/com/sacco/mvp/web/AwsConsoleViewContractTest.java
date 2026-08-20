@@ -255,8 +255,8 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260814-loan-detail-v39")
-            .contains("shell.css?v=20260819-language-select-v41")
+            .contains("console-components.css?v=20260820-modal-sections-v40")
+            .contains("shell.css?v=20260820-modal-sections-v42")
             .contains("shell.js?v=20260814-console-popover-v18")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
@@ -999,6 +999,7 @@ class AwsConsoleViewContractTest {
     void otpConfirmationModalUsesSharedCompactContainerLayout() throws Exception {
         String guaranteeRequests = read(JSP_ROOT.resolve("app/guarantee-requests.jsp"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
 
         assertThat(guaranteeRequests)
             .contains("class=\"app-modal-panel app-modal-panel--compact guarantee-otp-modal-panel\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"guaranteeApproveTitle-${req.id}\"")
@@ -1020,7 +1021,13 @@ class AwsConsoleViewContractTest {
             .contains(".guarantee-otp-modal-panel .app-modal-header h2")
             .contains("width: min(100%, 16rem)")
             .contains("border-radius: 2px")
+            .containsPattern("(?s)\\.app-modal-section \\{\\s*border: 1px solid #e2e8f0;\\s*border-radius: 2px;")
+            .containsPattern("(?s)@media \\(max-width: 640px\\) \\{.*?\\.app-modal-section \\{\\s*padding: 0\\.95rem;\\s*border-radius: 2px;")
+            .doesNotContainPattern("(?s)\\.app-modal-section \\{\\s*border: 1px solid #e2e8f0;\\s*border-radius: 0\\.75rem;")
             .doesNotContain(".guarantee-modal-subtitle-legacy");
+
+        assertThat(shellCss)
+            .containsPattern("(?s)\\.app-modal-section \\{\\s*border-radius: 2px !important;\\s*\\}");
     }
 
     private static List<Path> routeViews() throws IOException {

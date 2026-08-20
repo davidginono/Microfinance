@@ -5325,7 +5325,7 @@ html.session-timeout-active,
         max-height: min(88vh, 52rem);
         overflow: hidden;
         border: 1px solid #d8e0e8;
-        border-radius: 1rem;
+        border-radius: 2px;
         background: #ffffff;
         box-shadow: 0 22px 56px rgba(15, 23, 42, 0.14);
     }
@@ -5423,7 +5423,7 @@ html.session-timeout-active,
 
     .app-modal-section {
         border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
+        border-radius: 2px;
         background: #fafcff;
         padding: 1rem 1.1rem;
     }
@@ -5438,7 +5438,7 @@ html.session-timeout-active,
 
     .app-modal-actions .app-btn {
         min-width: 7rem;
-        border-radius: 0.72rem;
+        border-radius: 2px;
         padding: 0.72rem 1.05rem;
     }
 
@@ -5448,7 +5448,7 @@ html.session-timeout-active,
         }
 
         .app-modal-panel {
-            border-radius: 0.9rem;
+            border-radius: 2px;
         }
 
         .app-modal-header {
@@ -5461,7 +5461,7 @@ html.session-timeout-active,
 
         .app-modal-section {
             padding: 0.95rem;
-            border-radius: 0.7rem;
+            border-radius: 2px;
         }
 
         .app-modal-actions .app-btn {
