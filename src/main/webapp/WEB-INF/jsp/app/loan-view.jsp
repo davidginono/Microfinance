@@ -543,6 +543,7 @@
                                     <div class="flex flex-wrap gap-2">
                                         <form action="/app/loan-applications/${app.id}/guarantor-reversal-requests/${pendingUndo.id}/approve"
                                               method="post"
+                                              data-page-preloader="true"
                                               data-confirm-title="Approve Removal"
                                               data-confirm-message="Approve this request and remove the guarantor from this application?"
                                               data-confirm-proceed="Approve Removal">
@@ -551,6 +552,7 @@
                                         </form>
                                         <form action="/app/loan-applications/${app.id}/guarantor-reversal-requests/${pendingUndo.id}/reject"
                                               method="post"
+                                              data-page-preloader="true"
                                               data-confirm-title="Keep Guarantor"
                                               data-confirm-message="Decline this request and keep the guarantor on this application?"
                                               data-confirm-proceed="Keep Guarantor">
