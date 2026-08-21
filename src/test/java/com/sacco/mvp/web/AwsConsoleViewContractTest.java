@@ -63,10 +63,12 @@ class AwsConsoleViewContractTest {
             .contains("data-active-loans-refresh")
             .contains("data-refresh-url=\"${pageContext.request.contextPath}/app/dashboard/active-loans/balances/refresh\"")
             .contains("data-aws-no-refresh=\"true\"")
+            .contains("M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5")
             .contains("data-active-loan-current-balance")
             .contains("data-active-loan-paid-amount")
             .contains("updateActiveLoanBalanceRows(payload.rows)")
-            .contains("We could not refresh loan balances right now. Please retry again later.");
+            .contains("We could not refresh loan balances right now. Please retry again later.")
+            .doesNotContain("data-lucide=\"refresh-cw\"");
     }
 
     @Test
