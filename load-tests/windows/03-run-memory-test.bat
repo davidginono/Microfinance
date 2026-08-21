@@ -7,8 +7,9 @@ echo.
 echo SACCOS LMS - beginner k6 memory test
 echo.
 
-where k6 >nul 2>nul
-if errorlevel 1 (
+set "K6_EXE="
+call :find_k6
+if not defined K6_EXE (
   echo k6 was not found.
   echo Double-click load-tests\windows\01-install-k6.bat first.
   echo Then close and reopen this window.
@@ -61,10 +62,12 @@ if not "%VUS_INPUT%"=="" set "SACCOS_MAX_VUS=%VUS_INPUT%"
 
 echo.
 echo Running k6 now...
+echo Using k6:
+echo %K6_EXE%
 echo Results will be saved in load-tests\results.
 echo.
 
-k6 run ^
+"%K6_EXE%" run ^
   --summary-export "load-tests/results/beginner-memory-summary.json" ^
   --out "csv=load-tests/results/beginner-memory-timeseries.csv" ^
   "load-tests/k6/saccos-memory-beginner.js"
@@ -75,3 +78,17 @@ echo Main report: load-tests\results\beginner-memory-report.txt
 echo Timeline CSV: load-tests\results\beginner-memory-timeseries.csv
 echo.
 pause
+
+exit /b 0
+
+:find_k6
+where k6 >nul 2>nul
+if not errorlevel 1 (
+  for /f "delims=" %%K in ('where k6 2^>nul') do (
+    if not defined K6_EXE set "K6_EXE=%%K"
+  )
+)
+if not defined K6_EXE if exist "%ProgramFiles%\k6\k6.exe" set "K6_EXE=%ProgramFiles%\k6\k6.exe"
+if not defined K6_EXE if exist "%ProgramFiles%\Grafana Labs\k6\k6.exe" set "K6_EXE=%ProgramFiles%\Grafana Labs\k6\k6.exe"
+if not defined K6_EXE if exist "%LOCALAPPDATA%\Microsoft\WindowsApps\k6.exe" set "K6_EXE=%LOCALAPPDATA%\Microsoft\WindowsApps\k6.exe"
+exit /b 0
