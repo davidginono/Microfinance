@@ -17,6 +17,7 @@ docs/**/*.pyc
 *.class
 *.argfile
 *.log
+load-tests/results/
 *-response.html
 *-page.html
 *-post-body.html
