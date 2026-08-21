@@ -2,6 +2,8 @@
 
 These scripts measure route latency, errors, throughput, and memory behavior for the SACCO LMS without changing loan workflow data. Authenticated scripts log in once per virtual user, keep the session cookie, and fail fast if the chosen account requires MFA.
 
+Beginner path without Docker or PowerShell: see `BEGINNER-MEMORY.md`.
+
 ## Tools
 
 - k6 for HTTP load.
