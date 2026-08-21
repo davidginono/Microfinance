@@ -138,6 +138,12 @@
             document.querySelectorAll("[data-live-account-status-url]").forEach(hydrateLiveAccountStatus);
         }
 
+        window.SaccosLiveAccountStatus = {
+            hydrate: hydrateLiveAccountStatus,
+            hydrateAll: hydrateAllLiveAccountStatuses,
+            cancel: cancelLiveAccountStatusRequest
+        };
+
         if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", hydrateAllLiveAccountStatuses, { once: true });
         } else {

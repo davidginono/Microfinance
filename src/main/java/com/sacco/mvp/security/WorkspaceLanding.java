@@ -11,6 +11,10 @@ public final class WorkspaceLanding {
         return "/app/dashboard";
     }
 
+    public static String memberDashboardAfterLogin() {
+        return memberDashboard() + "?progressive=true";
+    }
+
     public static String staffDashboard(Member member) {
         if (member == null) {
             return memberDashboard();

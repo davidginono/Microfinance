@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.security.AppUserPrincipal;
+import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.LoanPaymentSummarySyncService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
@@ -16,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -34,6 +36,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,10 +47,30 @@ class AppControllerActiveLoanBalanceRefreshTest {
     @Mock private LoanPresentationService loanPresentationService;
     @Mock private LoanProductDisplayService loanProductDisplayService;
     @Mock private UserSettingsService userSettingsService;
+    @Mock private ExternalAccountStatusService externalAccountStatusService;
     @Mock private MessageSource messageSource;
     @Mock private AppUserPrincipal principal;
 
     @InjectMocks private AppController controller;
+
+    @Test
+    void progressiveDashboardRendersShellWithoutSynchronousDashboardQueries() {
+        ExternalAccountStatusService.ExternalAccountStatusView loadingStatus =
+            ExternalAccountStatusService.ExternalAccountStatusView.loading("loan.loadingLiveBalances");
+        when(messageSource.getMessage(anyString(), isNull(), anyString(), any(Locale.class)))
+            .thenAnswer(invocation -> invocation.getArgument(2));
+        when(externalAccountStatusService.loading("loan.loadingLiveBalances")).thenReturn(loadingStatus);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        String view = controller.dashboard(principal, true, model);
+
+        assertThat(view).isEqualTo("app/dashboard");
+        assertThat(model.get("dashboardProgressive")).isEqualTo(true);
+        assertThat(model.get("dashboardExternalAccountStatus")).isSameAs(loadingStatus);
+        assertThat((List<?>) model.get("statusChartRows")).isEmpty();
+        assertThat((List<?>) model.get("activeLoanChartRows")).isEmpty();
+        verify(loanWorkflowService, never()).memberDashboard(any());
+    }
 
     @Test
     @SuppressWarnings("unchecked")

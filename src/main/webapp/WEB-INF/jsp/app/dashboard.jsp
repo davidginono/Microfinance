@@ -222,7 +222,11 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 }
 %>
 
-<section class="space-y-4">
+<section id="memberDashboardContent"
+         class="space-y-4"
+         data-member-dashboard-content
+         data-member-dashboard-progressive="${dashboardProgressive}"
+         data-member-dashboard-content-url="${pageContext.request.contextPath}/app/dashboard?full=true">
 <div class="erp-page-header" data-aws-page-header>
         <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
         <p class="mt-1 text-lg font-semibold text-sacco-ink">
@@ -256,6 +260,89 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </c:if>
 
+    <c:choose>
+        <c:when test="${dashboardProgressive}">
+            <div class="erp-stat-grid" aria-busy="true">
+                <div class="erp-stat-card erp-stat-blue">
+                    <div class="erp-stat-main">
+                        <div>
+                            <p class="erp-stat-label"><spring:message code="dashboard.stat.applications.label" /></p>
+                            <p class="erp-stat-value">...</p>
+                        </div>
+                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+                    </div>
+                </div>
+                <div class="erp-stat-card erp-stat-green">
+                    <div class="erp-stat-main">
+                        <div>
+                            <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
+                            <p class="erp-stat-value">...</p>
+                        </div>
+                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+                    </div>
+                </div>
+                <div class="erp-stat-card erp-stat-amber">
+                    <div class="erp-stat-main">
+                        <div>
+                            <p class="erp-stat-label"><spring:message code="dashboard.stat.guarantorRequests.label" /></p>
+                            <p class="erp-stat-value">...</p>
+                        </div>
+                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+                    </div>
+                </div>
+                <div class="erp-stat-card erp-stat-red">
+                    <div class="erp-stat-main">
+                        <div>
+                            <p class="erp-stat-label"><spring:message code="dashboard.stat.archivedRejections.label" /></p>
+                            <p class="erp-stat-value">...</p>
+                        </div>
+                        <span class="erp-stat-icon" aria-hidden="true">...</span>
+                    </div>
+                </div>
+            </div>
+
+            <section class="erp-panel" data-live-account-status-url="${pageContext.request.contextPath}/app/dashboard/external-account-status">
+                <div class="erp-panel-header">
+                    <p class="erp-panel-title"><spring:message code="dashboard.panel.financialStatus" /></p>
+                </div>
+                <div class="erp-panel-body">
+                    <h2 class="erp-widget-heading"><spring:message code="dashboard.widget.yourBalances" text="Your Balances" /></h2>
+                    <div class="aws-status-summary-grid mt-3">
+                        <div class="aws-status-summary-item">
+                            <p class="aws-status-summary-label"><spring:message code="dashboard.savings.label" /></p>
+                            <p class="aws-status-summary-value" data-live-account-status-savings>${dashboardExternalAccountStatus.savingsLabel}</p>
+                        </div>
+                        <div class="aws-status-summary-item">
+                            <p class="aws-status-summary-label"><spring:message code="dashboard.shares.label" /></p>
+                            <p class="aws-status-summary-value" data-live-account-status-shares>${dashboardExternalAccountStatus.sharesLabel}</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid min-w-0 gap-4 xl:grid-cols-2" aria-busy="true">
+                <section class="erp-panel min-w-0">
+                    <div class="erp-panel-header">
+                        <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
+                    </div>
+                    <div class="erp-panel-body">
+                        <div class="erp-section text-center text-sm text-slate-500">Loading application status...</div>
+                    </div>
+                </section>
+                <section class="erp-panel min-w-0 xl:self-start">
+                    <div class="erp-panel-header">
+                        <p class="erp-panel-title"><spring:message code="dashboard.activeLoans.title" text="Active Loans" /></p>
+                    </div>
+                    <div class="erp-panel-body">
+                        <div class="erp-section text-center text-sm text-slate-500">Loading active loans...</div>
+                    </div>
+                </section>
+            </div>
+            <div class="aws-inline-notice aws-inline-notice--danger hidden" data-dashboard-progressive-error hidden>
+                <span>Dashboard content could not load. Refresh this page to try again.</span>
+            </div>
+        </c:when>
+        <c:otherwise>
     <div class="erp-stat-grid">
         <a href="/app/loan-applications" class="erp-stat-card erp-stat-card-interactive erp-stat-blue block no-underline">
             <div class="erp-stat-main">
@@ -528,6 +615,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
     </div>
         </section>
     </div>
+        </c:otherwise>
+    </c:choose>
 </section>
 
 <script>
@@ -545,6 +634,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         function initDashboardDropdowns() {
             var triggers = document.querySelectorAll('[data-dashboard-toggle]');
             Array.prototype.forEach.call(triggers, function (trigger) {
+                if (trigger.getAttribute('data-dashboard-toggle-ready') === 'true') {
+                    return;
+                }
+                trigger.setAttribute('data-dashboard-toggle-ready', 'true');
                 setExpanded(trigger, trigger.getAttribute('aria-expanded') !== 'false');
                 trigger.addEventListener('click', function () {
                     setExpanded(trigger, trigger.getAttribute('aria-expanded') !== 'true');
@@ -559,6 +652,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             if (!cardTrigger || !loansPanel) {
                 return;
             }
+            if (cardTrigger.getAttribute('data-active-loans-shortcut-ready') === 'true') {
+                return;
+            }
+            cardTrigger.setAttribute('data-active-loans-shortcut-ready', 'true');
             cardTrigger.addEventListener('click', function () {
                 if (tableTrigger) {
                     setExpanded(tableTrigger, true);
@@ -584,6 +681,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             if (!table) {
                 return;
             }
+            if (table.getAttribute('data-active-loans-pagination-ready') === 'true') {
+                return;
+            }
+            table.setAttribute('data-active-loans-pagination-ready', 'true');
             var rows = Array.prototype.slice.call(table.querySelectorAll('[data-active-loans-row]'));
             var pageSize = Number(table.getAttribute('data-page-size')) || 5;
             var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -678,6 +779,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             if (!refreshButton) {
                 return;
             }
+            if (refreshButton.getAttribute('data-active-loans-refresh-ready') === 'true') {
+                return;
+            }
+            refreshButton.setAttribute('data-active-loans-refresh-ready', 'true');
             var refreshUrl = refreshButton.getAttribute('data-refresh-url');
             var csrfParam = refreshButton.getAttribute('data-csrf-param');
             var csrfToken = refreshButton.getAttribute('data-csrf-token');
@@ -743,10 +848,78 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             });
         }
 
-        initDashboardDropdowns();
-        initActiveLoansShortcut();
-        initActiveLoansPagination();
-        initActiveLoansBalanceRefresh();
+        function initMemberDashboard() {
+            initDashboardDropdowns();
+            initActiveLoansShortcut();
+            initActiveLoansPagination();
+            initActiveLoansBalanceRefresh();
+        }
+
+        function initProgressiveDashboard() {
+            var shell = document.querySelector('[data-member-dashboard-progressive="true"]');
+            if (!shell || shell.getAttribute('data-member-dashboard-progressive-ready') === 'true') {
+                return;
+            }
+            var contentUrl = shell.getAttribute('data-member-dashboard-content-url');
+            if (!contentUrl) {
+                return;
+            }
+            shell.setAttribute('data-member-dashboard-progressive-ready', 'true');
+            fetch(contentUrl, {
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'text/html'
+                }
+            })
+                .then(function (response) {
+                    if (response.redirected && response.url) {
+                        var redirectedUrl = new URL(response.url, window.location.href);
+                        if (/^\/(?:login|auth)(?:\/|$)/.test(redirectedUrl.pathname)) {
+                            window.location.assign(redirectedUrl.href);
+                            return null;
+                        }
+                    }
+                    if (!response.ok) {
+                        throw new Error('Dashboard content could not load.');
+                    }
+                    return response.text();
+                })
+                .then(function (html) {
+                    if (!html) {
+                        return;
+                    }
+                    var parsed = new DOMParser().parseFromString(html, 'text/html');
+                    var nextContent = parsed.querySelector('[data-member-dashboard-content]');
+                    if (!nextContent) {
+                        throw new Error('Dashboard content could not load.');
+                    }
+                    shell.replaceWith(document.importNode(nextContent, true));
+                    var dashboardPath = '${pageContext.request.contextPath}/app/dashboard';
+                    if (window.location.pathname === dashboardPath && window.history && window.history.replaceState) {
+                        window.history.replaceState(window.history.state, '', dashboardPath);
+                    }
+                    initMemberDashboard();
+                    if (window.SaccosLiveAccountStatus && typeof window.SaccosLiveAccountStatus.hydrateAll === 'function') {
+                        window.SaccosLiveAccountStatus.hydrateAll();
+                    }
+                })
+                .catch(function () {
+                    var errorBox = shell.querySelector('[data-dashboard-progressive-error]');
+                    if (errorBox) {
+                        errorBox.hidden = false;
+                        errorBox.classList.remove('hidden');
+                    }
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('error', 'Dashboard content could not load. Refresh this page to try again.');
+                    }
+                });
+        }
+
+        window.SaccosMemberDashboard = {
+            init: initMemberDashboard
+        };
+        initMemberDashboard();
+        initProgressiveDashboard();
     }());
 </script>
 

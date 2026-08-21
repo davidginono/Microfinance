@@ -341,7 +341,7 @@ public class AuthController {
                 member.getSaccoId(), member.getStationId(), Map.of("method", "OTP", "memberNo", member.getMemberNo()));
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "redirectUrl", WorkspaceLanding.memberDashboard()
+                "redirectUrl", WorkspaceLanding.memberDashboardAfterLogin()
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(

@@ -72,6 +72,34 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void memberDashboardSupportsProgressivePostLoginHydration() throws Exception {
+        String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
+        String liveStatusHydration = read(JSP_ROOT.resolve("fragments/live-account-status-hydration.jspf"));
+        String workspaceLanding = read(Path.of("src/main/java/com/sacco/mvp/security/WorkspaceLanding.java"));
+        String securityConfig = read(Path.of("src/main/java/com/sacco/mvp/config/SecurityConfig.java"));
+        String authController = read(Path.of("src/main/java/com/sacco/mvp/web/AuthController.java"));
+
+        assertThat(dashboard)
+            .contains("data-member-dashboard-progressive=\"${dashboardProgressive}\"")
+            .contains("data-member-dashboard-content-url=\"${pageContext.request.contextPath}/app/dashboard?full=true\"")
+            .contains("initProgressiveDashboard()")
+            .contains("window.SaccosMemberDashboard")
+            .contains("window.SaccosLiveAccountStatus.hydrateAll()")
+            .contains("Dashboard content could not load. Refresh this page to try again.");
+        assertThat(liveStatusHydration)
+            .contains("window.SaccosLiveAccountStatus")
+            .contains("hydrateAll: hydrateAllLiveAccountStatuses");
+        assertThat(workspaceLanding)
+            .contains("memberDashboardAfterLogin()")
+            .contains("return memberDashboard() + \"?progressive=true\";");
+        assertThat(securityConfig)
+            .contains("WorkspaceLanding.memberDashboardAfterLogin()")
+            .contains("savedTargetAfterLogin(principal, savedTarget)");
+        assertThat(authController)
+            .contains("\"redirectUrl\", WorkspaceLanding.memberDashboardAfterLogin()");
+    }
+
+    @Test
     void conciseWorkspaceHeadersDoNotExposePageSubtitles() throws Exception {
         for (String workspace : List.of("app", "manager", "board", "loan-officer", "disbursement")) {
             try (Stream<Path> paths = Files.walk(JSP_ROOT.resolve(workspace))) {

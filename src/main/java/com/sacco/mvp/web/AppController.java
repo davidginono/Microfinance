@@ -113,7 +113,22 @@ public class AppController {
 
     @GetMapping("/dashboard")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
-    public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
+    public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal,
+                            @RequestParam(name = "progressive", defaultValue = "false") boolean progressive,
+                            Model model) {
+        if (progressive) {
+            model.addAttribute("dashboardProgressive", true);
+            model.addAttribute("dashboardExternalAccountStatus", externalAccountStatusService.loading(message("loan.loadingLiveBalances")));
+            model.addAttribute("statusChartRows", List.of());
+            model.addAttribute("activeLoanChartRows", List.of());
+            return "app/dashboard";
+        }
+        model.addAttribute("dashboardProgressive", false);
+        addMemberDashboardModel(principal, model);
+        return "app/dashboard";
+    }
+
+    private void addMemberDashboardModel(AppUserPrincipal principal, Model model) {
         LoanWorkflowService.MemberDashboardData dashboard = loanWorkflowService.memberDashboard(principal.getMemberId());
         Map<LoanStatus, Long> statusCounts = dashboard.statusCounts();
         List<LoanApplication> activeLoans = dashboard.activeLoans();
@@ -183,7 +198,6 @@ public class AppController {
             currentWorkflowApplication == null
                 ? List.of()
                 : buildDashboardWorkflowSteps(currentWorkflowApplication));
-        return "app/dashboard";
     }
 
     @GetMapping("/dashboard/external-account-status")

@@ -246,12 +246,12 @@ public class SecurityConfig {
 
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                        response.sendRedirect(savedTarget);
+                        response.sendRedirect(savedTargetAfterLogin(principal, savedTarget));
                         return;
                     }
                     if (!staffPasswordLogin && principal != null && principal.isMemberAccess()) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                        response.sendRedirect(WorkspaceLanding.memberDashboard());
+                        response.sendRedirect(WorkspaceLanding.memberDashboardAfterLogin());
                         return;
                     }
                     if (isSuperAdmin) {
@@ -266,7 +266,7 @@ public class SecurityConfig {
                         return;
                     }
                     auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                    response.sendRedirect(WorkspaceLanding.memberDashboard());
+                    response.sendRedirect(WorkspaceLanding.memberDashboardAfterLogin());
                 })
                 .permitAll())
             .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout"))
@@ -338,11 +338,11 @@ public class SecurityConfig {
                     String savedTarget = savedRequestTarget(request);
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
-                        response.sendRedirect(savedTarget);
+                        response.sendRedirect(savedTargetAfterLogin(principal, savedTarget));
                         return;
                     }
                     auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
-                    response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
+                    response.sendRedirect(authenticatedLandingAfterLogin(principal));
                 })
                 .failureHandler((request, response, exception) -> {
                     auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "Google sign-in could not be completed.");
@@ -497,12 +497,48 @@ public class SecurityConfig {
 
     private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {
         if (!staffPasswordLogin && principal.isMemberAccess()) {
-            return WorkspaceLanding.memberDashboard();
+            return WorkspaceLanding.memberDashboardAfterLogin();
         }
         if (staffPasswordLogin || !principal.getStaffRoles().isEmpty()) {
             return WorkspaceLanding.staffDashboard(principal);
         }
-        return WorkspaceLanding.memberDashboard();
+        return WorkspaceLanding.memberDashboardAfterLogin();
+    }
+
+    private String authenticatedLandingAfterLogin(AppUserPrincipal principal) {
+        if (principal != null && principal.isMemberAccess() && !principal.isStaffSession()) {
+            return WorkspaceLanding.memberDashboardAfterLogin();
+        }
+        return WorkspaceLanding.authenticatedDefault(principal);
+    }
+
+    private String savedTargetAfterLogin(AppUserPrincipal principal, String savedTarget) {
+        if (principal == null || !principal.isMemberAccess() || principal.isStaffSession() || !isMemberDashboardTarget(savedTarget)) {
+            return savedTarget;
+        }
+        if (savedTarget.contains("progressive=true")) {
+            return savedTarget;
+        }
+        int fragmentIndex = savedTarget.indexOf('#');
+        String baseTarget = fragmentIndex >= 0 ? savedTarget.substring(0, fragmentIndex) : savedTarget;
+        String fragment = fragmentIndex >= 0 ? savedTarget.substring(fragmentIndex) : "";
+        return baseTarget + (baseTarget.contains("?") ? "&" : "?") + "progressive=true" + fragment;
+    }
+
+    private boolean isMemberDashboardTarget(String target) {
+        if (target == null || target.isBlank()) {
+            return false;
+        }
+        try {
+            return "/app/dashboard".equals(java.net.URI.create(target).getPath());
+        } catch (IllegalArgumentException ex) {
+            int queryIndex = target.indexOf('?');
+            int fragmentIndex = target.indexOf('#');
+            int endIndex = queryIndex >= 0 && fragmentIndex >= 0
+                ? Math.min(queryIndex, fragmentIndex)
+                : Math.max(queryIndex, fragmentIndex);
+            return "/app/dashboard".equals(endIndex >= 0 ? target.substring(0, endIndex) : target);
+        }
     }
 
     private void clearAuthenticationContext(HttpServletRequest request) {
