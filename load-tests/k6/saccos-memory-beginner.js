@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, fail, sleep } from 'k6';
+import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 import {
   authenticatedBrowse,
@@ -30,6 +30,7 @@ const hikariPending = new Trend('hikaricp_connections_pending');
 const gcPauseMaxMs = new Trend('jvm_gc_pause_max_ms');
 
 let metricsLoggedIn = false;
+let actuatorWarningLogged = false;
 
 export const options = {
   scenarios: {
@@ -67,11 +68,6 @@ export function userLoginsAndPages() {
 }
 
 export function memorySampler() {
-  if (!metricsLoggedIn) {
-    login();
-    metricsLoggedIn = true;
-  }
-
   const heapUsedBytes = actuatorValue('jvm.memory.used', 'area:heap');
   const heapMaxBytes = actuatorValue('jvm.memory.max', 'area:heap');
   const nonHeapUsedBytes = actuatorValue('jvm.memory.used', 'area:nonheap');
@@ -147,13 +143,29 @@ function actuatorValue(name, tag) {
 
 function actuatorMeasurement(name, statistic, tag) {
   const url = `${baseUrl()}/actuator/metrics/${name}${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`;
-  const response = http.get(url, { tags: { route: `/actuator/metrics/${name}` } });
+  let response = http.get(url, {
+    redirects: 0,
+    tags: { route: `/actuator/metrics/${name}` }
+  });
+
+  if (isRedirect(response) && !metricsLoggedIn) {
+    login();
+    metricsLoggedIn = true;
+    response = http.get(url, {
+      redirects: 0,
+      tags: { route: `/actuator/metrics/${name}` }
+    });
+  }
+
   const ok = check(response, {
-    [`metric ${name} loaded`]: function (res) { return res.status === 200; }
+    [`metric ${name} returned JSON`]: function (res) {
+      return res.status === 200 && looksLikeJson(res);
+    }
   });
   actuatorMetricFetchOk.add(ok);
 
   if (!ok) {
+    warnActuatorResponse(name, response);
     return null;
   }
 
@@ -161,7 +173,8 @@ function actuatorMeasurement(name, statistic, tag) {
   try {
     body = response.json();
   } catch (error) {
-    fail(`Metric ${name} did not return JSON.`);
+    warnActuatorResponse(name, response);
+    return null;
   }
 
   const measurements = body && Array.isArray(body.measurements) ? body.measurements : [];
@@ -170,6 +183,33 @@ function actuatorMeasurement(name, statistic, tag) {
   }) || measurements[0];
 
   return measurement ? Number(measurement.value) : null;
+}
+
+function looksLikeJson(response) {
+  const contentType = header(response, 'Content-Type').toLowerCase();
+  return contentType.indexOf('json') !== -1 || String(response.body || '').trim().charAt(0) === '{';
+}
+
+function isRedirect(response) {
+  return response.status === 302 || response.status === 303 || response.status === 307 || response.status === 308;
+}
+
+function warnActuatorResponse(name, response) {
+  if (actuatorWarningLogged) {
+    return;
+  }
+  actuatorWarningLogged = true;
+  const location = header(response, 'Location');
+  const contentType = header(response, 'Content-Type');
+  console.warn(
+    `Could not sample Actuator metric ${name}. ` +
+    `Status=${response.status || 'n/a'}, Content-Type=${contentType || 'n/a'}, Location=${location || 'n/a'}. ` +
+    'Start the app with load-tests/windows/02-start-app-for-memory-test.bat so the benchmark profile exposes local metrics.'
+  );
+}
+
+function header(response, name) {
+  return response.headers[name] || response.headers[name.toLowerCase()] || '';
 }
 
 function durationToSeconds(raw, fallbackSeconds) {

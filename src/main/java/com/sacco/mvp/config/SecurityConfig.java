@@ -66,6 +66,9 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.client.registration.google.client-secret:}")
     private String googleClientSecret;
 
+    @Value("${app.benchmark.public-actuator-metrics:false}")
+    private boolean publicActuatorMetrics;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    MemberDirectoryService memberDirectoryService,
@@ -84,9 +87,13 @@ public class SecurityConfig {
                                                    PasswordEncoder passwordEncoder) throws Exception {
         http
             .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
-            .authorizeHttpRequests(auth -> auth
-                .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll()
+            .authorizeHttpRequests(auth -> {
+                auth.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
+                .requestMatchers("/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
+                if (publicActuatorMetrics) {
+                    auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
+                }
+                auth
                 .requestMatchers("/admin/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
@@ -147,7 +154,8 @@ public class SecurityConfig {
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && accessControlService.canAccessMemberArea(appUser));
                 })
-                .anyRequest().authenticated())
+                .anyRequest().authenticated();
+            })
             .formLogin(form -> form
                 .loginPage("/login")
                 .failureHandler((request, response, exception) -> {

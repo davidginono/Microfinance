@@ -52,6 +52,8 @@ logging:
     com.sacco.mvp: INFO
 
 app:
+  benchmark:
+    public-actuator-metrics: ${APP_BENCHMARK_PUBLIC_ACTUATOR_METRICS:true}
   outbox:
     scheduler-enabled: ${APP_OUTBOX_SCHEDULER_ENABLED:false}
   retention:

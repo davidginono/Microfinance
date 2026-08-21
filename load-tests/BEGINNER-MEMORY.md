@@ -29,6 +29,8 @@ Easy option:
 
 If you already start the app from your IDE, that is also fine. For memory metrics, start it with the `benchmark` profile and use port `8080`.
 
+The benchmark profile exposes `/actuator/metrics` locally so k6 can read memory numbers. Normal production profiles should keep those metrics protected.
+
 ## Run The Test
 
 1. Double-click `load-tests/windows/03-run-memory-test.bat`.
