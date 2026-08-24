@@ -558,7 +558,7 @@
         function showFeedback(type, text) {
             feedback.classList.add("hidden");
             feedback.textContent = "";
-            window.showToast?.(type === "success" ? "success" : "error", text);
+            window.showToast?.(type === "success" ? "success" : "error", text, { contextElement: modal });
         }
 
         function clearPreview() {

@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260820-disbursement-bar-v42' />" />
-<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260820-modal-sections-v42' />" />
+<link rel="stylesheet" href="<c:url value='/css/shell.css?v=20260824-modal-toast-v43' />" />
 <%@ include file="select-enhancer.jspf" %>
 </head>
 <body class="aws-console min-h-screen font-sans text-sacco-ink antialiased">
@@ -280,4 +280,4 @@
 <div class="aws-app-shell relative min-h-screen">
 <script id="adminScopeOptionsData" type="application/json">${adminScopeOptionsJson}</script>
 <script>window.currentAdminScopeStation = '${not empty adminScope ? adminScope.stationId : ""}';</script>
-<script src="<c:url value='/js/shell.js?v=20260814-console-popover-v18' />" defer></script>
+<script src="<c:url value='/js/shell.js?v=20260824-modal-toast-v19' />" defer></script>

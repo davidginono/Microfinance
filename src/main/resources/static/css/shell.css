@@ -2858,6 +2858,27 @@ body.aws-console {
     overflow: visible;
 }
 
+.app-modal-panel,
+.session-timeout-panel {
+    position: relative;
+}
+
+.app-modal-toast-container {
+    position: absolute;
+    top: var(--modal-toast-top, 0);
+    left: 0;
+    right: 0;
+    z-index: 18;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    pointer-events: none;
+}
+
+.app-modal-toast-container:empty {
+    display: none;
+}
+
 .profile-panel .truncate {
     overflow: visible !important;
     text-overflow: clip !important;
@@ -2878,17 +2899,37 @@ body.aws-console {
     padding: 6px 44px 6px 10px !important;
 }
 
+.app-modal-toast-container > * {
+    position: relative !important;
+    inset: auto !important;
+    width: 100%;
+    min-height: 30px;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box;
+    overflow: hidden !important;
+    padding: 6px 44px 6px 10px !important;
+    pointer-events: auto;
+}
+
+.app-modal-toast-container > * + * {
+    margin-top: 1px;
+}
+
 #appToastContainer > * > .flex {
     width: 100%;
     min-width: 0;
     align-items: center !important;
 }
 
-#appToastContainer [data-toast-text] {
+#appToastContainer [data-toast-text],
+.app-modal-toast-container [data-toast-text] {
     overflow-wrap: anywhere;
 }
 
-#appToastContainer .app-toast-close {
+#appToastContainer .app-toast-close,
+.app-modal-toast-container .app-toast-close {
     top: 50% !important;
     right: 8px !important;
     width: 24px !important;
@@ -2906,7 +2947,9 @@ body.aws-console {
 }
 
 #appToastContainer .app-toast-close:hover,
-#appToastContainer .app-toast-close:focus-visible {
+#appToastContainer .app-toast-close:focus-visible,
+.app-modal-toast-container .app-toast-close:hover,
+.app-modal-toast-container .app-toast-close:focus-visible {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;

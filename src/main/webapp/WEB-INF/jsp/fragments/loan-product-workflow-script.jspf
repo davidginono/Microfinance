@@ -756,7 +756,7 @@
                         && workflowFormIsActive(form)
                         && !previousWorkflowWarningKeys.has(warningKey)
                         && typeof window.showToast === 'function') {
-                        window.showToast(toastType, message);
+                        window.showToast(toastType, message, { contextElement: form });
                     }
                 });
                 if (!workflowWarningsInitialized || publishChanges) {
@@ -1005,7 +1005,7 @@
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
                 [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
                     if (typeof window.showToast === 'function') {
-                        window.showToast('error', message);
+                        window.showToast('error', message, { contextElement: form });
                     }
                 });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];
@@ -1037,7 +1037,7 @@
                 errors.forEach((entry) => applyFieldError(form, entry.key, entry.message));
                 [...new Set(errors.map((entry) => entry.message))].forEach((message) => {
                     if (typeof window.showToast === 'function') {
-                        window.showToast('error', message);
+                        window.showToast('error', message, { contextElement: form });
                     }
                 });
                 const firstTarget = resolveFieldTargets(form, errors[0].key)[0];

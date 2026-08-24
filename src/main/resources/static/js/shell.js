@@ -8,6 +8,12 @@
     const toastQueue = [];
     const visibleToasts = [];
     const maxVisibleToasts = 3;
+    const pageToastState = {
+        container: toastContainer,
+        queue: toastQueue,
+        visible: visibleToasts
+    };
+    const modalToastStates = new WeakMap();
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
     let exportDownloadActive = false;
@@ -746,25 +752,136 @@
         });
     };
 
-    const refreshToastLayers = function () {
-        visibleToasts.forEach(function (entry, index) {
-            const depth = Math.max(visibleToasts.length - 1 - index, 0);
+    const resolveToastContextElement = function (options) {
+        if (!options || typeof options !== 'object') {
+            return null;
+        }
+        const candidate = options.contextElement || options.sourceElement || options.target || options.modal;
+        return candidate instanceof HTMLElement ? candidate : null;
+    };
+
+    const isToastModalOpen = function (modal) {
+        if (!(modal instanceof HTMLElement)) {
+            return false;
+        }
+        if (modal.classList.contains('app-modal-overlay')) {
+            return isModalOpen(modal);
+        }
+        return modal.classList.contains('session-timeout-overlay')
+            && !modal.classList.contains('hidden')
+            && modal.getAttribute('aria-hidden') === 'false';
+    };
+
+    const findOpenToastModal = function () {
+        const openModals = Array.from(document.querySelectorAll('.app-modal-overlay, .session-timeout-overlay'))
+            .filter(isToastModalOpen);
+        return openModals.length ? openModals[openModals.length - 1] : null;
+    };
+
+    const resolveToastModal = function (options) {
+        if (options && (options.forcePage === true || options.placement === 'page')) {
+            return null;
+        }
+        let modal = options && options.modal instanceof HTMLElement ? options.modal : null;
+        const contextElement = resolveToastContextElement(options);
+        if (!modal && contextElement) {
+            modal = contextElement.closest('.app-modal-overlay, .session-timeout-overlay');
+        }
+        if ((!modal || !isToastModalOpen(modal)) && document.activeElement instanceof HTMLElement) {
+            modal = document.activeElement.closest('.app-modal-overlay, .session-timeout-overlay');
+        }
+        if ((!modal || !isToastModalOpen(modal)) && options && options.preferModal === true) {
+            modal = findOpenToastModal();
+        }
+        return modal && isToastModalOpen(modal) ? modal : null;
+    };
+
+    const updateModalToastOffset = function (panel, container) {
+        const header = panel.querySelector('.app-modal-header, .session-timeout-header, .guarantor-financial-modal-header');
+        const height = header instanceof HTMLElement ? Math.max(0, Math.ceil(header.getBoundingClientRect().height)) : 0;
+        container.style.setProperty('--modal-toast-top', height + 'px');
+    };
+
+    const ensureModalToastContainer = function (modal) {
+        const panel = modal.querySelector('.app-modal-panel, .session-timeout-panel, [role="dialog"], [role="alertdialog"]') || modal;
+        let container = Array.from(panel.children).find(function (child) {
+            return child instanceof HTMLElement && child.hasAttribute('data-modal-toast-container');
+        });
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'app-modal-toast-container';
+            container.setAttribute('data-modal-toast-container', 'true');
+            container.setAttribute('aria-live', 'polite');
+            container.setAttribute('aria-atomic', 'false');
+            panel.appendChild(container);
+        }
+        updateModalToastOffset(panel, container);
+        return container;
+    };
+
+    const resolveToastState = function (options) {
+        const modal = resolveToastModal(options);
+        if (!modal) {
+            return pageToastState;
+        }
+        const container = ensureModalToastContainer(modal);
+        const existingState = modalToastStates.get(modal);
+        if (existingState) {
+            existingState.container = container;
+            return existingState;
+        }
+        const state = {
+            container: container,
+            queue: [],
+            visible: []
+        };
+        modalToastStates.set(modal, state);
+        return state;
+    };
+
+    const clearToastState = function (state) {
+        if (!state) {
+            return;
+        }
+        state.queue.length = 0;
+        state.visible.forEach(function (entry) {
+            entry.toast.remove();
+        });
+        state.visible.length = 0;
+    };
+
+    const clearModalToasts = function (modal) {
+        const state = modalToastStates.get(modal);
+        clearToastState(state);
+        modalToastStates.delete(modal);
+        modal.querySelectorAll('[data-modal-toast-container]').forEach(function (container) {
+            container.remove();
+        });
+    };
+
+    const refreshToastLayers = function (state) {
+        state.visible.forEach(function (entry, index) {
+            const depth = Math.max(state.visible.length - 1 - index, 0);
             entry.toast.style.setProperty('--toast-depth', String(depth));
             entry.toast.style.zIndex = String(100 + index);
         });
     };
 
-    const promoteQueuedToast = function () {
-        while (visibleToasts.length < maxVisibleToasts && toastQueue.length > 0) {
-            const entry = toastQueue.shift();
-            visibleToasts.push(entry);
-            toastContainer.appendChild(entry.toast);
-            refreshToastLayers();
+    const promoteQueuedToast = function (state) {
+        while (state.visible.length < maxVisibleToasts && state.queue.length > 0) {
+            const entry = state.queue.shift();
+            state.visible.push(entry);
+            state.container.appendChild(entry.toast);
+            refreshToastLayers(state);
         }
     };
 
     window.showToast = function (type, message, options) {
-        if (!toastContainer || !message || !String(message).trim()) {
+        if (!message || !String(message).trim()) {
+            return null;
+        }
+        const state = resolveToastState(options || {});
+        if (!state.container) {
             return null;
         }
         const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
@@ -794,9 +911,9 @@
         const entry = { toast: toast, dismiss: null };
         const dismiss = function () {
             if (!toast.isConnected || toast.classList.contains('app-toast-exit')) {
-                const queuedIndex = toastQueue.indexOf(entry);
+                const queuedIndex = state.queue.indexOf(entry);
                 if (queuedIndex >= 0) {
-                    toastQueue.splice(queuedIndex, 1);
+                    state.queue.splice(queuedIndex, 1);
                 }
                 return;
             }
@@ -804,12 +921,12 @@
             toast.classList.add('app-toast-exit');
             window.setTimeout(function () {
                 toast.remove();
-                const visibleIndex = visibleToasts.indexOf(entry);
+                const visibleIndex = state.visible.indexOf(entry);
                 if (visibleIndex >= 0) {
-                    visibleToasts.splice(visibleIndex, 1);
+                    state.visible.splice(visibleIndex, 1);
                 }
-                refreshToastLayers();
-                promoteQueuedToast();
+                refreshToastLayers(state);
+                promoteQueuedToast(state);
             }, 190);
         };
         entry.dismiss = dismiss;
@@ -820,12 +937,12 @@
             event.stopPropagation();
             dismiss();
         });
-        if (visibleToasts.length < maxVisibleToasts) {
-            visibleToasts.push(entry);
-            toastContainer.appendChild(toast);
-            refreshToastLayers();
+        if (state.visible.length < maxVisibleToasts) {
+            state.visible.push(entry);
+            state.container.appendChild(toast);
+            refreshToastLayers(state);
         } else {
-            toastQueue.push(entry);
+            state.queue.push(entry);
         }
         return { dismiss: dismiss, element: toast };
     };
@@ -1259,6 +1376,7 @@
                 rememberOpenModal(modal);
             } else {
                 clearOpenModal(modal);
+                clearModalToasts(modal);
             }
         });
     });
@@ -1883,7 +2001,7 @@
             window.showToast(
                 element.getAttribute('data-toast-type') || 'info',
                 message,
-                {}
+                { contextElement: element }
             );
         });
         const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find(function (element) {
