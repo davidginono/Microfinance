@@ -786,6 +786,11 @@ button:active {
 .erp-table-scroll table {
     min-width: max(100%, 56rem);
 }
+
+.aws-console .loan-calculator-detail-scroll .loan-calculator-detail-table {
+    min-width: 100% !important;
+}
+
 .erp-table-scroll thead th {
     position: sticky;
     top: 0;

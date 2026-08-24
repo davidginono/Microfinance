@@ -153,7 +153,7 @@
                     </div>
                 </div>
             </div>
-            <div id="productsFinancialCard" class="hidden grid gap-3 md:grid-cols-2"></div>
+            <div id="productsFinancialCard" class="hidden loan-calculator-detail-grid"></div>
             <div id="productsRepaymentScheduleCard" class="hidden app-modal-section">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -581,12 +581,12 @@
             card.innerHTML = "";
             Object.entries(sections || {}).forEach(function (section) {
                 const wrapper = document.createElement("div");
-                wrapper.className ="erp-table-wrap";
+                wrapper.className = "erp-table-wrap loan-calculator-detail-card";
                 wrapper.innerHTML = ""
                     +"<div class='app-table-titlebar'>"
                     +"<div class='app-table-heading'><h3></h3></div>"
                     + "</div>"
-                    +"<div class='erp-table-scroll erp-table-scroll-sm'><table class='erp-table'>"
+                    +"<div class='erp-table-scroll erp-table-scroll-sm loan-calculator-detail-scroll'><table class='erp-table loan-calculator-detail-table'>"
                     + "<thead><tr><th></th><th></th></tr></thead>"
                     + "<tbody></tbody>"
                     +"</table></div>";

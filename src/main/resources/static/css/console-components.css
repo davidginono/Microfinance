@@ -6915,6 +6915,61 @@ html.session-timeout-active,
     outline-offset: 2px;
 }
 
+.loan-calculator-detail-grid {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.loan-calculator-detail-card {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.loan-calculator-detail-card .app-table-titlebar {
+    min-height: 34px;
+    padding: 6px 9px !important;
+}
+
+.loan-calculator-detail-card .app-table-heading h3 {
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.loan-calculator-detail-scroll {
+    --erp-table-height: clamp(8rem, 24vh, 13rem);
+    max-height: min(var(--erp-table-height), 32vh);
+    scrollbar-gutter: auto;
+}
+
+.loan-calculator-detail-scroll .loan-calculator-detail-table {
+    min-width: 100%;
+    table-layout: fixed;
+}
+
+.loan-calculator-detail-table th,
+.loan-calculator-detail-table td {
+    padding: 4px 8px !important;
+    line-height: 17px !important;
+}
+
+.loan-calculator-detail-table th:first-child,
+.loan-calculator-detail-table td:first-child {
+    width: 58%;
+}
+
+.loan-calculator-detail-table th:last-child,
+.loan-calculator-detail-table td:last-child {
+    width: 42%;
+}
+
+@media (min-width: 900px) {
+    .loan-calculator-detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .loan-application-steps {
     position: static;
     grid-template-columns: repeat(5, minmax(0, 1fr));
