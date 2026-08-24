@@ -123,7 +123,10 @@
 
             <div class="app-modal-section loan-calculator-actionbar flex flex-wrap items-center justify-between gap-3">
                 <div class="text-sm text-slate-500"><spring:message code="products.loadHint" /></div>
-                <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary"><spring:message code="products.calculateEligibility.button" /></button>
+                <button id="productsCalculatorLoadButton" type="button" class="app-btn btn-primary loan-calculator-load-button">
+                    <span class="loan-calculator-button-spinner hidden" aria-hidden="true"></span>
+                    <span data-calculator-load-label><spring:message code="products.calculateEligibility.button" /></span>
+                </button>
             </div>
 
             <div id="productsCalculatorResults" class="hidden loan-calculator-results" tabindex="-1">
@@ -318,7 +321,10 @@
         const scheduleBody = document.getElementById("productsRepaymentScheduleBody");
         const eligibilityMessage = document.getElementById("productsEligibilityMessage");
         const eligibilityStatus = document.getElementById("productsEligibilityStatus");
+        const eligibilityCard = document.getElementById("productsEligibilityCard");
         const resultsRegion = document.getElementById("productsCalculatorResults");
+        const loadButtonLabel = loadButton ? loadButton.querySelector("[data-calculator-load-label]") : null;
+        const loadButtonSpinner = loadButton ? loadButton.querySelector(".loan-calculator-button-spinner") : null;
         const editFiguresButton = document.querySelector("[data-calculator-edit]");
         const applyLink = document.getElementById("productsCalculatorApplyLink");
         const calculatorSteps = Array.from(document.querySelectorAll("[data-calculator-step]"));
@@ -336,6 +342,7 @@
         const msgEligibleStatus = "<spring:message code='products.js.eligibleStatus' text='Eligible' />";
         const msgNotEligibleStatus = "<spring:message code='products.js.notEligibleStatus' text='Not eligible' />";
         const msgNotCheckedStatus = "<spring:message code='products.eligibilityResult.notChecked' text='Not checked' />";
+        const msgLoadingCalculator = "<spring:message code='products.loadingCalculator' text='Calculating...' />";
         const msgLoaded = "<spring:message code='products.js.loaded' />";
         const msgFailedLoad = "<spring:message code='products.js.failedLoad' />";
         const tableSectionLabel = "<spring:message code='products.table.section' text='Section' />";
@@ -620,6 +627,20 @@
             eligibilityStatus.classList.add("bg-slate-100", "text-slate-600");
         }
 
+        function setCalculatorLoading(isLoading) {
+            loading.classList.toggle("hidden", !isLoading);
+            loadButton.disabled = isLoading;
+            loadButton.classList.toggle("is-loading", isLoading);
+            loadButton.classList.toggle("opacity-60", isLoading);
+            loadButton.classList.toggle("cursor-not-allowed", isLoading);
+            loadButton.setAttribute("aria-busy", isLoading ? "true" : "false");
+            eligibilityCard?.setAttribute("aria-busy", isLoading ? "true" : "false");
+            loadButtonSpinner?.classList.toggle("hidden", !isLoading);
+            if (loadButtonLabel) {
+                loadButtonLabel.textContent = isLoading ? msgLoadingCalculator : "<spring:message code='products.calculateEligibility.button' javaScriptEscape='true' />";
+            }
+        }
+
         [loanTypeInput, tenorDisplayInput].forEach(function (input) {
             input.addEventListener("change", clearPreview);
         });
@@ -672,9 +693,7 @@
                 return;
             }
 
-            loading.classList.remove("hidden");
-            loadButton.disabled = true;
-            loadButton.classList.add("opacity-60", "cursor-not-allowed");
+            setCalculatorLoading(true);
 
             try {
                 const response = await fetch("/app/loan-applications/financial-preview", {
@@ -745,9 +764,7 @@
             } catch (error) {
                 showFeedback("error", error.message || msgFailedLoad);
             } finally {
-                loading.classList.add("hidden");
-                loadButton.disabled = false;
-                loadButton.classList.remove("opacity-60", "cursor-not-allowed");
+                setCalculatorLoading(false);
             }
         });
 

@@ -7021,6 +7021,28 @@ html.session-timeout-active,
     margin-right: auto;
 }
 
+.loan-calculator-load-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.loan-calculator-button-spinner {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: page-submit-preloader-spin .72s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loan-calculator-button-spinner {
+        animation: none;
+    }
+}
+
 .loan-calculator-results:focus {
     outline: 2px solid #0972d3;
     outline-offset: 2px;
