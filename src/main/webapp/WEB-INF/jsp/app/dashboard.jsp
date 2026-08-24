@@ -320,7 +320,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 </div>
             </section>
 
-            <div class="grid min-w-0 gap-4 xl:grid-cols-2" aria-busy="true">
+            <div class="grid min-w-0 items-start gap-4 xl:grid-cols-2" aria-busy="true">
                 <section class="erp-panel min-w-0">
                     <div class="erp-panel-header">
                         <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
@@ -415,7 +415,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         </div>
     </section>
 
-    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-2">
         <section class="erp-panel min-w-0">
             <div class="erp-panel-header">
                 <p class="erp-panel-title"><spring:message code="dashboard.currentLoanApplication" text="Current Loan Application" /></p>
