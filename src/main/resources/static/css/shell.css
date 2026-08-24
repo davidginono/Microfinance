@@ -2872,7 +2872,7 @@ body.aws-console {
     position: absolute;
     top: var(--modal-toast-top, 0);
     left: 0;
-    right: 0;
+    right: 10px;
     z-index: 18;
     display: flex;
     flex-direction: column;
@@ -2914,7 +2914,7 @@ body.aws-console {
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden !important;
-    padding: 6px 44px 6px 10px !important;
+    padding: 6px 52px 6px 10px !important;
     pointer-events: auto;
 }
 
@@ -2951,6 +2951,10 @@ body.aws-console {
     transform: translateY(-50%) !important;
 }
 
+.app-modal-toast-container .app-toast-close {
+    right: 12px !important;
+}
+
 #appToastContainer .app-toast-close:hover,
 #appToastContainer .app-toast-close:focus-visible,
 .app-modal-toast-container .app-toast-close:hover,
@@ -2966,6 +2970,7 @@ body.aws-console {
     width: 14px;
     height: 14px;
     flex: 0 0 14px;
+    overflow: visible;
 }
 
 .app-toast-success {
