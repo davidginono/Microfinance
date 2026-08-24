@@ -2153,8 +2153,31 @@ body {
         padding: 8px 10px;
     }
     .loan-analytics-command-panel .loan-analytics-actions .app-btn {
+        gap: 6px;
         white-space: nowrap;
         text-align: center;
+    }
+    .loan-report-action-icon {
+        display: inline-flex;
+        width: 14px;
+        height: 14px;
+        flex: 0 0 14px;
+        align-items: center;
+        justify-content: center;
+        color: var(--aws-muted);
+    }
+    .loan-report-action-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+    .loan-report-action-icon.is-pdf {
+        color: var(--aws-danger);
+    }
+    .loan-report-action-icon.is-excel {
+        color: var(--aws-success);
+    }
+    .loan-report-action-icon.is-refresh {
+        color: var(--aws-blue);
     }
     .loan-analytics-filter {
         order: 1;

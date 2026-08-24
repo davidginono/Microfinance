@@ -603,6 +603,9 @@ class AwsConsoleViewContractTest {
             .contains("data-aws-filter-pin=\"true\"")
             .contains("data-aws-action-pin=\"true\"")
             .contains("data-download-action=\"true\"")
+            .contains("class=\"loan-report-action-icon is-pdf\"")
+            .contains("class=\"loan-report-action-icon is-excel\"")
+            .contains("class=\"loan-report-action-icon is-refresh\"")
             .contains("loan-spark-row")
             .contains("renderMetricSparklines")
             .doesNotContain("loan-analytics-command-header")
@@ -656,6 +659,8 @@ class AwsConsoleViewContractTest {
             .contains("<c:set var=\"showStaffAnalyticsPanel\" value=\"true\" />");
         assertThat(consoleCss)
             .contains(".loan-analytics-command-panel .loan-analytics-actions")
+            .contains(".loan-report-action-icon")
+            .contains(".loan-report-action-icon.is-refresh")
             .contains("height: var(--sacco-control-height)")
             .contains(".staff-analytics-command-panel")
             .contains(".staff-analytics-filter")
