@@ -486,12 +486,6 @@
                 <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
                             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></label>
-                <div class="erp-section-muted py-3 text-sm font-semibold text-slate-700">
-                    <spring:message code="loan.disbursement.foresightScheduleSource" text="Loaded from Foresight after disbursement." />
-                </div>
-                        </div>
-            <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
                        id="depositAmountInput"
