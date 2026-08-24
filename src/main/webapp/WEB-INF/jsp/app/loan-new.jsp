@@ -1524,7 +1524,7 @@
             const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
             const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
             const msgEnterGuarantorName = "<spring:message code='newloan.js.enterGuarantorName' />";
-            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a valid phone number to search.' />";
+            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a phone number in the format 255XXXXXXXXX.' />";
             const msgEnterGuarantorEmail = "<spring:message code='newloan.js.enterGuarantorEmail' text='Enter a valid email address to search.' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
@@ -1543,7 +1543,7 @@
             const emailPlaceholder = "<spring:message code='newloan.guarantors.emailPlaceholder' text='Enter guarantor email address' />";
             const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
             const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
-            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Direct OTP searches the member profile portal by phone number.' />";
+            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Use Tanzania format: 255 followed by 9 digits, for example 255746359369.' />";
             const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the member profile portal by email address.' />";
             const directOtpLoanDetailsEndpoint = "/app/guarantors/direct-otp/loan-details";
             const searchConfigurations = {
