@@ -89,12 +89,14 @@
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.schedule" text="Schedule" /></th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100" data-staff-active-loans-body>
                 <c:choose>
                     <c:when test="${not empty activeApplicantLoans}">
                         <c:forEach items="${activeApplicantLoans}" var="loan">
+                            <c:set var="loanScheduleId" value="${not empty loan.scheduleLoanId ? loan.scheduleLoanId : loan.loanId}" />
                             <tr>
                                 <td class="px-3 py-2">
                                     <div class="font-medium text-slate-900">${loan.shortId}</div>
@@ -113,12 +115,28 @@
                                         <div class="mt-1 text-xs text-slate-500">${loan.countdown}</div>
                                     </c:if>
                                 </td>
+                                <td class="px-3 py-2">
+                                    <c:choose>
+                                        <c:when test="${loan.scheduleAvailable and not empty loanScheduleId and loanScheduleId ne '-'}">
+                                            <button type="button"
+                                                    class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm"
+                                                    data-open-repayment-schedule
+                                                    data-schedule-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans/${loanScheduleId}/repayment-schedule"
+                                                    data-schedule-title="Repayment Schedule ${loanScheduleId}">
+                                                <spring:message code="loan.repayment.viewSchedule" text="View Schedule" />
+                                            </button>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span class="text-sm font-semibold text-slate-500">-</span>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
                             </tr>
                         </c:forEach>
                     </c:when>
                     <c:otherwise>
                         <tr data-staff-active-loans-empty>
-                            <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
+                            <td colspan="8" class="px-3 py-4 text-center text-sm text-slate-600">
                                 <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
                             </td>
                         </tr>
@@ -130,6 +148,7 @@
             </div>
     </div>
 <%@ include file="../fragments/staff-active-loans-hydration.jspf" %>
+<%@ include file="../fragments/repayment-schedule-hydration.jspf" %>
 
 <div class="loan-view-summary-card mt-5 px-5 py-5">
     <div>

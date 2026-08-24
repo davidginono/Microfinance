@@ -365,6 +365,81 @@ class ForesightDirectoryServiceTest {
     }
 
     @Test
+    void repaymentScheduleLookupUsesDocumentedPathAndParsesArrayResponse() throws Exception {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> query = new AtomicReference<>();
+        HttpServer server = server(200, """
+            [
+              {
+                "paymentNumber": 1,
+                "month": "2026-08-31",
+                "beginningBalance": 700000.00,
+                "amountToPay": 122500.00,
+                "principal": 116666.67,
+                "interest": 5833.33,
+                "endingBalance": 583333.33
+              },
+              {
+                "paymentNumber": 2,
+                "month": "2026-09-30",
+                "beginningBalance": 583333.33,
+                "amountToPay": 122500.00,
+                "principal": 116666.67,
+                "interest": 5833.33,
+                "endingBalance": 466666.66
+              }
+            ]
+            """, path, query);
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            var rows = service.fetchRepaymentSchedule("MEM123", "STN456", "101");
+
+            assertThat(rows).hasSize(2);
+            ForesightRepaymentScheduleRow first = rows.getFirst();
+            assertThat(first.paymentNumber()).isEqualTo(1);
+            assertThat(first.month()).isEqualTo(LocalDate.of(2026, 8, 31));
+            assertThat(first.beginningBalance()).isEqualByComparingTo("700000.00");
+            assertThat(first.amountToPay()).isEqualByComparingTo("122500.00");
+            assertThat(first.principal()).isEqualByComparingTo("116666.67");
+            assertThat(first.interest()).isEqualByComparingTo("5833.33");
+            assertThat(first.endingBalance()).isEqualByComparingTo("583333.33");
+            assertThat(path.get()).isEqualTo("/repayment-schedule");
+            assertThat(query.get()).isEqualTo("memberNumber=MEM123&stationId=STN456&loanId=101");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void repaymentScheduleLookupReturnsEmptyListForEmptyArray() throws Exception {
+        HttpServer server = server(200, "[]", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThat(service.fetchRepaymentSchedule("MEM123", "STN456", "101")).isEmpty();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void repaymentScheduleLookupThrowsAvailabilityExceptionForUpstreamFailure() throws Exception {
+        HttpServer server = server(500, "{\"error\":\"down\"}", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThatThrownBy(() -> service.fetchRepaymentSchedule("MEM123", "STN456", "101"))
+                .isInstanceOf(UpstreamAvailabilityException.class);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void loanPaymentTransactionsLookupUsesDocumentedPathAndParsesArrayResponse() throws Exception {
         AtomicReference<String> path = new AtomicReference<>();
         AtomicReference<String> query = new AtomicReference<>();

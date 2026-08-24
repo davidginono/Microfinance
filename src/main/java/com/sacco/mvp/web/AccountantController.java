@@ -17,6 +17,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.ForesightRepaymentScheduleService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -74,6 +75,7 @@ public class AccountantController {
     private final NotificationInboxService notificationInboxService;
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final PaymentDetailsService paymentDetailsService;
+    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
     private final MessageSource messageSource;
     private final EmailOtpService emailOtpService;
     private final StationOtpSettingsService stationOtpSettingsService;
@@ -283,9 +285,16 @@ public class AccountantController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());
+        model.addAttribute("actualRepaymentScheduleEnabled", actualRepaymentScheduleEnabled);
+        model.addAttribute("repaymentSchedulePath", actualRepaymentScheduleEnabled
+            ? "/accountant/loan-applications/" + app.getId() + "/repayment-schedule"
+            : "");
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
+        model.addAttribute("calculatedRepaymentRows", actualRepaymentScheduleEnabled
+            ? List.of()
+            : loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews",
@@ -343,6 +352,27 @@ public class AccountantController {
             app,
             activeApplicantLoans
         ).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/repayment-schedule")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> repaymentSchedule(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> applicantActiveLoanRepaymentSchedule(@PathVariable UUID id,
+                                                                                   @PathVariable String loanId,
+                                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService
+            .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
+            .toPayload());
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
@@ -561,6 +591,10 @@ public class AccountantController {
 
     private String humanizeEnum(String value) {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     private UUID validateAccountantDecisionOtp(UUID memberId, String otpCode) {

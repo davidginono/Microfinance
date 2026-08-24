@@ -15,6 +15,7 @@ import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ActiveLoanDisplayService;
 import com.sacco.mvp.service.ArchiveDateRange;
+import com.sacco.mvp.service.ForesightRepaymentScheduleService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
 import com.sacco.mvp.service.ManagerService;
@@ -58,6 +59,7 @@ public class ManagerController {
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
+    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final ReversalRequestService reversalRequestService;
@@ -249,9 +251,16 @@ public class ManagerController {
         model.addAttribute("totalDeductions", loanPresentationService.totalDeductions(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());
+        model.addAttribute("actualRepaymentScheduleEnabled", actualRepaymentScheduleEnabled);
+        model.addAttribute("repaymentSchedulePath", actualRepaymentScheduleEnabled
+            ? "/manager/loan-applications/" + app.getId() + "/repayment-schedule"
+            : "");
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
+        model.addAttribute("calculatedRepaymentRows", actualRepaymentScheduleEnabled
+            ? List.of()
+            : loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews",
@@ -311,6 +320,27 @@ public class ManagerController {
             app,
             activeApplicantLoans
         ).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/repayment-schedule")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> repaymentSchedule(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal) {
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> applicantActiveLoanRepaymentSchedule(@PathVariable UUID id,
+                                                                                   @PathVariable String loanId,
+                                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService
+            .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
+            .toPayload());
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")
@@ -657,6 +687,10 @@ public class ManagerController {
 
     private String dashboardStatusColor(LoanStatus status) {
         return workflowStatusPresentationService.dashboardStatusColor(status);
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     private void addReviewDisplayAttributes(Model model,

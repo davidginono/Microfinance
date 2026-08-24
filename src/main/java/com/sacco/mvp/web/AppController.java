@@ -12,6 +12,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.ForesightRepaymentScheduleService;
 import com.sacco.mvp.service.LoanWorkflowService;
 import com.sacco.mvp.service.LoanAnalyticsService;
 import com.sacco.mvp.service.LoanPresentationService;
@@ -95,6 +96,7 @@ public class AppController {
     private final LoanPresentationService loanPresentationService;
     private final LoanPaymentSummarySyncService loanPaymentSummarySyncService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
+    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
@@ -223,6 +225,27 @@ public class AppController {
             dismissedActiveLoanChartIds(principal.getMemberId())
         );
         return ResponseEntity.ok(display.toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/repayment-schedule")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @authz.isLoanOwner(#id, principal)")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> loanRepaymentSchedule(@PathVariable UUID id,
+                                                                     @AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanApplication app = loanWorkflowService.getMine(id, principal.getMemberId());
+        Member member = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, member).toPayload());
+    }
+
+    @GetMapping("/active-loans/{loanId}/repayment-schedule")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> externalActiveLoanRepaymentSchedule(@PathVariable String loanId,
+                                                                                  @AuthenticationPrincipal AppUserPrincipal principal) {
+        Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService
+            .loadExternalLoanSchedule(member, principal.getStationId(), loanId)
+            .toPayload());
     }
 
     @PostMapping("/dashboard/active-loans/balances/refresh")
@@ -1302,7 +1325,14 @@ public class AppController {
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("decisionFeedback", isRejectedStatus(app.getStatus()) ? loanPresentationService.rejectionFeedback(id) : List.of());
-        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
+        boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());
+        model.addAttribute("actualRepaymentScheduleEnabled", actualRepaymentScheduleEnabled);
+        model.addAttribute("repaymentSchedulePath", actualRepaymentScheduleEnabled
+            ? "/app/loan-applications/" + app.getId() + "/repayment-schedule"
+            : "");
+        model.addAttribute("calculatedRepaymentRows", actualRepaymentScheduleEnabled
+            ? List.of()
+            : loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
@@ -3357,6 +3387,10 @@ public class AppController {
             || status == LoanStatus.PAR
             || status == LoanStatus.DEFAULTED
             || status == LoanStatus.PAID;
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     private boolean isWithinReversalWindow(OffsetDateTime referenceAt) {

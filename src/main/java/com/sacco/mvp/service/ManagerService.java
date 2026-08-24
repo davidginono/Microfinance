@@ -37,7 +37,6 @@ public class ManagerService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final OutboxService outboxService;
-    private final RepaymentScheduleService repaymentScheduleService;
     private final RoleDirectoryService roleDirectoryService;
     private final LoanAttachmentService loanAttachmentService;
     private final WorkflowRoutingService workflowRoutingService;
@@ -390,8 +389,7 @@ public class ManagerService {
         if (app.getStatus() != LoanStatus.READY_FOR_DISBURSEMENT) {
             throw new IllegalStateException("Application is not ready for disbursement");
         }
-        RepaymentFrequency effectiveFrequency = repaymentFrequency == null ? RepaymentFrequency.MONTHLY : repaymentFrequency;
-        validateDisbursement(disbursementDate, firstRepaymentDate);
+        validateDisbursement(disbursementDate);
         BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, app.getAmount());
         boolean hasUploadedProof = disbursementProofFile != null && !disbursementProofFile.isEmpty();
         if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
@@ -409,24 +407,15 @@ public class ManagerService {
             throw new IllegalArgumentException("Loan ID is already used in this SACCO");
         }
         app.setDepositAmount(effectiveDepositAmount);
-        RepaymentScheduleService.ScheduleResult schedule = repaymentScheduleService.buildSchedule(
-            app,
-            disbursementDate,
-            firstRepaymentDate,
-            effectiveFrequency,
-            installmentAmount,
-            disbursementReference,
-            disbursementNotes
-        );
         app.setDisbursementDate(disbursementDate);
-        app.setFirstRepaymentDate(firstRepaymentDate);
-        app.setRepaymentFrequency(effectiveFrequency);
-        app.setInstallmentAmount(schedule.installmentAmount());
-        app.setFinalDueDate(schedule.finalDueDate());
+        app.setFirstRepaymentDate(null);
+        app.setRepaymentFrequency(null);
+        app.setInstallmentAmount(null);
+        app.setFinalDueDate(null);
         app.setLoanId(normalisedLoanId);
         app.setDisbursementReference(blankToNull(disbursementReference));
         app.setDisbursementNotes(blankToNull(disbursementNotes));
-        app.setRepaymentScheduleJson(schedule.scheduleJson());
+        app.setRepaymentScheduleJson(null);
         if (hasUploadedProof) {
             app.setAttachmentsJson(loanAttachmentService.store(
                 app.getId(),
@@ -591,16 +580,9 @@ public class ManagerService {
             : UserClaim.ACCOUNTANT_QUEUE_APPROVE;
     }
 
-    private void validateDisbursement(LocalDate disbursementDate,
-                                      LocalDate firstRepaymentDate) {
+    private void validateDisbursement(LocalDate disbursementDate) {
         if (disbursementDate == null) {
             throw new IllegalArgumentException("Disbursement date is required for final approval");
-        }
-        if (firstRepaymentDate == null) {
-            throw new IllegalArgumentException("First repayment date is required for final approval");
-        }
-        if (firstRepaymentDate.isBefore(disbursementDate)) {
-            throw new IllegalArgumentException("First repayment date cannot be before disbursement date");
         }
     }
 

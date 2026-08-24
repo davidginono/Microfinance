@@ -68,7 +68,29 @@
             }
         }
 
-        function rowHtml(row) {
+        function scheduleButtonHtml(row, section) {
+            if (!row || !row.scheduleAvailable) {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var loanId = valueOrDash(row.scheduleLoanId || row.loanId || row.shortId);
+            if (loanId === "-") {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var baseUrl = section ? String(section.getAttribute("data-active-loans-url") || "") : "";
+            if (!baseUrl) {
+                return "<span class=\"text-sm font-semibold text-slate-500\">-</span>";
+            }
+            var url = baseUrl.replace(/\/$/, "") + "/" + encodeURIComponent(loanId) + "/repayment-schedule";
+            return [
+                "<button type=\"button\" class=\"app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm\"",
+                " data-open-repayment-schedule data-schedule-url=\"", escapeHtml(url), "\"",
+                " data-schedule-title=\"Repayment Schedule ", escapeHtml(loanId), "\">",
+                "View Schedule",
+                "</button>"
+            ].join("");
+        }
+
+        function rowHtml(row, section) {
             var frequency = String(row.repaymentFrequency || "").trim();
             var countdown = String(row.countdown || "").trim();
             return [
@@ -86,6 +108,7 @@
                 "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.finalDueDate)), "</div>",
                 countdown ? "<div class=\"mt-1 text-xs text-slate-500\">" + escapeHtml(countdown) + "</div>" : "",
                 "</td>",
+                "<td class=\"px-3 py-2\">", scheduleButtonHtml(row, section), "</td>",
                 "</tr>"
             ].join("");
         }
@@ -93,7 +116,7 @@
         function emptyRowHtml() {
             return [
                 "<tr data-staff-active-loans-empty>",
-                "<td colspan=\"7\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
+                "<td colspan=\"8\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
                 "<spring:message code='review.noActiveApplicantLoans' text='This applicant has no other active disbursed loans at the moment.' javaScriptEscape='true' />",
                 "</td>",
                 "</tr>"
@@ -126,7 +149,9 @@
             }
             if (body) {
                 body.innerHTML = payload.rows.length
-                    ? payload.rows.map(rowHtml).join("")
+                    ? payload.rows.map(function (row) {
+                        return rowHtml(row, section);
+                    }).join("")
                     : emptyRowHtml();
             }
         }

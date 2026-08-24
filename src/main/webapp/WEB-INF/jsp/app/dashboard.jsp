@@ -584,10 +584,14 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                                     <td class="px-3 py-3">
                                                         <c:choose>
                                                             <c:when test="${loanRow.scheduleAvailable}">
-                                                                <a href="${pageContext.request.contextPath}${loanRow.scheduleUrl}"
-                                                                   class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">
+                                                                <c:set var="loanScheduleUrl" value="${not empty loanRow.scheduleDataUrl ? loanRow.scheduleDataUrl : loanRow.scheduleUrl}" />
+                                                                <button type="button"
+                                                                   class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm"
+                                                                   data-open-repayment-schedule
+                                                                   data-schedule-url="${pageContext.request.contextPath}${loanScheduleUrl}"
+                                                                   data-schedule-title="Repayment Schedule ${loanRow.loanId}">
                                                                     View Schedule
-                                                                </a>
+                                                                </button>
                                                             </c:when>
                                                             <c:otherwise>
                                                                 <span class="text-sm font-semibold text-slate-500">-</span>
@@ -792,15 +796,21 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
         }
 
         function activeLoansScheduleHtml(row) {
-            if (!row || !row.scheduleAvailable || !row.scheduleUrl) {
+            if (!row || !row.scheduleAvailable || (!row.scheduleDataUrl && !row.scheduleUrl)) {
                 return '<span class="text-sm font-semibold text-slate-500">-</span>';
             }
             var contextPath = '${pageContext.request.contextPath}';
-            var url = String(row.scheduleUrl || '');
+            var url = String(row.scheduleDataUrl || row.scheduleUrl || '');
             if (contextPath && url.charAt(0) === '/') {
                 url = contextPath + url;
             }
-            return '<a href="' + escapeHtml(url) + '" class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">View Schedule</a>';
+            return [
+                '<button type="button" class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm"',
+                ' data-open-repayment-schedule data-schedule-url="', escapeHtml(url), '"',
+                ' data-schedule-title="Repayment Schedule ', escapeHtml(valueOrDash(row.loanId)), '">',
+                'View Schedule',
+                '</button>'
+            ].join('');
         }
 
         function activeLoanRowHtml(row) {
@@ -1050,4 +1060,5 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 </script>
 
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<%@ include file="../fragments/repayment-schedule-hydration.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

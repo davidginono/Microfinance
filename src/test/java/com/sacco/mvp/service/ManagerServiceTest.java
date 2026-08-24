@@ -9,7 +9,6 @@ import com.sacco.mvp.domain.ManagerDecision;
 import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
-import com.sacco.mvp.domain.RepaymentFrequency;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.repository.BoardReviewRepository;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
@@ -50,7 +49,6 @@ class ManagerServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Mock private OutboxService outboxService;
-    @Mock private RepaymentScheduleService repaymentScheduleService;
     @Mock private RoleDirectoryService roleDirectoryService;
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private WorkflowRoutingService workflowRoutingService;
@@ -169,24 +167,6 @@ class ManagerServiceTest {
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(true).build()));
         when(loanApplicationRepository.existsBySaccoIdAndLoanId("SACCO-A", "12345")).thenReturn(false);
-        when(repaymentScheduleService.buildSchedule(
-            eq(app),
-            eq(LocalDate.of(2026, 6, 3)),
-            eq(LocalDate.of(2026, 7, 3)),
-            eq(RepaymentFrequency.MONTHLY),
-            eq(null),
-            eq(null),
-            eq("Release notes")
-        )).thenAnswer(invocation -> {
-            org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("150000.00");
-            org.assertj.core.api.Assertions.assertThat(app.getDepositAmount()).isEqualByComparingTo("125000.00");
-            return new RepaymentScheduleService.ScheduleResult(
-                "{\"disbursedPrincipal\":150000.00,\"schedule\":[]}",
-                LocalDate.of(2026, 12, 3),
-                new BigDecimal("20833.33"),
-                6
-            );
-        });
         when(loanAttachmentService.store(eq(loanId), any(), eq(null), eq(LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF)))
             .thenReturn("[]");
 
@@ -207,7 +187,11 @@ class ManagerServiceTest {
         org.assertj.core.api.Assertions.assertThat(app.getAmount()).isEqualByComparingTo("150000.00");
         org.assertj.core.api.Assertions.assertThat(app.getDepositAmount()).isEqualByComparingTo("125000.00");
         org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
-        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).contains("150000.00");
+        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).isNull();
+        org.assertj.core.api.Assertions.assertThat(app.getFirstRepaymentDate()).isNull();
+        org.assertj.core.api.Assertions.assertThat(app.getFinalDueDate()).isNull();
+        org.assertj.core.api.Assertions.assertThat(app.getInstallmentAmount()).isNull();
+        org.assertj.core.api.Assertions.assertThat(app.getRepaymentFrequency()).isNull();
         verify(loanApplicationRepository).save(app);
     }
 
@@ -224,21 +208,6 @@ class ManagerServiceTest {
             .thenReturn(true);
         when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
             .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(false).build()));
-        when(repaymentScheduleService.buildSchedule(
-            eq(app),
-            eq(LocalDate.of(2026, 6, 3)),
-            eq(LocalDate.of(2026, 7, 3)),
-            eq(RepaymentFrequency.MONTHLY),
-            eq(null),
-            eq(null),
-            eq(null)
-        )).thenReturn(new RepaymentScheduleService.ScheduleResult(
-            "{\"disbursedPrincipal\":125000.00,\"schedule\":[]}",
-            LocalDate.of(2026, 12, 3),
-            new BigDecimal("20833.33"),
-            6
-        ));
-
         managerService.disburseLoan(
             loanId,
             officerId,
@@ -254,6 +223,7 @@ class ManagerServiceTest {
         );
 
         org.assertj.core.api.Assertions.assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        org.assertj.core.api.Assertions.assertThat(app.getRepaymentScheduleJson()).isNull();
         verify(loanAttachmentService, never()).store(eq(loanId), any(), any(), eq(LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
         verify(loanApplicationRepository).save(app);
     }
@@ -288,7 +258,6 @@ class ManagerServiceTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Disbursement proof file is required to disburse this loan");
 
-        verify(repaymentScheduleService, never()).buildSchedule(any(), any(), any(), any(), any(), any(), any());
         verify(loanApplicationRepository, never()).save(app);
     }
 

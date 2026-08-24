@@ -34,6 +34,32 @@ class ActiveLoanHydrationRouteContractTest {
     }
 
     @Test
+    void repaymentScheduleEndpointsAreScopedToMemberAndReviewRoles() throws Exception {
+        assertGetRoute(
+            AppController.class,
+            "loanRepaymentSchedule",
+            new Class<?>[] { UUID.class, AppUserPrincipal.class },
+            "/loan-applications/{id}/repayment-schedule"
+        );
+        assertGetRoute(
+            AppController.class,
+            "externalActiveLoanRepaymentSchedule",
+            new Class<?>[] { String.class, AppUserPrincipal.class },
+            "/active-loans/{loanId}/repayment-schedule"
+        );
+        assertGetRoute(ManagerController.class, "repaymentSchedule", staffScheduleSignature(), "/loan-applications/{id}/repayment-schedule");
+        assertGetRoute(AccountantController.class, "repaymentSchedule", staffScheduleSignature(), "/loan-applications/{id}/repayment-schedule");
+        assertGetRoute(BoardController.class, "repaymentSchedule", staffScheduleSignature(), "/loan-applications/{id}/repayment-schedule");
+        assertGetRoute(LoanOfficerController.class, "repaymentSchedule", staffScheduleSignature(), "/loan-applications/{id}/repayment-schedule");
+        assertGetRoute(DisbursementController.class, "repaymentSchedule", staffScheduleSignature(), "/loan-applications/{id}/repayment-schedule");
+
+        assertGetRoute(ManagerController.class, "applicantActiveLoanRepaymentSchedule", activeLoanScheduleSignature(), "/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule");
+        assertGetRoute(AccountantController.class, "applicantActiveLoanRepaymentSchedule", activeLoanScheduleSignature(), "/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule");
+        assertGetRoute(BoardController.class, "applicantActiveLoanRepaymentSchedule", activeLoanScheduleSignature(), "/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule");
+        assertGetRoute(LoanOfficerController.class, "applicantActiveLoanRepaymentSchedule", activeLoanScheduleSignature(), "/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule");
+    }
+
+    @Test
     void staffActiveLoanEndpointsReuseExistingScopeChecks() throws Exception {
         Map<String, String> sources = Map.of(
             "manager", Files.readString(Path.of("src/main/java/com/sacco/mvp/web/ManagerController.java")),
@@ -67,7 +93,25 @@ class ActiveLoanHydrationRouteContractTest {
         assertThat(method.getAnnotation(ResponseBody.class)).isNotNull();
     }
 
+    private void assertGetRoute(Class<?> controllerClass,
+                                String methodName,
+                                Class<?>[] parameterTypes,
+                                String expectedPath) throws Exception {
+        Method method = controllerClass.getMethod(methodName, parameterTypes);
+
+        assertThat(method.getAnnotation(GetMapping.class).value()).containsExactly(expectedPath);
+        assertThat(method.getAnnotation(ResponseBody.class)).isNotNull();
+    }
+
     private Method routeMethod(Class<?> controllerClass) throws Exception {
         return controllerClass.getMethod("applicantActiveLoans", UUID.class, AppUserPrincipal.class);
+    }
+
+    private Class<?>[] staffScheduleSignature() {
+        return new Class<?>[] { UUID.class, AppUserPrincipal.class };
+    }
+
+    private Class<?>[] activeLoanScheduleSignature() {
+        return new Class<?>[] { UUID.class, String.class, AppUserPrincipal.class };
     }
 }

@@ -128,12 +128,14 @@
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
                     <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.schedule" text="Schedule" /></th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100" data-staff-active-loans-body>
                 <c:choose>
                     <c:when test="${not empty activeApplicantLoans}">
                         <c:forEach items="${activeApplicantLoans}" var="loan">
+                            <c:set var="loanScheduleId" value="${not empty loan.scheduleLoanId ? loan.scheduleLoanId : loan.loanId}" />
                             <tr>
                                 <td class="px-3 py-2">
                                     <div class="font-medium text-slate-900">${loan.shortId}</div>
@@ -152,12 +154,28 @@
                                         <div class="mt-1 text-xs text-slate-500">${loan.countdown}</div>
                                     </c:if>
                                 </td>
+                                <td class="px-3 py-2">
+                                    <c:choose>
+                                        <c:when test="${loan.scheduleAvailable and not empty loanScheduleId and loanScheduleId ne '-'}">
+                                            <button type="button"
+                                                    class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm"
+                                                    data-open-repayment-schedule
+                                                    data-schedule-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans/${loanScheduleId}/repayment-schedule"
+                                                    data-schedule-title="Repayment Schedule ${loanScheduleId}">
+                                                <spring:message code="loan.repayment.viewSchedule" text="View Schedule" />
+                                            </button>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span class="text-sm font-semibold text-slate-500">-</span>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
                             </tr>
                         </c:forEach>
                     </c:when>
                     <c:otherwise>
                         <tr data-staff-active-loans-empty>
-                            <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
+                            <td colspan="8" class="px-3 py-4 text-center text-sm text-slate-600">
                                 <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
                             </td>
                         </tr>
@@ -170,6 +188,7 @@
             </div>
 </c:if>
 <%@ include file="../fragments/staff-active-loans-hydration.jspf" %>
+<%@ include file="../fragments/repayment-schedule-hydration.jspf" %>
 
 <c:choose>
     <c:when test="${isDisbursementReview}">
@@ -450,7 +469,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <label class="block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.formTitle" text="Loan Disbursement" /></label>
-                <p class="mt-1 text-sm text-slate-500"><spring:message code="loan.disbursement.formHelp" text="Enter the release date and repayment terms before final approval." /></p>
+                <p class="mt-1 text-sm text-slate-500"><spring:message code="loan.disbursement.formHelp" text="Enter the release details before final approval." /></p>
                             </div>
             <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                 <c:choose>
@@ -465,8 +484,10 @@
                 <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
                             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.firstRepayment" text="First Repayment Date" /></label>
-                <input type="date" name="firstRepaymentDate" value="${app.firstRepaymentDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></label>
+                <div class="erp-section-muted py-3 text-sm font-semibold text-slate-700">
+                    <spring:message code="loan.disbursement.foresightScheduleSource" text="Loaded from Foresight after disbursement." />
+                </div>
                         </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /> <span class="text-rose-600">*</span></label>
@@ -566,7 +587,7 @@
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.tenorGuidance" text="Tenor Guidance" /></label>
                 <div class="erp-section-muted text-sm text-slate-600">
-                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The repayment schedule will use the standard monthly cycle and calculate the final due date automatically." />
+                    <spring:message code="loan.disbursement.tenorGuidanceHelp" arguments="${app.tenorMonths}" text="Tenor is {0} month(s). The actual repayment schedule is retrieved from Foresight." />
         </div>
                 </div>
             </div>

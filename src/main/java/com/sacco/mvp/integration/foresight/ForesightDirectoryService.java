@@ -214,6 +214,38 @@ public class ForesightDirectoryService {
         }
     }
 
+    public List<ForesightRepaymentScheduleRow> fetchRepaymentSchedule(String memberNumber, String stationId, String loanId) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/repayment-schedule")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .queryParam("loanId", loanId)
+                .build()
+                .toUri();
+            log.info("Foresight repayment-schedule lookup started: {}", requestUri);
+            List<ForesightRepaymentScheduleRow> rows = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightRepaymentScheduleRow>>() {});
+            log.info("Foresight repayment-schedule lookup completed: loanId={}, rows={}",
+                loanId,
+                rows == null ? 0 : rows.size());
+            return rows == null ? List.of() : rows;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight repayment-schedule lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External repayment schedule service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External repayment schedule lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight repayment-schedule lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external repayment schedule service.", ex);
+        }
+    }
+
     public List<ForesightLoanPaymentTransaction> fetchLoanPaymentTransactions(String memberNumber, String stationId, String loanId) {
         try {
             URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)

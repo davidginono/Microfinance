@@ -16,6 +16,7 @@ import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.ExternalAccountStatusService;
 import com.sacco.mvp.service.EmailOtpService;
+import com.sacco.mvp.service.ForesightRepaymentScheduleService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -71,6 +72,7 @@ public class DisbursementController {
     private final WorkflowStatusPresentationService workflowStatusPresentationService;
     private final EmailOtpService emailOtpService;
     private final PaymentDetailsService paymentDetailsService;
+    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
     private final MessageSource messageSource;
     private final AccessControlService access;
     private final ApplicationClock applicationClock;
@@ -278,9 +280,16 @@ public class DisbursementController {
         model.addAttribute("deductibleFeeRows", loanPresentationService.deductibleFeeRows(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
+        boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());
+        model.addAttribute("actualRepaymentScheduleEnabled", actualRepaymentScheduleEnabled);
+        model.addAttribute("repaymentSchedulePath", actualRepaymentScheduleEnabled
+            ? "/disbursement/loan-applications/" + app.getId() + "/repayment-schedule"
+            : "");
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
+        model.addAttribute("calculatedRepaymentRows", actualRepaymentScheduleEnabled
+            ? List.of()
+            : loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("previousApprovedReviews",
@@ -363,6 +372,15 @@ public class DisbursementController {
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(guarantor)));
     }
 
+    @GetMapping("/loan-applications/{id}/repayment-schedule")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> repaymentSchedule(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal) {
+        LoanApplication app = requireVisibleApplication(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+    }
+
     @PostMapping("/loan-applications/{id}/finalize")
     @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
     public String finalize(@PathVariable UUID id,
@@ -392,7 +410,13 @@ public class DisbursementController {
                 disbursementProofFile
             );
             emailOtpService.consumeOtpById(otpTokenId);
-            ra.addFlashAttribute("message", "Loan disbursed successfully.");
+            ForesightRepaymentScheduleService.RefreshResult scheduleRefresh =
+                foresightRepaymentScheduleService.tryRefreshLocalLoanSchedule(id);
+            if (scheduleRefresh.status() == ForesightRepaymentScheduleService.RefreshStatus.UPDATED) {
+                ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule loaded from Foresight.");
+            } else {
+                ra.addFlashAttribute("message", "Loan disbursed successfully. Repayment schedule will appear when Foresight is available.");
+            }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }
@@ -586,6 +610,10 @@ public class DisbursementController {
 
     private String humanizeEnum(String value) {
         return value == null ? "-" : value.replace('_', ' ').toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     private void addReviewDisplayAttributes(Model model, LoanApplication app) {

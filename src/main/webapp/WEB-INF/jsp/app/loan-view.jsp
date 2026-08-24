@@ -250,7 +250,10 @@
 </c:if>
 
 <c:if test="${app.status eq 'DISBURSED' or app.status eq 'DEFAULTED' or app.status eq 'PAID'}">
-    <div id="repayment-plan" class="erp-section">
+    <div id="repayment-plan" class="erp-section"
+         data-repayment-schedule-section="true"
+         data-repayment-schedule-url="${pageContext.request.contextPath}${repaymentSchedulePath}"
+         data-repayment-summary-card-class="loan-repayment-card">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.title" text="Repayment Plan" /></h5>
@@ -276,40 +279,40 @@
                 </div>
                     </div>
         <div class="loan-repayment-summary">
-            <div class="loan-repayment-grid">
+            <div class="loan-repayment-grid" data-repayment-summary-grid>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.installmentAmount" text="Installment Amount" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Installment Amount">
                         <c:out value="${repaymentSummary['Installment Amount']}" default="Pending update" />
                 </div>
                     </div>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalInterest" text="Total Interest" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Total Interest">
                         <c:out value="${repaymentSummary['Total Interest']}" default="Pending update" />
                 </div>
                     </div>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalPrincipal" text="Total Principal" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Total Principal">
                         <c:out value="${repaymentSummary['Total Principal']}" default="Pending update" />
                 </div>
                     </div>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.totalAmount" text="Total Amount" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Total Amount">
                         <c:out value="${repaymentSummary['Total Amount']}" default="Pending update" />
                 </div>
                     </div>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.frequency" text="Repayment Frequency" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Repayment Frequency">
                         <c:out value="${repaymentSummary['Repayment Frequency']}" default="Pending update" />
                 </div>
                     </div>
                 <div class="loan-repayment-card">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.repayment.firstRepayment" text="First Repayment" /></div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="First Repayment Date">
                         <c:out value="${repaymentSummary['First Repayment Date']}" default="Pending update" />
                     </div>
                 </div>
@@ -320,7 +323,7 @@
                             <c:otherwise><spring:message code="loan.repayment.finalDueDate" text="Final Due Date" /></c:otherwise>
                         </c:choose>
             </div>
-                    <div class="loan-repayment-card-value">
+                    <div class="loan-repayment-card-value" data-repayment-summary-value="Final Due Date">
                         <c:choose>
                             <c:when test="${app.status eq 'PAID'}">
                                 <c:out value="${repaymentSummary['Paid At']}" default="${repaymentSummary['Final Due Date']}" />
@@ -391,44 +394,53 @@
                 </c:if>
     </div>
         </div>
-        <c:if test="${not empty repaymentRows}">
-            <details class="loan-detail-disclosure" open>
-                <summary class="loan-detail-disclosure__summary">
-                    <span><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></span>
-                    <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
-                </summary>
-                <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true">
-                    <div class="erp-table-scroll">
-                    <table class="erp-table loan-repayment-schedule-table">
-                        <thead>
-                            <tr>
-                                <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
-                                <th><spring:message code="repayment.month" text="Month" /></th>
-                                <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
-                                <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
-                                <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
-                                <th><spring:message code="repayment.interest" text="Interest" /></th>
-                                <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <c:forEach items="${repaymentRows}" var="row">
-                                <tr>
-                                    <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
-                                    <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
-                                    <td class="px-3 py-2">${row.beginningBalance}</td>
-                                    <td class="px-3 py-2 font-medium text-slate-900">${not empty row.payment ? row.payment : row.amount}</td>
-                                    <td class="px-3 py-2">${row.loanAmount}</td>
-                                    <td class="px-3 py-2">${row.interest}</td>
-                                    <td class="px-3 py-2">${not empty row.endingBalance ? row.endingBalance : row.outstandingBalance}</td>
+        <details class="loan-detail-disclosure" open>
+            <summary class="loan-detail-disclosure__summary">
+                <span><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></span>
+                <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true">
+                <div class="erp-table-scroll">
+                <table class="erp-table loan-repayment-schedule-table">
+                    <thead>
+                        <tr>
+                            <th><spring:message code="repayment.pmtNo" text="Pmt No." /></th>
+                            <th><spring:message code="repayment.month" text="Month" /></th>
+                            <th><spring:message code="repayment.beginningBalance" text="Beginning Balance" /></th>
+                            <th><spring:message code="repayment.amountToPay" text="Amount to Pay" /></th>
+                            <th><spring:message code="loan.amount.label" text="Loan Amount" /></th>
+                            <th><spring:message code="repayment.interest" text="Interest" /></th>
+                            <th><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" data-repayment-schedule-body>
+                        <c:choose>
+                            <c:when test="${not empty repaymentRows}">
+                                <c:forEach items="${repaymentRows}" var="row">
+                                    <tr>
+                                        <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                                        <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
+                                        <td class="px-3 py-2">${row.beginningBalance}</td>
+                                        <td class="px-3 py-2 font-medium text-slate-900">${not empty row.payment ? row.payment : row.amount}</td>
+                                        <td class="px-3 py-2">${not empty row.loanAmount ? row.loanAmount : row.principal}</td>
+                                        <td class="px-3 py-2">${row.interest}</td>
+                                        <td class="px-3 py-2">${not empty row.endingBalance ? row.endingBalance : row.outstandingBalance}</td>
+                                    </tr>
+                                </c:forEach>
+                            </c:when>
+                            <c:otherwise>
+                                <tr data-repayment-schedule-empty>
+                                    <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
+                                        <spring:message code="loan.repayment.foresightPending" text="Repayment schedule will appear when Foresight is available." />
+                                    </td>
                                 </tr>
-                            </c:forEach>
-                        </tbody>
-                    </table>
-                            </div>
-    </div>
-            </details>
-        </c:if>
+                            </c:otherwise>
+                        </c:choose>
+                    </tbody>
+                </table>
+                        </div>
+</div>
+        </details>
     </div>
 </c:if>
 
@@ -1267,5 +1279,6 @@
 </script>
 
 <%@ include file="../fragments/live-account-status-hydration.jspf" %>
+<%@ include file="../fragments/repayment-schedule-hydration.jspf" %>
 <%@ include file="../fragments/loan-export-modal.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

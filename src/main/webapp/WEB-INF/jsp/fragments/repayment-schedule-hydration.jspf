@@ -1,0 +1,275 @@
+<script>
+    (function () {
+        if (window.SaccosRepaymentSchedule && window.SaccosRepaymentSchedule.ready) {
+            window.SaccosRepaymentSchedule.init();
+            return;
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function valueOrDash(value) {
+            var text = String(value == null ? "" : value).trim();
+            return text ? text : "-";
+        }
+
+        function rowHtml(row) {
+            return [
+                "<tr>",
+                "<td class=\"px-3 py-2 font-medium text-slate-700\">", escapeHtml(valueOrDash(row.pmtNo || row.installmentNumber)), "</td>",
+                "<td class=\"px-3 py-2\">", escapeHtml(valueOrDash(row.month || row.dueDate)), "</td>",
+                "<td class=\"px-3 py-2\">", escapeHtml(valueOrDash(row.beginningBalance)), "</td>",
+                "<td class=\"px-3 py-2 font-medium text-slate-900\">", escapeHtml(valueOrDash(row.payment || row.amount)), "</td>",
+                "<td class=\"px-3 py-2\">", escapeHtml(valueOrDash(row.loanAmount || row.principal)), "</td>",
+                "<td class=\"px-3 py-2\">", escapeHtml(valueOrDash(row.interest)), "</td>",
+                "<td class=\"px-3 py-2\">", escapeHtml(valueOrDash(row.endingBalance || row.outstandingBalance)), "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function emptyRowHtml(message) {
+            return [
+                "<tr data-repayment-schedule-empty>",
+                "<td colspan=\"7\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
+                escapeHtml(valueOrDash(message || "Repayment schedule is not available from Foresight yet.")),
+                "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function normalizeEntries(payload) {
+            if (!payload) {
+                return [];
+            }
+            if (Array.isArray(payload.summaryEntries)) {
+                return payload.summaryEntries;
+            }
+            if (!payload.summary) {
+                return [];
+            }
+            return Object.keys(payload.summary).map(function (key) {
+                return { key: key, value: payload.summary[key] };
+            });
+        }
+
+        function renderSummaryGrid(grid, payload, cardClass) {
+            if (!grid) {
+                return;
+            }
+            var entries = normalizeEntries(payload);
+            if (grid.getAttribute("data-repayment-summary-dynamic") === "true") {
+                grid.innerHTML = entries.length
+                    ? entries.map(function (entry) {
+                        return [
+                            "<div class=\"", cardClass || "erp-section-muted", "\">",
+                            "<div class=\"text-xs font-semibold uppercase tracking-wide text-slate-500\">", escapeHtml(valueOrDash(entry.key)), "</div>",
+                            "<div class=\"mt-2 text-sm font-semibold text-slate-800\">", escapeHtml(valueOrDash(entry.value)), "</div>",
+                            "</div>"
+                        ].join("");
+                    }).join("")
+                    : "";
+                return;
+            }
+            entries.forEach(function (entry) {
+                Array.prototype.some.call(grid.querySelectorAll("[data-repayment-summary-value]"), function (target) {
+                    if (target.getAttribute("data-repayment-summary-value") === String(entry.key)) {
+                        target.textContent = valueOrDash(entry.value);
+                        return true;
+                    }
+                    return false;
+                });
+            });
+        }
+
+        function applyPayloadToSection(section, payload) {
+            var body = section.querySelector("[data-repayment-schedule-body]");
+            var grid = section.querySelector("[data-repayment-summary-grid]");
+            renderSummaryGrid(grid, payload, section.getAttribute("data-repayment-summary-card-class"));
+            if (!body || !payload) {
+                return;
+            }
+            var rows = Array.isArray(payload.rows) ? payload.rows : [];
+            body.innerHTML = rows.length && payload.scheduleAvailable !== false
+                ? rows.map(rowHtml).join("")
+                : emptyRowHtml(payload.message);
+        }
+
+        function hydrateSection(section) {
+            if (!section || section.getAttribute("data-repayment-schedule-loading") === "true"
+                || section.getAttribute("data-repayment-schedule-ready") === "true") {
+                return;
+            }
+            var url = section.getAttribute("data-repayment-schedule-url");
+            if (!url) {
+                return;
+            }
+            section.setAttribute("data-repayment-schedule-loading", "true");
+            fetch(url, {
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Repayment schedule could not load.");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    applyPayloadToSection(section, payload);
+                    section.setAttribute("data-repayment-schedule-ready", "true");
+                })
+                .catch(function () {
+                    var body = section.querySelector("[data-repayment-schedule-body]");
+                    if (body) {
+                        body.innerHTML = emptyRowHtml("Repayment schedule is unavailable right now. Please retry again later.");
+                    }
+                })
+                .finally(function () {
+                    section.removeAttribute("data-repayment-schedule-loading");
+                });
+        }
+
+        function ensureModal() {
+            var modal = document.querySelector("[data-repayment-schedule-modal]");
+            if (modal) {
+                return modal;
+            }
+            modal = document.createElement("div");
+            modal.className = "fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/40 px-4 py-6";
+            modal.setAttribute("data-repayment-schedule-modal", "true");
+            modal.innerHTML = [
+                "<div class=\"w-full max-w-5xl overflow-hidden border border-slate-200 bg-white shadow-xl\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"repaymentScheduleModalTitle\">",
+                "<div class=\"flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3\">",
+                "<div>",
+                "<h2 id=\"repaymentScheduleModalTitle\" class=\"text-sm font-semibold uppercase tracking-wide text-slate-700\" data-repayment-modal-title>Repayment Schedule</h2>",
+                "<p class=\"mt-1 text-sm text-slate-500\" data-repayment-modal-message></p>",
+                "</div>",
+                "<button type=\"button\" class=\"app-icon-button btn-neutral\" data-repayment-modal-close aria-label=\"Close repayment schedule\">",
+                "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg>",
+                "</button>",
+                "</div>",
+                "<div class=\"space-y-4 px-4 py-4\">",
+                "<div class=\"grid gap-3 md:grid-cols-2 xl:grid-cols-4\" data-repayment-modal-summary data-repayment-summary-grid data-repayment-summary-dynamic=\"true\"></div>",
+                "<div class=\"erp-table-wrap rounded-none border-0\" data-aws-no-titlebar=\"true\">",
+                "<div class=\"erp-table-scroll\">",
+                "<" + "table class=\"erp-table loan-repayment-schedule-table\">",
+                "<thead><tr>",
+                "<th>Pmt No.</th><th>Month</th><th>Beginning Balance</th><th>Amount to Pay</th><th>Loan Amount</th><th>Interest</th><th>Ending Balance</th>",
+                "</tr></thead>",
+                "<tbody class=\"divide-y divide-slate-100\" data-repayment-schedule-body></tbody>",
+                "</" + "table>",
+                "</div>",
+                "</div>",
+                "</div>",
+                "</div>"
+            ].join("");
+            document.body.appendChild(modal);
+            modal.addEventListener("click", function (event) {
+                if (event.target === modal || event.target.closest("[data-repayment-modal-close]")) {
+                    closeModal();
+                }
+            });
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && !modal.classList.contains("hidden")) {
+                    closeModal();
+                }
+            });
+            return modal;
+        }
+
+        function closeModal() {
+            var modal = document.querySelector("[data-repayment-schedule-modal]");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.classList.remove("flex");
+            }
+        }
+
+        function openModal(url, title) {
+            var modal = ensureModal();
+            var titleNode = modal.querySelector("[data-repayment-modal-title]");
+            var messageNode = modal.querySelector("[data-repayment-modal-message]");
+            var body = modal.querySelector("[data-repayment-schedule-body]");
+            var summary = modal.querySelector("[data-repayment-modal-summary]");
+            if (titleNode) {
+                titleNode.textContent = title || "Repayment Schedule";
+            }
+            if (messageNode) {
+                messageNode.textContent = "Loading repayment schedule...";
+            }
+            if (summary) {
+                summary.innerHTML = "";
+            }
+            if (body) {
+                body.innerHTML = emptyRowHtml("Loading repayment schedule...");
+            }
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+            fetch(url, {
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Repayment schedule could not load.");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    if (messageNode) {
+                        messageNode.textContent = payload.message || "";
+                    }
+                    applyPayloadToSection(modal, payload);
+                })
+                .catch(function () {
+                    if (messageNode) {
+                        messageNode.textContent = "Repayment schedule is unavailable right now. Please retry again later.";
+                    }
+                    if (body) {
+                        body.innerHTML = emptyRowHtml("Repayment schedule is unavailable right now. Please retry again later.");
+                    }
+                });
+        }
+
+        function init() {
+            document.querySelectorAll("[data-repayment-schedule-section=\"true\"]").forEach(hydrateSection);
+        }
+
+        document.addEventListener("click", function (event) {
+            var trigger = event.target.closest("[data-open-repayment-schedule]");
+            if (!trigger) {
+                return;
+            }
+            event.preventDefault();
+            var url = trigger.getAttribute("data-schedule-url");
+            if (!url) {
+                return;
+            }
+            openModal(url, trigger.getAttribute("data-schedule-title"));
+        });
+
+        window.SaccosRepaymentSchedule = {
+            ready: true,
+            init: init,
+            open: openModal
+        };
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init, { once: true });
+        } else {
+            init();
+        }
+    }());
+</script>

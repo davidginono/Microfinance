@@ -98,7 +98,9 @@ class ActiveLoanDisplayServiceTest {
         assertThat(display.rows().get(0).get("scheduleAvailable")).isEqualTo(true);
         assertThat(display.rows().get(1).get("currentBalance")).isEqualTo("TSh 165000");
         assertThat(display.rows().get(1).get("paidAmount")).isEqualTo("-");
-        assertThat(display.rows().get(1).get("scheduleAvailable")).isEqualTo(false);
+        assertThat(display.rows().get(1).get("scheduleAvailable")).isEqualTo(true);
+        assertThat(display.rows().get(1).get("scheduleDataUrl"))
+            .isEqualTo("/app/active-loans/2002/repayment-schedule");
     }
 
     @Test
@@ -127,7 +129,8 @@ class ActiveLoanDisplayServiceTest {
         assertThat(display.rows()).extracting(row -> row.get("loanId"))
             .containsExactly("1001", "2002");
         assertThat(display.rows()).noneMatch(row -> "3003".equals(row.get("loanId")));
-        assertThat(display.rows().get(1).get("scheduleAvailable")).isEqualTo(false);
+        assertThat(display.rows().get(1).get("scheduleAvailable")).isEqualTo(true);
+        assertThat(display.rows().get(1).get("scheduleLoanId")).isEqualTo("2002");
         assertThat(display.rows().get(1).get("installmentAmount")).isEqualTo("-");
     }
 

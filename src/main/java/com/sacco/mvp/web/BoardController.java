@@ -18,6 +18,7 @@ import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.BoardService;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.ExternalAccountStatusService;
+import com.sacco.mvp.service.ForesightRepaymentScheduleService;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.LoanReportService;
@@ -60,6 +61,7 @@ public class BoardController {
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
     private final ActiveLoanDisplayService activeLoanDisplayService;
+    private final ForesightRepaymentScheduleService foresightRepaymentScheduleService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
@@ -274,9 +276,16 @@ public class BoardController {
         model.addAttribute("formFields", parseFormData(app.getFormData()));
         model.addAttribute("financialFields", loanPresentationService.parseFinancialFields(app));
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
+        boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());
+        model.addAttribute("actualRepaymentScheduleEnabled", actualRepaymentScheduleEnabled);
+        model.addAttribute("repaymentSchedulePath", actualRepaymentScheduleEnabled
+            ? reviewBasePath(principal) + "/loan-applications/" + app.getId() + "/repayment-schedule"
+            : "");
         model.addAttribute("repaymentSummary", loanPresentationService.reviewRepaymentSummary(app));
         model.addAttribute("repaymentSummaryEstimated", loanPresentationService.isEstimatedReviewRepaymentSummary(app));
-        model.addAttribute("calculatedRepaymentRows", loanPresentationService.calculatedRepaymentRows(app));
+        model.addAttribute("calculatedRepaymentRows", actualRepaymentScheduleEnabled
+            ? List.of()
+            : loanPresentationService.calculatedRepaymentRows(app));
         model.addAttribute("repaymentRows", loanPresentationService.reviewRepaymentRows(app));
         model.addAttribute("repaymentCountdown", loanPresentationService.countdownLabel(app.getFinalDueDate()));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
@@ -361,6 +370,33 @@ public class BoardController {
             app,
             activeApplicantLoans
         ).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/repayment-schedule")
+    @ResponseBody
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> repaymentSchedule(@PathVariable UUID id,
+                                                                 @AuthenticationPrincipal AppUserPrincipal principal) {
+        resolveMyReview(id, principal);
+        LoanApplication app = boardService.findLoan(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService.loadLocalLoanSchedule(app, applicant).toPayload());
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-active-loans/{loanId}/repayment-schedule")
+    @ResponseBody
+    @PreAuthorize("@authz.isBoardAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> applicantActiveLoanRepaymentSchedule(@PathVariable UUID id,
+                                                                                   @PathVariable String loanId,
+                                                                                   @AuthenticationPrincipal AppUserPrincipal principal) {
+        resolveMyReview(id, principal);
+        LoanApplication app = boardService.findLoan(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        return ResponseEntity.ok(foresightRepaymentScheduleService
+            .loadExternalLoanSchedule(applicant, app.getStationId(), loanId)
+            .toPayload());
     }
 
     @GetMapping("/loan-applications/{id}/applicant-financial-status")
@@ -639,6 +675,10 @@ public class BoardController {
             return "/credit-committee";
         }
         return "/board";
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     private String message(String code) {

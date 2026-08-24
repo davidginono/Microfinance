@@ -25,6 +25,9 @@ class ActiveLoanHydrationViewContractTest {
             .contains("aws-table-loader__spinner")
             .contains("renderActiveLoanPayload")
             .contains("scheduleAvailable")
+            .contains("scheduleDataUrl")
+            .contains("data-open-repayment-schedule")
+            .contains("repayment-schedule-hydration.jspf")
             .doesNotContain("<c:when test=\"${not empty activeLoanChartRows}\">\r\n                        <div class=\"erp-table-wrap\"");
     }
 
@@ -44,7 +47,34 @@ class ActiveLoanHydrationViewContractTest {
             .contains("data-aws-async-table-loading")
             .contains("aws-table-loader__spinner")
             .contains("\"Accept\": \"application/json\"")
+            .contains("data-open-repayment-schedule")
+            .contains("encodeURIComponent(loanId)")
+            .contains("colspan=\\\"8\\\"")
             .contains("data-staff-active-loans-body");
+        assertThat(manager)
+            .contains("data-open-repayment-schedule")
+            .contains("repayment-schedule-hydration.jspf");
+        assertThat(board)
+            .contains("data-open-repayment-schedule")
+            .contains("repayment-schedule-hydration.jspf");
+    }
+
+    @Test
+    void actualRepaymentScheduleViewsExposeForesightHydrationHooks() throws Exception {
+        String memberDetail = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-view.jsp"));
+        String staffSummary = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/staff-repayment-summary.jspf"));
+
+        assertThat(memberDetail)
+            .contains("data-repayment-schedule-section=\"true\"")
+            .contains("data-repayment-schedule-url=\"${pageContext.request.contextPath}${repaymentSchedulePath}\"")
+            .contains("data-repayment-schedule-body")
+            .contains("repayment-schedule-hydration.jspf");
+        assertThat(staffSummary)
+            .contains("actualRepaymentScheduleEnabled or not empty repaymentSummary")
+            .contains("data-repayment-schedule-section=\"true\"")
+            .contains("data-repayment-schedule-url=\"${repaymentSchedulePath}\"")
+            .contains("data-repayment-schedule-body")
+            .contains("Repayment schedule will appear when Foresight is available.");
     }
 
     @Test

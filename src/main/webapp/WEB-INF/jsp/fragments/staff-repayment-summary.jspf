@@ -1,13 +1,18 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<c:if test="${not empty repaymentSummary}">
-    <section class="erp-panel mt-5 overflow-hidden" data-staff-repayment-summary>
+<c:set var="staffRepaymentRows" value="${calculatedRepaymentRows}" />
+<c:if test="${actualRepaymentScheduleEnabled}">
+    <c:set var="staffRepaymentRows" value="${repaymentRows}" />
+</c:if>
+<c:if test="${actualRepaymentScheduleEnabled or not empty repaymentSummary}">
+    <section class="erp-panel mt-5 overflow-hidden" data-staff-repayment-summary
+             <c:if test="${actualRepaymentScheduleEnabled}">data-repayment-schedule-section="true" data-repayment-schedule-url="${repaymentSchedulePath}" data-repayment-summary-card-class="erp-section-muted"</c:if>>
         <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div>
                 <div class="text-sm font-semibold uppercase tracking-wide text-slate-700"><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></div>
                 <div class="mt-1 text-sm text-slate-500">
                     <c:choose>
                         <c:when test="${repaymentSummaryEstimated}"><spring:message code="loan.repayment.estimatedHelp" text="This is a calculated repayment schedule based on the applied loan amount." /></c:when>
-                        <c:otherwise><spring:message code="loan.repayment.actualHelp" text="Actual repayment details recorded after disbursement." /></c:otherwise>
+                        <c:otherwise><spring:message code="loan.repayment.actualHelp" text="Actual repayment details retrieved from Foresight after disbursement." /></c:otherwise>
                     </c:choose>
                 </div>
             </div>
@@ -21,7 +26,7 @@
             </div>
         </div>
         <div class="space-y-4 px-4 py-4">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-repayment-summary-grid data-repayment-summary-dynamic="${actualRepaymentScheduleEnabled}">
                 <c:forEach items="${repaymentSummary}" var="entry">
                     <div class="erp-section-muted">
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">${entry.key}</div>
@@ -30,7 +35,7 @@
                 </c:forEach>
             </div>
 
-            <c:if test="${not empty calculatedRepaymentRows}">
+            <c:if test="${actualRepaymentScheduleEnabled or not empty staffRepaymentRows}">
                 <details class="expected-schedule-details border border-slate-200 bg-white" open>
                     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
                         <span>
@@ -61,18 +66,29 @@
                                     <th class="px-3 py-2 text-left"><spring:message code="repayment.endingBalance" text="Ending Balance" /></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
-                            <c:forEach items="${calculatedRepaymentRows}" var="row">
-                                <tr>
-                                    <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
-                                    <td class="px-3 py-2">${row.month}</td>
-                                    <td class="px-3 py-2">${row.beginningBalance}</td>
-                                    <td class="px-3 py-2 font-medium text-slate-900">${row.payment}</td>
-                                    <td class="px-3 py-2">${row.loanAmount}</td>
-                                    <td class="px-3 py-2">${row.interest}</td>
-                                    <td class="px-3 py-2">${row.endingBalance}</td>
-                                </tr>
-                            </c:forEach>
+                            <tbody class="divide-y divide-slate-100" <c:if test="${actualRepaymentScheduleEnabled}">data-repayment-schedule-body</c:if>>
+                            <c:choose>
+                                <c:when test="${not empty staffRepaymentRows}">
+                                    <c:forEach items="${staffRepaymentRows}" var="row">
+                                        <tr>
+                                            <td class="px-3 py-2 font-medium text-slate-700">${row.pmtNo}</td>
+                                            <td class="px-3 py-2">${not empty row.month ? row.month : row.dueDate}</td>
+                                            <td class="px-3 py-2">${row.beginningBalance}</td>
+                                            <td class="px-3 py-2 font-medium text-slate-900">${not empty row.payment ? row.payment : row.amount}</td>
+                                            <td class="px-3 py-2">${not empty row.loanAmount ? row.loanAmount : row.principal}</td>
+                                            <td class="px-3 py-2">${row.interest}</td>
+                                            <td class="px-3 py-2">${not empty row.endingBalance ? row.endingBalance : row.outstandingBalance}</td>
+                                        </tr>
+                                    </c:forEach>
+                                </c:when>
+                                <c:otherwise>
+                                    <tr data-repayment-schedule-empty>
+                                        <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
+                                            <spring:message code="loan.repayment.foresightPending" text="Repayment schedule will appear when Foresight is available." />
+                                        </td>
+                                    </tr>
+                                </c:otherwise>
+                            </c:choose>
                             </tbody>
                         </table>
                     </div>

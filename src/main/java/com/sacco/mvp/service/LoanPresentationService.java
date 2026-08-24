@@ -474,6 +474,9 @@ public class LoanPresentationService {
             putFinancialSnapshotRepaymentTotals(display, app);
             return display;
         }
+        if (isActualRepaymentStatus(app.getStatus())) {
+            return Collections.emptyMap();
+        }
         if (app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             return Collections.emptyMap();
         }
@@ -503,6 +506,7 @@ public class LoanPresentationService {
 
     public boolean isEstimatedReviewRepaymentSummary(LoanApplication app) {
         return app != null
+            && !isActualRepaymentStatus(app.getStatus())
             && (app.getRepaymentScheduleJson() == null || app.getRepaymentScheduleJson().isBlank())
             && app.getFinancialSnapshot() != null
             && !app.getFinancialSnapshot().isBlank();
@@ -526,6 +530,9 @@ public class LoanPresentationService {
         );
         if (!storedRows.isEmpty()) {
             return storedRows;
+        }
+        if (isActualRepaymentStatus(app.getStatus())) {
+            return Collections.emptyList();
         }
         return estimatedReviewRepaymentRows(app);
     }
@@ -558,6 +565,9 @@ public class LoanPresentationService {
                 row.put("installmentNumber", installmentNumber == null ? "-" : String.valueOf(installmentNumber));
                 row.put("pmtNo", installmentNumber == null ? "-" : String.valueOf(installmentNumber));
                 Object dueDateValue = item.get("dueDate");
+                if (dueDateValue == null) {
+                    dueDateValue = item.get("month");
+                }
                 row.put("dueDate", dueDateValue);
                 row.put("amount", formatMoneyValue(item.get("amount")));
                 row.put("payment", formatMoneyValue(item.get("amount")));
@@ -565,10 +575,14 @@ public class LoanPresentationService {
                 row.put("interest", formatMoneyValue(item.get("interestComponent")));
                 BigDecimal endingBalance = toBigDecimal(item.get("outstandingBalance"));
                 BigDecimal amount = toBigDecimal(item.get("amount"));
+                BigDecimal beginningBalance = toBigDecimal(item.get("beginningBalance"));
+                if (beginningBalance != null) {
+                    row.put("beginningBalance", formatMoney(beginningBalance));
+                }
                 if (endingBalance != null) {
                     row.put("endingBalance", formatMoney(endingBalance));
                     row.put("outstandingBalance", formatMoney(endingBalance));
-                    if (amount != null) {
+                    if (beginningBalance == null && amount != null) {
                         row.put("beginningBalance", formatMoney(endingBalance.add(amount)));
                     }
                 }
@@ -1668,9 +1682,9 @@ public class LoanPresentationService {
     private void putRepaymentScheduleTotals(Map<String, Object> display, Map<String, Object> raw) {
         Object scheduleObject = raw.get("schedule");
         if (!(scheduleObject instanceof List<?> schedule) || schedule.isEmpty()) {
-            putMoney(display, "Total Interest", raw.get("interestAmount"));
-            putMoney(display, "Total Principal", raw.get("disbursedPrincipal"));
-            putMoney(display, "Total Amount", raw.get("principalPlusInterest"));
+            putMoney(display, "Total Interest", firstNonNull(raw.get("totalInterest"), raw.get("interestAmount")));
+            putMoney(display, "Total Principal", firstNonNull(raw.get("totalPrincipal"), raw.get("disbursedPrincipal")));
+            putMoney(display, "Total Amount", firstNonNull(raw.get("totalAmount"), raw.get("principalPlusInterest")));
             return;
         }
 
@@ -1688,6 +1702,14 @@ public class LoanPresentationService {
         putMoney(display, "Total Interest", totalInterest);
         putMoney(display, "Total Principal", totalPrincipal);
         putMoney(display, "Total Amount", totalAmount);
+    }
+
+    private boolean isActualRepaymentStatus(LoanStatus status) {
+        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
+    }
+
+    private Object firstNonNull(Object first, Object second) {
+        return first == null ? second : first;
     }
 
     private void putFinancialSnapshotRepaymentTotals(Map<String, Object> display, LoanApplication app) {

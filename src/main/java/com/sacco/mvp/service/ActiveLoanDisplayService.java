@@ -213,6 +213,7 @@ public class ActiveLoanDisplayService {
         row.put("totalInterestPaid", money(loanPresentationService.activeLoanTotalInterestPaid(app)));
         row.put("scheduleAvailable", true);
         row.put("scheduleUrl", "/app/loan-applications/" + app.getId() + "#repayment-plan");
+        row.put("scheduleDataUrl", "/app/loan-applications/" + app.getId() + "/repayment-schedule");
         row.put("externalOnly", false);
         return new ResolvedRow(row, balance);
     }
@@ -249,8 +250,9 @@ public class ActiveLoanDisplayService {
         row.put("outstandingInterest", moneyOrDash(outstandingLoan == null ? null : outstandingLoan.outstandingInterest()));
         row.put("totalPrincipalPaid", "-");
         row.put("totalInterestPaid", "-");
-        row.put("scheduleAvailable", false);
-        row.put("scheduleUrl", "");
+        row.put("scheduleAvailable", true);
+        row.put("scheduleUrl", "/app/active-loans/" + loanId + "/repayment-schedule");
+        row.put("scheduleDataUrl", "/app/active-loans/" + loanId + "/repayment-schedule");
         row.put("externalOnly", true);
         return new ResolvedRow(row, balance);
     }
@@ -277,7 +279,10 @@ public class ActiveLoanDisplayService {
         row.put("isTopUpSource", String.valueOf(currentApplication != null
             && currentApplication.getTopUpSourceLoanId() != null
             && currentApplication.getTopUpSourceLoanId().equals(loan.getId())));
-        row.put("scheduleAvailable", true);
+        String scheduleLoanId = blankToNull(loan.getLoanId());
+        row.put("scheduleAvailable", scheduleLoanId != null);
+        row.put("scheduleLoanId", scheduleLoanId == null ? "" : scheduleLoanId);
+        row.put("scheduleUrl", "");
         row.put("externalOnly", false);
         return new ResolvedRow(row, balance);
     }
@@ -299,7 +304,9 @@ public class ActiveLoanDisplayService {
         row.put("finalDueDate", "-");
         row.put("countdown", "");
         row.put("isTopUpSource", "false");
-        row.put("scheduleAvailable", false);
+        row.put("scheduleAvailable", true);
+        row.put("scheduleLoanId", loanId);
+        row.put("scheduleUrl", "");
         row.put("externalOnly", true);
         return new ResolvedRow(row, balance);
     }
