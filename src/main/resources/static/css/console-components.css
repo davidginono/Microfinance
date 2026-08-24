@@ -5148,7 +5148,8 @@ html.session-timeout-active,
         animation: otp-pop 180ms ease-out;
     }
 
-    .otp-button-spinner {
+    .otp-button-spinner,
+    .loan-guarantor-search-spinner {
         position: relative;
         display: none;
         height: 1rem;
@@ -5160,11 +5161,13 @@ html.session-timeout-active,
         animation: otp-spin 0.72s linear infinite;
     }
 
-    .otp-button-spinner:not(.hidden) {
+    .otp-button-spinner:not(.hidden),
+    .loan-guarantor-search-spinner:not(.hidden) {
         display: inline-flex;
     }
 
-    .otp-button-spinner::after {
+    .otp-button-spinner::after,
+    .loan-guarantor-search-spinner::after {
         content: "";
         position: absolute;
         inset: 3px;
@@ -7403,6 +7406,16 @@ html.session-timeout-active,
 
     .loan-guarantor-search-action {
         flex: 0 0 auto;
+        gap: 6px;
+    }
+
+    .loan-guarantor-search-action.is-loading,
+    .loan-guarantor-search-action:disabled {
+        border-color: #cbd5e1 !important;
+        background: #e2e8f0 !important;
+        color: #64748b !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
     }
 
     .loan-guarantor-dropdown {
