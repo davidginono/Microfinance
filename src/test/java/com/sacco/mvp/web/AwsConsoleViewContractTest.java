@@ -915,6 +915,119 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void pagesChangedInThisIterationKeepResponsiveScrollAndActionContracts() throws Exception {
+        String dashboard = read(JSP_ROOT.resolve("app/dashboard.jsp"));
+        String loanProducts = read(JSP_ROOT.resolve("app/loan-products.jsp"));
+        String loanNew = read(JSP_ROOT.resolve("app/loan-new.jsp"));
+        String memberReports = read(JSP_ROOT.resolve("app/reports.jsp"));
+        String staffAnalytics = read(JSP_ROOT.resolve("staff/analytics.jsp"));
+        String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
+        String managerDetail = read(JSP_ROOT.resolve("manager/detail.jsp"));
+        String boardDetail = read(JSP_ROOT.resolve("board/detail.jsp"));
+        String staffDetailHeader = read(JSP_ROOT.resolve("fragments/staff-loan-detail-header.jspf"));
+        String loanExportModal = read(JSP_ROOT.resolve("fragments/loan-export-modal.jspf"));
+        String repaymentHydration = read(JSP_ROOT.resolve("fragments/repayment-schedule-hydration.jspf"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
+        String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
+        String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+
+        assertThat(dashboard)
+            .contains("class=\"erp-table-scroll member-dashboard-active-loans-scroll\"")
+            .contains("include file=\"../fragments/repayment-schedule-hydration.jspf\"")
+            .contains("data-open-repayment-schedule")
+            .doesNotContain("erp-table-wrap erp-table-scroll");
+        assertThat(loanProducts)
+            .contains("class=\"loan-calculator-steps\"")
+            .contains("loan-calculator-actionbar");
+        assertThat(loanNew)
+            .contains("class=\"loan-guarantor-search-row\"")
+            .contains("class=\"loan-guarantor-format-indicator\"")
+            .contains("id=\"guarantorFormatMessage\"")
+            .contains("aria-describedby=\"guarantorHint guarantorFormatMessage\"")
+            .contains("loan-guarantor-search-action");
+
+        assertThat(memberReports)
+            .contains("class=\"loan-analytics-actions\" data-aws-action-pin=\"true\"")
+            .contains("class=\"loan-report-action-icon is-pdf\"")
+            .contains("class=\"loan-report-action-icon is-excel\"")
+            .contains("class=\"loan-report-action-icon is-refresh\"")
+            .contains("data-print-action=\"true\"");
+        assertThat(staffAnalytics)
+            .contains("class=\"app-table-toolbar staff-analytics-actions\" data-aws-action-pin=\"true\"")
+            .contains("class=\"staff-action-icon is-pdf\"")
+            .contains("class=\"staff-action-icon is-excel\"")
+            .contains("class=\"staff-action-icon is-refresh\"")
+            .contains("data-print-action=\"true\"")
+            .contains("class=\"erp-table-scroll\" data-view-position-key=\"staff-analytics-financial-breakdown\"");
+
+        for (String detail : List.of(memberDetail, staffDetailHeader)) {
+            assertThat(detail)
+                .contains("class=\"loan-detail-action-row\"")
+                .contains("data-loan-export-url=")
+                .contains("data-print-action=\"true\"")
+                .contains("class=\"loan-document-action-icon\"");
+        }
+        for (String detail : List.of(managerDetail, boardDetail)) {
+            assertThat(detail)
+                .contains("include file=\"../fragments/staff-loan-detail-header.jspf\"")
+                .contains("include file=\"../fragments/repayment-schedule-hydration.jspf\"");
+        }
+        assertThat(loanExportModal)
+            .contains("class=\"app-modal-overlay\"")
+            .contains("data-loan-print-signed data-print-action=\"true\"")
+            .contains("data-loan-print-unsigned data-print-action=\"true\"")
+            .contains("class=\"loan-document-action-icon\"");
+        assertThat(repaymentHydration)
+            .contains("modal.className = \"repayment-schedule-modal-overlay hidden\"")
+            .contains("document.body.appendChild(modal)")
+            .contains("class=\\\"erp-table-scroll repayment-schedule-modal-table-scroll\\\"")
+            .contains("data-repayment-summary-dynamic=\\\"true\\\"");
+
+        assertThat(consoleCss)
+            .contains(".member-dashboard-active-loans-scroll")
+            .contains("--erp-table-height: clamp(11rem, 30vh, 15rem)")
+            .contains(".loan-calculator-steps li")
+            .contains(".loan-calculator-steps strong")
+            .contains(".loan-analytics-command-panel .loan-analytics-actions")
+            .contains("grid-template-columns: repeat(2, minmax(0, 1fr))")
+            .contains(".loan-analytics-command-panel .loan-analytics-actions .app-btn")
+            .contains("white-space: normal")
+            .contains(".staff-analytics-actions")
+            .contains(".staff-analytics-actions .app-btn")
+            .contains(".loan-guarantor-search-row")
+            .contains(".loan-guarantor-format-indicator")
+            .contains("order: 3")
+            .contains(".loan-guarantor-search-action")
+            .contains("order: 4")
+            .contains(".repayment-schedule-modal-overlay")
+            .contains(".repayment-schedule-modal-panel")
+            .contains("max-height: calc(100vh - 1rem)")
+            .contains(".repayment-schedule-modal-body")
+            .contains("overflow-y: auto")
+            .contains(".repayment-schedule-modal-table-scroll")
+            .contains("max-height: min(38vh, 18rem)")
+            .contains(".loan-detail-action-row")
+            .contains("flex-wrap: wrap")
+            .contains(".loan-detail-action-row .app-btn")
+            .contains("justify-content: center");
+
+        assertThat(shellCss)
+            .contains("overflow-x: clip !important")
+            .contains("overflow-y: visible !important")
+            .contains("height: auto !important")
+            .contains(".shell-content-frame")
+            .contains(".staff-analytics-command-panel .staff-analytics-filter")
+            .contains("flex-flow: row wrap !important")
+            .contains("overflow-x: hidden !important");
+        assertThat(shellJs)
+            .contains("const handOffTableWheelScroll = function (event)")
+            .contains("event.target instanceof Element ? event.target.closest('.erp-table-scroll') : null")
+            .contains("normalizedWheelDeltaY(event)")
+            .contains("findVerticalScrollParent(target)")
+            .contains("document.addEventListener('wheel', handOffTableWheelScroll, { capture: true, passive: false })");
+    }
+
+    @Test
     void documentDownloadsUseSelfClearingPagePreloader() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
         String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
