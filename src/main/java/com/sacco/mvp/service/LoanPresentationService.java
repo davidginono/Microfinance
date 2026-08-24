@@ -558,12 +558,12 @@ public class LoanPresentationService {
                 row.put("loanAmount", formatMoneyValue(item.get("principalComponent")));
                 row.put("interest", formatMoneyValue(item.get("interestComponent")));
                 BigDecimal endingBalance = toBigDecimal(item.get("outstandingBalance"));
-                BigDecimal principalComponent = toBigDecimal(item.get("principalComponent"));
+                BigDecimal amount = toBigDecimal(item.get("amount"));
                 if (endingBalance != null) {
                     row.put("endingBalance", formatMoney(endingBalance));
                     row.put("outstandingBalance", formatMoney(endingBalance));
-                    if (principalComponent != null) {
-                        row.put("beginningBalance", formatMoney(endingBalance.add(principalComponent)));
+                    if (amount != null) {
+                        row.put("beginningBalance", formatMoney(endingBalance.add(amount)));
                     }
                 }
                 row.put("scheduledBreakdown", scheduledAmountBreakdown(item));
@@ -645,7 +645,6 @@ public class LoanPresentationService {
                 BigDecimal principalComponent;
                 BigDecimal interestComponent;
                 BigDecimal installmentAmount;
-                BigDecimal beginningBalance = remainingPrincipal;
                 if (interestMethod == InterestMethod.REDUCING_BALANCE) {
                     interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
                     principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
@@ -677,7 +676,6 @@ public class LoanPresentationService {
                 row.put("installmentNumber", String.valueOf(month));
                 row.put("pmtNo", String.valueOf(month));
                 row.put("month", "Month " + month);
-                row.put("beginningBalance", formatMoney(beginningBalance));
                 row.put("dueDate", "-");
                 row.put("amount", formatMoney(installmentAmount));
                 row.put("payment", formatMoney(installmentAmount));
@@ -687,17 +685,33 @@ public class LoanPresentationService {
                 row.put("scheduledPrincipalAmount", principalComponent);
                 row.put("scheduledInterestAmount", interestComponent);
                 row.put("scheduledTotalAmount", installmentAmount);
-                row.put("outstandingBalance", formatMoney(remainingPrincipal));
-                row.put("endingBalance", formatMoney(remainingPrincipal));
                 row.put("principalPaid", "-");
                 row.put("interestPaid", "-");
                 row.put("totalPaid", "-");
                 row.put("paymentDate", "-");
                 rows.add(row);
             }
+            applyInterestInclusiveDisplayBalances(rows);
             return rows;
         } catch (Exception ex) {
             return Collections.emptyList();
+        }
+    }
+
+    private void applyInterestInclusiveDisplayBalances(List<Map<String, Object>> rows) {
+        BigDecimal totalScheduled = rows.stream()
+            .map(row -> toBigDecimal(row.get("scheduledTotalAmount")))
+            .map(amount -> amount == null ? BigDecimal.ZERO : amount)
+            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal runningPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (Map<String, Object> row : rows) {
+            row.put("beginningBalance", formatMoney(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO)));
+            BigDecimal amount = toBigDecimal(row.get("scheduledTotalAmount"));
+            runningPaid = runningPaid.add(amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal outstanding = totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            row.put("outstandingBalance", formatMoney(outstanding));
+            row.put("endingBalance", formatMoney(outstanding));
         }
     }
 

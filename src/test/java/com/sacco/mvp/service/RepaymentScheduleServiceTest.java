@@ -146,6 +146,7 @@ class RepaymentScheduleServiceTest {
         assertThat(new BigDecimal(String.valueOf(firstRow.get("amount"))).compareTo(new BigDecimal("122500.00"))).isZero();
         assertThat(new BigDecimal(String.valueOf(firstRow.get("interestComponent"))).compareTo(new BigDecimal("11000.00"))).isZero();
         assertThat(new BigDecimal(String.valueOf(firstRow.get("principalComponent"))).compareTo(new BigDecimal("111500.00"))).isZero();
+        assertThat(new BigDecimal(String.valueOf(firstRow.get("outstandingBalance"))).compareTo(new BigDecimal("643500.00"))).isZero();
     }
 
     @Test

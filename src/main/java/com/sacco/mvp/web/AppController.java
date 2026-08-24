@@ -2536,12 +2536,12 @@ public class AppController {
         BigDecimal flatPrincipalBase = principal.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
         BigDecimal flatInterestBase = flatTotalInterest.divide(BigDecimal.valueOf(months), 2, RoundingMode.HALF_UP);
         BigDecimal reducingInstallment = reducingInstallment(principal, monthlyRate, months);
+        List<BigDecimal> installmentAmounts = new ArrayList<>();
 
         for (int month = 1; month <= months; month++) {
             BigDecimal principalComponent;
             BigDecimal interestComponent;
             BigDecimal installmentAmount;
-            BigDecimal beginningBalance = remainingPrincipal;
             if (interestMethod == InterestMethod.REDUCING_BALANCE) {
                 interestComponent = remainingPrincipal.multiply(monthlyRate).setScale(2, RoundingMode.HALF_UP);
                 principalComponent = reducingInstallment.subtract(interestComponent).setScale(2, RoundingMode.HALF_UP);
@@ -2571,17 +2571,35 @@ public class AppController {
             Map<String, String> row = new LinkedHashMap<>();
             row.put("pmtNo", String.valueOf(month));
             row.put("month", "Month " + month);
-            row.put("beginningBalance", formatTzs(beginningBalance));
             row.put("payment", formatTzs(installmentAmount));
             row.put("loanAmount", formatTzs(principalComponent));
             row.put("interest", formatTzs(interestComponent));
-            row.put("endingBalance", formatTzs(remainingPrincipal));
             row.put("installment", formatTzs(installmentAmount));
             row.put("principal", formatTzs(principalComponent));
-            row.put("outstandingBalance", formatTzs(remainingPrincipal));
             rows.add(row);
+            installmentAmounts.add(installmentAmount);
         }
+        applyInterestInclusivePreviewBalances(rows, installmentAmounts);
         return rows;
+    }
+
+    private void applyInterestInclusivePreviewBalances(List<Map<String, String>> rows, List<BigDecimal> installmentAmounts) {
+        BigDecimal totalScheduled = installmentAmounts.stream()
+            .filter(java.util.Objects::nonNull)
+            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal runningPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (int index = 0; index < rows.size(); index++) {
+            Map<String, String> row = rows.get(index);
+            row.put("beginningBalance", formatTzs(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO)));
+            BigDecimal amount = index < installmentAmounts.size() && installmentAmounts.get(index) != null
+                ? installmentAmounts.get(index)
+                : BigDecimal.ZERO;
+            runningPaid = runningPaid.add(amount).setScale(2, RoundingMode.HALF_UP);
+            String endingBalance = formatTzs(totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO));
+            row.put("endingBalance", endingBalance);
+            row.put("outstandingBalance", endingBalance);
+        }
     }
 
     private BigDecimal reducingInstallment(BigDecimal principal, BigDecimal monthlyRate, int months) {

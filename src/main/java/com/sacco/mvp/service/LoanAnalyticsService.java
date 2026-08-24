@@ -1,5 +1,7 @@
 package com.sacco.mvp.service;
 
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
@@ -64,6 +66,7 @@ public class LoanAnalyticsService {
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final AccessControlService access;
     private final ApplicationClock applicationClock;
+    private final ObjectMapper objectMapper;
 
     public MemberLoanAnalytics forMember(UUID memberId, LocalDate fromDate, LocalDate toDate) {
         return forMember(memberId, fromDate, toDate, null, null);
@@ -460,14 +463,13 @@ public class LoanAnalyticsService {
             .sum();
         long disbursed = DISBURSED_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
         long rejected = REJECTED_STATUSES.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
-        BigDecimal activeAmount = loanApplicationRepository.sumAmountForApplicantScopeAndStatuses(
-            memberId, saccoId, stationId, ACTIVE_STATUSES);
+        BigDecimal activeAmount = activeLoanAmount(memberId, saccoId, stationId);
         return new MemberLoanAnalytics(defaulted, active, paid, applied, disbursed, rejected, activeAmount);
     }
 
     public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
-        return loanApplicationRepository.sumAmountForApplicantScopeAndStatuses(
-            memberId, saccoId, stationId, ACTIVE_STATUSES);
+        return sumInterestInclusiveActiveAmount(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
+            memberId, saccoId, stationId, ACTIVE_STATUSES));
     }
 
     /**
@@ -714,12 +716,83 @@ public class LoanAnalyticsService {
         long applied = loans.stream().filter(app -> app.getStatus() != LoanStatus.DRAFT).count();
         long disbursed = loans.stream().filter(app -> DISBURSED_STATUSES.contains(app.getStatus())).count();
         long rejected = loans.stream().filter(app -> REJECTED_STATUSES.contains(app.getStatus())).count();
-        BigDecimal activeAmount = loans.stream()
+        BigDecimal activeAmount = sumInterestInclusiveActiveAmount(loans.stream()
             .filter(app -> ACTIVE_STATUSES.contains(app.getStatus()))
-            .map(LoanApplicationRepository.AnalyticsLoanRow::getAmount)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+            .toList());
         return new MemberLoanAnalytics(defaulted, active, paid, applied, disbursed, rejected, activeAmount);
+    }
+
+    private BigDecimal sumInterestInclusiveActiveAmount(List<LoanApplicationRepository.AnalyticsLoanRow> loans) {
+        if (loans == null || loans.isEmpty()) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return loans.stream()
+            .map(this::interestInclusiveActiveAmount)
+            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal interestInclusiveActiveAmount(LoanApplicationRepository.AnalyticsLoanRow loan) {
+        if (loan == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal principal = nonNegative(loan.getAmount());
+        Map<String, Object> snapshot = financialSnapshot(loan.getFinancialSnapshot());
+        BigDecimal syncedOutstanding = readBigDecimal(snapshot.get(LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING));
+        if (syncedOutstanding != null) {
+            return nonNegative(syncedOutstanding);
+        }
+        BigDecimal principalPlusInterest = resolvePrincipalPlusInterest(snapshot, principal);
+        return principalPlusInterest == null ? principal : nonNegative(principalPlusInterest);
+    }
+
+    private BigDecimal resolvePrincipalPlusInterest(Map<String, Object> snapshot, BigDecimal principal) {
+        BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
+        if (principalPlusInterest != null) {
+            return principalPlusInterest.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal loanPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
+        if (loanPlusInterest != null) {
+            return loanPlusInterest.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal interest = readBigDecimal(snapshot.get("interestAmount"));
+        return interest == null
+            ? null
+            : principal.add(interest).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private Map<String, Object> financialSnapshot(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        try {
+            return new BigDecimal(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private BigDecimal nonNegative(BigDecimal amount) {
+        return amount == null
+            ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : amount.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
     private MetricTrendSeries trendSeriesRows(String name,

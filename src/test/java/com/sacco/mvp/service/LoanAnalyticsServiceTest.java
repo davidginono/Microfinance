@@ -17,6 +17,7 @@ import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
 import com.sacco.mvp.security.AppUserPrincipal;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -54,7 +55,8 @@ class LoanAnalyticsServiceTest {
             boardReviewRepository,
             loanProductSettingRepository,
             new AccessControlService(),
-            new ApplicationClock("Africa/Nairobi")
+            new ApplicationClock("Africa/Nairobi"),
+            JsonMapper.builder().findAndAddModules().build()
         );
 
         when(managerReviewRepository.findForAnalytics(
@@ -115,7 +117,8 @@ class LoanAnalyticsServiceTest {
             boardReviewRepository,
             loanProductSettingRepository,
             new AccessControlService(),
-            new ApplicationClock("Africa/Nairobi")
+            new ApplicationClock("Africa/Nairobi"),
+            JsonMapper.builder().findAndAddModules().build()
         );
         when(managerReviewRepository.findForAnalytics(any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of(
@@ -148,6 +151,35 @@ class LoanAnalyticsServiceTest {
                 assertThat(item.paidLoans()).isZero();
                 assertThat(item.defaultedLoans()).isEqualTo(1);
             });
+    }
+
+    @Test
+    void memberActiveLoanAmountIncludesInterestFromFinancialSnapshot() {
+        UUID memberId = UUID.randomUUID();
+        LoanApplication activeLoan = loan(UUID.randomUUID(), LoanType.EDUCATION_LOAN, LoanStatus.DISBURSED);
+        activeLoan.setAmount(new BigDecimal("700000.00"));
+        activeLoan.setFinancialSnapshot("""
+            {
+              "interestAmount": 70000.00,
+              "principalPlusInterest": 770000.00
+            }
+            """);
+        LoanAnalyticsService service = new LoanAnalyticsService(
+            loanApplicationRepository,
+            managerReviewRepository,
+            boardReviewRepository,
+            loanProductSettingRepository,
+            new AccessControlService(),
+            new ApplicationClock("Africa/Nairobi"),
+            JsonMapper.builder().findAndAddModules().build()
+        );
+
+        when(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
+            memberId, "SACCO-01", "ST-1", java.util.EnumSet.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED)
+        )).thenReturn(List.of(analyticsRow(activeLoan)));
+
+        assertThat(service.activeLoanAmount(memberId, "SACCO-01", "ST-1"))
+            .isEqualByComparingTo("770000.00");
     }
 
     private AppUserPrincipal principal(UUID memberId, Position position) {
@@ -220,6 +252,11 @@ class LoanAnalyticsServiceTest {
             @Override
             public String getStationId() {
                 return loan.getStationId();
+            }
+
+            @Override
+            public String getFinancialSnapshot() {
+                return loan.getFinancialSnapshot();
             }
         };
     }

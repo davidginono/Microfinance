@@ -119,10 +119,65 @@ public class FinancialDetailsService {
         if (sourceLoan == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
+        BigDecimal syncedOutstanding = financialSnapshotAmount(sourceLoan, LoanFinancialSnapshotKeys.FORESIGHT_TOTAL_OUTSTANDING);
+        if (syncedOutstanding != null) {
+            return syncedOutstanding.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal principalPlusInterest = principalPlusInterest(sourceLoan);
+        if (principalPlusInterest != null) {
+            return principalPlusInterest.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        }
         BigDecimal outstanding = sourceLoan.getInstallmentAmount() != null
             ? sourceLoan.getInstallmentAmount().multiply(BigDecimal.valueOf(Math.max(sourceLoan.getTenorMonths(), 1)))
             : sourceLoan.getAmount();
         return outstanding.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal principalPlusInterest(LoanApplication loan) {
+        BigDecimal principal = loan.getAmount() == null ? BigDecimal.ZERO : loan.getAmount();
+        Map<String, Object> snapshot = financialSnapshot(loan);
+        BigDecimal principalPlusInterest = readBigDecimal(snapshot.get("principalPlusInterest"));
+        if (principalPlusInterest != null) {
+            return principalPlusInterest;
+        }
+        BigDecimal loanPlusInterest = readBigDecimal(snapshot.get("loanPlusInterest"));
+        if (loanPlusInterest != null) {
+            return loanPlusInterest;
+        }
+        BigDecimal interest = readBigDecimal(snapshot.get("interestAmount"));
+        return interest == null ? null : principal.add(interest);
+    }
+
+    private BigDecimal financialSnapshotAmount(LoanApplication loan, String key) {
+        return readBigDecimal(financialSnapshot(loan).get(key));
+    }
+
+    private Map<String, Object> financialSnapshot(LoanApplication loan) {
+        if (loan == null || loan.getFinancialSnapshot() == null || loan.getFinancialSnapshot().isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(loan.getFinancialSnapshot(), new tools.jackson.core.type.TypeReference<>() {});
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        try {
+            return new BigDecimal(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private void validateRequestedAmount(LoanProductSetting product, BigDecimal amount) {

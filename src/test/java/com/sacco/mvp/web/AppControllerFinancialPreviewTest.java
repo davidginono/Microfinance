@@ -122,10 +122,11 @@ class AppControllerFinancialPreviewTest {
         assertThat(rows).hasSize(6);
         assertThat(rows.get(0)).containsEntry("pmtNo", "1");
         assertThat(rows.get(0)).containsEntry("month", "Month 1");
-        assertThat(rows.get(0)).containsEntry("beginningBalance", "TSh 1,000,000");
+        assertThat(rows.get(0)).containsEntry("beginningBalance", "TSh 1,120,000");
         assertThat(rows.get(0)).containsEntry("payment", "TSh 186,666.67");
         assertThat(rows.get(0)).containsEntry("loanAmount", "TSh 166,666.67");
         assertThat(rows.get(0)).containsEntry("interest", "TSh 20,000");
+        assertThat(rows.get(0)).containsEntry("endingBalance", "TSh 933,333.33");
         assertThat(rows.get(5)).containsEntry("interest", "TSh 20,000");
         assertThat(rows.get(5)).containsEntry("endingBalance", "TSh 0");
     }

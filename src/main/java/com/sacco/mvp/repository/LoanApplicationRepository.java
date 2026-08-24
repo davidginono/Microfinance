@@ -144,6 +144,7 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         java.math.BigDecimal getAmount();
         String getSaccoId();
         String getStationId();
+        String getFinancialSnapshot();
     }
 
     @Query("""
@@ -154,7 +155,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.createdAt as createdAt,
                l.amount as amount,
                l.saccoId as saccoId,
-               l.stationId as stationId
+               l.stationId as stationId,
+               l.financialSnapshot as financialSnapshot
         from LoanApplication l
         where l.applicantMemberId = :applicantMemberId
           and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
@@ -177,7 +179,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.createdAt as createdAt,
                l.amount as amount,
                l.saccoId as saccoId,
-               l.stationId as stationId
+               l.stationId as stationId,
+               l.financialSnapshot as financialSnapshot
         from LoanApplication l
         where l.saccoId = :saccoId
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
@@ -202,11 +205,33 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.createdAt as createdAt,
                l.amount as amount,
                l.saccoId as saccoId,
-               l.stationId as stationId
+               l.stationId as stationId,
+               l.financialSnapshot as financialSnapshot
         from LoanApplication l
         where l.id in :ids
         """)
     List<AnalyticsLoanRow> findAnalyticsRowsById(@Param("ids") Collection<UUID> ids);
+
+    @Query("""
+        select l.id as id,
+               l.status as status,
+               l.loanType as loanType,
+               l.loanProductSettingId as loanProductSettingId,
+               l.createdAt as createdAt,
+               l.amount as amount,
+               l.saccoId as saccoId,
+               l.stationId as stationId,
+               l.financialSnapshot as financialSnapshot
+        from LoanApplication l
+        where l.applicantMemberId = :applicantMemberId
+          and l.status in :statuses
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        """)
+    List<AnalyticsLoanRow> findActiveAmountRowsForApplicantScope(@Param("applicantMemberId") UUID applicantMemberId,
+                                                                 @Param("saccoId") String saccoId,
+                                                                 @Param("stationId") String stationId,
+                                                                 @Param("statuses") Collection<LoanStatus> statuses);
 
     interface ReportLoanRow {
         UUID getId();
@@ -675,19 +700,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     List<StatusCountProjection> countByStatusForApplicantScope(@Param("applicantMemberId") UUID applicantMemberId,
                                                                @Param("saccoId") String saccoId,
                                                                @Param("stationId") String stationId);
-
-    @Query("""
-        select coalesce(sum(l.amount), 0)
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and l.status in :statuses
-          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
-          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
-        """)
-    java.math.BigDecimal sumAmountForApplicantScopeAndStatuses(@Param("applicantMemberId") UUID applicantMemberId,
-                                                               @Param("saccoId") String saccoId,
-                                                               @Param("stationId") String stationId,
-                                                               @Param("statuses") Collection<LoanStatus> statuses);
 
     @Query("""
         select count(l)

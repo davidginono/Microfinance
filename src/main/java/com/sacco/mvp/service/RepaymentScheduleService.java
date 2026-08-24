@@ -96,7 +96,7 @@ public class RepaymentScheduleService {
                 remainingPrincipal = app.getAmount().subtract(runningPrincipal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             }
 
-            runningTotal = runningTotal.add(installmentAmount);
+            runningTotal = runningTotal.add(installmentAmount).setScale(2, RoundingMode.HALF_UP);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("installmentNumber", index);
             row.put("dueDate", dueDate.toString());
@@ -108,6 +108,7 @@ public class RepaymentScheduleService {
             rows.add(row);
             dueDate = frequency == RepaymentFrequency.WEEKLY ? dueDate.plusWeeks(1) : dueDate.plusMonths(1);
         }
+        applyInterestInclusiveOutstandingBalances(rows);
 
         LocalDate finalDueDate = rows.isEmpty()
             ? firstRepaymentDate
@@ -163,6 +164,20 @@ public class RepaymentScheduleService {
             return rows;
         }
         return Collections.emptyList();
+    }
+
+    private void applyInterestInclusiveOutstandingBalances(List<Map<String, Object>> rows) {
+        BigDecimal totalScheduled = rows.stream()
+            .map(row -> readBigDecimal(row.get("amount")))
+            .map(amount -> amount == null ? BigDecimal.ZERO : amount)
+            .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal runningPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (Map<String, Object> row : rows) {
+            BigDecimal amount = readBigDecimal(row.get("amount"));
+            runningPaid = runningPaid.add(amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
+            row.put("outstandingBalance", totalScheduled.subtract(runningPaid).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        }
     }
 
     public long daysLeft(LocalDate finalDueDate) {
