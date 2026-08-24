@@ -512,7 +512,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     </svg>
                 </button>
                 <div id="activeLoansTablePanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
-                        <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results..." data-active-loans-url="${pageContext.request.contextPath}/app/dashboard/active-loans">
+                        <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading active loans..." data-active-loans-url="${pageContext.request.contextPath}/app/dashboard/active-loans">
                             <div class="app-table-titlebar">
                                 <div class="app-table-heading">
                                     <h2><spring:message code="dashboard.activeLoans.balancesTitle" text="Loan balances" /></h2>
@@ -744,6 +744,39 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             }
         }
 
+        function showActiveLoansTableLoading(region, label) {
+            if (!region || region.classList.contains('is-loading')) {
+                return;
+            }
+            region.classList.add('is-loading');
+            region.setAttribute('aria-busy', 'true');
+            region.setAttribute('data-aws-async-table-loading', 'true');
+            if (label) {
+                region.setAttribute('data-loading-label', label);
+            }
+            var loader = document.createElement('div');
+            loader.className = 'aws-table-loader';
+            loader.setAttribute('role', 'status');
+            loader.setAttribute('aria-label', region.getAttribute('data-loading-label') || 'Loading results...');
+            var spinner = document.createElement('span');
+            spinner.className = 'aws-table-loader__spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+            loader.appendChild(spinner);
+            region.appendChild(loader);
+        }
+
+        function hideActiveLoansTableLoading(region) {
+            if (!region) {
+                return;
+            }
+            region.classList.remove('is-loading');
+            region.setAttribute('aria-busy', 'false');
+            region.removeAttribute('data-aws-async-table-loading');
+            Array.prototype.forEach.call(region.querySelectorAll('.aws-table-loader'), function (loader) {
+                loader.remove();
+            });
+        }
+
         function escapeHtml(value) {
             return String(value == null ? '' : value)
                 .replace(/&/g, '&amp;')
@@ -835,6 +868,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 return;
             }
             region.setAttribute('data-active-loans-hydration-ready', 'true');
+            showActiveLoansTableLoading(region);
             fetch(url, {
                 credentials: 'same-origin',
                 headers: {
@@ -851,6 +885,9 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 .then(renderActiveLoanPayload)
                 .catch(function () {
                     region.removeAttribute('data-active-loans-hydration-ready');
+                })
+                .finally(function () {
+                    hideActiveLoansTableLoading(region);
                 });
         }
 
@@ -873,6 +910,8 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             var noDataMessage = refreshButton.getAttribute('data-no-data-message')
                 || 'No updated balance was returned. Original outstanding balance remains.';
             var successMessage = refreshButton.getAttribute('data-success-message') || 'Loan balances updated.';
+            var region = refreshButton.closest('.erp-table-wrap');
+            var originalTableLoadingLabel = region ? region.getAttribute('data-loading-label') : null;
 
             refreshButton.addEventListener('click', function () {
                 if (refreshButton.disabled || !refreshUrl) {
@@ -885,6 +924,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                 refreshButton.disabled = true;
                 refreshButton.setAttribute('aria-busy', 'true');
                 refreshButton.setAttribute('aria-label', loadingLabel);
+                showActiveLoansTableLoading(region, loadingLabel);
                 fetch(refreshUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
@@ -925,6 +965,10 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         refreshButton.disabled = false;
                         refreshButton.setAttribute('aria-busy', 'false');
                         refreshButton.setAttribute('aria-label', originalLabel);
+                        if (region && originalTableLoadingLabel) {
+                            region.setAttribute('data-loading-label', originalTableLoadingLabel);
+                        }
+                        hideActiveLoansTableLoading(region);
                     });
             });
         }

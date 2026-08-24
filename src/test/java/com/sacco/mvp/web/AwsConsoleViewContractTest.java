@@ -67,6 +67,9 @@ class AwsConsoleViewContractTest {
             .contains("M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5")
             .contains("data-active-loan-current-balance")
             .contains("data-active-loan-paid-amount")
+            .contains("showActiveLoansTableLoading(region)")
+            .contains("showActiveLoansTableLoading(region, loadingLabel)")
+            .contains("hideActiveLoansTableLoading(region)")
             .contains("renderActiveLoanPayload(payload)")
             .contains("We could not refresh loan balances right now. Please retry again later.")
             .doesNotContain("data-lucide=\"refresh-cw\"");
@@ -302,7 +305,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
             .contains("console-components.css?v=20260824-calculator-detail-v43")
             .contains("shell.css?v=20260824-calculator-detail-v44")
-            .contains("shell.js?v=20260824-modal-toast-v19")
+            .contains("shell.js?v=20260824-active-loans-preloader-v20")
             .contains("app-global-logo")
             .contains("app-global-logo-image")
             .contains("activeSaccoLogoUrl")
@@ -712,6 +715,8 @@ class AwsConsoleViewContractTest {
             .contains("dataset.awsFilterPin")
             .contains("data-aws-action-pin")
             .contains("restoreScrollablePositions")
+            .contains("data-aws-async-table-loading")
+            .contains("clearConsoleTableLoading({ force: true })")
             .contains("clearConsoleTableLoading");
     }
 

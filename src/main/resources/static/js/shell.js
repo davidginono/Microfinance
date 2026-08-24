@@ -581,10 +581,15 @@
             });
         });
     };
-    const clearConsoleTableLoading = function () {
+    const clearConsoleTableLoading = function (options) {
+        const force = options && options.force === true;
         document.querySelectorAll('.erp-table-wrap.is-loading').forEach(function (region) {
+            if (!force && region.getAttribute('data-aws-async-table-loading') === 'true') {
+                return;
+            }
             region.classList.remove('is-loading');
             region.setAttribute('aria-busy', 'false');
+            region.removeAttribute('data-aws-async-table-loading');
             region.querySelectorAll('.aws-table-loader').forEach(function (loader) {
                 loader.remove();
             });
@@ -633,14 +638,18 @@
                 showConsoleTableLoading(link);
             });
         });
-        window.addEventListener('pagehide', clearConsoleTableLoading);
+        window.addEventListener('pagehide', function () {
+            clearConsoleTableLoading({ force: true });
+        });
         window.addEventListener('pageshow', function () {
-            clearConsoleTableLoading();
+            clearConsoleTableLoading({ force: true });
             syncConsoleFiltersFromUrl();
-            window.requestAnimationFrame(clearConsoleTableLoading);
+            window.requestAnimationFrame(function () {
+                clearConsoleTableLoading({ force: true });
+            });
         });
         window.addEventListener('popstate', function () {
-            clearConsoleTableLoading();
+            clearConsoleTableLoading({ force: true });
             syncConsoleFiltersFromUrl();
         });
     };

@@ -15,8 +15,14 @@ class ActiveLoanHydrationViewContractTest {
 
         assertThat(dashboard)
             .contains("data-active-loans-url=\"${pageContext.request.contextPath}/app/dashboard/active-loans\"")
+            .contains("data-loading-label=\"Loading active loans...\"")
             .contains("data-active-loans-body")
             .contains("data-member-active-loans-count")
+            .contains("showActiveLoansTableLoading(region)")
+            .contains("showActiveLoansTableLoading(region, loadingLabel)")
+            .contains("hideActiveLoansTableLoading(region)")
+            .contains("data-aws-async-table-loading")
+            .contains("aws-table-loader__spinner")
             .contains("renderActiveLoanPayload")
             .contains("scheduleAvailable")
             .doesNotContain("<c:when test=\"${not empty activeLoanChartRows}\">\r\n                        <div class=\"erp-table-wrap\"");
