@@ -60,7 +60,8 @@ public class ForesightRepaymentScheduleService {
             member == null ? null : member.getMemberNo(),
             stationId,
             loan.getLoanId(),
-            loan
+            loan,
+            true
         );
     }
 
@@ -69,7 +70,8 @@ public class ForesightRepaymentScheduleService {
             member == null ? null : member.getMemberNo(),
             firstText(member == null ? null : member.getStationId(), fallbackStationId),
             loanId,
-            null
+            null,
+            false
         );
     }
 
@@ -135,7 +137,8 @@ public class ForesightRepaymentScheduleService {
     private RepaymentScheduleDisplay loadSchedule(String memberNumber,
                                                   String stationId,
                                                   String loanId,
-                                                  LoanApplication localLoan) {
+                                                  LoanApplication localLoan,
+                                                  boolean showInterestMethod) {
         String normalizedMemberNumber = blankToNull(memberNumber);
         String normalizedStationId = blankToNull(stationId);
         String normalizedLoanId = blankToNull(loanId);
@@ -159,7 +162,7 @@ public class ForesightRepaymentScheduleService {
                     null
                 );
             }
-            ScheduleSnapshot snapshot = toSnapshot(usableRows, localLoan, normalizedLoanId);
+            ScheduleSnapshot snapshot = toSnapshot(usableRows, localLoan, normalizedLoanId, showInterestMethod);
             return new RepaymentScheduleDisplay(
                 snapshot.displayRows(),
                 snapshot.displaySummary(),
@@ -189,7 +192,8 @@ public class ForesightRepaymentScheduleService {
 
     private ScheduleSnapshot toSnapshot(List<ForesightRepaymentScheduleRow> rows,
                                         LoanApplication localLoan,
-                                        String loanId) {
+                                        String loanId,
+                                        boolean showInterestMethod) {
         BigDecimal totalPrincipal = rows.stream()
             .map(ForesightRepaymentScheduleRow::principal)
             .filter(Objects::nonNull)
@@ -256,7 +260,9 @@ public class ForesightRepaymentScheduleService {
         displaySummary.put("First Repayment Date", dateLabel(firstDueDate));
         displaySummary.put("Final Due Date", dateLabel(finalDueDate));
         displaySummary.put("Installments", rows.size());
-        displaySummary.put("Interest Method", interestMethod);
+        if (showInterestMethod) {
+            displaySummary.put("Interest Method", interestMethod);
+        }
 
         Map<String, Object> cacheSummary = new LinkedHashMap<>();
         cacheSummary.put("source", "FORESIGHT");

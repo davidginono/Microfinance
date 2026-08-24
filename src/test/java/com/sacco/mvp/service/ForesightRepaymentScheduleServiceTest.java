@@ -62,7 +62,8 @@ class ForesightRepaymentScheduleServiceTest {
             .containsEntry("Total Interest", "TSh 11,666.66")
             .containsEntry("Total Principal", "TSh 700,000")
             .containsEntry("Total Amount", "TSh 245,000")
-            .containsEntry("Final Due Date", "2026-09-30");
+            .containsEntry("Final Due Date", "2026-09-30")
+            .containsEntry("Interest Method", "Flat schedule");
         assertThat(display.toPayload())
             .containsEntry("scheduleAvailable", true)
             .containsEntry("count", 2);
@@ -146,6 +147,11 @@ class ForesightRepaymentScheduleServiceTest {
 
         assertThat(payload).containsEntry("scheduleAvailable", true);
         assertThat((List<Map<String, Object>>) payload.get("rows")).hasSize(2);
+        assertThat((Map<String, Object>) payload.get("summary"))
+            .doesNotContainKey("Interest Method");
+        assertThat((List<Map<String, Object>>) payload.get("summaryEntries"))
+            .extracting(entry -> entry.get("key"))
+            .doesNotContain("Interest Method");
     }
 
     private ForesightRepaymentScheduleService service() {
