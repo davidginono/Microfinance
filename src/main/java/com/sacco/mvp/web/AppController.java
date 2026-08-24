@@ -306,7 +306,6 @@ public class AppController {
         List<LoanApplication> activeDisbursedLoans = loanWorkflowService.findActiveDisbursedLoans(principal.getMemberId());
         if (!activeDisbursedLoans.isEmpty()) {
             model.addAttribute("activeDisbursedLoanApp", activeDisbursedLoans.get(0));
-            model.addAttribute("activeLoanAwarenessMessage", loanWorkflowService.activeLoanAwarenessMessage(activeDisbursedLoans));
         }
         return "app/loan-products";
     }

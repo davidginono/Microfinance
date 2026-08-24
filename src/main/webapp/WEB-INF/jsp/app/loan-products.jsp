@@ -208,12 +208,6 @@
     </div>
 </c:if>
 
-<c:if test="${empty applicationLockApp and not empty activeDisbursedLoanApp}">
-        <div class="erp-section mb-4 text-sm text-slate-700">
-        <c:out value="${activeLoanAwarenessMessage}" />
-    </div>
-</c:if>
-
 <c:if test="${applicantPolicyEligible eq false}">
     <div class="erp-section mb-4 text-sm leading-6 text-rose-700">
         ${applicantPolicyReason}

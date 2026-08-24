@@ -500,7 +500,8 @@ class AwsConsoleViewContractTest {
             .contains("loan-calculator-steps")
             .contains("productsCalculatorResults")
             .contains("productsCalculatorApplyLink")
-            .contains("setCalculatorStage");
+            .contains("setCalculatorStage")
+            .doesNotContain("activeLoanAwarenessMessage");
         assertThat(loanApplication)
             .contains("data-loan-flow-step=\"1\"")
             .contains("data-loan-flow-step=\"5\"")
