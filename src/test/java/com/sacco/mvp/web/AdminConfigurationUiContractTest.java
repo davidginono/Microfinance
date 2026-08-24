@@ -181,6 +181,8 @@ class AdminConfigurationUiContractTest {
             .contains("shell-sidebar-subitem-label")
             .contains("menu.settings.language")
             .contains("Language &amp; Preferences")
+            .contains("access=\"@access.has(principal, 'PLATFORM_SETTINGS_VIEW')\"")
+            .contains("/admin/platform-settings")
             .contains("/images/computer-resources-mark-orange.png")
             .contains("Computer Resources")
             .contains("(T) Limited")

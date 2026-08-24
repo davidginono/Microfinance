@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service("userClaims")
 @RequiredArgsConstructor
@@ -39,15 +38,13 @@ public class UserClaimService {
         }
         List<MemberAccessClaim> storedClaims = memberAccessClaimRepository.findByIdMemberId(memberId);
         if (!storedClaims.isEmpty()) {
-            return storedClaims.stream()
-                .flatMap(claim -> UserClaim.fromStoredName(claim.getId().getClaimName()).stream())
-                .collect(Collectors.toCollection(() -> EnumSet.noneOf(UserClaim.class)));
+            return parseStoredClaims(storedClaims, staffRoles);
         }
         return userSettingsRepository.findById(memberId)
             .map(UserSettings::getNotificationPrefs)
             .map(this::parsePrefs)
             .filter(prefs -> prefs.containsKey("claims"))
-            .map(this::parseClaims)
+            .map(prefs -> parseClaims(prefs, staffRoles))
             .orElse(defaults);
     }
 
@@ -61,8 +58,15 @@ public class UserClaimService {
         }
         Map<UUID, Set<UserClaim>> resolved = new LinkedHashMap<>();
         for (MemberAccessClaim claim : memberAccessClaimRepository.findByIdMemberIdIn(subjects.keySet())) {
-            resolved.computeIfAbsent(claim.getId().getMemberId(), key -> EnumSet.noneOf(UserClaim.class))
-                .addAll(UserClaim.fromStoredName(claim.getId().getClaimName()));
+            UUID memberId = claim.getId().getMemberId();
+            Set<UserClaim> claims = resolved.computeIfAbsent(memberId, key -> EnumSet.noneOf(UserClaim.class));
+            String claimName = claim.getId().getClaimName();
+            claims.addAll(UserClaim.fromStoredName(claimName));
+            ClaimSubject subject = subjects.get(memberId);
+            if (isLegacyPlatformAdminSettingsClaim(claimName, subject == null ? List.of() : subject.staffRoles())) {
+                claims.add(UserClaim.PLATFORM_SETTINGS_VIEW);
+                claims.add(UserClaim.PLATFORM_SETTINGS_UPDATE);
+            }
         }
 
         List<UUID> withoutStoredClaims = subjects.keySet().stream()
@@ -76,7 +80,7 @@ public class UserClaimService {
                 ClaimSubject subject = subjects.get(memberId);
                 Map<String, Object> prefs = parsePrefs(prefsByMember.get(memberId));
                 resolved.put(memberId, prefs.containsKey("claims")
-                    ? parseClaims(prefs)
+                    ? parseClaims(prefs, subject.staffRoles())
                     : defaultClaims(subject.staffRoles(), subject.memberAccess()));
             }
         }
@@ -141,6 +145,48 @@ public class UserClaimService {
             claims.addAll(UserClaim.fromStoredName(String.valueOf(item)));
         }
         return claims;
+    }
+
+    private Set<UserClaim> parseClaims(Map<String, Object> prefs, Collection<Position> staffRoles) {
+        Set<UserClaim> claims = parseClaims(prefs);
+        if (containsLegacyClaimName(prefs.get("claims"), "ACCESS_ADMIN_SETTINGS")
+            && isPlatformAdminRole(staffRoles)) {
+            claims.add(UserClaim.PLATFORM_SETTINGS_VIEW);
+            claims.add(UserClaim.PLATFORM_SETTINGS_UPDATE);
+        }
+        return claims;
+    }
+
+    private Set<UserClaim> parseStoredClaims(List<MemberAccessClaim> storedClaims,
+                                             Collection<Position> staffRoles) {
+        EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
+        for (MemberAccessClaim claim : storedClaims) {
+            String claimName = claim.getId().getClaimName();
+            claims.addAll(UserClaim.fromStoredName(claimName));
+            if (isLegacyPlatformAdminSettingsClaim(claimName, staffRoles)) {
+                claims.add(UserClaim.PLATFORM_SETTINGS_VIEW);
+                claims.add(UserClaim.PLATFORM_SETTINGS_UPDATE);
+            }
+        }
+        return claims;
+    }
+
+    private boolean isLegacyPlatformAdminSettingsClaim(String claimName, Collection<Position> staffRoles) {
+        return "ACCESS_ADMIN_SETTINGS".equals(claimName) && isPlatformAdminRole(staffRoles);
+    }
+
+    private boolean isPlatformAdminRole(Collection<Position> staffRoles) {
+        return Position.normalizeStaffRoles(staffRoles).contains(Position.ADMIN);
+    }
+
+    private boolean containsLegacyClaimName(Object rawClaims, String legacyClaimName) {
+        if (!(rawClaims instanceof List<?> items)) {
+            return false;
+        }
+        return items.stream()
+            .filter(java.util.Objects::nonNull)
+            .map(String::valueOf)
+            .anyMatch(legacyClaimName::equals);
     }
 
     public Set<UserClaim> defaultClaims(Collection<Position> staffRoles, boolean memberAccess) {

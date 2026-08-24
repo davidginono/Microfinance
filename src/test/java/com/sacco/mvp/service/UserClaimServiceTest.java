@@ -59,6 +59,34 @@ class UserClaimServiceTest {
     }
 
     @Test
+    void storedLegacyAdminSettingsClaimKeepsPlatformAdminPlatformSettingsAccess() {
+        UUID memberId = UUID.randomUUID();
+        when(memberAccessClaimRepository.findByIdMemberId(memberId))
+            .thenReturn(List.of(accessClaim(memberId, "ACCESS_ADMIN_SETTINGS")));
+
+        Set<UserClaim> claims = userClaimService.effectiveClaims(memberId, List.of(Position.ADMIN), false);
+
+        assertThat(claims).contains(
+            UserClaim.ADMIN_DASHBOARD_VIEW,
+            UserClaim.PLATFORM_SETTINGS_VIEW,
+            UserClaim.PLATFORM_SETTINGS_UPDATE
+        );
+    }
+
+    @Test
+    void storedLegacyAdminSettingsClaimDoesNotGrantWorkspaceAdminPlatformSettingsAccess() {
+        UUID memberId = UUID.randomUUID();
+        when(memberAccessClaimRepository.findByIdMemberId(memberId))
+            .thenReturn(List.of(accessClaim(memberId, "ACCESS_ADMIN_SETTINGS")));
+
+        Set<UserClaim> claims = userClaimService.effectiveClaims(memberId, List.of(Position.MINOR_ADMIN), false);
+
+        assertThat(claims)
+            .contains(UserClaim.ADMIN_DASHBOARD_VIEW)
+            .doesNotContain(UserClaim.PLATFORM_SETTINGS_VIEW, UserClaim.PLATFORM_SETTINGS_UPDATE);
+    }
+
+    @Test
     void legacyJsonClaimsAreMappedToGranularClaimsWhenMatrixRowsAreMissing() {
         UUID memberId = UUID.randomUUID();
         UserSettings settings = UserSettings.builder()
