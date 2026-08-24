@@ -226,6 +226,7 @@ public class ManagerController {
         List<com.sacco.mvp.domain.GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
         List<Member> guarantorMembers = memberDirectoryService.findAll(
             guarantorRequests.stream().map(com.sacco.mvp.domain.GuarantorRequest::getGuarantorMemberId)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet()));
         Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));

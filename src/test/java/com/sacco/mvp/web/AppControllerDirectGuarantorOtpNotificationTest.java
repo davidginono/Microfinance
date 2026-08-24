@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -137,5 +138,87 @@ class AppControllerDirectGuarantorOtpNotificationTest {
             .contains("Tenure: 2 month(s)")
             .contains("Loan Product: Watumishi Emergency Loan")
             .doesNotContain("Product: Loan Product");
+    }
+
+    @Test
+    void directGuarantorOtpNotificationSupportsForesightOnlyRequest() {
+        UUID loanId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        LoanApplication application = LoanApplication.builder()
+            .id(loanId)
+            .applicationNumber(100402L)
+            .saccoId("SACCO-1")
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("150000"))
+            .tenorMonths(3)
+            .status(LoanStatus.AWAITING_GUARANTORS)
+            .requiredGuarantors(1)
+            .formData("{\"guarantorApprovalMode\":\"DIRECT_OTP\"}")
+            .build();
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .loanApplicationId(loanId)
+            .guarantorMemberId(null)
+            .guarantorSource("FORESIGHT")
+            .externalMemberNo("EXT-77")
+            .externalStationId("ST-1")
+            .externalFullName("Asha Mtei")
+            .externalEmail("asha@example.com")
+            .externalPhone("+255700000003")
+            .status(GuarantorRequestStatus.PENDING)
+            .build();
+        Member applicant = Member.builder()
+            .id(applicantId)
+            .fullName("Asha Applicant")
+            .build();
+        OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(10);
+
+        when(principal.getMemberId()).thenReturn(applicantId);
+        when(loanWorkflowService.getMine(loanId, applicantId)).thenReturn(application);
+        when(loanWorkflowService.findGuarantorRequest(requestId)).thenReturn(Optional.of(request));
+        when(memberDirectoryService.find(applicantId)).thenReturn(Optional.of(applicant));
+        when(loanProductDisplayService.displayName(application)).thenReturn("Development Loan");
+        when(emailOtpService.issueOtpWithDeliveryContact(
+            anyString(),
+            anyString(),
+            eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
+            isNull(),
+            anyString(),
+            anyString(),
+            anyString(),
+            anyString(),
+            anyString()
+        )).thenReturn(new EmailOtpService.OtpIssueResult(
+            true,
+            new StationOtpDeliveryService.DeliveryReceipt(
+                OtpDeliveryChannel.SMS,
+                "We sent a guarantor OTP code to the profile phone."
+            ),
+            expiresAt,
+            600,
+            expiresAt,
+            0,
+            3,
+            3
+        ));
+
+        var response = controller.requestApplicantGuarantorConfirmationOtpJson(loanId, requestId, principal);
+
+        verify(emailOtpService).issueOtpWithDeliveryContact(
+            eq("guarantor-request:" + requestId),
+            eq("asha@example.com"),
+            eq(EmailOtpPurpose.GUARANTOR_APPLICANT_CONFIRMATION),
+            isNull(),
+            eq("Your SACCO guarantor confirmation code"),
+            anyString(),
+            eq("SACCO-1"),
+            eq("ST-1"),
+            eq("+255700000003")
+        );
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("valid", true);
     }
 }

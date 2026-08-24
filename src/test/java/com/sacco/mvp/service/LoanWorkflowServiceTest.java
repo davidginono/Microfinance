@@ -13,7 +13,10 @@ import com.sacco.mvp.domain.ReversalRequest;
 import com.sacco.mvp.domain.ReversalRequestStatus;
 import com.sacco.mvp.domain.ReversalRequestType;
 import com.sacco.mvp.domain.SaccoSettings;
+import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
+import com.sacco.mvp.integration.foresight.ForesightActiveLoan;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.ForesightMemberProfile;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -605,6 +609,183 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void directOtpSearchReturnsLmsCandidateWhenForesightMemberNumberMatchesLocalMember() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .formSchema("{}")
+            .active(true)
+            .build();
+        ForesightMemberProfile profile = new ForesightMemberProfile(
+            "Mushi",
+            "Jane",
+            "0101",
+            "ST01",
+            "Demo SACCO",
+            "+255676423992",
+            "jane@example.com"
+        );
+        Member localGuarantor = activeMember(guarantorId, saccoId, "ST01");
+        localGuarantor.setMemberNo("0101");
+        localGuarantor.setFullName("Jane Mushi");
+
+        when(foresightDirectoryService.lookupMemberProfileByPhone("+255676423992"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
+        stubDirectOtpFinancialProfile("0101", "ST01", new BigDecimal("250000.00"), List.of(), List.of(
+            new ForesightActiveLoan("2001", LocalDate.of(2023, 2, 15), "Paid Loan",
+                new BigDecimal("400000.00"), new BigDecimal("420000.00"), BigDecimal.TEN, new BigDecimal("20000.00"))
+        ));
+        when(memberRepository.findByMemberNoIgnoreCase("0101")).thenReturn(Optional.of(localGuarantor));
+        when(loanQualificationPolicyService.guarantorFailureReason(saccoId, guarantorId, null, product))
+            .thenReturn(Optional.empty());
+
+        List<LoanWorkflowService.DirectOtpGuarantorCandidate> result =
+            loanWorkflowService.searchDirectOtpGuarantorCandidates(
+                saccoId,
+                "ST01",
+                applicantId,
+                "0676423992",
+                "phone",
+                product
+            );
+
+        assertThat(result).hasSize(1);
+        LoanWorkflowService.DirectOtpGuarantorCandidate candidate = result.getFirst();
+        assertThat(candidate.source()).isEqualTo("LMS");
+        assertThat(candidate.localMemberId()).isEqualTo(guarantorId);
+        assertThat(candidate.memberNo()).isEqualTo("0101");
+        assertThat(candidate.fullName()).isEqualTo("Jane Mushi");
+        assertThat(candidate.paidLoanCount()).isEqualTo(1);
+        assertThat(candidate.selectionToken()).contains("\"id\":\"" + guarantorId + "\"");
+    }
+
+    @Test
+    void directOtpSearchHandlesMissingAndInvalidProfileResponses() {
+        String saccoId = "CIRCLE-1001";
+        UUID applicantId = UUID.randomUUID();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .active(true)
+            .build();
+
+        when(foresightDirectoryService.lookupMemberProfileByEmail("missing@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.notFound());
+        assertThat(loanWorkflowService.searchDirectOtpGuarantorCandidates(
+            saccoId, "ST01", applicantId, "missing@example.com", "email", product)).isEmpty();
+
+        when(foresightDirectoryService.lookupMemberProfileByEmail("broken@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
+                new ForesightMemberProfile("Missing", "Station", "0101", "", "Demo", null, "broken@example.com")
+            ));
+        assertThatThrownBy(() -> loanWorkflowService.searchDirectOtpGuarantorCandidates(
+            saccoId, "ST01", applicantId, "broken@example.com", "email", product))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("missing member number or station");
+
+        when(foresightDirectoryService.lookupMemberProfileByEmail("down@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.unavailable());
+        assertThatThrownBy(() -> loanWorkflowService.searchDirectOtpGuarantorCandidates(
+            saccoId, "ST01", applicantId, "down@example.com", "email", product))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("unavailable");
+    }
+
+    @Test
+    void submitCreatesForesightOnlyDirectOtpGuarantorRequest() {
+        UUID appId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
+            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"phone\",\"lookupValue\":\"0676423992\"}]");
+        LoanProductSetting product = directOtpProduct(saccoId);
+        ForesightMemberProfile profile = new ForesightMemberProfile(
+            "Mtei",
+            "Asha",
+            "EXT-77",
+            "ST01",
+            "Demo SACCO",
+            "+255676423992",
+            "asha@example.com"
+        );
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+        when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
+            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
+        when(foresightDirectoryService.lookupMemberProfileByPhone("+255676423992"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
+        stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(), List.of());
+        when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
+        when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
+            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(0), eq(new BigDecimal("100000")), eq(product)))
+            .thenReturn(Optional.empty());
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        loanWorkflowService.submit(appId, applicantId);
+
+        verify(guarantorRequestRepository).save(argThat(request ->
+            request.getGuarantorMemberId() == null
+                && "FORESIGHT".equals(request.getGuarantorSource())
+                && "EXT-77".equals(request.getExternalMemberNo())
+                && "ST01".equals(request.getExternalStationId())
+                && "Asha Mtei".equals(request.getExternalFullName())
+                && request.getExternalFinancialSnapshot() != null
+                && request.getExternalFinancialSnapshot().contains("300000.00")
+        ));
+    }
+
+    @Test
+    void submitRejectsForesightOnlyDirectOtpGuarantorWhenExternalPolicyFails() {
+        UUID appId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
+            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"email\",\"lookupValue\":\"guarantor@example.com\"}]");
+        LoanProductSetting product = directOtpProduct(saccoId);
+        ForesightMemberProfile profile = new ForesightMemberProfile(
+            "Mtei",
+            "Asha",
+            "EXT-77",
+            "ST01",
+            "Demo SACCO",
+            "+255676423992",
+            "guarantor@example.com"
+        );
+        ForesightActiveLoan activeLoan = new ForesightActiveLoan("3001", LocalDate.now(), "Active Loan",
+            new BigDecimal("100000.00"), new BigDecimal("110000.00"), BigDecimal.TEN, new BigDecimal("10000.00"));
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(app));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+        when(financialDetailsService.generateSnapshot(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000"), 6, null))
+            .thenReturn(Map.of("principalPlusInterest", new BigDecimal("120000.00")));
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
+        when(foresightDirectoryService.lookupMemberProfileByEmail("guarantor@example.com"))
+            .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(profile));
+        stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(activeLoan), List.of());
+        when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
+        when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
+            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(1), eq(new BigDecimal("100000")), eq(product)))
+            .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
+
+        assertThatThrownBy(() -> loanWorkflowService.submit(appId, applicantId))
+            .isInstanceOf(LoanWorkflowService.GuarantorValidationException.class)
+            .hasMessageContaining("active loans are not allowed");
+
+        verify(guarantorRequestRepository, never()).save(any());
+    }
+
+    @Test
     void saveDraftRejectsGuarantorWithActiveLoanWhenStationPolicyBlocksIt() {
         UUID applicantId = UUID.randomUUID();
         UUID guarantorId = UUID.randomUUID();
@@ -805,6 +986,61 @@ class LoanWorkflowServiceTest {
                 && guarantorId.toString().equals(details.get("guarantorId"))
                 && "Savings committed elsewhere".equals(details.get("reasons")))
         );
+    }
+
+    private LoanApplication directOtpDraft(UUID appId, UUID applicantId, String saccoId, String selectedGuarantors) {
+        return LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("100000"))
+            .tenorMonths(6)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(1)
+            .selectedGuarantors(selectedGuarantors)
+            .financialSnapshot("{\"principalPlusInterest\":120000.00}")
+            .formData("{\"guarantorApprovalMode\":\"DIRECT_OTP\"}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+    }
+
+    private LoanProductSetting directOtpProduct(String saccoId) {
+        return LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .freshFinancialDataRequired(false)
+            .managerReviewRequired(true)
+            .committeeReviewRequired(false)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+    }
+
+    private void stubDirectOtpFinancialProfile(String memberNo,
+                                               String stationId,
+                                               BigDecimal savingsBalance,
+                                               List<ForesightActiveLoan> activeLoans,
+                                               List<ForesightActiveLoan> paidLoans) {
+        when(foresightDirectoryService.fetchAccountSummary(memberNo, stationId))
+            .thenReturn(new ForesightAccountSummary(
+                savingsBalance,
+                new BigDecimal("50000.00"),
+                new BigDecimal("125000.00"),
+                List.of()
+            ));
+        when(foresightDirectoryService.fetchInvestments(eq(memberNo), eq(stationId), anyInt()))
+            .thenReturn(List.of());
+        when(foresightDirectoryService.fetchActiveLoans(memberNo, stationId))
+            .thenReturn(activeLoans);
+        when(foresightDirectoryService.fetchPaidLoans(memberNo, stationId))
+            .thenReturn(paidLoans);
     }
 
     private void stubActiveMemberBatchLookup(String saccoId) {

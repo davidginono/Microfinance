@@ -34,6 +34,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     }
 
     Optional<Member> findByMemberNo(String memberNo);
+    Optional<Member> findByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
     Optional<Member> findByStaffNo(String staffNo);

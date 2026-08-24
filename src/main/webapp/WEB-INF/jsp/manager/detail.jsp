@@ -281,12 +281,16 @@
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty guarantorNames[g.guarantorMemberId]}">${guarantorNames[g.guarantorMemberId]}</c:when>
-                        <c:otherwise>#${fn:substring(g.guarantorMemberId, 0, 8)}</c:otherwise>
+                        <c:when test="${not empty g.externalFullName}">${g.externalFullName}</c:when>
+                        <c:when test="${not empty g.externalMemberNo}">${g.externalMemberNo}</c:when>
+                        <c:when test="${not empty g.guarantorMemberId}">#${fn:substring(g.guarantorMemberId, 0, 8)}</c:when>
+                        <c:otherwise>Guarantor</c:otherwise>
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">
                     <c:choose>
                         <c:when test="${not empty guarantorMembersById[g.guarantorMemberId] and not empty guarantorMembersById[g.guarantorMemberId].memberNo}">${guarantorMembersById[g.guarantorMemberId].memberNo}</c:when>
+                        <c:when test="${not empty g.externalMemberNo}">${g.externalMemberNo}</c:when>
                         <c:otherwise>-</c:otherwise>
                     </c:choose>
                 </td>
@@ -298,6 +302,7 @@
                     </c:choose>
                 </td>
                 <td class="px-3 py-2">
+                    <c:if test="${not empty g.guarantorMemberId}">
                     <button type="button"
                             class="app-btn btn-neutral guarantor-financial-trigger"
                             data-url="${reviewBasePath}/loan-applications/${app.id}/guarantors/${g.guarantorMemberId}/financial-status">
@@ -315,6 +320,10 @@
                         </div>
                         <div class="guarantor-financial-result-note" data-financial-note></div>
                     </div>
+                    </c:if>
+                    <c:if test="${empty g.guarantorMemberId}">
+                        <span class="text-slate-400">-</span>
+                    </c:if>
                 </td>
             </tr>
         </c:forEach>

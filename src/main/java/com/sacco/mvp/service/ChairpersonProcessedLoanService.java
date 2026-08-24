@@ -2,6 +2,7 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
+import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
@@ -34,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -112,7 +114,10 @@ public class ChairpersonProcessedLoanService {
         var guarantorRequests = guarantorRequestRepository.findByLoanApplicationId(loanId);
         Set<UUID> memberIds = new LinkedHashSet<>();
         memberIds.add(app.getApplicantMemberId());
-        guarantorRequests.forEach(request -> memberIds.add(request.getGuarantorMemberId()));
+        guarantorRequests.stream()
+            .map(GuarantorRequest::getGuarantorMemberId)
+            .filter(Objects::nonNull)
+            .forEach(memberIds::add);
         Map<UUID, Member> memberMap = members(memberIds);
         Member applicant = memberMap.get(app.getApplicantMemberId());
         LoanProductSetting product = app.getLoanProductSettingId() == null ? null
@@ -121,8 +126,8 @@ public class ChairpersonProcessedLoanService {
         List<GuarantorView> guarantors = guarantorRequests.stream().map(request -> {
             Member guarantor = memberMap.get(request.getGuarantorMemberId());
             return new GuarantorView(
-                guarantor == null ? "-" : guarantor.getFullName(),
-                guarantor == null ? "-" : guarantor.getMemberNo(), request.getStatus().name(),
+                guarantor == null ? firstNonBlank(request.getExternalFullName(), request.getExternalMemberNo(), "-") : guarantor.getFullName(),
+                guarantor == null ? firstNonBlank(request.getExternalMemberNo(), "-") : guarantor.getMemberNo(), request.getStatus().name(),
                 request.getRequestedAmount(), request.getCommittedAmount(), request.getDecisionReason(), request.getDecidedAt());
         }).toList();
 
@@ -208,6 +213,18 @@ public class ChairpersonProcessedLoanService {
 
     private String reviewerNumber(Member member) {
         return member == null || member.getStaffNo() == null || member.getStaffNo().isBlank() ? "-" : member.getStaffNo();
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "-";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "-";
     }
 
     private String decisionLabel(ManagerReview review) {

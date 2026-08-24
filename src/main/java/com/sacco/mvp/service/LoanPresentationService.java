@@ -1454,11 +1454,13 @@ public class LoanPresentationService {
         } else {
             for (GuarantorRequest request : guarantorRequests) {
                 String name = guarantorNames == null ? null : guarantorNames.get(request.getGuarantorMemberId());
+                name = firstNonBlank(name, request.getExternalFullName(), request.getExternalMemberNo(), "Guarantor");
                 String memberNumber = guarantorMemberNumbers == null ? null : guarantorMemberNumbers.get(request.getGuarantorMemberId());
+                memberNumber = firstNonBlank(memberNumber, request.getExternalMemberNo(), "-");
                 html.append("<tr><td>")
-                    .append(esc(name == null || name.isBlank() ? "Guarantor" : name))
+                    .append(esc(name))
                     .append("</td><td>")
-                    .append(esc(memberNumber == null || memberNumber.isBlank() ? "-" : memberNumber))
+                    .append(esc(memberNumber))
                     .append("</td><td>")
                     .append(esc(humanizeValue(request.getStatus())))
                     .append("</td><td>");
@@ -1865,6 +1867,18 @@ public class LoanPresentationService {
 
     private String esc(String value) {
         return HtmlUtils.htmlEscape(value == null ? "" : value);
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private static String sanitizePdfText(String text) {
@@ -2499,11 +2513,16 @@ public class LoanPresentationService {
                 for (GuarantorRequest request : guarantorRequests) {
                     String guarantorLabel = guarantorNames.get(request.getGuarantorMemberId());
                     if (guarantorLabel == null || guarantorLabel.isBlank()) {
-                        guarantorLabel = shortId(request.getGuarantorMemberId());
+                        guarantorLabel = firstNonBlank(
+                            request.getExternalFullName(),
+                            request.getExternalMemberNo(),
+                            request.getGuarantorMemberId() == null ? null : shortId(request.getGuarantorMemberId()),
+                            "Guarantor"
+                        );
                     }
                     rows.add(new String[]{
                         sanitizePdfText(guarantorLabel),
-                        sanitizePdfText(guarantorMemberNumbers.get(request.getGuarantorMemberId())),
+                        sanitizePdfText(firstNonBlank(guarantorMemberNumbers.get(request.getGuarantorMemberId()), request.getExternalMemberNo(), "-")),
                         humanizeValue(request.getStatus()),
                         guarantorSignatureForPdf(request),
                         sanitizePdfText(formatTimestamp(request.getGuarantorSignatureVerifiedAt()))

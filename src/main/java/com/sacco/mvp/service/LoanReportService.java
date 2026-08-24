@@ -2436,7 +2436,10 @@ public class LoanReportService {
             .collect(Collectors.groupingBy(BoardReview::getLoanApplicationId, LinkedHashMap::new, Collectors.toList()));
 
         Set<UUID> memberIds = new java.util.LinkedHashSet<>();
-        guarantorsByLoan.values().forEach(requests -> requests.forEach(request -> memberIds.add(request.getGuarantorMemberId())));
+        guarantorsByLoan.values().forEach(requests -> requests.stream()
+            .map(GuarantorRequest::getGuarantorMemberId)
+            .filter(Objects::nonNull)
+            .forEach(memberIds::add));
         boardReviewsByLoan.values().forEach(reviews -> reviews.forEach(review -> memberIds.add(review.getBoardMemberId())));
 
         Map<UUID, Member> memberMap = memberRepository.findAllById(memberIds).stream()
@@ -2546,7 +2549,8 @@ public class LoanReportService {
             .map(request -> {
                 Member guarantor = memberMap.get(request.getGuarantorMemberId());
                 String guarantorLabel = guarantor == null
-                    ? shortId(request.getGuarantorMemberId())
+                    ? firstNonBlank(request.getExternalFullName(), request.getExternalMemberNo(),
+                        request.getGuarantorMemberId() == null ? null : shortId(request.getGuarantorMemberId()))
                     : guarantor.getFullName() + " (" + guarantor.getMemberNo() + ")";
                 return guarantorLabel + " - " + humanizeGuarantorStatus(request.getStatus());
             })
@@ -2961,6 +2965,18 @@ public class LoanReportService {
 
     private String shortId(UUID id) {
         return id == null ? "-" : id.toString().substring(0, 8);
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "-";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "-";
     }
 
     private String humanizeLoanType(String text) {

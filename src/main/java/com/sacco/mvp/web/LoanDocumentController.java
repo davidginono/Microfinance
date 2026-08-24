@@ -93,7 +93,10 @@ public class LoanDocumentController {
         List<ManagerReview> staffReviews = loanPresentationService.staffReviewsForLoan(loanId);
         Map<UUID, String> guarantorNames = new LinkedHashMap<>();
         Map<UUID, String> guarantorMemberNumbers = new LinkedHashMap<>();
-        for (Member member : memberDirectoryService.findAll(guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).toList())) {
+        for (Member member : memberDirectoryService.findAll(guarantorRequests.stream()
+            .map(GuarantorRequest::getGuarantorMemberId)
+            .filter(java.util.Objects::nonNull)
+            .toList())) {
             guarantorNames.put(member.getId(), member.getFullName());
             guarantorMemberNumbers.put(member.getId(), member.getMemberNo());
         }

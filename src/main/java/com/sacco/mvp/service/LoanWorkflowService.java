@@ -2,11 +2,17 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.integration.foresight.ForesightAccountSummary;
+import com.sacco.mvp.integration.foresight.ForesightActiveLoan;
 import com.sacco.mvp.integration.foresight.ForesightDirectoryService;
+import com.sacco.mvp.integration.foresight.ForesightInvestment;
+import com.sacco.mvp.integration.foresight.ForesightLoanPaymentSummary;
+import com.sacco.mvp.integration.foresight.ForesightLoanPaymentTransaction;
+import com.sacco.mvp.integration.foresight.ForesightMemberProfile;
 import com.sacco.mvp.integration.foresight.UpstreamAvailabilityException;
 import com.sacco.mvp.repository.*;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +36,13 @@ public class LoanWorkflowService {
     private static final String GUARANTOR_APPROVAL_MODE_FIELD = "guarantorApprovalMode";
     private static final String GUARANTOR_APPROVAL_MODE_DIRECT_OTP = "DIRECT_OTP";
     private static final String GUARANTOR_APPROVAL_MODE_LOGIN = "LOGIN";
+    private static final String GUARANTOR_SOURCE_LMS = "LMS";
+    private static final String GUARANTOR_SOURCE_FORESIGHT = "FORESIGHT";
+    private static final String DIRECT_OTP_SEARCH_PHONE = "phone";
+    private static final String DIRECT_OTP_SEARCH_EMAIL = "email";
+    private static final int INVESTMENT_CODE_SAVINGS = 98;
+    private static final int INVESTMENT_CODE_SHARES = 97;
+    private static final int INVESTMENT_CODE_DEPOSITS = 96;
     private static final List<LoanStatus> APPLICATION_IN_PROGRESS_LOCK_STATUSES = List.of(
         LoanStatus.DRAFT,
         LoanStatus.SUBMITTED,
@@ -309,16 +322,16 @@ public class LoanWorkflowService {
 
     public LoanApplication saveDraft(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                     List<UUID> guarantorIds,
+                                     List<?> guarantorSelections,
                                      String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                      Map<UUID, List<MultipartFile>> requiredAttachments) {
-        return saveDraft(saccoId, applicantId, null, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+        return saveDraft(saccoId, applicantId, null, loanType, amount, tenorMonths, requestParams, existingId, guarantorSelections,
             financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
     }
 
     public LoanApplication saveDraft(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
                                      Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                     List<UUID> guarantorIds,
+                                     List<?> guarantorSelections,
                                      String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                      Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
@@ -347,10 +360,8 @@ public class LoanWorkflowService {
         validateRepaymentPeriod(product, tenorMonths);
         requireLoadedFinancialDataForDraft(product, financialSnapshotJson);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
-        formData.put(
-            GUARANTOR_APPROVAL_MODE_FIELD,
-            normalizeGuarantorApprovalMode(requestParams.get(GUARANTOR_APPROVAL_MODE_FIELD))
-        );
+        String guarantorApprovalMode = normalizeGuarantorApprovalMode(requestParams.get(GUARANTOR_APPROVAL_MODE_FIELD));
+        formData.put(GUARANTOR_APPROVAL_MODE_FIELD, guarantorApprovalMode);
         formSchemaService.validateAgainstSchema(product.getFormSchema(), formData);
         appendLoanPurpose(formData, requestParams.get("purpose"));
         List<LoanProductRequiredAttachment> requiredAttachmentDefinitions = validateApplicantAttachmentRequirement(
@@ -359,14 +370,15 @@ public class LoanWorkflowService {
             attachments,
             requiredAttachments
         );
-        validateGuarantorSelection(
+        List<GuarantorSelection> normalizedGuarantors = validateGuarantorSelections(
             saccoId,
             applicantStationId,
             applicantId,
             product.getGuarantorsRequired(),
             amount,
-            guarantorIds,
-            product
+            guarantorSelections,
+            product,
+            guarantorApprovalMode
         );
 
         EligibilityService.EligibilityResult eligibility = loanProductId == null
@@ -400,7 +412,7 @@ public class LoanWorkflowService {
         application.setFormData(formSchemaService.toJson(formData));
         application.setRequiredGuarantors(product.getGuarantorsRequired());
         application.setPolicySnapshot(snapshot);
-        application.setSelectedGuarantors(toGuarantorSelectionJson(guarantorIds));
+        application.setSelectedGuarantors(toGuarantorSelectionJson(normalizedGuarantors));
         application.setFinancialSnapshot(normalizeJson(financialSnapshotJson, "Load SACCO financial details again before saving the draft."));
         if (application.getAttachmentsJson() == null) {
             application.setAttachmentsJson("[]");
@@ -532,11 +544,11 @@ public class LoanWorkflowService {
 
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                         List<UUID> guarantorIds,
+                                         List<?> guarantorSelections,
                                          String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                          Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication saved = saveDraft(
-            saccoId, applicantId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+            saccoId, applicantId, loanType, amount, tenorMonths, requestParams, existingId, guarantorSelections,
             financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
         LoanApplication submitted = submit(saved.getId(), applicantId);
         // Return reloaded row to guarantee caller sees persisted status/form data.
@@ -545,11 +557,11 @@ public class LoanWorkflowService {
 
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, UUID loanProductId, LoanType loanType, BigDecimal amount,
                                          Integer tenorMonths, Map<String, String> requestParams, UUID existingId,
-                                         List<UUID> guarantorIds,
+                                         List<?> guarantorSelections,
                                          String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                          Map<UUID, List<MultipartFile>> requiredAttachments) {
         LoanApplication saved = saveDraft(
-            saccoId, applicantId, loanProductId, loanType, amount, tenorMonths, requestParams, existingId, guarantorIds,
+            saccoId, applicantId, loanProductId, loanType, amount, tenorMonths, requestParams, existingId, guarantorSelections,
             financialSnapshotJson, topUpSourceLoanId, attachments, requiredAttachments);
         LoanApplication submitted = submit(saved.getId(), applicantId);
         return getMine(submitted.getId(), applicantId);
@@ -609,19 +621,33 @@ public class LoanWorkflowService {
             )
         ));
         capturePaymentDetailsIfMissing(app);
-        return inTransaction(() -> persistSubmittedApplication(app, memberId));
+        List<GuarantorSelection> selectedGuarantors = app.getRequiredGuarantors() == null || app.getRequiredGuarantors() <= 0
+            ? List.of()
+            : validateGuarantorSelections(
+                app.getSaccoId(),
+                coalesceStationId(app.getStationId(), requireMemberStationId(memberId)),
+                memberId,
+                app.getRequiredGuarantors(),
+                app.getAmount(),
+                parseSelectedGuarantorSelections(app.getSelectedGuarantors()),
+                product,
+                guarantorApprovalMode(app)
+            );
+        return inTransaction(() -> persistSubmittedApplication(app, memberId, selectedGuarantors));
     }
 
-    private LoanApplication persistSubmittedApplication(LoanApplication app, UUID memberId) {
+    private LoanApplication persistSubmittedApplication(LoanApplication app,
+                                                       UUID memberId,
+                                                       List<GuarantorSelection> selectedGuarantors) {
         app.setSubmittedAt(OffsetDateTime.now());
 
         if (app.getRequiredGuarantors() == 0) {
             moveIntoConfiguredReviewStage(app, memberId);
         } else {
-            List<UUID> selectedGuarantors = parseSelectedGuarantors(app.getSelectedGuarantors());
             if (selectedGuarantors.size() != app.getRequiredGuarantors()) {
                 throw new IllegalStateException("Select exactly " + app.getRequiredGuarantors() + " guarantors before submitting.");
             }
+            app.setSelectedGuarantors(toGuarantorSelectionJson(selectedGuarantors));
             app.setStatus(LoanStatus.AWAITING_GUARANTORS);
         }
         app.setUpdatedAt(OffsetDateTime.now());
@@ -631,7 +657,7 @@ public class LoanWorkflowService {
             refreshGuarantorRequestsForSubmission(
                 submitted,
                 memberId,
-                parseSelectedGuarantors(submitted.getSelectedGuarantors())
+                selectedGuarantors
             );
             LoanApplication reloaded = getMine(submitted.getId(), memberId);
             auditLoan(reloaded, memberId, "LOAN_SENT_TO_GUARANTORS", "Application sent to guarantors");
@@ -814,6 +840,277 @@ public class LoanWorkflowService {
             .toList();
     }
 
+    public List<DirectOtpGuarantorCandidate> searchDirectOtpGuarantorCandidates(String saccoId,
+                                                                                String stationId,
+                                                                                UUID applicantId,
+                                                                                String q,
+                                                                                String searchBy,
+                                                                                LoanProductSetting product) {
+        String mode = normalizeDirectOtpSearchBy(searchBy);
+        String lookupValue = normalizeDirectOtpLookupValue(q, mode);
+        if (lookupValue == null) {
+            return List.of();
+        }
+        ForesightDirectoryService.MemberProfileLookupResult lookup = lookupDirectOtpProfile(mode, lookupValue);
+        if (lookup.isNotFound()) {
+            return List.of();
+        }
+        if (!lookup.isFound()) {
+            throw new IllegalStateException("External member profile is unavailable right now.");
+        }
+        ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
+        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(profile);
+        GuarantorSelection selection = selectionFromProfile(profile, mode, lookupValue, snapshot);
+        CandidateResolution resolution = resolveDirectOtpCandidate(saccoId, stationId, applicantId, selection);
+        GuarantorSelection resolvedSelection = resolution.selection();
+        String disabledReason = resolution.disabledReason();
+        if (disabledReason == null || disabledReason.isBlank()) {
+            disabledReason = resolvedSelection.localMemberId() == null
+                ? Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReasonForExternal(
+                    saccoId,
+                    stationId,
+                    resolvedSelection.externalMemberNo(),
+                    resolvedSelection.externalStationId(),
+                    snapshot.savingsBalance(),
+                    snapshot.activeLoanCount(),
+                    null,
+                    product
+                )).orElse(Optional.empty()).orElse("")
+                : Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReason(
+                    saccoId,
+                    resolvedSelection.localMemberId(),
+                    null,
+                    product
+                )).orElse(Optional.empty()).orElse("");
+        }
+        return List.of(new DirectOtpGuarantorCandidate(
+            resolvedSelection.source(),
+            resolvedSelection.localMemberId(),
+            resolvedSelection.identityKey(),
+            selectionToken(resolvedSelection),
+            resolvedSelection.externalMemberNo(),
+            resolvedSelection.externalStationId(),
+            profile.saccoName(),
+            resolvedSelection.displayName(),
+            resolvedSelection.email(),
+            resolvedSelection.phone(),
+            snapshot.savingsBalance(),
+            snapshot.sharesBalance(),
+            snapshot.depositsBalance(),
+            snapshot.activeLoanCount(),
+            snapshot.paidLoanCount(),
+            snapshot.activeLoans().stream().map(this::loanRow).toList(),
+            snapshot.paidLoans().stream().map(this::loanRow).toList(),
+            disabledReason == null || disabledReason.isBlank(),
+            disabledReason == null ? "" : disabledReason,
+            mode,
+            lookupValue
+        ));
+    }
+
+    public DirectOtpLoanDetails directOtpLoanPaymentDetails(String q, String searchBy, String loanId) {
+        String mode = normalizeDirectOtpSearchBy(searchBy);
+        String lookupValue = normalizeDirectOtpLookupValue(q, mode);
+        String normalizedLoanId = normalizeOptional(loanId);
+        if (lookupValue == null || normalizedLoanId == null) {
+            throw new IllegalArgumentException("Select a valid loan before loading payment details.");
+        }
+        ForesightDirectoryService.MemberProfileLookupResult lookup = lookupDirectOtpProfile(mode, lookupValue);
+        if (!lookup.isFound()) {
+            throw new IllegalStateException("External member profile is unavailable right now.");
+        }
+        ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
+        List<ForesightLoanPaymentSummary> summaries = foresightDirectoryService.fetchLoanPaymentSummary(
+            profile.memberNo(),
+            profile.stationId(),
+            normalizedLoanId
+        );
+        List<ForesightLoanPaymentTransaction> transactions = foresightDirectoryService.fetchLoanPaymentTransactions(
+            profile.memberNo(),
+            profile.stationId(),
+            normalizedLoanId
+        );
+        return new DirectOtpLoanDetails(
+            summaries.stream().map(this::paymentSummaryRow).toList(),
+            transactions.stream().map(this::paymentTransactionRow).toList()
+        );
+    }
+
+    private GuarantorSelection normalizeDirectOtpSelection(String saccoId,
+                                                          String stationId,
+                                                          UUID applicantId,
+                                                          BigDecimal pendingLoanAmount,
+                                                          LoanProductSetting product,
+                                                          GuarantorSelection submittedSelection) {
+        if (submittedSelection == null) {
+            throw new IllegalArgumentException("Guarantor not found");
+        }
+        String lookupBy = submittedSelection.lookupBy();
+        String lookupValue = normalizeOptional(submittedSelection.lookupValue());
+        if (lookupBy == null && submittedSelection.phone() != null) {
+            lookupBy = DIRECT_OTP_SEARCH_PHONE;
+            lookupValue = submittedSelection.phone();
+        }
+        if (lookupBy == null && submittedSelection.email() != null) {
+            lookupBy = DIRECT_OTP_SEARCH_EMAIL;
+            lookupValue = submittedSelection.email();
+        }
+        if (lookupBy == null || lookupValue == null) {
+            return submittedSelection;
+        }
+
+        lookupValue = normalizeDirectOtpLookupValue(lookupValue, lookupBy);
+        if (lookupValue == null) {
+            throw new IllegalArgumentException("Enter a valid phone number or email address for Direct OTP guarantor search.");
+        }
+        ForesightDirectoryService.MemberProfileLookupResult lookup = lookupDirectOtpProfile(lookupBy, lookupValue);
+        if (lookup.isNotFound()) {
+            throw new IllegalArgumentException("Foresight member profile was not found.");
+        }
+        if (!lookup.isFound()) {
+            throw new IllegalStateException("External member profile is unavailable right now.");
+        }
+        ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
+        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(profile);
+        GuarantorSelection refreshedSelection = selectionFromProfile(profile, lookupBy, lookupValue, snapshot);
+        CandidateResolution resolution = resolveDirectOtpCandidate(saccoId, stationId, applicantId, refreshedSelection);
+        if (resolution.disabledReason() != null && !resolution.disabledReason().isBlank()) {
+            throw new IllegalArgumentException(resolution.disabledReason());
+        }
+        if (submittedSelection.localMemberId() != null
+            && resolution.selection().localMemberId() != null
+            && !submittedSelection.localMemberId().equals(resolution.selection().localMemberId())) {
+            throw new IllegalArgumentException("Selected guarantor profile no longer matches the LMS member.");
+        }
+        if (resolution.selection().localMemberId() != null) {
+            validateLocalGuarantor(
+                saccoId,
+                stationId,
+                applicantId,
+                pendingLoanAmount,
+                product,
+                resolution.selection().localMemberId()
+            );
+        }
+        return resolution.selection();
+    }
+
+    private ForesightDirectoryService.MemberProfileLookupResult lookupDirectOtpProfile(String mode, String lookupValue) {
+        return DIRECT_OTP_SEARCH_EMAIL.equals(mode)
+            ? foresightDirectoryService.lookupMemberProfileByEmail(lookupValue)
+            : foresightDirectoryService.lookupMemberProfileByPhone(lookupValue);
+    }
+
+    private ForesightMemberProfile requireProfileIdentity(ForesightMemberProfile profile) {
+        if (profile == null || normalizeOptional(profile.memberNo()) == null || normalizeOptional(profile.stationId()) == null) {
+            throw new IllegalArgumentException("Foresight member profile is missing member number or station.");
+        }
+        return profile;
+    }
+
+    private GuarantorSelection selectionFromProfile(ForesightMemberProfile profile,
+                                                    String lookupBy,
+                                                    String lookupValue,
+                                                    DirectOtpFinancialSnapshot snapshot) {
+        return new GuarantorSelection(
+            GUARANTOR_SOURCE_FORESIGHT,
+            null,
+            normalizeOptional(profile.memberNo()),
+            normalizeOptional(profile.stationId()),
+            profileFullName(profile),
+            normalizeOptional(profile.email()),
+            normalizeOptional(profile.phoneNumber()),
+            lookupBy,
+            lookupValue,
+            snapshot
+        );
+    }
+
+    private CandidateResolution resolveDirectOtpCandidate(String saccoId,
+                                                          String stationId,
+                                                          UUID applicantId,
+                                                          GuarantorSelection selection) {
+        if (selection.externalMemberNo() == null || selection.externalStationId() == null) {
+            return new CandidateResolution(selection, "Foresight member profile is missing member number or station.");
+        }
+        if (!sameStation(selection.externalStationId(), stationId)) {
+            return new CandidateResolution(selection, "Guarantor must be in the same station");
+        }
+        Optional<Member> localMember = memberRepository.findByMemberNoIgnoreCase(selection.externalMemberNo())
+            .filter(member -> saccoId.equals(member.getSaccoId()));
+        if (localMember.isEmpty()) {
+            return new CandidateResolution(selection, "");
+        }
+        Member member = localMember.get();
+        if (member.getId().equals(applicantId)) {
+            return new CandidateResolution(selection, "You cannot select yourself as a guarantor");
+        }
+        if (member.getStatus() != MemberStatus.ACTIVE || !member.isMemberAccess()) {
+            return new CandidateResolution(selection, "Guarantor must be active and in same SACCO");
+        }
+        if (!matchesStation(member, stationId)) {
+            return new CandidateResolution(selection, "Guarantor must be in the same station");
+        }
+        return new CandidateResolution(selection.asLocal(member), "");
+    }
+
+    private DirectOtpFinancialSnapshot loadDirectOtpFinancialSnapshot(ForesightMemberProfile profile) {
+        ForesightAccountSummary summary = foresightDirectoryService.fetchAccountSummary(profile.memberNo(), profile.stationId());
+        List<ForesightInvestment> savingsInvestments = foresightDirectoryService.fetchInvestments(
+            profile.memberNo(), profile.stationId(), INVESTMENT_CODE_SAVINGS);
+        List<ForesightInvestment> sharesInvestments = foresightDirectoryService.fetchInvestments(
+            profile.memberNo(), profile.stationId(), INVESTMENT_CODE_SHARES);
+        List<ForesightInvestment> depositsInvestments = foresightDirectoryService.fetchInvestments(
+            profile.memberNo(), profile.stationId(), INVESTMENT_CODE_DEPOSITS);
+        List<ForesightActiveLoan> activeLoans = foresightDirectoryService.fetchActiveLoans(profile.memberNo(), profile.stationId());
+        List<ForesightActiveLoan> paidLoans = foresightDirectoryService.fetchPaidLoans(profile.memberNo(), profile.stationId());
+        return new DirectOtpFinancialSnapshot(
+            nullToZero(summary == null ? null : summary.savingsBalance()),
+            nullToZero(summary == null ? null : summary.sharesBalance()),
+            nullToZero(summary == null ? null : summary.depositsBalance()),
+            activeLoans == null ? List.of() : activeLoans,
+            paidLoans == null ? List.of() : paidLoans,
+            savingsInvestments == null ? 0 : savingsInvestments.size(),
+            sharesInvestments == null ? 0 : sharesInvestments.size(),
+            depositsInvestments == null ? 0 : depositsInvestments.size()
+        );
+    }
+
+    private DirectOtpLoanRow loanRow(ForesightActiveLoan loan) {
+        return new DirectOtpLoanRow(
+            loan.loanIdText(),
+            firstNonBlank(loan.loanDescription(), "-"),
+            loan.disbursedDate() == null ? "-" : loan.disbursedDate().toString(),
+            loan.requestedAmount(),
+            loan.disbursedAmount(),
+            loan.totalInterest()
+        );
+    }
+
+    private DirectOtpPaymentSummaryRow paymentSummaryRow(ForesightLoanPaymentSummary summary) {
+        return new DirectOtpPaymentSummaryRow(
+            summary.loanIdText(),
+            firstNonBlank(summary.loanDescription(), "-"),
+            summary.requestedAmount(),
+            summary.disbursedAmount(),
+            summary.totalPrincipalPaid(),
+            summary.totalInterestPaid(),
+            summary.outstandingPrincipal(),
+            summary.outstandingInterest(),
+            summary.totalOutstanding(),
+            summary.lastPaymentDate() == null ? "-" : summary.lastPaymentDate().toString()
+        );
+    }
+
+    private DirectOtpPaymentTransactionRow paymentTransactionRow(ForesightLoanPaymentTransaction transaction) {
+        return new DirectOtpPaymentTransactionRow(
+            transaction.receiptDate() == null ? "-" : transaction.receiptDate().toString(),
+            transaction.principalPaid(),
+            transaction.interestPaid(),
+            transaction.totalPaid()
+        );
+    }
+
     @Transactional
     public void selectGuarantors(UUID appId, UUID applicantId, List<UUID> guarantorIds) {
         LoanApplication app = getMine(appId, applicantId);
@@ -831,7 +1128,7 @@ public class LoanWorkflowService {
             product
         );
 
-        app.setSelectedGuarantors(toGuarantorSelectionJson(uniqueGuarantors));
+        app.setSelectedGuarantors(toJson(uniqueGuarantors));
         app.setUpdatedAt(OffsetDateTime.now());
 
         if (app.getStatus() == LoanStatus.DRAFT) {
@@ -899,6 +1196,61 @@ public class LoanWorkflowService {
                 );
                 auditLoan(app, guarantorId, "GUARANTOR_REQUEST_APPROVED", "Guarantor request approved");
             });
+    }
+
+    @Transactional
+    public void approveDirectOtpGuarantorRequest(UUID requestId,
+                                                 UUID applicantId,
+                                                 String signatureText,
+                                                 OffsetDateTime verifiedAt) {
+        GuarantorRequest request = guarantorRequestRepository.findById(requestId)
+            .orElseThrow(() -> new IllegalArgumentException("Guarantor request not found"));
+        LoanApplication app = loanApplicationRepository.findById(request.getLoanApplicationId())
+            .orElseThrow(() -> new IllegalArgumentException("Loan application not found"));
+        if (!Objects.equals(app.getApplicantMemberId(), applicantId)) {
+            throw new IllegalArgumentException("Guarantor request not found");
+        }
+        if (!isDirectOtpGuarantorApproval(app)) {
+            throw new IllegalStateException("Direct OTP approval is not enabled for this application.");
+        }
+        if (request.getStatus() != GuarantorRequestStatus.PENDING) {
+            throw new IllegalStateException("Request already decided");
+        }
+        request.setStatus(GuarantorRequestStatus.APPROVED);
+        request.setCommittedAmount(null);
+        request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
+        request.setGuarantorSignatureVerifiedAt(verifiedAt);
+        request.setDecidedAt(OffsetDateTime.now());
+        guarantorRequestRepository.save(request);
+        evaluateReadiness(request.getLoanApplicationId());
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("loanId", app.getId().toString());
+        details.put("guarantorRequestId", request.getId().toString());
+        if (request.getGuarantorMemberId() != null) {
+            details.put("guarantorId", request.getGuarantorMemberId().toString());
+        }
+        if (request.getExternalMemberNo() != null) {
+            details.put("externalMemberNo", request.getExternalMemberNo());
+        }
+        if (request.getExternalStationId() != null) {
+            details.put("externalStationId", request.getExternalStationId());
+        }
+        outboxService.enqueue(
+            "GUARANTOR_REQUEST",
+            request.getId(),
+            "GUARANTOR_REQUEST_APPROVED",
+            app.getApplicantMemberId(),
+            request.getGuarantorMemberId() == null ? applicantId : request.getGuarantorMemberId(),
+            app.getSaccoId(),
+            app.getStationId(),
+            details
+        );
+        auditLoan(
+            app,
+            request.getGuarantorMemberId() == null ? applicantId : request.getGuarantorMemberId(),
+            "GUARANTOR_REQUEST_APPROVED",
+            "Guarantor request approved"
+        );
     }
 
     @Transactional
@@ -1070,34 +1422,54 @@ public class LoanWorkflowService {
     }
 
     private boolean isDirectOtpGuarantorApproval(LoanApplication app) {
+        return GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(guarantorApprovalMode(app));
+    }
+
+    private String guarantorApprovalMode(LoanApplication app) {
         if (app == null || app.getFormData() == null || app.getFormData().isBlank()) {
-            return false;
+            return GUARANTOR_APPROVAL_MODE_LOGIN;
         }
         try {
             Map<String, Object> formData = objectMapper.readValue(app.getFormData(), new TypeReference<Map<String, Object>>() {});
-            return GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(
-                normalizeGuarantorApprovalMode(String.valueOf(formData.get(GUARANTOR_APPROVAL_MODE_FIELD)))
-            );
+            return normalizeGuarantorApprovalMode(String.valueOf(formData.get(GUARANTOR_APPROVAL_MODE_FIELD)));
         } catch (Exception ex) {
-            return false;
+            return GUARANTOR_APPROVAL_MODE_LOGIN;
         }
     }
 
-    private String toGuarantorSelectionJson(List<UUID> guarantorIds) {
-        List<UUID> uniqueGuarantors = guarantorIds == null ? Collections.emptyList() : new ArrayList<>(new LinkedHashSet<>(guarantorIds));
-        if (uniqueGuarantors.isEmpty()) {
+    private String toGuarantorSelectionJson(List<GuarantorSelection> selections) {
+        List<GuarantorSelection> uniqueSelections = selections == null ? Collections.emptyList() : selections;
+        if (uniqueSelections.isEmpty()) {
             return "[]";
         }
-        List<Map<String, String>> rows = new ArrayList<>();
-        for (UUID guarantorId : uniqueGuarantors) {
-            Map<String, String> row = new LinkedHashMap<>();
-            row.put("id", guarantorId.toString());
-            rows.add(row);
-        }
         try {
-            return objectMapper.writeValueAsString(rows);
+            return objectMapper.writeValueAsString(uniqueSelections.stream()
+                .map(this::selectionPayload)
+                .toList());
         } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to save selected guarantors", e);
+        }
+    }
+
+    private Map<String, String> selectionPayload(GuarantorSelection selection) {
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("source", selection.source());
+        if (selection.localMemberId() != null) {
+            row.put("id", selection.localMemberId().toString());
+        }
+        putIfPresent(row, "memberNo", selection.externalMemberNo());
+        putIfPresent(row, "stationId", selection.externalStationId());
+        putIfPresent(row, "fullName", selection.fullName());
+        putIfPresent(row, "email", selection.email());
+        putIfPresent(row, "phone", selection.phone());
+        putIfPresent(row, "lookupBy", selection.lookupBy());
+        putIfPresent(row, "lookupValue", selection.lookupValue());
+        return row;
+    }
+
+    private void putIfPresent(Map<String, String> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value);
         }
     }
 
@@ -1115,36 +1487,250 @@ public class LoanWorkflowService {
     }
 
     private List<UUID> parseSelectedGuarantors(String json) {
+        return parseSelectedGuarantorSelections(json).stream()
+            .map(GuarantorSelection::localMemberId)
+            .filter(Objects::nonNull)
+            .toList();
+    }
+
+    private List<GuarantorSelection> parseSelectedGuarantorSelections(String json) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
         try {
-            List<?> raw = objectMapper.readValue(json, new TypeReference<List<?>>() {});
-            List<UUID> values = new ArrayList<>();
-            for (Object item : raw) {
-                if (item instanceof String text) {
-                    values.add(UUID.fromString(text));
-                } else if (item instanceof Map<?, ?> map && map.get("id") != null) {
-                    values.add(UUID.fromString(String.valueOf(map.get("id"))));
-                }
+            List<Map<String, Object>> raw = objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+            return parseSubmittedGuarantorSelections(raw);
+        } catch (Exception ignored) {
+            try {
+                List<String> raw = objectMapper.readValue(json, new TypeReference<List<String>>() {});
+                return parseSubmittedGuarantorSelections(raw);
+            } catch (Exception ex) {
+                return Collections.emptyList();
             }
-            return values;
-        } catch (Exception e) {
+        }
+    }
+
+    private List<GuarantorSelection> parseSubmittedGuarantorSelections(List<?> rawSelections) {
+        if (rawSelections == null || rawSelections.isEmpty()) {
             return Collections.emptyList();
         }
+        List<GuarantorSelection> selections = new ArrayList<>();
+        for (Object rawSelection : rawSelections) {
+            parseSubmittedGuarantorSelection(rawSelection).ifPresent(selections::add);
+        }
+        return selections;
+    }
+
+    private Optional<GuarantorSelection> parseSubmittedGuarantorSelection(Object rawSelection) {
+        if (rawSelection == null) {
+            return Optional.empty();
+        }
+        if (rawSelection instanceof UUID id) {
+            return Optional.of(localSelection(id));
+        }
+        if (rawSelection instanceof GuarantorSelection selection) {
+            return Optional.of(selection);
+        }
+        if (rawSelection instanceof Map<?, ?> map) {
+            return Optional.ofNullable(selectionFromMap(map));
+        }
+        String text = normalizeOptional(rawString(rawSelection));
+        if (text == null || text.isBlank()) {
+            return Optional.empty();
+        }
+        UUID localId = parseUuid(text);
+        if (localId != null) {
+            return Optional.of(localSelection(localId));
+        }
+        try {
+            Map<String, Object> map = objectMapper.readValue(text, new TypeReference<Map<String, Object>>() {});
+            return Optional.ofNullable(selectionFromMap(map));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
+    }
+
+    private GuarantorSelection selectionFromMap(Map<?, ?> map) {
+        if (map == null || map.isEmpty()) {
+            return null;
+        }
+        UUID localId = parseUuid(rawString(map.get("id")));
+        String source = GUARANTOR_SOURCE_FORESIGHT.equalsIgnoreCase(rawString(map.get("source")))
+            ? GUARANTOR_SOURCE_FORESIGHT
+            : GUARANTOR_SOURCE_LMS;
+        String lookupBy = normalizeDirectOtpSearchBy(rawString(map.get("lookupBy")));
+        String lookupValue = normalizeOptional(rawString(map.get("lookupValue")));
+        if (localId != null) {
+            return new GuarantorSelection(
+                GUARANTOR_SOURCE_LMS,
+                localId,
+                normalizeOptional(rawString(map.get("memberNo"))),
+                normalizeOptional(rawString(map.get("stationId"))),
+                normalizeOptional(rawString(map.get("fullName"))),
+                normalizeOptional(rawString(map.get("email"))),
+                normalizeOptional(rawString(map.get("phone"))),
+                lookupBy,
+                lookupValue,
+                null
+            );
+        }
+        String memberNo = normalizeOptional(rawString(map.get("memberNo")));
+        String stationId = normalizeOptional(rawString(map.get("stationId")));
+        if (!GUARANTOR_SOURCE_FORESIGHT.equals(source) && memberNo == null) {
+            return null;
+        }
+        return new GuarantorSelection(
+            GUARANTOR_SOURCE_FORESIGHT,
+            null,
+            memberNo,
+            stationId,
+            normalizeOptional(rawString(map.get("fullName"))),
+            normalizeOptional(rawString(map.get("email"))),
+            normalizeOptional(rawString(map.get("phone"))),
+            lookupBy,
+            lookupValue,
+            null
+        );
+    }
+
+    private UUID parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String rawString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof JsonNode node) {
+            if (node.isNull()) {
+                return null;
+            }
+            return node.isValueNode() ? node.asString() : node.toString();
+        }
+        return String.valueOf(value);
+    }
+
+    private GuarantorSelection localSelection(UUID localMemberId) {
+        return new GuarantorSelection(GUARANTOR_SOURCE_LMS, localMemberId, null, null, null, null, null, null, null, null);
+    }
+
+    public List<Map<String, String>> selectedGuarantorDisplayItems(String selectedGuarantorsJson) {
+        return selectedGuarantorDisplayItemsFromSelections(parseSelectedGuarantorSelections(selectedGuarantorsJson));
+    }
+
+    public List<Map<String, String>> selectedGuarantorDisplayItems(List<?> rawSelections) {
+        return selectedGuarantorDisplayItemsFromSelections(parseSubmittedGuarantorSelections(rawSelections));
+    }
+
+    private List<Map<String, String>> selectedGuarantorDisplayItemsFromSelections(List<GuarantorSelection> selections) {
+        if (selections == null || selections.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Set<UUID> localIds = new LinkedHashSet<>();
+        for (GuarantorSelection selection : selections) {
+            if (selection.localMemberId() != null) {
+                localIds.add(selection.localMemberId());
+            }
+        }
+        Map<UUID, Member> membersById = new LinkedHashMap<>();
+        if (!localIds.isEmpty()) {
+            for (Member member : memberRepository.findAllById(localIds)) {
+                membersById.put(member.getId(), member);
+            }
+        }
+        List<Map<String, String>> items = new ArrayList<>();
+        for (GuarantorSelection selection : selections) {
+            Member member = selection.localMemberId() == null ? null : membersById.get(selection.localMemberId());
+            String memberNo = firstNonBlank(member == null ? null : member.getMemberNo(), selection.externalMemberNo(), "-");
+            String fullName = firstNonBlank(member == null ? null : member.getFullName(), selection.fullName(), "Guarantor");
+            Map<String, String> item = new LinkedHashMap<>();
+            item.put("id", selection.identityKey());
+            item.put("selectionKey", selection.identityKey());
+            item.put("selectionToken", selectionToken(selection));
+            item.put("memberNo", memberNo);
+            item.put("fullName", fullName);
+            item.put("source", selection.source());
+            if (selection.localMemberId() != null) {
+                item.put("localMemberId", selection.localMemberId().toString());
+            }
+            items.add(item);
+        }
+        return items;
     }
 
     private List<UUID> normalizeGuarantorSelection(LoanApplication app, UUID applicantId, List<UUID> guarantorIds) {
         LoanProductSetting product = resolveWorkflowProduct(app);
-        return validateGuarantorSelection(
+        return validateGuarantorSelections(
             app.getSaccoId(),
             coalesceStationId(app.getStationId(), requireMemberStationId(applicantId)),
             applicantId,
             app.getRequiredGuarantors(),
             app.getAmount(),
             guarantorIds,
-            product
-        );
+            product,
+            guarantorApprovalMode(app)
+        ).stream()
+            .map(GuarantorSelection::localMemberId)
+            .filter(Objects::nonNull)
+            .toList();
+    }
+
+    private List<GuarantorSelection> validateGuarantorSelections(String saccoId,
+                                                                 String stationId,
+                                                                 UUID applicantId,
+                                                                 Integer requiredGuarantors,
+                                                                 BigDecimal pendingLoanAmount,
+                                                                 List<?> rawSelections,
+                                                                 LoanProductSetting product,
+                                                                 String approvalMode) {
+        if (requiredGuarantors == null || requiredGuarantors <= 0) {
+            return Collections.emptyList();
+        }
+        List<GuarantorSelection> submittedSelections = parseSubmittedGuarantorSelections(rawSelections);
+        if (submittedSelections.size() != requiredGuarantors) {
+            throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " guarantors");
+        }
+
+        List<GuarantorSelection> normalizedSelections = new ArrayList<>();
+        Set<String> uniqueKeys = new LinkedHashSet<>();
+        boolean directOtp = GUARANTOR_APPROVAL_MODE_DIRECT_OTP.equals(approvalMode);
+        for (GuarantorSelection submittedSelection : submittedSelections) {
+            GuarantorSelection selection = directOtp
+                ? normalizeDirectOtpSelection(saccoId, stationId, applicantId, pendingLoanAmount, product, submittedSelection)
+                : submittedSelection;
+            if (!directOtp && selection.localMemberId() == null) {
+                throw new IllegalArgumentException("Login approval guarantors must be LMS members.");
+            }
+            if (selection.localMemberId() != null) {
+                Member guarantor = validateLocalGuarantor(
+                    saccoId,
+                    stationId,
+                    applicantId,
+                    pendingLoanAmount,
+                    product,
+                    selection.localMemberId()
+                );
+                selection = selection.withMember(guarantor);
+            } else {
+                validateExternalGuarantor(saccoId, stationId, pendingLoanAmount, product, selection);
+            }
+            if (!uniqueKeys.add(selection.identityKey())) {
+                throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " different guarantors");
+            }
+            normalizedSelections.add(selection);
+        }
+
+        if (normalizedSelections.size() != requiredGuarantors) {
+            throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " guarantors");
+        }
+        return normalizedSelections;
     }
 
     private List<UUID> validateGuarantorSelection(String saccoId,
@@ -1166,38 +1752,87 @@ public class LoanWorkflowService {
             throw new IllegalArgumentException("Select exactly " + requiredGuarantors + " different guarantors");
         }
 
-        Map<UUID, Member> guarantorsById = memberRepository.findAllById(uniqueGuarantors).stream()
-            .collect(java.util.stream.Collectors.toMap(Member::getId, member -> member, (left, right) -> left));
-
         for (UUID guarantorId : uniqueGuarantors) {
-            if (guarantorId.equals(applicantId)) {
-                throw new IllegalArgumentException("You cannot select yourself as a guarantor");
-            }
-            Member guarantor = guarantorsById.get(guarantorId);
-            if (guarantor == null) {
-                throw new IllegalArgumentException("Guarantor not found");
-            }
-            if (!guarantor.getSaccoId().equals(saccoId) || guarantor.getStatus() != MemberStatus.ACTIVE) {
-                throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
-            }
-            if (!guarantor.isMemberAccess()) {
-                throw new IllegalArgumentException("Guarantor must have member access");
-            }
-            if (!matchesStation(guarantor, stationId)) {
-                throw new IllegalArgumentException("Guarantor must be in the same station");
-            }
-            Optional<String> policyFailure = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReason(
-                saccoId,
-                guarantorId,
-                pendingLoanAmount,
-                product
-            )).orElse(Optional.empty());
-            if (policyFailure.isPresent()) {
-                throw guarantorValidationException(guarantorId, guarantor, policyFailure.get());
-            }
+            validateLocalGuarantor(saccoId, stationId, applicantId, pendingLoanAmount, product, guarantorId);
         }
 
         return uniqueGuarantors;
+    }
+
+    private Member validateLocalGuarantor(String saccoId,
+                                          String stationId,
+                                          UUID applicantId,
+                                          BigDecimal pendingLoanAmount,
+                                          LoanProductSetting product,
+                                          UUID guarantorId) {
+        if (guarantorId == null) {
+            throw new IllegalArgumentException("Guarantor not found");
+        }
+        if (guarantorId.equals(applicantId)) {
+            throw new IllegalArgumentException("You cannot select yourself as a guarantor");
+        }
+        Member guarantor = null;
+        Iterable<Member> matches = memberRepository.findAllById(List.of(guarantorId));
+        if (matches != null) {
+            for (Member match : matches) {
+                if (match != null && guarantorId.equals(match.getId())) {
+                    guarantor = match;
+                    break;
+                }
+            }
+        }
+        if (guarantor == null) {
+            guarantor = memberRepository.findById(guarantorId)
+                .orElseThrow(() -> new IllegalArgumentException("Guarantor not found"));
+        }
+        if (!saccoId.equals(guarantor.getSaccoId()) || guarantor.getStatus() != MemberStatus.ACTIVE) {
+            throw new IllegalArgumentException("Guarantor must be active and in same SACCO");
+        }
+        if (!guarantor.isMemberAccess()) {
+            throw new IllegalArgumentException("Guarantor must have member access");
+        }
+        if (!matchesStation(guarantor, stationId)) {
+            throw new IllegalArgumentException("Guarantor must be in the same station");
+        }
+        Optional<String> policyFailure = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReason(
+            saccoId,
+            guarantorId,
+            pendingLoanAmount,
+            product
+        )).orElse(Optional.empty());
+        if (policyFailure.isPresent()) {
+            throw guarantorValidationException(guarantorId, guarantor, policyFailure.get());
+        }
+        return guarantor;
+    }
+
+    private void validateExternalGuarantor(String saccoId,
+                                           String stationId,
+                                           BigDecimal pendingLoanAmount,
+                                           LoanProductSetting product,
+                                           GuarantorSelection selection) {
+        if (selection.externalMemberNo() == null || selection.externalStationId() == null) {
+            throw new IllegalArgumentException("Foresight member profile is missing member number or station.");
+        }
+        if (!sameStation(selection.externalStationId(), stationId)) {
+            throw new IllegalArgumentException("Guarantor must be in the same station");
+        }
+        DirectOtpFinancialSnapshot snapshot = selection.financialSnapshot();
+        BigDecimal savings = snapshot == null ? BigDecimal.ZERO : snapshot.savingsBalance();
+        int activeLoanCount = snapshot == null ? 0 : snapshot.activeLoanCount();
+        Optional<String> policyFailure = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReasonForExternal(
+            saccoId,
+            stationId,
+            selection.externalMemberNo(),
+            selection.externalStationId(),
+            savings,
+            activeLoanCount,
+            pendingLoanAmount,
+            product
+        )).orElse(Optional.empty());
+        if (policyFailure.isPresent()) {
+            throw new GuarantorValidationException(null, selection.displayName() + ": " + policyFailure.get());
+        }
     }
 
     private GuarantorValidationException guarantorValidationException(Member guarantor, RuntimeException ex) {
@@ -1273,6 +1908,96 @@ public class LoanWorkflowService {
         return normalized.isBlank() ? null : normalized;
     }
 
+    private String normalizeDirectOtpSearchBy(String searchBy) {
+        return DIRECT_OTP_SEARCH_EMAIL.equalsIgnoreCase(String.valueOf(searchBy).trim())
+            ? DIRECT_OTP_SEARCH_EMAIL
+            : DIRECT_OTP_SEARCH_PHONE;
+    }
+
+    private String normalizeDirectOtpLookupValue(String value, String mode) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            return null;
+        }
+        if (DIRECT_OTP_SEARCH_EMAIL.equals(mode)) {
+            String email = normalized.toLowerCase(Locale.ROOT);
+            return email.contains("@") ? email : null;
+        }
+        String phone = TanzaniaPhoneNumber.normalizeOptional(normalized);
+        return phone == null ? null : "+" + phone;
+    }
+
+    private String selectionToken(GuarantorSelection selection) {
+        if (selection.localMemberId() != null
+            && selection.lookupBy() == null
+            && selection.lookupValue() == null
+            && selection.externalMemberNo() == null
+            && selection.email() == null
+            && selection.phone() == null) {
+            return selection.localMemberId().toString();
+        }
+        try {
+            return objectMapper.writeValueAsString(selectionPayload(selection));
+        } catch (JacksonException ex) {
+            throw new IllegalArgumentException("Failed to save selected guarantor", ex);
+        }
+    }
+
+    private String financialSnapshotJson(DirectOtpFinancialSnapshot snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("savingsBalance", snapshot.savingsBalance());
+        data.put("sharesBalance", snapshot.sharesBalance());
+        data.put("depositsBalance", snapshot.depositsBalance());
+        data.put("activeLoanCount", snapshot.activeLoanCount());
+        data.put("paidLoanCount", snapshot.paidLoanCount());
+        data.put("savingsInvestmentCount", snapshot.savingsInvestmentCount());
+        data.put("sharesInvestmentCount", snapshot.sharesInvestmentCount());
+        data.put("depositsInvestmentCount", snapshot.depositsInvestmentCount());
+        data.put("fetchedAt", OffsetDateTime.now().toString());
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (JacksonException ex) {
+            throw new IllegalArgumentException("Failed to save guarantor financial snapshot", ex);
+        }
+    }
+
+    private BigDecimal nullToZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private boolean sameStation(String left, String right) {
+        String normalizedLeft = normalizeStationId(left);
+        String normalizedRight = normalizeStationId(right);
+        return normalizedLeft == null || normalizedRight == null || normalizedLeft.equalsIgnoreCase(normalizedRight);
+    }
+
+    private String profileFullName(ForesightMemberProfile profile) {
+        if (profile == null) {
+            return "Guarantor";
+        }
+        String otherName = normalizeOptional(profile.otherName());
+        String surname = normalizeOptional(profile.surname());
+        String joined = List.of(otherName, surname).stream()
+            .filter(Objects::nonNull)
+            .collect(java.util.stream.Collectors.joining(" "));
+        return firstNonBlank(joined, profile.memberNo(), "Guarantor");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
     private String coalesceStationId(String primaryStationId, String fallbackStationId) {
         String normalizedPrimary = normalizeStationId(primaryStationId);
         return normalizedPrimary != null ? normalizedPrimary : normalizeStationId(fallbackStationId);
@@ -1288,21 +2013,27 @@ public class LoanWorkflowService {
 
     private void refreshGuarantorRequestsForSubmission(LoanApplication app,
                                                        UUID applicantId,
-                                                       List<UUID> guarantorIds) {
-        List<UUID> uniqueGuarantors = normalizeGuarantorSelection(app, applicantId, guarantorIds);
-
+                                                       List<GuarantorSelection> guarantors) {
+        List<GuarantorSelection> uniqueGuarantors = guarantors == null ? List.of() : guarantors;
         guarantorRequestRepository.deleteByLoanApplicationId(app.getId());
         guarantorRequestRepository.flush();
 
-        for (UUID guarantorId : uniqueGuarantors) {
-            GuarantorRequest request = guarantorRequestRepository.findByLoanApplicationIdAndGuarantorMemberId(app.getId(), guarantorId)
-                .orElseGet(() -> GuarantorRequest.builder()
-                    .id(UUID.randomUUID())
-                    .loanApplicationId(app.getId())
-                    .guarantorMemberId(guarantorId)
-                    .createdAt(OffsetDateTime.now())
-                    .build());
+        for (GuarantorSelection selection : uniqueGuarantors) {
+            UUID guarantorId = selection.localMemberId();
+            GuarantorRequest request = GuarantorRequest.builder()
+                .id(UUID.randomUUID())
+                .loanApplicationId(app.getId())
+                .guarantorMemberId(guarantorId)
+                .createdAt(OffsetDateTime.now())
+                .build();
 
+            request.setGuarantorSource(selection.source());
+            request.setExternalMemberNo(selection.externalMemberNo());
+            request.setExternalStationId(selection.externalStationId());
+            request.setExternalFullName(selection.fullName());
+            request.setExternalEmail(selection.email());
+            request.setExternalPhone(selection.phone());
+            request.setExternalFinancialSnapshot(financialSnapshotJson(selection.financialSnapshot()));
             request.setStatus(GuarantorRequestStatus.PENDING);
             request.setRequestedAmount(null);
             request.setCommittedAmount(null);
@@ -1312,7 +2043,7 @@ public class LoanWorkflowService {
             request.setDecidedAt(null);
             guarantorRequestRepository.save(request);
 
-            if (!isDirectOtpGuarantorApproval(app)) {
+            if (guarantorId != null && !isDirectOtpGuarantorApproval(app)) {
                 outboxService.enqueue("GUARANTOR_REQUEST", request.getId(), "GUARANTOR_REQUEST_ASSIGNED", guarantorId,
                     applicantId, app.getSaccoId(), app.getStationId(),
                     Map.of(
@@ -1648,5 +2379,180 @@ public class LoanWorkflowService {
         boolean eligible,
         String disabledReason
     ) {
+    }
+
+    public record DirectOtpGuarantorCandidate(
+        String source,
+        UUID localMemberId,
+        String selectionKey,
+        String selectionToken,
+        String memberNo,
+        String stationId,
+        String saccoName,
+        String fullName,
+        String email,
+        String phone,
+        BigDecimal savingsBalance,
+        BigDecimal sharesBalance,
+        BigDecimal depositsBalance,
+        int activeLoanCount,
+        int paidLoanCount,
+        List<DirectOtpLoanRow> activeLoans,
+        List<DirectOtpLoanRow> paidLoans,
+        boolean eligible,
+        String disabledReason,
+        String lookupBy,
+        String lookupValue
+    ) {
+    }
+
+    public record DirectOtpLoanRow(
+        String loanId,
+        String description,
+        String disbursedDate,
+        BigDecimal requestedAmount,
+        BigDecimal disbursedAmount,
+        BigDecimal totalInterest
+    ) {
+    }
+
+    public record DirectOtpLoanDetails(
+        List<DirectOtpPaymentSummaryRow> summaries,
+        List<DirectOtpPaymentTransactionRow> transactions
+    ) {
+    }
+
+    public record DirectOtpPaymentSummaryRow(
+        String loanId,
+        String description,
+        BigDecimal requestedAmount,
+        BigDecimal disbursedAmount,
+        BigDecimal totalPrincipalPaid,
+        BigDecimal totalInterestPaid,
+        BigDecimal outstandingPrincipal,
+        BigDecimal outstandingInterest,
+        BigDecimal totalOutstanding,
+        String lastPaymentDate
+    ) {
+    }
+
+    public record DirectOtpPaymentTransactionRow(
+        String receiptDate,
+        BigDecimal principalPaid,
+        BigDecimal interestPaid,
+        BigDecimal totalPaid
+    ) {
+    }
+
+    private record CandidateResolution(GuarantorSelection selection, String disabledReason) {
+    }
+
+    private record DirectOtpFinancialSnapshot(
+        BigDecimal savingsBalance,
+        BigDecimal sharesBalance,
+        BigDecimal depositsBalance,
+        List<ForesightActiveLoan> activeLoans,
+        List<ForesightActiveLoan> paidLoans,
+        int savingsInvestmentCount,
+        int sharesInvestmentCount,
+        int depositsInvestmentCount
+    ) {
+        private DirectOtpFinancialSnapshot {
+            activeLoans = activeLoans == null ? List.of() : activeLoans;
+            paidLoans = paidLoans == null ? List.of() : paidLoans;
+        }
+
+        int activeLoanCount() {
+            return activeLoans.size();
+        }
+
+        int paidLoanCount() {
+            return paidLoans.size();
+        }
+    }
+
+    private record GuarantorSelection(
+        String source,
+        UUID localMemberId,
+        String externalMemberNo,
+        String externalStationId,
+        String fullName,
+        String email,
+        String phone,
+        String lookupBy,
+        String lookupValue,
+        DirectOtpFinancialSnapshot financialSnapshot
+    ) {
+        private GuarantorSelection {
+            source = GUARANTOR_SOURCE_FORESIGHT.equalsIgnoreCase(String.valueOf(source))
+                ? GUARANTOR_SOURCE_FORESIGHT
+                : GUARANTOR_SOURCE_LMS;
+        }
+
+        String identityKey() {
+            if (localMemberId != null) {
+                return GUARANTOR_SOURCE_LMS + ":" + localMemberId;
+            }
+            return GUARANTOR_SOURCE_FORESIGHT + ":"
+                + safeLower(externalStationId)
+                + ":"
+                + safeLower(externalMemberNo);
+        }
+
+        String displayName() {
+            return first(fullName, externalMemberNo, "Guarantor");
+        }
+
+        GuarantorSelection withMember(Member member) {
+            if (member == null) {
+                return this;
+            }
+            return new GuarantorSelection(
+                source,
+                member.getId(),
+                first(externalMemberNo, member.getMemberNo()),
+                first(externalStationId, member.getStationId()),
+                first(fullName, member.getFullName()),
+                email,
+                phone,
+                lookupBy,
+                lookupValue,
+                financialSnapshot
+            );
+        }
+
+        GuarantorSelection asLocal(Member member) {
+            if (member == null) {
+                return this;
+            }
+            return new GuarantorSelection(
+                GUARANTOR_SOURCE_LMS,
+                member.getId(),
+                first(externalMemberNo, member.getMemberNo()),
+                first(externalStationId, member.getStationId()),
+                first(fullName, member.getFullName()),
+                email,
+                phone,
+                lookupBy,
+                lookupValue,
+                financialSnapshot
+            );
+        }
+
+        private static String safeLower(String value) {
+            return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        }
+
+        private static String first(String... values) {
+            if (values == null) {
+                return "";
+            }
+            for (String value : values) {
+                if (value != null && !value.isBlank()) {
+                    return value.trim();
+                }
+            }
+            return "";
+        }
     }
 }

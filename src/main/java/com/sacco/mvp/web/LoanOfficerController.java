@@ -253,7 +253,7 @@ public class LoanOfficerController {
         List<BoardReview> stageReviews = boardService.reviewsForLoan(id, STAGE);
         List<GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
         List<Member> guarantorMembers = memberDirectoryService.findAll(
-            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
+            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()));
         Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
         Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()

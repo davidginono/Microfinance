@@ -317,14 +317,14 @@
             </div>
 
             <div class="loan-guarantor-search-row">
-                <select id="guarantorSearchMode"
+                    <select id="guarantorSearchMode"
                         data-native-select="true"
                         class="fcms-control loan-guarantor-search-mode"
                         aria-label="Guarantor search field">
-                    <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
                     <option value="number"><spring:message code="newloan.guarantors.modeNumber" /></option>
+                    <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
                 </select>
-                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.namePlaceholder' />"
+                <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
                        class="fcms-control loan-guarantor-search-input" />
                 <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action"><spring:message code="common.search" /></button>
                 <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
@@ -338,6 +338,9 @@
                     <button type="button"
                             class="selected-guarantor-chip"
                             data-id="${item.id}"
+                            data-selection-key="${item.selectionKey}"
+                            data-selection-token="${fn:escapeXml(item.selectionToken)}"
+                            data-local-member-id="${item.localMemberId}"
                             data-member-no="${item.memberNo}"
                             data-full-name="${item.fullName}"
                             aria-label="Remove ${item.fullName}">
@@ -1521,15 +1524,84 @@
             const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
             const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
             const msgEnterGuarantorName = "<spring:message code='newloan.js.enterGuarantorName' />";
+            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a valid phone number to search.' />";
+            const msgEnterGuarantorEmail = "<spring:message code='newloan.js.enterGuarantorEmail' text='Enter a valid email address to search.' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
+            const msgDirectOtpSearchModeChanged = "<spring:message code='newloan.js.directOtpSearchModeChanged' text='Select guarantors again for this approval mode.' />";
+            const msgLoanDetailsLoading = "<spring:message code='newloan.js.loanDetailsLoading' text='Loading loan details...' />";
+            const msgLoanDetailsUnavailable = "<spring:message code='newloan.js.loanDetailsUnavailable' text='Unable to load loan details right now.' />";
+            const msgLoadLoanDetails = "<spring:message code='newloan.js.loadLoanDetails' text='Details' />";
+            const modeNumberLabel = "<spring:message code='newloan.guarantors.modeNumber' />";
+            const modeNameLabel = "<spring:message code='newloan.guarantors.modeName' />";
+            const modePhoneLabel = "<spring:message code='newloan.guarantors.modePhone' text='Phone Number' />";
+            const modeEmailLabel = "<spring:message code='newloan.guarantors.modeEmail' text='Email' />";
             const numberPlaceholder = "<spring:message code='newloan.guarantors.placeholder' />";
             const namePlaceholder = "<spring:message code='newloan.guarantors.namePlaceholder' />";
+            const phonePlaceholder = "<spring:message code='newloan.guarantors.phonePlaceholder' text='Enter guarantor phone number' />";
+            const emailPlaceholder = "<spring:message code='newloan.guarantors.emailPlaceholder' text='Enter guarantor email address' />";
             const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
             const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
+            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Direct OTP searches the member profile portal by phone number.' />";
+            const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the member profile portal by email address.' />";
+            const directOtpLoanDetailsEndpoint = "/app/guarantors/direct-otp/loan-details";
+            const searchConfigurations = {
+                LOGIN: [
+                    { value: "number", label: modeNumberLabel, placeholder: numberPlaceholder, hint: numberHint },
+                    { value: "name", label: modeNameLabel, placeholder: namePlaceholder, hint: nameHint }
+                ],
+                DIRECT_OTP: [
+                    { value: "phone", label: modePhoneLabel, placeholder: phonePlaceholder, hint: phoneHint },
+                    { value: "email", label: modeEmailLabel, placeholder: emailPlaceholder, hint: emailHint }
+                ]
+            };
+
+            function escapeHtml(value) {
+                return String(value == null ? "" : value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function itemKey(item) {
+                return item.selectionKey || item.id;
+            }
+
+            function localMemberId(item) {
+                if (item.localMemberId) {
+                    return item.localMemberId;
+                }
+                if (item.source === "LMS" && /^[0-9a-f-]{36}$/i.test(item.id || "")) {
+                    return item.id;
+                }
+                return "";
+            }
+
+            function currentApprovalMode() {
+                return approvalModeInput && approvalModeInput.value === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
+            }
+
+            function configureSearchForApprovalMode(mode, preserveValue) {
+                const config = searchConfigurations[mode] || searchConfigurations.LOGIN;
+                const current = preserveValue ? searchMode.value : "";
+                searchMode.innerHTML = "";
+                config.forEach(function (item) {
+                    const option = document.createElement("option");
+                    option.value = item.value;
+                    option.textContent = item.label;
+                    searchMode.appendChild(option);
+                });
+                const selectedOption = config.find(function (item) { return item.value === current; }) || config[0];
+                searchMode.value = selectedOption.value;
+                searchInput.placeholder = selectedOption.placeholder;
+                hint.textContent = selectedOption.hint;
+            }
 
             function setApprovalMode(mode) {
+                const previous = currentApprovalMode();
                 const normalized = mode === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
                 if (approvalModeInput) {
                     approvalModeInput.value = normalized;
@@ -1539,6 +1611,14 @@
                     button.setAttribute("aria-pressed", selectedMode ? "true" : "false");
                     button.classList.toggle("is-active", selectedMode);
                 });
+                configureSearchForApprovalMode(normalized, previous === normalized);
+                searchInput.value = "";
+                hideDropdown();
+                if (previous !== normalized && selected.size > 0) {
+                    selected.clear();
+                    renderSelected();
+                    hint.textContent = msgDirectOtpSearchModeChanged;
+                }
             }
 
             approvalModeButtons.forEach(function (button) {
@@ -1554,11 +1634,11 @@
 
             function renderHiddenInputs() {
                 hiddenInputs.innerHTML = "";
-                Array.from(selected.keys()).forEach(function (id) {
+                Array.from(selected.values()).forEach(function (item) {
                     const input = document.createElement("input");
                     input.type = "hidden";
-                    input.name = "guarantorIds";
-                    input.value = id;
+                    input.name = "guarantorSelections";
+                    input.value = item.selectionToken || item.localMemberId || item.id;
                     hiddenInputs.appendChild(input);
                 });
             }
@@ -1568,13 +1648,13 @@
                 Array.from(selected.values()).forEach(function (item) {
                     const chip = document.createElement("button");
                     chip.type = "button";
-                    const hasServerError = serverGuarantorErrorId && item.id === serverGuarantorErrorId;
+                    const hasServerError = serverGuarantorErrorId && item.localMemberId === serverGuarantorErrorId;
                     chip.className = "selected-guarantor-chip" + (hasServerError ? " has-error" : "");
-                    chip.dataset.guarantorId = item.id;
+                    chip.dataset.guarantorId = item.localMemberId || item.id;
                     chip.setAttribute("aria-label", "Remove " + item.fullName);
-                    chip.innerHTML = "<span>" + item.memberNo + " - " + item.fullName + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
+                    chip.innerHTML = "<span>" + escapeHtml(item.memberNo) + " - " + escapeHtml(item.fullName) + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
                     chip.addEventListener("click", function () {
-                        selected.delete(item.id);
+                        selected.delete(item.selectionKey || item.id);
                         renderSelected();
                     });
                     selectedContainer.appendChild(chip);
@@ -1601,8 +1681,12 @@
             }
 
             Array.from(document.querySelectorAll(".selected-guarantor-chip")).forEach(function (chip) {
-                selected.set(chip.dataset.id, {
+                const key = chip.dataset.selectionKey || chip.dataset.id;
+                selected.set(key, {
                     id: chip.dataset.id,
+                    selectionKey: key,
+                    selectionToken: chip.dataset.selectionToken || chip.dataset.id,
+                    localMemberId: chip.dataset.localMemberId || "",
                     memberNo: chip.dataset.memberNo,
                     fullName: chip.dataset.fullName
                 });
@@ -1615,6 +1699,94 @@
                 dropdown.innerHTML = "";
             }
 
+            function selectCandidate(item) {
+                if (selected.size >= required) {
+                    hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
+                    hideDropdown();
+                    return;
+                }
+                const key = itemKey(item);
+                selected.set(key, {
+                    id: item.id,
+                    selectionKey: key,
+                    selectionToken: item.selectionToken || item.id,
+                    localMemberId: localMemberId(item),
+                    memberNo: item.memberNo || "-",
+                    fullName: item.fullName || "Guarantor"
+                });
+                renderSelected();
+                searchInput.value = "";
+                hint.textContent = msgGuarantorSelected;
+                hideDropdown();
+            }
+
+            function directOtpLoanRows(item) {
+                const rows = [];
+                (item.activeLoans || []).forEach(function (loan) {
+                    rows.push(Object.assign({ loanState: "Active" }, loan));
+                });
+                (item.paidLoans || []).forEach(function (loan) {
+                    rows.push(Object.assign({ loanState: "Paid" }, loan));
+                });
+                if (!rows.length) {
+                    return "";
+                }
+                return "<div class='mt-3 space-y-1'>" + rows.slice(0, 4).map(function (loan) {
+                    return "<div class='flex flex-wrap items-center justify-between gap-2 border border-slate-200 bg-white px-2 py-1 text-xs'>"
+                        + "<span><span class='font-semibold'>" + escapeHtml(loan.loanState) + "</span> " + escapeHtml(loan.loanId || "-") + " - " + escapeHtml(loan.description || "-") + "</span>"
+                        + "<button type='button' class='app-btn btn-neutral px-2 py-1 text-xs' data-direct-otp-loan-details data-loan-id='" + escapeHtml(loan.loanId || "") + "'>" + escapeHtml(msgLoadLoanDetails) + "</button>"
+                        + "<div class='hidden w-full border-t border-slate-100 pt-2 text-xs text-slate-600' data-direct-otp-loan-detail-panel></div>"
+                        + "</div>";
+                }).join("") + "</div>";
+            }
+
+            function directOtpPreview(item) {
+                return "<div class='mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3'>"
+                    + "<span><strong>Station:</strong> " + escapeHtml(item.stationId || item.saccoName || "-") + "</span>"
+                    + "<span><strong>Savings:</strong> " + escapeHtml(item.savingsBalance || "-") + "</span>"
+                    + "<span><strong>Shares:</strong> " + escapeHtml(item.sharesBalance || "-") + "</span>"
+                    + "<span><strong>Deposits:</strong> " + escapeHtml(item.depositsBalance || "-") + "</span>"
+                    + "<span><strong>Active Loans:</strong> " + escapeHtml(item.activeLoanCount || 0) + "</span>"
+                    + "<span><strong>Paid Loans:</strong> " + escapeHtml(item.paidLoanCount || 0) + "</span>"
+                    + "</div>"
+                    + directOtpLoanRows(item);
+            }
+
+            async function loadDirectOtpLoanDetails(item, loanId, panel) {
+                if (!loanId) {
+                    return;
+                }
+                panel.classList.remove("hidden");
+                panel.textContent = msgLoanDetailsLoading;
+                const query = new URLSearchParams({
+                    q: item.lookupValue || searchInput.value.trim(),
+                    searchBy: item.lookupBy || searchMode.value,
+                    loanId: loanId
+                });
+                const response = await fetch(directOtpLoanDetailsEndpoint + "?" + query.toString(), {
+                    headers: {"X-Requested-With":"XMLHttpRequest"}
+                });
+                if (!response.ok) {
+                    throw new Error("Unable to load loan details");
+                }
+                const data = await response.json();
+                const summaries = data.summaries || [];
+                const transactions = data.transactions || [];
+                const summaryHtml = summaries.length
+                    ? summaries.map(function (summary) {
+                        return "<div><strong>Outstanding:</strong> " + escapeHtml(summary.totalOutstanding || "-")
+                            + " <span class='text-slate-400'>Principal " + escapeHtml(summary.outstandingPrincipal || "-")
+                            + ", Interest " + escapeHtml(summary.outstandingInterest || "-") + "</span></div>";
+                    }).join("")
+                    : "<div>No payment summary found.</div>";
+                const transactionHtml = transactions.length
+                    ? "<div class='mt-1'>" + transactions.slice(0, 3).map(function (tx) {
+                        return escapeHtml(tx.receiptDate || "-") + ": " + escapeHtml(tx.totalPaid || "-");
+                    }).join(" | ") + "</div>"
+                    : "";
+                panel.innerHTML = summaryHtml + transactionHtml;
+            }
+
             function showResults(items) {
                 dropdown.innerHTML = "";
                 if (!items.length) {
@@ -1624,31 +1796,32 @@
                     dropdown.appendChild(empty);
                 } else {
                     items.forEach(function (item) {
-                        const row = document.createElement("button");
-                        row.type = "button";
-                        const eligible = item.eligible !== "false";
-                        row.className = "block w-full border-b border-slate-100 px-4 py-3 text-left text-sm " + (eligible ? "text-slate-700 hover:bg-slate-50" : "cursor-not-allowed bg-slate-50 text-slate-400");
-                        row.innerHTML = "<span class='block font-semibold'>" + item.memberNo + " - " + item.fullName + "</span>"
-                            + (!eligible && item.disabledReason ? "<span class='mt-1 block text-xs text-rose-600'>" + item.disabledReason + "</span>" : "");
-                        row.addEventListener("click", function () {
+                        const row = document.createElement("div");
+                        const eligible = item.eligible !== "false" && item.eligible !== false;
+                        const directOtp = currentApprovalMode() === "DIRECT_OTP";
+                        row.className = "border-b border-slate-100 px-4 py-3 text-sm " + (eligible ? "text-slate-700" : "bg-slate-50 text-slate-400");
+                        row.innerHTML = "<div class='flex flex-wrap items-start justify-between gap-3'>"
+                            + "<div><span class='block font-semibold'>" + escapeHtml(item.memberNo || "-") + " - " + escapeHtml(item.fullName || "Guarantor") + "</span>"
+                            + (!eligible && item.disabledReason ? "<span class='mt-1 block text-xs text-rose-600'>" + escapeHtml(item.disabledReason) + "</span>" : "")
+                            + "</div>"
+                            + "<button type='button' class='app-btn " + (eligible ? "btn-primary" : "btn-neutral") + " px-3 py-1 text-xs' data-select-guarantor " + (eligible ? "" : "disabled") + ">Select</button>"
+                            + "</div>"
+                            + (directOtp ? directOtpPreview(item) : "");
+                        row.querySelector("[data-select-guarantor]").addEventListener("click", function () {
                             if (!eligible) {
                                 hint.textContent = item.disabledReason || "<spring:message code='newloan.js.guarantorDisabled' text='This guarantor is disabled by SACCO policy.' />";
                                 return;
                             }
-                            if (selected.size >= required) {
-                                hint.textContent = msgOnlySelectGuarantors.replace("{0}", required);
-                                hideDropdown();
-                                return;
-                            }
-                            selected.set(item.id, {
-                                id: item.id,
-                                memberNo: item.memberNo,
-                                fullName: item.fullName
+                            selectCandidate(item);
+                        });
+                        row.querySelectorAll("[data-direct-otp-loan-details]").forEach(function (button) {
+                            button.addEventListener("click", function () {
+                                const panel = button.parentElement.querySelector("[data-direct-otp-loan-detail-panel]");
+                                loadDirectOtpLoanDetails(item, button.dataset.loanId, panel).catch(function () {
+                                    panel.classList.remove("hidden");
+                                    panel.textContent = msgLoanDetailsUnavailable;
+                                });
                             });
-                            renderSelected();
-                            searchInput.value = "";
-                            hint.textContent = msgGuarantorSelected;
-                            hideDropdown();
                         });
                         dropdown.appendChild(row);
                     });
@@ -1657,9 +1830,24 @@
             }
 
             async function runSearch() {
-                const mode = searchMode.value === "name" ? "name" : "number";
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
                 let term = searchInput.value.trim();
-                if (mode === "name") {
+                if (approvalMode === "DIRECT_OTP" && mode === "email") {
+                    term = term.toLowerCase();
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(term)) {
+                        hint.textContent = msgEnterGuarantorEmail;
+                        hideDropdown();
+                        return;
+                    }
+                } else if (approvalMode === "DIRECT_OTP") {
+                    const digits = term.replace(/[^0-9]/g, "");
+                    if (!(digits.length === 10 || digits.length === 12)) {
+                        hint.textContent = msgEnterGuarantorPhone;
+                        hideDropdown();
+                        return;
+                    }
+                } else if (mode === "name") {
                     term = term.toLowerCase();
                     if (term.length < 2) {
                         hint.textContent = msgEnterGuarantorName;
@@ -1677,12 +1865,19 @@
                     }
                 }
                 const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
-                const response = await fetch("/app/guarantors/search?" + query.toString(), {
+                const endpoint = approvalMode === "DIRECT_OTP" ? "/app/guarantors/direct-otp/search" : "/app/guarantors/search";
+                const response = await fetch(endpoint + "?" + query.toString(), {
                     headers: {"X-Requested-With":"XMLHttpRequest"
                     }
                 });
-                const data = response.ok ? await response.json() : [];
-                const filtered = data.filter(function (item) { return !selected.has(item.id); });
+                const payload = await response.json().catch(function () { return approvalMode === "DIRECT_OTP" ? { items: [] } : []; });
+                if (!response.ok) {
+                    hint.textContent = payload.message || msgUnableSearchGuarantors;
+                    showResults([]);
+                    return;
+                }
+                const data = Array.isArray(payload) ? payload : (payload.items || []);
+                const filtered = data.filter(function (item) { return !selected.has(itemKey(item)); });
                 hint.textContent = filtered.length + " " + msgMatchingMembers;
                 showResults(filtered);
             }
@@ -1695,10 +1890,12 @@
             });
 
             searchMode.addEventListener("change", function () {
-                const mode = searchMode.value === "name" ? "name" : "number";
+                const mode = searchMode.value;
+                const config = (searchConfigurations[currentApprovalMode()] || searchConfigurations.LOGIN)
+                    .find(function (item) { return item.value === mode; });
                 searchInput.value = "";
-                searchInput.placeholder = mode === "name" ? namePlaceholder : numberPlaceholder;
-                hint.textContent = mode === "name" ? nameHint : numberHint;
+                searchInput.placeholder = config ? config.placeholder : numberPlaceholder;
+                hint.textContent = config ? config.hint : numberHint;
                 hideDropdown();
                 searchInput.focus();
             });

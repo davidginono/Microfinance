@@ -8,6 +8,15 @@ public record ForesightMemberProfile(
     String otherName,
     String memberNo,
     String stationId,
-    String saccoName
+    String saccoName,
+    String phoneNumber,
+    String email
 ) {
+    public ForesightMemberProfile(String surname,
+                                  String otherName,
+                                  String memberNo,
+                                  String stationId,
+                                  String saccoName) {
+        this(surname, otherName, memberNo, stationId, saccoName, null, null);
+    }
 }

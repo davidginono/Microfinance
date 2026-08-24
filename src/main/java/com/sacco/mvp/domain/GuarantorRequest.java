@@ -8,9 +8,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "guarantor_requests", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"loan_application_id", "guarantor_member_id"})
-})
+@Table(name = "guarantor_requests")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,8 +21,30 @@ public class GuarantorRequest {
     @Column(name = "loan_application_id", nullable = false)
     private UUID loanApplicationId;
 
-    @Column(name = "guarantor_member_id", nullable = false)
+    @Column(name = "guarantor_member_id")
     private UUID guarantorMemberId;
+
+    @Builder.Default
+    @Column(name = "guarantor_source", nullable = false)
+    private String guarantorSource = "LMS";
+
+    @Column(name = "external_member_no")
+    private String externalMemberNo;
+
+    @Column(name = "external_station_id")
+    private String externalStationId;
+
+    @Column(name = "external_full_name")
+    private String externalFullName;
+
+    @Column(name = "external_email")
+    private String externalEmail;
+
+    @Column(name = "external_phone")
+    private String externalPhone;
+
+    @Column(name = "external_financial_snapshot", columnDefinition = "jsonb")
+    private String externalFinancialSnapshot;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

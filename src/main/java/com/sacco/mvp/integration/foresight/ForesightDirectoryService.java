@@ -50,8 +50,13 @@ public class ForesightDirectoryService {
         return lookupMemberProfile("/member-profile-v2", "email", email);
     }
 
+    public MemberProfileLookupResult lookupMemberProfileByEmail(String email) {
+        log.info("Foresight member-profile lookup by email started");
+        return lookupMemberProfile("/member-profile", "email", email);
+    }
+
     public MemberProfileLookupResult lookupMemberProfileByPhone(String phoneNumber) {
-        log.info("Foresight staff-precheck member-profile lookup by phone started: {}", phoneNumber);
+        log.info("Foresight member-profile lookup by phone started");
         return lookupMemberProfile("/member-profile", "phoneNumber", phoneNumber);
     }
 
@@ -116,6 +121,67 @@ public class ForesightDirectoryService {
         }
     }
 
+    public List<ForesightActiveLoan> fetchPaidLoans(String memberNumber, String stationId) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/paid-loans/records")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .build()
+                .toUri();
+            log.info("Foresight paid-loans lookup started: {}", requestUri);
+            List<ForesightActiveLoan> loans = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightActiveLoan>>() {});
+            log.info("Foresight paid-loans lookup completed: rows={}", loans == null ? 0 : loans.size());
+            return loans == null ? List.of() : loans;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight paid-loans lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External paid loans service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External paid loans lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight paid-loans lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external paid loans service.", ex);
+        }
+    }
+
+    public List<ForesightInvestment> fetchInvestments(String memberNumber, String stationId, int investmentCode) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/investments")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .queryParam("investmentCode", investmentCode)
+                .build()
+                .toUri();
+            log.info("Foresight investments lookup started: {}", requestUri);
+            List<ForesightInvestment> investments = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightInvestment>>() {});
+            log.info("Foresight investments lookup completed: investmentCode={}, rows={}",
+                investmentCode,
+                investments == null ? 0 : investments.size());
+            return investments == null ? List.of() : investments;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight investments lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External investments service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External investments lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight investments lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external investments service.", ex);
+        }
+    }
+
     public List<ForesightLoanPaymentSummary> fetchLoanPaymentSummary(String memberNumber, String stationId, String loanId) {
         try {
             URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
@@ -145,6 +211,38 @@ public class ForesightDirectoryService {
         } catch (ResourceAccessException ex) {
             log.warn("Foresight loan-payment-summary lookup could not reach the external directory: {}", ex.getMessage());
             throw new UpstreamAvailabilityException("Unable to reach the external loan payment summary service.", ex);
+        }
+    }
+
+    public List<ForesightLoanPaymentTransaction> fetchLoanPaymentTransactions(String memberNumber, String stationId, String loanId) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/loan-payment-transactions")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .queryParam("loanId", loanId)
+                .build()
+                .toUri();
+            log.info("Foresight loan-payment-transactions lookup started: {}", requestUri);
+            List<ForesightLoanPaymentTransaction> transactions = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightLoanPaymentTransaction>>() {});
+            log.info("Foresight loan-payment-transactions lookup completed: loanId={}, rows={}",
+                loanId,
+                transactions == null ? 0 : transactions.size());
+            return transactions == null ? List.of() : transactions;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight loan-payment-transactions lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External loan payment transaction service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External loan payment transactions lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight loan-payment-transactions lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external loan payment transaction service.", ex);
         }
     }
 

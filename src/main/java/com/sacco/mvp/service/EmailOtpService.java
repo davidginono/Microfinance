@@ -76,7 +76,20 @@ public class EmailOtpService {
                                                String saccoId,
                                                String stationId,
                                                String phone) {
-        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
+    }
+
+    @Transactional
+    public OtpIssueResult issueOtpWithDeliveryContact(String tokenKey,
+                                                      String deliveryEmail,
+                                                      EmailOtpPurpose purpose,
+                                                      UUID memberId,
+                                                      String subject,
+                                                      String introMessage,
+                                                      String saccoId,
+                                                      String stationId,
+                                                      String phone) {
+        return issueOtpWithMetadata(tokenKey, deliveryEmail, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false);
     }
 
     @Transactional
@@ -85,10 +98,11 @@ public class EmailOtpService {
                                                                      UUID memberId,
                                                                      String subject,
                                                                      String introMessage) {
-        return issueOtpWithMetadata(email, purpose, memberId, subject, introMessage, null, null, null, true).deliveryReceipt();
+        return issueOtpWithMetadata(email, email, purpose, memberId, subject, introMessage, null, null, null, true).deliveryReceipt();
     }
 
-    private OtpIssueResult issueOtpWithMetadata(String email,
+    private OtpIssueResult issueOtpWithMetadata(String tokenKey,
+                                                String deliveryEmail,
                                                 EmailOtpPurpose purpose,
                                                 UUID memberId,
                                                 String subject,
@@ -97,10 +111,11 @@ public class EmailOtpService {
                                                 String stationId,
                                                 String phone,
                                                 boolean emailOnly) {
-        String normalizedEmail = normalizeEmail(email);
+        String normalizedTokenKey = normalizeEmail(tokenKey);
+        String normalizedDeliveryEmail = normalizeEmail(deliveryEmail);
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            java.util.List<EmailOtpToken> activeTokens = activeTokens(normalizedEmail, purpose, memberId);
+            java.util.List<EmailOtpToken> activeTokens = activeTokens(normalizedTokenKey, purpose, memberId);
             EmailOtpToken existingToken = activeTokens.stream()
                 .filter(token -> token.getExpiresAt() != null && token.getExpiresAt().isAfter(now))
                 .max(java.util.Comparator.comparing(EmailOtpToken::getCreatedAt))
@@ -120,7 +135,7 @@ public class EmailOtpService {
             OffsetDateTime expiresAt = now.plusMinutes(Math.max(1, otpTtlMinutes));
             EmailOtpToken token = EmailOtpToken.builder()
                 .id(UUID.randomUUID())
-                .email(normalizedEmail)
+                .email(normalizedTokenKey)
                 .purpose(purpose)
                 .memberId(memberId)
                 .codeHash(passwordEncoder.encode(code))
@@ -132,7 +147,7 @@ public class EmailOtpService {
 
             StationOtpDeliveryService.DeliveryReceipt receipt = emailOnly
                 ? stationOtpDeliveryService.deliverEmailOnly(
-                    normalizedEmail,
+                    normalizedDeliveryEmail,
                     subject,
                     introMessage,
                     code,
@@ -141,7 +156,7 @@ public class EmailOtpService {
                 : stationOtpDeliveryService.deliver(
                     saccoId,
                     stationId,
-                    normalizedEmail,
+                    normalizedDeliveryEmail,
                     phone,
                     purpose,
                     subject,
@@ -149,10 +164,10 @@ public class EmailOtpService {
                     code,
                     Math.max(1, otpTtlMinutes)
                 );
-            log.info("Issued {} OTP for {}", purpose, normalizedEmail);
+            log.info("Issued {} OTP for {}", purpose, normalizedTokenKey);
             return OtpIssueResult.issued(receipt, expiresAt, secondsUntil(now, expiresAt), resendCount);
         } catch (DataAccessException ex) {
-            log.error("Unable to issue {} OTP for {} due to a data access problem", purpose, normalizedEmail, ex);
+            log.error("Unable to issue {} OTP for {} due to a data access problem", purpose, normalizedTokenKey, ex);
             throw new IllegalStateException(
                 "OTP setup needs a quick application restart before this action can continue. Restart the app once, then try again."
             );

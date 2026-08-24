@@ -114,6 +114,51 @@ public class LoanQualificationPolicyService {
         return Optional.empty();
     }
 
+    public Optional<String> guarantorFailureReasonForExternal(String saccoId,
+                                                              String stationId,
+                                                              String externalMemberNo,
+                                                              String externalStationId,
+                                                              BigDecimal savings,
+                                                              int activeLoanCount,
+                                                              BigDecimal pendingGuaranteedAmount,
+                                                              LoanProductSetting product) {
+        SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
+        if (settings == null) {
+            return Optional.empty();
+        }
+        ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
+        BigDecimal minSavings = product == null || !product.isGuarantorMinSavingsCheckRequired()
+            ? null
+            : positive(product.getGuarantorMinimumSavings());
+        if (minSavings != null && nullToZero(savings).compareTo(minSavings) < 0) {
+            return Optional.of("Disabled: guarantor savings are "
+                + formatAmount(savings)
+                + ", below the required minimum of "
+                + formatAmount(minSavings)
+                + " for this loan product.");
+        }
+        if (!policy.guarantorWithActiveLoanAllowed() && activeLoanCount > 0) {
+            return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
+        }
+        Integer maxGuarantees = positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount());
+        if (maxGuarantees != null && externalMemberNo != null && externalStationId != null) {
+            long currentGuarantees = guarantorRequestRepository.countExternalActiveGuarantees(
+                externalMemberNo,
+                externalStationId,
+                saccoId,
+                stationId
+            );
+            long projectedGuarantees = currentGuarantees + (pendingGuaranteedAmount == null ? 0 : 1);
+            if (pendingGuaranteedAmount != null && projectedGuarantees > maxGuarantees) {
+                return Optional.of("Disabled: approving this loan would exceed the station guarantor guarantee count limit.");
+            }
+            if (currentGuarantees >= maxGuarantees) {
+                return Optional.of("Disabled: active guarantee count has reached the station guarantor limit.");
+            }
+        }
+        return Optional.empty();
+    }
+
     public void assertGuarantorEligible(String saccoId, UUID guarantorMemberId) {
         assertGuarantorEligible(saccoId, guarantorMemberId, null);
     }

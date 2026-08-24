@@ -265,7 +265,7 @@ public class AccountantController {
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         List<GuarantorRequest> guarantorRequests = loanPresentationService.guarantorRequests(id);
         List<Member> guarantorMembers = memberDirectoryService.findAll(
-            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).collect(Collectors.toSet()));
+            guarantorRequests.stream().map(GuarantorRequest::getGuarantorMemberId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()));
         Map<UUID, String> guarantorNames = guarantorMembers.stream()
             .collect(Collectors.toMap(Member::getId, Member::getFullName));
         Map<UUID, Member> guarantorMembersById = guarantorMembers.stream()

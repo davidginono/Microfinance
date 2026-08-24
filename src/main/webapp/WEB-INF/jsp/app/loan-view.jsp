@@ -528,12 +528,16 @@
                         <c:choose>
                             <c:when test="${not empty guarantorNames[req.guarantorMemberId]}">
                                 ${guarantorNames[req.guarantorMemberId]}</c:when>
-                            <c:otherwise>#${fn:substring(req.guarantorMemberId, 0, 8)}</c:otherwise>
+                            <c:when test="${not empty req.externalFullName}">${req.externalFullName}</c:when>
+                            <c:when test="${not empty req.externalMemberNo}">${req.externalMemberNo}</c:when>
+                            <c:when test="${not empty req.guarantorMemberId}">#${fn:substring(req.guarantorMemberId, 0, 8)}</c:when>
+                            <c:otherwise>Guarantor</c:otherwise>
                         </c:choose>
                     </td>
                     <td class="px-3 py-2 align-top">
                         <c:choose>
                             <c:when test="${not empty guarantorMembersById[req.guarantorMemberId] and not empty guarantorMembersById[req.guarantorMemberId].memberNo}">${guarantorMembersById[req.guarantorMemberId].memberNo}</c:when>
+                            <c:when test="${not empty req.externalMemberNo}">${req.externalMemberNo}</c:when>
                             <c:otherwise>-</c:otherwise>
                         </c:choose>
                     </td>
@@ -644,13 +648,17 @@
                                     <c:when test="${not empty guarantorNames[req.guarantorMemberId]}">
                                         ${guarantorNames[req.guarantorMemberId]}
                                     </c:when>
-                                    <c:otherwise>#${fn:substring(req.guarantorMemberId, 0, 8)}</c:otherwise>
+                                    <c:when test="${not empty req.externalFullName}">${req.externalFullName}</c:when>
+                                    <c:when test="${not empty req.externalMemberNo}">${req.externalMemberNo}</c:when>
+                                    <c:when test="${not empty req.guarantorMemberId}">#${fn:substring(req.guarantorMemberId, 0, 8)}</c:when>
+                                    <c:otherwise>Guarantor</c:otherwise>
                                 </c:choose>
                 </div>
                             <div class="mt-1 text-xs text-slate-500">
                                 <spring:message code="member.memberNo" text="Member No" />:
                                 <c:choose>
                                     <c:when test="${not empty guarantorMembersById[req.guarantorMemberId] and not empty guarantorMembersById[req.guarantorMemberId].memberNo}">${guarantorMembersById[req.guarantorMemberId].memberNo}</c:when>
+                                    <c:when test="${not empty req.externalMemberNo}">${req.externalMemberNo}</c:when>
                                     <c:otherwise>-</c:otherwise>
                                 </c:choose>
             </div>

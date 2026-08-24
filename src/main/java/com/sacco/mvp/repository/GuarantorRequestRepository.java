@@ -192,6 +192,26 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
                                @Param("saccoId") String saccoId,
                                @Param("stationId") String stationId);
 
+    @Query("""
+        select count(g)
+        from GuarantorRequest g, LoanApplication l
+        where g.loanApplicationId = l.id
+          and g.guarantorMemberId is null
+          and lower(g.externalMemberNo) = lower(:externalMemberNo)
+          and lower(g.externalStationId) = lower(:externalStationId)
+          and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
+          and l.status in (
+            com.sacco.mvp.domain.LoanStatus.DISBURSED,
+            com.sacco.mvp.domain.LoanStatus.DEFAULTED
+          )
+          and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
+          and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+        """)
+    long countExternalActiveGuarantees(@Param("externalMemberNo") String externalMemberNo,
+                                       @Param("externalStationId") String externalStationId,
+                                       @Param("saccoId") String saccoId,
+                                       @Param("stationId") String stationId);
+
     Optional<GuarantorRequest> findByIdAndGuarantorMemberId(UUID id, UUID guarantorMemberId);
 
     Optional<GuarantorRequest> findByLoanApplicationIdAndGuarantorMemberId(UUID loanApplicationId, UUID guarantorMemberId);
