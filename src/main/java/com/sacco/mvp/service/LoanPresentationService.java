@@ -2051,6 +2051,7 @@ public class LoanPresentationService {
             document.addPage(page);
             stream = new PDPageContentStream(document, page);
             PdfWatermarkRenderer.draw(document, stream, page, saccoLogoImage);
+            drawPageReferenceHeader();
             y = page.getMediaBox().getHeight() - TOP_MARGIN;
         }
 
@@ -2096,6 +2097,17 @@ public class LoanPresentationService {
             y -= 18f;
             writeText("Prepared from the system record for formal review and filing", MARGIN, y, regular, META_SIZE, MUTED_COLOR);
             y -= 20f;
+        }
+
+        private void drawPageReferenceHeader() throws IOException {
+            writeRightAligned(
+                applicationReferenceFooterText(),
+                page.getMediaBox().getWidth() - MARGIN,
+                page.getMediaBox().getHeight() - 24f,
+                bold,
+                SMALL_SIZE,
+                MUTED_COLOR
+            );
         }
 
         private boolean drawSaccoLogo(float x, float y, float size) throws IOException {

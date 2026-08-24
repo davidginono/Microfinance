@@ -807,7 +807,7 @@ class LoanPresentationServiceTest {
     }
 
     @Test
-    void printablePdfRepeatsApplicationReferenceInFooterOnEveryPage() throws IOException {
+    void printablePdfRepeatsApplicationReferenceOnEveryGeneratedPage() throws IOException {
         LoanApplication app = basicPrintableApplication();
         Member applicant = basicApplicant();
         Map<String, Object> formFields = new LinkedHashMap<>();
@@ -838,7 +838,8 @@ class LoanPresentationServiceTest {
                 PDFTextStripper stripper = new PDFTextStripper();
                 stripper.setStartPage(pageNumber);
                 stripper.setEndPage(pageNumber);
-                assertThat(stripper.getText(document)).contains("Application Reference: 503");
+                assertThat(countOccurrences(stripper.getText(document), "Application Reference: 503"))
+                    .isGreaterThanOrEqualTo(2);
             }
         }
     }
@@ -1607,6 +1608,16 @@ class LoanPresentationServiceTest {
         java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(image, "png", output);
         return output.toByteArray();
+    }
+
+    private int countOccurrences(String text, String token) {
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(token, index)) >= 0) {
+            count++;
+            index += token.length();
+        }
+        return count;
     }
 
     private LoanProductWorkflowService.WorkflowDefinition workflow(ApprovalWorkflowStage... stages) {
