@@ -58,7 +58,7 @@
                         <div hidden data-toast-message="${fn:escapeXml(errorMessage)}" data-toast-type="error" data-mfa-email-fallback="${fn:contains(errorMessage, 'SMS OTP')}"></div>
                     </c:if>
                     <c:if test="${param.logout != null}">
-                        <div hidden data-toast-message="Logged out successfully." data-toast-type="success"></div>
+                        <div hidden data-toast-message="Logged out successfully." data-toast-type="success" data-toast-auto-dismiss-ms="4000" data-toast-closeable="false"></div>
                     </c:if>
                     <c:if test="${param.claimed != null and empty loginMessage}">
                         <div hidden data-toast-message="Your account is now active. Sign in as staff to continue." data-toast-type="success"></div>
@@ -254,6 +254,8 @@
             }
             const settings = options || {};
             const offerEmailFallback = settings.mfaEmailFallback === true;
+            const autoDismissMs = Number(settings.autoDismissMs || 0);
+            const closeable = settings.closeable !== false;
             const variant = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
             const icon = variant === 'success'
                 ? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z" clip-rule="evenodd"/></svg>'
@@ -263,10 +265,15 @@
             const toast = document.createElement('div');
             toast.className = 'app-toast-enter auth-notification-bar auth-notification-' + variant;
             toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
+            const closeButtonMarkup = closeable
+                ? '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
+                    '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+                '</button>'
+                : '';
             toast.innerHTML =
                 '<div class="flex items-start gap-3">' +
                     '<div class="mt-0.5 shrink-0">' + icon + '</div>' +
-                    '<div class="min-w-0 flex-1 pr-6">' +
+                    '<div class="min-w-0 flex-1' + (closeable ? ' pr-6' : '') + '">' +
                         '<p class="text-sm font-semibold leading-5" data-toast-text></p>' +
                         '<div class="mt-3 hidden" data-toast-email-fallback>' +
                             '<p class="text-xs font-semibold uppercase tracking-wide">Or send to email?</p>' +
@@ -276,9 +283,7 @@
                             '</div>' +
                         '</div>' +
                     '</div>' +
-                    '<button type="button" class="app-toast-close" aria-label="Dismiss notification">' +
-                        '<svg class="app-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
-                    '</button>' +
+                    closeButtonMarkup +
                 '</div>';
             toast.querySelector('[data-toast-text]').textContent = String(message);
             const dismiss = () => {
@@ -323,6 +328,9 @@
             }
             toast.querySelector('.app-toast-close')?.addEventListener('click', dismiss);
             toastContainer.appendChild(toast);
+            if (Number.isFinite(autoDismissMs) && autoDismissMs > 0) {
+                window.setTimeout(dismiss, autoDismissMs);
+            }
             return { dismiss, element: toast };
         };
 
@@ -349,8 +357,11 @@
             document.querySelectorAll('[data-toast-message]').forEach((element) => {
                 const message = element.getAttribute('data-toast-message');
                 if (message) {
+                    const autoDismissMs = Number.parseInt(element.getAttribute('data-toast-auto-dismiss-ms') || '0', 10);
                     window.showToast(element.getAttribute('data-toast-type') || 'info', message, {
-                        mfaEmailFallback: element.getAttribute('data-mfa-email-fallback') === 'true'
+                        mfaEmailFallback: element.getAttribute('data-mfa-email-fallback') === 'true',
+                        autoDismissMs: Number.isFinite(autoDismissMs) ? autoDismissMs : 0,
+                        closeable: element.getAttribute('data-toast-closeable') !== 'false'
                     });
                 }
             });
