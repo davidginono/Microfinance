@@ -6,64 +6,112 @@
 ALTER TABLE public.members
     ALTER COLUMN sacco_id DROP NOT NULL;
 
-INSERT INTO public.members (
-    id,
-    created_at,
-    email,
-    full_name,
-    member_no,
-    staff_no,
-    password_hash,
-    phone,
-    "position",
-    profile_last_synced_at,
-    rank,
-    sacco_id,
-    status,
-    station_id,
-    is_member,
-    staff_access_status,
-    staff_access_assigned_at,
-    staff_access_activated_at,
-    signature_registered_at,
-    signature_text,
-    phone_verified_at
-)
-VALUES (
-    '00000000-0000-0000-0000-000000000001',
-    now(),
-    null,
-    'Super Admin',
-    'ADM001',
-    'ADM001',
-    '$2a$10$4744Rxj0in3jgiirjBqqY.WGf1lh1ygq.S2zK3aiI4Wuz7F5zfCky',
-    null,
-    'ADMIN',
-    null,
-    1,
-    null,
-    'ACTIVE',
-    null,
-    false,
-    'ACTIVE',
-    now(),
-    now(),
-    null,
-    null,
-    null
-)
-ON CONFLICT (member_no) DO UPDATE
-SET full_name = excluded.full_name,
-    "position" = 'ADMIN',
-    rank = excluded.rank,
-    sacco_id = null,
-    status = 'ACTIVE',
-    station_id = null,
-    is_member = false,
-    staff_no = COALESCE(NULLIF(members.staff_no, ''), excluded.staff_no),
-    staff_access_status = 'ACTIVE',
-    staff_access_assigned_at = COALESCE(members.staff_access_assigned_at, members.created_at, now()),
-    staff_access_activated_at = COALESCE(members.staff_access_activated_at, now());
+DO $$
+DECLARE
+    super_admin_id uuid;
+    super_admin_staff_no varchar(255);
+BEGIN
+    SELECT id
+    INTO super_admin_id
+    FROM public.members
+    WHERE member_no = 'ADM001'
+    ORDER BY created_at ASC NULLS LAST
+    LIMIT 1;
+
+    IF super_admin_id IS NULL THEN
+        SELECT id
+        INTO super_admin_id
+        FROM public.members
+        WHERE id = '00000000-0000-0000-0000-000000000001'
+        LIMIT 1;
+
+        IF super_admin_id IS NULL THEN
+            super_admin_id := '00000000-0000-0000-0000-000000000001';
+            super_admin_staff_no := CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM public.members
+                    WHERE staff_no = 'ADM001'
+                ) THEN null
+                ELSE 'ADM001'
+            END;
+
+            INSERT INTO public.members (
+                id,
+                created_at,
+                email,
+                full_name,
+                member_no,
+                staff_no,
+                password_hash,
+                phone,
+                "position",
+                profile_last_synced_at,
+                rank,
+                sacco_id,
+                status,
+                station_id,
+                is_member,
+                staff_access_status,
+                staff_access_assigned_at,
+                staff_access_activated_at,
+                signature_registered_at,
+                signature_text,
+                phone_verified_at
+            )
+            VALUES (
+                super_admin_id,
+                now(),
+                null,
+                'Super Admin',
+                'ADM001',
+                super_admin_staff_no,
+                '$2a$10$4744Rxj0in3jgiirjBqqY.WGf1lh1ygq.S2zK3aiI4Wuz7F5zfCky',
+                null,
+                'ADMIN',
+                null,
+                1,
+                null,
+                'ACTIVE',
+                null,
+                false,
+                'ACTIVE',
+                now(),
+                now(),
+                null,
+                null,
+                null
+            );
+        ELSE
+            UPDATE public.members
+            SET member_no = 'ADM001'
+            WHERE id = super_admin_id;
+        END IF;
+    END IF;
+
+    UPDATE public.members
+    SET full_name = 'Super Admin',
+        "position" = 'ADMIN',
+        rank = 1,
+        sacco_id = null,
+        status = 'ACTIVE',
+        station_id = null,
+        is_member = false,
+        staff_no = CASE
+            WHEN NULLIF(staff_no, '') IS NOT NULL THEN staff_no
+            WHEN EXISTS (
+                SELECT 1
+                FROM public.members other_member
+                WHERE other_member.staff_no = 'ADM001'
+                  AND other_member.id <> super_admin_id
+            ) THEN null
+            ELSE 'ADM001'
+        END,
+        staff_access_status = 'ACTIVE',
+        staff_access_assigned_at = COALESCE(staff_access_assigned_at, created_at, now()),
+        staff_access_activated_at = COALESCE(staff_access_activated_at, now())
+    WHERE id = super_admin_id;
+END $$;
 
 INSERT INTO public.member_staff_roles (member_id, role_name)
 SELECT id, 'ADMIN'
