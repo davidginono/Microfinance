@@ -4655,6 +4655,22 @@ html.session-timeout-active,
     }
 
 /* Source: src/main/webapp/WEB-INF/jsp/fragments/loan-export-modal.jspf */
+.loan-document-action-icon {
+        display: inline-flex;
+        width: 14px;
+        height: 14px;
+        flex: 0 0 14px;
+        align-items: center;
+        justify-content: center;
+        color: currentColor;
+    }
+    .loan-document-action-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+    .loan-export-option .app-btn {
+        gap: 6px;
+    }
 .loan-export-option {
         border-width: 1px;
         cursor: pointer;
@@ -6475,9 +6491,11 @@ html.session-timeout-active,
 
     .loan-detail-action-row {
         display: flex;
+        flex-wrap: wrap;
         min-width: 0;
         align-items: center;
         justify-content: flex-end;
+        gap: 6px;
         margin: 0 0 10px;
     }
 
@@ -6496,7 +6514,7 @@ html.session-timeout-active,
 
     .erp-page-header.loan-detail-heading-row > .erp-page-title {
         flex: 1 1 auto !important;
-        max-width: calc(100% - 110px) !important;
+        max-width: none !important;
     }
 
     .erp-page-header.loan-detail-heading-row > .loan-detail-action-row {
@@ -6507,6 +6525,9 @@ html.session-timeout-active,
 
     .loan-application-detail-page .loan-detail-action-row {
         margin: 0;
+    }
+    .loan-detail-action-row .app-btn {
+        gap: 6px;
     }
 
     .loan-application-detail-page .erp-page-header,

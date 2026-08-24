@@ -917,6 +917,7 @@ class AwsConsoleViewContractTest {
     @Test
     void documentDownloadsUseSelfClearingPagePreloader() throws Exception {
         String shellJs = read(Path.of("src/main/resources/static/js/shell.js"));
+        String consoleCss = read(Path.of("src/main/resources/static/css/console-components.css"));
         String loanExportModal = read(JSP_ROOT.resolve("fragments/loan-export-modal.jspf"));
         String staffLoanDetailHeader = read(JSP_ROOT.resolve("fragments/staff-loan-detail-header.jspf"));
         String attachmentPreview = read(JSP_ROOT.resolve("documents/attachment-view.jsp"));
@@ -942,7 +943,14 @@ class AwsConsoleViewContractTest {
             .contains("void downloadWithPagePreloader(target.toString())");
         assertThat(loanExportModal)
             .contains("data-loan-export-signed data-download-action=\"true\"")
-            .contains("data-loan-export-unsigned data-download-action=\"true\"");
+            .contains("data-loan-export-unsigned data-download-action=\"true\"")
+            .contains("data-loan-print-signed data-print-action=\"true\"")
+            .contains("data-loan-print-unsigned data-print-action=\"true\"")
+            .contains("class=\"loan-document-action-icon\"");
+        assertThat(consoleCss)
+            .contains(".loan-document-action-icon")
+            .contains(".loan-detail-action-row .app-btn")
+            .contains("flex-wrap: wrap");
         assertThat(attachmentPreview)
             .contains("previewDownloadHref")
             .contains("data-download-action=\"true\">Download</a>");
@@ -951,9 +959,16 @@ class AwsConsoleViewContractTest {
                 .contains("/documents/loan-applications/${app.id}/attachments/${file.id}\"")
                 .contains("data-download-action=\"true\"><spring:message code=\"common.download\"");
         }
-        assertThat(loanDetails.get(0)).contains("data-loan-export-url=");
+        assertThat(loanDetails.get(0))
+            .contains("data-loan-export-url=")
+            .contains("data-print-action=\"true\"")
+            .contains("?signatureMode=signed")
+            .contains("class=\"loan-document-action-icon\"");
         assertThat(staffLoanDetailHeader)
             .contains("data-loan-export-url=")
+            .contains("data-print-action=\"true\"")
+            .contains("?signatureMode=signed")
+            .contains("class=\"loan-document-action-icon\"")
             .contains("/documents/loan-applications/${reviewDocumentLoanId}/print");
     }
 
