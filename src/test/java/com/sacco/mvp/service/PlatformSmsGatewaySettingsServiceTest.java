@@ -69,6 +69,29 @@ class PlatformSmsGatewaySettingsServiceTest {
     }
 
     @Test
+    void unreadableStoredApiKeyDoesNotBreakResolvedConfig() {
+        PlatformSmsGatewaySettings existing = existingSettings();
+        existing.setEnabled(true);
+        existing.setBaseUrl("https://api.example.com");
+        existing.setSendPath("/send");
+        existing.setClientId("client");
+        existing.setApiKeyEncrypted("enc:v1:stored");
+        existing.setSenderId("SENDER");
+        PlatformSmsGatewaySettingsRepository repository = Mockito.mock(PlatformSmsGatewaySettingsRepository.class);
+        PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
+        when(repository.findById(PlatformSmsGatewaySettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
+        when(secrets.decrypt("enc:v1:stored")).thenThrow(new IllegalStateException("Unable to decrypt platform secret."));
+        PlatformSmsGatewaySettingsService service = service(repository, secrets, gatewayProvider());
+
+        PlatformSmsGatewaySettingsService.ResolvedSmsGatewayConfig config = service.resolvedConfig();
+
+        assertFalse(config.configured());
+        assertFalse(config.enabled());
+        assertTrue(config.apiKeyConfigured());
+        assertEquals("", config.apiKey());
+    }
+
+    @Test
     void updatesValidSettingsEncryptsApiKeyAndAudits() {
         PlatformSmsGatewaySettingsRepository repository = Mockito.mock(PlatformSmsGatewaySettingsRepository.class);
         AuditService auditService = Mockito.mock(AuditService.class);

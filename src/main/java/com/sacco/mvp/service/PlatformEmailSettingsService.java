@@ -269,9 +269,17 @@ public class PlatformEmailSettingsService {
         String host = firstNonBlank(settings.getHost(), envHost);
         int port = usingDatabase ? settings.getPort() : envPort;
         String username = firstNonBlank(settings.getUsername(), envUsername);
-        String password = settings.hasStoredPassword()
-            ? secretProtectionService.decrypt(settings.getPasswordEncrypted())
-            : nullToEmpty(envPassword);
+        String password = nullToEmpty(envPassword);
+        boolean storedPasswordReadable = true;
+        if (settings.hasStoredPassword()) {
+            try {
+                password = secretProtectionService.decrypt(settings.getPasswordEncrypted());
+            } catch (IllegalStateException ex) {
+                storedPasswordReadable = false;
+                password = "";
+                log.warn("Stored platform email password could not be decrypted. Re-save email settings with the active APP_SECRETS_ENCRYPTION_KEY.");
+            }
+        }
         String fromAddress = firstNonBlank(settings.getFromAddress(), envFromAddress, username, "no-reply@sacco.local");
         String overrideRecipient = blank(settings.getOverrideRecipient())
             ? firstNonBlank(envOverrideRecipient)
@@ -282,7 +290,7 @@ public class PlatformEmailSettingsService {
         int readTimeoutMs = usingDatabase ? settings.getReadTimeoutMs() : envReadTimeoutMs;
         int writeTimeoutMs = usingDatabase ? settings.getWriteTimeoutMs() : envWriteTimeoutMs;
         boolean configured = usingDatabase
-            ? !host.isBlank() && !fromAddress.isBlank()
+            ? !host.isBlank() && !fromAddress.isBlank() && (!settings.hasStoredPassword() || storedPasswordReadable)
             : !host.isBlank() && !username.isBlank() && !password.isBlank();
         boolean sendEnabled = (usingDatabase ? settings.isEnabled() : hasEnvConfiguration()) && configured;
         return new ResolvedEmailConfig(

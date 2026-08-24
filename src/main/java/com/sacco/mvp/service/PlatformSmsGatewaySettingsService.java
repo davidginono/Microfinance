@@ -229,9 +229,15 @@ public class PlatformSmsGatewaySettingsService {
         String baseUrl = firstNonBlank(settings.getBaseUrl(), envBaseUrl);
         String sendPath = firstNonBlank(settings.getSendPath(), envSendPath);
         String clientId = firstNonBlank(settings.getClientId(), envClientId);
-        String apiKey = settings.hasStoredApiKey()
-            ? secretProtectionService.decrypt(settings.getApiKeyEncrypted())
-            : nullToEmpty(envApiKey);
+        String apiKey = nullToEmpty(envApiKey);
+        if (settings.hasStoredApiKey()) {
+            try {
+                apiKey = secretProtectionService.decrypt(settings.getApiKeyEncrypted());
+            } catch (IllegalStateException ex) {
+                apiKey = "";
+                log.warn("Stored platform SMS API key could not be decrypted. Re-save SMS gateway settings with the active APP_SECRETS_ENCRYPTION_KEY.");
+            }
+        }
         String senderId = firstNonBlank(settings.getSenderId(), envSenderId);
         int connectTimeoutSeconds = usingDatabase ? settings.getConnectTimeoutSeconds() : seconds(envConnectTimeout, 3);
         int readTimeoutSeconds = usingDatabase ? settings.getReadTimeoutSeconds() : seconds(envReadTimeout, 8);

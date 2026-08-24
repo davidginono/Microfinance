@@ -109,6 +109,28 @@ class PlatformEmailSettingsServiceTest {
     }
 
     @Test
+    void unreadableStoredPasswordDoesNotBreakResolvedConfig() {
+        PlatformEmailSettings existing = existingSettings();
+        existing.setEnabled(true);
+        existing.setHost("smtp.example.com");
+        existing.setUsername("mailer");
+        existing.setPasswordEncrypted("enc:v1:stored");
+        existing.setFromAddress("alerts@example.com");
+        PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
+        PlatformSecretProtectionService secrets = Mockito.mock(PlatformSecretProtectionService.class);
+        when(repository.findById(PlatformEmailSettings.DEFAULT_ID)).thenReturn(Optional.of(existing));
+        when(secrets.decrypt("enc:v1:stored")).thenThrow(new IllegalStateException("Unable to decrypt platform secret."));
+        PlatformEmailSettingsService service = service(repository, secrets, factoryProvider());
+
+        PlatformEmailSettingsService.ResolvedEmailConfig config = service.resolvedConfig();
+
+        assertFalse(config.configured());
+        assertFalse(config.enabled());
+        assertTrue(config.passwordConfigured());
+        assertEquals("", config.password());
+    }
+
+    @Test
     void updatesValidSettingsEncryptsPasswordAndAudits() {
         PlatformEmailSettingsRepository repository = Mockito.mock(PlatformEmailSettingsRepository.class);
         AuditService auditService = Mockito.mock(AuditService.class);
