@@ -53,7 +53,9 @@ safe because it is needed for future recovery.
 
 DNS for `lms.foresight.co.tz` is currently outside Route53. After the script
 prints the static IP, update the Cloudflare A record for `lms.foresight.co.tz`
-to that IP. Caddy will issue HTTPS once the DNS record reaches the instance.
+to that IP and keep the record proxied. Caddy uses an internal origin
+certificate so Cloudflare can complete the origin TLS handshake without public
+ACME challenges being redirected by the proxy.
 
 ## Higher-cost EC2/RDS path
 

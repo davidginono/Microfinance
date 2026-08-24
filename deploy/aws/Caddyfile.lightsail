@@ -3,6 +3,7 @@
 }
 
 {$APP_PUBLIC_DOMAIN} {
+	tls internal
 	encode zstd gzip
 
 	handle {
