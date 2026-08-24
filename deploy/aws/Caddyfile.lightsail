@@ -1,0 +1,11 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_PUBLIC_DOMAIN} {
+	encode zstd gzip
+
+	handle {
+		reverse_proxy app:8080
+	}
+}

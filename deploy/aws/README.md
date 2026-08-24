@@ -1,7 +1,64 @@
 # AWS deployment
 
-This folder contains the one-command deployment helper for the low-cost AWS
-shape used by SACCOS LMS:
+This folder contains two deployment paths for SACCOS LMS.
+
+## Recommended budget path: Lightsail
+
+Use this path for the practical lowest-cost public web deployment:
+
+- one Amazon Lightsail Linux 2 GB instance with public IPv4
+- app and PostgreSQL colocated with Docker Compose
+- Caddy HTTPS for `lms.foresight.co.tz`
+- local persistent data under `/mnt/saccos-data`
+
+The AWS CLI must be authenticated as IAM user `david`:
+
+```powershell
+aws sts get-caller-identity
+```
+
+Run from the repository root:
+
+```powershell
+.\deploy\aws\deploy-lightsail.ps1
+```
+
+The script creates or reuses:
+
+- Lightsail instance `saccos-lms-prod`
+- Lightsail static IP `saccos-lms-prod-ip`
+- Lightsail key pair `saccos-lms-prod-key`
+
+It packages the current workspace, uploads it over SSH, creates a production
+`.env` on the host, then runs:
+
+```bash
+docker compose --env-file .env -f deploy/aws/docker-compose.lightsail.yml up --build -d --remove-orphans
+```
+
+Set production secrets as environment variables before running when available:
+
+```powershell
+$env:POSTGRES_PASSWORD = "..."
+$env:APP_SECRETS_ENCRYPTION_KEY = "..."
+$env:SPRING_MAIL_HOST = "..."
+$env:SPRING_MAIL_USERNAME = "..."
+$env:SPRING_MAIL_PASSWORD = "..."
+$env:APP_SMS_BENTER_API_KEY = "..."
+```
+
+If `POSTGRES_PASSWORD` or `APP_SECRETS_ENCRYPTION_KEY` is omitted, the script
+generates a strong value for this deployment. Keep the generated server `.env`
+safe because it is needed for future recovery.
+
+DNS for `lms.foresight.co.tz` is currently outside Route53. After the script
+prints the static IP, update the Cloudflare A record for `lms.foresight.co.tz`
+to that IP. Caddy will issue HTTPS once the DNS record reaches the instance.
+
+## Higher-cost EC2/RDS path
+
+`deploy.ps1` is the older stronger isolation path. It is not the $12/month
+deployment because it uses:
 
 - one EC2 Docker host
 - one private RDS PostgreSQL database

@@ -37,3 +37,5 @@ admin_dashboard_response.html
 login-after.html
 application-local.yml
 .tmp-ec2-*
+.tmp-lightsail-*
+deploy/aws/*.pem
