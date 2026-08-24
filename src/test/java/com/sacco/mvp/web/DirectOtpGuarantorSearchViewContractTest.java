@@ -26,8 +26,22 @@ class DirectOtpGuarantorSearchViewContractTest {
         assertThat(source)
             .contains("{ value: \"phone\", label: modePhoneLabel")
             .contains("{ value: \"email\", label: modeEmailLabel")
-            .contains("\"/app/guarantors/direct-otp/search\"")
-            .contains("\"/app/guarantors/direct-otp/loan-details\"");
+            .contains("\"/app/guarantors/direct-otp/search\"");
+    }
+
+    @Test
+    void guarantorSearchShowsInlineFormatVerificationBeforeFetch() throws Exception {
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+
+        assertThat(source)
+            .contains("id=\"guarantorFormatIndicator\"")
+            .contains("id=\"guarantorFormatMessage\"")
+            .contains("aria-describedby=\"guarantorHint guarantorFormatMessage\"")
+            .contains("function validateSearchTerm(showEmpty)")
+            .contains("function normalizePhoneSearch(value)")
+            .contains("searchInput.setAttribute(\"aria-invalid\", \"true\")")
+            .contains("const validation = refreshSearchValidation(true);")
+            .contains("const term = validation.term;");
     }
 
     @Test

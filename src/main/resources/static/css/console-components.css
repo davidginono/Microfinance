@@ -7404,6 +7404,64 @@ html.session-timeout-active,
         flex: 1 1 20rem;
     }
 
+    .loan-guarantor-search-input.is-format-valid {
+        border-color: #037f0c !important;
+        box-shadow: 0 0 0 1px rgba(3, 127, 12, 0.16);
+    }
+
+    .loan-guarantor-format-indicator {
+        position: relative;
+        display: none;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d5dbdb;
+        border-radius: 2px;
+        background: #ffffff;
+    }
+
+    .loan-guarantor-format-indicator.is-valid,
+    .loan-guarantor-format-indicator.is-invalid {
+        display: inline-flex;
+    }
+
+    .loan-guarantor-format-indicator.is-valid {
+        border-color: #037f0c;
+        background: #f2fcf3;
+    }
+
+    .loan-guarantor-format-indicator.is-valid::before {
+        width: 11px;
+        height: 6px;
+        border-bottom: 2px solid #037f0c;
+        border-left: 2px solid #037f0c;
+        content: "";
+        transform: rotate(-45deg) translate(1px, -1px);
+    }
+
+    .loan-guarantor-format-indicator.is-invalid {
+        border-color: #d13212;
+        background: #fff7f5;
+        color: #d13212;
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .loan-guarantor-format-indicator.is-invalid::before {
+        content: "!";
+    }
+
+    .loan-guarantor-format-message {
+        margin-top: 6px;
+        color: #d13212;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px;
+    }
+
     .loan-guarantor-search-action {
         flex: 0 0 auto;
         gap: 6px;
@@ -7574,7 +7632,12 @@ html.session-timeout-active,
             flex-basis: 100%;
         }
 
+        .loan-guarantor-format-indicator {
+            order: 3;
+        }
+
         .loan-guarantor-search-action {
+            order: 4;
             margin-left: auto;
         }
     }

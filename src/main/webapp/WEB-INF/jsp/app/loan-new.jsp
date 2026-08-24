@@ -325,7 +325,11 @@
                     <option value="name"><spring:message code="newloan.guarantors.modeName" /></option>
                 </select>
                 <input id="guarantorSearch" type="text" autocomplete="off" placeholder="<spring:message code='newloan.guarantors.placeholder' />"
-                       class="fcms-control loan-guarantor-search-input" />
+                       class="fcms-control loan-guarantor-search-input"
+                       aria-describedby="guarantorHint guarantorFormatMessage" />
+                <span id="guarantorFormatIndicator"
+                      class="loan-guarantor-format-indicator"
+                      aria-hidden="true"></span>
                 <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action">
                     <span class="loan-guarantor-search-spinner hidden" data-guarantor-search-spinner aria-hidden="true"></span>
                     <span><spring:message code="common.search" /></span>
@@ -333,6 +337,7 @@
                 <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
         </div>
 
+            <p id="guarantorFormatMessage" class="loan-guarantor-format-message hidden" aria-live="polite"></p>
            
             <p id="guarantorHint" class="mt-2 text-sm text-slate-500"></p>
 
@@ -1510,6 +1515,8 @@
             const searchInput = document.getElementById("guarantorSearch");
             const searchButton = document.getElementById("guarantorSearchButton");
             const searchButtonSpinner = searchButton ? searchButton.querySelector("[data-guarantor-search-spinner]") : null;
+            const formatIndicator = document.getElementById("guarantorFormatIndicator");
+            const formatMessage = document.getElementById("guarantorFormatMessage");
             const dropdown = document.getElementById("guarantorDropdown");
             const hint = document.getElementById("guarantorHint");
             const counter = document.getElementById("guarantorSelectedCount");
@@ -1528,8 +1535,9 @@
             const msgGuarantorSelected = "<spring:message code='newloan.js.guarantorSelected' />";
             const msgEnterMemberNumber = "<spring:message code='newloan.js.enterMemberNumber' />";
             const msgEnterGuarantorName = "<spring:message code='newloan.js.enterGuarantorName' />";
-            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a phone number in the format 255XXXXXXXXX.' />";
+            const msgEnterGuarantorPhone = "<spring:message code='newloan.js.enterGuarantorPhone' text='Enter a Tanzania phone number, for example 255746359369 or 0746359369.' />";
             const msgEnterGuarantorEmail = "<spring:message code='newloan.js.enterGuarantorEmail' text='Enter a valid email address to search.' />";
+            const msgValidGuarantorSearch = "<spring:message code='newloan.js.validGuarantorSearch' text='Ready to search.' />";
             const msgMatchingMembers = "<spring:message code='newloan.js.matchingMembers' />";
             const msgUnableSearchGuarantors = "<spring:message code='newloan.js.unableSearchGuarantors' />";
             const msgSelectGuarantorsDraft = "<spring:message code='newloan.js.selectGuarantorsDraft' />";
@@ -1544,7 +1552,7 @@
             const emailPlaceholder = "<spring:message code='newloan.guarantors.emailPlaceholder' text='Enter guarantor email address' />";
             const numberHint = "<spring:message code='newloan.guarantors.numberHint' />";
             const nameHint = "<spring:message code='newloan.guarantors.nameHint' />";
-            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Use Tanzania format: 255 followed by 9 digits, for example 255746359369.' />";
+            const phoneHint = "<spring:message code='newloan.guarantors.phoneHint' text='Use Tanzania format 255XXXXXXXXX or 0XXXXXXXXX, for example 255746359369.' />";
             const emailHint = "<spring:message code='newloan.guarantors.emailHint' text='Direct OTP searches the member profile portal by email address.' />";
             const searchConfigurations = {
                 LOGIN: [
@@ -1584,6 +1592,115 @@
                 return approvalModeInput && approvalModeInput.value === "DIRECT_OTP" ? "DIRECT_OTP" : "LOGIN";
             }
 
+            function searchConfigForCurrentMode() {
+                return (searchConfigurations[currentApprovalMode()] || searchConfigurations.LOGIN)
+                    .find(function (item) { return item.value === searchMode.value; });
+            }
+
+            function searchFormatMessage() {
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
+                if (approvalMode === "DIRECT_OTP" && mode === "email") {
+                    return msgEnterGuarantorEmail;
+                }
+                if (approvalMode === "DIRECT_OTP") {
+                    return msgEnterGuarantorPhone;
+                }
+                if (mode === "name") {
+                    return msgEnterGuarantorName;
+                }
+                return msgEnterMemberNumber;
+            }
+
+            function normalizePhoneSearch(value) {
+                const digits = String(value || "").replace(/[^0-9]/g, "");
+                if (/^0[0-9]{9}$/.test(digits)) {
+                    return "255" + digits.substring(1);
+                }
+                return /^255[0-9]{9}$/.test(digits) ? digits : "";
+            }
+
+            function validateSearchTerm(showEmpty) {
+                const approvalMode = currentApprovalMode();
+                const mode = searchMode.value;
+                const raw = searchInput.value.trim();
+                const emptyMessage = searchFormatMessage();
+                if (!raw) {
+                    return { valid: !showEmpty, empty: true, message: showEmpty ? emptyMessage : "", term: "" };
+                }
+                if (approvalMode === "DIRECT_OTP" && mode === "email") {
+                    const email = raw.toLowerCase();
+                    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
+                        ? { valid: true, message: "", term: email }
+                        : { valid: false, message: msgEnterGuarantorEmail, term: "" };
+                }
+                if (approvalMode === "DIRECT_OTP") {
+                    const phone = normalizePhoneSearch(raw);
+                    return phone
+                        ? { valid: true, message: "", term: phone }
+                        : { valid: false, message: msgEnterGuarantorPhone, term: "" };
+                }
+                if (mode === "name") {
+                    const name = raw.toLowerCase();
+                    return name.length >= 2
+                        ? { valid: true, message: "", term: name }
+                        : { valid: false, message: msgEnterGuarantorName, term: "" };
+                }
+                const number = raw.toUpperCase();
+                const validFourDigitsOrMore = /^\d{4,20}$/.test(number);
+                const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(number) && /\d/.test(number);
+                return validFourDigitsOrMore || validFullMemberNo
+                    ? { valid: true, message: "", term: number }
+                    : { valid: false, message: msgEnterMemberNumber, term: "" };
+            }
+
+            function clearSearchValidation() {
+                searchInput.classList.remove("field-error-input", "is-format-valid");
+                searchInput.removeAttribute("aria-invalid");
+                if (formatIndicator) {
+                    formatIndicator.className = "loan-guarantor-format-indicator";
+                    formatIndicator.removeAttribute("title");
+                }
+                if (formatMessage) {
+                    formatMessage.textContent = "";
+                    formatMessage.classList.add("hidden");
+                }
+            }
+
+            function setSearchValidationState(result, forceMessage) {
+                const hasValue = searchInput.value.trim().length > 0;
+                clearSearchValidation();
+                if (!hasValue && !forceMessage) {
+                    return;
+                }
+                if (result.valid && hasValue) {
+                    searchInput.classList.add("is-format-valid");
+                    if (formatIndicator) {
+                        formatIndicator.classList.add("is-valid");
+                        formatIndicator.setAttribute("title", msgValidGuarantorSearch);
+                    }
+                    return;
+                }
+                if (!result.valid && (hasValue || forceMessage)) {
+                    searchInput.classList.add("field-error-input");
+                    searchInput.setAttribute("aria-invalid", "true");
+                    if (formatIndicator) {
+                        formatIndicator.classList.add("is-invalid");
+                        formatIndicator.setAttribute("title", result.message);
+                    }
+                    if (formatMessage) {
+                        formatMessage.textContent = result.message;
+                        formatMessage.classList.remove("hidden");
+                    }
+                }
+            }
+
+            function refreshSearchValidation(forceMessage) {
+                const result = validateSearchTerm(forceMessage);
+                setSearchValidationState(result, forceMessage);
+                return result;
+            }
+
             function configureSearchForApprovalMode(mode, preserveValue) {
                 const config = searchConfigurations[mode] || searchConfigurations.LOGIN;
                 const current = preserveValue ? searchMode.value : "";
@@ -1598,6 +1715,7 @@
                 searchMode.value = selectedOption.value;
                 searchInput.placeholder = selectedOption.placeholder;
                 hint.textContent = selectedOption.hint;
+                clearSearchValidation();
             }
 
             function setApprovalMode(mode) {
@@ -1613,6 +1731,7 @@
                 });
                 configureSearchForApprovalMode(normalized, previous === normalized);
                 searchInput.value = "";
+                clearSearchValidation();
                 hideDropdown();
                 if (previous !== normalized && selected.size > 0) {
                     selected.clear();
@@ -1728,6 +1847,7 @@
                 });
                 renderSelected();
                 searchInput.value = "";
+                clearSearchValidation();
                 hint.textContent = msgGuarantorSelected;
                 hideDropdown();
             }
@@ -1770,38 +1890,14 @@
             async function runSearch() {
                 const approvalMode = currentApprovalMode();
                 const mode = searchMode.value;
-                let term = searchInput.value.trim();
-                if (approvalMode === "DIRECT_OTP" && mode === "email") {
-                    term = term.toLowerCase();
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(term)) {
-                        hint.textContent = msgEnterGuarantorEmail;
-                        hideDropdown();
-                        return;
-                    }
-                } else if (approvalMode === "DIRECT_OTP") {
-                    const digits = term.replace(/[^0-9]/g, "");
-                    if (!(digits.length === 10 || digits.length === 12)) {
-                        hint.textContent = msgEnterGuarantorPhone;
-                        hideDropdown();
-                        return;
-                    }
-                } else if (mode === "name") {
-                    term = term.toLowerCase();
-                    if (term.length < 2) {
-                        hint.textContent = msgEnterGuarantorName;
-                        hideDropdown();
-                        return;
-                    }
-                } else {
-                    term = term.toUpperCase();
-                    const validFourDigitsOrMore = /^\d{4,20}$/.test(term);
-                    const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(term) && /\d/.test(term);
-                    if (!validFourDigitsOrMore && !validFullMemberNo) {
-                        hint.textContent = msgEnterMemberNumber;
-                        hideDropdown();
-                        return;
-                    }
+                const validation = refreshSearchValidation(true);
+                if (!validation.valid) {
+                    hint.textContent = validation.message;
+                    hideDropdown();
+                    searchInput.focus();
+                    return;
                 }
+                const term = validation.term;
                 setSearchLoading(true);
                 const query = new URLSearchParams({ q: term, searchBy: mode, loanProductId: "${loanProductId}", loanType: "${loanType}" });
                 const endpoint = approvalMode === "DIRECT_OTP" ? "/app/guarantors/direct-otp/search" : "/app/guarantors/search";
@@ -1832,13 +1928,21 @@
                 });
             });
 
+            searchInput.addEventListener("input", function () {
+                refreshSearchValidation(false);
+                hideDropdown();
+            });
+
+            searchInput.addEventListener("blur", function () {
+                refreshSearchValidation(false);
+            });
+
             searchMode.addEventListener("change", function () {
-                const mode = searchMode.value;
-                const config = (searchConfigurations[currentApprovalMode()] || searchConfigurations.LOGIN)
-                    .find(function (item) { return item.value === mode; });
+                const config = searchConfigForCurrentMode();
                 searchInput.value = "";
                 searchInput.placeholder = config ? config.placeholder : numberPlaceholder;
                 hint.textContent = config ? config.hint : numberHint;
+                clearSearchValidation();
                 hideDropdown();
                 searchInput.focus();
             });
