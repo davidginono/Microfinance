@@ -144,11 +144,11 @@
                 return modal;
             }
             modal = document.createElement("div");
-            modal.className = "fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/40 px-4 py-6";
+            modal.className = "repayment-schedule-modal-overlay hidden";
             modal.setAttribute("data-repayment-schedule-modal", "true");
             modal.innerHTML = [
-                "<div class=\"w-full max-w-5xl overflow-hidden border border-slate-200 bg-white shadow-xl\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"repaymentScheduleModalTitle\">",
-                "<div class=\"flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3\">",
+                "<div class=\"repayment-schedule-modal-panel\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"repaymentScheduleModalTitle\">",
+                "<div class=\"repayment-schedule-modal-header\">",
                 "<div>",
                 "<h2 id=\"repaymentScheduleModalTitle\" class=\"text-sm font-semibold uppercase tracking-wide text-slate-700\" data-repayment-modal-title>Repayment Schedule</h2>",
                 "<p class=\"mt-1 text-sm text-slate-500\" data-repayment-modal-message></p>",
@@ -157,10 +157,10 @@
                 "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg>",
                 "</button>",
                 "</div>",
-                "<div class=\"space-y-4 px-4 py-4\">",
+                "<div class=\"repayment-schedule-modal-body\">",
                 "<div class=\"grid gap-3 md:grid-cols-2 xl:grid-cols-4\" data-repayment-modal-summary data-repayment-summary-grid data-repayment-summary-dynamic=\"true\"></div>",
-                "<div class=\"erp-table-wrap rounded-none border-0\" data-aws-no-titlebar=\"true\">",
-                "<div class=\"erp-table-scroll\">",
+                "<div class=\"erp-table-wrap repayment-schedule-modal-table rounded-none border-0\" data-aws-no-titlebar=\"true\">",
+                "<div class=\"erp-table-scroll repayment-schedule-modal-table-scroll\">",
                 "<" + "table class=\"erp-table loan-repayment-schedule-table\">",
                 "<thead><tr>",
                 "<th>Pmt No.</th><th>Month</th><th>Beginning Balance</th><th>Amount to Pay</th><th>Loan Amount</th><th>Interest</th><th>Ending Balance</th>",
@@ -190,7 +190,7 @@
             var modal = document.querySelector("[data-repayment-schedule-modal]");
             if (modal) {
                 modal.classList.add("hidden");
-                modal.classList.remove("flex");
+                modal.classList.remove("is-open");
             }
         }
 
@@ -213,7 +213,7 @@
                 body.innerHTML = emptyRowHtml("Loading repayment schedule...");
             }
             modal.classList.remove("hidden");
-            modal.classList.add("flex");
+            modal.classList.add("is-open");
             fetch(url, {
                 credentials: "same-origin",
                 headers: {
