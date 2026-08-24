@@ -81,21 +81,16 @@ public class StaffAnalyticsController {
             : stationWideStaffView
                 ? loanAnalyticsService.productPerformanceForStation(principal.getSaccoId(), principal.getStationId(), resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null)
             : loanAnalyticsService.productPerformanceForStaff(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, null);
-        BigDecimal totalInterestAccumulated = BigDecimal.ZERO;
         List<LoanReportService.ProductFinancialBreakdownRow> productFinancialRows = List.of();
         if (stationWideStaffView) {
             LoanReportService.AnalyticsExportReport interestReport =
                 loanReportService.staffAnalyticsExportReport(principal, resolvedFrom, resolvedTo, resolvedLoanType, resolvedLoanProductId, selectedView);
             if (interestReport != null) {
-                totalInterestAccumulated = interestReport.productRows()
-                    .stream()
-                    .map(LoanReportService.ProductPerformanceRow::interestPaid)
-                    .filter(java.util.Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
                 productFinancialRows = interestReport.productFinancialRows() == null ? List.of() : interestReport.productFinancialRows();
             }
         }
         ProductFinancialTotals productFinancialTotals = productFinancialTotals(productFinancialRows);
+        BigDecimal totalInterestAccumulated = productFinancialTotals.totalInterestPaid();
 
         model.addAttribute("analytics", analytics);
         model.addAttribute("metricCards", staffReviewView
@@ -223,15 +218,20 @@ public class StaffAnalyticsController {
     }
 
     private ProductFinancialTotals productFinancialTotals(List<LoanReportService.ProductFinancialBreakdownRow> rows) {
+        BigDecimal interestPaid = BigDecimal.ZERO;
         BigDecimal interestUnpaid = BigDecimal.ZERO;
         BigDecimal loanAmountPaid = BigDecimal.ZERO;
         BigDecimal loanAmountUnpaid = BigDecimal.ZERO;
+        if (rows == null || rows.isEmpty()) {
+            return new ProductFinancialTotals(interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
+        }
         for (LoanReportService.ProductFinancialBreakdownRow row : rows) {
+            interestPaid = interestPaid.add(row.totalInterestPaid() == null ? BigDecimal.ZERO : row.totalInterestPaid());
             interestUnpaid = interestUnpaid.add(row.totalInterestUnpaid() == null ? BigDecimal.ZERO : row.totalInterestUnpaid());
             loanAmountPaid = loanAmountPaid.add(row.totalLoanAmountPaid() == null ? BigDecimal.ZERO : row.totalLoanAmountPaid());
             loanAmountUnpaid = loanAmountUnpaid.add(row.totalLoanAmountUnpaid() == null ? BigDecimal.ZERO : row.totalLoanAmountUnpaid());
         }
-        return new ProductFinancialTotals(interestUnpaid, loanAmountPaid, loanAmountUnpaid);
+        return new ProductFinancialTotals(interestPaid, interestUnpaid, loanAmountPaid, loanAmountUnpaid);
     }
 
     private String roleLabel(Position position) {
@@ -286,6 +286,7 @@ public class StaffAnalyticsController {
     }
 
     private record ProductFinancialTotals(
+        BigDecimal totalInterestPaid,
         BigDecimal totalInterestUnpaid,
         BigDecimal totalLoanAmountPaid,
         BigDecimal totalLoanAmountUnpaid

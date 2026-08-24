@@ -619,6 +619,57 @@ class LoanReportServiceTest {
     }
 
     @Test
+    void stationAnalyticsReportUsesSyncedPaidInterestForAccumulatedInterest() {
+        UUID activeLoanId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        LoanApplication activeLoan = LoanApplication.builder()
+            .id(activeLoanId)
+            .saccoId("IAA")
+            .stationId("AR704")
+            .applicantMemberId(UUID.randomUUID())
+            .loanType(LoanType.EDUCATION_LOAN)
+            .loanProductSettingId(productId)
+            .amount(new BigDecimal("700000.00"))
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
+            .updatedAt(OffsetDateTime.parse("2026-07-13T10:00:00Z"))
+            .financialSnapshot("""
+                {
+                  "interestAmount":70000.00,
+                  "foresightTotalInterestPaid":5000.00,
+                  "foresightLastPaymentDate":"2026-07-12"
+                }
+                """)
+            .build();
+
+        when(loanApplicationRepository.findScopeReportRows(any(), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(activeLoan)));
+        when(loanApplicationRepository.findScopeFinancialReportRows(any(), any(), any(), any()))
+            .thenReturn(List.of(reportRow(activeLoan)));
+        when(memberRepository.countActiveMemberAccountsForScope("IAA", "AR704")).thenReturn(3L);
+        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
+            .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
+
+        LoanReportService.StationAnalyticsExportReport report = loanReportService.stationAnalyticsReport(
+            "IAA",
+            "AR704",
+            LocalDate.of(2026, 1, 1),
+            LocalDate.of(2026, 12, 31),
+            LoanType.EDUCATION_LOAN,
+            "Daniel Sikukuu",
+            "Manager"
+        );
+
+        assertThat(report.productRows().getFirst().totalPaidInterest()).isEqualByComparingTo("5000.00");
+        assertThat(report.productRows().getFirst().fullyPaidLoanInterest()).isEqualByComparingTo("0.00");
+        assertThat(report.yearlyRows()).anySatisfy(row -> {
+            assertThat(row.year()).isEqualTo(2026);
+            assertThat(row.totalPaidInterestAccumulated()).isEqualByComparingTo("5000.00");
+            assertThat(row.fullyPaidLoanInterest()).isEqualByComparingTo("0.00");
+        });
+    }
+
+    @Test
     void stationAnalyticsExcelContainsApplicantAndYearlyInterestHeaders() throws Exception {
         LoanReportService.StationAnalyticsExportReport report = new LoanReportService.StationAnalyticsExportReport(
             "IAA",

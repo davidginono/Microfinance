@@ -78,13 +78,14 @@ class StaffAnalyticsControllerSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private LoanAnalyticsService loanAnalyticsService;
     @Autowired private LoanReportService loanReportService;
+    @Autowired private LoanProductDisplayService loanProductDisplayService;
     @Autowired private SaccoStationRepository saccoStationRepository;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(loanAnalyticsService, loanReportService, saccoStationRepository);
+        Mockito.reset(loanAnalyticsService, loanReportService, loanProductDisplayService, saccoStationRepository);
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -101,6 +102,8 @@ class StaffAnalyticsControllerSecurityTest {
         when(loanAnalyticsService.productChartSeries(any())).thenReturn(List.of());
         when(loanAnalyticsService.stationPortfolio(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"));
+        when(loanReportService.staffAnalyticsExportReport(any(), any(), any(), any(), any(), any()))
+            .thenReturn(stationFinancialReport());
         when(loanReportService.stationAnalyticsReport(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(new LoanReportService.StationAnalyticsExportReport(
                 "SACCO-01",
@@ -132,7 +135,11 @@ class StaffAnalyticsControllerSecurityTest {
             .andExpect(model().attribute("viewAs", "staff"))
             .andExpect(model().attribute("stationWideStaffView", true))
             .andExpect(model().attribute("staffReviewView", false))
-            .andExpect(model().attribute("staffAnalyticsTitle", "Station Loan Status"));
+            .andExpect(model().attribute("staffAnalyticsTitle", "Station Loan Status"))
+            .andExpect(model().attribute("totalInterestAccumulatedLabel", "123.45"))
+            .andExpect(model().attribute("totalInterestUnpaidLabel", "67.89"))
+            .andExpect(model().attribute("totalLoanAmountPaidLabel", "500"))
+            .andExpect(model().attribute("totalLoanAmountUnpaidLabel", "600"));
 
         verify(loanAnalyticsService).forStation(any(), any(), any(), any(), any(), any(), any());
         verify(loanAnalyticsService, never()).forStaff(any(), any(), any(), any(), any());
@@ -240,6 +247,51 @@ class StaffAnalyticsControllerSecurityTest {
             .createdAt(OffsetDateTime.now())
             .updatedAt(OffsetDateTime.now())
             .build();
+    }
+
+    private LoanReportService.AnalyticsExportReport stationFinancialReport() {
+        return new LoanReportService.AnalyticsExportReport(
+            LoanReportService.ReportKind.STATION,
+            "SACCO One",
+            "SACCO-01",
+            "STATION LOAN STATUS REPORT",
+            "AR704",
+            "AR704",
+            java.time.LocalDate.of(2025, 7, 10),
+            java.time.LocalDate.of(2025, 7, 11),
+            java.time.LocalDate.of(2025, 7, 11),
+            "Test User",
+            "Manager",
+            "All Products",
+            null,
+            new LoanAnalyticsService.MemberLoanAnalytics(0, 0, 0, 0, 0, 0, BigDecimal.ZERO),
+            new LoanAnalyticsService.StaffPortfolioSummary(0, 0, 0, 0, 0, BigDecimal.ZERO, "Low"),
+            List.of(new LoanReportService.ProductPerformanceRow(
+                "Education Loan",
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                new BigDecimal("99.99"),
+                BigDecimal.ZERO
+            )),
+            List.of(new LoanReportService.ProductFinancialBreakdownRow(
+                "Education Loan",
+                new BigDecimal("123.45"),
+                new BigDecimal("67.89"),
+                new BigDecimal("500.00"),
+                new BigDecimal("600.00")
+            )),
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            new LoanReportService.FinancialSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+            List.of(),
+            ""
+        );
     }
 
     @Configuration

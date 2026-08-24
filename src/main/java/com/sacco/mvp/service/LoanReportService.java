@@ -2766,15 +2766,36 @@ public class LoanReportService {
     }
 
     private BigDecimal stationInterestPaidAmount(LoanApplication loan) {
-        return loan == null || loan.getStatus() != LoanStatus.PAID
-            ? BigDecimal.ZERO
-            : requiredInterestAmount(loan);
+        return interestPaidAmount(loan);
     }
 
     private BigDecimal stationInterestPaidForYear(LoanApplication loan, int year) {
-        return loan != null && loan.getStatus() == LoanStatus.PAID && loanYear(loan) == year
-            ? requiredInterestAmount(loan)
-            : BigDecimal.ZERO;
+        if (loan == null || stationInterestYear(loan) != year) {
+            return BigDecimal.ZERO;
+        }
+        return stationInterestPaidAmount(loan);
+    }
+
+    private int stationInterestYear(LoanApplication loan) {
+        LocalDate lastPaymentDate = financialSnapshotDate(loan, LoanFinancialSnapshotKeys.FORESIGHT_LAST_PAYMENT_DATE);
+        return lastPaymentDate == null ? loanYear(loan) : lastPaymentDate.getYear();
+    }
+
+    private LocalDate financialSnapshotDate(LoanApplication loan, String key) {
+        if (loan == null || loan.getFinancialSnapshot() == null || loan.getFinancialSnapshot().isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> raw = objectMapper.readValue(loan.getFinancialSnapshot(), new TypeReference<>() {});
+            Object value = raw.get(key);
+            if (value == null) {
+                return null;
+            }
+            String text = String.valueOf(value).trim();
+            return text.isEmpty() ? null : LocalDate.parse(text);
+        } catch (DateTimeException | JacksonException ex) {
+            return null;
+        }
     }
 
     private int writeTitle(XSSFSheet sheet, CellStyle titleStyle, String title) {
