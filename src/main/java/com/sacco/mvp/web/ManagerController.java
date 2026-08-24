@@ -13,6 +13,7 @@ import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.LoanProductDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
+import com.sacco.mvp.service.ActiveLoanDisplayService;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.LoanPresentationService;
 import com.sacco.mvp.service.LoanReportService;
@@ -56,6 +57,7 @@ public class ManagerController {
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
+    private final ActiveLoanDisplayService activeLoanDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final ReversalRequestService reversalRequestService;
@@ -257,33 +259,12 @@ public class ManagerController {
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
         model.addAttribute("pendingManagerStageWithdrawal", reversalRequestService.pendingManagerStageWithdrawal(id));
-        Map<com.sacco.mvp.domain.LoanType, String> activeLoanProductNames = loanProductDisplayService.namesForSacco(principal.getSaccoId());
-        model.addAttribute("activeApplicantLoans", activeApplicantLoans.stream()
-            .map(loan -> {
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("id", loan.getId().toString());
-                row.put("shortId", loan.getApplicationNumber() == null ? "" : loan.getApplicationNumber().toString());
-                row.put("loanId", loan.getLoanId() == null ? "" : loan.getLoanId());
-                row.put("loanTypeLabel", loanProductDisplayService.displayName(loan, activeLoanProductNames));
-                row.put("amount", formatMoney(loan.getAmount()));
-                row.put("disbursedAt", loan.getDisbursementDate() == null ? "-" : loan.getDisbursementDate().toString());
-                row.put("finalDueDate", loan.getFinalDueDate() == null ? "-" : loan.getFinalDueDate().toString());
-                row.put("installmentAmount", formatMoney(loan.getInstallmentAmount()));
-                row.put("outstandingBalance", formatMoney(loanPresentationService.activeLoanOutstandingBalance(loan)));
-                row.put("repaymentFrequency", loan.getRepaymentFrequency() == null
-                    ? "Standard schedule"
-                    : humanizeEnum(loan.getRepaymentFrequency().name()));
-                row.put("countdown", loanPresentationService.countdownLabel(loan.getFinalDueDate()));
-                row.put("isTopUpSource", String.valueOf(
-                    app.getTopUpSourceLoanId() != null && app.getTopUpSourceLoanId().equals(loan.getId())));
-                return row;
-            })
-            .toList());
-        model.addAttribute("activeApplicantLoanCount", activeApplicantLoans.size());
-        model.addAttribute("activeApplicantLoanTotalAmount", formatMoney(
-            activeApplicantLoans.stream()
-                .map(loanPresentationService::activeLoanOutstandingBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)));
+        ActiveLoanDisplayService.ActiveLoanDisplay activeLoanDisplay =
+            activeLoanDisplayService.localStaffReviewRows(principal.getSaccoId(), app, activeApplicantLoans);
+        model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
+        model.addAttribute("activeApplicantLoanCount", activeLoanDisplay.count());
+        model.addAttribute("activeApplicantLoanTotalAmount", activeLoanDisplay.totalExposure());
+        model.addAttribute("activeApplicantLoansForesightEnabled", true);
         model.addAttribute("reviewBasePath", "/manager");
         model.addAttribute("reviewPanelBreadcrumb", message("review.manager.breadcrumb"));
         model.addAttribute("reviewPanelTitle", message("review.manager.title"));
@@ -312,6 +293,22 @@ public class ManagerController {
         var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-active-loans")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> applicantActiveLoans(@PathVariable UUID id,
+                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
+        var app = managerService.get(id, principal.getSaccoId(), principal.getStationId());
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        return ResponseEntity.ok(activeLoanDisplayService.staffReviewRows(
+            applicant,
+            principal.getSaccoId(),
+            app,
+            activeApplicantLoans
+        ).toPayload());
     }
 
     @GetMapping("/loan-applications/{loanId}/guarantors/{guarantorId}/financial-status")

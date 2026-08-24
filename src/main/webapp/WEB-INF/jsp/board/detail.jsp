@@ -37,81 +37,85 @@
 
 <%@ include file="../fragments/applicant-payment-details.jspf" %>
 
-<div class="loan-view-summary-card mt-5 px-5 py-5">
+<div class="loan-view-summary-card mt-5 px-5 py-5"
+     <c:if test="${activeApplicantLoansForesightEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
             <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" data-staff-active-loans-count-label>
                 ${activeApplicantLoanCount} active loan<c:if test="${activeApplicantLoanCount ne 1}">s</c:if>
             </span>
-            <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue">
+            <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue" data-staff-active-loans-total-label>
                 Total exposure ${activeApplicantLoanTotalAmount}
             </span>
         </div>
     </div>
-    <c:choose>
-        <c:when test="${not empty activeApplicantLoans}">
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="analytics.activeLoans" text="Active Loans" /></div>
-                    <div class="applicant-info-value">${activeApplicantLoanCount}</div>
-                </div>
-                <div class="applicant-info-card">
-                    <div class="applicant-info-label"><spring:message code="analytics.totalActiveAmount" text="Total Active Amount" /></div>
-                    <div class="applicant-info-value">${activeApplicantLoanTotalAmount}</div>
-                </div>
-            </div>
-<div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
-                <div class="erp-table-scroll">
-                <table class="erp-table">
-                    <thead>
-                    <tr>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.single" text="Loan" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="common.type" text="Type" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="common.amount" text="Amount" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
-                        <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
-                    </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                    <c:forEach items="${activeApplicantLoans}" var="loan">
-                        <tr>
-                            <td class="px-3 py-2">
-                                <div class="font-medium text-slate-900">${loan.shortId}</div>
-                            </td>
-                            <td class="px-3 py-2 text-slate-700">${loan.loanTypeLabel}</td>
-                            <td class="px-3 py-2 font-medium text-slate-900">${loan.amount}</td>
-                            <td class="px-3 py-2 font-medium text-slate-900" data-active-loan-outstanding="${loan.id}">${loan.outstandingBalance}</td>
-                            <td class="px-3 py-2">
-                                <div class="font-medium text-slate-900">${loan.installmentAmount}</div>
-                                <div class="mt-1 text-xs uppercase tracking-wide text-slate-500">${loan.repaymentFrequency}</div>
-                            </td>
-                            <td class="px-3 py-2 text-slate-700">${loan.disbursedAt}</td>
-                            <td class="px-3 py-2">
-                                <div class="font-medium text-slate-900">${loan.finalDueDate}</div>
-                                <c:if test="${not empty loan.countdown}">
-                                    <div class="mt-1 text-xs text-slate-500">${loan.countdown}</div>
-                                </c:if>
+    <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <div class="applicant-info-card">
+            <div class="applicant-info-label"><spring:message code="analytics.activeLoans" text="Active Loans" /></div>
+            <div class="applicant-info-value" data-staff-active-loans-count>${activeApplicantLoanCount}</div>
+        </div>
+        <div class="applicant-info-card">
+            <div class="applicant-info-label"><spring:message code="analytics.totalActiveAmount" text="Total Active Amount" /></div>
+            <div class="applicant-info-value" data-staff-active-loans-total>${activeApplicantLoanTotalAmount}</div>
+        </div>
+    </div>
+    <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+        <div class="erp-table-scroll">
+            <table class="erp-table">
+                <thead>
+                <tr>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.single" text="Loan" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="common.type" text="Type" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="common.amount" text="Amount" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.table.outstandingBalance" text="Outstanding Balance" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.installmentAmount" text="Installment" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="analytics.disbursed" text="Disbursed" /></th>
+                    <th class="px-3 py-2 text-left"><spring:message code="loan.repayment.finalDueDate" text="Final Due" /></th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100" data-staff-active-loans-body>
+                <c:choose>
+                    <c:when test="${not empty activeApplicantLoans}">
+                        <c:forEach items="${activeApplicantLoans}" var="loan">
+                            <tr>
+                                <td class="px-3 py-2">
+                                    <div class="font-medium text-slate-900">${loan.shortId}</div>
+                                </td>
+                                <td class="px-3 py-2 text-slate-700">${loan.loanTypeLabel}</td>
+                                <td class="px-3 py-2 font-medium text-slate-900">${loan.amount}</td>
+                                <td class="px-3 py-2 font-medium text-slate-900" data-active-loan-outstanding="${loan.id}">${loan.outstandingBalance}</td>
+                                <td class="px-3 py-2">
+                                    <div class="font-medium text-slate-900">${loan.installmentAmount}</div>
+                                    <div class="mt-1 text-xs uppercase tracking-wide text-slate-500">${loan.repaymentFrequency}</div>
+                                </td>
+                                <td class="px-3 py-2 text-slate-700">${loan.disbursedAt}</td>
+                                <td class="px-3 py-2">
+                                    <div class="font-medium text-slate-900">${loan.finalDueDate}</div>
+                                    <c:if test="${not empty loan.countdown}">
+                                        <div class="mt-1 text-xs text-slate-500">${loan.countdown}</div>
+                                    </c:if>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </c:when>
+                    <c:otherwise>
+                        <tr data-staff-active-loans-empty>
+                            <td colspan="7" class="px-3 py-4 text-center text-sm text-slate-600">
+                                <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
                             </td>
                         </tr>
-                    </c:forEach>
-                    </tbody>
-                </table>
+                    </c:otherwise>
+                </c:choose>
+                </tbody>
+            </table>
             </div>
             </div>
-        </c:when>
-        <c:otherwise>
-            <div class="mt-5 border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                <spring:message code="review.noActiveApplicantLoans" text="This applicant has no other active disbursed loans at the moment." />
-</div>
-        </c:otherwise>
-    </c:choose>
     </div>
+<%@ include file="../fragments/staff-active-loans-hydration.jspf" %>
 
 <div class="loan-view-summary-card mt-5 px-5 py-5">
     <div>

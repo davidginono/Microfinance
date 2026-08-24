@@ -111,6 +111,111 @@ class ForesightDirectoryServiceTest {
     }
 
     @Test
+    void activeLoansLookupUsesRecordsPathAndParsesArrayResponse() throws Exception {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> query = new AtomicReference<>();
+        HttpServer server = server(200, """
+            [
+              {
+                "loanId": "1001",
+                "disbursedDate": "2024-03-15",
+                "loanDescription": "Personal Loan",
+                "requestedAmount": 500000.00,
+                "disbursedAmount": 525000.00,
+                "interestRate": 15.5,
+                "totalInterest": 25000.00
+              }
+            ]
+            """, path, query);
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            var loans = service.fetchActiveLoans("MEM001", "ST01");
+
+            assertThat(loans).hasSize(1);
+            ForesightActiveLoan loan = loans.getFirst();
+            assertThat(loan.loanIdText()).isEqualTo("1001");
+            assertThat(loan.loanDescription()).isEqualTo("Personal Loan");
+            assertThat(loan.disbursedDate()).isEqualTo(LocalDate.of(2024, 3, 15));
+            assertThat(loan.requestedAmount()).isEqualByComparingTo("500000.00");
+            assertThat(loan.disbursedAmount()).isEqualByComparingTo("525000.00");
+            assertThat(loan.totalInterest()).isEqualByComparingTo("25000.00");
+            assertThat(path.get()).isEqualTo("/active-loans/records");
+            assertThat(query.get()).isEqualTo("memberNumber=MEM001&stationId=ST01");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void activeLoansLookupReturnsEmptyListForEmptyArray() throws Exception {
+        HttpServer server = server(200, "[]", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThat(service.fetchActiveLoans("MEM001", "ST01")).isEmpty();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void activeLoansLookupThrowsAvailabilityExceptionForUpstreamFailure() throws Exception {
+        HttpServer server = server(500, "{\"error\":\"down\"}", new AtomicReference<>(), new AtomicReference<>());
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            assertThatThrownBy(() -> service.fetchActiveLoans("MEM001", "ST01"))
+                .isInstanceOf(UpstreamAvailabilityException.class);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void accountSummaryParsesDocumentedOutstandingLoanFields() throws Exception {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> query = new AtomicReference<>();
+        HttpServer server = server(200, """
+            {
+              "savingsBalance": 100000.00,
+              "sharesBalance": 200000.00,
+              "depositsBalance": 300000.00,
+              "outstandingLoans": [
+                {
+                  "loanId": 1001,
+                  "loanDescription": "Education Loan",
+                  "outstandingPrincipal": 700000.00,
+                  "outstandingInterest": 70000.00
+                }
+              ]
+            }
+            """, path, query);
+        server.start();
+        try {
+            ForesightDirectoryService service = service("http://localhost:" + server.getAddress().getPort());
+
+            ForesightAccountSummary summary = service.fetchAccountSummary("MEM001", "ST01");
+
+            assertThat(summary.savingsBalance()).isEqualByComparingTo("100000.00");
+            assertThat(summary.outstandingLoans()).hasSize(1);
+            ForesightAccountSummary.ForesightOutstandingLoan loan = summary.outstandingLoans().getFirst();
+            assertThat(loan.loanIdText()).isEqualTo("1001");
+            assertThat(loan.loanDescription()).isEqualTo("Education Loan");
+            assertThat(loan.outstandingPrincipal()).isEqualByComparingTo("700000.00");
+            assertThat(loan.outstandingInterest()).isEqualByComparingTo("70000.00");
+            assertThat(loan.balanceIncludingInterest()).isEqualByComparingTo("770000.00");
+            assertThat(path.get()).isEqualTo("/account-summary");
+            assertThat(query.get()).isEqualTo("memberNumber=MEM001&stationId=ST01");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void loanPaymentSummaryLookupUsesDocumentedPathAndParsesArrayResponse() throws Exception {
         AtomicReference<String> path = new AtomicReference<>();
         AtomicReference<String> query = new AtomicReference<>();

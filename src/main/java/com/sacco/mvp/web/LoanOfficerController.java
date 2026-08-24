@@ -12,6 +12,7 @@ import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AccessControlService;
+import com.sacco.mvp.service.ActiveLoanDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.BoardService;
@@ -64,6 +65,7 @@ public class LoanOfficerController {
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
+    private final ActiveLoanDisplayService activeLoanDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final ExternalAccountStatusService externalAccountStatusService;
     private final EmailOtpService emailOtpService;
@@ -278,6 +280,14 @@ public class LoanOfficerController {
         model.addAttribute("guarantorRequests", guarantorRequests);
         model.addAttribute("guarantorNames", guarantorNames);
         model.addAttribute("guarantorMembersById", guarantorMembersById);
+        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        ActiveLoanDisplayService.ActiveLoanDisplay activeLoanDisplay =
+            activeLoanDisplayService.localStaffReviewRows(principal.getSaccoId(), app, activeApplicantLoans);
+        model.addAttribute("activeApplicantLoans", activeLoanDisplay.rows());
+        model.addAttribute("activeApplicantLoanCount", activeLoanDisplay.count());
+        model.addAttribute("activeApplicantLoanTotalAmount", activeLoanDisplay.totalExposure());
+        model.addAttribute("activeApplicantLoansForesightEnabled", true);
         model.addAttribute("managerReason", loanPresentationService.latestManagerReason(id));
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
@@ -338,6 +348,25 @@ public class LoanOfficerController {
             .orElseThrow(() -> new IllegalArgumentException("Application not found"));
         Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(applicant)));
+    }
+
+    @GetMapping("/loan-applications/{id}/applicant-active-loans")
+    @ResponseBody
+    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @authz.isLoanOfficerAssignee(#id, principal)")
+    public ResponseEntity<Map<String, Object>> applicantActiveLoans(@PathVariable UUID id,
+                                                                    @AuthenticationPrincipal AppUserPrincipal principal) {
+        boardService.getMyReview(id, principal.getMemberId(), STAGE);
+        LoanApplication app = boardService.findLoan(id)
+            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+        Member applicant = memberDirectoryService.find(app.getApplicantMemberId()).orElse(null);
+        List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
+            app.getApplicantMemberId(), app.getId(), principal.getSaccoId());
+        return ResponseEntity.ok(activeLoanDisplayService.staffReviewRows(
+            applicant,
+            principal.getSaccoId(),
+            app,
+            activeApplicantLoans
+        ).toPayload());
     }
 
     @PostMapping("/loan-applications/{id}/request-signature-otp")

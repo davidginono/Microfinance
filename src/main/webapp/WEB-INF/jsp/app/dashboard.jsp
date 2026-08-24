@@ -359,7 +359,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             <div class="erp-stat-main">
                 <div>
                     <p class="erp-stat-label"><spring:message code="dashboard.stat.activeLoans.label" /></p>
-                    <p class="erp-stat-value">${activeLoanCount}</p>
+                    <p class="erp-stat-value" data-member-active-loans-count>${activeLoanCount}</p>
                 </div>
                 <span class="erp-stat-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v3H4V4zm0 5h12v7H4V9zm2 2v3h4v-3H6z"/></svg>
@@ -512,9 +512,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     </svg>
                 </button>
                 <div id="activeLoansTablePanel" class="member-dashboard-collapsible aws-dashboard-detail-panel" hidden>
-                <c:choose>
-                    <c:when test="${not empty activeLoanChartRows}">
-                        <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results...">
+                        <div class="erp-table-wrap" data-aws-table-region data-aws-no-refresh="true" data-loading-label="Loading results..." data-active-loans-url="${pageContext.request.contextPath}/app/dashboard/active-loans">
                             <div class="app-table-titlebar">
                                 <div class="app-table-heading">
                                     <h2><spring:message code="dashboard.activeLoans.balancesTitle" text="Loan balances" /></h2>
@@ -555,40 +553,58 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                         <th class="px-3 py-3 text-left">Repayment Schedule</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    <c:forEach items="${activeLoanChartRows}" var="loanRow">
-                                        <tr data-active-loans-row data-loan-application-id="${loanRow.applicationId}">
-                                            <td class="px-3 py-3 text-sm font-semibold text-slate-700">${loanRow.disbursementDate}</td>
-                                            <td class="px-3 py-3 text-sm font-semibold text-slate-700">
-                                                <c:choose>
-                                                    <c:when test="${not empty loanRow.finalDueDate}">${loanRow.finalDueDate}</c:when>
-                                                    <c:otherwise>-</c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                            <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.loanId}</td>
-                                            <td class="px-3 py-3">
-                                                <span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">
-                                                    ${loanRow.repaymentStateLabel}
-                                                </span>
-                                            </td>
-                                            <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.loanProductName}</td>
-                                            <td class="px-3 py-3 text-sm font-semibold uppercase text-sacco-ink">
-                                                <c:choose>
-                                                    <c:when test="${not empty loanRow.applicantReason}">${loanRow.applicantReason}</c:when>
-                                                    <c:otherwise>-</c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                            <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.amountLabel}</td>
-                                            <td class="px-3 py-3 text-sm font-bold text-emerald-600" data-active-loan-paid-amount>${loanRow.paidAmount}</td>
-                                            <td class="px-3 py-3 text-sm font-bold text-blue-600" data-active-loan-current-balance>${loanRow.currentBalance}</td>
-                                            <td class="px-3 py-3">
-                                                <a href="${pageContext.request.contextPath}/app/loan-applications/${loanRow.fullId}#repayment-plan"
-                                                   class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">
-                                                    View Schedule
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    </c:forEach>
+                                <tbody class="divide-y divide-slate-100" data-active-loans-body>
+                                    <c:choose>
+                                        <c:when test="${not empty activeLoanChartRows}">
+                                            <c:forEach items="${activeLoanChartRows}" var="loanRow">
+                                                <tr data-active-loans-row data-loan-application-id="${loanRow.applicationId}">
+                                                    <td class="px-3 py-3 text-sm font-semibold text-slate-700">${loanRow.disbursementDate}</td>
+                                                    <td class="px-3 py-3 text-sm font-semibold text-slate-700">
+                                                        <c:choose>
+                                                            <c:when test="${not empty loanRow.finalDueDate}">${loanRow.finalDueDate}</c:when>
+                                                            <c:otherwise>-</c:otherwise>
+                                                        </c:choose>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-sm font-bold text-blue-600">${loanRow.loanId}</td>
+                                                    <td class="px-3 py-3">
+                                                        <span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${loanRow.repaymentStateClasses}">
+                                                            ${loanRow.repaymentStateLabel}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.loanProductName}</td>
+                                                    <td class="px-3 py-3 text-sm font-semibold uppercase text-sacco-ink">
+                                                        <c:choose>
+                                                            <c:when test="${not empty loanRow.applicantReason}">${loanRow.applicantReason}</c:when>
+                                                            <c:otherwise>-</c:otherwise>
+                                                        </c:choose>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-sm font-semibold text-sacco-ink">${loanRow.amountLabel}</td>
+                                                    <td class="px-3 py-3 text-sm font-bold text-emerald-600" data-active-loan-paid-amount>${loanRow.paidAmount}</td>
+                                                    <td class="px-3 py-3 text-sm font-bold text-blue-600" data-active-loan-current-balance>${loanRow.currentBalance}</td>
+                                                    <td class="px-3 py-3">
+                                                        <c:choose>
+                                                            <c:when test="${loanRow.scheduleAvailable}">
+                                                                <a href="${pageContext.request.contextPath}${loanRow.scheduleUrl}"
+                                                                   class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">
+                                                                    View Schedule
+                                                                </a>
+                                                            </c:when>
+                                                            <c:otherwise>
+                                                                <span class="text-sm font-semibold text-slate-500">-</span>
+                                                            </c:otherwise>
+                                                        </c:choose>
+                                                    </td>
+                                                </tr>
+                                            </c:forEach>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <tr data-active-loans-empty>
+                                                <td colspan="10" class="px-3 py-4 text-center text-sm text-slate-600">
+                                                    <spring:message code="dashboard.activeLoans.empty.title" />
+                                                </td>
+                                            </tr>
+                                        </c:otherwise>
+                                    </c:choose>
                                 </tbody>
                             </table>
                         </div>
@@ -597,20 +613,6 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                             <p class="font-semibold text-slate-600" data-active-loans-pagination-summary></p>
                             <div class="flex items-center gap-2" data-active-loans-pagination></div>
                         </div>
-                    </c:when>
-                    <c:otherwise>
-                        <div class="erp-section mt-4 text-center">
-                            <c:choose>
-                                <c:when test="${activeLoanCount gt 0}">
-                                    <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.repaymentTimers.empty.title" /></p>
-                                </c:when>
-                                <c:otherwise>
-                                    <p class="font-display text-xl text-sacco-ink"><spring:message code="dashboard.activeLoans.empty.title" /></p>
-                                </c:otherwise>
-                            </c:choose>
-                </div>
-                    </c:otherwise>
-                </c:choose>
             </div>
     </div>
         </section>
@@ -736,42 +738,120 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             render();
         }
 
-        function cssSelectorValue(value) {
-            var text = String(value || '');
-            if (window.CSS && typeof window.CSS.escape === 'function') {
-                return window.CSS.escape(text);
-            }
-            return text.replace(/["\\]/g, '\\$&');
-        }
-
         function showActiveLoanRefreshToast(type, message) {
             if (typeof window.showToast === 'function') {
                 window.showToast(type, message);
             }
         }
 
-        function updateActiveLoanBalanceRows(rows) {
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function valueOrDash(value) {
+            var text = String(value == null ? '' : value).trim();
+            return text ? text : '-';
+        }
+
+        function activeLoansScheduleHtml(row) {
+            if (!row || !row.scheduleAvailable || !row.scheduleUrl) {
+                return '<span class="text-sm font-semibold text-slate-500">-</span>';
+            }
+            var contextPath = '${pageContext.request.contextPath}';
+            var url = String(row.scheduleUrl || '');
+            if (contextPath && url.charAt(0) === '/') {
+                url = contextPath + url;
+            }
+            return '<a href="' + escapeHtml(url) + '" class="app-btn btn-neutral inline-flex justify-center whitespace-nowrap px-3 py-2 text-sm">View Schedule</a>';
+        }
+
+        function activeLoanRowHtml(row) {
+            var stateClasses = valueOrDash(row.repaymentStateClasses);
+            return [
+                '<tr data-active-loans-row data-loan-application-id="', escapeHtml(valueOrDash(row.applicationId)), '">',
+                '<td class="px-3 py-3 text-sm font-semibold text-slate-700">', escapeHtml(valueOrDash(row.disbursementDate)), '</td>',
+                '<td class="px-3 py-3 text-sm font-semibold text-slate-700">', escapeHtml(valueOrDash(row.finalDueDate)), '</td>',
+                '<td class="px-3 py-3 text-sm font-bold text-blue-600">', escapeHtml(valueOrDash(row.loanId)), '</td>',
+                '<td class="px-3 py-3"><span class="inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ',
+                escapeHtml(stateClasses),
+                '">', escapeHtml(valueOrDash(row.repaymentStateLabel)), '</span></td>',
+                '<td class="px-3 py-3 text-sm font-semibold text-sacco-ink">', escapeHtml(valueOrDash(row.loanProductName)), '</td>',
+                '<td class="px-3 py-3 text-sm font-semibold uppercase text-sacco-ink">', escapeHtml(valueOrDash(row.applicantReason)), '</td>',
+                '<td class="px-3 py-3 text-sm font-semibold text-sacco-ink">', escapeHtml(valueOrDash(row.amountLabel)), '</td>',
+                '<td class="px-3 py-3 text-sm font-bold text-emerald-600" data-active-loan-paid-amount>', escapeHtml(valueOrDash(row.paidAmount)), '</td>',
+                '<td class="px-3 py-3 text-sm font-bold text-blue-600" data-active-loan-current-balance>', escapeHtml(valueOrDash(row.currentBalance)), '</td>',
+                '<td class="px-3 py-3">', activeLoansScheduleHtml(row), '</td>',
+                '</tr>'
+            ].join('');
+        }
+
+        function activeLoansEmptyRowHtml() {
+            return [
+                '<tr data-active-loans-empty>',
+                '<td colspan="10" class="px-3 py-4 text-center text-sm text-slate-600">',
+                '<spring:message code="dashboard.activeLoans.empty.title" javaScriptEscape="true" />',
+                '</td>',
+                '</tr>'
+            ].join('');
+        }
+
+        function renderActiveLoanRows(rows) {
             var table = document.querySelector('[data-active-loans-table]');
             if (!table || !Array.isArray(rows)) {
                 return;
             }
-            rows.forEach(function (row) {
-                if (!row || !row.applicationId) {
-                    return;
+            var body = table.querySelector('[data-active-loans-body]');
+            if (!body) {
+                return;
+            }
+            body.innerHTML = rows.length ? rows.map(activeLoanRowHtml).join('') : activeLoansEmptyRowHtml();
+            table.removeAttribute('data-active-loans-pagination-ready');
+            initActiveLoansPagination();
+        }
+
+        function renderActiveLoanPayload(payload) {
+            if (!payload || !Array.isArray(payload.rows)) {
+                return;
+            }
+            renderActiveLoanRows(payload.rows);
+            var countValue = document.querySelector('[data-member-active-loans-count]');
+            if (countValue) {
+                countValue.textContent = String(typeof payload.count === 'number' ? payload.count : payload.rows.length);
+            }
+        }
+
+        function initActiveLoansHydration() {
+            var region = document.querySelector('[data-active-loans-url]');
+            if (!region || region.getAttribute('data-active-loans-hydration-ready') === 'true') {
+                return;
+            }
+            var url = region.getAttribute('data-active-loans-url');
+            if (!url) {
+                return;
+            }
+            region.setAttribute('data-active-loans-hydration-ready', 'true');
+            fetch(url, {
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
-                var target = table.querySelector('[data-active-loans-row][data-loan-application-id="' + cssSelectorValue(row.applicationId) + '"]');
-                if (!target) {
-                    return;
-                }
-                var currentBalance = target.querySelector('[data-active-loan-current-balance]');
-                var paidAmount = target.querySelector('[data-active-loan-paid-amount]');
-                if (currentBalance && row.currentBalance) {
-                    currentBalance.textContent = row.currentBalance;
-                }
-                if (paidAmount && row.paidAmount) {
-                    paidAmount.textContent = row.paidAmount;
-                }
-            });
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Active loans could not load.');
+                    }
+                    return response.json();
+                })
+                .then(renderActiveLoanPayload)
+                .catch(function () {
+                    region.removeAttribute('data-active-loans-hydration-ready');
+                });
         }
 
         function initActiveLoansBalanceRefresh() {
@@ -809,6 +889,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
@@ -826,7 +907,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                         });
                     })
                     .then(function (payload) {
-                        updateActiveLoanBalanceRows(payload.rows);
+                        renderActiveLoanPayload(payload);
                         if (payload.status === 'ERROR') {
                             showActiveLoanRefreshToast('error', payload.message || errorMessage);
                         } else if (payload.status === 'NO_DATA') {
@@ -852,6 +933,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
             initDashboardDropdowns();
             initActiveLoansShortcut();
             initActiveLoansPagination();
+            initActiveLoansHydration();
             initActiveLoansBalanceRefresh();
         }
 

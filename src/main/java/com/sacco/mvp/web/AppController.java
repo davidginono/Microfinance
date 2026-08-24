@@ -7,6 +7,7 @@ import com.sacco.mvp.service.EligibilityService;
 import com.sacco.mvp.service.FinancialDetailsService;
 import com.sacco.mvp.service.FormSchemaService;
 import com.sacco.mvp.service.AdminService;
+import com.sacco.mvp.service.ActiveLoanDisplayService;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.ArchiveDateRange;
 import com.sacco.mvp.service.EmailOtpService;
@@ -92,6 +93,7 @@ public class AppController {
     private final FinancialDetailsService financialDetailsService;
     private final LoanPresentationService loanPresentationService;
     private final LoanPaymentSummarySyncService loanPaymentSummarySyncService;
+    private final ActiveLoanDisplayService activeLoanDisplayService;
     private final LoanProductDisplayService loanProductDisplayService;
     private final LoanReportService loanReportService;
     private final LoanProductRequiredAttachmentService requiredAttachmentService;
@@ -208,6 +210,20 @@ public class AppController {
         return ResponseEntity.ok(externalAccountStatusPayload(externalAccountStatusService.resolve(member)));
     }
 
+    @GetMapping("/dashboard/active-loans")
+    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> dashboardActiveLoans(@AuthenticationPrincipal AppUserPrincipal principal) {
+        Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
+        ActiveLoanDisplayService.ActiveLoanDisplay display = activeLoanDisplayService.memberDashboardRows(
+            member,
+            principal.getSaccoId(),
+            loanWorkflowService.findActiveDisbursedLoans(principal.getMemberId()),
+            dismissedActiveLoanChartIds(principal.getMemberId())
+        );
+        return ResponseEntity.ok(display.toPayload());
+    }
+
     @PostMapping("/dashboard/active-loans/balances/refresh")
     @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'MEMBER_LOANS_VIEW') and @access.has(principal, 'MEMBER_LOANS_UPDATE')")
     @ResponseBody
@@ -217,16 +233,15 @@ public class AppController {
                 principal.getMemberId(),
                 MEMBER_ACTIVE_LOAN_BALANCE_REFRESH_LIMIT
             );
-        List<Map<String, Object>> rows = buildActiveLoanChartRows(
+        Member member = memberDirectoryService.find(principal.getMemberId()).orElse(null);
+        Map<String, Object> payload = activeLoanDisplayService.memberDashboardRows(
+            member,
+            principal.getSaccoId(),
             loanWorkflowService.findActiveDisbursedLoans(principal.getMemberId()),
-            dismissedActiveLoanChartIds(principal.getMemberId()),
-            loanProductNames(principal.getSaccoId())
-        );
-
-        Map<String, Object> payload = new LinkedHashMap<>();
+            dismissedActiveLoanChartIds(principal.getMemberId())
+        ).toPayload();
         payload.put("status", refreshResult.status().name());
         payload.put("message", refreshResult.message());
-        payload.put("rows", activeLoanBalanceResponseRows(rows));
         return ResponseEntity.ok(payload);
     }
 
@@ -538,24 +553,9 @@ public class AppController {
                 row.put("totalInterestPaid", loanPresentationService.formatMoneyDisplay(
                     loanPresentationService.activeLoanTotalInterestPaid(app)
                 ));
-                return row;
-            })
-            .toList();
-    }
-
-    private List<Map<String, Object>> activeLoanBalanceResponseRows(List<Map<String, Object>> sourceRows) {
-        return sourceRows.stream()
-            .map(source -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("applicationId", source.get("applicationId"));
-                row.put("loanId", source.get("loanId"));
-                row.put("currentBalance", source.get("currentBalance"));
-                row.put("paidAmount", source.get("paidAmount"));
-                row.put("outstandingPrincipal", source.get("outstandingPrincipal"));
-                row.put("outstandingInterest", source.get("outstandingInterest"));
-                row.put("totalPrincipalPaid", source.get("totalPrincipalPaid"));
-                row.put("totalInterestPaid", source.get("totalInterestPaid"));
-                row.put("lastPaymentDate", source.get("lastPaymentDate"));
+                row.put("scheduleAvailable", true);
+                row.put("scheduleUrl", "/app/loan-applications/" + app.getId() + "#repayment-plan");
+                row.put("externalOnly", false);
                 return row;
             })
             .toList();

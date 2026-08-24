@@ -57,7 +57,12 @@ public class ForesightDirectoryService {
 
     public ForesightAccountSummary fetchAccountSummary(String memberNumber, String stationId) {
         try {
-            URI requestUri = URI.create(baseUrl + "/account-summary?memberNumber=" + memberNumber + "&stationId=" + stationId);
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/account-summary")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .build()
+                .toUri();
             log.info("Foresight account-summary lookup started: {}", requestUri);
             ForesightAccountSummary summary = client().get()
                 .uri(requestUri)
@@ -79,6 +84,35 @@ public class ForesightDirectoryService {
         } catch (ResourceAccessException ex) {
             log.warn("Foresight account-summary lookup could not reach the external directory: {}", ex.getMessage());
             throw new UpstreamAvailabilityException("Unable to reach the external member directory.", ex);
+        }
+    }
+
+    public List<ForesightActiveLoan> fetchActiveLoans(String memberNumber, String stationId) {
+        try {
+            URI requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/active-loans/records")
+                .queryParam("memberNumber", memberNumber)
+                .queryParam("stationId", stationId)
+                .build()
+                .toUri();
+            log.info("Foresight active-loans lookup started: {}", requestUri);
+            List<ForesightActiveLoan> loans = client().get()
+                .uri(requestUri)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ForesightActiveLoan>>() {});
+            log.info("Foresight active-loans lookup completed: rows={}", loans == null ? 0 : loans.size());
+            return loans == null ? List.of() : loans;
+        } catch (RestClientResponseException ex) {
+            log.warn("Foresight active-loans lookup failed with status {}. Response body: {}",
+                ex.getStatusCode(), ex.getResponseBodyAsString());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new UpstreamAvailabilityException(
+                    "External active loans service is temporarily unavailable.", ex);
+            }
+            throw new IllegalStateException("External active loans lookup failed with status " + ex.getStatusCode().value() + ".", ex);
+        } catch (ResourceAccessException ex) {
+            log.warn("Foresight active-loans lookup could not reach the external directory: {}", ex.getMessage());
+            throw new UpstreamAvailabilityException("Unable to reach the external active loans service.", ex);
         }
     }
 

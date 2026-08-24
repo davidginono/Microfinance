@@ -1,0 +1,124 @@
+<script>
+    (function () {
+        function escapeHtml(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function valueOrDash(value) {
+            var text = String(value == null ? "" : value).trim();
+            return text ? text : "-";
+        }
+
+        function activeLoanCountLabel(count) {
+            return count + " active loan" + (count === 1 ? "" : "s");
+        }
+
+        function rowHtml(row) {
+            var frequency = String(row.repaymentFrequency || "").trim();
+            var countdown = String(row.countdown || "").trim();
+            return [
+                "<tr>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.shortId)), "</div></td>",
+                "<td class=\"px-3 py-2 text-slate-700\">", escapeHtml(valueOrDash(row.loanTypeLabel)), "</td>",
+                "<td class=\"px-3 py-2 font-medium text-slate-900\">", escapeHtml(valueOrDash(row.amount)), "</td>",
+                "<td class=\"px-3 py-2 font-medium text-slate-900\" data-active-loan-outstanding=\"", escapeHtml(valueOrDash(row.id)), "\">",
+                escapeHtml(valueOrDash(row.outstandingBalance)),
+                "</td>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.installmentAmount)), "</div>",
+                frequency ? "<div class=\"mt-1 text-xs uppercase tracking-wide text-slate-500\">" + escapeHtml(frequency) + "</div>" : "",
+                "</td>",
+                "<td class=\"px-3 py-2 text-slate-700\">", escapeHtml(valueOrDash(row.disbursedAt)), "</td>",
+                "<td class=\"px-3 py-2\"><div class=\"font-medium text-slate-900\">", escapeHtml(valueOrDash(row.finalDueDate)), "</div>",
+                countdown ? "<div class=\"mt-1 text-xs text-slate-500\">" + escapeHtml(countdown) + "</div>" : "",
+                "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function emptyRowHtml() {
+            return [
+                "<tr data-staff-active-loans-empty>",
+                "<td colspan=\"7\" class=\"px-3 py-4 text-center text-sm text-slate-600\">",
+                "<spring:message code='review.noActiveApplicantLoans' text='This applicant has no other active disbursed loans at the moment.' javaScriptEscape='true' />",
+                "</td>",
+                "</tr>"
+            ].join("");
+        }
+
+        function applyPayload(section, payload) {
+            if (!payload || !Array.isArray(payload.rows)) {
+                return;
+            }
+            var count = typeof payload.count === "number" ? payload.count : payload.rows.length;
+            var totalExposure = payload.totalExposure || "TSh 0";
+            var countLabel = section.querySelector("[data-staff-active-loans-count-label]");
+            var totalLabel = section.querySelector("[data-staff-active-loans-total-label]");
+            var countValue = section.querySelector("[data-staff-active-loans-count]");
+            var totalValue = section.querySelector("[data-staff-active-loans-total]");
+            var body = section.querySelector("[data-staff-active-loans-body]");
+
+            if (countLabel) {
+                countLabel.textContent = activeLoanCountLabel(count);
+            }
+            if (totalLabel) {
+                totalLabel.textContent = "Total exposure " + totalExposure;
+            }
+            if (countValue) {
+                countValue.textContent = String(count);
+            }
+            if (totalValue) {
+                totalValue.textContent = totalExposure;
+            }
+            if (body) {
+                body.innerHTML = payload.rows.length
+                    ? payload.rows.map(rowHtml).join("")
+                    : emptyRowHtml();
+            }
+        }
+
+        function hydrate(section) {
+            if (section.getAttribute("data-staff-active-loans-ready") === "true") {
+                return;
+            }
+            var url = section.getAttribute("data-active-loans-url");
+            if (!url) {
+                return;
+            }
+            section.setAttribute("data-staff-active-loans-ready", "true");
+            fetch(url, {
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Active loans could not load.");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    applyPayload(section, payload);
+                })
+                .catch(function () {
+                    section.removeAttribute("data-staff-active-loans-ready");
+                });
+        }
+
+        function init() {
+            document.querySelectorAll("[data-staff-active-loans-section=\"true\"]").forEach(hydrate);
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init, { once: true });
+        } else {
+            init();
+        }
+    }());
+</script>
