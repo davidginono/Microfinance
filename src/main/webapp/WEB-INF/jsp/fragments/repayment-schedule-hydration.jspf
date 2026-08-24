@@ -100,16 +100,30 @@
                 : emptyRowHtml(payload.message);
         }
 
-        function hydrateSection(section) {
+        function hydrateSection(section, force) {
             if (!section || section.getAttribute("data-repayment-schedule-loading") === "true"
-                || section.getAttribute("data-repayment-schedule-ready") === "true") {
+                || (!force && section.getAttribute("data-repayment-schedule-ready") === "true")) {
                 return;
             }
             var url = section.getAttribute("data-repayment-schedule-url");
             if (!url) {
                 return;
             }
+            var button = section.querySelector("[data-repayment-schedule-refresh]");
+            var originalLabel = button ? button.getAttribute("aria-label") : "";
             section.setAttribute("data-repayment-schedule-loading", "true");
+            section.removeAttribute("data-repayment-schedule-ready");
+            if (button) {
+                button.disabled = true;
+                button.setAttribute("aria-busy", "true");
+                button.setAttribute("aria-label", button.getAttribute("data-loading-label") || "Refreshing repayment schedule");
+            }
+            if (force) {
+                var body = section.querySelector("[data-repayment-schedule-body]");
+                if (body) {
+                    body.innerHTML = emptyRowHtml("Refreshing repayment schedule...");
+                }
+            }
             fetch(url, {
                 credentials: "same-origin",
                 headers: {
@@ -132,9 +146,17 @@
                     if (body) {
                         body.innerHTML = emptyRowHtml("Repayment schedule is unavailable right now. Please retry again later.");
                     }
+                    if (force && typeof window.showToast === "function") {
+                        window.showToast("error", "Repayment schedule is unavailable right now. Please retry again later.");
+                    }
                 })
                 .finally(function () {
                     section.removeAttribute("data-repayment-schedule-loading");
+                    if (button) {
+                        button.disabled = false;
+                        button.setAttribute("aria-busy", "false");
+                        button.setAttribute("aria-label", originalLabel || "Refresh repayment schedule");
+                    }
                 });
         }
 
@@ -244,7 +266,18 @@
         }
 
         function init() {
-            document.querySelectorAll("[data-repayment-schedule-section=\"true\"]").forEach(hydrateSection);
+            document.querySelectorAll("[data-repayment-schedule-section=\"true\"]").forEach(function (section) {
+                hydrateSection(section, false);
+                var button = section.querySelector("[data-repayment-schedule-refresh]");
+                if (button && button.getAttribute("data-repayment-schedule-refresh-ready") !== "true") {
+                    button.setAttribute("data-repayment-schedule-refresh-ready", "true");
+                    button.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        hydrateSection(section, true);
+                    });
+                }
+            });
         }
 
         document.addEventListener("click", function (event) {

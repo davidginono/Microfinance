@@ -397,7 +397,20 @@
         <details class="loan-detail-disclosure" open>
             <summary class="loan-detail-disclosure__summary">
                 <span><spring:message code="loan.repayment.schedule" text="Repayment Schedule" /></span>
-                <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
+                <span class="inline-flex items-center gap-2">
+                    <button type="button"
+                            class="app-icon-button btn-neutral"
+                            data-repayment-schedule-refresh
+                            data-loading-label="<spring:message code='loan.repayment.refreshingSchedule' text='Refreshing repayment schedule' />"
+                            aria-label="<spring:message code='loan.repayment.refreshSchedule' text='Refresh repayment schedule' />"
+                            title="<spring:message code='loan.repayment.refreshSchedule' text='Refresh repayment schedule' />">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+                            <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+                        </svg>
+                    </button>
+                    <span class="loan-detail-disclosure__chevron" aria-hidden="true"></span>
+                </span>
             </summary>
             <div class="erp-table-wrap rounded-none border-0" data-aws-no-titlebar="true">
                 <div class="erp-table-scroll">

@@ -67,12 +67,14 @@ class ActiveLoanHydrationViewContractTest {
         assertThat(memberDetail)
             .contains("data-repayment-schedule-section=\"true\"")
             .contains("data-repayment-schedule-url=\"${pageContext.request.contextPath}${repaymentSchedulePath}\"")
+            .contains("data-repayment-schedule-refresh")
             .contains("data-repayment-schedule-body")
             .contains("repayment-schedule-hydration.jspf");
         assertThat(staffSummary)
             .contains("actualRepaymentScheduleEnabled or not empty repaymentSummary")
             .contains("data-repayment-schedule-section=\"true\"")
             .contains("data-repayment-schedule-url=\"${repaymentSchedulePath}\"")
+            .contains("data-repayment-schedule-refresh")
             .contains("data-repayment-schedule-body")
             .contains("Repayment schedule will appear when Foresight is available.");
     }

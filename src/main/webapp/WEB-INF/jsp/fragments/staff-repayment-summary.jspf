@@ -48,9 +48,24 @@
                                 </c:otherwise>
                             </c:choose>
                         </span>
-                        <svg class="expected-schedule-chevron h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                        </svg>
+                        <span class="inline-flex items-center gap-2">
+                            <c:if test="${actualRepaymentScheduleEnabled}">
+                                <button type="button"
+                                        class="app-icon-button btn-neutral"
+                                        data-repayment-schedule-refresh
+                                        data-loading-label="<spring:message code='loan.repayment.refreshingSchedule' text='Refreshing repayment schedule' />"
+                                        aria-label="<spring:message code='loan.repayment.refreshSchedule' text='Refresh repayment schedule' />"
+                                        title="<spring:message code='loan.repayment.refreshSchedule' text='Refresh repayment schedule' />">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+                                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+                                    </svg>
+                                </button>
+                            </c:if>
+                            <svg class="expected-schedule-chevron h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
                     </summary>
                     <div class="erp-table-wrap rounded-none border-0">
                         <div class="erp-table-scroll">
