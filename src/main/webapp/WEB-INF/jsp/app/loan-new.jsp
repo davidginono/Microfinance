@@ -331,7 +331,11 @@
                       class="loan-guarantor-format-indicator"
                       aria-hidden="true"></span>
                 <button id="guarantorSearchButton" type="button" class="app-btn btn-primary loan-guarantor-search-action">
-                    <span class="loan-guarantor-search-spinner hidden" data-guarantor-search-spinner aria-hidden="true"></span>
+                    <span class="loan-guarantor-search-spinner hidden" data-guarantor-search-spinner aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
                     <span><spring:message code="common.search" /></span>
                 </button>
                 <div id="guarantorDropdown" class="loan-guarantor-dropdown hidden"></div>
@@ -1681,7 +1685,7 @@
                     }
                     return;
                 }
-                if (!result.valid && (hasValue || forceMessage)) {
+                if (!result.valid && forceMessage) {
                     searchInput.classList.add("field-error-input");
                     searchInput.setAttribute("aria-invalid", "true");
                     if (formatIndicator) {

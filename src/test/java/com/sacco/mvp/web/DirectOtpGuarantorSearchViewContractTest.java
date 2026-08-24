@@ -30,8 +30,9 @@ class DirectOtpGuarantorSearchViewContractTest {
     }
 
     @Test
-    void guarantorSearchShowsInlineFormatVerificationBeforeFetch() throws Exception {
+    void guarantorSearchShowsInlineFormatVerificationOnlyAfterSearchClick() throws Exception {
         String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/app/loan-new.jsp"));
+        String styles = Files.readString(Path.of("src/main/resources/static/css/console-components.css"));
 
         assertThat(source)
             .contains("id=\"guarantorFormatIndicator\"")
@@ -41,7 +42,16 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("function normalizePhoneSearch(value)")
             .contains("searchInput.setAttribute(\"aria-invalid\", \"true\")")
             .contains("const validation = refreshSearchValidation(true);")
-            .contains("const term = validation.term;");
+            .contains("const term = validation.term;")
+            .contains("if (!result.valid && forceMessage)")
+            .contains("searchInput.addEventListener(\"input\", function () {")
+            .contains("refreshSearchValidation(false);")
+            .doesNotContain("if (!result.valid && (hasValue || forceMessage))");
+
+        assertThat(styles)
+            .contains(".loan-guarantor-search-spinner > span")
+            .contains("@keyframes loan-guarantor-search-pulse")
+            .contains("prefers-reduced-motion: reduce");
     }
 
     @Test
