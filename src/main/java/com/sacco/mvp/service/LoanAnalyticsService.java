@@ -52,11 +52,17 @@ public class LoanAnalyticsService {
     );
     private static final EnumSet<LoanStatus> DISBURSED_STATUSES = EnumSet.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
     private static final EnumSet<LoanStatus> ACTIVE_STATUSES = EnumSet.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
+        LoanStatus.DEFAULTED
+    );
+    private static final EnumSet<LoanStatus> DEFAULTED_RISK_STATUSES = EnumSet.of(
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED
     );
 
@@ -470,6 +476,16 @@ public class LoanAnalyticsService {
     public BigDecimal activeLoanAmount(UUID memberId, String saccoId, String stationId) {
         return sumInterestInclusiveActiveAmount(loanApplicationRepository.findActiveAmountRowsForApplicantScope(
             memberId, saccoId, stationId, ACTIVE_STATUSES));
+    }
+
+    public long defaultedRiskLoanCount(UUID memberId, String saccoId, String stationId) {
+        if (memberId == null) {
+            return 0L;
+        }
+        return loanApplicationRepository.countByStatusForApplicantScope(memberId, saccoId, stationId).stream()
+            .filter(row -> row.getStatus() != null && DEFAULTED_RISK_STATUSES.contains(row.getStatus()))
+            .mapToLong(LoanApplicationRepository.StatusCountProjection::getTotal)
+            .sum();
     }
 
     /**

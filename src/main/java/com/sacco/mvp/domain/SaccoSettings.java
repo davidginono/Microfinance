@@ -63,6 +63,10 @@ public class SaccoSettings {
     @Column(name = "guarantor_max_defaulted_loans")
     private Integer guarantorMaxDefaultedLoans;
 
+    @Builder.Default
+    @Column(name = "portfolio_at_risk_days", nullable = false)
+    private Integer portfolioAtRiskDays = 30;
+
     @Column(name = "default_language", nullable = false)
     private String defaultLanguage;
 

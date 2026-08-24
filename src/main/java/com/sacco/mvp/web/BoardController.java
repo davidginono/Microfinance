@@ -651,7 +651,7 @@ public class BoardController {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", BoardDecision.APPROVED, List.of());
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", BoardDecision.REJECTED, List.of());
             case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
-                List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID));
+                List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID));
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of());
         };
     }
@@ -865,6 +865,7 @@ public class BoardController {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
             case CHAIRPERSON_APPROVED, BOARD_APPROVED, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
+            case PAR -> "bg-amber-50 text-amber-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";

@@ -91,6 +91,7 @@ import java.util.stream.Collectors;
 public class LoanReportService {
     private static final List<LoanStatus> DISBURSED_STATUSES = List.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
@@ -105,6 +106,7 @@ public class LoanReportService {
     );
     private static final List<LoanStatus> ACTIVE_STATUSES = List.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED
     );
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -2034,7 +2036,9 @@ public class LoanReportService {
     private LoanSummary summarize(Collection<LoanApplication> loans) {
         long paidCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
         long ongoingCount = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED || loan.getStatus() == LoanStatus.DEFAULTED)
+            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED
+                || loan.getStatus() == LoanStatus.PAR
+                || loan.getStatus() == LoanStatus.DEFAULTED)
             .count();
         BigDecimal disbursedAmount = loans.stream().map(LoanApplication::getAmount).filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -2256,6 +2260,7 @@ public class LoanReportService {
         line.append("Due ").append(formatDate(loan.getFinalDueDate())).append(" | ");
         line.append(switch (loan.getStatus()) {
             case PAID -> "PAID on " + formatTimestamp(loan.getPaidAt());
+            case PAR -> "PORTFOLIO AT RISK";
             case DEFAULTED -> "DEFAULTED";
             default -> "ONGOING";
         });
@@ -2328,6 +2333,7 @@ public class LoanReportService {
             case ACCOUNTANT_REJECTED -> "Accountant Rejected";
             case REJECTED -> "Rejected";
             case DISBURSED -> "Disbursed";
+            case PAR -> "Portfolio At Risk";
             case DEFAULTED -> "Defaulted";
             case PAID -> "Paid";
             case MANAGER_ACCEPTED -> "Manager Approved";
@@ -2952,6 +2958,7 @@ public class LoanReportService {
             case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
             case REJECTED -> "Rejected";
             case DISBURSED -> "Disbursed";
+            case PAR -> "Portfolio At Risk";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
         };

@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import tools.jackson.databind.ObjectMapper;
+import com.sacco.mvp.domain.ExternalGuarantorRegistry;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
@@ -57,6 +58,7 @@ class LoanWorkflowServiceTest {
     @Mock private LoanProductSettingRepository loanProductSettingRepository;
     @Mock private LoanApplicationRepository loanApplicationRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
+    @Mock private ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     @Mock private BoardReviewRepository boardReviewRepository;
     @Mock private ManagerReviewRepository managerReviewRepository;
     @Mock private MemberRepository memberRepository;
@@ -80,6 +82,7 @@ class LoanWorkflowServiceTest {
     @Mock private ReversalRequestRepository reversalRequestRepository;
     @Mock private AuditService auditService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ApplicationClock applicationClock;
 
     @InjectMocks
     private LoanWorkflowService loanWorkflowService;
@@ -90,6 +93,8 @@ class LoanWorkflowServiceTest {
         lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
         lenient().doNothing().when(transactionManager).commit(any());
         lenient().doNothing().when(transactionManager).rollback(any());
+        lenient().when(applicationClock.today()).thenReturn(LocalDate.of(2026, 8, 24));
+        lenient().when(applicationClock.now()).thenReturn(OffsetDateTime.parse("2026-08-24T13:00:00+03:00"));
     }
 
     @Test
@@ -726,7 +731,7 @@ class LoanWorkflowServiceTest {
         stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(), List.of());
         when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
         when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
-            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(0), eq(new BigDecimal("100000")), eq(product)))
+            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(0), eq(0), eq(new BigDecimal("100000")), eq(product)))
             .thenReturn(Optional.empty());
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -775,7 +780,7 @@ class LoanWorkflowServiceTest {
         stubDirectOtpFinancialProfile("EXT-77", "ST01", new BigDecimal("300000.00"), List.of(activeLoan), List.of());
         when(memberRepository.findByMemberNoIgnoreCase("EXT-77")).thenReturn(Optional.empty());
         when(loanQualificationPolicyService.guarantorFailureReasonForExternal(
-            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(1), eq(new BigDecimal("100000")), eq(product)))
+            eq(saccoId), eq("ST01"), eq("EXT-77"), eq("ST01"), any(BigDecimal.class), eq(1), eq(0), eq(new BigDecimal("100000")), eq(product)))
             .thenReturn(Optional.of("Disabled: active loans are not allowed for guarantors under the station policy."));
 
         assertThatThrownBy(() -> loanWorkflowService.submit(appId, applicantId))
@@ -783,6 +788,66 @@ class LoanWorkflowServiceTest {
             .hasMessageContaining("active loans are not allowed");
 
         verify(guarantorRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void directOtpApprovalUpsertsRegistryForForesightOnlyGuarantor() {
+        UUID appId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        LoanApplication app = directOtpDraft(appId, applicantId, saccoId,
+            "[{\"source\":\"FORESIGHT\",\"lookupBy\":\"phone\",\"lookupValue\":\"+255676423992\"}]");
+        app.setStatus(LoanStatus.AWAITING_GUARANTORS);
+        GuarantorRequest request = GuarantorRequest.builder()
+            .id(requestId)
+            .loanApplicationId(appId)
+            .guarantorMemberId(null)
+            .status(GuarantorRequestStatus.PENDING)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        request.setGuarantorSource("FORESIGHT");
+        request.setExternalMemberNo("EXT-77");
+        request.setExternalStationId("ST01");
+        request.setExternalFullName("Asha Mtei");
+        request.setExternalEmail("asha@example.com");
+        request.setExternalPhone("+255676423992");
+        request.setExternalFinancialSnapshot("{\"savingsBalance\":\"300000.00\"}");
+        LoanProductSetting product = directOtpProduct(saccoId);
+
+        when(guarantorRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(loanApplicationRepository.findById(appId)).thenReturn(Optional.of(app));
+        when(externalGuarantorRegistryRepository.findBySaccoIdAndExternalStationIdIgnoreCaseAndExternalMemberNoIgnoreCase(
+            saccoId, "ST01", "EXT-77"))
+            .thenReturn(Optional.empty());
+        when(externalGuarantorRegistryRepository.save(any(ExternalGuarantorRegistry.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(guarantorRequestRepository.save(any(GuarantorRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(loanProductSettingRepository.findBySaccoIdAndLoanType(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(Optional.of(product));
+        when(guarantorRequestRepository.countByLoanApplicationIdAndStatus(appId, GuarantorRequestStatus.APPROVED)).thenReturn(1L);
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, BigDecimal.ONE, new BigDecimal("500000"), new BigDecimal("500000")));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        loanWorkflowService.approveDirectOtpGuarantorRequest(
+            requestId,
+            applicantId,
+            "Asha Mtei",
+            OffsetDateTime.parse("2026-08-24T12:00:00+03:00")
+        );
+
+        verify(externalGuarantorRegistryRepository).save(argThat(registry ->
+            saccoId.equals(registry.getSaccoId())
+                && "ST01".equals(registry.getStationId())
+                && "ST01".equals(registry.getExternalStationId())
+                && "EXT-77".equals(registry.getExternalMemberNo())
+                && "Asha Mtei".equals(registry.getFullName())
+                && registry.getLastApprovedAt() != null
+        ));
+        verify(guarantorRequestRepository).save(argThat(saved ->
+            saved.getExternalGuarantorRegistryId() != null
+                && saved.getStatus() == GuarantorRequestStatus.APPROVED
+        ));
     }
 
     @Test

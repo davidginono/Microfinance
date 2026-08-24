@@ -74,8 +74,8 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
             or (
               g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
               and l.status in (
-                com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
-                com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED
+            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
+            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED
               )
               and g.decidedAt > :removalCutoff
             )
@@ -93,6 +93,7 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
             com.sacco.mvp.domain.LoanStatus.DISBURSED,
+            com.sacco.mvp.domain.LoanStatus.PAR,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
@@ -160,7 +161,10 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
             com.sacco.mvp.domain.LoanStatus.DISBURSED,
+            com.sacco.mvp.domain.LoanStatus.PAR,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
+            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED,
             com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
             com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
@@ -170,6 +174,12 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           )
           and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and not exists (
+            select superseding.id
+            from LoanApplication superseding
+            where superseding.topUpSourceLoanId = g.loanApplicationId
+              and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
+          )
         """)
     java.math.BigDecimal sumActiveGuaranteedAmount(@Param("guarantorMemberId") UUID guarantorMemberId,
                                                    @Param("saccoId") String saccoId,
@@ -182,11 +192,26 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
           and g.guarantorMemberId = :guarantorMemberId
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
+            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
+            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED,
+            com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
+            com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.DISBURSED,
+            com.sacco.mvp.domain.LoanStatus.PAR,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED
           )
           and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and not exists (
+            select superseding.id
+            from LoanApplication superseding
+            where superseding.topUpSourceLoanId = g.loanApplicationId
+              and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
+          )
         """)
     long countActiveGuarantees(@Param("guarantorMemberId") UUID guarantorMemberId,
                                @Param("saccoId") String saccoId,
@@ -197,17 +222,41 @@ public interface GuarantorRequestRepository extends JpaRepository<GuarantorReque
         from GuarantorRequest g, LoanApplication l
         where g.loanApplicationId = l.id
           and g.guarantorMemberId is null
-          and lower(g.externalMemberNo) = lower(:externalMemberNo)
-          and lower(g.externalStationId) = lower(:externalStationId)
+          and (
+            (
+              cast(:externalGuarantorRegistryId as uuid) is not null
+              and g.externalGuarantorRegistryId = :externalGuarantorRegistryId
+            )
+            or (
+              lower(g.externalMemberNo) = lower(:externalMemberNo)
+              and lower(g.externalStationId) = lower(:externalStationId)
+            )
+          )
           and g.status = com.sacco.mvp.domain.GuarantorRequestStatus.APPROVED
           and l.status in (
+            com.sacco.mvp.domain.LoanStatus.AWAITING_GUARANTORS,
+            com.sacco.mvp.domain.LoanStatus.ALL_GUARANTORS_APPROVED,
+            com.sacco.mvp.domain.LoanStatus.READY_FOR_MANAGER,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_LOAN_OFFICER,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_BOARD,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_CREDIT_COMMITTEE,
+            com.sacco.mvp.domain.LoanStatus.AWAITING_ACCOUNTANT,
+            com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT,
             com.sacco.mvp.domain.LoanStatus.DISBURSED,
+            com.sacco.mvp.domain.LoanStatus.PAR,
             com.sacco.mvp.domain.LoanStatus.DEFAULTED
           )
           and (cast(:saccoId as string) is null or l.saccoId = :saccoId)
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
+          and not exists (
+            select superseding.id
+            from LoanApplication superseding
+            where superseding.topUpSourceLoanId = g.loanApplicationId
+              and superseding.status <> com.sacco.mvp.domain.LoanStatus.DRAFT
+          )
         """)
-    long countExternalActiveGuarantees(@Param("externalMemberNo") String externalMemberNo,
+    long countExternalActiveGuarantees(@Param("externalGuarantorRegistryId") UUID externalGuarantorRegistryId,
+                                       @Param("externalMemberNo") String externalMemberNo,
                                        @Param("externalStationId") String externalStationId,
                                        @Param("saccoId") String saccoId,
                                        @Param("stationId") String stationId);

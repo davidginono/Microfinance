@@ -24,6 +24,9 @@ public class GuarantorRequest {
     @Column(name = "guarantor_member_id")
     private UUID guarantorMemberId;
 
+    @Column(name = "external_guarantor_registry_id")
+    private UUID externalGuarantorRegistryId;
+
     @Builder.Default
     @Column(name = "guarantor_source", nullable = false)
     private String guarantorSource = "LMS";

@@ -2759,6 +2759,23 @@ body.aws-console {
     text-align: left !important;
 }
 
+.erp-table tbody td,
+.erp-table tbody td :where(*),
+.erp-table tfoot td,
+.erp-table tfoot td :where(*) {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
+}
+
+@media (min-width: 768px) {
+    .erp-table thead th {
+        white-space: nowrap !important;
+        overflow-wrap: normal !important;
+        word-break: normal !important;
+    }
+}
+
 .erp-table th.text-center,
 .erp-table td.text-center {
     text-align: center !important;

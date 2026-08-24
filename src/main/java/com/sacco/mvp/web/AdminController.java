@@ -947,6 +947,10 @@ public class AdminController {
         model.addAttribute("policyGuarantorWithActiveLoanAllowed", guarantorWithActiveLoanAllowed == null || guarantorWithActiveLoanAllowed);
         model.addAttribute("policyGuarantorMaxGuaranteedLoanAmount", stationPolicy == null ? settings.getGuarantorMaxGuaranteedLoanAmount() : stationPolicy.getGuarantorMaxGuaranteedLoanAmount());
         model.addAttribute("policyGuarantorMaxDefaultedLoans", stationPolicy == null ? settings.getGuarantorMaxDefaultedLoans() : stationPolicy.getGuarantorMaxDefaultedLoans());
+        Integer portfolioAtRiskDays = stationPolicy == null || stationPolicy.getPortfolioAtRiskDays() == null
+            ? settings.getPortfolioAtRiskDays()
+            : stationPolicy.getPortfolioAtRiskDays();
+        model.addAttribute("policyPortfolioAtRiskDays", portfolioAtRiskDays == null ? 30 : portfolioAtRiskDays);
         model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
         model.addAttribute("activeCreditCommitteeMemberCount", adminService.activeCreditCommitteeMemberCount(saccoId));
         model.addAttribute("activeChairpersonCount", adminService.activeChairpersonCount(saccoId));
@@ -1298,6 +1302,7 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                               @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                               @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
+                                              @RequestParam(required = false) Integer portfolioAtRiskDays,
                                               RedirectAttributes ra) {
         try {
             adminService.updateStationQualificationPolicies(
@@ -1307,7 +1312,8 @@ public class AdminController {
                 applicantMaxDefaultedLoans,
                 guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
-                guarantorMaxDefaultedLoans
+                guarantorMaxDefaultedLoans,
+                portfolioAtRiskDays
             );
             ra.addFlashAttribute("message", "Station qualification policies updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -1324,6 +1330,7 @@ public class AdminController {
                                                      @RequestParam(defaultValue = "false") boolean guarantorWithActiveLoanAllowed,
                                                      @RequestParam(required = false) BigDecimal guarantorMaxGuaranteedLoanAmount,
                                                      @RequestParam(required = false) Integer guarantorMaxDefaultedLoans,
+                                                     @RequestParam(required = false) Integer portfolioAtRiskDays,
                                                      RedirectAttributes ra) {
         try {
             adminService.updateStationQualificationPolicies(
@@ -1333,7 +1340,8 @@ public class AdminController {
                 applicantMaxDefaultedLoans,
                 guarantorWithActiveLoanAllowed,
                 guarantorMaxGuaranteedLoanAmount,
-                guarantorMaxDefaultedLoans
+                guarantorMaxDefaultedLoans,
+                portfolioAtRiskDays
             );
             ra.addFlashAttribute("message", "Station qualification policies updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {

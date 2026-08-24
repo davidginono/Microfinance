@@ -47,6 +47,9 @@ public class SaccoStationPolicy {
     @Column(name = "guarantor_max_defaulted_loans")
     private Integer guarantorMaxDefaultedLoans;
 
+    @Column(name = "portfolio_at_risk_days")
+    private Integer portfolioAtRiskDays;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

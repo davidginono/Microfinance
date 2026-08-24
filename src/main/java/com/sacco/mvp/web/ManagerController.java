@@ -96,6 +96,7 @@ public class ManagerController {
                 row.put("loanTypeLabel", loan.getLoanType().getDisplayLabel());
                 row.put("statusLabel", switch (loan.getStatus()) {
                     case PAID -> message("loan.status.PAID");
+                    case PAR -> message("loan.status.PAR");
                     case DEFAULTED -> message("loan.status.DEFAULTED");
                     default -> message("manager.dashboard.disbursedLoan");
                 });
@@ -676,6 +677,7 @@ public class ManagerController {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE -> "bg-blue-50 text-blue-700";
             case MANAGER_ACCEPTED, BOARD_APPROVED, DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
+            case PAR -> "bg-amber-50 text-amber-700";
             case DEFAULTED -> "bg-rose-50 text-rose-700";
             case MANAGER_REJECTED, BOARD_REJECTED, REJECTED -> "bg-rose-50 text-rose-700";
             default -> "bg-slate-100 text-slate-700";
@@ -703,7 +705,7 @@ public class ManagerController {
             case "DISBURSED" -> new QueueFilter(
                 "DISBURSED",
                 "Disbursed Loans",
-                List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID)
+                List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID)
             );
             default -> new QueueFilter(
                 "READY_FOR_MANAGER",
@@ -723,7 +725,7 @@ public class ManagerController {
         return switch (status) {
             case READY_FOR_MANAGER -> "READY_FOR_MANAGER";
             case AWAITING_BOARD -> "AWAITING_BOARD";
-            case DISBURSED, DEFAULTED, PAID -> "DISBURSED";
+            case DISBURSED, PAR, DEFAULTED, PAID -> "DISBURSED";
             default -> "READY_FOR_MANAGER";
         };
     }
@@ -734,7 +736,7 @@ public class ManagerController {
             case "APPROVED" -> new ArchiveFilter("APPROVED", "Approved Loans", ManagerDecision.ACCEPT, List.of(), false);
             case "REJECTED" -> new ArchiveFilter("REJECTED", "Rejected Loans", ManagerDecision.REJECT, List.of(), false);
             case "DISBURSED", "APPROVED_FOR_DISBURSEMENT" -> new ArchiveFilter("DISBURSED", "Disbursed Loans", null,
-                List.of(LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
+                List.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID), true);
             default -> new ArchiveFilter("ALL", "All Reviewed Loans", null, List.of(), false);
         };
     }

@@ -77,6 +77,7 @@ public class AppController {
         LoanStatus.ACCOUNTANT_REJECTED,
         LoanStatus.REJECTED,
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED,
         LoanStatus.PAID
     );
@@ -252,7 +253,7 @@ public class AppController {
                                                  RedirectAttributes ra) {
         LoanApplication app = loanWorkflowService.findMine(loanId, principal.getMemberId())
             .orElseThrow(() -> new IllegalArgumentException("Loan not found"));
-        if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.DEFAULTED) {
+        if (app.getStatus() != LoanStatus.DISBURSED && app.getStatus() != LoanStatus.PAR && app.getStatus() != LoanStatus.DEFAULTED) {
             ra.addFlashAttribute("error", "Only active or defaulted disbursed loans can be removed from the repayment timeline.");
             return "redirect:/app/dashboard";
         }
@@ -604,7 +605,8 @@ public class AppController {
             LoanStatus.READY_FOR_MANAGER,
             LoanStatus.AWAITING_BOARD,
             LoanStatus.AWAITING_CREDIT_COMMITTEE,
-            LoanStatus.DISBURSED
+            LoanStatus.DISBURSED,
+            LoanStatus.PAR
         );
         long maxCount = statusOrder.stream()
             .map(status -> statusCounts.getOrDefault(status, 0L))
@@ -723,7 +725,7 @@ public class AppController {
                 AWAITING_ACCOUNTANT, ACCOUNTANT_REJECTED -> 3;
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED -> 4;
             case READY_FOR_DISBURSEMENT, REJECTED -> 4;
-            case DISBURSED, DEFAULTED, PAID -> 5;
+            case DISBURSED, PAR, DEFAULTED, PAID -> 5;
         };
     }
 
@@ -921,6 +923,7 @@ public class AppController {
             return false;
         }
         return app.getStatus() == LoanStatus.DISBURSED
+            || app.getStatus() == LoanStatus.PAR
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID;
     }
@@ -1011,6 +1014,7 @@ public class AppController {
         }
         if (app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT
             || app.getStatus() == LoanStatus.DISBURSED
+            || app.getStatus() == LoanStatus.PAR
             || app.getStatus() == LoanStatus.DEFAULTED
             || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
@@ -1025,7 +1029,7 @@ public class AppController {
         if (app.getDisbursementDate() != null) {
             return formatDashboardWorkflowDate(app.getDisbursementDate());
         }
-        if (app.getStatus() == LoanStatus.DISBURSED || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
+        if (app.getStatus() == LoanStatus.DISBURSED || app.getStatus() == LoanStatus.PAR || app.getStatus() == LoanStatus.DEFAULTED || app.getStatus() == LoanStatus.PAID) {
             return formatDashboardWorkflowTimestamp(app.getUpdatedAt());
         }
         return "";
@@ -1324,7 +1328,7 @@ public class AppController {
         model.addAttribute("statusTimeline", List.of(
             LoanStatus.DRAFT, LoanStatus.AWAITING_GUARANTORS, LoanStatus.ALL_GUARANTORS_APPROVED, LoanStatus.READY_FOR_MANAGER,
             LoanStatus.MANAGER_ACCEPTED, LoanStatus.AWAITING_BOARD, LoanStatus.AWAITING_CREDIT_COMMITTEE, LoanStatus.BOARD_APPROVED,
-            LoanStatus.CREDIT_COMMITTEE_APPROVED, LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.DISBURSED, LoanStatus.DEFAULTED, LoanStatus.PAID
+            LoanStatus.CREDIT_COMMITTEE_APPROVED, LoanStatus.READY_FOR_DISBURSEMENT, LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED, LoanStatus.PAID
         ));
         return "app/loan-view";
     }
@@ -1379,6 +1383,7 @@ public class AppController {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, DEFAULTED -> "bg-rose-50 text-rose-700";
             case AWAITING_LOAN_OFFICER, AWAITING_CHAIRPERSON, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";
+            case PAR -> "bg-amber-50 text-amber-700";
             case MANAGER_ACCEPTED, LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT,
                 DISBURSED, PAID -> "bg-emerald-50 text-emerald-700";
             case REJECTED -> "bg-rose-50 text-rose-700";
@@ -3224,6 +3229,7 @@ public class AppController {
     private List<LoanStatus> loanArchiveStatuses(String filter) {
         return switch (safeArchiveFilter(filter)) {
             case "DISBURSED" -> List.of(LoanStatus.DISBURSED);
+            case "PAR" -> List.of(LoanStatus.PAR);
             case "DEFAULTED" -> List.of(LoanStatus.DEFAULTED);
             case "PAID" -> List.of(LoanStatus.PAID);
             case "REJECTED" -> List.of(
@@ -3263,6 +3269,9 @@ public class AppController {
         if (app.getStatus() == LoanStatus.DEFAULTED) {
             return message("analytics.defaulted");
         }
+        if (app.getStatus() == LoanStatus.PAR) {
+            return message("loan.status.PAR");
+        }
         if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
             return message("loan.repayment.overdue");
         }
@@ -3275,6 +3284,9 @@ public class AppController {
         }
         if (app.getStatus() == LoanStatus.DEFAULTED) {
             return "border-rose-200 bg-rose-50 text-rose-700";
+        }
+        if (app.getStatus() == LoanStatus.PAR) {
+            return "border-amber-200 bg-amber-50 text-amber-700";
         }
         if (app.getFinalDueDate() != null && app.getFinalDueDate().isBefore(today)) {
             return "border-amber-200 bg-amber-50 text-amber-700";
@@ -3342,6 +3354,7 @@ public class AppController {
     private boolean isArchivedStatus(LoanStatus status) {
         return isRejectedStatus(status)
             || status == LoanStatus.DISBURSED
+            || status == LoanStatus.PAR
             || status == LoanStatus.DEFAULTED
             || status == LoanStatus.PAID;
     }
@@ -3451,6 +3464,7 @@ public class AppController {
             || status == LoanStatus.AWAITING_BOARD
             || status == LoanStatus.AWAITING_CREDIT_COMMITTEE
             || status == LoanStatus.DISBURSED
+            || status == LoanStatus.PAR
             || status == LoanStatus.DEFAULTED;
     }
 
@@ -3483,6 +3497,9 @@ public class AppController {
         }
         if (status == LoanStatus.DISBURSED) {
             return "#22C55E";
+        }
+        if (status == LoanStatus.PAR) {
+            return "#F59E0B";
         }
         if (status == LoanStatus.DEFAULTED) {
             return "#DC2626";

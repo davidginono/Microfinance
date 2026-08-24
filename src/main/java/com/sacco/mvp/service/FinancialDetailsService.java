@@ -114,7 +114,9 @@ public class FinancialDetailsService {
         }
         LoanApplication sourceLoan = loanApplicationRepository.findById(topUpSourceLoanId)
             .filter(loan -> memberId.equals(loan.getApplicantMemberId()))
-            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED || loan.getStatus() == LoanStatus.DEFAULTED)
+            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED
+                || loan.getStatus() == LoanStatus.PAR
+                || loan.getStatus() == LoanStatus.DEFAULTED)
             .orElse(null);
         if (sourceLoan == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);

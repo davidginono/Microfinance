@@ -1445,13 +1445,15 @@ public class AdminService {
                                             Integer applicantMaxDefaultedLoans,
                                             boolean guarantorWithActiveLoanAllowed,
                                             BigDecimal guarantorMaxGuaranteedLoanAmount,
-                                            Integer guarantorMaxDefaultedLoans) {
+                                            Integer guarantorMaxDefaultedLoans,
+                                            Integer portfolioAtRiskDays) {
         SaccoSettings settings = settings(saccoId);
         Map<String, Object> before = snapshotSettings(settings);
         settings.setApplicantMaxDefaultedLoans(limitedCount(applicantMaxDefaultedLoans, "Defaulted loan limit", 0));
         settings.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
         settings.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
         settings.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
+        settings.setPortfolioAtRiskDays(limitedPortfolioAtRiskDays(portfolioAtRiskDays, false));
         settings.setUpdatedAt(OffsetDateTime.now());
         saccoSettingsRepository.save(settings);
         auditService.log("SACCO_SETTINGS", null, "ADMIN_UPDATE_QUALIFICATION_POLICIES", adminId, before, snapshotSettings(settings));
@@ -1464,7 +1466,8 @@ public class AdminService {
                                                    Integer applicantMaxDefaultedLoans,
                                                    boolean guarantorWithActiveLoanAllowed,
                                                    BigDecimal guarantorMaxGuaranteedLoanAmount,
-                                                   Integer guarantorMaxDefaultedLoans) {
+                                                   Integer guarantorMaxDefaultedLoans,
+                                                   Integer portfolioAtRiskDays) {
         String normalizedStationId = normalizeOptional(stationId);
         if (normalizedStationId == null) {
             throw new IllegalArgumentException("Choose a station before saving station policies.");
@@ -1481,6 +1484,7 @@ public class AdminService {
         policy.setGuarantorWithActiveLoanAllowed(guarantorWithActiveLoanAllowed);
         policy.setGuarantorMaxGuaranteedLoanAmount(limitedWholeNumber(guarantorMaxGuaranteedLoanAmount, "Maximum guarantee count", 0));
         policy.setGuarantorMaxDefaultedLoans(limitedCount(guarantorMaxDefaultedLoans, "Guarantor defaulted loan limit", 0));
+        policy.setPortfolioAtRiskDays(limitedPortfolioAtRiskDays(portfolioAtRiskDays, true));
         policy.setUpdatedAt(OffsetDateTime.now());
         saccoStationPolicyRepository.save(policy);
         auditService.log("SACCO_STATION_POLICY", policy.getId(), "ADMIN_UPDATE_STATION_QUALIFICATION_POLICIES", adminId, before, snapshotStationPolicy(policy));
@@ -2959,6 +2963,16 @@ public class AdminService {
         return whole;
     }
 
+    private Integer limitedPortfolioAtRiskDays(Integer value, boolean nullable) {
+        if (value == null) {
+            return nullable ? null : 30;
+        }
+        if (value < 1 || value > 365) {
+            throw new IllegalStateException("Portfolio At Risk days must be between 1 and 365.");
+        }
+        return value;
+    }
+
     private BigDecimal nonNegativeAmount(BigDecimal value, String message) {
         if (value == null) {
             return null;
@@ -3497,6 +3511,7 @@ public class AdminService {
         data.put("guarantorWithActiveLoanAllowed", settings.getGuarantorWithActiveLoanAllowed());
         data.put("guarantorMaxGuaranteedLoanAmount", settings.getGuarantorMaxGuaranteedLoanAmount());
         data.put("guarantorMaxDefaultedLoans", settings.getGuarantorMaxDefaultedLoans());
+        data.put("portfolioAtRiskDays", settings.getPortfolioAtRiskDays());
         return data;
     }
 
@@ -3520,6 +3535,7 @@ public class AdminService {
         data.put("guarantorWithActiveLoanAllowed", policy.getGuarantorWithActiveLoanAllowed());
         data.put("guarantorMaxGuaranteedLoanAmount", policy.getGuarantorMaxGuaranteedLoanAmount());
         data.put("guarantorMaxDefaultedLoans", policy.getGuarantorMaxDefaultedLoans());
+        data.put("portfolioAtRiskDays", policy.getPortfolioAtRiskDays());
         return data;
     }
 

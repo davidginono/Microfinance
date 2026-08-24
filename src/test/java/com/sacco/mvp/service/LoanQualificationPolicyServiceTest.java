@@ -1,6 +1,7 @@
 package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.LoanProductSetting;
+import com.sacco.mvp.domain.ExternalGuarantorRegistry;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
@@ -8,6 +9,7 @@ import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStationPolicy;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.ExternalGuarantorRegistryRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +34,7 @@ class LoanQualificationPolicyServiceTest {
     @Mock private SaccoSettingsRepository saccoSettingsRepository;
     @Mock private GuarantorRequestRepository guarantorRequestRepository;
     @Mock private MemberRepository memberRepository;
+    @Mock private ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     @Mock private SaccoStationPolicyRepository saccoStationPolicyRepository;
     @Mock private LoanAnalyticsService loanAnalyticsService;
     @Mock private EligibilityService eligibilityService;
@@ -44,6 +47,7 @@ class LoanQualificationPolicyServiceTest {
             saccoSettingsRepository,
             guarantorRequestRepository,
             memberRepository,
+            externalGuarantorRegistryRepository,
             saccoStationPolicyRepository,
             loanAnalyticsService,
             eligibilityService
@@ -59,8 +63,8 @@ class LoanQualificationPolicyServiceTest {
                 .saccoId(SACCO_ID)
                 .applicantMaxDefaultedLoans(1)
                 .build()));
-        when(loanAnalyticsService.summarizeAllTime(applicantId, SACCO_ID, STATION_ID))
-            .thenReturn(memberAnalytics(1));
+        when(loanAnalyticsService.defaultedRiskLoanCount(applicantId, SACCO_ID, STATION_ID))
+            .thenReturn(1L);
 
         Optional<String> reason = service.applicantFailureReason(SACCO_ID, applicantId);
 
@@ -77,8 +81,8 @@ class LoanQualificationPolicyServiceTest {
                 .saccoId(SACCO_ID)
                 .guarantorMaxDefaultedLoans(1)
                 .build()));
-        when(loanAnalyticsService.summarizeAllTime(guarantorId, SACCO_ID, STATION_ID))
-            .thenReturn(memberAnalytics(1));
+        when(loanAnalyticsService.defaultedRiskLoanCount(guarantorId, SACCO_ID, STATION_ID))
+            .thenReturn(1L);
 
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
 
@@ -119,6 +123,89 @@ class LoanQualificationPolicyServiceTest {
         Optional<String> reason = service.guarantorFailureReason(SACCO_ID, guarantorId);
 
         assertThat(reason).isEmpty();
+    }
+
+    @Test
+    void externalGuarantorLimitCountsRegistryBackedApprovals() {
+        UUID registryId = UUID.randomUUID();
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .guarantorMaxGuaranteedLoanAmount(new BigDecimal("1"))
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.empty());
+        when(externalGuarantorRegistryRepository.findBySaccoIdAndExternalStationIdIgnoreCaseAndExternalMemberNoIgnoreCase(
+            SACCO_ID, STATION_ID, "EXT-77"))
+            .thenReturn(Optional.of(ExternalGuarantorRegistry.builder()
+                .id(registryId)
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .externalStationId(STATION_ID)
+                .externalMemberNo("EXT-77")
+                .build()));
+        when(guarantorRequestRepository.countExternalActiveGuarantees(
+            registryId, "EXT-77", STATION_ID, SACCO_ID, STATION_ID))
+            .thenReturn(1L);
+
+        Optional<String> reason = service.guarantorFailureReasonForExternal(
+            SACCO_ID,
+            STATION_ID,
+            "EXT-77",
+            STATION_ID,
+            new BigDecimal("500000.00"),
+            0,
+            0,
+            null,
+            null
+        );
+
+        assertThat(reason)
+            .hasValue("Disabled: active guarantee count has reached the station guarantor limit.");
+    }
+
+    @Test
+    void externalDefaultedRiskBlocksWhenGuarantorDefaultedPolicyIsEnabled() {
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .guarantorMaxDefaultedLoans(1)
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.empty());
+
+        Optional<String> reason = service.guarantorFailureReasonForExternal(
+            SACCO_ID,
+            STATION_ID,
+            "EXT-77",
+            STATION_ID,
+            new BigDecimal("500000.00"),
+            1,
+            1,
+            null,
+            null
+        );
+
+        assertThat(reason)
+            .hasValue("Disabled: defaulted loan count has reached the station guarantor limit.");
+    }
+
+    @Test
+    void stationPortfolioAtRiskDaysOverridesSaccoDefault() {
+        when(saccoSettingsRepository.findById(SACCO_ID))
+            .thenReturn(Optional.of(SaccoSettings.builder()
+                .saccoId(SACCO_ID)
+                .portfolioAtRiskDays(30)
+                .build()));
+        when(saccoStationPolicyRepository.findBySaccoIdAndStationId(SACCO_ID, STATION_ID))
+            .thenReturn(Optional.of(SaccoStationPolicy.builder()
+                .id(UUID.randomUUID())
+                .saccoId(SACCO_ID)
+                .stationId(STATION_ID)
+                .portfolioAtRiskDays(7)
+                .build()));
+
+        assertThat(service.resolvedPortfolioAtRiskDays(SACCO_ID, STATION_ID)).isEqualTo(7);
     }
 
     @Test

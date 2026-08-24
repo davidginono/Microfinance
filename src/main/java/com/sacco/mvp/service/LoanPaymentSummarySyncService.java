@@ -36,6 +36,7 @@ public class LoanPaymentSummarySyncService {
     private static final int DEFAULT_MANUAL_REFRESH_LIMIT = 50;
     private static final List<LoanStatus> SYNCABLE_STATUSES = List.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED
     );
 

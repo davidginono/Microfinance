@@ -24,6 +24,7 @@ public class WorkflowStatusPresentationService {
             slice("MANAGER_ACCEPTED", "Approved by Manager", "#0EA5E9", LoanStatus.MANAGER_ACCEPTED),
             slice("MANAGER_REJECTED", "Rejected by Manager", "#F43F5E", LoanStatus.MANAGER_REJECTED),
             slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED),
+            slice("PAR", "Portfolio At Risk", "#F59E0B", LoanStatus.PAR),
             slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID),
             slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED)
         ), statusBreakdown);
@@ -70,6 +71,7 @@ public class WorkflowStatusPresentationService {
         return buildRows(List.of(
             slice("READY_FOR_DISBURSEMENT", "Ready for Disbursement", "#0EA5E9", LoanStatus.READY_FOR_DISBURSEMENT),
             slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED),
+            slice("PAR", "Portfolio At Risk", "#F59E0B", LoanStatus.PAR),
             slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID),
             slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED)
         ), statusBreakdown);
@@ -97,6 +99,7 @@ public class WorkflowStatusPresentationService {
             case AWAITING_ACCOUNTANT -> "On Review By Accountant";
             case READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "Ready for Disbursement";
             case DISBURSED -> "Disbursed";
+            case PAR -> "Portfolio At Risk";
             case DEFAULTED -> "Defaulted / Not Paid";
             case PAID -> "Paid";
             case MANAGER_REJECTED -> "Manager Rejected";
@@ -132,6 +135,7 @@ public class WorkflowStatusPresentationService {
             case BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED -> "#2F348D";
             case LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";
             case DISBURSED -> "#22C55E";
+            case PAR -> "#F59E0B";
             case DEFAULTED -> "#DC2626";
             case PAID -> "#16A34A";
             case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "#F43F5E";
@@ -143,6 +147,7 @@ public class WorkflowStatusPresentationService {
             return;
         }
         slices.add(slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED));
+        slices.add(slice("PAR", "Portfolio At Risk", "#F59E0B", LoanStatus.PAR));
         slices.add(slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID));
         slices.add(slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED));
     }

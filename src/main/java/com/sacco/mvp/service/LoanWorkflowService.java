@@ -61,6 +61,7 @@ public class LoanWorkflowService {
     );
     private static final List<LoanStatus> ACTIVE_LOAN_LOCK_STATUSES = List.of(
         LoanStatus.DISBURSED,
+        LoanStatus.PAR,
         LoanStatus.DEFAULTED
     );
     private static final List<LoanStatus> REJECTED_ACKNOWLEDGEMENT_STATUSES = List.of(
@@ -75,6 +76,7 @@ public class LoanWorkflowService {
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
+    private final ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final ManagerReviewRepository managerReviewRepository;
     private final MemberRepository memberRepository;
@@ -96,6 +98,7 @@ public class LoanWorkflowService {
     private final ReversalRequestRepository reversalRequestRepository;
     private final AuditService auditService;
     private final PlatformTransactionManager transactionManager;
+    private final ApplicationClock applicationClock;
 
     public List<LoanProductSetting> listProducts(String saccoId) {
         List<LoanProductSetting> products = loanProductSettingRepository.findBySaccoIdAndActiveTrue(saccoId);
@@ -539,7 +542,7 @@ public class LoanWorkflowService {
 
     private boolean isTopUpBlockedFor(LoanApplication app) {
         LoanStatus status = app.getStatus();
-        return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
+        return status == LoanStatus.DISBURSED || status == LoanStatus.PAR || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
@@ -859,7 +862,11 @@ public class LoanWorkflowService {
             throw new IllegalStateException("External member profile is unavailable right now.");
         }
         ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
-        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(profile);
+        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(
+            profile,
+            loanQualificationPolicyService.externalDefaultedRiskCheckRequired(saccoId, stationId),
+            loanQualificationPolicyService.resolvedPortfolioAtRiskDays(saccoId, stationId)
+        );
         GuarantorSelection selection = selectionFromProfile(profile, mode, lookupValue, snapshot);
         CandidateResolution resolution = resolveDirectOtpCandidate(saccoId, stationId, applicantId, selection);
         GuarantorSelection resolvedSelection = resolution.selection();
@@ -873,6 +880,7 @@ public class LoanWorkflowService {
                     resolvedSelection.externalStationId(),
                     snapshot.savingsBalance(),
                     snapshot.activeLoanCount(),
+                    snapshot.defaultedRiskLoanCount(),
                     null,
                     product
                 )).orElse(Optional.empty()).orElse("")
@@ -971,7 +979,11 @@ public class LoanWorkflowService {
             throw new IllegalStateException("External member profile is unavailable right now.");
         }
         ForesightMemberProfile profile = requireProfileIdentity(lookup.profile());
-        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(profile);
+        DirectOtpFinancialSnapshot snapshot = loadDirectOtpFinancialSnapshot(
+            profile,
+            loanQualificationPolicyService.externalDefaultedRiskCheckRequired(saccoId, stationId),
+            loanQualificationPolicyService.resolvedPortfolioAtRiskDays(saccoId, stationId)
+        );
         GuarantorSelection refreshedSelection = selectionFromProfile(profile, lookupBy, lookupValue, snapshot);
         CandidateResolution resolution = resolveDirectOtpCandidate(saccoId, stationId, applicantId, refreshedSelection);
         if (resolution.disabledReason() != null && !resolution.disabledReason().isBlank()) {
@@ -1054,7 +1066,9 @@ public class LoanWorkflowService {
         return new CandidateResolution(selection.asLocal(member), "");
     }
 
-    private DirectOtpFinancialSnapshot loadDirectOtpFinancialSnapshot(ForesightMemberProfile profile) {
+    private DirectOtpFinancialSnapshot loadDirectOtpFinancialSnapshot(ForesightMemberProfile profile,
+                                                                     boolean defaultedRiskCheckRequired,
+                                                                     int portfolioAtRiskDays) {
         ForesightAccountSummary summary = foresightDirectoryService.fetchAccountSummary(profile.memberNo(), profile.stationId());
         List<ForesightInvestment> savingsInvestments = foresightDirectoryService.fetchInvestments(
             profile.memberNo(), profile.stationId(), INVESTMENT_CODE_SAVINGS);
@@ -1064,16 +1078,77 @@ public class LoanWorkflowService {
             profile.memberNo(), profile.stationId(), INVESTMENT_CODE_DEPOSITS);
         List<ForesightActiveLoan> activeLoans = foresightDirectoryService.fetchActiveLoans(profile.memberNo(), profile.stationId());
         List<ForesightActiveLoan> paidLoans = foresightDirectoryService.fetchPaidLoans(profile.memberNo(), profile.stationId());
+        List<ForesightActiveLoan> normalizedActiveLoans = activeLoans == null ? List.of() : activeLoans;
+        int defaultedRiskLoanCount = defaultedRiskCheckRequired
+            ? foresightDefaultedRiskLoanCount(profile, normalizedActiveLoans, portfolioAtRiskDays)
+            : 0;
         return new DirectOtpFinancialSnapshot(
             nullToZero(summary == null ? null : summary.savingsBalance()),
             nullToZero(summary == null ? null : summary.sharesBalance()),
             nullToZero(summary == null ? null : summary.depositsBalance()),
-            activeLoans == null ? List.of() : activeLoans,
+            normalizedActiveLoans,
             paidLoans == null ? List.of() : paidLoans,
             savingsInvestments == null ? 0 : savingsInvestments.size(),
             sharesInvestments == null ? 0 : sharesInvestments.size(),
-            depositsInvestments == null ? 0 : depositsInvestments.size()
+            depositsInvestments == null ? 0 : depositsInvestments.size(),
+            defaultedRiskLoanCount
         );
+    }
+
+    private int foresightDefaultedRiskLoanCount(ForesightMemberProfile profile,
+                                                List<ForesightActiveLoan> activeLoans,
+                                                int portfolioAtRiskDays) {
+        if (profile == null || activeLoans == null || activeLoans.isEmpty()) {
+            return 0;
+        }
+        LocalDate today = applicationClock.today();
+        int days = Math.max(1, Math.min(365, portfolioAtRiskDays));
+        int riskCount = 0;
+        for (ForesightActiveLoan loan : activeLoans) {
+            String loanId = loan == null ? null : normalizeOptional(loan.loanIdText());
+            if (loanId == null) {
+                continue;
+            }
+            List<ForesightLoanPaymentSummary> summaries = foresightDirectoryService.fetchLoanPaymentSummary(
+                profile.memberNo(),
+                profile.stationId(),
+                loanId
+            );
+            if (selectUsablePaymentSummary(summaries, loanId)
+                .filter(summary -> isForesightParEquivalentRisk(summary, days, today))
+                .isPresent()) {
+                riskCount++;
+            }
+        }
+        return riskCount;
+    }
+
+    private Optional<ForesightLoanPaymentSummary> selectUsablePaymentSummary(List<ForesightLoanPaymentSummary> summaries,
+                                                                            String loanId) {
+        if (summaries == null || summaries.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ForesightLoanPaymentSummary> usable = summaries.stream()
+            .filter(Objects::nonNull)
+            .filter(summary -> summary.totalOutstanding() != null)
+            .toList();
+        if (usable.isEmpty()) {
+            return Optional.empty();
+        }
+        return usable.stream()
+            .filter(summary -> summary.loanIdText().equalsIgnoreCase(loanId))
+            .findFirst()
+            .or(() -> usable.size() == 1 ? Optional.of(usable.getFirst()) : Optional.empty());
+    }
+
+    private boolean isForesightParEquivalentRisk(ForesightLoanPaymentSummary summary,
+                                                 int portfolioAtRiskDays,
+                                                 LocalDate today) {
+        if (summary == null || nullToZero(summary.totalOutstanding()).compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        LocalDate lastPaymentDate = summary.lastPaymentDate();
+        return lastPaymentDate == null || lastPaymentDate.plusDays(portfolioAtRiskDays).isBefore(today);
     }
 
     private DirectOtpLoanRow loanRow(ForesightActiveLoan loan) {
@@ -1221,6 +1296,10 @@ public class LoanWorkflowService {
         request.setGuarantorSignatureText(signatureText == null ? null : signatureText.trim());
         request.setGuarantorSignatureVerifiedAt(verifiedAt);
         request.setDecidedAt(OffsetDateTime.now());
+        if (request.getGuarantorMemberId() == null) {
+            ExternalGuarantorRegistry registry = upsertExternalGuarantorRegistry(app, request);
+            request.setExternalGuarantorRegistryId(registry.getId());
+        }
         guarantorRequestRepository.save(request);
         evaluateReadiness(request.getLoanApplicationId());
         Map<String, Object> details = new LinkedHashMap<>();
@@ -1234,6 +1313,9 @@ public class LoanWorkflowService {
         }
         if (request.getExternalStationId() != null) {
             details.put("externalStationId", request.getExternalStationId());
+        }
+        if (request.getExternalGuarantorRegistryId() != null) {
+            details.put("externalGuarantorRegistryId", request.getExternalGuarantorRegistryId().toString());
         }
         outboxService.enqueue(
             "GUARANTOR_REQUEST",
@@ -1251,6 +1333,40 @@ public class LoanWorkflowService {
             "GUARANTOR_REQUEST_APPROVED",
             "Guarantor request approved"
         );
+    }
+
+    private ExternalGuarantorRegistry upsertExternalGuarantorRegistry(LoanApplication app, GuarantorRequest request) {
+        String externalMemberNo = normalizeOptional(request.getExternalMemberNo());
+        String externalStationId = normalizeStationId(request.getExternalStationId());
+        if (externalMemberNo == null || externalStationId == null) {
+            throw new IllegalStateException("Foresight guarantor profile is missing member number or station.");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        ExternalGuarantorRegistry registry = externalGuarantorRegistryRepository
+            .findBySaccoIdAndExternalStationIdIgnoreCaseAndExternalMemberNoIgnoreCase(
+                app.getSaccoId(),
+                externalStationId,
+                externalMemberNo
+            )
+            .orElseGet(() -> ExternalGuarantorRegistry.builder()
+                .id(UUID.randomUUID())
+                .saccoId(app.getSaccoId())
+                .externalStationId(externalStationId)
+                .externalMemberNo(externalMemberNo)
+                .createdAt(now)
+                .version(0)
+                .build());
+        registry.setStationId(app.getStationId());
+        registry.setFullName(normalizeOptional(request.getExternalFullName()));
+        registry.setEmail(normalizeOptional(request.getExternalEmail()));
+        registry.setPhone(normalizeOptional(request.getExternalPhone()));
+        registry.setLatestFinancialSnapshot(normalizeJson(
+            request.getExternalFinancialSnapshot(),
+            "Failed to save Foresight guarantor financial snapshot"
+        ));
+        registry.setLastApprovedAt(now);
+        registry.setUpdatedAt(now);
+        return externalGuarantorRegistryRepository.save(registry);
     }
 
     @Transactional
@@ -1820,6 +1936,7 @@ public class LoanWorkflowService {
         DirectOtpFinancialSnapshot snapshot = selection.financialSnapshot();
         BigDecimal savings = snapshot == null ? BigDecimal.ZERO : snapshot.savingsBalance();
         int activeLoanCount = snapshot == null ? 0 : snapshot.activeLoanCount();
+        int defaultedRiskLoanCount = snapshot == null ? 0 : snapshot.defaultedRiskLoanCount();
         Optional<String> policyFailure = Optional.ofNullable(loanQualificationPolicyService.guarantorFailureReasonForExternal(
             saccoId,
             stationId,
@@ -1827,6 +1944,7 @@ public class LoanWorkflowService {
             selection.externalStationId(),
             savings,
             activeLoanCount,
+            defaultedRiskLoanCount,
             pendingLoanAmount,
             product
         )).orElse(Optional.empty());
@@ -1956,6 +2074,7 @@ public class LoanWorkflowService {
         data.put("savingsInvestmentCount", snapshot.savingsInvestmentCount());
         data.put("sharesInvestmentCount", snapshot.sharesInvestmentCount());
         data.put("depositsInvestmentCount", snapshot.depositsInvestmentCount());
+        data.put("defaultedRiskLoanCount", snapshot.defaultedRiskLoanCount());
         data.put("fetchedAt", OffsetDateTime.now().toString());
         try {
             return objectMapper.writeValueAsString(data);
@@ -2034,6 +2153,7 @@ public class LoanWorkflowService {
             request.setExternalEmail(selection.email());
             request.setExternalPhone(selection.phone());
             request.setExternalFinancialSnapshot(financialSnapshotJson(selection.financialSnapshot()));
+            request.setExternalGuarantorRegistryId(null);
             request.setStatus(GuarantorRequestStatus.PENDING);
             request.setRequestedAmount(null);
             request.setCommittedAmount(null);
@@ -2455,7 +2575,8 @@ public class LoanWorkflowService {
         List<ForesightActiveLoan> paidLoans,
         int savingsInvestmentCount,
         int sharesInvestmentCount,
-        int depositsInvestmentCount
+        int depositsInvestmentCount,
+        int defaultedRiskLoanCount
     ) {
         private DirectOtpFinancialSnapshot {
             activeLoans = activeLoans == null ? List.of() : activeLoans;

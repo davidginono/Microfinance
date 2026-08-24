@@ -26,6 +26,7 @@ public enum LoanStatus {
     READY_FOR_DISBURSEMENT,
     REJECTED,
     DISBURSED,
+    PAR,
     DEFAULTED,
     PAID
 }

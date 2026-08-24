@@ -227,6 +227,10 @@
                             Max Guarantees
                             <input name="guarantorMaxGuaranteedLoanAmount" type="number" min="0" max="15" step="1" data-number-range-max="15" class="aws-control" value="${policyGuarantorMaxGuarantees}" />
                         </label>
+                        <label class="aws-settings-field aws-settings-field--compact">
+                            Portfolio At Risk Days
+                            <input name="portfolioAtRiskDays" type="number" min="1" max="365" step="1" data-number-range-max="365" class="aws-control" value="${policyPortfolioAtRiskDays}" />
+                        </label>
                         <label class="aws-settings-checkbox-row">
                             <input class="aws-settings-checkbox" name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">

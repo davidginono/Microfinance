@@ -6,6 +6,7 @@ import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStationPolicy;
 import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.MemberRepository;
+import com.sacco.mvp.repository.ExternalGuarantorRegistryRepository;
 import com.sacco.mvp.repository.SaccoSettingsRepository;
 import com.sacco.mvp.repository.SaccoStationPolicyRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class LoanQualificationPolicyService {
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
     private final MemberRepository memberRepository;
+    private final ExternalGuarantorRegistryRepository externalGuarantorRegistryRepository;
     private final SaccoStationPolicyRepository saccoStationPolicyRepository;
     private final LoanAnalyticsService loanAnalyticsService;
     private final EligibilityService eligibilityService;
@@ -39,9 +41,8 @@ public class LoanQualificationPolicyService {
         }
         String stationId = resolveMemberStationId(memberId);
         ResolvedQualificationPolicy policy = resolvePolicy(settings, stationId);
-        LoanAnalyticsService.MemberLoanAnalytics analytics = loanAnalyticsService.summarizeAllTime(memberId, saccoId, stationId);
         Integer maxDefaulted = positive(policy.applicantMaxDefaultedLoans());
-        if (maxDefaulted != null && analytics.defaultedLoans() >= maxDefaulted) {
+        if (maxDefaulted != null && loanAnalyticsService.defaultedRiskLoanCount(memberId, saccoId, stationId) >= maxDefaulted) {
             return Optional.of("You cannot apply because your defaulted loan count has reached the station policy limit.");
         }
         return Optional.empty();
@@ -97,7 +98,7 @@ public class LoanQualificationPolicyService {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }
         Integer maxDefaulted = positive(policy.guarantorMaxDefaultedLoans());
-        if (maxDefaulted != null && loanAnalyticsService.summarizeAllTime(guarantorMemberId, saccoId, stationId).defaultedLoans() >= maxDefaulted) {
+        if (maxDefaulted != null && loanAnalyticsService.defaultedRiskLoanCount(guarantorMemberId, saccoId, stationId) >= maxDefaulted) {
             return Optional.of("Disabled: defaulted loan count has reached the station guarantor limit.");
         }
         Integer maxGuarantees = positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount());
@@ -120,6 +121,7 @@ public class LoanQualificationPolicyService {
                                                               String externalStationId,
                                                               BigDecimal savings,
                                                               int activeLoanCount,
+                                                              int defaultedRiskLoanCount,
                                                               BigDecimal pendingGuaranteedAmount,
                                                               LoanProductSetting product) {
         SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
@@ -140,9 +142,22 @@ public class LoanQualificationPolicyService {
         if (!policy.guarantorWithActiveLoanAllowed() && activeLoanCount > 0) {
             return Optional.of("Disabled: active loans are not allowed for guarantors under the station policy.");
         }
+        Integer maxDefaulted = positive(policy.guarantorMaxDefaultedLoans());
+        if (maxDefaulted != null && defaultedRiskLoanCount >= maxDefaulted) {
+            return Optional.of("Disabled: defaulted loan count has reached the station guarantor limit.");
+        }
         Integer maxGuarantees = positiveGuaranteeCount(policy.guarantorMaxGuaranteedLoanAmount());
         if (maxGuarantees != null && externalMemberNo != null && externalStationId != null) {
+            UUID registryId = externalGuarantorRegistryRepository
+                .findBySaccoIdAndExternalStationIdIgnoreCaseAndExternalMemberNoIgnoreCase(
+                    saccoId,
+                    externalStationId,
+                    externalMemberNo
+                )
+                .map(com.sacco.mvp.domain.ExternalGuarantorRegistry::getId)
+                .orElse(null);
             long currentGuarantees = guarantorRequestRepository.countExternalActiveGuarantees(
+                registryId,
                 externalMemberNo,
                 externalStationId,
                 saccoId,
@@ -186,8 +201,39 @@ public class LoanQualificationPolicyService {
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()) == null
                 || firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorWithActiveLoanAllowed(), settings.getGuarantorWithActiveLoanAllowed()),
             firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxGuaranteedLoanAmount(), settings.getGuarantorMaxGuaranteedLoanAmount()),
-            firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxDefaultedLoans(), settings.getGuarantorMaxDefaultedLoans())
+            firstNonNull(stationPolicy == null ? null : stationPolicy.getGuarantorMaxDefaultedLoans(), settings.getGuarantorMaxDefaultedLoans()),
+            resolvedPortfolioAtRiskDays(settings, stationPolicy)
         );
+    }
+
+    public int resolvedPortfolioAtRiskDays(String saccoId, String stationId) {
+        SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
+        if (settings == null) {
+            return 30;
+        }
+        SaccoStationPolicy stationPolicy = stationId == null || stationId.isBlank()
+            ? null
+            : saccoStationPolicyRepository.findBySaccoIdAndStationId(settings.getSaccoId(), stationId).orElse(null);
+        return resolvedPortfolioAtRiskDays(settings, stationPolicy);
+    }
+
+    public boolean externalDefaultedRiskCheckRequired(String saccoId, String stationId) {
+        SaccoSettings settings = saccoSettingsRepository.findById(saccoId).orElse(null);
+        if (settings == null) {
+            return false;
+        }
+        return positive(resolvePolicy(settings, stationId).guarantorMaxDefaultedLoans()) != null;
+    }
+
+    private int resolvedPortfolioAtRiskDays(SaccoSettings settings, SaccoStationPolicy stationPolicy) {
+        Integer configured = firstNonNull(
+            stationPolicy == null ? null : stationPolicy.getPortfolioAtRiskDays(),
+            settings == null ? null : settings.getPortfolioAtRiskDays()
+        );
+        if (configured == null) {
+            return 30;
+        }
+        return Math.max(1, Math.min(365, configured));
     }
 
     private String resolveMemberStationId(UUID memberId) {
@@ -226,7 +272,8 @@ public class LoanQualificationPolicyService {
         Integer applicantMaxDefaultedLoans,
         boolean guarantorWithActiveLoanAllowed,
         BigDecimal guarantorMaxGuaranteedLoanAmount,
-        Integer guarantorMaxDefaultedLoans
+        Integer guarantorMaxDefaultedLoans,
+        Integer portfolioAtRiskDays
     ) {
     }
 

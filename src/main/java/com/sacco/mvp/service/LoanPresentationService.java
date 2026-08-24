@@ -362,8 +362,14 @@ public class LoanPresentationService {
                 labels.add("Disbursed");
                 currentIndex = labels.size() - 1;
             }
+            case PAR -> {
+                labels.add("Disbursed");
+                labels.add("Portfolio At Risk");
+                currentIndex = labels.size() - 1;
+            }
             case DEFAULTED -> {
                 labels.add("Disbursed");
+                labels.add("Portfolio At Risk");
                 labels.add("Defaulted");
                 currentIndex = labels.size() - 1;
             }
@@ -794,6 +800,7 @@ public class LoanPresentationService {
             case "Approved For Disbursement" -> message("loan.status.READY_FOR_DISBURSEMENT");
             case "Rejected" -> message("loan.status.REJECTED");
             case "Disbursed" -> message("loan.status.DISBURSED");
+            case "Portfolio At Risk" -> message("loan.status.PAR");
             case "Defaulted" -> message("loan.status.DEFAULTED");
             case "Paid" -> message("loan.status.PAID");
             default -> label;
@@ -2807,6 +2814,7 @@ public class LoanPresentationService {
         private boolean completedApplication() {
             return app.getStatus() == com.sacco.mvp.domain.LoanStatus.READY_FOR_DISBURSEMENT
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DISBURSED
+                || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAR
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.DEFAULTED
                 || app.getStatus() == com.sacco.mvp.domain.LoanStatus.PAID;
         }
