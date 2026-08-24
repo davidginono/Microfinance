@@ -6202,19 +6202,24 @@ body.aws-console,
         text-align: center;
     }
 
-    .aws-console .loan-calculator-steps,
+    .aws-console .loan-calculator-steps {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        overflow: hidden;
+    }
+
     .aws-console .loan-application-steps {
-        grid-template-columns: repeat(3, minmax(9rem, 1fr));
+        grid-template-columns: repeat(5, minmax(9rem, 1fr));
         overflow-x: auto;
         overflow-y: hidden;
         scrollbar-width: thin;
     }
 
-    .aws-console .loan-application-steps {
-        grid-template-columns: repeat(5, minmax(9rem, 1fr));
+    .aws-console .loan-calculator-steps li {
+        position: relative;
+        justify-content: center;
+        gap: 0;
     }
 
-    .aws-console .loan-calculator-steps strong,
     .aws-console .loan-application-steps button > span:last-child {
         position: static;
         width: auto;
@@ -6222,6 +6227,19 @@ body.aws-console,
         overflow: visible;
         clip: auto;
         white-space: normal;
+    }
+
+    .aws-console .loan-calculator-steps strong {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        clip-path: inset(50%) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
     }
 }
 
