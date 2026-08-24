@@ -537,7 +537,7 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
                                     </button>
                                 </div>
                             </div>
-                            <div class="erp-table-scroll">
+                            <div class="erp-table-scroll member-dashboard-active-loans-scroll">
                             <table class="erp-table member-dashboard-active-loans-table" data-active-loans-table data-page-size="5">
                                 <thead>
                                     <tr>

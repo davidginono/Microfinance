@@ -330,6 +330,9 @@ body {
     .member-dashboard-active-loans-table {
         min-width: 860px;
     }
+    .member-dashboard-active-loans-scroll {
+        --erp-table-height: clamp(11rem, 30vh, 15rem);
+    }
     .member-dashboard-active-loans-table th,
     .member-dashboard-active-loans-table td {
         white-space: nowrap;
