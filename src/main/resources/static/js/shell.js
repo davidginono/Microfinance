@@ -17,7 +17,9 @@
     let titleRailTicking = false;
     let pageSubmitPreloaderActive = false;
     let exportDownloadActive = false;
+    let exportPrintActive = false;
     const exportDownloadTimeoutMs = 60 * 1000;
+    const exportPrintFrameCleanupDelayMs = 2 * 60 * 1000;
     const legacyScrollRestoreStorageKey = 'saccos:restore-scroll';
     const scrollRestoreStorageKeyPrefix = 'saccos:restore-scroll:';
     const modalRestoreStorageKey = 'saccos:open-modal';
@@ -378,7 +380,10 @@
         return control.getAttribute?.('data-download-action') === 'true'
             || control.hasAttribute?.('download')
             || /\.(pdf|xlsx?|csv|zip)(?:$|[?#])/i.test(href)
-            || /^(export|print|csv|pdf|excel|download)/.test(label);
+            || /^(export|csv|pdf|excel|download)/.test(label);
+    };
+    const isConsolePrintAction = function (control) {
+        return !!control && control.getAttribute?.('data-print-action') === 'true';
     };
     const ensureConsoleTableScroller = function (region, index) {
         const existingScroller = region.querySelector(':scope > .erp-table-scroll');
@@ -1026,6 +1031,53 @@
         }, 1000);
     };
 
+    const triggerBrowserPrint = function (blob) {
+        const objectUrl = window.URL.createObjectURL(blob);
+        const frame = document.createElement('iframe');
+        let cleaned = false;
+        const cleanup = function () {
+            if (cleaned) {
+                return;
+            }
+            cleaned = true;
+            frame.remove();
+            window.URL.revokeObjectURL(objectUrl);
+        };
+        frame.setAttribute('aria-hidden', 'true');
+        frame.setAttribute('data-export-print-frame', 'true');
+        frame.title = 'Print export';
+        frame.style.position = 'fixed';
+        frame.style.right = '0';
+        frame.style.bottom = '0';
+        frame.style.width = '1px';
+        frame.style.height = '1px';
+        frame.style.border = '0';
+        frame.style.opacity = '0';
+        frame.addEventListener('load', function () {
+            window.setTimeout(function () {
+                try {
+                    if (!frame.contentWindow) {
+                        throw new Error('Print frame is not available');
+                    }
+                    frame.contentWindow.focus();
+                    frame.contentWindow.print();
+                    window.setTimeout(cleanup, exportPrintFrameCleanupDelayMs);
+                } catch (ignored) {
+                    const printWindow = window.open(objectUrl, '_blank');
+                    if (printWindow) {
+                        printWindow.opener = null;
+                    } else if (typeof window.showToast === 'function') {
+                        window.showToast('error', 'The print preview could not be opened. Please allow pop-ups and try again.');
+                    }
+                    window.setTimeout(cleanup, exportPrintFrameCleanupDelayMs);
+                }
+            }, 100);
+        }, { once: true });
+        frame.addEventListener('error', cleanup, { once: true });
+        document.body.appendChild(frame);
+        frame.src = objectUrl;
+    };
+
     const downloadWithPagePreloader = async function (url) {
         if (!pageSubmitPreloader) {
             window.location.assign(url);
@@ -1065,6 +1117,55 @@
             exportDownloadActive = false;
             hidePageSubmitPreloader();
         }
+    };
+
+    const printWithPagePreloader = async function (url) {
+        if (exportPrintActive) {
+            return;
+        }
+        exportPrintActive = true;
+        clearConsoleTableLoading();
+        showPageSubmitPreloader(null);
+        const controller = new AbortController();
+        const timeout = window.setTimeout(function () {
+            controller.abort();
+        }, exportDownloadTimeoutMs);
+        try {
+            const target = new URL(url, window.location.href);
+            const response = await window.fetch(target.toString(), {
+                credentials: 'same-origin',
+                signal: controller.signal
+            });
+            const redirectedPath = response.redirected ? new URL(response.url, window.location.href).pathname : '';
+            if (!response.ok || /^\/(?:login|auth)(?:\/|$)/.test(redirectedPath)) {
+                throw new Error('Print request failed');
+            }
+            const blob = await response.blob();
+            triggerBrowserPrint(blob);
+        } catch (error) {
+            const timedOut = error && error.name === 'AbortError';
+            if (typeof window.showToast === 'function') {
+                window.showToast('error', timedOut
+                    ? 'The print file took too long. Please try again.'
+                    : 'The print preview could not be prepared. Please try again.');
+            }
+        } finally {
+            window.clearTimeout(timeout);
+            exportPrintActive = false;
+            hidePageSubmitPreloader();
+        }
+    };
+
+    const resolvePrintControlUrl = function (control) {
+        const url = control?.getAttribute?.('data-print-url') || control?.getAttribute?.('href') || '';
+        if (!url || url.startsWith('#') || url.startsWith('javascript:')) {
+            return null;
+        }
+        const target = new URL(url, window.location.href);
+        if (target.origin !== window.location.origin) {
+            return null;
+        }
+        return target.toString();
     };
 
     const resolveExportFormUrl = function (form, submitter) {
@@ -1541,7 +1642,11 @@
         if (exportUrl) {
             event.preventDefault();
             rememberScrollForReload();
-            void downloadWithPagePreloader(exportUrl);
+            if (isConsolePrintAction(event.submitter)) {
+                void printWithPagePreloader(exportUrl);
+            } else {
+                void downloadWithPagePreloader(exportUrl);
+            }
             return;
         }
         if (form.matches('[data-no-page-preloader="true"], [data-page-preloader="false"]')) {
@@ -1558,6 +1663,16 @@
     document.addEventListener('click', function (event) {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
             return;
+        }
+        const printControl = event.target instanceof Element ? event.target.closest('[data-print-action="true"]') : null;
+        if (printControl && !printControl.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
+            const printUrl = resolvePrintControlUrl(printControl);
+            if (printUrl) {
+                event.preventDefault();
+                rememberScrollForReload();
+                void printWithPagePreloader(printUrl);
+                return;
+            }
         }
         const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
         if (!link || link.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {

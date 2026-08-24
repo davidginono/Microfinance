@@ -43,6 +43,7 @@
     </form>
     <div class="loan-analytics-actions" data-aws-action-pin="true" aria-label="Report actions">
         <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral" data-download-action="true"><spring:message code="reports.exportPdf" text="Export PDF" /></a>
+        <a href="/documents/reports/member-loans.pdf?${currentQuery}" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" text="Print" /></a>
         <a href="/documents/reports/member-loans.xlsx?${currentQuery}" class="app-btn btn-neutral" data-download-action="true"><spring:message code="reports.exportExcel" text="Export Excel" /></a>
         <a href="/app/reports" class="app-btn btn-neutral"><spring:message code="common.refresh" text="Refresh" /></a>
     </div>

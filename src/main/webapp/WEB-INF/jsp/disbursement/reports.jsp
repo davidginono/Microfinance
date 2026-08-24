@@ -27,6 +27,7 @@
     </div>
     <div class="erp-table-toolbar__actions pt-6">
         <button type="submit" class="app-btn btn-primary"><spring:message code="reports.generatePdf" text="Generate PDF Report" /></button>
+        <button type="submit" class="app-btn btn-neutral" data-print-action="true"><spring:message code="common.print" text="Print" /></button>
     </div>
 </form>
 
