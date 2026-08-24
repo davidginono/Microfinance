@@ -807,6 +807,43 @@ class LoanPresentationServiceTest {
     }
 
     @Test
+    void printablePdfRepeatsApplicationReferenceInFooterOnEveryPage() throws IOException {
+        LoanApplication app = basicPrintableApplication();
+        Member applicant = basicApplicant();
+        Map<String, Object> formFields = new LinkedHashMap<>();
+        for (int index = 1; index <= 90; index++) {
+            formFields.put("Supporting Detail " + index, "Recorded value for application reference footer check " + index);
+        }
+
+        byte[] pdf = loanPresentationService.buildPrintablePdf(
+            app,
+            "IAA SACCOS LTD",
+            applicant,
+            formFields,
+            loanPresentationService.parseFinancialFields(app),
+            List.of(),
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            List.of(),
+            Map.of(),
+            null,
+            true
+        );
+
+        try (org.apache.pdfbox.pdmodel.PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(document.getNumberOfPages()).isGreaterThan(1);
+            for (int pageNumber = 1; pageNumber <= document.getNumberOfPages(); pageNumber++) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(pageNumber);
+                stripper.setEndPage(pageNumber);
+                assertThat(stripper.getText(document)).contains("Application Reference: 503");
+            }
+        }
+    }
+
+    @Test
     void printablePdfIncludesGeneratedAndCalculatedSchedulesForDisbursedLoan() throws IOException {
         LoanApplication app = LoanApplication.builder()
             .id(UUID.randomUUID())

@@ -3149,7 +3149,16 @@ public class LoanPresentationService {
             stream.lineTo(page.getMediaBox().getWidth() - MARGIN, footerY + 10f);
             stream.stroke();
             writeText("Prepared for printing", MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
+            writeCentered(applicationReferenceFooterText(), page.getMediaBox().getWidth() / 2f, footerY, regular, 7.4f, MUTED_COLOR);
             writeRightAligned("Date: " + LocalDate.now(), page.getMediaBox().getWidth() - MARGIN, footerY, regular, 7.4f, MUTED_COLOR);
+        }
+
+        private String applicationReferenceFooterText() {
+            String reference = app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString();
+            if (reference.isBlank() && app.getId() != null) {
+                reference = shortId(app.getId());
+            }
+            return "Application Reference: " + sanitizePdfLineText(reference);
         }
 
         private void writeText(String text,
