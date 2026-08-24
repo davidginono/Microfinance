@@ -1,8 +1,10 @@
 target/
 tmp/
 loan-uploads/
+stored-uploads/
 registered-saccos/
 node_modules/
+output/
 docs/assets/
 docs/**/*.pdf
 docs/**/*.docx
@@ -11,6 +13,10 @@ docs/**/*.xlsx
 docs/**/*.html
 docs/**/__pycache__/
 docs/**/*.pyc
+.github/context-*.md
+.github/openai-context.md
+.github/java-upgrade/
+.github/modernize/
 .idea/
 .vscode/
 *.iml
