@@ -31,7 +31,8 @@ import java.util.Optional;
 public class LoanPortfolioRiskStatusService {
     private static final List<LoanStatus> CANDIDATE_STATUSES = List.of(
         LoanStatus.DISBURSED,
-        LoanStatus.PAR
+        LoanStatus.PAR,
+        LoanStatus.DEFAULTED
     );
 
     private final LoanApplicationRepository loanApplicationRepository;
@@ -111,6 +112,9 @@ public class LoanPortfolioRiskStatusService {
         }
         if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
             return StatusDecision.to(LoanStatus.PAID, null, outstanding, resolvedPortfolioAtRiskDays(loan));
+        }
+        if (loan.getStatus() == LoanStatus.DEFAULTED) {
+            return StatusDecision.to(LoanStatus.DEFAULTED, null, outstanding, resolvedPortfolioAtRiskDays(loan));
         }
         LocalDate dueDate = firstUnpaidDueDate(loan, outstanding).orElse(loan.getFinalDueDate());
         if (dueDate == null) {

@@ -25,10 +25,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -122,6 +124,38 @@ class LoanPortfolioRiskStatusServiceTest {
         assertThat(result.paid()).isEqualTo(1);
         assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
         assertThat(loan.getPaidAt()).isEqualTo(OffsetDateTime.parse("2026-08-24T13:00:00+03:00"));
+    }
+
+    @Test
+    void defaultedLoanWithZeroOutstandingMovesToPaid() {
+        LoanApplication loan = loan(LoanStatus.DEFAULTED, outstandingSnapshot("0.00", "100.00", "0.00"));
+        givenSettings(30);
+        givenCandidatePage(loan);
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LoanPortfolioRiskStatusService.PortfolioRiskStatusResult result = service.reevaluatePortfolioRiskStatuses(50);
+
+        assertThat(result.paid()).isEqualTo(1);
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
+        assertThat(loan.getPaidAt()).isEqualTo(OffsetDateTime.parse("2026-08-24T13:00:00+03:00"));
+        verify(loanApplicationRepository, atLeastOnce()).findByStatusInAndLoanIdIsNotNull(
+            argThat(statuses -> statuses.contains(LoanStatus.DEFAULTED)),
+            any()
+        );
+    }
+
+    @Test
+    void defaultedLoanWithPositiveOutstandingRemainsDefaulted() {
+        LoanApplication loan = loan(LoanStatus.DEFAULTED, outstandingSnapshot("100.00", "0.00", "0.00"));
+        givenSettings(30);
+        givenCandidatePage(loan);
+
+        LoanPortfolioRiskStatusService.PortfolioRiskStatusResult result = service.reevaluatePortfolioRiskStatuses(50);
+
+        assertThat(result.changed()).isZero();
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DEFAULTED);
+        verify(loanApplicationRepository, never()).save(any());
+        verify(repaymentScheduleService, never()).parseRows(any());
     }
 
     @Test
