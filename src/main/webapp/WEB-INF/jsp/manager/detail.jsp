@@ -90,6 +90,20 @@
             <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue" data-staff-active-loans-total-label>
                 <spring:message code="review.totalExposure" arguments="${activeApplicantLoanTotalAmount}" text="Total exposure ${activeApplicantLoanTotalAmount}" />
             </span>
+            <c:if test="${activeApplicantLoansForesightEnabled}">
+                <button type="button"
+                        class="app-icon-button btn-neutral"
+                        data-staff-active-loans-refresh
+                        data-loading-label="Refreshing active loans..."
+                        data-error-message="Applicant active loans could not load. Please retry again later."
+                        aria-label="Refresh applicant active loans"
+                        title="Refresh applicant active loans">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+                    </svg>
+                </button>
+            </c:if>
         </div>
     </div>
     <div class="mt-5 grid gap-3 sm:grid-cols-2">
@@ -102,7 +116,7 @@
             <div class="applicant-info-value" data-staff-active-loans-total>${activeApplicantLoanTotalAmount}</div>
         </div>
     </div>
-    <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
+    <div class="mt-5 erp-table-wrap" data-aws-table-region data-loading-label="Loading active loans...">
         <div class="erp-table-scroll">
             <table class="erp-table">
                 <thead>

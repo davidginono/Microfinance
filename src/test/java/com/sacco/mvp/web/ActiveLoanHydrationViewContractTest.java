@@ -38,6 +38,11 @@ class ActiveLoanHydrationViewContractTest {
         assertStaffHydrationMarkup(board);
         assertThat(fragment)
             .contains("data-staff-active-loans-section")
+            .contains("data-staff-active-loans-refresh")
+            .contains("showLoading(section")
+            .contains("hideLoading(section)")
+            .contains("data-aws-async-table-loading")
+            .contains("aws-table-loader__spinner")
             .contains("\"Accept\": \"application/json\"")
             .contains("data-staff-active-loans-body");
     }
@@ -55,6 +60,9 @@ class ActiveLoanHydrationViewContractTest {
         assertThat(source)
             .contains("data-staff-active-loans-section=\"true\"")
             .contains("data-active-loans-url=\"${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans\"")
+            .contains("data-staff-active-loans-refresh")
+            .contains("data-loading-label=\"Loading active loans...\"")
+            .contains("aria-label=\"Refresh applicant active loans\"")
             .contains("data-staff-active-loans-body")
             .contains("data-staff-active-loans-count")
             .contains("staff-active-loans-hydration.jspf");

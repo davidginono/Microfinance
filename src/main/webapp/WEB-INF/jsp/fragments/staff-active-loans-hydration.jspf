@@ -18,6 +18,56 @@
             return count + " active loan" + (count === 1 ? "" : "s");
         }
 
+        function tableRegion(section) {
+            return section ? section.querySelector("[data-aws-table-region]") : null;
+        }
+
+        function refreshButton(section) {
+            return section ? section.querySelector("[data-staff-active-loans-refresh]") : null;
+        }
+
+        function showLoading(section, label) {
+            var region = tableRegion(section);
+            if (!region || region.classList.contains("is-loading")) {
+                return;
+            }
+            if (!region.hasAttribute("data-staff-active-loans-loading-label")) {
+                region.setAttribute("data-staff-active-loans-loading-label", region.getAttribute("data-loading-label") || "");
+            }
+            if (label) {
+                region.setAttribute("data-loading-label", label);
+            }
+            region.classList.add("is-loading");
+            region.setAttribute("aria-busy", "true");
+            region.setAttribute("data-aws-async-table-loading", "true");
+            var loader = document.createElement("div");
+            loader.className = "aws-table-loader";
+            loader.setAttribute("role", "status");
+            loader.setAttribute("aria-label", region.getAttribute("data-loading-label") || "Loading results...");
+            var spinner = document.createElement("span");
+            spinner.className = "aws-table-loader__spinner";
+            spinner.setAttribute("aria-hidden", "true");
+            loader.appendChild(spinner);
+            region.appendChild(loader);
+        }
+
+        function hideLoading(section) {
+            var region = tableRegion(section);
+            if (region) {
+                region.classList.remove("is-loading");
+                region.setAttribute("aria-busy", "false");
+                region.removeAttribute("data-aws-async-table-loading");
+                var originalLabel = region.getAttribute("data-staff-active-loans-loading-label");
+                if (originalLabel !== null) {
+                    region.setAttribute("data-loading-label", originalLabel || "Loading results...");
+                    region.removeAttribute("data-staff-active-loans-loading-label");
+                }
+                Array.prototype.forEach.call(region.querySelectorAll(".aws-table-loader"), function (loader) {
+                    loader.remove();
+                });
+            }
+        }
+
         function rowHtml(row) {
             var frequency = String(row.repaymentFrequency || "").trim();
             var countdown = String(row.countdown || "").trim();
@@ -81,15 +131,25 @@
             }
         }
 
-        function hydrate(section) {
-            if (section.getAttribute("data-staff-active-loans-ready") === "true") {
+        function hydrate(section, force) {
+            if (section.getAttribute("data-staff-active-loans-loading") === "true"
+                || (!force && section.getAttribute("data-staff-active-loans-ready") === "true")) {
                 return;
             }
             var url = section.getAttribute("data-active-loans-url");
             if (!url) {
                 return;
             }
-            section.setAttribute("data-staff-active-loans-ready", "true");
+            var button = refreshButton(section);
+            var originalButtonLabel = button ? button.getAttribute("aria-label") : "";
+            var loadingLabel = button ? (button.getAttribute("data-loading-label") || "Refreshing active loans...") : "";
+            section.setAttribute("data-staff-active-loans-loading", "true");
+            if (button) {
+                button.disabled = true;
+                button.setAttribute("aria-busy", "true");
+                button.setAttribute("aria-label", loadingLabel);
+            }
+            showLoading(section, force ? loadingLabel : null);
             fetch(url, {
                 credentials: "same-origin",
                 headers: {
@@ -105,14 +165,38 @@
                 })
                 .then(function (payload) {
                     applyPayload(section, payload);
+                    section.setAttribute("data-staff-active-loans-ready", "true");
                 })
                 .catch(function () {
-                    section.removeAttribute("data-staff-active-loans-ready");
+                    if (!force) {
+                        section.removeAttribute("data-staff-active-loans-ready");
+                    }
+                    if (force && button && typeof window.showToast === "function") {
+                        window.showToast("error", button.getAttribute("data-error-message") || "Applicant active loans could not load. Please retry again later.");
+                    }
+                })
+                .finally(function () {
+                    section.removeAttribute("data-staff-active-loans-loading");
+                    if (button) {
+                        button.disabled = false;
+                        button.setAttribute("aria-busy", "false");
+                        button.setAttribute("aria-label", originalButtonLabel || "Refresh applicant active loans");
+                    }
+                    hideLoading(section);
                 });
         }
 
         function init() {
-            document.querySelectorAll("[data-staff-active-loans-section=\"true\"]").forEach(hydrate);
+            document.querySelectorAll("[data-staff-active-loans-section=\"true\"]").forEach(function (section) {
+                hydrate(section, false);
+                var button = refreshButton(section);
+                if (button && button.getAttribute("data-staff-active-loans-refresh-ready") !== "true") {
+                    button.setAttribute("data-staff-active-loans-refresh-ready", "true");
+                    button.addEventListener("click", function () {
+                        hydrate(section, true);
+                    });
+                }
+            });
         }
 
         if (document.readyState === "loading") {
