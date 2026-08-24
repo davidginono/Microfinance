@@ -222,25 +222,26 @@ for (int i = 0; i < activeLoanRows.size(); i++) {
 }
 %>
 
+<div class="erp-page-header" data-aws-page-header>
+    <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
+    <p class="mt-1 text-lg font-semibold text-sacco-ink">
+        <spring:message code="dashboard.welcome" text="Welcome" />,
+        <c:choose>
+            <c:when test="${not empty currentMember and not empty currentMember.fullName}">
+                <c:out value="${currentMember.fullName}" />
+            </c:when>
+            <c:otherwise>
+                <c:out value="${pageContext.request.userPrincipal.name}" />
+            </c:otherwise>
+        </c:choose>
+    </p>
+</div>
+
 <section id="memberDashboardContent"
          class="space-y-4"
          data-member-dashboard-content
          data-member-dashboard-progressive="${dashboardProgressive}"
          data-member-dashboard-content-url="${pageContext.request.contextPath}/app/dashboard?full=true">
-<div class="erp-page-header" data-aws-page-header>
-        <h1 class="erp-page-title text-3xl sm:text-4xl" data-sticky-title-source="true">Member Dashboard</h1>
-        <p class="mt-1 text-lg font-semibold text-sacco-ink">
-            <spring:message code="dashboard.welcome" text="Welcome" />,
-            <c:choose>
-                <c:when test="${not empty currentMember and not empty currentMember.fullName}">
-                    <c:out value="${currentMember.fullName}" />
-                </c:when>
-                <c:otherwise>
-                    <c:out value="${pageContext.request.userPrincipal.name}" />
-                </c:otherwise>
-            </c:choose>
-        </p>
-    </div>
 
     <c:if test="${not empty pendingStaffAccess}">
         <div class="erp-panel border-cyan-200 bg-cyan-50/70">

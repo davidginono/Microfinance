@@ -90,6 +90,8 @@ class AwsConsoleViewContractTest {
             .contains("window.SaccosMemberDashboard")
             .contains("window.SaccosLiveAccountStatus.hydrateAll()")
             .contains("Dashboard content could not load. Refresh this page to try again.");
+        assertThat(dashboard.indexOf("<div class=\"erp-page-header\""))
+            .isLessThan(dashboard.indexOf("<section id=\"memberDashboardContent\""));
         assertThat(liveStatusHydration)
             .contains("window.SaccosLiveAccountStatus")
             .contains("hydrateAll: hydrateAllLiveAccountStatuses");
