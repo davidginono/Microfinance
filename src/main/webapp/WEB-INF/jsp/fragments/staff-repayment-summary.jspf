@@ -33,7 +33,16 @@
             <c:if test="${not empty calculatedRepaymentRows}">
                 <details class="expected-schedule-details border border-slate-200 bg-white" open>
                     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">
-                        <span><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></span>
+                        <span>
+                            <c:choose>
+                                <c:when test="${not empty app.disbursementDate}">
+                                    <spring:message code="loan.repayment.actualSchedule" text="Actual Repayment Schedule" />
+                                </c:when>
+                                <c:otherwise>
+                                    <spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" />
+                                </c:otherwise>
+                            </c:choose>
+                        </span>
                         <svg class="expected-schedule-chevron h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                         </svg>

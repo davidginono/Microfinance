@@ -205,7 +205,18 @@
 <c:if test="${not empty calculatedRepaymentRows}">
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results...">
         <div class="app-table-titlebar">
-            <div class="app-table-heading"><h2><spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" /></h2></div>
+            <div class="app-table-heading">
+                <h2>
+                    <c:choose>
+                        <c:when test="${not empty app.disbursementDate}">
+                            <spring:message code="loan.repayment.actualSchedule" text="Actual Repayment Schedule" />
+                        </c:when>
+                        <c:otherwise>
+                            <spring:message code="loan.repayment.calculatedSchedule" text="Calculated Repayment Schedule" />
+                        </c:otherwise>
+                    </c:choose>
+                </h2>
+            </div>
             </div>
         <div class="erp-table-scroll">
         <table class="erp-table loan-repayment-schedule-table">
