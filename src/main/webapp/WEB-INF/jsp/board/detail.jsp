@@ -39,21 +39,15 @@
 
 <div class="loan-view-summary-card mt-5 px-5 py-5"
      <c:if test="${activeApplicantLoansForesightEnabled}">data-staff-active-loans-section="true" data-active-loans-url="${reviewBasePath}/loan-applications/${app.id}/applicant-active-loans"</c:if>>
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
-            <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" data-staff-active-loans-count-label>
-                ${activeApplicantLoanCount} active loan<c:if test="${activeApplicantLoanCount ne 1}">s</c:if>
-            </span>
-            <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue" data-staff-active-loans-total-label>
-                Total exposure ${activeApplicantLoanTotalAmount}
-            </span>
+    <div>
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500"><spring:message code="review.applicantActiveLoans" text="Applicant Active Loans" /></p>
+                <p class="mt-2 text-base text-slate-600"><spring:message code="review.applicantActiveLoansHelp" text="Other disbursed loans that are still active for this applicant at the time of review." /></p>
+            </div>
             <c:if test="${activeApplicantLoansForesightEnabled}">
                 <button type="button"
-                        class="app-icon-button btn-neutral"
+                        class="app-icon-button btn-neutral shrink-0"
                         data-staff-active-loans-refresh
                         data-loading-label="Refreshing active loans..."
                         data-error-message="Applicant active loans could not load. Please retry again later."
@@ -65,6 +59,14 @@
                     </svg>
                 </button>
             </c:if>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" data-staff-active-loans-count-label>
+                ${activeApplicantLoanCount} active loan<c:if test="${activeApplicantLoanCount ne 1}">s</c:if>
+            </span>
+            <span class="rounded-full bg-sacco-blue/10 px-3 py-1 text-xs font-semibold text-sacco-blue" data-staff-active-loans-total-label>
+                Total exposure ${activeApplicantLoanTotalAmount}
+            </span>
         </div>
     </div>
     <div class="mt-5 grid gap-3 sm:grid-cols-2">
