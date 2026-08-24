@@ -6376,6 +6376,8 @@ html.session-timeout-active,
 
     .live-account-status-message {
         min-height: 32px;
+        justify-content: flex-start;
+        flex-flow: row nowrap;
         align-items: center;
         gap: 8px;
         background: #f1faff;
@@ -6383,6 +6385,12 @@ html.session-timeout-active,
         padding: 6px 10px;
         font-size: 13px;
         line-height: 18px;
+        text-align: left;
+    }
+
+    .live-account-status-message [data-live-account-status-message] {
+        min-width: 0;
+        flex: 1 1 auto;
     }
 
     .live-account-status-message.hidden,
@@ -6398,26 +6406,26 @@ html.session-timeout-active,
 
     .live-account-status-spinner {
         display: none;
+        box-sizing: border-box;
         width: 14px;
         height: 14px;
         flex: 0 0 14px;
         border: 2px solid #7db7e8;
         border-top-color: #0972d3;
         border-radius: 50%;
-        animation: live-account-status-spin 0.8s linear infinite;
+        transform-origin: 50% 50%;
+        animation: aws-console-spin 0.65s linear infinite;
+        will-change: transform;
     }
 
     .live-account-status-message.is-loading .live-account-status-spinner {
-        display: inline-block;
-    }
-
-    @keyframes live-account-status-spin {
-        to { transform: rotate(360deg); }
+        display: block;
     }
 
     @media (prefers-reduced-motion: reduce) {
         .live-account-status-spinner {
             animation: none;
+            will-change: auto;
         }
     }
 
