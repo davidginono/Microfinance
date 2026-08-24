@@ -12,13 +12,13 @@
                 <div class="shell-support-contact__channels">
                     <c:if test="${not empty platformSupportContact.phone}">
                         <a href="${platformSupportContact.phoneHref}" class="shell-support-contact__link">
-                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.phone" text="Phone" /></span>
+                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.phone" text="Phone" />:</span>
                             <span class="shell-support-contact__value"><c:out value="${platformSupportContact.phone}" /></span>
                         </a>
                     </c:if>
                     <c:if test="${not empty platformSupportContact.email}">
                         <a href="${platformSupportContact.emailHref}" class="shell-support-contact__link">
-                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.email" text="Email" /></span>
+                            <span class="shell-support-contact__label"><spring:message code="support.platformContact.email" text="Email" />:</span>
                             <span class="shell-support-contact__value"><c:out value="${platformSupportContact.email}" /></span>
                         </a>
                     </c:if>

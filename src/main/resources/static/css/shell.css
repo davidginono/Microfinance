@@ -5463,12 +5463,14 @@ body.aws-console,
     margin-top: 7px;
 }
 
+.shell-support-contact__link,
 .shell-sidebar-group > div .shell-support-contact__link {
     display: grid !important;
-    grid-template-columns: max-content minmax(0, 1fr);
-    column-gap: 12px;
-    align-items: start;
+    grid-template-columns: minmax(38px, max-content) minmax(0, 1fr);
+    column-gap: 6px;
+    align-items: baseline;
     width: 100% !important;
+    max-width: 100% !important;
     min-height: 0 !important;
     margin: 0 !important;
     border: 0 !important;
@@ -5481,6 +5483,8 @@ body.aws-console,
     text-decoration: none !important;
 }
 
+.shell-support-contact__link:hover,
+.shell-support-contact__link:focus-visible,
 .shell-sidebar-group > div .shell-support-contact__link:hover,
 .shell-sidebar-group > div .shell-support-contact__link:focus-visible {
     border: 0 !important;
@@ -5491,6 +5495,8 @@ body.aws-console,
 }
 
 .shell-support-contact__label {
+    display: inline-block;
+    margin-right: 4px;
     color: #aab7b8 !important;
     font-weight: 700;
     overflow-wrap: normal;
@@ -5498,8 +5504,11 @@ body.aws-console,
 }
 
 .shell-support-contact__value {
+    display: block;
     min-width: 0;
+    max-width: 100%;
     overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .shell-support-contact__meta {
