@@ -38,48 +38,50 @@
                 </div>
             </div>
 
-            <form action="/admin/saccos/minor-admins" method="post" class="erp-panel-body grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-minor-admin-form>
+            <form action="/admin/saccos/minor-admins" method="post" class="minor-admin-create-form" data-minor-admin-form>
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="common.sacco" text="SACCO" />
-                    <select id="minorAdminSaccoSelect" name="saccoId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                        <c:forEach items="${registeredSaccos}" var="sacco" varStatus="status">
-                            <c:set var="stationList" value="" />
-                            <c:forEach items="${sacco.stationIds}" var="stationId" varStatus="stationStatus">
-                                <c:set var="stationList" value="${stationList}${stationStatus.first ? '' : ','}${stationId}" />
+                <div class="erp-panel-body minor-admin-create-grid">
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="common.sacco" text="SACCO" />
+                        <select id="minorAdminSaccoSelect" name="saccoId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
+                            <c:forEach items="${registeredSaccos}" var="sacco" varStatus="status">
+                                <c:set var="stationList" value="" />
+                                <c:forEach items="${sacco.stationIds}" var="stationId" varStatus="stationStatus">
+                                    <c:set var="stationList" value="${stationList}${stationStatus.first ? '' : ','}${stationId}" />
+                                </c:forEach>
+                                <option value="${sacco.saccoId}"
+                                        data-stations="${stationList}"
+                                        ${status.first ? 'selected' : ''}>
+                                    ${sacco.saccoId} - ${sacco.saccoName}
+                                </option>
                             </c:forEach>
-                            <option value="${sacco.saccoId}"
-                                    data-stations="${stationList}"
-                                    ${status.first ? 'selected' : ''}>
-                                ${sacco.saccoId} - ${sacco.saccoName}
-                            </option>
-                        </c:forEach>
-                    </select>
-                </label>
+                        </select>
+                    </label>
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="admin.saccoRegistry.station" text="Station" />
-                    <select id="minorAdminStationSelect" name="stationId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
-                </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="admin.saccoRegistry.station" text="Station" />
+                        <select id="minorAdminStationSelect" name="stationId" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"></select>
+                    </label>
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="member.fullName" text="Full Name" />
-                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
-                </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="member.fullName" text="Full Name" />
+                        <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                    </label>
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="register.member.email" text="Email" />
-                    <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="register.member.email" text="Email" />
+                        <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    </label>
 
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="register.member.phone" text="Phone" />
-                    <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                    <span class="mt-1 block text-[11px] font-medium normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
-                </label>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <spring:message code="register.member.phone" text="Phone" />
+                        <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" placeholder="255712345678" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                        <span class="mt-1 block text-[11px] font-medium normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
+                    </label>
+                </div>
 
-                <div class="md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3">
+                <div class="minor-admin-create-actions" data-aws-action-pin="true">
                     <button type="submit" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.register" text="Register SACCOS Admin" /></button>
                 </div>
             </form>
@@ -87,7 +89,7 @@
     </c:otherwise>
 </c:choose>
 
-<div class="erp-panel overflow-hidden">
+<div class="erp-panel overflow-hidden minor-admin-list-panel">
     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>

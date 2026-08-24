@@ -305,7 +305,7 @@ class AwsConsoleViewContractTest {
             .contains("open-sans-400.woff2")
             .contains("open-sans-700.woff2")
             .contains("open-sans.css?v=20260805-cloudscape-type-v2")
-            .contains("console-components.css?v=20260824-repayment-modal-mobile-v45")
+            .contains("console-components.css?v=20260824-minor-admin-action-v46")
             .contains("shell.css?v=20260824-scroll-chain-v46")
             .contains("shell.js?v=20260824-export-print-v23")
             .contains("app-global-logo")

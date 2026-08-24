@@ -1604,6 +1604,37 @@ body {
     }
 
 /* Source: src/main/webapp/WEB-INF/jsp/admin/minor-admins.jsp */
+.minor-admin-create-form {
+        display: block;
+    }
+
+    .minor-admin-create-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .minor-admin-create-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        border-top: 1px solid #d5dbdb;
+        background: #f7f8f8;
+        padding: 10px 12px;
+    }
+
+    .minor-admin-create-actions .app-btn {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    .minor-admin-list-panel {
+        margin-top: 12px;
+    }
+
 [data-minor-admin-form] input,
     [data-minor-admin-form] select,
     [data-minor-admin-form] .app-btn {
@@ -1622,6 +1653,27 @@ body {
         justify-content: center;
         padding-top: 0;
         padding-bottom: 0;
+    }
+
+    @media (max-width: 1023px) {
+        .minor-admin-create-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 640px) {
+        .minor-admin-create-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .minor-admin-create-actions {
+            justify-content: stretch;
+            padding: 10px;
+        }
+
+        .minor-admin-create-actions .app-btn {
+            width: 100%;
+        }
     }
 
 /* Source: src/main/webapp/WEB-INF/jsp/app/settings.jsp */
