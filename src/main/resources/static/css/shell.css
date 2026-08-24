@@ -1584,7 +1584,8 @@ button:active {
 .erp-table-wrap.erp-table-scroll,
 .erp-table-wrap > .erp-table-scroll {
     overflow: auto !important;
-    overscroll-behavior: contain;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
     scrollbar-gutter: stable both-edges;
 }
 
@@ -4992,7 +4993,8 @@ body.aws-console,
     max-width: 100%;
     max-height: min(60vh, 620px);
     overflow: auto !important;
-    overscroll-behavior: contain;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
 }
 .aws-console .admin-register-shell .erp-table thead th {
     position: sticky;

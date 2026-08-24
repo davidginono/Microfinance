@@ -1131,11 +1131,96 @@
         return role + ':' + index;
     };
 
+    const scrollablePositionSelector = '[data-view-position-key], [data-aws-persist-scroll], [data-fcms-persist-scroll], .erp-table-scroll, .app-modal-scroll, .shell-sidebar-scroll, .shell-main, .aws-filter-toolbar';
+
     const scrollableElements = function () {
-        return Array.from(document.querySelectorAll('[data-view-position-key], [data-aws-persist-scroll], [data-fcms-persist-scroll], .erp-table-scroll, .app-modal-scroll, .shell-sidebar-scroll, .shell-main, .aws-filter-toolbar'))
+        return Array.from(document.querySelectorAll(scrollablePositionSelector))
             .filter(function (element) {
                 return element instanceof HTMLElement;
             });
+    };
+
+    const isScrollablePositionElement = function (element) {
+        return element instanceof HTMLElement && element.matches(scrollablePositionSelector);
+    };
+
+    const canScrollVertically = function (element) {
+        if (!(element instanceof HTMLElement)) {
+            return false;
+        }
+        const style = window.getComputedStyle(element);
+        return /(auto|scroll|overlay)/.test(style.overflowY || '')
+            && element.scrollHeight - element.clientHeight > 1;
+    };
+
+    const canDocumentScrollVertically = function () {
+        const scroller = document.scrollingElement || document.documentElement;
+        return scroller && scroller.scrollHeight - scroller.clientHeight > 1;
+    };
+
+    const canScrollInDirection = function (element, deltaY) {
+        if (element === document.scrollingElement || element === document.documentElement || element === document.body) {
+            const currentTop = window.scrollY || window.pageYOffset || 0;
+            const maxTop = Math.max((document.scrollingElement || document.documentElement).scrollHeight - window.innerHeight, 0);
+            return deltaY < 0 ? currentTop > 0 : currentTop < maxTop - 1;
+        }
+        const maxTop = Math.max(element.scrollHeight - element.clientHeight, 0);
+        return deltaY < 0 ? element.scrollTop > 0 : element.scrollTop < maxTop - 1;
+    };
+
+    const findVerticalScrollParent = function (element) {
+        let parent = element ? element.parentElement : null;
+        while (parent) {
+            if (canScrollVertically(parent)) {
+                return parent;
+            }
+            parent = parent.parentElement;
+        }
+        return canDocumentScrollVertically() ? (document.scrollingElement || document.documentElement) : null;
+    };
+
+    const normalizedWheelDeltaY = function (event) {
+        if (!event) {
+            return 0;
+        }
+        if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+            return event.deltaY * 16;
+        }
+        if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+            return event.deltaY * window.innerHeight;
+        }
+        return event.deltaY;
+    };
+
+    const handOffTableWheelScroll = function (event) {
+        if (!event || event.defaultPrevented || event.ctrlKey) {
+            return;
+        }
+        const target = event.target instanceof Element ? event.target.closest('.erp-table-scroll') : null;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        const deltaY = normalizedWheelDeltaY(event);
+        if (!deltaY || Math.abs(deltaY) < Math.abs(event.deltaX || 0)) {
+            return;
+        }
+        const maxTop = Math.max(target.scrollHeight - target.clientHeight, 0);
+        const atTop = target.scrollTop <= 1;
+        const atBottom = target.scrollTop >= maxTop - 1;
+        if (!((deltaY < 0 && atTop) || (deltaY > 0 && atBottom) || maxTop <= 1)) {
+            return;
+        }
+        const parent = findVerticalScrollParent(target);
+        if (!parent || parent === target || !canScrollInDirection(parent, deltaY)) {
+            return;
+        }
+        event.preventDefault();
+        if (parent === document.scrollingElement || parent === document.documentElement || parent === document.body) {
+            window.scrollBy({ top: deltaY, left: 0, behavior: 'auto' });
+        } else {
+            parent.scrollTop += deltaY;
+        }
+        scheduleScrollStateSave();
     };
 
     const collectScrollablePositions = function () {
@@ -1513,8 +1598,9 @@
     }, { capture: true });
 
     window.addEventListener('scroll', scheduleScrollStateSave, { passive: true });
+    document.addEventListener('wheel', handOffTableWheelScroll, { capture: true, passive: false });
     document.addEventListener('scroll', function (event) {
-        if (event.target instanceof HTMLElement && scrollableElements().includes(event.target)) {
+        if (isScrollablePositionElement(event.target)) {
             scheduleScrollStateSave();
         }
     }, { capture: true, passive: true });
