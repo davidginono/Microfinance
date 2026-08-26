@@ -892,7 +892,7 @@ body {
         border: 1px solid #d7dde3;
         border-radius: 0.4rem;
         background: #ffffff;
-        overflow: hidden;
+        overflow: visible;
     }
     .product-builder-section-header {
         padding: 0.95rem 1rem 0.85rem;
@@ -1723,7 +1723,7 @@ body {
         border: 1px solid #d7dde3;
         border-radius: 0.4rem;
         background: #ffffff;
-        overflow: hidden;
+        overflow: visible;
     }
     .product-builder-section-header {
         padding: 0.95rem 1rem 0.85rem;
@@ -8406,6 +8406,7 @@ html.session-timeout-active,
     border-color: #d5dbdb;
     border-radius: 2px;
     box-shadow: 0 1px 1px rgba(0, 28, 36, 0.08);
+    overflow: visible;
 }
 
 .product-config-step-toggle {
@@ -8494,7 +8495,7 @@ html.session-timeout-active,
 
 .product-config-subsection {
     scroll-margin-top: calc(var(--shell-nav-height, 52px) + var(--shell-context-height, 36px) + 12px);
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid #d5dbdb;
     border-radius: 2px;
     background: #ffffff;

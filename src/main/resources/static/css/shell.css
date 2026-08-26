@@ -3093,6 +3093,13 @@ body.aws-console {
     box-shadow: none !important;
 }
 
+.workflow-subsection,
+.product-builder-section,
+.product-config-subsection,
+.product-builder-section-body {
+    overflow: visible;
+}
+
 .loan-metric-card,
 .staff-metric-card,
 .staff-summary-item,
