@@ -2203,6 +2203,8 @@
         initConsoleTableLoading();
         schedulePageTitleRailUpdate();
         applyPlaceholderTitles();
+        restoreScrollAfterReload();
+        restoreModalAfterReload();
         document.querySelectorAll('[data-toast-message]').forEach(function (element) {
             const message = element.getAttribute('data-toast-message');
             if (!message) {
@@ -2211,7 +2213,7 @@
             window.showToast(
                 element.getAttribute('data-toast-type') || 'info',
                 message,
-                { contextElement: element }
+                { contextElement: element, preferModal: true }
             );
         });
         const initialAlert = Array.from(document.querySelectorAll('[data-auto-scroll-message]')).find(function (element) {
@@ -2220,8 +2222,6 @@
         if (initialAlert) {
             window.scrollToFeedback(initialAlert);
         }
-        restoreScrollAfterReload();
-        restoreModalAfterReload();
         initSessionInactivityPrompt();
     });
 

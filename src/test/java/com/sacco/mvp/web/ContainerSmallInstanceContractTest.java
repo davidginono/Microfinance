@@ -15,6 +15,7 @@ class ContainerSmallInstanceContractTest {
         String security = Files.readString(Path.of("src/main/java/com/sacco/mvp/config/SecurityConfig.java"));
         String compose = Files.readString(Path.of("docker-compose.yml"));
         String prodCompose = Files.readString(Path.of("docker-compose.prod.yml"));
+        String lightsailDeploy = Files.readString(Path.of("deploy/aws/deploy-lightsail.ps1"));
 
         assertThat(dockerfile)
             .contains("SPRING_PROFILES_ACTIVE=prod")
@@ -49,5 +50,8 @@ class ContainerSmallInstanceContractTest {
             .contains("APP_SACCOS_FILES_ROOT: /var/lib/saccos-lms/saccos")
             .doesNotContain("mailpit")
             .doesNotContain("5432:5432");
+        assertThat(lightsailDeploy)
+            .contains("sudo chown -R 100:101 /mnt/saccos-data/uploads /mnt/saccos-data/saccos")
+            .contains("sudo chmod -R u+rwX,g+rwX,o-rwx /mnt/saccos-data/uploads /mnt/saccos-data/saccos");
     }
 }

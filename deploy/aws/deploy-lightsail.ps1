@@ -223,6 +223,8 @@ dnf install -y docker tar gzip
 systemctl enable --now docker
 usermod -aG docker ec2-user || true
 mkdir -p /mnt/saccos-data/postgres /mnt/saccos-data/uploads /mnt/saccos-data/saccos /mnt/saccos-data/caddy-data /mnt/saccos-data/caddy-config /opt/saccos-lms
+chown -R 100:101 /mnt/saccos-data/uploads /mnt/saccos-data/saccos
+chmod -R u+rwX,g+rwX,o-rwx /mnt/saccos-data/uploads /mnt/saccos-data/saccos
 chown -R ec2-user:ec2-user /opt/saccos-lms
 "@
     $userDataFile = New-TemporaryFile
@@ -339,6 +341,8 @@ if ! sudo docker compose version >/dev/null 2>&1; then
   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
 sudo mkdir -p /mnt/saccos-data/postgres /mnt/saccos-data/uploads /mnt/saccos-data/saccos /mnt/saccos-data/caddy-data /mnt/saccos-data/caddy-config
+sudo chown -R 100:101 /mnt/saccos-data/uploads /mnt/saccos-data/saccos
+sudo chmod -R u+rwX,g+rwX,o-rwx /mnt/saccos-data/uploads /mnt/saccos-data/saccos
 sudo chown -R ec2-user:ec2-user /opt/saccos-lms
 rm -rf /opt/saccos-lms/releases/$stamp
 mkdir -p /opt/saccos-lms/releases/$stamp

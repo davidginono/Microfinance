@@ -46,11 +46,11 @@ public class SaccoLogoStorageService {
 
     public void store(String saccoId, MultipartFile logoFile) {
         String normalizedSaccoId = requireSaccoId(saccoId);
-        ensureSaccoDirectories(normalizedSaccoId);
         if (logoFile == null || logoFile.isEmpty()) {
             return;
         }
 
+        ensureSaccoDirectories(normalizedSaccoId);
         LogoUploadPolicy policy = platformBrandingSettingsService.logoUploadPolicy();
         String extension = resolveAllowedExtension(logoFile);
         validateSize(logoFile, policy);

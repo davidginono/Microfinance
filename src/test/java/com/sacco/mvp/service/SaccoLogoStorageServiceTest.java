@@ -22,12 +22,22 @@ class SaccoLogoStorageServiceTest {
     Path tempDir;
 
     @Test
-    void createsSaccoImagesDirectoryWhenNoLogoIsProvided() {
+    void skipsSaccoImagesDirectoryWhenNoLogoIsProvided() {
         SaccoLogoStorageService service = service();
 
         service.store("SACCO-ARUSHA-001", null);
 
-        assertThat(tempDir.resolve("SACCO-ARUSHA-001").resolve("images")).isDirectory();
+        assertThat(tempDir.resolve("SACCO-ARUSHA-001").resolve("images")).doesNotExist();
+        assertThat(service.hasLogo("SACCO-ARUSHA-001")).isFalse();
+    }
+
+    @Test
+    void skipsSaccoImagesDirectoryWhenLogoFileIsEmpty() {
+        SaccoLogoStorageService service = service();
+
+        service.store("SACCO-ARUSHA-001", new MockMultipartFile("logoFile", "", "application/octet-stream", new byte[0]));
+
+        assertThat(tempDir.resolve("SACCO-ARUSHA-001").resolve("images")).doesNotExist();
         assertThat(service.hasLogo("SACCO-ARUSHA-001")).isFalse();
     }
 
