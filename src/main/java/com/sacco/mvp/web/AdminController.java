@@ -1862,7 +1862,11 @@ public class AdminController {
                 registrationForm.getPhone()
             );
             ra.addFlashAttribute("createdMinorAdminStaffNumber", createdAdmin.getStaffNo());
-            ra.addFlashAttribute("message", "SACCOS Admin invited with Staff Number " + createdAdmin.getStaffNo() + ". A password setup link has been emailed to them.");
+            if (createdAdmin.isMemberAccess()) {
+                ra.addFlashAttribute("message", "SACCOS Admin access assigned to the existing LMS member account with Staff Number " + createdAdmin.getStaffNo() + ".");
+            } else {
+                ra.addFlashAttribute("message", "SACCOS Admin invited with Staff Number " + createdAdmin.getStaffNo() + ". A password setup link has been emailed to them.");
+            }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
         }

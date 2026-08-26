@@ -2606,7 +2606,18 @@ public class AdminService {
         if (normalizedPhone == null) {
             throw new IllegalStateException("Enter the staff member phone number.");
         }
-        ensureExternalMemberDirectoryResolved(normalizedEmail, normalizedPhone);
+        ExternalMemberPrecheck externalMemberPrecheck = verifyExternalMemberDirectory(normalizedEmail, normalizedPhone);
+        Optional<Member> existingLocalMember = findLocalMemberByIdentity(normalizedEmail, normalizedPhone);
+
+        if (externalMemberPrecheck.memberFound()) {
+            Member member = existingLocalMember
+                .filter(Member::isMemberAccess)
+                .orElseThrow(() -> new IllegalStateException("This person is registered in Foresight as a member. Ask them to register as an LMS member first, then add them as SACCOS Admin."));
+            ensureExistingMemberIdentityMatches(member, normalizedEmail, normalizedPhone);
+            ensureExistingMemberScopeMatches(member, saccoId, normalizedStationId);
+            return assignStaffAccessToExistingMember(member, normalizedFullName, normalizedEmail, normalizedPhone,
+                staffRoles, adminId, auditAction, primaryRole);
+        }
 
         if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalStateException("That email address is already in use.");
@@ -2654,7 +2665,7 @@ public class AdminService {
         return saved;
     }
 
-    private void ensureExternalMemberDirectoryResolved(String normalizedEmail, String normalizedPhone) {
+    private ExternalMemberPrecheck verifyExternalMemberDirectory(String normalizedEmail, String normalizedPhone) {
         ForesightDirectoryService.MemberProfileLookupResult phoneLookup =
             foresightDirectoryService.lookupMemberProfileByPhone("+" + normalizedPhone);
         ForesightDirectoryService.MemberProfileLookupResult emailLookup =
@@ -2663,10 +2674,74 @@ public class AdminService {
         if (!isExternalMemberLookupResolved(phoneLookup) || !isExternalMemberLookupResolved(emailLookup)) {
             throw new IllegalStateException("We could not verify this person against Foresight. Try again later.");
         }
+        return new ExternalMemberPrecheck(phoneLookup.isFound() || emailLookup.isFound());
     }
 
     private boolean isExternalMemberLookupResolved(ForesightDirectoryService.MemberProfileLookupResult lookup) {
         return lookup != null && (lookup.isFound() || lookup.isNotFound());
+    }
+
+    private Optional<Member> findLocalMemberByIdentity(String normalizedEmail, String normalizedPhone) {
+        Optional<Member> emailMatch = memberRepository.findByEmailIgnoreCase(normalizedEmail);
+        Optional<Member> phoneMatch = memberRepository.findByPhone(normalizedPhone);
+        if (emailMatch.isPresent() && phoneMatch.isPresent()
+            && !emailMatch.get().getId().equals(phoneMatch.get().getId())) {
+            throw new IllegalStateException("That email address and phone number belong to different LMS accounts.");
+        }
+        return emailMatch.or(() -> phoneMatch);
+    }
+
+    private void ensureExistingMemberIdentityMatches(Member member, String normalizedEmail, String normalizedPhone) {
+        if (!normalizedEmail.equalsIgnoreCase(member.getEmail() == null ? "" : member.getEmail())
+            || !normalizedPhone.equals(member.getPhone())) {
+            throw new IllegalStateException("Use the same email address and phone number the member registered with in LMS.");
+        }
+    }
+
+    private void ensureExistingMemberScopeMatches(Member member, String saccoId, String stationId) {
+        if (!saccoId.equals(member.getSaccoId())) {
+            throw new IllegalStateException("This LMS member is not registered under the selected SACCO.");
+        }
+        String memberStationId = normalizeOptional(member.getStationId());
+        if (stationId != null && (memberStationId == null || !stationId.equalsIgnoreCase(memberStationId))) {
+            throw new IllegalStateException("This LMS member is not registered under the selected station.");
+        }
+    }
+
+    private Member assignStaffAccessToExistingMember(Member member,
+                                                     String fullName,
+                                                     String email,
+                                                     String phone,
+                                                     LinkedHashSet<Position> staffRoles,
+                                                     UUID adminId,
+                                                     String auditAction,
+                                                     Position primaryRole) {
+        Map<String, Object> before = snapshotMember(member);
+        OffsetDateTime now = OffsetDateTime.now();
+        Position previousPosition = member.getPosition();
+        UserUpdateResult result = applyStaffAccessState(member, staffRoles, true, now);
+        member.setFullName(fullName);
+        member.setEmail(email);
+        member.setPhone(phone);
+        member.setPosition(primaryRole);
+        member.setStaffRoles(staffRoles);
+        member.setMemberAccount(true);
+        member.setStatus(MemberStatus.ACTIVE);
+        if (previousPosition != primaryRole || member.getRank() == null) {
+            member.setRank(nextRank(member.getSaccoId(), primaryRole == null ? Position.MEMBER : primaryRole));
+        }
+        Member saved = memberRepository.save(member);
+        ensureUserSettings(saved.getId(), now);
+        ensureSavingsAccount(saved.getId(), now);
+        userClaimService.updateClaims(saved.getId(), new ArrayList<>(userClaimService.defaultClaims(staffRoles, true)));
+        if (result.isStaffAccessPending()) {
+            notifyPendingStaffAccess(saved, adminId, now);
+        }
+        auditService.log("MEMBER", saved.getId(), auditAction, adminId, before, snapshotMember(saved));
+        return saved;
+    }
+
+    private record ExternalMemberPrecheck(boolean memberFound) {
     }
 
     public String userIdLabel(UUID accountId) {

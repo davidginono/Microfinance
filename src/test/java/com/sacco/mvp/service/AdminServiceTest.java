@@ -1519,39 +1519,52 @@ class AdminServiceTest {
     }
 
     @Test
-    void createUserAllowsStaffAccountWhenForesightPhoneProfileExists() {
-        when(memberRepository.nextStaffNumberValue()).thenReturn(10002L);
-        when(memberRepository.existsByEmailIgnoreCase("anna.staff@example.com")).thenReturn(false);
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void createUserRejectsExternalMemberBeforeLocalMemberRegistration() {
         when(foresightDirectoryService.lookupMemberProfileByPhone("+255700000002"))
             .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
                 new ForesightMemberProfile("Smith", "Anna", "MBR-001", "ST-1", "Demo SACCO")
             ));
 
-        adminService.createUser(
+        assertThatThrownBy(() -> adminService.createUser(
             "SACCO-01",
-            null,
+            "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
             "Anna Smith",
             "anna.staff@example.com",
             "255700000002",
             List.of(Position.MANAGER)
-        );
-
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStaffNo()).isEqualTo("10002");
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().isMemberAccess()).isFalse();
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("This person is registered in Foresight as a member. Ask them to register as an LMS member first, then add them as SACCOS Admin.");
 
         verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000002");
         verify(foresightDirectoryService).lookupMemberProfileByEmailV2("anna.staff@example.com");
-        verify(memberRepository).save(any(Member.class));
+        verify(memberRepository).findByEmailIgnoreCase("anna.staff@example.com");
+        verify(memberRepository).findByPhone("255700000002");
+        verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
-    void createUserAllowsStaffAccountWhenForesightEmailProfileExists() {
+    void createUserAssignsStaffAccessToExistingExternalMember() {
+        UUID memberId = UUID.randomUUID();
+        Member member = Member.builder()
+            .id(memberId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("MBR-002")
+            .fullName("Existing Member")
+            .email("member@example.com")
+            .phone("255700000003")
+            .position(Position.MEMBER)
+            .memberAccount(true)
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.NONE)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now())
+            .build();
+        when(memberRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
+        when(memberRepository.findByPhone("255700000003")).thenReturn(Optional.of(member));
         when(memberRepository.nextStaffNumberValue()).thenReturn(10002L);
-        when(memberRepository.existsByEmailIgnoreCase("member@example.com")).thenReturn(false);
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(foresightDirectoryService.lookupMemberProfileByEmailV2("member@example.com"))
             .thenReturn(ForesightDirectoryService.MemberProfileLookupResult.found(
@@ -1560,7 +1573,7 @@ class AdminServiceTest {
 
         adminService.createUser(
             "SACCO-01",
-            null,
+            "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
             "Existing Member",
@@ -1569,13 +1582,20 @@ class AdminServiceTest {
             List.of(Position.MANAGER)
         );
 
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStaffNo()).isEqualTo("10002");
-        org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().isMemberAccess()).isFalse();
+        assertThat(member.getStaffNo()).isEqualTo("10002");
+        assertThat(member.getMemberNo()).isEqualTo("MBR-002");
+        assertThat(member.getPosition()).isEqualTo(Position.MANAGER);
+        assertThat(member.getStaffRolesResolved()).containsExactly(Position.MANAGER);
+        assertThat(member.isMemberAccess()).isTrue();
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getStaffAccessStatus()).isEqualTo(com.sacco.mvp.domain.StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
+        org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isZero();
 
         verify(foresightDirectoryService).lookupMemberProfileByPhone("+255700000003");
         verify(foresightDirectoryService).lookupMemberProfileByEmailV2("member@example.com");
         verify(memberRepository).save(any(Member.class));
+        verify(notificationRepository).save(any(Notification.class));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
     }
 
     @Test
