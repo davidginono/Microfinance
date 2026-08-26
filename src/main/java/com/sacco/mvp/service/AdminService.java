@@ -340,6 +340,47 @@ public class AdminService {
     }
 
     @Transactional
+    public Member changeMinorAdmin(UUID adminId,
+                                   String saccoId,
+                                   String stationId,
+                                   String fullName,
+                                   String email,
+                                   String phone) {
+        String resolvedSaccoId = saccoRegistryService.resolveRegisteredSacco(saccoId).getSaccoId();
+        String resolvedStationId = saccoRegistryService.requireStationForSacco(resolvedSaccoId, stationId);
+        Member currentAdmin = memberRepository
+            .findBySaccoIdAndStationIdIgnoreCaseAndPosition(resolvedSaccoId, resolvedStationId, Position.MINOR_ADMIN)
+            .orElseThrow(() -> new IllegalStateException("No existing SACCOS Admin is assigned to this station."));
+        String normalizedEmail = requireValue(email, "Enter the user's email address.").toLowerCase();
+        String normalizedPhone = normalizeAdminPhone(phone);
+        if (normalizedPhone == null) {
+            throw new IllegalStateException("Enter the SACCOS Admin phone number.");
+        }
+        if (normalizedEmail.equalsIgnoreCase(currentAdmin.getEmail() == null ? "" : currentAdmin.getEmail())
+            || normalizedPhone.equals(currentAdmin.getPhone())) {
+            throw new IllegalStateException("Enter the details of the new SACCOS Admin, not the current one.");
+        }
+
+        Map<String, Object> before = snapshotMember(currentAdmin);
+        OffsetDateTime now = OffsetDateTime.now();
+        releaseMinorAdminAccess(currentAdmin, adminId, now);
+        memberRepository.save(currentAdmin);
+        memberRepository.flush();
+        auditService.log("STAFF_USER", currentAdmin.getId(), "ADMIN_RELEASE_MINOR_ADMIN_SLOT", adminId, before, snapshotMember(currentAdmin));
+
+        return createStaffAccount(
+            resolvedSaccoId,
+            resolvedStationId,
+            adminId,
+            fullName,
+            normalizedEmail,
+            normalizedPhone,
+            new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)),
+            "ADMIN_CHANGE_MINOR_ADMIN"
+        );
+    }
+
+    @Transactional
     public void updateMinorAdmin(UUID adminId,
                                  UUID accountId,
                                  String saccoId,
@@ -537,6 +578,45 @@ public class AdminService {
         }
         auditService.log("MEMBER", accountId, "ADMIN_UPDATE_MEMBER", adminId, before, snapshotMember(member));
         return result;
+    }
+
+    private void releaseMinorAdminAccess(Member member, UUID adminId, OffsetDateTime now) {
+        minorAdminInvitationService.revokeInvitation(member.getId(), adminId);
+        LinkedHashSet<Position> remainingRoles = Position.normalizeStaffRoles(member.getStaffRolesResolved());
+        remainingRoles.remove(Position.MINOR_ADMIN);
+        boolean memberAccess = member.isMemberAccess();
+        if (remainingRoles.isEmpty() && !memberAccess) {
+            member.setStationId(null);
+            member.setPosition(Position.MEMBER);
+            member.setStaffRoles(remainingRoles);
+            member.setMemberAccount(false);
+            member.setStatus(MemberStatus.INACTIVE);
+            member.setStaffAccessStatus(StaffAccessStatus.NONE);
+            member.setStaffAccessActivatedAt(null);
+            member.setStaffAccessAssignedAt(null);
+            userClaimService.updateClaims(member.getId(), List.of());
+            return;
+        }
+
+        UserUpdateResult result = applyStaffAccessState(member, remainingRoles, memberAccess, now);
+        member.setPosition(Position.primaryRole(remainingRoles, memberAccess));
+        member.setStaffRoles(remainingRoles);
+        member.setMemberAccount(memberAccess);
+        if (member.getStatus() == MemberStatus.INVITED) {
+            if (memberAccess) {
+                member.setStatus(MemberStatus.ACTIVE);
+            } else if (!remainingRoles.isEmpty()) {
+                member.setStatus(MemberStatus.INVITED);
+                member.setPasswordHash(INVITED_ACCOUNT_PASSWORD_PLACEHOLDER);
+                minorAdminInvitationService.issueInvitation(member, adminId);
+            } else {
+                member.setStatus(MemberStatus.INACTIVE);
+            }
+        }
+        userClaimService.updateClaims(member.getId(), new ArrayList<>(userClaimService.defaultClaims(remainingRoles, memberAccess)));
+        if (result.isStaffAccessPending()) {
+            notifyPendingStaffAccess(member, adminId, now);
+        }
     }
 
     public List<LoanProductSetting> loanProducts(String saccoId) {

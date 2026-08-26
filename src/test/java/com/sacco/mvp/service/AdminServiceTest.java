@@ -18,6 +18,7 @@ import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoSettings;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.domain.SmsUnitStatus;
+import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.domain.StationSmsAccount;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.domain.UserSettings;
@@ -1683,6 +1684,76 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStationId()).isEqualTo("ST-1");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
+    }
+
+    @Test
+    void changeMinorAdminReleasesCurrentAdminAndInvitesReplacement() {
+        UUID adminId = UUID.randomUUID();
+        UUID currentAdminId = UUID.randomUUID();
+        RegisteredSacco registeredSacco = RegisteredSacco.builder()
+            .saccoId("SACCO-01")
+            .saccoName("SACCO One")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        SaccoStation station = SaccoStation.builder()
+            .id(UUID.randomUUID())
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Member currentAdmin = Member.builder()
+            .id(currentAdminId)
+            .saccoId("SACCO-01")
+            .stationId("ST-1")
+            .memberNo("STAFF-10000")
+            .staffNo("10000")
+            .fullName("Current Admin")
+            .email("current@example.com")
+            .phone("255712345677")
+            .position(Position.MINOR_ADMIN)
+            .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
+            .memberAccount(false)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .status(MemberStatus.ACTIVE)
+            .createdAt(OffsetDateTime.now().minusDays(1))
+            .build();
+
+        when(registeredSaccoRepository.findById("SACCO-01")).thenReturn(Optional.of(registeredSacco));
+        when(saccoStationRepository.findBySaccoIdAndStationIdAndActiveTrue("SACCO-01", "ST-1")).thenReturn(Optional.of(station));
+        when(memberRepository.findBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN))
+            .thenReturn(Optional.of(currentAdmin));
+        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN)).thenReturn(false);
+        when(memberRepository.existsByEmailIgnoreCase("replacement@example.com")).thenReturn(false);
+        when(memberRepository.existsByPhone("255712345678")).thenReturn(false);
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Member replacement = adminService.changeMinorAdmin(
+            adminId,
+            "SACCO-01",
+            "ST-1",
+            "Replacement Admin",
+            "replacement@example.com",
+            "255712345678"
+        );
+
+        assertThat(currentAdmin.getStatus()).isEqualTo(MemberStatus.INACTIVE);
+        assertThat(currentAdmin.getPosition()).isEqualTo(Position.MEMBER);
+        assertThat(currentAdmin.getStaffRoles()).isEmpty();
+        assertThat(currentAdmin.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.NONE);
+        assertThat(replacement.getStatus()).isEqualTo(MemberStatus.INVITED);
+        assertThat(replacement.getStaffRolesResolved()).containsExactly(Position.MINOR_ADMIN);
+        assertThat(replacement.getStationId()).isEqualTo("ST-1");
+        assertThat(replacement.getEmail()).isEqualTo("replacement@example.com");
+        assertThat(issuedInvitationCount.get()).isEqualTo(1);
+        assertThat(lastInvitedMember.get()).isEqualTo(replacement);
+        assertThat(lastInvitedBy.get()).isEqualTo(adminId);
+        assertThat(revokedInvitationCount.get()).isEqualTo(1);
+        assertThat(lastRevokedMemberId.get()).isEqualTo(currentAdminId);
+        verify(memberRepository).flush();
     }
 
     @Test

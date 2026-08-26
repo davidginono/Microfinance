@@ -82,6 +82,12 @@
                 </div>
 
                 <div class="minor-admin-create-actions" data-aws-action-pin="true">
+                    <button type="submit"
+                            formaction="/admin/saccos/minor-admins/change"
+                            class="app-btn btn-primary"
+                            onclick="return confirm('<spring:message code='admin.minorAdmins.confirmChange' text='Change the SACCOS Admin for the selected station to the person entered in this form?' javaScriptEscape='true' />');">
+                        <spring:message code="admin.minorAdmins.changeAdmin" text="Change SACCOS Admin" />
+                    </button>
                     <button type="submit" class="app-btn btn-launch"><spring:message code="admin.minorAdmins.register" text="Register SACCOS Admin" /></button>
                 </div>
             </form>

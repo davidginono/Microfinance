@@ -323,6 +323,8 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     boolean existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(String saccoId, String stationId, Position position, UUID id);
 
+    Optional<Member> findBySaccoIdAndStationIdIgnoreCaseAndPosition(String saccoId, String stationId, Position position);
+
     @Query(
         value = """
             select m.*

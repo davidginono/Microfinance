@@ -18,6 +18,8 @@ class AdminMinorAdminsJspLayoutTest {
             .contains("class=\"minor-admin-create-form\"")
             .contains("class=\"erp-panel-body minor-admin-create-grid\"")
             .contains("class=\"minor-admin-create-actions\" data-aws-action-pin=\"true\"")
+            .contains("formaction=\"/admin/saccos/minor-admins/change\"")
+            .contains("Change SACCOS Admin")
             .contains("class=\"erp-panel overflow-hidden minor-admin-list-panel\"")
             .doesNotContain("md:col-span-2 xl:col-span-3 flex flex-wrap items-center justify-end gap-3");
         assertThat(componentCss)

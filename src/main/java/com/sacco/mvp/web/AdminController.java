@@ -1873,6 +1873,32 @@ public class AdminController {
         return "redirect:/admin/saccos/minor-admins";
     }
 
+    @PostMapping("/saccos/minor-admins/change")
+    @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE') and @access.has(principal, 'USER_ACCESS_CREATE')")
+    public String changeMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
+                                   @ModelAttribute MinorAdminRegistrationForm registrationForm,
+                                   RedirectAttributes ra) {
+        try {
+            var createdAdmin = adminService.changeMinorAdmin(
+                principal.getMemberId(),
+                registrationForm.getSaccoId(),
+                registrationForm.getStationId(),
+                registrationForm.getFullName(),
+                registrationForm.getEmail(),
+                registrationForm.getPhone()
+            );
+            ra.addFlashAttribute("createdMinorAdminStaffNumber", createdAdmin.getStaffNo());
+            if (createdAdmin.isMemberAccess()) {
+                ra.addFlashAttribute("message", "SACCOS Admin changed. Access assigned to the existing LMS member account with Staff Number " + createdAdmin.getStaffNo() + ".");
+            } else {
+                ra.addFlashAttribute("message", "SACCOS Admin changed. The new admin has been invited with Staff Number " + createdAdmin.getStaffNo() + ".");
+            }
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            ra.addFlashAttribute("error", ex.getMessage());
+        }
+        return "redirect:/admin/saccos/minor-admins";
+    }
+
     @PostMapping("/saccos/minor-admins/{accountId}")
     @PreAuthorize("@authz.platformAdminIdentity(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String updateMinorAdmin(@AuthenticationPrincipal AppUserPrincipal principal,
