@@ -12,6 +12,7 @@ param(
     [string]$RemoteUser = "ec2-user",
     [string]$PostgresPassword = $env:POSTGRES_PASSWORD,
     [string]$AppSecretsEncryptionKey = $env:APP_SECRETS_ENCRYPTION_KEY,
+    [string]$AppTimeZone = $env:APP_TIME_ZONE,
     [string]$SpringMailHost = $env:SPRING_MAIL_HOST,
     [string]$SpringMailPort = $env:SPRING_MAIL_PORT,
     [string]$SpringMailUsername = $env:SPRING_MAIL_USERNAME,
@@ -171,6 +172,9 @@ if ([string]::IsNullOrWhiteSpace($AppSecretsEncryptionKey)) {
 if ([string]::IsNullOrWhiteSpace($SpringMailPort)) {
     $SpringMailPort = "465"
 }
+if ([string]::IsNullOrWhiteSpace($AppTimeZone)) {
+    $AppTimeZone = "Africa/Nairobi"
+}
 if ([string]::IsNullOrWhiteSpace($AppSmsEnabled)) {
     $AppSmsEnabled = "true"
 }
@@ -292,6 +296,7 @@ Write-EnvLine $envBuilder "POSTGRES_DB" "sacco"
 Write-EnvLine $envBuilder "POSTGRES_USER" "sacco"
 Write-EnvLine $envBuilder "POSTGRES_PASSWORD" $PostgresPassword
 Write-EnvLine $envBuilder "APP_BASE_URL" "https://$PublicDomain"
+Write-EnvLine $envBuilder "APP_TIME_ZONE" $AppTimeZone
 Write-EnvLine $envBuilder "APP_SECRETS_ENCRYPTION_KEY" $AppSecretsEncryptionKey
 Write-EnvLine $envBuilder "SPRING_MAIL_HOST" $SpringMailHost
 Write-EnvLine $envBuilder "SPRING_MAIL_PORT" $SpringMailPort
