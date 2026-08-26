@@ -2606,7 +2606,7 @@ public class AdminService {
         if (normalizedPhone == null) {
             throw new IllegalStateException("Enter the staff member phone number.");
         }
-        ensureStaffIsNotExternalMember(normalizedEmail, normalizedPhone);
+        ensureExternalMemberDirectoryResolved(normalizedEmail, normalizedPhone);
 
         if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalStateException("That email address is already in use.");
@@ -2654,26 +2654,19 @@ public class AdminService {
         return saved;
     }
 
-    private void ensureStaffIsNotExternalMember(String normalizedEmail, String normalizedPhone) {
+    private void ensureExternalMemberDirectoryResolved(String normalizedEmail, String normalizedPhone) {
         ForesightDirectoryService.MemberProfileLookupResult phoneLookup =
             foresightDirectoryService.lookupMemberProfileByPhone("+" + normalizedPhone);
         ForesightDirectoryService.MemberProfileLookupResult emailLookup =
             foresightDirectoryService.lookupMemberProfileByEmailV2(normalizedEmail);
 
-        if (isExternalMemberFound(phoneLookup) || isExternalMemberFound(emailLookup)) {
-            throw new IllegalStateException("This person is already registered as a SACCO member and cannot be added as staff.");
-        }
-        if (!isExternalMemberNotFound(phoneLookup) || !isExternalMemberNotFound(emailLookup)) {
+        if (!isExternalMemberLookupResolved(phoneLookup) || !isExternalMemberLookupResolved(emailLookup)) {
             throw new IllegalStateException("We could not verify this person against Foresight. Try again later.");
         }
     }
 
-    private boolean isExternalMemberFound(ForesightDirectoryService.MemberProfileLookupResult lookup) {
-        return lookup != null && lookup.isFound();
-    }
-
-    private boolean isExternalMemberNotFound(ForesightDirectoryService.MemberProfileLookupResult lookup) {
-        return lookup != null && lookup.isNotFound();
+    private boolean isExternalMemberLookupResolved(ForesightDirectoryService.MemberProfileLookupResult lookup) {
+        return lookup != null && (lookup.isFound() || lookup.isNotFound());
     }
 
     public String userIdLabel(UUID accountId) {

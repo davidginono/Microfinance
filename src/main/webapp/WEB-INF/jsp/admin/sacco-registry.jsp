@@ -196,6 +196,7 @@
                             <span class="aws-file-help">
                                 Optional. ${logoUploadPolicy.helpText} If you skip this, the navbar will use the SACCO initials.
                             </span>
+                            <span class="aws-file-meta hidden" data-logo-file-meta></span>
                     </div>
                 </div>
                 </div>
@@ -330,6 +331,7 @@
                                 <span class="aws-file-help">
                                     Leave this empty to keep the current logo. Upload or paste a new image to replace it. ${logoUploadPolicy.helpText}
                                 </span>
+                                <span class="aws-file-meta hidden" data-logo-file-meta></span>
                         </div>
                     </div>
                     </div>
@@ -447,6 +449,7 @@
                                 <span class="aws-file-help">
                                     ${logoUploadPolicy.helpText}
                                 </span>
+                                <span class="aws-file-meta hidden" data-logo-file-meta></span>
                         </div>
                     </div>
                     </div>
@@ -509,7 +512,30 @@
             }
         });
 
-        function updateLogoPreview(container, file) {
+        function formatLogoFileSize(bytes) {
+            if (!Number.isFinite(bytes) || bytes <= 0) {
+                return '0 KB';
+            }
+            if (bytes < 1024 * 1024) {
+                return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+            }
+            return (bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
+        }
+
+        function setLogoFileMeta(meta, text) {
+            if (!meta) {
+                return;
+            }
+            if (!text) {
+                meta.textContent = '';
+                meta.classList.add('hidden');
+                return;
+            }
+            meta.textContent = text;
+            meta.classList.remove('hidden');
+        }
+
+        function updateLogoPreview(container, file, meta) {
             if (!container || !file || !file.type || file.type.indexOf('image/') !== 0) {
                 return;
             }
@@ -522,6 +548,15 @@
             previewImage.src = objectUrl;
             previewImage.classList.remove('hidden');
             previewFallback.classList.add('hidden');
+            setLogoFileMeta(meta, 'Checking image details...');
+            previewImage.onload = function () {
+                setLogoFileMeta(meta, previewImage.naturalWidth + ' x ' + previewImage.naturalHeight + ' px, ' + formatLogoFileSize(file.size));
+                URL.revokeObjectURL(objectUrl);
+            };
+            previewImage.onerror = function () {
+                setLogoFileMeta(meta, 'Unable to read image dimensions, ' + formatLogoFileSize(file.size));
+                URL.revokeObjectURL(objectUrl);
+            };
         }
 
         function bindLogoUploadCard(card) {
@@ -529,16 +564,19 @@
             const pasteTarget = card.querySelector('[data-logo-paste-target]');
             const pasteHint = card.querySelector('[data-logo-paste-hint]');
             const previewShell = card.querySelector('[data-logo-preview-shell]');
+            const fileMeta = card.querySelector('[data-logo-file-meta]');
             if (!fileInput || !pasteTarget || !previewShell) {
                 return;
             }
 
             fileInput.addEventListener('change', function () {
                 if (fileInput.files && fileInput.files[0]) {
-                    updateLogoPreview(previewShell, fileInput.files[0]);
+                    updateLogoPreview(previewShell, fileInput.files[0], fileMeta);
                     if (pasteHint) {
                         pasteHint.textContent = 'Selected image ready. You can still paste another one to replace it before saving.';
                     }
+                } else {
+                    setLogoFileMeta(fileMeta, '');
                 }
             });
 

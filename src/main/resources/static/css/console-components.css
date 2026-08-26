@@ -3384,6 +3384,17 @@ body {
         font-weight: 400;
         line-height: 16px;
     }
+    .aws-file-meta {
+        display: block;
+        margin-top: 6px;
+        color: var(--aws-ink, #16191f);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px;
+    }
+    .aws-file-meta.hidden {
+        display: none;
+    }
     .aws-file-dropzone {
         display: grid;
         width: 100%;
