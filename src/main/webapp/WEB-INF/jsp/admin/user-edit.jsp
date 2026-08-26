@@ -341,7 +341,28 @@
             });
         }
 
+        function applyDefaultClaimsForRole(editForm, roleName) {
+            const defaults = new Set(roleDefaultClaims[roleName] || []);
+            if (!defaults.size) {
+                return;
+            }
+            editForm.querySelectorAll('[data-access-claim]:not(:disabled)').forEach((input) => {
+                if (defaults.has(input.value)) {
+                    input.checked = true;
+                }
+            });
+            syncMatrixState(editForm);
+        }
+
         if (form) {
+            form.querySelectorAll('[data-staff-role-checkbox="edit-user"]').forEach((roleInput) => {
+                roleInput.addEventListener('change', () => {
+                    if (roleInput.checked) {
+                        applyDefaultClaimsForRole(form, roleInput.value);
+                    }
+                });
+            });
+
             form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
                 toggle.addEventListener('change', () => {
                     const row = toggle.getAttribute('data-access-row-toggle');

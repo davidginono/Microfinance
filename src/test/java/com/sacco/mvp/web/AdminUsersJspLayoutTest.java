@@ -78,6 +78,9 @@ class AdminUsersJspLayoutTest {
         assertThat(editJsp).contains("disabled");
         assertThat(editJsp).contains("No supported claim");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");
+        assertThat(editJsp)
+            .contains("function applyDefaultClaimsForRole(editForm, roleName)")
+            .contains("applyDefaultClaimsForRole(form, roleInput.value)");
     }
 
     @Test
