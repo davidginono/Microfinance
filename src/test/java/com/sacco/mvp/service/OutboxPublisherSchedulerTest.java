@@ -49,7 +49,8 @@ class OutboxPublisherSchedulerTest {
             new NotificationViewService(
                 objectMapper,
                 mock(MemberRepository.class),
-                new AccessControlService()
+                new AccessControlService(),
+                new ApplicationClock("Africa/Nairobi")
             ),
             deliveryService,
             mock(LoanNotificationFormatter.class)

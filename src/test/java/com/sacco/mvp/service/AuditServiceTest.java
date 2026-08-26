@@ -10,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -25,7 +26,7 @@ class AuditServiceTest {
 
     @Test
     void logEnrichesFailureStatusScopeActionAndReference() {
-        AuditService service = new AuditService(auditLogRepository, new ObjectMapper());
+        AuditService service = new AuditService(auditLogRepository, new ObjectMapper(), new ApplicationClock("Africa/Nairobi"));
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
         UUID loanId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
@@ -46,11 +47,12 @@ class AuditServiceTest {
         assertThat(saved.getStationId()).isEqualTo("ST-1");
         assertThat(saved.getActionDescription()).isEqualTo("OTP verification");
         assertThat(saved.getReferenceValue()).isEqualTo("Loan Application #42");
+        assertThat(saved.getCreatedAt().getOffset().getTotalSeconds()).isEqualTo(3 * 60 * 60);
     }
 
     @Test
     void logEventStoresReportExportReference() {
-        AuditService service = new AuditService(auditLogRepository, new ObjectMapper());
+        AuditService service = new AuditService(auditLogRepository, new ObjectMapper(), new ApplicationClock("Africa/Nairobi"));
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
         UUID actorId = UUID.randomUUID();
 
@@ -74,5 +76,14 @@ class AuditServiceTest {
         assertThat(saved.getDisplayStatus()).isEqualTo("Success");
         assertThat(saved.getDisplayAction()).isEqualTo("Report exported");
         assertThat(saved.getShortEntityReference()).isEqualTo("Report station-loan-analytics");
+    }
+
+    @Test
+    void auditLogLabelDisplaysUtcRowsInNairobiTime() {
+        AuditLog auditLog = AuditLog.builder()
+            .createdAt(OffsetDateTime.parse("2026-08-26T14:28:00Z"))
+            .build();
+
+        assertThat(auditLog.getCreatedAtLabel()).isEqualTo("2026-08-26 17:28");
     }
 }

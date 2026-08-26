@@ -14,6 +14,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.UUID;
@@ -33,6 +34,7 @@ import java.util.UUID;
 public class AuditLog {
     private static final DateTimeFormatter DISPLAY_TIMESTAMP =
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final ZoneId DISPLAY_ZONE = ZoneId.of("Africa/Nairobi");
 
     @Id
     private UUID id;
@@ -199,7 +201,7 @@ public class AuditLog {
 
     @Transient
     public String getCreatedAtLabel() {
-        return createdAt == null ? "-" : createdAt.format(DISPLAY_TIMESTAMP);
+        return createdAt == null ? "-" : createdAt.atZoneSameInstant(DISPLAY_ZONE).format(DISPLAY_TIMESTAMP);
     }
 
     private String humanize(String raw) {

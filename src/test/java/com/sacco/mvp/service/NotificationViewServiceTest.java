@@ -62,7 +62,8 @@ class NotificationViewServiceTest {
         return new NotificationViewService(
             new ObjectMapper(),
             mock(MemberRepository.class),
-            new AccessControlService()
+            new AccessControlService(),
+            new ApplicationClock("Africa/Nairobi")
         );
     }
 

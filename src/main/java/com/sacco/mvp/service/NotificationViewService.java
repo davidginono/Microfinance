@@ -24,6 +24,7 @@ public class NotificationViewService {
     private final ObjectMapper objectMapper;
     private final MemberRepository memberRepository;
     private final AccessControlService access;
+    private final ApplicationClock applicationClock;
 
     public List<NotificationView> toViews(List<Notification> notifications) {
         if (notifications == null) {
@@ -451,7 +452,7 @@ public class NotificationViewService {
     }
 
     private String formatCreatedAt(OffsetDateTime createdAt) {
-        return createdAt == null ? "" : DATE_TIME_FORMATTER.format(createdAt);
+        return createdAt == null ? "" : DATE_TIME_FORMATTER.format(applicationClock.zoned(createdAt));
     }
 
     @SuppressWarnings("unchecked")

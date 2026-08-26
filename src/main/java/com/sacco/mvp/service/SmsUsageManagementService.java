@@ -29,6 +29,7 @@ public class SmsUsageManagementService {
     private final SmsUsageAlertService alertService;
     private final StationSmsAccountRepository accountRepository;
     private final SmsUsageLedgerRepository ledgerRepository;
+    private final ApplicationClock applicationClock;
 
     public Page<StationSmsAccount> accounts(String saccoId, String stationId, SmsUnitStatus status, Pageable pageable) {
         String normalizedSaccoId = blankToNull(saccoId);
@@ -107,7 +108,7 @@ public class SmsUsageManagementService {
     }
 
     private String formatTimestamp(OffsetDateTime timestamp) {
-        return timestamp == null ? "-" : timestamp.format(USAGE_TIMESTAMP);
+        return timestamp == null ? "-" : applicationClock.zoned(timestamp).format(USAGE_TIMESTAMP);
     }
 
     public record SmsUsageRow(

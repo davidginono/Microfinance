@@ -12,7 +12,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -27,6 +26,7 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final ApplicationClock applicationClock;
 
     public void log(String entityType, UUID entityId, String action, UUID actorMemberId, Object beforeState, Object afterState) {
         Map<String, Object> before = asMap(beforeState);
@@ -91,7 +91,7 @@ public class AuditService {
             .beforeState(toJson(beforeState))
             .afterState(toJson(afterState))
             .requestMetadata(toJson(requestMetadata()))
-            .createdAt(OffsetDateTime.now())
+            .createdAt(applicationClock.now())
             .build());
     }
 

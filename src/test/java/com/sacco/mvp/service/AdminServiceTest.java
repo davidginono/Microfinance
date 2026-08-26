@@ -117,14 +117,15 @@ class AdminServiceTest {
         ObjectMapper objectMapper = new ObjectMapper();
         UserClaimService userClaimService = new UserClaimService(memberAccessClaimRepository, userSettingsRepository, objectMapper);
         RoleDirectoryService roleDirectoryService = new RoleDirectoryService(memberRepository, userClaimService);
-        AuditService auditService = new AuditService(auditLogRepository, objectMapper);
+        ApplicationClock applicationClock = new ApplicationClock("Africa/Nairobi");
+        AuditService auditService = new AuditService(auditLogRepository, objectMapper, applicationClock);
         AdminAlertService adminAlertService = new AdminAlertService(
             roleDirectoryService,
             notificationRepository,
             adminIncidentRepository,
             objectMapper
         );
-        NotificationViewService notificationViewService = new NotificationViewService(objectMapper, memberRepository, new AccessControlService());
+        NotificationViewService notificationViewService = new NotificationViewService(objectMapper, memberRepository, new AccessControlService(), applicationClock);
         SaccoConfigurationService saccoConfigurationService = new SaccoConfigurationService(loanProductSettingRepository);
         NameSignatureService nameSignatureService = new NameSignatureService();
         SaccoRegistryService saccoRegistryService = new SaccoRegistryService(
@@ -197,7 +198,7 @@ class AdminServiceTest {
             objectMapper,
             nameSignatureService,
             foresightDirectoryService,
-            new ApplicationClock("Africa/Nairobi")
+            applicationClock
         );
     }
 
