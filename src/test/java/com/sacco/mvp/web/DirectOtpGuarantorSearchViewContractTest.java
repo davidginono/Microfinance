@@ -69,6 +69,12 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("input.name = \"guarantorSelections\"")
             .contains("id=\"selectedGuarantorState\" name=\"guarantorSelectionState\"")
             .contains("selectionStateInput.value = JSON.stringify(selectionTokens);")
+            .contains("function itemFromChip(chip)")
+            .contains("function syncSelectedFromRenderedChips()")
+            .contains("chip.dataset.selectionKey = selectionKey || \"\";")
+            .contains("chip.dataset.selectionToken = selectionToken || \"\";")
+            .contains("syncSelectedFromRenderedChips();")
+            .contains("hiddenInputs.innerHTML = \"\";")
             .contains("item.memberNo) + \" - \" + escapeHtml(item.fullName)");
     }
 

@@ -1802,10 +1802,44 @@
                 counter.textContent = selected.size + " " + msgSelectedSuffix + " / " + required;
             }
 
+            function selectionTokenForItem(item) {
+                return item.selectionToken || item.localMemberId || item.id || "";
+            }
+
+            function itemFromChip(chip) {
+                const key = chip.dataset.selectionKey || chip.dataset.id || chip.dataset.guarantorId || "";
+                if (!key) {
+                    return null;
+                }
+                return {
+                    id: chip.dataset.id || chip.dataset.guarantorId || key,
+                    selectionKey: key,
+                    selectionToken: chip.dataset.selectionToken || chip.dataset.localMemberId || chip.dataset.id || chip.dataset.guarantorId || key,
+                    localMemberId: chip.dataset.localMemberId || "",
+                    memberNo: chip.dataset.memberNo || "-",
+                    fullName: chip.dataset.fullName || "Guarantor"
+                };
+            }
+
+            function syncSelectedFromRenderedChips() {
+                let changed = false;
+                Array.from(selectedContainer.querySelectorAll(".selected-guarantor-chip")).forEach(function (chip) {
+                    const item = itemFromChip(chip);
+                    if (item && !selected.has(item.selectionKey)) {
+                        selected.set(item.selectionKey, item);
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    updateCounter();
+                }
+            }
+
             function renderHiddenInputs() {
+                syncSelectedFromRenderedChips();
                 hiddenInputs.innerHTML = "";
                 const selectionTokens = Array.from(selected.values())
-                    .map(function (item) { return item.selectionToken || item.localMemberId || item.id; })
+                    .map(selectionTokenForItem)
                     .filter(Boolean);
                 selectionTokens.forEach(function (token) {
                     const input = document.createElement("input");
@@ -1833,12 +1867,20 @@
                     const chip = document.createElement("button");
                     chip.type = "button";
                     const hasServerError = serverGuarantorErrorId && item.localMemberId === serverGuarantorErrorId;
+                    const selectionKey = item.selectionKey || item.id;
+                    const selectionToken = selectionTokenForItem(item);
                     chip.className = "selected-guarantor-chip" + (hasServerError ? " has-error" : "");
+                    chip.dataset.id = item.id || "";
+                    chip.dataset.selectionKey = selectionKey || "";
+                    chip.dataset.selectionToken = selectionToken || "";
+                    chip.dataset.localMemberId = item.localMemberId || "";
+                    chip.dataset.memberNo = item.memberNo || "-";
+                    chip.dataset.fullName = item.fullName || "Guarantor";
                     chip.dataset.guarantorId = item.localMemberId || item.id;
                     chip.setAttribute("aria-label", "Remove " + item.fullName);
                     chip.innerHTML = "<span>" + escapeHtml(item.memberNo) + " - " + escapeHtml(item.fullName) + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
                     chip.addEventListener("click", function () {
-                        selected.delete(item.selectionKey || item.id);
+                        selected.delete(selectionKey);
                         renderSelected();
                     });
                     selectedContainer.appendChild(chip);
@@ -1864,17 +1906,7 @@
                 }
             }
 
-            Array.from(document.querySelectorAll(".selected-guarantor-chip")).forEach(function (chip) {
-                const key = chip.dataset.selectionKey || chip.dataset.id;
-                selected.set(key, {
-                    id: chip.dataset.id,
-                    selectionKey: key,
-                    selectionToken: chip.dataset.selectionToken || chip.dataset.id,
-                    localMemberId: chip.dataset.localMemberId || "",
-                    memberNo: chip.dataset.memberNo,
-                    fullName: chip.dataset.fullName
-                });
-            });
+            syncSelectedFromRenderedChips();
             renderSelected();
             window.setTimeout(revealServerGuarantorError, 120);
 

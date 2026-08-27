@@ -167,6 +167,70 @@ class AppControllerDraftNavigationTest {
     }
 
     @Test
+    void saveDraftUsesRawRequestGuarantorSelectionWhenListBindingIsEmpty() {
+        String saccoId = "SACCO-1";
+        UUID memberId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID applicationId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("700000");
+        int tenorMonths = 6;
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(productId)
+            .saccoId(saccoId)
+            .loanType(LoanType.CUSTOMIZED_LOAN)
+            .build();
+        LoanApplication saved = LoanApplication.builder()
+            .id(applicationId)
+            .build();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addParameter("guarantorSelections", guarantorId.toString());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        when(principal.getSaccoId()).thenReturn(saccoId);
+        when(principal.getMemberId()).thenReturn(memberId);
+        when(formSchemaService.getSchema(saccoId, productId, LoanType.CUSTOMIZED_LOAN)).thenReturn(product);
+        when(loanWorkflowService.saveDraft(
+            eq(saccoId),
+            eq(memberId),
+            eq(productId),
+            eq(LoanType.CUSTOMIZED_LOAN),
+            eq(amount),
+            eq(tenorMonths),
+            anyMap(),
+            isNull(),
+            eq(List.of(guarantorId.toString())),
+            isNull(),
+            isNull(),
+            isNull(),
+            anyMap()
+        )).thenReturn(saved);
+
+        String result = controller.createDraft(
+            principal,
+            productId,
+            LoanType.CUSTOMIZED_LOAN,
+            amount,
+            tenorMonths,
+            null,
+            "SAVE_DRAFT",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Map.of(),
+            null,
+            request,
+            redirect,
+            new ExtendedModelMap()
+        );
+
+        assertThat(result).isEqualTo("redirect:/app/loan-applications/" + applicationId + "/edit?step=5");
+    }
+
+    @Test
     void submitDraftWithMissingGuarantorSelectionReturnsToGuarantorStep() {
         UUID memberId = UUID.randomUUID();
         UUID applicationId = UUID.randomUUID();

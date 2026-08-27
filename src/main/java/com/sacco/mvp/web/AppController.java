@@ -1185,7 +1185,8 @@ public class AppController {
         List<?> submittedGuarantorSelections = normalizeSubmittedGuarantorSelections(
             guarantorSelections,
             guarantorIds,
-            guarantorSelectionState
+            guarantorSelectionState,
+            request
         );
 
         try {
@@ -2798,7 +2799,8 @@ public class AppController {
 
     private List<?> normalizeSubmittedGuarantorSelections(List<String> guarantorSelections,
                                                           List<UUID> guarantorIds,
-                                                          String guarantorSelectionState) {
+                                                          String guarantorSelectionState,
+                                                          HttpServletRequest request) {
         if (guarantorSelections != null) {
             List<String> postedSelections = guarantorSelections.stream()
                 .filter(value -> value != null && !value.isBlank())
@@ -2807,11 +2809,31 @@ public class AppController {
                 return postedSelections;
             }
         }
-        List<String> stateSelections = parseGuarantorSelectionState(guarantorSelectionState);
+        List<String> requestSelections = request == null
+            ? Collections.emptyList()
+            : normalizeRequestValues(request.getParameterValues("guarantorSelections"));
+        if (!requestSelections.isEmpty()) {
+            return requestSelections;
+        }
+        String rawSelectionState = firstNonBlank(guarantorSelectionState, request == null ? null : request.getParameter("guarantorSelectionState"));
+        List<String> stateSelections = parseGuarantorSelectionState(rawSelectionState);
         if (!stateSelections.isEmpty()) {
             return stateSelections;
         }
         return guarantorIds == null ? Collections.emptyList() : guarantorIds;
+    }
+
+    private List<String> normalizeRequestValues(String[] values) {
+        if (values == null || values.length == 0) {
+            return Collections.emptyList();
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                normalized.add(value.trim());
+            }
+        }
+        return normalized;
     }
 
     private List<String> parseGuarantorSelectionState(String guarantorSelectionState) {
