@@ -1179,6 +1179,18 @@ class AwsConsoleViewContractTest {
     }
 
     @Test
+    void memberDraftDetailOnlySendsWhenSavedGuarantorSelectionIsComplete() throws Exception {
+        String memberDetail = read(JSP_ROOT.resolve("app/loan-view.jsp"));
+
+        assertThat(memberDetail)
+            .contains("<c:set var=\"draftGuarantorSelectionComplete\" value=\"${app.status eq 'DRAFT' and requiredDraftGuarantors gt 0 and draftSelectedGuarantorCount eq requiredDraftGuarantors}\" />")
+            .contains("<c:set var=\"showDraftSelectGuarantorAction\" value=\"${app.status eq 'DRAFT' and requiredDraftGuarantors gt 0 and not draftGuarantorSelectionComplete}\" />")
+            .contains("<c:set var=\"showDraftSendToGuarantorsAction\" value=\"${draftGuarantorSelectionComplete}\" />")
+            .contains("href=\"/app/loan-applications/${app.id}/edit?step=3\"")
+            .contains("code=\"loan.actions.selectGuarantor\"");
+    }
+
+    @Test
     void adminRegistersKeepAwsFiltersAndScrollableTablesInOneSurface() throws Exception {
         for (String viewName : List.of("admin/users.jsp", "admin/events.jsp", "admin/outbox.jsp")) {
             String view = read(JSP_ROOT.resolve(viewName));

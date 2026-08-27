@@ -766,11 +766,15 @@
     </details>
 </c:if>
 
+<c:set var="requiredDraftGuarantors" value="${empty app.requiredGuarantors ? 0 : app.requiredGuarantors}" />
+<c:set var="draftSelectedGuarantorCount" value="${empty draftSelectedGuarantors ? 0 : fn:length(draftSelectedGuarantors)}" />
+<c:set var="draftGuarantorSelectionComplete" value="${app.status eq 'DRAFT' and requiredDraftGuarantors gt 0 and draftSelectedGuarantorCount eq requiredDraftGuarantors}" />
+<c:set var="showDraftSelectGuarantorAction" value="${app.status eq 'DRAFT' and requiredDraftGuarantors gt 0 and not draftGuarantorSelectionComplete}" />
 <c:set var="showEditAction" value="${app.status eq 'DRAFT' or app.status eq 'ALL_GUARANTORS_APPROVED'}" />
-<c:set var="showDraftSendToGuarantorsAction" value="${app.status eq 'DRAFT' and app.requiredGuarantors gt 0}" />
+<c:set var="showDraftSendToGuarantorsAction" value="${draftGuarantorSelectionComplete}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction}" />
+<c:set var="showLoanActionCard" value="${showEditAction or showDraftSelectGuarantorAction or showDraftSendToGuarantorsAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction}" />
 <c:set var="canSubmitApprovedGuarantorLoan" value="${app.status eq 'ALL_GUARANTORS_APPROVED' and not pendingGuarantorRemovalRequest}" />
 <spring:message code="loan.confirm.cancelSubmission.title" text="Cancel Application" var="cancelSubmissionTitle" />
 <spring:message code="loan.confirm.cancelSubmission.message" text="Move this application back to draft so you can keep editing it?" var="cancelSubmissionMessage" />
@@ -785,7 +789,12 @@
 <c:if test="${showLoanActionCard}">
     <div class="erp-form-wrap loan-page-bottom-actions">
         <div class="loan-view-action-cluster">
-            <c:if test="${showEditAction}">
+            <c:if test="${showDraftSelectGuarantorAction}">
+                <a href="/app/loan-applications/${app.id}/edit?step=3" class="app-btn btn-primary">
+                    <spring:message code="loan.actions.selectGuarantor" text="Select Guarantor" />
+                </a>
+            </c:if>
+            <c:if test="${showEditAction and not showDraftSelectGuarantorAction}">
                 <a href="/app/loan-applications/${app.id}/edit" class="app-btn btn-neutral">
                     <spring:message code="loan.actions.reEdit" text="Re-edit Application" />
                 </a>
