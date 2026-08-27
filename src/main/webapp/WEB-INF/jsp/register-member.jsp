@@ -53,7 +53,7 @@
                             <form:select path="saccoId" cssClass="registration-select">
                                 <option value="" data-placeholder="true">Select SACCO Name</option>
                                 <c:forEach items="${registrationSaccos}" var="sacco">
-                                    <form:option value="${sacco.saccoId}">${sacco.saccoId} - ${sacco.saccoName}</form:option>
+                                    <form:option value="${sacco.saccoId}">${sacco.saccoName}</form:option>
                                 </c:forEach>
                             </form:select>
                             <form:errors path="saccoId" cssClass="mt-1 block text-xs text-rose-600" />

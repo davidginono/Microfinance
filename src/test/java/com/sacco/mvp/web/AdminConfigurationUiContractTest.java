@@ -137,6 +137,15 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void registrationSaccoDropdownShowsNameOnly() throws Exception {
+        String registration = read(JSP_ROOT.resolve("register-member.jsp"));
+
+        assertThat(registration)
+            .contains("<form:option value=\"${sacco.saccoId}\">${sacco.saccoName}</form:option>")
+            .doesNotContain("${sacco.saccoId} - ${sacco.saccoName}");
+    }
+
+    @Test
     void smsTablesAndSharedPageHeaderUseAwsConsoleStructure() throws Exception {
         String smsUsage = read(JSP_ROOT.resolve("admin/sms-usage.jsp"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));
