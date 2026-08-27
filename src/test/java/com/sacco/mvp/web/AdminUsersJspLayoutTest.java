@@ -79,8 +79,10 @@ class AdminUsersJspLayoutTest {
         assertThat(editJsp).contains("No supported claim");
         assertThat(editJsp).contains("input.checked = defaults.has(input.value)");
         assertThat(editJsp)
-            .contains("function applyDefaultClaimsForRole(editForm, roleName)")
-            .contains("applyDefaultClaimsForRole(form, roleInput.value)");
+            .contains("function syncClaimsForSelectedRoles(editForm)")
+            .contains("selectedDefaultClaims(editForm)")
+            .contains("roleDefaults.has(input.value)")
+            .contains("roleInput.addEventListener('change', () => syncClaimsForSelectedRoles(form))");
     }
 
     @Test

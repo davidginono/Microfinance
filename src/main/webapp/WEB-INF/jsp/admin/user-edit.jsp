@@ -341,14 +341,36 @@
             });
         }
 
-        function applyDefaultClaimsForRole(editForm, roleName) {
-            const defaults = new Set(roleDefaultClaims[roleName] || []);
-            if (!defaults.size) {
-                return;
+        function allRoleDefaultClaims() {
+            const defaults = new Set();
+            Object.keys(roleDefaultClaims).forEach((roleName) => {
+                (roleDefaultClaims[roleName] || []).forEach((claim) => defaults.add(claim));
+            });
+            return defaults;
+        }
+
+        function selectedDefaultClaims(editForm) {
+            const defaults = new Set();
+            if (editForm.getAttribute('data-member-access') === 'true') {
+                memberDefaultClaims.forEach((claim) => defaults.add(claim));
             }
+            enabledInputs(editForm, '[data-staff-role-checkbox="edit-user"]').forEach((roleInput) => {
+                if (!roleInput.checked) {
+                    return;
+                }
+                (roleDefaultClaims[roleInput.value] || []).forEach((claim) => defaults.add(claim));
+            });
+            return defaults;
+        }
+
+        function syncClaimsForSelectedRoles(editForm) {
+            const selectedDefaults = selectedDefaultClaims(editForm);
+            const roleDefaults = allRoleDefaultClaims();
             editForm.querySelectorAll('[data-access-claim]:not(:disabled)').forEach((input) => {
-                if (defaults.has(input.value)) {
+                if (selectedDefaults.has(input.value)) {
                     input.checked = true;
+                } else if (roleDefaults.has(input.value)) {
+                    input.checked = false;
                 }
             });
             syncMatrixState(editForm);
@@ -356,11 +378,7 @@
 
         if (form) {
             form.querySelectorAll('[data-staff-role-checkbox="edit-user"]').forEach((roleInput) => {
-                roleInput.addEventListener('change', () => {
-                    if (roleInput.checked) {
-                        applyDefaultClaimsForRole(form, roleInput.value);
-                    }
-                });
+                roleInput.addEventListener('change', () => syncClaimsForSelectedRoles(form));
             });
 
             form.querySelectorAll('[data-access-row-toggle]').forEach((toggle) => {
@@ -390,16 +408,7 @@
             const restoreButton = form.querySelector('[data-restore-default-claims]');
             if (restoreButton) {
                 restoreButton.addEventListener('click', () => {
-                    const defaults = new Set();
-                    if (form.getAttribute('data-member-access') === 'true') {
-                        memberDefaultClaims.forEach((claim) => defaults.add(claim));
-                    }
-                    enabledInputs(form, '[data-staff-role-checkbox="edit-user"]').forEach((roleInput) => {
-                        if (!roleInput.checked) {
-                            return;
-                        }
-                        (roleDefaultClaims[roleInput.value] || []).forEach((claim) => defaults.add(claim));
-                    });
+                    const defaults = selectedDefaultClaims(form);
                     form.querySelectorAll('[data-access-claim]').forEach((input) => {
                         input.checked = defaults.has(input.value);
                     });
