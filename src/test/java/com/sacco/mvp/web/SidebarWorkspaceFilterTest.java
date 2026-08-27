@@ -31,6 +31,18 @@ class SidebarWorkspaceFilterTest {
     }
 
     @Test
+    void memberLoanFormRoutesHighlightApplyForLoanInsteadOfApplicationProgress() throws IOException {
+        String sidebar = sidebarFragment();
+
+        assertThat(sidebar).contains(
+            "<c:set var=\"memberApplyLoanActive\" value=\"${requestUri eq '/app/loan-products' or requestUri eq '/app/loan-applications/new' or (fn:startsWith(requestUri, '/app/loan-applications/') and fn:endsWith(requestUri, '/edit'))}\" />",
+            "<c:set var=\"memberApplicationProgressActive\" value=\"${fn:startsWith(requestUri, '/app/loan-applications') and not memberApplyLoanActive}\" />",
+            "${memberApplyLoanActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'",
+            "${memberApplicationProgressActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'"
+        );
+    }
+
+    @Test
     void staffMenusAreLimitedToStaffWorkspace() throws IOException {
         String sidebar = sidebarFragment();
 
