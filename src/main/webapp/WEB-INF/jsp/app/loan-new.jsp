@@ -1665,12 +1665,7 @@
                         ? { valid: true, message: "", term: name }
                         : { valid: false, message: msgEnterGuarantorName, term: "" };
                 }
-                const number = raw.toUpperCase();
-                const validFourDigitsOrMore = /^\d{4,20}$/.test(number);
-                const validFullMemberNo = /^[A-Z0-9]{4,20}$/.test(number) && /\d/.test(number);
-                return validFourDigitsOrMore || validFullMemberNo
-                    ? { valid: true, message: "", term: number }
-                    : { valid: false, message: msgEnterMemberNumber, term: "" };
+                return { valid: true, message: "", term: raw.toUpperCase() };
             }
 
             function clearSearchValidation() {

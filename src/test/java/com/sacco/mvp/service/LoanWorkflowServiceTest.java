@@ -523,13 +523,41 @@ class LoanWorkflowServiceTest {
 
         when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "0101"))
             .thenReturn(Optional.of(staffOnly));
-        when(memberRepository.findGuarantorCandidatesByNumberSuffix(
-            eq(saccoId), eq("ST01"), eq(applicantId), eq("0101"), eq(PageRequest.of(0, 10))
-        )).thenReturn(Page.empty(PageRequest.of(0, 10)));
-
         var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "0101", 0, 10);
 
         assertThat(result.getContent()).isEmpty();
+        verify(memberRepository, never()).findGuarantorCandidatesByNumberSuffix(anyString(), anyString(), any(), anyString(), any());
+    }
+
+    @Test
+    void searchGuarantorsUsesExactMemberNumberWithoutMinimumLength() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+        Member guarantor = activeMember(guarantorId, saccoId, "ST01");
+        guarantor.setMemberNo("00");
+
+        when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "00"))
+            .thenReturn(Optional.of(guarantor));
+
+        var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "00", "number", 0, 10);
+
+        assertThat(result.getContent()).containsExactly(guarantor);
+        verify(memberRepository, never()).findGuarantorCandidatesByNumberSuffix(anyString(), anyString(), any(), anyString(), any());
+    }
+
+    @Test
+    void searchGuarantorsDoesNotFallbackToPartialNumberSuffix() {
+        UUID applicantId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        when(memberRepository.findBySaccoIdAndStatusAndMemberNoIgnoreCase(saccoId, MemberStatus.ACTIVE, "00"))
+            .thenReturn(Optional.empty());
+
+        var result = loanWorkflowService.searchGuarantors(saccoId, "ST01", applicantId, "00", "number", 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+        verify(memberRepository, never()).findGuarantorCandidatesByNumberSuffix(anyString(), anyString(), any(), anyString(), any());
     }
 
     @Test

@@ -1560,11 +1560,6 @@ public class AppController {
             }
         } else {
             query = query.toUpperCase(Locale.ROOT);
-            boolean fourDigitsOrMore = query.matches("\\d{4,20}");
-            boolean fullMemberNo = query.matches("[A-Z0-9]{4,20}") && query.chars().anyMatch(Character::isDigit);
-            if (!fourDigitsOrMore && !fullMemberNo) {
-                return Collections.emptyList();
-            }
         }
         if (query.isBlank()) {
             return Collections.emptyList();

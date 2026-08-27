@@ -846,17 +846,7 @@ public class LoanWorkflowService {
             return new PageImpl<>(List.of(exactMemberNo.get()), PageRequest.of(page, size), 1);
         }
 
-        if (!query.matches("\\d{4,20}")) {
-            return Page.empty(PageRequest.of(page, size));
-        }
-
-        return memberRepository.findGuarantorCandidatesByNumberSuffix(
-            saccoId,
-            normalizedStationId,
-            applicantId,
-            query,
-            PageRequest.of(page, size)
-        );
+        return Page.empty(PageRequest.of(page, size));
     }
 
     public List<GuarantorCandidate> searchGuarantorCandidates(String saccoId,

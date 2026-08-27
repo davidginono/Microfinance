@@ -43,9 +43,12 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("searchInput.setAttribute(\"aria-invalid\", \"true\")")
             .contains("const validation = refreshSearchValidation(true);")
             .contains("const term = validation.term;")
+            .contains("return { valid: true, message: \"\", term: raw.toUpperCase() };")
             .contains("if (!result.valid && forceMessage)")
             .contains("searchInput.addEventListener(\"input\", function () {")
             .contains("refreshSearchValidation(false);")
+            .doesNotContain("validFourDigitsOrMore")
+            .doesNotContain("validFullMemberNo")
             .doesNotContain("if (!result.valid && (hasValue || forceMessage))");
 
         assertThat(styles)

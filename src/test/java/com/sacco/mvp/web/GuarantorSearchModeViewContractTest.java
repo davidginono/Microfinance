@@ -24,7 +24,10 @@ class GuarantorSearchModeViewContractTest {
             .contains("DIRECT_OTP: [")
             .contains("{ value: \"phone\", label: modePhoneLabel, placeholder: phonePlaceholder, hint: phoneHint }")
             .contains("{ value: \"email\", label: modeEmailLabel, placeholder: emailPlaceholder, hint: emailHint }")
-            .contains("const endpoint = approvalMode === \"DIRECT_OTP\" ? \"/app/guarantors/direct-otp/search\" : \"/app/guarantors/search\";");
+            .contains("const endpoint = approvalMode === \"DIRECT_OTP\" ? \"/app/guarantors/direct-otp/search\" : \"/app/guarantors/search\";")
+            .contains("return { valid: true, message: \"\", term: raw.toUpperCase() };")
+            .doesNotContain("validFourDigitsOrMore")
+            .doesNotContain("validFullMemberNo");
     }
 
     @Test
