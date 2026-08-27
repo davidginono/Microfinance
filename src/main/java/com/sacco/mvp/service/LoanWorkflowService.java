@@ -417,13 +417,14 @@ public class LoanWorkflowService {
             attachments,
             requiredAttachments
         );
+        List<?> effectiveGuarantorSelections = preserveSavedGuarantorSelections(existingDraft, guarantorSelections);
         List<GuarantorSelection> normalizedGuarantors = validateGuarantorSelections(
             saccoId,
             applicantStationId,
             applicantId,
             product.getGuarantorsRequired(),
             applicationAmount,
-            guarantorSelections,
+            effectiveGuarantorSelections,
             product,
             guarantorApprovalMode
         );
@@ -1687,6 +1688,36 @@ public class LoanWorkflowService {
             parseSubmittedGuarantorSelection(rawSelection).ifPresent(selections::add);
         }
         return selections;
+    }
+
+    private List<?> preserveSavedGuarantorSelections(LoanApplication existingDraft, List<?> rawSelections) {
+        if (hasSubmittedGuarantorSelectionPayload(rawSelections)) {
+            return rawSelections;
+        }
+        if (existingDraft == null) {
+            return rawSelections;
+        }
+        List<GuarantorSelection> savedSelections = parseSelectedGuarantorSelections(existingDraft.getSelectedGuarantors());
+        return savedSelections.isEmpty() ? rawSelections : savedSelections;
+    }
+
+    private boolean hasSubmittedGuarantorSelectionPayload(List<?> rawSelections) {
+        if (rawSelections == null || rawSelections.isEmpty()) {
+            return false;
+        }
+        for (Object rawSelection : rawSelections) {
+            if (rawSelection == null) {
+                continue;
+            }
+            if (rawSelection instanceof Map<?, ?> map && map.isEmpty()) {
+                continue;
+            }
+            if (rawSelection instanceof String text && normalizeOptional(text) == null) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     private Optional<GuarantorSelection> parseSubmittedGuarantorSelection(Object rawSelection) {
