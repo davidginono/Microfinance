@@ -467,6 +467,47 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void saveDraftRejectsIncompleteGuarantorSelection() {
+        UUID applicantId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+
+        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+            saccoId,
+            applicantId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            null,
+            List.of(),
+            "{\"principalPlusInterest\":120000.00}",
+            null,
+            null,
+            null
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Select exactly 1 guarantors");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
+    }
+
+    @Test
     void saveDraftRejectsStaffOnlyGuarantorSelection() {
         // Scenario: staff-only accounts cannot be used as guarantors because they do not have member access.
         // Given an applicant selects a staff-only account as guarantor
