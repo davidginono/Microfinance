@@ -2,6 +2,7 @@ package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
+import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.FormSchemaService;
@@ -163,5 +164,28 @@ class AppControllerDraftNavigationTest {
         );
 
         assertThat(result).isEqualTo("redirect:/app/loan-applications/" + applicationId + "/edit?step=5");
+    }
+
+    @Test
+    void submitDraftWithMissingGuarantorSelectionReturnsToGuarantorStep() {
+        UUID memberId = UUID.randomUUID();
+        UUID applicationId = UUID.randomUUID();
+        LoanApplication current = LoanApplication.builder()
+            .id(applicationId)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(1)
+            .build();
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        when(principal.getMemberId()).thenReturn(memberId);
+        when(loanWorkflowService.getMine(applicationId, memberId)).thenReturn(current);
+        when(loanWorkflowService.submit(applicationId, memberId))
+            .thenThrow(new IllegalStateException("Select exactly 1 guarantors before submitting."));
+
+        String result = controller.submit(applicationId, principal, null, null, redirect);
+
+        assertThat(result).isEqualTo("redirect:/app/loan-applications/" + applicationId + "/edit?step=3");
+        assertThat(redirect.getFlashAttributes().get("error"))
+            .isEqualTo("Select exactly 1 guarantors before submitting.");
     }
 }

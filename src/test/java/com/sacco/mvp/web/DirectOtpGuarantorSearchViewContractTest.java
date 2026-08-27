@@ -82,9 +82,13 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("form.dataset.pendingFormAction = button.dataset.formAction || \"\";")
             .contains("const formAction = submitButton.dataset.formAction || form.dataset.pendingFormAction || \"SAVE_DRAFT\";")
             .contains("actionInput.value = formAction;")
+            .contains("const configuredInitialStep = Number(\"${loanFormInitialStep}\");")
+            .contains("window.SaccosLoanForm.activateStep = activateStep;")
             .contains("function submitAction(event)")
             .contains("return form.dataset.pendingFormAction || (actionInput ? actionInput.value : \"\");")
+            .contains("function blockForGuarantorSelection(event)")
+            .contains("window.SaccosLoanForm?.activateStep?.(3, true);")
             .contains("const action = submitAction(event);")
-            .contains("renderHiddenInputs();\n                if (selected.size !== required)");
+            .contains("renderHiddenInputs();\n                if (selected.size !== required) {\n                    blockForGuarantorSelection(event);");
     }
 }

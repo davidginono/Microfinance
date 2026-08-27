@@ -1254,6 +1254,9 @@ public class AppController {
                 model.addAttribute("guarantorValidationErrorId", guarantorEx.getGuarantorId().toString());
                 model.addAttribute("guarantorValidationErrorMessage", errorMessage);
             }
+            if (isGuarantorSelectionCountError(ex.getMessage())) {
+                model.addAttribute("loanFormInitialStep", 3);
+            }
             Integer requiredGuarantorsOverride = resolveDraftRequiredGuarantors(principal.getMemberId(), applicationId);
             return prepareLoanNewModel(
                 principal,
@@ -1473,6 +1476,9 @@ public class AppController {
             return "redirect:/app/loan-applications/" + id;
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage());
+            if (isGuarantorSelectionCountError(ex.getMessage())) {
+                return "redirect:/app/loan-applications/" + id + "/edit?step=3";
+            }
             return "redirect:/app/loan-applications/" + id;
         }
     }
@@ -2882,6 +2888,10 @@ public class AppController {
             return "Load the loan calculations first so the application can include the official deductions section.";
         }
         return message == null ? "Unable to process loan form." : message;
+    }
+
+    private boolean isGuarantorSelectionCountError(String message) {
+        return message != null && message.startsWith("Select exactly ");
     }
 
     private Member requireMemberWithSavedSignature(UUID memberId) {

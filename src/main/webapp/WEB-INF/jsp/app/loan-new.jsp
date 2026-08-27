@@ -672,9 +672,12 @@
             return Number(panel.dataset.loanFlowStep);
         }));
         const requestedStep = Number(new URLSearchParams(window.location.search).get("step"));
+        const configuredInitialStep = Number("${loanFormInitialStep}");
         let currentStep = Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= maxStep
             ? requestedStep
-            : (document.getElementById("guarantorValidationErrorMarker") ? 3 : 1);
+            : (Number.isInteger(configuredInitialStep) && configuredInitialStep >= 1 && configuredInitialStep <= maxStep
+                ? configuredInitialStep
+                : (document.getElementById("guarantorValidationErrorMarker") ? 3 : 1));
 
         function panelFor(step) {
             return panels.find(function (panel) {
@@ -754,6 +757,9 @@
                 activateStep(Number(containingPanel.dataset.loanFlowStep), false);
             }
         }, true);
+
+        window.SaccosLoanForm = window.SaccosLoanForm || {};
+        window.SaccosLoanForm.activateStep = activateStep;
 
         activateStep(currentStep, false);
     })();
@@ -1872,6 +1878,15 @@
             renderSelected();
             window.setTimeout(revealServerGuarantorError, 120);
 
+            function blockForGuarantorSelection(event) {
+                const warning = msgSelectGuarantorsDraft.replace("{0}", required);
+                event.preventDefault();
+                renderHiddenInputs();
+                window.SaccosLoanForm?.activateStep?.(3, true);
+                hint.textContent = warning;
+                window.showToast?.("error", warning);
+            }
+
             function hideDropdown() {
                 dropdown.classList.add("hidden");
                 dropdown.innerHTML = "";
@@ -2010,10 +2025,7 @@
             if (draftButton) {
                 draftButton.addEventListener("click", function (event) {
                     if (selected.size !== required) {
-                        event.preventDefault();
-                        const warning = msgSelectGuarantorsDraft.replace("{0}", required);
-                        hint.textContent = warning;
-                        window.showToast?.("error", warning);
+                        blockForGuarantorSelection(event);
                     }
                 });
             }
@@ -2025,10 +2037,7 @@
                 }
                 renderHiddenInputs();
                 if (selected.size !== required) {
-                    const warning = msgSelectGuarantorsDraft.replace("{0}", required);
-                    event.preventDefault();
-                    hint.textContent = warning;
-                    window.showToast?.("error", warning);
+                    blockForGuarantorSelection(event);
                     return;
                 }
             }, true);
