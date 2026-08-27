@@ -1239,7 +1239,7 @@ public class AppController {
                 financialSnapshotJson, topUpLoanId, attachments, requiredAttachmentFiles);
 
             ra.addFlashAttribute("message", "Draft saved successfully. You can continue editing.");
-            return "redirect:/app/loan-applications/" + app.getId() + "/edit";
+            return "redirect:/app/loan-applications/" + app.getId() + "/edit?step=5";
         } catch (IllegalArgumentException | IllegalStateException ex) {
             String errorMessage = humanizeLoanFormError(ex.getMessage(), principal, product);
             model.addAttribute("error", errorMessage);
