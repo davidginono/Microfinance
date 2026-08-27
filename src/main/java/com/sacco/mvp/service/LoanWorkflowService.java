@@ -381,10 +381,13 @@ public class LoanWorkflowService {
                     return existing;
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Loan draft not found"));
+        UUID effectiveTopUpSourceLoanId = topUpSourceLoanId == null && existingDraft != null
+            ? existingDraft.getTopUpSourceLoanId()
+            : topUpSourceLoanId;
         LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(
             saccoId,
             applicantId,
-            topUpSourceLoanId,
+            effectiveTopUpSourceLoanId,
             existingDraft == null ? null : existingDraft.getId()
         );
         boolean reEditingAfterGuarantorApproval = existingDraft != null

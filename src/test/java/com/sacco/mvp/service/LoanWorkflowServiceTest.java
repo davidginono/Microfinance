@@ -1072,6 +1072,112 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void saveAndSubmitTopUpPreservesSavedSourceLoanAndGuarantorsWhenReloadSubmitOmitsInputs() {
+        UUID appId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID sourceLoanId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanApplication existing = LoanApplication.builder()
+            .id(appId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .topUpSourceLoanId(sourceLoanId)
+            .loanProductSettingId(productId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .amount(new BigDecimal("150000.00"))
+            .tenorMonths(6)
+            .status(LoanStatus.DRAFT)
+            .requiredGuarantors(1)
+            .selectedGuarantors("[{\"id\":\"" + guarantorId + "\"}]")
+            .financialSnapshot("{\"topUpRequestedAmount\":100000.00,\"topUpSettlementAmount\":50000.00,\"principalAmount\":150000.00}")
+            .attachmentsJson("[]")
+            .formData("{\"purpose\":\"WORKING CAPITAL\"}")
+            .policySnapshot("{}")
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .version(0)
+            .build();
+        LoanApplication sourceLoan = LoanApplication.builder()
+            .id(sourceLoanId)
+            .applicantMemberId(applicantId)
+            .saccoId(saccoId)
+            .stationId("ST01")
+            .status(LoanStatus.DISBURSED)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(productId)
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .freshFinancialDataRequired(false)
+            .allowApplicationWithActiveLoan(true)
+            .minimumAmount(BigDecimal.ZERO)
+            .maximumAmount(new BigDecimal("1000000.00"))
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Map<String, Object> topUpSnapshot = new LinkedHashMap<>(Map.of(
+            "requestedAmount", new BigDecimal("100000.00"),
+            "topUpRequestedAmount", new BigDecimal("100000.00"),
+            "topUpSettlementAmount", new BigDecimal("50000.00"),
+            "principalAmount", new BigDecimal("150000.00"),
+            "principalPlusInterest", new BigDecimal("180000.00")
+        ));
+
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(appId, applicantId)).thenReturn(Optional.of(existing));
+        when(loanApplicationRepository.findByIdAndApplicantMemberId(sourceLoanId, applicantId)).thenReturn(Optional.of(sourceLoan));
+        when(formSchemaService.getSchema(saccoId, productId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(applicantId), any()))
+            .thenReturn(List.of(existing))
+            .thenReturn(List.of(sourceLoan));
+        when(loanProductSettingRepository.findByIdAndSaccoId(productId, saccoId)).thenReturn(Optional.of(product));
+        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(activeMember(applicantId, saccoId, "ST01")));
+        when(financialDetailsService.generateSnapshot(eq(saccoId), eq(applicantId), eq(product), any(BigDecimal.class), eq(6), eq(sourceLoanId)))
+            .thenReturn(topUpSnapshot);
+        when(eligibilityService.check(eq(saccoId), eq(applicantId), eq(product), any(BigDecimal.class)))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
+                new BigDecimal("166650.00")));
+        when(eligibilityService.policySnapshotJson(any(), anyInt(), any())).thenReturn("{}");
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(loanAttachmentService.store(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
+        when(loanAttachmentService.storeRequired(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
+        when(paymentDetailsService.snapshotJsonForMember(applicantId)).thenReturn("{}");
+        stubActiveMemberBatchLookup(saccoId);
+
+        LoanApplication submitted = loanWorkflowService.saveAndSubmit(
+            saccoId,
+            applicantId,
+            productId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            appId,
+            List.of(),
+            "{\"principalPlusInterest\":180000.00}",
+            null,
+            null,
+            null
+        );
+
+        assertThat(submitted.getStatus()).isEqualTo(LoanStatus.AWAITING_GUARANTORS);
+        assertThat(submitted.getTopUpSourceLoanId()).isEqualTo(sourceLoanId);
+        assertThat(submitted.getAmount()).isEqualByComparingTo("150000.00");
+        assertThat(submitted.getSelectedGuarantors()).contains(guarantorId.toString());
+        verify(guarantorRequestRepository).save(argThat(request -> guarantorId.equals(request.getGuarantorMemberId())));
+    }
+
+    @Test
     void approveGuarantorRequestNotifiesApplicant() {
         UUID requestId = UUID.randomUUID();
         UUID loanId = UUID.randomUUID();
