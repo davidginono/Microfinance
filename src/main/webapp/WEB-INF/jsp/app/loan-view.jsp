@@ -22,18 +22,16 @@
     </c:url>
 </c:if>
 
-<div class="erp-page-header" data-aws-page-header>
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-            <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
-            <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
-        </div>
-        <c:if test="${showTopUpAction}">
-            <a href="${topUpLoanUrl}" class="app-btn btn-neutral ml-auto shrink-0">
+<div class="erp-page-header loan-detail-heading-row" data-aws-page-header>
+    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
+    <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
+    <c:if test="${showTopUpAction}">
+        <div class="loan-detail-action-row">
+            <a href="${topUpLoanUrl}" class="app-btn btn-neutral">
                 <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
             </a>
-        </c:if>
-    </div>
+        </div>
+    </c:if>
 </div>
 <div class="loan-application-detail-page">
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
