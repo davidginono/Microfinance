@@ -455,7 +455,7 @@ class LoanWorkflowServiceTest {
             6,
             Map.of("purpose", "WORKING CAPITAL"),
             null,
-            List.of(guarantorOne, guarantorTwo),
+            List.of(guarantorOne.toString(), guarantorTwo.toString()),
             "{\"principalPlusInterest\":120000.00}",
             null,
             null,

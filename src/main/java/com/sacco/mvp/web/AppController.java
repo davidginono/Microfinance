@@ -1156,6 +1156,7 @@ public class AppController {
                               @RequestParam(required = false) String applicantSignatureOtpCode,
                               @RequestParam(required = false) List<String> guarantorSelections,
                               @RequestParam(required = false) List<UUID> guarantorIds,
+                              @RequestParam(required = false) String guarantorSelectionState,
                               @RequestParam(required = false) String financialSnapshotJson,
                               @RequestParam(required = false) UUID topUpLoanId,
                               @RequestParam Map<String, String> params,
@@ -1174,13 +1175,18 @@ public class AppController {
         formPayload.remove("termsAccepted");
         formPayload.remove("guarantorIds");
         formPayload.remove("guarantorSelections");
+        formPayload.remove("guarantorSelectionState");
         formPayload.remove("financialSnapshotJson");
         formPayload.remove("topUpLoanId");
         formPayload.remove("_csrf");
         Map<UUID, List<MultipartFile>> requiredAttachmentFiles = requiredAttachmentFiles(request);
         LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
         LoanType resolvedLoanType = product.getLoanType();
-        List<?> submittedGuarantorSelections = normalizeSubmittedGuarantorSelections(guarantorSelections, guarantorIds);
+        List<?> submittedGuarantorSelections = normalizeSubmittedGuarantorSelections(
+            guarantorSelections,
+            guarantorIds,
+            guarantorSelectionState
+        );
 
         try {
             if ("SEND_TO_GUARANTORS".equalsIgnoreCase(action)) {
@@ -2784,13 +2790,45 @@ public class AppController {
         return null;
     }
 
-    private List<?> normalizeSubmittedGuarantorSelections(List<String> guarantorSelections, List<UUID> guarantorIds) {
-        if (guarantorSelections != null && !guarantorSelections.isEmpty()) {
-            return guarantorSelections.stream()
+    private List<?> normalizeSubmittedGuarantorSelections(List<String> guarantorSelections,
+                                                          List<UUID> guarantorIds,
+                                                          String guarantorSelectionState) {
+        if (guarantorSelections != null) {
+            List<String> postedSelections = guarantorSelections.stream()
                 .filter(value -> value != null && !value.isBlank())
                 .toList();
+            if (!postedSelections.isEmpty()) {
+                return postedSelections;
+            }
+        }
+        List<String> stateSelections = parseGuarantorSelectionState(guarantorSelectionState);
+        if (!stateSelections.isEmpty()) {
+            return stateSelections;
         }
         return guarantorIds == null ? Collections.emptyList() : guarantorIds;
+    }
+
+    private List<String> parseGuarantorSelectionState(String guarantorSelectionState) {
+        if (guarantorSelectionState == null || guarantorSelectionState.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<?> rawSelections = objectMapper.readValue(guarantorSelectionState, new TypeReference<List<?>>() {});
+            List<String> selections = new ArrayList<>();
+            for (Object rawSelection : rawSelections) {
+                if (rawSelection instanceof Map<?, ?> map) {
+                    selections.add(objectMapper.writeValueAsString(map));
+                } else if (rawSelection != null) {
+                    String selection = String.valueOf(rawSelection).trim();
+                    if (!selection.isBlank()) {
+                        selections.add(selection);
+                    }
+                }
+            }
+            return selections;
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
     }
 
     private String formatSavingsMultiple(BigDecimal ratio) {

@@ -383,6 +383,7 @@
                            value="${fn:escapeXml(not empty item.selectionToken ? item.selectionToken : (not empty item.localMemberId ? item.localMemberId : item.id))}" />
                 </c:forEach>
             </div>
+            <input type="hidden" id="selectedGuarantorState" name="guarantorSelectionState" value="" />
             <c:if test="${not empty guarantorValidationErrorId}">
                 <div id="guarantorValidationErrorMarker"
                      hidden
@@ -1569,6 +1570,7 @@
             const counter = document.getElementById("guarantorSelectedCount");
             const selectedContainer = document.getElementById("selectedGuarantors");
             const hiddenInputs = document.getElementById("selectedGuarantorInputs");
+            const selectionStateInput = document.getElementById("selectedGuarantorState");
             const actionInput = document.getElementById("loanFormAction");
             const approvalModeInput = document.getElementById("guarantorApprovalMode");
             const approvalModeButtons = Array.from(document.querySelectorAll("[data-guarantor-approval-mode-option]"));
@@ -1796,13 +1798,19 @@
 
             function renderHiddenInputs() {
                 hiddenInputs.innerHTML = "";
-                Array.from(selected.values()).forEach(function (item) {
+                const selectionTokens = Array.from(selected.values())
+                    .map(function (item) { return item.selectionToken || item.localMemberId || item.id; })
+                    .filter(Boolean);
+                selectionTokens.forEach(function (token) {
                     const input = document.createElement("input");
                     input.type = "hidden";
                     input.name = "guarantorSelections";
-                    input.value = item.selectionToken || item.localMemberId || item.id;
+                    input.value = token;
                     hiddenInputs.appendChild(input);
                 });
+                if (selectionStateInput) {
+                    selectionStateInput.value = JSON.stringify(selectionTokens);
+                }
             }
 
             function submitAction(event) {

@@ -67,6 +67,8 @@ class DirectOtpGuarantorSearchViewContractTest {
             .contains("name=\"guarantorSelections\"")
             .contains("value=\"${fn:escapeXml(not empty item.selectionToken ? item.selectionToken : (not empty item.localMemberId ? item.localMemberId : item.id))}\"")
             .contains("input.name = \"guarantorSelections\"")
+            .contains("id=\"selectedGuarantorState\" name=\"guarantorSelectionState\"")
+            .contains("selectionStateInput.value = JSON.stringify(selectionTokens);")
             .contains("item.memberNo) + \" - \" + escapeHtml(item.fullName)");
     }
 
