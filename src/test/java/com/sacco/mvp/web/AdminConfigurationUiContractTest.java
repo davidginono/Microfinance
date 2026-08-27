@@ -146,6 +146,24 @@ class AdminConfigurationUiContractTest {
     }
 
     @Test
+    void registrationSubmitUsesAnimatedEllipsisLoader() throws Exception {
+        String registration = read(JSP_ROOT.resolve("register-member.jsp"));
+        String authCss = read(Path.of("src/main/resources/static/css/aws-auth.css"));
+
+        assertThat(registration)
+            .contains("id=\"memberRegisterSubmitLoader\" class=\"auth-ellipsis-loader hidden\"")
+            .contains("const submitLoader = document.getElementById(\"memberRegisterSubmitLoader\")")
+            .contains("submitLoader.classList.remove(\"hidden\")")
+            .contains("submitText.textContent = \"Creating account...\"");
+        assertThat(authCss)
+            .contains(".auth-ellipsis-loader")
+            .contains("auth-ellipsis-loader-pulse 0.78s ease-in-out infinite")
+            .contains("@keyframes auth-ellipsis-loader-pulse")
+            .contains("animation-delay: 0.12s")
+            .contains("animation-delay: 0.24s");
+    }
+
+    @Test
     void smsTablesAndSharedPageHeaderUseAwsConsoleStructure() throws Exception {
         String smsUsage = read(JSP_ROOT.resolve("admin/sms-usage.jsp"));
         String shellCss = read(Path.of("src/main/resources/static/css/shell.css"));

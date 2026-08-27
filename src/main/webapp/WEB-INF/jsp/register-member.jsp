@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260813-ribbonless-v7' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-registration-loader-v1' />" />
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
@@ -169,7 +169,12 @@
                             <span class="otp-button-spinner hidden"></span>
                             <span class="otp-button-label">Submit</span>
                         </button>
-                        <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex w-full items-center justify-center" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
+                        <button id="memberRegisterSubmit" class="registration-action registration-primary inline-flex w-full items-center justify-center gap-2" type="submit" ${empty registrationForm.otpCode ? 'disabled' : ''}>
+                            <span id="memberRegisterSubmitLoader" class="auth-ellipsis-loader hidden" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </span>
                             <span id="memberRegisterSubmitText"><spring:message code="register.member.submit" /></span>
                         </button>
                         <a href="/login" class="registration-action inline-flex w-full items-center justify-center text-slate-700">
@@ -252,6 +257,7 @@
         const form = document.getElementById("memberRegistrationForm");
         const requestOtpButton = document.getElementById("memberRegisterRequestOtp");
         const submitButton = document.getElementById("memberRegisterSubmit");
+        const submitLoader = document.getElementById("memberRegisterSubmitLoader");
         const submitText = document.getElementById("memberRegisterSubmitText");
         const errorBox = document.getElementById("registrationVerifyError");
         const successBox = document.getElementById("registrationVerifySuccess");
@@ -261,7 +267,7 @@
         const saccoSelect = form.querySelector('[name="saccoId"]');
         const stationSelect = document.getElementById("registrationStationSelect");
         const registrationSaccosData = document.getElementById("registrationSaccosData");
-        if (!form || !requestOtpButton || !submitButton || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData) {
+        if (!form || !requestOtpButton || !submitButton || !submitLoader || !submitText || !errorBox || !successBox || !otpBlock || !otpInput || !otpLiveStatus || !saccoSelect || !stationSelect || !registrationSaccosData) {
             return;
         }
 
@@ -464,6 +470,7 @@
             clearMessages();
             submitButton.disabled = true;
             requestOtpButton.disabled = true;
+            submitLoader.classList.remove("hidden");
             submitText.textContent = "Creating account...";
         });
     })();
