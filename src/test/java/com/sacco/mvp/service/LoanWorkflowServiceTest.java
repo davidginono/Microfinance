@@ -467,6 +467,76 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
+    void saveDraftStoresStructuredGuarantorSelectionState() {
+        UUID applicantId = UUID.randomUUID();
+        UUID guarantorId = UUID.randomUUID();
+        String saccoId = "CIRCLE-1001";
+
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(1)
+            .guarantorMinSavingsCheckRequired(false)
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+
+        when(formSchemaService.getSchema(saccoId, LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(memberRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+            UUID memberId = invocation.getArgument(0);
+            return Optional.of(activeMember(memberId, saccoId, "ST01"));
+        });
+        stubActiveMemberBatchLookup(saccoId);
+        when(eligibilityService.check(saccoId, applicantId, LoanType.DEVELOPMENT_LOAN, new BigDecimal("100000")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("500000"),
+                new BigDecimal("166650.00")));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(loanAttachmentService.store(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
+
+        LoanApplication saved = loanWorkflowService.saveDraft(
+            saccoId,
+            applicantId,
+            LoanType.DEVELOPMENT_LOAN,
+            new BigDecimal("100000"),
+            6,
+            Map.of("purpose", "WORKING CAPITAL"),
+            null,
+            List.of(Map.of(
+                "source", "LMS",
+                "id", guarantorId.toString(),
+                "memberNo", "M-100",
+                "stationId", "ST01",
+                "fullName", "Saved Guarantor",
+                "email", "guarantor@example.com",
+                "phone", "+255700000000"
+            )),
+            "{\"principalPlusInterest\":120000.00}",
+            null,
+            null,
+            null
+        );
+
+        assertThat(saved.getSelectedGuarantors())
+            .contains("\"id\":\"" + guarantorId + "\"")
+            .contains("\"memberNo\":\"M-100\"")
+            .contains("\"stationId\":\"ST01\"")
+            .contains("\"fullName\":\"Saved Guarantor\"")
+            .contains("\"email\":\"guarantor@example.com\"")
+            .contains("\"phone\":\"+255700000000\"");
+        assertThat(loanWorkflowService.selectedGuarantorDisplayItems(saved.getSelectedGuarantors()))
+            .singleElement()
+            .satisfies(item -> assertThat(item)
+                .containsEntry("source", "LMS")
+                .containsEntry("localMemberId", guarantorId.toString())
+                .containsEntry("stationId", "ST01"));
+    }
+
+    @Test
     void saveDraftRejectsIncompleteGuarantorSelection() {
         UUID applicantId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";

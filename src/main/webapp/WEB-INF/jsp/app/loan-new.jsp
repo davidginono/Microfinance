@@ -367,9 +367,15 @@
                             data-id="${item.id}"
                             data-selection-key="${item.selectionKey}"
                             data-selection-token="${fn:escapeXml(item.selectionToken)}"
+                            data-source="${item.source}"
                             data-local-member-id="${item.localMemberId}"
                             data-member-no="${item.memberNo}"
+                            data-station-id="${item.stationId}"
                             data-full-name="${item.fullName}"
+                            data-email="${item.email}"
+                            data-phone="${item.phone}"
+                            data-lookup-by="${item.lookupBy}"
+                            data-lookup-value="${item.lookupValue}"
                             aria-label="Remove ${item.fullName}">
                         <span>${item.memberNo} - ${item.fullName}</span>
                         <span class="selected-guarantor-remove" aria-hidden="true">&times;</span>
@@ -380,7 +386,7 @@
                 <c:forEach items="${selectedGuarantorItems}" var="item">
                     <input type="hidden"
                            name="guarantorSelections"
-                           value="${fn:escapeXml(not empty item.selectionToken ? item.selectionToken : (not empty item.localMemberId ? item.localMemberId : item.id))}" />
+                           value="${fn:escapeXml(not empty item.localMemberId ? item.localMemberId : (not empty item.selectionToken ? item.selectionToken : item.id))}" />
                 </c:forEach>
             </div>
             <input type="hidden" id="selectedGuarantorState" name="guarantorSelectionState" value="" />
@@ -1806,6 +1812,33 @@
                 return item.selectionToken || item.localMemberId || item.id || "";
             }
 
+            function putPayloadValue(payload, key, value) {
+                const normalized = String(value == null ? "" : value).trim();
+                if (normalized && normalized !== "-") {
+                    payload[key] = normalized;
+                }
+            }
+
+            function selectionPayloadForItem(item) {
+                if (!item) {
+                    return null;
+                }
+                const source = item.source === "FORESIGHT" ? "FORESIGHT" : "LMS";
+                const payload = { source: source };
+                const localId = item.localMemberId || (source === "LMS" && /^[0-9a-f-]{36}$/i.test(item.id || "") ? item.id : "");
+                if (localId) {
+                    payload.id = localId;
+                }
+                putPayloadValue(payload, "memberNo", item.memberNo);
+                putPayloadValue(payload, "stationId", item.stationId);
+                putPayloadValue(payload, "fullName", item.fullName);
+                putPayloadValue(payload, "email", item.email);
+                putPayloadValue(payload, "phone", item.phone);
+                putPayloadValue(payload, "lookupBy", item.lookupBy);
+                putPayloadValue(payload, "lookupValue", item.lookupValue);
+                return payload;
+            }
+
             function itemFromChip(chip) {
                 const key = chip.dataset.selectionKey || chip.dataset.id || chip.dataset.guarantorId || "";
                 if (!key) {
@@ -1815,9 +1848,15 @@
                     id: chip.dataset.id || chip.dataset.guarantorId || key,
                     selectionKey: key,
                     selectionToken: chip.dataset.selectionToken || chip.dataset.localMemberId || chip.dataset.id || chip.dataset.guarantorId || key,
+                    source: chip.dataset.source || "LMS",
                     localMemberId: chip.dataset.localMemberId || "",
                     memberNo: chip.dataset.memberNo || "-",
-                    fullName: chip.dataset.fullName || "Guarantor"
+                    stationId: chip.dataset.stationId || "",
+                    fullName: chip.dataset.fullName || "Guarantor",
+                    email: chip.dataset.email || "",
+                    phone: chip.dataset.phone || "",
+                    lookupBy: chip.dataset.lookupBy || "",
+                    lookupValue: chip.dataset.lookupValue || ""
                 };
             }
 
@@ -1838,18 +1877,18 @@
             function renderHiddenInputs() {
                 syncSelectedFromRenderedChips();
                 hiddenInputs.innerHTML = "";
-                const selectionTokens = Array.from(selected.values())
-                    .map(selectionTokenForItem)
-                    .filter(Boolean);
-                selectionTokens.forEach(function (token) {
+                const selectionPayloads = Array.from(selected.values())
+                    .map(selectionPayloadForItem)
+                    .filter(function (payload) { return payload && (payload.id || payload.memberNo); });
+                selectionPayloads.forEach(function (payload) {
                     const input = document.createElement("input");
                     input.type = "hidden";
                     input.name = "guarantorSelections";
-                    input.value = token;
+                    input.value = JSON.stringify(payload);
                     hiddenInputs.appendChild(input);
                 });
                 if (selectionStateInput) {
-                    selectionStateInput.value = JSON.stringify(selectionTokens);
+                    selectionStateInput.value = JSON.stringify(selectionPayloads);
                 }
             }
 
@@ -1873,9 +1912,15 @@
                     chip.dataset.id = item.id || "";
                     chip.dataset.selectionKey = selectionKey || "";
                     chip.dataset.selectionToken = selectionToken || "";
+                    chip.dataset.source = item.source || "LMS";
                     chip.dataset.localMemberId = item.localMemberId || "";
                     chip.dataset.memberNo = item.memberNo || "-";
+                    chip.dataset.stationId = item.stationId || "";
                     chip.dataset.fullName = item.fullName || "Guarantor";
+                    chip.dataset.email = item.email || "";
+                    chip.dataset.phone = item.phone || "";
+                    chip.dataset.lookupBy = item.lookupBy || "";
+                    chip.dataset.lookupValue = item.lookupValue || "";
                     chip.dataset.guarantorId = item.localMemberId || item.id;
                     chip.setAttribute("aria-label", "Remove " + item.fullName);
                     chip.innerHTML = "<span>" + escapeHtml(item.memberNo) + " - " + escapeHtml(item.fullName) + "</span><span class='selected-guarantor-remove' aria-hidden='true'>&times;</span>";
@@ -1947,9 +1992,15 @@
                     id: item.id,
                     selectionKey: key,
                     selectionToken: item.selectionToken || item.id,
+                    source: item.source || "LMS",
                     localMemberId: localMemberId(item),
                     memberNo: item.memberNo || "-",
-                    fullName: item.fullName || "Guarantor"
+                    stationId: item.stationId || "",
+                    fullName: item.fullName || "Guarantor",
+                    email: item.email || "",
+                    phone: item.phone || "",
+                    lookupBy: item.lookupBy || "",
+                    lookupValue: item.lookupValue || ""
                 });
                 renderSelected();
                 searchInput.value = "";

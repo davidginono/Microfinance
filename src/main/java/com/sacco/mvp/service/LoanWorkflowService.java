@@ -1859,6 +1859,11 @@ public class LoanWorkflowService {
             item.put("memberNo", memberNo);
             item.put("fullName", fullName);
             item.put("source", selection.source());
+            item.put("stationId", firstNonBlank(member == null ? null : member.getStationId(), selection.externalStationId(), ""));
+            item.put("email", firstNonBlank(selection.email(), member == null ? null : member.getEmail(), ""));
+            item.put("phone", firstNonBlank(selection.phone(), member == null ? null : member.getPhone(), ""));
+            item.put("lookupBy", firstNonBlank(selection.lookupBy(), ""));
+            item.put("lookupValue", firstNonBlank(selection.lookupValue(), ""));
             if (selection.localMemberId() != null) {
                 item.put("localMemberId", selection.localMemberId().toString());
             }

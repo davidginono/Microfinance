@@ -2801,6 +2801,11 @@ public class AppController {
                                                           List<UUID> guarantorIds,
                                                           String guarantorSelectionState,
                                                           HttpServletRequest request) {
+        String rawSelectionState = firstNonBlank(guarantorSelectionState, request == null ? null : request.getParameter("guarantorSelectionState"));
+        List<?> stateSelections = parseGuarantorSelectionState(rawSelectionState);
+        if (!stateSelections.isEmpty()) {
+            return stateSelections;
+        }
         if (guarantorSelections != null) {
             List<String> postedSelections = guarantorSelections.stream()
                 .filter(value -> value != null && !value.isBlank())
@@ -2814,11 +2819,6 @@ public class AppController {
             : normalizeRequestValues(request.getParameterValues("guarantorSelections"));
         if (!requestSelections.isEmpty()) {
             return requestSelections;
-        }
-        String rawSelectionState = firstNonBlank(guarantorSelectionState, request == null ? null : request.getParameter("guarantorSelectionState"));
-        List<String> stateSelections = parseGuarantorSelectionState(rawSelectionState);
-        if (!stateSelections.isEmpty()) {
-            return stateSelections;
         }
         return guarantorIds == null ? Collections.emptyList() : guarantorIds;
     }
@@ -2836,16 +2836,16 @@ public class AppController {
         return normalized;
     }
 
-    private List<String> parseGuarantorSelectionState(String guarantorSelectionState) {
+    private List<?> parseGuarantorSelectionState(String guarantorSelectionState) {
         if (guarantorSelectionState == null || guarantorSelectionState.isBlank()) {
             return Collections.emptyList();
         }
         try {
             List<?> rawSelections = objectMapper.readValue(guarantorSelectionState, new TypeReference<List<?>>() {});
-            List<String> selections = new ArrayList<>();
+            List<Object> selections = new ArrayList<>();
             for (Object rawSelection : rawSelections) {
                 if (rawSelection instanceof Map<?, ?> map) {
-                    selections.add(objectMapper.writeValueAsString(map));
+                    selections.add(map);
                 } else if (rawSelection != null) {
                     String selection = String.valueOf(rawSelection).trim();
                     if (!selection.isBlank()) {
