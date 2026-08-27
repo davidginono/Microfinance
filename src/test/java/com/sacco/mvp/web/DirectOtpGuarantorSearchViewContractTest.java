@@ -63,6 +63,9 @@ class DirectOtpGuarantorSearchViewContractTest {
 
         assertThat(source)
             .contains("${item.memberNo} - ${item.fullName}")
+            .contains("<div id=\"selectedGuarantorInputs\">")
+            .contains("name=\"guarantorSelections\"")
+            .contains("value=\"${fn:escapeXml(not empty item.selectionToken ? item.selectionToken : (not empty item.localMemberId ? item.localMemberId : item.id))}\"")
             .contains("input.name = \"guarantorSelections\"")
             .contains("item.memberNo) + \" - \" + escapeHtml(item.fullName)");
     }

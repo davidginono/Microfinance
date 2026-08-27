@@ -376,7 +376,13 @@
                     </button>
                 </c:forEach>
         </div>
-            <div id="selectedGuarantorInputs"></div>
+            <div id="selectedGuarantorInputs">
+                <c:forEach items="${selectedGuarantorItems}" var="item">
+                    <input type="hidden"
+                           name="guarantorSelections"
+                           value="${fn:escapeXml(not empty item.selectionToken ? item.selectionToken : (not empty item.localMemberId ? item.localMemberId : item.id))}" />
+                </c:forEach>
+            </div>
             <c:if test="${not empty guarantorValidationErrorId}">
                 <div id="guarantorValidationErrorMarker"
                      hidden
