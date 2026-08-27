@@ -1110,7 +1110,8 @@ public class AppController {
 
         Map<String, String> formValues = new LinkedHashMap<>();
         formValues.put("applicationId", app.getId().toString());
-        formValues.put("amount", app.getAmount() == null ? "" : app.getAmount().toPlainString());
+        BigDecimal formAmount = app.getTopUpSourceLoanId() == null ? app.getAmount() : loanPresentationService.topUpRequestedAmount(app);
+        formValues.put("amount", formAmount == null ? "" : formAmount.toPlainString());
         formValues.put("tenorMonths", app.getTenorMonths() == null ? "" : String.valueOf(app.getTenorMonths()));
         formValues.put("financialSnapshotJson", app.getFinancialSnapshot());
         if (app.getTopUpSourceLoanId() != null) {
@@ -1731,12 +1732,14 @@ public class AppController {
                                                                 @RequestParam(required = false) UUID applicationId,
                                                                 @RequestParam(required = false) UUID topUpLoanId) {
         try {
-            loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId);
+            loanWorkflowService.requireAllowedTopUpSourceLoan(principal.getSaccoId(), principal.getMemberId(), topUpLoanId, applicationId);
             LoanProductSetting product = resolveApplicationProduct(principal.getSaccoId(), loanProductId, loanType);
             Map<String, Object> snapshot = financialDetailsService.generateSnapshot(
                 principal.getSaccoId(), principal.getMemberId(), product, amount, tenorMonths, topUpLoanId);
+            BigDecimal effectiveAmount = Optional.ofNullable(readBigDecimal(snapshot.get("principalAmount")))
+                .orElse(amount);
             EligibilityService.EligibilityResult eligibility = eligibilityService.check(
-                principal.getSaccoId(), principal.getMemberId(), product, amount);
+                principal.getSaccoId(), principal.getMemberId(), product, effectiveAmount);
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("snapshotJson", financialDetailsService.toJson(snapshot));
             response.put("fields", loanPresentationService.parseFinancialFields(financialDetailsService.toJson(snapshot)));
@@ -1748,7 +1751,7 @@ public class AppController {
             }
             response.put("principalPlusInterest", principalPlusInterest == null ? "" : principalPlusInterest.setScale(2, RoundingMode.HALF_UP).toPlainString());
             response.put("principalPlusInterestLabel", principalPlusInterest == null ? "" : formatTzs(principalPlusInterest));
-            response.put("repaymentSchedule", previewRepaymentSchedule(amount, tenorMonths, snapshot));
+            response.put("repaymentSchedule", previewRepaymentSchedule(effectiveAmount, tenorMonths, snapshot));
             Map<String, Object> eligibilityMap = new LinkedHashMap<>();
             eligibilityMap.put("eligible", eligibility.eligible());
             eligibilityMap.put("savingsLabel", formatTzs(eligibility.savings()));
@@ -2508,8 +2511,11 @@ public class AppController {
             loanPresentationService.parseFinancialFieldSections(formValues == null ? null : formValues.get("financialSnapshotJson")));
         model.addAttribute("repaymentSchedulePreviewRows", draftRepaymentSchedulePreview(formValues));
         model.addAttribute("savedSignatureText", resolveSavedSignatureText(principal.getMemberId()));
-        model.addAttribute("topUpLoanId", formValues == null ? null : formValues.get("topUpLoanId"));
-        model.addAttribute("topUpSourceLoan", resolveTopUpSourceLoan(principal.getMemberId(), formValues == null ? null : formValues.get("topUpLoanId")));
+        String topUpLoanId = formValues == null ? null : formValues.get("topUpLoanId");
+        LoanApplication topUpSourceLoan = resolveTopUpSourceLoan(principal.getMemberId(), topUpLoanId);
+        model.addAttribute("topUpLoanId", topUpLoanId);
+        model.addAttribute("topUpMode", topUpSourceLoan != null);
+        model.addAttribute("topUpSourceLoan", topUpSourceLoan);
         return "app/loan-new";
     }
 
@@ -2653,7 +2659,9 @@ public class AppController {
     private List<Map<String, String>> previewRepaymentSchedule(BigDecimal amount,
                                                                Integer tenorMonths,
                                                                Map<String, Object> snapshot) {
-        BigDecimal principal = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal principal = Optional.ofNullable(readBigDecimal(snapshot.get("principalAmount")))
+            .orElse(amount == null ? BigDecimal.ZERO : amount)
+            .setScale(2, RoundingMode.HALF_UP);
         int months = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
         BigDecimal annualRate = Optional.ofNullable(readBigDecimal(snapshot.get("interestRate")))
             .orElse(BigDecimal.ZERO);

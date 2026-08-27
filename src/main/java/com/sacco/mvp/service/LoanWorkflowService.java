@@ -73,6 +73,29 @@ public class LoanWorkflowService {
         LoanStatus.ACCOUNTANT_REJECTED,
         LoanStatus.REJECTED
     );
+    private static final List<LoanStatus> TOP_UP_BLOCKING_STATUSES = List.of(
+        LoanStatus.DRAFT,
+        LoanStatus.SUBMITTED,
+        LoanStatus.AWAITING_GUARANTORS,
+        LoanStatus.ALL_GUARANTORS_APPROVED,
+        LoanStatus.READY_FOR_MANAGER,
+        LoanStatus.MANAGER_ACCEPTED,
+        LoanStatus.AWAITING_LOAN_OFFICER,
+        LoanStatus.LOAN_OFFICER_APPROVED,
+        LoanStatus.AWAITING_CHAIRPERSON,
+        LoanStatus.CHAIRPERSON_APPROVED,
+        LoanStatus.AWAITING_BOARD,
+        LoanStatus.AWAITING_CREDIT_COMMITTEE,
+        LoanStatus.BOARD_APPROVED,
+        LoanStatus.CREDIT_COMMITTEE_APPROVED,
+        LoanStatus.AWAITING_ACCOUNTANT,
+        LoanStatus.ACCOUNTANT_APPROVED,
+        LoanStatus.READY_FOR_DISBURSEMENT,
+        LoanStatus.DISBURSED,
+        LoanStatus.PAR,
+        LoanStatus.DEFAULTED,
+        LoanStatus.PAID
+    );
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final GuarantorRequestRepository guarantorRequestRepository;
@@ -303,12 +326,16 @@ public class LoanWorkflowService {
         if (app == null) {
             return false;
         }
-        return !isTopUpBlockedFor(app)
-            && app.getFinalDueDate() != null
-            && !app.getFinalDueDate().isBefore(LocalDate.now());
+        return isAllowedTopUpSource(app)
+            && countBlockingTopUpApplications(app.getId(), null) == 0;
     }
 
     public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId) {
+        return requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId, null);
+    }
+
+    public LoanApplication requireAllowedTopUpSourceLoan(String saccoId, UUID applicantId, UUID topUpSourceLoanId,
+                                                         UUID excludedApplicationId) {
         if (topUpSourceLoanId == null) {
             return null;
         }
@@ -317,8 +344,14 @@ public class LoanWorkflowService {
         if (!Objects.equals(sourceLoan.getSaccoId(), saccoId)) {
             throw new IllegalArgumentException("Selected top-up source loan was not found.");
         }
-        if (isTopUpBlockedFor(sourceLoan)) {
-            throw new IllegalStateException("Disbursed loans cannot be topped up.");
+        if (sourceLoan.getStatus() != LoanStatus.DISBURSED) {
+            throw new IllegalStateException("Only active disbursed loans can be topped up.");
+        }
+        if (sourceLoan.getFinalDueDate() != null && sourceLoan.getFinalDueDate().isBefore(applicationClock.today())) {
+            throw new IllegalStateException("This loan has already reached its final due date.");
+        }
+        if (countBlockingTopUpApplications(sourceLoan.getId(), excludedApplicationId) > 0) {
+            throw new IllegalStateException("This loan already has an open top-up application.");
         }
         return sourceLoan;
     }
@@ -337,7 +370,6 @@ public class LoanWorkflowService {
                                      List<?> guarantorSelections,
                                      String financialSnapshotJson, UUID topUpSourceLoanId, List<MultipartFile> attachments,
                                      Map<UUID, List<MultipartFile>> requiredAttachments) {
-        LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(saccoId, applicantId, topUpSourceLoanId);
         LoanApplication existingDraft = existingId == null
             ? null
             : loanApplicationRepository.findByIdAndApplicantMemberId(existingId, applicantId)
@@ -349,6 +381,12 @@ public class LoanWorkflowService {
                     return existing;
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Loan draft not found"));
+        LoanApplication topUpSourceLoan = requireAllowedTopUpSourceLoan(
+            saccoId,
+            applicantId,
+            topUpSourceLoanId,
+            existingDraft == null ? null : existingDraft.getId()
+        );
         boolean reEditingAfterGuarantorApproval = existingDraft != null
             && existingDraft.getStatus() == LoanStatus.ALL_GUARANTORS_APPROVED;
         String applicantStationId = existingDraft != null
@@ -359,8 +397,14 @@ public class LoanWorkflowService {
             : formSchemaService.getSchema(saccoId, loanProductId, loanType);
         LoanType resolvedLoanType = product.getLoanType();
         assertCanApplyForProduct(saccoId, applicantId, product, existingDraft == null ? null : existingDraft.getId());
-        validateRequestedAmount(product, amount);
         validateRepaymentPeriod(product, tenorMonths);
+        Map<String, Object> generatedTopUpSnapshot = topUpSourceLoan == null
+            ? null
+            : financialDetailsService.generateSnapshot(saccoId, applicantId, product, amount, tenorMonths, topUpSourceLoan.getId());
+        BigDecimal applicationAmount = topUpSourceLoan == null
+            ? amount
+            : requireFinancialSnapshotAmount(generatedTopUpSnapshot, "principalAmount");
+        validateRequestedAmount(product, applicationAmount);
         requireLoadedFinancialDataForDraft(product, financialSnapshotJson);
         Map<String, Object> formData = formSchemaService.extractFormData(requestParams, product.getFormSchema());
         String guarantorApprovalMode = normalizeGuarantorApprovalMode(requestParams.get(GUARANTOR_APPROVAL_MODE_FIELD));
@@ -378,15 +422,15 @@ public class LoanWorkflowService {
             applicantStationId,
             applicantId,
             product.getGuarantorsRequired(),
-            amount,
+            applicationAmount,
             guarantorSelections,
             product,
             guarantorApprovalMode
         );
 
         EligibilityService.EligibilityResult eligibility = loanProductId == null
-            ? checkApplicantSavingsEligibility(saccoId, applicantId, resolvedLoanType, amount)
-            : checkApplicantSavingsEligibility(saccoId, applicantId, product, amount);
+            ? checkApplicantSavingsEligibility(saccoId, applicantId, resolvedLoanType, applicationAmount)
+            : checkApplicantSavingsEligibility(saccoId, applicantId, product, applicationAmount);
         String snapshot = eligibilityService.policySnapshotJson(
             eligibility,
             product.getGuarantorsRequired(),
@@ -409,14 +453,14 @@ public class LoanWorkflowService {
         application.setTopUpSourceLoanId(topUpSourceLoan == null ? null : topUpSourceLoan.getId());
         application.setLoanType(resolvedLoanType);
         application.setLoanProductSettingId(product.getId());
-        application.setAmount(amount);
+        application.setAmount(applicationAmount);
         application.setTenorMonths(tenorMonths);
         application.setStatus(LoanStatus.DRAFT);
         application.setFormData(formSchemaService.toJson(formData));
         application.setRequiredGuarantors(product.getGuarantorsRequired());
         application.setPolicySnapshot(snapshot);
         application.setSelectedGuarantors(toGuarantorSelectionJson(normalizedGuarantors));
-        application.setFinancialSnapshot(normalizeJson(financialSnapshotJson, "Load SACCO financial details again before saving the draft."));
+        application.setFinancialSnapshot(financialSnapshotForDraft(generatedTopUpSnapshot, financialSnapshotJson));
         if (application.getAttachmentsJson() == null) {
             application.setAttachmentsJson("[]");
         }
@@ -540,9 +584,19 @@ public class LoanWorkflowService {
         formData.put("purpose", normalizedPurpose);
     }
 
-    private boolean isTopUpBlockedFor(LoanApplication app) {
-        LoanStatus status = app.getStatus();
-        return status == LoanStatus.DISBURSED || status == LoanStatus.PAR || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
+    private boolean isAllowedTopUpSource(LoanApplication app) {
+        return app != null
+            && app.getStatus() == LoanStatus.DISBURSED
+            && (app.getFinalDueDate() == null || !app.getFinalDueDate().isBefore(applicationClock.today()));
+    }
+
+    private long countBlockingTopUpApplications(UUID sourceLoanId, UUID excludedApplicationId) {
+        if (sourceLoanId == null) {
+            return 0L;
+        }
+        return excludedApplicationId == null
+            ? loanApplicationRepository.countByTopUpSourceLoanIdAndStatusIn(sourceLoanId, TOP_UP_BLOCKING_STATUSES)
+            : loanApplicationRepository.countByTopUpSourceLoanIdAndStatusInAndIdNot(sourceLoanId, TOP_UP_BLOCKING_STATUSES, excludedApplicationId);
     }
 
     public LoanApplication saveAndSubmit(String saccoId, UUID applicantId, LoanType loanType, BigDecimal amount,
@@ -611,6 +665,7 @@ public class LoanWorkflowService {
             throw new IllegalStateException("Load SACCO financial details before submitting the application");
         }
         LoanProductSetting product = resolveWorkflowProduct(app);
+        validateTopUpSourceForApplication(app);
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
@@ -682,6 +737,7 @@ public class LoanWorkflowService {
             throw new IllegalStateException("Load SACCO financial details before submitting the application");
         }
         LoanProductSetting product = resolveWorkflowProduct(app);
+        validateTopUpSourceForApplication(app);
         syncFinancialSnapshotToCurrentProduct(app);
         refreshFinancialSnapshotIfRequired(app, product);
         loanQualificationPolicyService.assertApplicantEligible(app.getSaccoId(), app.getApplicantMemberId());
@@ -706,6 +762,12 @@ public class LoanWorkflowService {
     private void capturePaymentDetailsIfMissing(LoanApplication app) {
         if (app.getPaymentDetailsSnapshot() == null || app.getPaymentDetailsSnapshot().isBlank()) {
             app.setPaymentDetailsSnapshot(paymentDetailsService.snapshotJsonForMember(app.getApplicantMemberId()));
+        }
+    }
+
+    private void validateTopUpSourceForApplication(LoanApplication app) {
+        if (app != null && app.getTopUpSourceLoanId() != null) {
+            requireAllowedTopUpSourceLoan(app.getSaccoId(), app.getApplicantMemberId(), app.getTopUpSourceLoanId(), app.getId());
         }
     }
 
@@ -2185,6 +2247,46 @@ public class LoanWorkflowService {
         }
     }
 
+    private String financialSnapshotForDraft(Map<String, Object> generatedSnapshot, String submittedFinancialSnapshotJson) {
+        if (generatedSnapshot == null) {
+            return normalizeJson(submittedFinancialSnapshotJson, "Load SACCO financial details again before saving the draft.");
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>(generatedSnapshot);
+        snapshot.putAll(extractLiveFinancialValues(submittedFinancialSnapshotJson));
+        return writeJson(snapshot, "Failed to prepare top-up financial details.");
+    }
+
+    private BigDecimal requireFinancialSnapshotAmount(Map<String, Object> snapshot, String key) {
+        BigDecimal amount = snapshot == null ? null : readBigDecimal(snapshot.get(key));
+        if (amount == null) {
+            throw new IllegalStateException("Load SACCO financial details again before saving the draft.");
+        }
+        return amount.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal topUpRequestedAmount(LoanApplication app) {
+        if (app == null || app.getTopUpSourceLoanId() == null) {
+            return app == null ? null : app.getAmount();
+        }
+        Map<String, Object> snapshot = parseFinancialSnapshot(app.getFinancialSnapshot());
+        BigDecimal topUpAmount = readBigDecimal(snapshot.get("topUpRequestedAmount"));
+        if (topUpAmount == null) {
+            topUpAmount = readBigDecimal(snapshot.get("requestedAmount"));
+        }
+        return topUpAmount == null ? app.getAmount() : topUpAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private Map<String, Object> parseFinancialSnapshot(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
     private void validateRequestedAmount(LoanProductSetting product, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Loan amount must be greater than zero.");
@@ -2297,13 +2399,17 @@ public class LoanWorkflowService {
         if (app == null) {
             return;
         }
+        BigDecimal requestedAmount = topUpRequestedAmount(app);
         Map<String, Object> generatedSnapshot = app.getLoanProductSettingId() == null
             ? financialDetailsService.generateSnapshot(
-                app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), app.getAmount(),
+                app.getSaccoId(), app.getApplicantMemberId(), app.getLoanType(), requestedAmount,
                 app.getTenorMonths(), app.getTopUpSourceLoanId())
             : financialDetailsService.generateSnapshot(
-                app.getSaccoId(), app.getApplicantMemberId(), resolveWorkflowProduct(app), app.getAmount(),
+                app.getSaccoId(), app.getApplicantMemberId(), resolveWorkflowProduct(app), requestedAmount,
                 app.getTenorMonths(), app.getTopUpSourceLoanId());
+        if (app.getTopUpSourceLoanId() != null) {
+            app.setAmount(requireFinancialSnapshotAmount(generatedSnapshot, "principalAmount"));
+        }
         Map<String, Object> latestSnapshot = new LinkedHashMap<>(generatedSnapshot);
         latestSnapshot.putAll(extractLiveFinancialValues(app.getFinancialSnapshot()));
         app.setFinancialSnapshot(writeJson(latestSnapshot, "Failed to refresh financial snapshot."));

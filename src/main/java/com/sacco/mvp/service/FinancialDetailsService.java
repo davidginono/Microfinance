@@ -47,7 +47,7 @@ public class FinancialDetailsService {
         }
         BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
         int safeTenor = tenorMonths == null || tenorMonths <= 0 ? 1 : tenorMonths;
-        validateRequestedAmount(product, safeAmount);
+        validatePositiveAmount(safeAmount);
         validateRepaymentPeriod(product, safeTenor);
 
         BigDecimal insuranceRate = product.getInsuranceRate() == null ? DEFAULT_INSURANCE_RATE : product.getInsuranceRate();
@@ -58,21 +58,22 @@ public class FinancialDetailsService {
         BigDecimal processingFeeRate = product.getResolvedProcessingFeeRate();
         BigDecimal interestRate = product.getInterestRate() == null ? DEFAULT_INTEREST_RATE : product.getInterestRate();
 
-        BigDecimal insuranceFee = safeAmount.multiply(insuranceRate)
-            .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal processingFee = safeAmount.multiply(processingFeeRate)
-            .setScale(2, RoundingMode.HALF_UP);
         BigDecimal loanBalance = outstandingLoanBalance(memberId, topUpSourceLoanId);
         BigDecimal principalAmount = safeAmount
             .add(loanBalance)
             .setScale(2, RoundingMode.HALF_UP);
+        validateRequestedAmount(product, principalAmount);
+
+        BigDecimal insuranceFee = safeAmount.multiply(insuranceRate)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal processingFee = safeAmount.multiply(processingFeeRate)
+            .setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalDeductions = applicationFee.add(insuranceFee).add(processingFee)
             .setScale(2, RoundingMode.HALF_UP);
 
-        AmortizationResult amortization = amortize(safeAmount, safeTenor, interestRate, product.getInterestMethod());
+        AmortizationResult amortization = amortize(principalAmount, safeTenor, interestRate, product.getInterestMethod());
         BigDecimal interestAmount = amortization.totalInterest();
         BigDecimal principalPlusInterest = amortization.totalRepayment()
-            .add(loanBalance)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal periodicRepaymentAmount = amortization.periodicPayment();
 
@@ -97,6 +98,12 @@ public class FinancialDetailsService {
         snapshot.put("numberOfPayments", safeTenor);
         snapshot.put("interestMethod", product.getInterestMethod() == null ? InterestMethod.FLAT_RATE.name() : product.getInterestMethod().name());
         snapshot.put("topUpSourceLoanId", topUpSourceLoanId == null ? "" : topUpSourceLoanId.toString());
+        if (topUpSourceLoanId != null) {
+            snapshot.put("topUpRequestedAmount", safeAmount);
+            snapshot.put("topUpSettlementAmount", loanBalance);
+            snapshot.put("topUpCashBeforeFees", safeAmount);
+            snapshot.put("topUpCashAfterFees", safeAmount.subtract(totalDeductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        }
         return snapshot;
     }
 
@@ -114,9 +121,7 @@ public class FinancialDetailsService {
         }
         LoanApplication sourceLoan = loanApplicationRepository.findById(topUpSourceLoanId)
             .filter(loan -> memberId.equals(loan.getApplicantMemberId()))
-            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED
-                || loan.getStatus() == LoanStatus.PAR
-                || loan.getStatus() == LoanStatus.DEFAULTED)
+            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED)
             .orElse(null);
         if (sourceLoan == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -182,10 +187,14 @@ public class FinancialDetailsService {
         }
     }
 
-    private void validateRequestedAmount(LoanProductSetting product, BigDecimal amount) {
+    private void validatePositiveAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Loan amount must be greater than zero.");
         }
+    }
+
+    private void validateRequestedAmount(LoanProductSetting product, BigDecimal amount) {
+        validatePositiveAmount(amount);
         if (product.getMinimumAmount() != null && amount.compareTo(product.getMinimumAmount()) < 0) {
             throw new IllegalArgumentException(
                 "Loan amount cannot be below " + product.getMinimumAmount().setScale(2, RoundingMode.HALF_UP).toPlainString()

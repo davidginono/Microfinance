@@ -167,6 +167,25 @@ public class LoanPresentationService {
         }
     }
 
+    public BigDecimal topUpRequestedAmount(LoanApplication app) {
+        if (app == null || app.getTopUpSourceLoanId() == null) {
+            return app == null || app.getAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : app.getAmount().setScale(2, RoundingMode.HALF_UP);
+        }
+        Map<String, Object> raw = financialSnapshot(app);
+        BigDecimal requestedAmount = readBigDecimal(firstNonNull(raw.get("topUpRequestedAmount"), raw.get("requestedAmount")));
+        return requestedAmount == null
+            ? nonNegative(app.getAmount())
+            : nonNegative(requestedAmount);
+    }
+
+    public BigDecimal disbursementCashBaseAmount(LoanApplication app) {
+        return app == null
+            ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : topUpRequestedAmount(app);
+    }
+
     public List<Map<String, Object>> deductibleFeeRows(LoanApplication app) {
         if (app == null || app.getFinancialSnapshot() == null || app.getFinancialSnapshot().isBlank()) {
             return Collections.emptyList();
@@ -218,7 +237,13 @@ public class LoanPresentationService {
             addFinancialRow(fees, feeLabelWithRate("Loan Processing Fee", raw.get("processingFeeRate")), raw.get("processingFee"));
             addFinancialRow(fees, "Total Fees (TZS)", raw.get("totalDeductions"));
             BigDecimal principalAmount = effectivePrincipal == null ? resolvePrincipalAmount(raw) : effectivePrincipal;
-            putMoney(calculations, "Loan Amount (TZS)", principalAmount);
+            if (isTopUpSnapshot(raw)) {
+                addFinancialRow(calculations, "Existing Loan Settlement (TZS)", raw.get("topUpSettlementAmount"));
+                addFinancialRow(calculations, "Additional Top-Up Amount (TZS)", firstNonNull(raw.get("topUpRequestedAmount"), raw.get("requestedAmount")));
+                putMoney(calculations, "New Loan Principal (TZS)", principalAmount);
+            } else {
+                putMoney(calculations, "Loan Amount (TZS)", principalAmount);
+            }
             putValue(calculations, "Annual Interest Rate", formatPercentValue(raw.get("interestRate")));
             putValue(calculations, "Interest Method", humanizeInterestMethod(raw.get("interestMethod")));
             addFinancialRow(calculations, "Interest (TZS)", raw.get("interestAmount"));
@@ -243,6 +268,14 @@ public class LoanPresentationService {
         } catch (Exception e) {
             return Collections.emptyMap();
         }
+    }
+
+    private boolean isTopUpSnapshot(Map<String, Object> raw) {
+        if (raw == null) {
+            return false;
+        }
+        Object sourceLoanId = raw.get("topUpSourceLoanId");
+        return sourceLoanId != null && !String.valueOf(sourceLoanId).isBlank();
     }
 
     private BigDecimal resolvePrincipalAmount(Map<String, Object> raw) {

@@ -1,5 +1,7 @@
 package com.sacco.mvp.service;
 
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -53,6 +56,7 @@ class ManagerServiceTest {
     @Mock private LoanAttachmentService loanAttachmentService;
     @Mock private WorkflowRoutingService workflowRoutingService;
     @Mock private AuditService auditService;
+    @Spy private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @InjectMocks
     private ManagerService managerService;
@@ -193,6 +197,130 @@ class ManagerServiceTest {
         org.assertj.core.api.Assertions.assertThat(app.getInstallmentAmount()).isNull();
         org.assertj.core.api.Assertions.assertThat(app.getRepaymentFrequency()).isNull();
         verify(loanApplicationRepository).save(app);
+    }
+
+    @Test
+    void disburseTopUpSettlesSourceLoanAndCapsDepositToRequestedCash() {
+        UUID loanId = UUID.randomUUID();
+        UUID sourceLoanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID officerId = UUID.randomUUID();
+        LoanApplication sourceLoan = LoanApplication.builder()
+            .id(sourceLoanId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .status(LoanStatus.DISBURSED)
+            .amount(new BigDecimal("420000.00"))
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .loanType(LoanType.EMERGENCY_LOAN)
+            .amount(new BigDecimal("500000.00"))
+            .tenorMonths(6)
+            .topUpSourceLoanId(sourceLoanId)
+            .financialSnapshot("""
+                {
+                  "requestedAmount": 80000.00,
+                  "topUpRequestedAmount": 80000.00,
+                  "topUpSettlementAmount": 420000.00,
+                  "principalAmount": 500000.00
+                }
+                """)
+            .status(LoanStatus.READY_FOR_DISBURSEMENT)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Member officer = activeOfficer(officerId);
+
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(loanApplicationRepository.findById(sourceLoanId)).thenReturn(Optional.of(sourceLoan));
+        when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
+            .thenReturn(true);
+        when(loanProductSettingRepository.findBySaccoIdAndLoanTypeAndActiveTrue("SACCO-A", LoanType.EMERGENCY_LOAN))
+            .thenReturn(Optional.of(LoanProductSetting.builder().disbursementProofRequired(false).build()));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        managerService.disburseLoan(
+            loanId,
+            officerId,
+            LocalDate.of(2026, 6, 3),
+            LocalDate.of(2026, 7, 3),
+            null,
+            null,
+            new BigDecimal("75000"),
+            "12345",
+            null,
+            "Top-up release",
+            null
+        );
+
+        assertThat(app.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        assertThat(app.getDepositAmount()).isEqualByComparingTo("75000.00");
+        assertThat(sourceLoan.getStatus()).isEqualTo(LoanStatus.PAID);
+        assertThat(sourceLoan.getPaidAt()).isNotNull();
+        assertThat(sourceLoan.getPaidMarkedByManagerId()).isEqualTo(officerId);
+        verify(loanApplicationRepository).save(sourceLoan);
+        verify(loanApplicationRepository).save(app);
+    }
+
+    @Test
+    void disburseTopUpRejectsDepositAboveRequestedCash() {
+        UUID loanId = UUID.randomUUID();
+        UUID sourceLoanId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID officerId = UUID.randomUUID();
+        LoanApplication app = LoanApplication.builder()
+            .id(loanId)
+            .saccoId("SACCO-A")
+            .stationId("ST-1")
+            .applicantMemberId(applicantId)
+            .loanType(LoanType.EMERGENCY_LOAN)
+            .amount(new BigDecimal("500000.00"))
+            .tenorMonths(6)
+            .topUpSourceLoanId(sourceLoanId)
+            .financialSnapshot("""
+                {
+                  "requestedAmount": 80000.00,
+                  "topUpRequestedAmount": 80000.00,
+                  "topUpSettlementAmount": 420000.00,
+                  "principalAmount": 500000.00
+                }
+                """)
+            .status(LoanStatus.READY_FOR_DISBURSEMENT)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
+        Member officer = activeOfficer(officerId);
+
+        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
+        when(memberRepository.findById(officerId)).thenReturn(Optional.of(officer));
+        when(roleDirectoryService.hasActiveClaimInSacco(officerId, "SACCO-A", UserClaim.DISBURSEMENT_QUEUE_DISBURSE))
+            .thenReturn(true);
+
+        assertThatThrownBy(() -> managerService.disburseLoan(
+            loanId,
+            officerId,
+            LocalDate.of(2026, 6, 3),
+            LocalDate.of(2026, 7, 3),
+            null,
+            null,
+            new BigDecimal("90000"),
+            "12345",
+            null,
+            "Top-up release",
+            null
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Deposit amount cannot be greater than the cash or deposit amount");
+
+        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
     }
 
     @Test

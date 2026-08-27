@@ -2,6 +2,8 @@ package com.sacco.mvp.service;
 
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.repository.*;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class ManagerService {
     private final LoanAttachmentService loanAttachmentService;
     private final WorkflowRoutingService workflowRoutingService;
     private final AuditService auditService;
+    private final ObjectMapper objectMapper;
 
     public ManagerDashboard dashboard(String saccoId) {
         return dashboard(saccoId, null);
@@ -390,7 +393,7 @@ public class ManagerService {
             throw new IllegalStateException("Application is not ready for disbursement");
         }
         validateDisbursement(disbursementDate);
-        BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, app.getAmount());
+        BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, disbursementCashBaseAmount(app));
         boolean hasUploadedProof = disbursementProofFile != null && !disbursementProofFile.isEmpty();
         if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
@@ -424,6 +427,8 @@ public class ManagerService {
                 LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF
             ));
         }
+        OffsetDateTime now = OffsetDateTime.now();
+        LoanApplication settledTopUpSourceLoan = settleTopUpSourceLoan(app, disbursementOfficerId, now);
         managerReviewRepository.save(ManagerReview.builder()
             .id(UUID.randomUUID())
             .loanApplicationId(applicationId)
@@ -431,10 +436,10 @@ public class ManagerService {
             .reviewStage(ApprovalWorkflowStage.DISBURSEMENT_OFFICER)
             .decision(ManagerDecision.ACCEPT)
             .reasons(blankToNull(disbursementNotes))
-            .createdAt(OffsetDateTime.now())
+            .createdAt(now)
             .build());
         app.setStatus(LoanStatus.DISBURSED);
-        app.setUpdatedAt(OffsetDateTime.now());
+        app.setUpdatedAt(now);
         loanApplicationRepository.save(app);
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("managerId", disbursementOfficerId.toString());
@@ -446,11 +451,53 @@ public class ManagerService {
         details.put("depositAmount", app.getDepositAmount());
         details.put("applicationId", applicationId.toString());
         details.put("loanId", app.getLoanId());
+        if (settledTopUpSourceLoan != null) {
+            details.put("topUpSourceLoanId", settledTopUpSourceLoan.getId().toString());
+            details.put("topUpSourceLoanNumber", settledTopUpSourceLoan.getLoanId());
+        }
         outboxService.enqueue("LOAN", applicationId, app.getStatus().name(), app.getApplicantMemberId(),
             disbursementOfficerId, app.getSaccoId(), app.getStationId(),
             details);
         auditLoan(app, disbursementOfficerId, "LOAN_DISBURSED", "Loan disbursed",
             Map.of("loanId", app.getLoanId(), "disbursementDate", String.valueOf(app.getDisbursementDate())));
+    }
+
+    private LoanApplication settleTopUpSourceLoan(LoanApplication topUpApplication, UUID actorId, OffsetDateTime now) {
+        if (topUpApplication == null || topUpApplication.getTopUpSourceLoanId() == null) {
+            return null;
+        }
+        LoanApplication sourceLoan = loanApplicationRepository.findById(topUpApplication.getTopUpSourceLoanId())
+            .orElseThrow(() -> new IllegalStateException("Selected top-up source loan was not found."));
+        if (!Objects.equals(sourceLoan.getApplicantMemberId(), topUpApplication.getApplicantMemberId())
+            || !Objects.equals(sourceLoan.getSaccoId(), topUpApplication.getSaccoId())
+            || !sameStation(sourceLoan, topUpApplication)) {
+            throw new IllegalStateException("Selected top-up source loan was not found.");
+        }
+        if (sourceLoan.getStatus() != LoanStatus.DISBURSED) {
+            throw new IllegalStateException("Top-up source loan must still be disbursed before settlement.");
+        }
+        if (sourceLoan.getFinalDueDate() != null && sourceLoan.getFinalDueDate().isBefore(LocalDate.now())) {
+            throw new IllegalStateException("Top-up source loan has already reached its final due date.");
+        }
+        sourceLoan.setStatus(LoanStatus.PAID);
+        sourceLoan.setPaidAt(now);
+        sourceLoan.setPaidMarkedByManagerId(actorId);
+        sourceLoan.setUpdatedAt(now);
+        LoanApplication savedSourceLoan = loanApplicationRepository.save(sourceLoan);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("settledByTopUpApplicationId", topUpApplication.getId().toString());
+        details.put("topUpLoanId", topUpApplication.getLoanId());
+        outboxService.enqueue("LOAN", savedSourceLoan.getId(), savedSourceLoan.getStatus().name(), savedSourceLoan.getApplicantMemberId(),
+            actorId, savedSourceLoan.getSaccoId(), savedSourceLoan.getStationId(), details);
+        auditLoan(savedSourceLoan, actorId, "LOAN_SETTLED_BY_TOP_UP", "Loan settled by top-up", details);
+        return savedSourceLoan;
+    }
+
+    private boolean sameStation(LoanApplication first, LoanApplication second) {
+        String firstStation = blankToNull(first == null ? null : first.getStationId());
+        String secondStation = blankToNull(second == null ? null : second.getStationId());
+        return Objects.equals(firstStation == null ? null : firstStation.toLowerCase(Locale.ROOT),
+            secondStation == null ? null : secondStation.toLowerCase(Locale.ROOT));
     }
 
     public boolean matchesApplicantStation(LoanApplication loan, String stationId) {
@@ -593,9 +640,55 @@ public class ManagerService {
             throw new IllegalArgumentException("Deposit amount cannot be negative");
         }
         if (principal.compareTo(BigDecimal.ZERO) > 0 && normalized.compareTo(principal) > 0) {
-            throw new IllegalArgumentException("Deposit amount cannot be greater than the approved loan amount");
+            throw new IllegalArgumentException("Deposit amount cannot be greater than the cash or deposit amount");
         }
         return normalized;
+    }
+
+    private BigDecimal disbursementCashBaseAmount(LoanApplication app) {
+        if (app == null) {
+            return BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        if (app.getTopUpSourceLoanId() == null) {
+            return nonNegative(app.getAmount());
+        }
+        Map<String, Object> snapshot = parseFinancialSnapshot(app.getFinancialSnapshot());
+        BigDecimal requestedAmount = readBigDecimal(snapshot.get("topUpRequestedAmount"));
+        if (requestedAmount == null) {
+            requestedAmount = readBigDecimal(snapshot.get("requestedAmount"));
+        }
+        if (requestedAmount == null) {
+            throw new IllegalStateException("Top-up cash amount is missing. Reload loan calculations before disbursement.");
+        }
+        return nonNegative(requestedAmount);
+    }
+
+    private Map<String, Object> parseFinancialSnapshot(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
+    private BigDecimal readBigDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).replace(",", "").trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private BigDecimal nonNegative(BigDecimal value) {
+        return value == null || value.compareTo(BigDecimal.ZERO) < 0
+            ? BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP)
+            : value.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private String blankToNull(String value) {

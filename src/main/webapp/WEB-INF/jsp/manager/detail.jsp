@@ -490,7 +490,7 @@
                 <input type="text"
                        id="depositAmountInput"
                        name="depositAmount"
-                       value="${app.depositAmount ne null ? app.depositAmount : app.amount}"
+                       value="${app.depositAmount ne null ? app.depositAmount : disbursementCashBaseAmount}"
                        inputmode="decimal"
                        autocomplete="off"
                        required
@@ -500,15 +500,18 @@
                     <button type="button"
                             class="app-btn btn-neutral ${empty deductibleFeeRows ? 'opacity-60 cursor-not-allowed' : ''}"
                             data-deduct-fees
-                            data-loan-amount="${app.amount}"
+                            data-loan-amount="${disbursementCashBaseAmount}"
                             ${empty deductibleFeeRows ? 'disabled' : ''}>
                         <spring:message code="loan.disbursement.deductFees" text="Deduct fees" />
                     </button>
                     <button type="button"
                             class="app-btn btn-neutral"
                             data-approved-amount
-                            data-loan-amount="${app.amount}">
-                        <spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" />
+                            data-loan-amount="${disbursementCashBaseAmount}">
+                        <c:choose>
+                            <c:when test="${app.topUpSourceLoanId ne null}"><spring:message code="loan.disbursement.topUpCashButton" text="Top-up cash" /></c:when>
+                            <c:otherwise><spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" /></c:otherwise>
+                        </c:choose>
                     </button>
                     <c:if test="${not empty deductibleFeeRows}">
                         <div class="hidden w-full border border-slate-200 bg-white px-4 py-4 shadow-sm"
@@ -566,7 +569,7 @@
             </div>
                         <div>
                             <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /></span>
-                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : app.amount}" minFractionDigits="0" maxFractionDigits="2" /></span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : disbursementCashBaseAmount}" minFractionDigits="0" maxFractionDigits="2" /></span>
             </div>
                 </div>
             </div>

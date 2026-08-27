@@ -67,7 +67,13 @@
 
     <div class="grid gap-4 md:grid-cols-2">
         <div>
-            <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.amount" /> (TSh)</label>
+            <label class="mb-1 block text-sm font-medium text-slate-700">
+                <c:choose>
+                    <c:when test="${topUpMode}"><spring:message code="newloan.topUp.additionalAmount" text="Additional Top-Up Amount" /></c:when>
+                    <c:otherwise><spring:message code="loan.amount" /></c:otherwise>
+                </c:choose>
+                (TSh)
+            </label>
             <input id="loanAmountInput" type="hidden" name="amount" value="${formValues['amount']}" />
             <input id="loanAmountDisplay" type="text" inputmode="decimal" autocomplete="off"
                    value="${formValues['amount']}"
@@ -76,7 +82,16 @@
                    data-max-amount="${product.maximumAmount}"
                    class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none"
                    required />
-            <p class="mt-1 text-xs text-slate-500"><spring:message code="newloan.allowedRange" /> ${minimumAmountLabel} <spring:message code="common.to" text="to" /> ${maximumAmountLabel}</p>
+            <p class="mt-1 text-xs text-slate-500">
+                <c:choose>
+                    <c:when test="${topUpMode}">
+                        <spring:message code="newloan.topUp.rangeHelp" text="The new loan principal must remain within" /> ${minimumAmountLabel} <spring:message code="common.to" text="to" /> ${maximumAmountLabel}
+                    </c:when>
+                    <c:otherwise>
+                        <spring:message code="newloan.allowedRange" /> ${minimumAmountLabel} <spring:message code="common.to" text="to" /> ${maximumAmountLabel}
+                    </c:otherwise>
+                </c:choose>
+            </p>
         </div>
         <div>
             <label id="tenorDisplayLabel" for="tenorDisplayInput" class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="newloan.tenor.label" /></label>

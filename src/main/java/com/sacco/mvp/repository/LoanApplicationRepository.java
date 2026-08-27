@@ -529,6 +529,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     );
     Optional<LoanApplication> findByIdAndApplicantMemberId(UUID id, UUID applicantMemberId);
 
+    long countByTopUpSourceLoanIdAndStatusIn(UUID topUpSourceLoanId, Collection<LoanStatus> statuses);
+
+    long countByTopUpSourceLoanIdAndStatusInAndIdNot(UUID topUpSourceLoanId, Collection<LoanStatus> statuses, UUID id);
+
     boolean existsBySaccoIdAndLoanId(String saccoId, String loanId);
 
     Optional<LoanApplication> findFirstByApplicantMemberIdAndLoanIdOrderByCreatedAtDesc(UUID applicantMemberId, String loanId);

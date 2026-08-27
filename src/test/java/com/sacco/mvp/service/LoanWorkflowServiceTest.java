@@ -1185,14 +1185,29 @@ class LoanWorkflowServiceTest {
     }
 
     @Test
-    void saveDraftRejectsTopUpWhenSourceLoanIsAlreadyDisbursed() {
+    void saveDraftStoresTopUpWithConsolidatedPrincipal() {
         UUID memberId = UUID.randomUUID();
         UUID sourceLoanId = UUID.randomUUID();
         String saccoId = "CIRCLE-1001";
 
+        LoanProductSetting product = LoanProductSetting.builder()
+            .id(UUID.randomUUID())
+            .saccoId(saccoId)
+            .loanType(LoanType.DEVELOPMENT_LOAN)
+            .guarantorsRequired(0)
+            .allowApplicationWithActiveLoan(true)
+            .minimumAmount(BigDecimal.ZERO)
+            .maximumAmount(new BigDecimal("1000000.00"))
+            .maxRepaymentMonths(12)
+            .formSchema("{}")
+            .active(true)
+            .createdAt(OffsetDateTime.now())
+            .updatedAt(OffsetDateTime.now())
+            .build();
         LoanApplication sourceLoan = LoanApplication.builder()
             .id(sourceLoanId)
             .saccoId(saccoId)
+            .stationId("ST01")
             .applicantMemberId(memberId)
             .status(LoanStatus.DISBURSED)
             .createdAt(OffsetDateTime.now())
@@ -1200,27 +1215,47 @@ class LoanWorkflowServiceTest {
             .build();
 
         when(loanApplicationRepository.findByIdAndApplicantMemberId(sourceLoanId, memberId)).thenReturn(Optional.of(sourceLoan));
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(activeMember(memberId, saccoId, "ST01")));
+        when(formSchemaService.getSchema(saccoId, product.getId(), LoanType.DEVELOPMENT_LOAN)).thenReturn(product);
+        when(formSchemaService.extractFormData(anyMap(), eq("{}"))).thenReturn(new LinkedHashMap<>(Map.of("purpose", "WORKING CAPITAL")));
+        when(loanApplicationRepository.findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(eq(memberId), any()))
+            .thenReturn(List.of())
+            .thenReturn(List.of(sourceLoan));
+        when(financialDetailsService.generateSnapshot(saccoId, memberId, product, new BigDecimal("1000"), 6, sourceLoanId))
+            .thenReturn(new LinkedHashMap<>(Map.of(
+                "requestedAmount", new BigDecimal("1000.00"),
+                "topUpRequestedAmount", new BigDecimal("1000.00"),
+                "topUpSettlementAmount", new BigDecimal("50000.00"),
+                "principalAmount", new BigDecimal("51000.00"),
+                "principalPlusInterest", new BigDecimal("56100.00")
+            )));
+        when(eligibilityService.check(saccoId, memberId, product, new BigDecimal("51000.00")))
+            .thenReturn(new EligibilityService.EligibilityResult(true, new BigDecimal("0.3333"), new BigDecimal("200000"),
+                new BigDecimal("66660.00")));
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(loanAttachmentService.store(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
+        when(loanAttachmentService.storeRequired(any(), any(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
 
-        assertThatThrownBy(() -> loanWorkflowService.saveDraft(
+        LoanApplication saved = loanWorkflowService.saveDraft(
             saccoId,
             memberId,
+            product.getId(),
             LoanType.DEVELOPMENT_LOAN,
             new BigDecimal("1000"),
             6,
-            Map.of("purpose", "Working capital"),
+            Map.of("purpose", "WORKING CAPITAL"),
             null,
             List.of(),
             "{\"balance\":1000}",
             sourceLoanId,
             null,
             null
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Disbursed loans cannot be topped up.");
+        );
 
-        verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
-        verify(loanAttachmentService, never()).store(any(), any(), anyString());
-        verifyNoInteractions(formSchemaService, eligibilityService, applicationNumberService);
+        assertThat(saved.getTopUpSourceLoanId()).isEqualTo(sourceLoanId);
+        assertThat(saved.getAmount()).isEqualByComparingTo("51000.00");
+        assertThat(saved.getFinancialSnapshot()).contains("topUpRequestedAmount", "topUpSettlementAmount", "principalAmount");
+        verify(eligibilityService).check(saccoId, memberId, product, new BigDecimal("51000.00"));
     }
 
     @Test

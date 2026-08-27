@@ -160,7 +160,7 @@ class FinancialDetailsServiceTest {
     }
 
     @Test
-    void topUpSourceBalanceIncludesInterestWhenInstallmentAmountIsMissing() {
+    void topUpSnapshotRecalculatesInterestOnConsolidatedPrincipal() {
         String saccoId = "SACCO-1";
         UUID memberId = UUID.randomUUID();
         UUID sourceLoanId = UUID.randomUUID();
@@ -173,7 +173,7 @@ class FinancialDetailsServiceTest {
             .guarantorsRequired(1)
             .insuranceRate(BigDecimal.ZERO)
             .processingFeeRate(BigDecimal.ZERO)
-            .interestRate(BigDecimal.ZERO)
+            .interestRate(new BigDecimal("0.1000"))
             .interestMethod(InterestMethod.FLAT_RATE)
             .minRepaymentMonths(1)
             .maxRepaymentMonths(12)
@@ -202,7 +202,11 @@ class FinancialDetailsServiceTest {
         );
 
         assertThat(snapshot.get("loanBalance")).isEqualTo(new BigDecimal("770000.00"));
+        assertThat(snapshot.get("topUpRequestedAmount")).isEqualTo(new BigDecimal("100000.00"));
+        assertThat(snapshot.get("topUpSettlementAmount")).isEqualTo(new BigDecimal("770000.00"));
         assertThat(snapshot.get("principalAmount")).isEqualTo(new BigDecimal("870000.00"));
-        assertThat(snapshot.get("principalPlusInterest")).isEqualTo(new BigDecimal("870000.00"));
+        assertThat(snapshot.get("interestAmount")).isEqualTo(new BigDecimal("87000.00"));
+        assertThat(snapshot.get("principalPlusInterest")).isEqualTo(new BigDecimal("957000.00"));
+        assertThat(snapshot.get("monthlyRepaymentAmount")).isEqualTo(new BigDecimal("957000.00"));
     }
 }
