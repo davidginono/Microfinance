@@ -7,9 +7,33 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/otp-ui-styles.jspf" %>
 
+<c:set var="showTopUpAction" value="${canRequestTopUp}" />
+<c:if test="${showTopUpAction}">
+    <c:url value="/app/loan-applications/new" var="topUpLoanUrl">
+        <c:choose>
+            <c:when test="${not empty app.loanProductSettingId}">
+                <c:param name="loanProductId" value="${app.loanProductSettingId}" />
+            </c:when>
+            <c:otherwise>
+                <c:param name="loanType" value="${app.loanType}" />
+            </c:otherwise>
+        </c:choose>
+        <c:param name="topUpLoanId" value="${app.id}" />
+    </c:url>
+</c:if>
+
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
-    <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+            <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
+            <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
+        </div>
+        <c:if test="${showTopUpAction}">
+            <a href="${topUpLoanUrl}" class="app-btn btn-neutral ml-auto shrink-0">
+                <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
+            </a>
+        </c:if>
+    </div>
 </div>
 <div class="loan-application-detail-page">
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
@@ -746,10 +770,9 @@
 
 <c:set var="showEditAction" value="${app.status eq 'DRAFT' or app.status eq 'ALL_GUARANTORS_APPROVED'}" />
 <c:set var="showDraftSendToGuarantorsAction" value="${app.status eq 'DRAFT' and app.requiredGuarantors gt 0}" />
-<c:set var="showTopUpAction" value="${canRequestTopUp}" />
 <c:set var="showMemberReversalAction" value="${app.status eq 'AWAITING_GUARANTORS' or app.status eq 'ALL_GUARANTORS_APPROVED' or app.status eq 'READY_FOR_MANAGER'}" />
 <c:set var="showDeleteAction" value="${app.status eq 'DRAFT' or app.status eq 'AWAITING_GUARANTORS'}" />
-<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or showTopUpAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction}" />
+<c:set var="showLoanActionCard" value="${showEditAction or showDraftSendToGuarantorsAction or (showMemberReversalAction and app.status ne 'READY_FOR_MANAGER') or showDeleteAction}" />
 <c:set var="canSubmitApprovedGuarantorLoan" value="${app.status eq 'ALL_GUARANTORS_APPROVED' and not pendingGuarantorRemovalRequest}" />
 <spring:message code="loan.confirm.cancelSubmission.title" text="Cancel Application" var="cancelSubmissionTitle" />
 <spring:message code="loan.confirm.cancelSubmission.message" text="Move this application back to draft so you can keep editing it?" var="cancelSubmissionMessage" />
@@ -780,22 +803,6 @@
                         <spring:message code="loan.actions.sendToGuarantors" text="Send to Guarantors" />
                     </button>
                 </form>
-            </c:if>
-            <c:if test="${showTopUpAction}">
-                <c:url value="/app/loan-applications/new" var="topUpLoanUrl">
-                    <c:choose>
-                        <c:when test="${not empty app.loanProductSettingId}">
-                            <c:param name="loanProductId" value="${app.loanProductSettingId}" />
-                        </c:when>
-                        <c:otherwise>
-                            <c:param name="loanType" value="${app.loanType}" />
-                        </c:otherwise>
-                    </c:choose>
-                    <c:param name="topUpLoanId" value="${app.id}" />
-                </c:url>
-                <a href="${topUpLoanUrl}" class="app-btn btn-neutral">
-                    <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
-                </a>
             </c:if>
             <c:if test="${showMemberReversalAction and app.status ne 'READY_FOR_MANAGER'}">
                 <form action="/app/loan-applications/${app.id}/cancel"
