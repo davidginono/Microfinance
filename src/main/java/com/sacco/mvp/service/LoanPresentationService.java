@@ -180,7 +180,7 @@ public class LoanPresentationService {
             : nonNegative(requestedAmount);
     }
 
-    public BigDecimal disbursementCashBaseAmount(LoanApplication app) {
+    public BigDecimal disbursementBaseAmount(LoanApplication app) {
         return app == null
             ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
             : topUpRequestedAmount(app);

@@ -393,7 +393,7 @@ public class ManagerService {
             throw new IllegalStateException("Application is not ready for disbursement");
         }
         validateDisbursement(disbursementDate);
-        BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, disbursementCashBaseAmount(app));
+        BigDecimal effectiveDepositAmount = validateDepositAmount(depositAmount, disbursementBaseAmount(app));
         boolean hasUploadedProof = disbursementProofFile != null && !disbursementProofFile.isEmpty();
         if (isDisbursementProofRequired(app) && !hasUploadedProof && !hasDisbursementProofAttachment(app)) {
             throw new IllegalArgumentException("Disbursement proof file is required to disburse this loan");
@@ -640,12 +640,12 @@ public class ManagerService {
             throw new IllegalArgumentException("Deposit amount cannot be negative");
         }
         if (principal.compareTo(BigDecimal.ZERO) > 0 && normalized.compareTo(principal) > 0) {
-            throw new IllegalArgumentException("Deposit amount cannot be greater than the cash or deposit amount");
+            throw new IllegalArgumentException("Deposit amount cannot be greater than the disbursement amount");
         }
         return normalized;
     }
 
-    private BigDecimal disbursementCashBaseAmount(LoanApplication app) {
+    private BigDecimal disbursementBaseAmount(LoanApplication app) {
         if (app == null) {
             return BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP);
         }
@@ -658,7 +658,7 @@ public class ManagerService {
             requestedAmount = readBigDecimal(snapshot.get("requestedAmount"));
         }
         if (requestedAmount == null) {
-            throw new IllegalStateException("Top-up cash amount is missing. Reload loan calculations before disbursement.");
+            throw new IllegalStateException("Top-up amount is missing. Reload loan calculations before disbursement.");
         }
         return nonNegative(requestedAmount);
     }

@@ -278,7 +278,7 @@ public class DisbursementController {
         model.addAttribute("financialFieldSections", loanPresentationService.parseFinancialFieldSections(app));
         model.addAttribute("totalDeductions", loanPresentationService.totalDeductions(app));
         model.addAttribute("deductibleFeeRows", loanPresentationService.deductibleFeeRows(app));
-        model.addAttribute("disbursementCashBaseAmount", loanPresentationService.disbursementCashBaseAmount(app));
+        model.addAttribute("disbursementBaseAmount", loanPresentationService.disbursementBaseAmount(app));
         model.addAttribute("attachments", loanPresentationService.parseApplicationAttachments(app.getAttachmentsJson()));
         model.addAttribute("disbursementProofAttachments", loanPresentationService.parseDisbursementProofAttachments(app.getAttachmentsJson()));
         boolean actualRepaymentScheduleEnabled = isActualRepaymentStatus(app.getStatus());

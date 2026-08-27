@@ -200,7 +200,7 @@ class ManagerServiceTest {
     }
 
     @Test
-    void disburseTopUpSettlesSourceLoanAndCapsDepositToRequestedCash() {
+    void disburseTopUpSettlesSourceLoanAndCapsDepositToRequestedAmount() {
         UUID loanId = UUID.randomUUID();
         UUID sourceLoanId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
@@ -271,7 +271,7 @@ class ManagerServiceTest {
     }
 
     @Test
-    void disburseTopUpRejectsDepositAboveRequestedCash() {
+    void disburseTopUpRejectsDepositAboveRequestedAmount() {
         UUID loanId = UUID.randomUUID();
         UUID sourceLoanId = UUID.randomUUID();
         UUID applicantId = UUID.randomUUID();
@@ -318,7 +318,7 @@ class ManagerServiceTest {
             null
         ))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Deposit amount cannot be greater than the cash or deposit amount");
+            .hasMessage("Deposit amount cannot be greater than the disbursement amount");
 
         verify(loanApplicationRepository, never()).save(any(LoanApplication.class));
     }

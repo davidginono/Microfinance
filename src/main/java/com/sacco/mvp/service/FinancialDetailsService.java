@@ -101,8 +101,8 @@ public class FinancialDetailsService {
         if (topUpSourceLoanId != null) {
             snapshot.put("topUpRequestedAmount", safeAmount);
             snapshot.put("topUpSettlementAmount", loanBalance);
-            snapshot.put("topUpCashBeforeFees", safeAmount);
-            snapshot.put("topUpCashAfterFees", safeAmount.subtract(totalDeductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+            snapshot.put("topUpAmountBeforeFees", safeAmount);
+            snapshot.put("topUpAmountAfterFees", safeAmount.subtract(totalDeductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
         }
         return snapshot;
     }

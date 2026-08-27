@@ -486,11 +486,11 @@
                 <input type="date" name="disbursementDate" value="${app.disbursementDate}" class="w-full border border-slate-300 px-3 py-3 focus:border-sacco-blue focus:outline-none" required />
                             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /> <span class="text-rose-600">*</span></label>
+                <label class="mb-1 block text-sm font-medium text-slate-700"><spring:message code="loan.disbursement.disbursementAmount" text="Disbursement Amount" /> <span class="text-rose-600">*</span></label>
                 <input type="text"
                        id="depositAmountInput"
                        name="depositAmount"
-                       value="${app.depositAmount ne null ? app.depositAmount : disbursementCashBaseAmount}"
+                       value="${app.depositAmount ne null ? app.depositAmount : disbursementBaseAmount}"
                        inputmode="decimal"
                        autocomplete="off"
                        required
@@ -500,16 +500,16 @@
                     <button type="button"
                             class="app-btn btn-neutral ${empty deductibleFeeRows ? 'opacity-60 cursor-not-allowed' : ''}"
                             data-deduct-fees
-                            data-loan-amount="${disbursementCashBaseAmount}"
+                            data-loan-amount="${disbursementBaseAmount}"
                             ${empty deductibleFeeRows ? 'disabled' : ''}>
                         <spring:message code="loan.disbursement.deductFees" text="Deduct fees" />
                     </button>
                     <button type="button"
                             class="app-btn btn-neutral"
                             data-approved-amount
-                            data-loan-amount="${disbursementCashBaseAmount}">
+                            data-loan-amount="${disbursementBaseAmount}">
                         <c:choose>
-                            <c:when test="${app.topUpSourceLoanId ne null}"><spring:message code="loan.disbursement.topUpCashButton" text="Top-up cash" /></c:when>
+                            <c:when test="${app.topUpSourceLoanId ne null}"><spring:message code="loan.disbursement.topUpAmountButton" text="Top-up amount" /></c:when>
                             <c:otherwise><spring:message code="loan.disbursement.approvedAmountButton" text="Approved amount" /></c:otherwise>
                         </c:choose>
                     </button>
@@ -553,7 +553,7 @@
                         </div>
                         </div>
                     </c:if>
-                    <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.cashOrDepositHelp" text="This is the amount the applicant will receive in cash/bank, while the required loan to be returned by the applicant remains the approved amount." /></p>
+                    <p class="w-full text-xs text-slate-500"><spring:message code="loan.disbursement.disbursementAmountHelp" text="This is the amount the applicant will receive, while the loan to be repaid remains the approved amount." /></p>
                         </div>
                     </div>
             <div class="md:col-span-2">
@@ -568,8 +568,8 @@
                             <span class="mt-1 block font-semibold text-slate-900" data-disbursement-fees-amount>${totalDeductions}</span>
             </div>
                         <div>
-                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.cashOrDepositAmount" text="Cash or Deposit Amount" /></span>
-                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : disbursementCashBaseAmount}" minFractionDigits="0" maxFractionDigits="2" /></span>
+                            <span class="block text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="loan.disbursement.disbursementAmount" text="Disbursement Amount" /></span>
+                            <span class="mt-1 block font-semibold text-slate-900" data-deposit-preview-amount><fmt:formatNumber value="${app.depositAmount ne null ? app.depositAmount : disbursementBaseAmount}" minFractionDigits="0" maxFractionDigits="2" /></span>
             </div>
                 </div>
             </div>
