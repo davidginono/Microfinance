@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="<c:url value='/css/open-sans.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css?v=20260805-cloudscape-type-v2' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
-    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-registration-loader-v1' />" />
+    <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20260827-auth-notice-width-v1' />" />
 <%@ include file="fragments/otp-ui-styles.jspf" %>
 <%@ include file="fragments/select-enhancer.jspf" %>
 </head>
