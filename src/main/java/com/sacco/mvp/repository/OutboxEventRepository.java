@@ -83,7 +83,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
                 where oe.aggregate_type = :aggregateType
                   and oe.aggregate_id = :aggregateId
                   and oe.event_type = :eventType
-                  and oe.status in ('NEW', 'PUBLISHED')
+                  and oe.status in ('NEW', 'PROCESSING', 'PUBLISHED')
                   and oe.payload ->> 'recipientId' = cast(:recipientId as text)
             )
             """,

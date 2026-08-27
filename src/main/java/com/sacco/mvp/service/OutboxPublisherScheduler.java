@@ -50,7 +50,7 @@ public class OutboxPublisherScheduler {
                 String saccoId = textOrNull(payload, "saccoId");
                 String stationId = textOrNull(payload, "stationId");
 
-                if (notificationRepository.existsDeliveredDuplicate(recipientId, event.getEventType(), event.getPayload())) {
+                if (isDuplicateDelivery(recipientId, event, payload)) {
                     log.info("Skipping duplicate notification delivery for outbox event {}", event.getId());
                     outboxPublishService.markPublished(event);
                     continue;
@@ -102,6 +102,32 @@ public class OutboxPublisherScheduler {
 
     private String textOrNull(JsonNode payload, String field) {
         JsonNode value = payload == null ? null : payload.get(field);
+        String text = value == null || value.isNull() ? null : value.asString();
+        return text == null || text.isBlank() ? null : text;
+    }
+
+    private boolean isDuplicateDelivery(UUID recipientId, OutboxEvent event, JsonNode payload) {
+        String loanId = detailTextOrNull(payload, "loanId");
+        String reviewStage = detailTextOrNull(payload, "reviewStage");
+        String reviewerMemberId = detailTextOrNull(payload, "reviewerMemberId");
+        if ("LOAN".equals(event.getAggregateType())
+            && loanId != null
+            && reviewStage != null
+            && reviewerMemberId != null
+            && notificationRepository.existsDeliveredStaffReviewDuplicate(
+                recipientId,
+                event.getEventType(),
+                loanId,
+                reviewStage
+            )) {
+            return true;
+        }
+        return notificationRepository.existsDeliveredDuplicate(recipientId, event.getEventType(), event.getPayload());
+    }
+
+    private String detailTextOrNull(JsonNode payload, String field) {
+        JsonNode details = payload == null ? null : payload.get("details");
+        JsonNode value = details == null || details.isNull() ? null : details.get(field);
         String text = value == null || value.isNull() ? null : value.asString();
         return text == null || text.isBlank() ? null : text;
     }

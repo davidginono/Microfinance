@@ -71,6 +71,24 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
                 select 1
                 from notifications n
                 where n.recipient_member_id = :recipientId
+                  and n.type = :type
+                  and n.payload -> 'details' ->> 'loanId' = :loanId
+                  and n.payload -> 'details' ->> 'reviewStage' = :reviewStage
+            )
+            """,
+        nativeQuery = true
+    )
+    boolean existsDeliveredStaffReviewDuplicate(@Param("recipientId") UUID recipientId,
+                                                @Param("type") String type,
+                                                @Param("loanId") String loanId,
+                                                @Param("reviewStage") String reviewStage);
+
+    @Query(
+        value = """
+            select exists (
+                select 1
+                from notifications n
+                where n.recipient_member_id = :recipientId
                   and n.type = 'REPAYMENT_REMINDER'
                   and n.created_at >= :since
                   and n.payload -> 'details' ->> 'loanId' = :loanId
