@@ -22,16 +22,9 @@
     </c:url>
 </c:if>
 
-<div class="erp-page-header loan-detail-heading-row" data-aws-page-header>
+<div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="loan.view.breadcrumb" text="Member Workspace / Application Detail" /></p>
     <h1 class="erp-page-title"><spring:message code="loan.detail" /></h1>
-    <c:if test="${showTopUpAction}">
-        <div class="loan-detail-action-row">
-            <a href="${topUpLoanUrl}" class="app-btn btn-neutral">
-                <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
-            </a>
-        </div>
-    </c:if>
 </div>
 <div class="loan-application-detail-page">
 <c:set var="declarationSaccoName" value="${not empty activeSaccoName ? activeSaccoName : 'your SACCO'}" />
@@ -68,20 +61,27 @@
         </form>
     </div>
 </c:if>
-<c:if test="${canPrint}">
+<c:if test="${showTopUpAction or canPrint}">
     <div class="loan-detail-action-row">
-        <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral">
-            <span class="loan-document-action-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
-            </span>
-            <spring:message code="common.export" text="Export" />
-        </button>
-        <a href="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print?signatureMode=signed" data-print-action="true" class="app-btn btn-neutral">
-            <span class="loan-document-action-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-            </span>
-            <spring:message code="common.print" text="Print" />
-        </a>
+        <c:if test="${showTopUpAction}">
+            <a href="${topUpLoanUrl}" class="app-btn btn-launch">
+                <spring:message code="loan.actions.topUp" text="Request Loan Top-Up" />
+            </a>
+        </c:if>
+        <c:if test="${canPrint}">
+            <button type="button" data-aws-action-pin="true" data-loan-export-url="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print" class="app-btn btn-neutral">
+                <span class="loan-document-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>
+                </span>
+                <spring:message code="common.export" text="Export" />
+            </button>
+            <a href="${pageContext.request.contextPath}/documents/loan-applications/${app.id}/print?signatureMode=signed" data-print-action="true" class="app-btn btn-neutral">
+                <span class="loan-document-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                </span>
+                <spring:message code="common.print" text="Print" />
+            </a>
+        </c:if>
     </div>
 </c:if>
 <div class="loan-view-hero-summary loan-staff-review-template">
