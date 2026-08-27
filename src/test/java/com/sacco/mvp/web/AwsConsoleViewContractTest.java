@@ -431,13 +431,13 @@ class AwsConsoleViewContractTest {
             .doesNotContain("Manrope")
             .doesNotContain("Sora");
         assertThat(login)
-            .contains("aws-auth.css?v=20260813-ribbonless-v7")
+            .contains("aws-auth.css?v=20260827-auth-notice-width-v1")
             .contains("href=\"#forgotPasswordModal\" class=\"auth-text-link\"")
             .contains("event.preventDefault()")
             .doesNotContain("data-forgot-password-open=\"member\">Forgot password?</button>")
             .contains("class=\"app-toast-close-icon\"");
         assertThat(registration)
-            .contains("aws-auth.css?v=20260813-ribbonless-v7")
+            .contains("aws-auth.css?v=20260827-auth-notice-width-v1")
             .contains("class=\"app-toast-close-icon\"")
             .doesNotContain("&times;");
         assertThat(authCss)
@@ -514,14 +514,14 @@ class AwsConsoleViewContractTest {
             .contains("<span>Loan Calculations</span>")
             .contains("<span>Select Guarantor</span>")
             .contains("<span>Attachments</span>")
-            .contains("<span>Submit</span>")
+            .contains("<span>Save and Submit</span>")
             .contains("data-aws-no-refresh=\"true\"")
             .contains("data-aws-no-titlebar=\"true\"")
             .contains("loan-summary-table")
             .contains("Continue to Loan Calculations")
             .contains("Continue to Select Guarantor")
             .contains("Continue to Attachments")
-            .contains("Continue to Submit")
+            .contains("Continue to Save and Submit")
             .doesNotContain("Check affordability")
             .doesNotContain("Add guarantors and documents")
             .contains("validateCurrentStep");

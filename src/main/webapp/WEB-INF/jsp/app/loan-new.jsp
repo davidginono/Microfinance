@@ -45,7 +45,7 @@
         <button type="button" data-loan-step-button="2"><span>2</span><span>Loan Calculations</span></button>
         <button type="button" data-loan-step-button="3"><span>3</span><span>Select Guarantor</span></button>
         <button type="button" data-loan-step-button="4"><span>4</span><span>Attachments</span></button>
-        <button type="button" data-loan-step-button="5"><span>5</span><span>Submit</span></button>
+        <button type="button" data-loan-step-button="5"><span>5</span><span>Save and Submit</span></button>
     </nav>
 
     <section class="loan-flow-panel" data-loan-flow-step="1" aria-labelledby="loanFlowStep1Title">
@@ -539,7 +539,7 @@
             </div>
         <div class="loan-flow-navigation">
             <button type="button" class="app-btn btn-neutral" data-loan-step-back>Back</button>
-            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Submit</button>
+            <button type="button" class="app-btn btn-primary" data-loan-step-next>Continue to Save and Submit</button>
         </div>
     </section>
 
@@ -547,7 +547,7 @@
         <div class="loan-flow-panel-heading">
             <span class="loan-flow-step-number">5</span>
             <div>
-                <h2 id="loanFlowStep5Title">Submit</h2>
+                <h2 id="loanFlowStep5Title">Save and Submit</h2>
                 <p>Review the declaration, save the draft, or submit the application.</p>
                         </div>
                             </div>
